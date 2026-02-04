@@ -2,7 +2,7 @@ using Unity.Entities;
 using Unity.Entities.Serialization;
 using UnityEngine;
 
-namespace SweepNDodge.ECS
+namespace SweepNDodge.DotsBullets
 {
     public struct PrefabReferenceComponent : IComponentData
     {

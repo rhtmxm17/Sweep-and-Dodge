@@ -1,29 +1,28 @@
 using Unity.Entities;
-using Unity.Mathematics;
 using UnityEngine;
 
-namespace SweepNDodge.ECS
+namespace SweepnDodge.DotsBullets
 {
-    // Bullet 프리팹에 붙여서 ECS 변환 시 BulletTag 등 컴포넌트 추가
     public class BulletAuthoring : MonoBehaviour
     {
-        public float Lifetime = 3f;
-        public float Radius = 0.1f;
-        public float Damage = 1f;
+        [Header("Default Bullet Data (spawn 시 덮어씌워짐)")]
+        public float Radius = 0.05f;
+        public BulletKindId Kind = BulletKindId.Trash;
 
-        public class Baker : Baker<BulletAuthoring>
+        private class BulletBaker : Baker<BulletAuthoring>
         {
             public override void Bake(BulletAuthoring authoring)
             {
-                var entity = GetEntity(TransformUsageFlags.Dynamic);
+                // Renderable 프리펩이어야 MaterialMeshInfo 등이 함께 베이크됨
+                var e = GetEntity(TransformUsageFlags.Renderable);
 
-                AddComponent<BulletTag>(entity);
-                AddComponent(entity, new LifetimeComponent { Value = authoring.Lifetime });
-                AddComponent(entity, new RadiusComponent { Value = authoring.Radius });
-                AddComponent(entity, new DamageComponent { Value = authoring.Damage });
+                AddComponent(e, new BulletVelocityComponent { Value = Unity.Mathematics.float2.zero });
+                AddComponent(e, new BulletRadiusComponent { Value = authoring.Radius });
+                AddComponent(e, new BulletKindComponent { Value = authoring.Kind });
+                AddComponent(e, new BulletLifetimeComponent { Value = 0f });
 
-                // 초기 속도는 0으로 설정(스포너에 의해 설정될 것)
-                AddComponent(entity, new Velocity2DComponent { Value = float2.zero });
+                // 풀에서 enable/disable로 운용
+                AddComponent<BulletActiveTag>(e);
             }
         }
     }
