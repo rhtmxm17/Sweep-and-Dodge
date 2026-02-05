@@ -1,7 +1,7 @@
 using Unity.Entities;
 using UnityEngine;
 
-namespace SweepnDodge.DotsBullets
+namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// Bullet 렌더 프리펩(GameObject)을 Entity Prefab으로 베이크한 참조를 저장

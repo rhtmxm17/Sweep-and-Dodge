@@ -3,7 +3,7 @@ using Unity.Entities;
 using Unity.Transforms;
 using UnityEngine;
 
-namespace SweepnDodge.DotsBullets
+namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// <br/>Player GameObject가 "표현/입력/애니"를 담당

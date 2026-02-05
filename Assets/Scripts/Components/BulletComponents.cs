@@ -1,7 +1,7 @@
 using Unity.Entities;
 using Unity.Mathematics;
 
-namespace SweepnDodge.DotsBullets
+namespace SweepNDodge.DotsBullets
 {
     public enum BulletKindId : byte
     {
@@ -32,33 +32,15 @@ namespace SweepnDodge.DotsBullets
     // Enableable Tag (활성/비활성 토글용)
     public struct BulletActiveTag : IComponentData, IEnableableComponent { }
 
+    // Render 관련 버퍼 (엔티티 활성/비활성 시 참조용)
+    public struct BulletRenderEntityBufferElement : IBufferElementData
+    {
+        public Entity Value;
+    }
+
     public struct BulletVisualPrefabComponent : IComponentData
     {
         public Entity Value; // baked entity prefab
-    }
-
-    // Player
-    public struct PlayerTag : IComponentData { }
-
-    public struct PlayerRadiusComponent : IComponentData
-    {
-        public float Value;
-    }
-
-    public struct VacuumBurstComponent : IComponentData
-    {
-        public float Range;
-        public float Strength;
-        public float CollectRadius;
-
-        public float ActiveTime;
-        public float ActiveTimer;
-
-        public float Cooldown;
-        public float CooldownTimer;
-
-        public byte IsActive;           // 0/1
-        public byte ActivateRequested;  // 0/1 (입력 시스템이 1로 세팅 → 이 시스템이 소모)
     }
 
     // Singleton Config

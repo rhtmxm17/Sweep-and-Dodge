@@ -6,20 +6,21 @@ using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
 
-namespace SweepnDodge.DotsBullets
+namespace SweepNDodge.DotsBullets
 {
     [BurstCompile]
     public partial struct BulletFieldSystem : ISystem, ISystemStartStop
     {
         private NativeParallelMultiHashMap<int, Entity> _cellMap;
         private NativeArray<Entity> _pool;
-        private int _poolNext;
+        private NativeQueue<Entity> _freeList;
+
         private float _spawnAcc;
+        private uint _spawnSequence; // Random.CreateFromIndex 기반 스폰 시퀀스
 
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
-            state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
             state.RequireForUpdate<BulletVisualPrefabComponent>();
         }
 
@@ -28,7 +29,7 @@ namespace SweepnDodge.DotsBullets
             var em = state.EntityManager;
 
             // Config + Score 싱글톤이 없으면 기본값 생성(테스트 편의)
-            if (!SystemAPI.TryGetSingleton<BulletFieldConfigComponent>(out var cfgSingleton))
+            if (!SystemAPI.TryGetSingleton<BulletFieldConfigComponent>(out _))
             {
                 var configEntity = em.CreateEntity(typeof(BulletFieldConfigComponent), typeof(ScoreComponent));
 
@@ -46,8 +47,12 @@ namespace SweepnDodge.DotsBullets
                 em.SetComponentData(configEntity, new ScoreComponent { Value = 0 });
             }
 
+            // 위에서 생성했을 수 있으므로, 여기서 확정적으로 다시 읽는다.
+            var cfgSingleton = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+
             _cellMap = new NativeParallelMultiHashMap<int, Entity>(cfgSingleton.PoolSize, Allocator.Persistent);
             _pool = new NativeArray<Entity>(cfgSingleton.PoolSize, Allocator.Persistent);
+            _freeList = new NativeQueue<Entity>(Allocator.Persistent);
 
             // Entity Prefab Instantiate로 풀 구성
             var visualPrefab = SystemAPI.GetSingleton<BulletVisualPrefabComponent>().Value;
@@ -70,13 +75,23 @@ namespace SweepnDodge.DotsBullets
                 em.SetComponentData(b, new BulletVelocityComponent { Value = float2.zero });
                 em.SetComponentData(b, new BulletLifetimeComponent { Value = 0f });
                 em.SetComponentData(b, new BulletKindComponent { Value = BulletKindId.Trash });
+
+                // Free-list에 반납(초기에는 전부 비활성)
+                _freeList.Enqueue(b);
             }
+
+            _spawnAcc = 0f;
+            _spawnSequence = 1;
         }
 
         public void OnStopRunning(ref SystemState state)
         {
+            // 스케줄된 잡이 남아있을 수 있으므로 Dispose 전 완료
+            state.Dependency.Complete();
+
             if (_cellMap.IsCreated) _cellMap.Dispose();
             if (_pool.IsCreated) _pool.Dispose();
+            if (_freeList.IsCreated) _freeList.Dispose();
         }
 
         [BurstCompile]
@@ -86,26 +101,74 @@ namespace SweepnDodge.DotsBullets
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
 
-            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
-            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+            // 임시 조치: BulletMoveJob에서 LocalTransform 타입을 사용하기 전에 캐시해둠
+            // TODO: 탄환 제거 행동의 System 분리시 필요없어짐
+            var playerTx = SystemAPI.GetComponent<LocalTransform>(playerEntity);
+            var playerPos = playerTx.Position;
 
-            // 1) Spawn
-            Spawn(ref state, cfg, dt);
+            // 0) 이번 프레임 스폰 개수 산출(메인)
+            _spawnAcc += cfg.SpawnRate * dt;
+            int spawnCount = (int)_spawnAcc;
+            _spawnAcc -= spawnCount;
+            uint spawnSeqStart = _spawnSequence;
+            _spawnSequence += (uint)math.max(0, spawnCount);
 
-            // 2) Move + Lifetime (활성 탄만)
-            state.Dependency = new BulletMoveJob
+            // 1) Spawn (Job: free-list pop + 데이터 세팅 + enable)
+            var txLookupSpawn = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: false);
+            var velLookupSpawn = SystemAPI.GetComponentLookup<BulletVelocityComponent>(isReadOnly: false);
+            var lifeLookupSpawn = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(isReadOnly: false);
+            var kindLookupSpawn = SystemAPI.GetComponentLookup<BulletKindComponent>(isReadOnly: false);
+            var activeLookupSpawn = SystemAPI.GetComponentLookup<BulletActiveTag>(isReadOnly: false);
+            var renderLookupSpawn = SystemAPI.GetComponentLookup<MaterialMeshInfo>(isReadOnly: false);
+
+            txLookupSpawn.Update(ref state);
+            velLookupSpawn.Update(ref state);
+            lifeLookupSpawn.Update(ref state);
+            kindLookupSpawn.Update(ref state);
+            activeLookupSpawn.Update(ref state);
+            renderLookupSpawn.Update(ref state);
+
+            var spawnHandle = new SpawnFromFreeListJob
+            {
+                SpawnCount = spawnCount,
+                SpawnSeed = spawnSeqStart,
+
+                PosMin = -20f,
+                PosMax = 20f,
+                Speed = 6.5f,
+                Lifetime = cfg.BulletLifetime,
+                Kind = BulletKindId.Trash,
+
+                FreeList = _freeList,
+
+                TxLookup = txLookupSpawn,
+                VelLookup = velLookupSpawn,
+                LifeLookup = lifeLookupSpawn,
+                KindLookup = kindLookupSpawn,
+                ActiveLookup = activeLookupSpawn,
+                RenderLookup = renderLookupSpawn,
+            }.Schedule(state.Dependency);
+
+            // 2) Move + Lifetime (활성 탄만) + 디스폰 시 free-list 반납
+            var moveHandle = new BulletMoveJob
             {
                 DeltaTime = dt,
-                ECB = ecb.AsParallelWriter()
-            }.ScheduleParallel(state.Dependency);
+                FreeList = _freeList.AsParallelWriter()
+            }.ScheduleParallel(spawnHandle);
 
             // 3) SpatialHash Build (활성 탄만)
-            _cellMap.Clear();
-            state.Dependency = new BuildSpatialHashJob
+            // - 메인 스레드에서 _cellMap.Clear()를 호출하면 이전 프레임 잡과 경쟁할 수 있으므로, Clear도 Job으로 처리
+            var clearHandle = new ClearCellMapJob
+            {
+                CellMap = _cellMap
+            }.Schedule(spawnHandle);
+
+            var buildDeps = JobHandle.CombineDependencies(moveHandle, clearHandle);
+            var buildHandle = new BuildSpatialHashJob
             {
                 InvCellSize = cfg.InvCellSize,
                 Writer = _cellMap.AsParallelWriter()
-            }.ScheduleParallel(state.Dependency);
+            }.ScheduleParallel(buildDeps);
 
             // 4) Vacuum 상태 갱신(플레이어 단일임. 메인에서 진행)
             var vacuumRW = SystemAPI.GetComponentRW<VacuumBurstComponent>(playerEntity);
@@ -114,21 +177,25 @@ namespace SweepnDodge.DotsBullets
             // 5) Vacuum 적용
             if (vacuumRW.ValueRO.IsActive != 0)
             {
-                var playerTx = SystemAPI.GetComponent<LocalTransform>(playerEntity);
-                var playerPos = playerTx.Position;
 
                 var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: false);
                 var velLookup = SystemAPI.GetComponentLookup<BulletVelocityComponent>(isReadOnly: false);
                 var kindLookup = SystemAPI.GetComponentLookup<BulletKindComponent>(isReadOnly: true);
+                var activeLookup = SystemAPI.GetComponentLookup<BulletActiveTag>(isReadOnly: false);
+                var renderLookup = SystemAPI.GetComponentLookup<MaterialMeshInfo>(isReadOnly: false);
+
+                var scoreEntity = SystemAPI.GetSingletonEntity<BulletFieldConfigComponent>();
+                var scoreLookup = SystemAPI.GetComponentLookup<ScoreComponent>(isReadOnly: false);
 
                 txLookup.Update(ref state);
                 velLookup.Update(ref state);
                 kindLookup.Update(ref state);
 
-                var collectedRef = new NativeReference<long>(Allocator.TempJob);
-                collectedRef.Value = 0;
+                activeLookup.Update(ref state);
+                renderLookup.Update(ref state);
+                scoreLookup.Update(ref state);
 
-                state.Dependency = new VacuumJob
+                var vacuumHandle = new VacuumJob
                 {
                     DeltaTime = dt,
 
@@ -144,76 +211,20 @@ namespace SweepnDodge.DotsBullets
                     VelLookup = velLookup,
                     KindLookup = kindLookup,
 
-                    ECB = ecb,
-                    Collected = collectedRef
-                }.Schedule(state.Dependency);
+                    ActiveLookup = activeLookup,
+                    RenderLookup = renderLookup,
+                    FreeList = _freeList,
 
-                // Score 반영
-                var configEntity = SystemAPI.GetSingletonEntity<BulletFieldConfigComponent>();
-                var scoreLookup = SystemAPI.GetComponentLookup<ScoreComponent>(isReadOnly: false);
-                scoreLookup.Update(ref state);
-
-                state.Dependency = new ApplyCollectedToScoreJob
-                {
-                    ScoreEntity = configEntity,
+                    ScoreEntity = scoreEntity,
                     ScoreLookup = scoreLookup,
-                    Collected = collectedRef
-                }.Schedule(state.Dependency);
+                }.Schedule(buildHandle);
 
-                state.Dependency = collectedRef.Dispose(state.Dependency);
-            }
-        }
-
-        private void Spawn(ref SystemState state, BulletFieldConfigComponent cfg, float dt)
-        {
-            _spawnAcc += cfg.SpawnRate * dt;
-            int spawnCount = (int)_spawnAcc;
-            _spawnAcc -= spawnCount;
-
-            var em = state.EntityManager;
-
-            for (int i = 0; i < spawnCount; i++)
-            {
-                if (!TryGetInactiveBullet(em, out var bullet))
-                    break;
-
-                // MVP 스폰: 임의 위치/속도 (패턴 시스템으로 교체 예정)
-                float angle = (float)((_poolNext * 0.6180339887) % 1.0) * math.PI * 2f;
-                float speed = 6.5f;
-
-                var pos = new float3(math.cos(angle) * 18f, 0f, math.sin(angle) * 18f);
-
-                em.SetComponentData(bullet, LocalTransform.FromPositionRotationScale(pos, quaternion.identity, 1f));
-                em.SetComponentData(bullet, new BulletVelocityComponent
-                {
-                    Value = new float2(-math.cos(angle), -math.sin(angle)) * speed
-                });
-                em.SetComponentData(bullet, new BulletLifetimeComponent { Value = cfg.BulletLifetime });
-                em.SetComponentData(bullet, new BulletKindComponent { Value = BulletKindId.Trash });
-
-                // 시뮬레이션/렌더 on
-                em.SetComponentEnabled<BulletActiveTag>(bullet, true);
-                em.SetComponentEnabled<MaterialMeshInfo>(bullet, true);
-            }
-        }
-
-        private bool TryGetInactiveBullet(EntityManager em, out Entity bullet)
-        {
-            int tries = 0;
-            while (tries++ < _pool.Length)
-            {
-                var e = _pool[_poolNext];
-                _poolNext = (_poolNext + 1) % _pool.Length;
-
-                if (!em.IsComponentEnabled<BulletActiveTag>(e))
-                {
-                    bullet = e;
-                    return true;
-                }
+                state.Dependency = vacuumHandle;
+                return;
             }
 
-            bullet = Entity.Null;
-            return false;
+            // Vacuum 비활성인 프레임
+            state.Dependency = buildHandle;
         }
 
         private static void UpdateVacuumState(ref VacuumBurstComponent v, float dt)
@@ -245,29 +256,96 @@ namespace SweepnDodge.DotsBullets
             }
         }
 
-
         // ---------------- Jobs ----------------
+
+        [BurstCompile]
+        public struct SpawnFromFreeListJob : IJob
+        {
+            public int SpawnCount;
+            public uint SpawnSeed;
+
+            public float PosMin;
+            public float PosMax;
+            public float Speed;
+            public float Lifetime;
+            public BulletKindId Kind;
+
+            // NOTE: NativeQueue는 단일 소비자(pop)에 안전. 이 Job은 단일(IJob)로만 사용.
+            public NativeQueue<Entity> FreeList;
+
+            public ComponentLookup<LocalTransform> TxLookup;
+            public ComponentLookup<BulletVelocityComponent> VelLookup;
+            public ComponentLookup<BulletLifetimeComponent> LifeLookup;
+            public ComponentLookup<BulletKindComponent> KindLookup;
+            public ComponentLookup<BulletActiveTag> ActiveLookup;
+            public ComponentLookup<MaterialMeshInfo> RenderLookup;
+
+            public void Execute()
+            {
+                if (SpawnCount <= 0)
+                    return;
+
+                // 프레임별로 다른 시퀀스를 갖도록 CreateFromIndex를 사용
+                var rand = Random.CreateFromIndex(math.max(1u, SpawnSeed));
+
+                for (int i = 0; i < SpawnCount; i++)
+                {
+                    if (!FreeList.TryDequeue(out var bullet))
+                        break;
+
+                    float3 pos = new float3(
+                        rand.NextFloat(PosMin, PosMax),
+                        0f,
+                        rand.NextFloat(PosMin, PosMax));
+
+                    float angle = rand.NextFloat(0f, math.PI * 2f);
+                    float2 dir = new float2(math.cos(angle), math.sin(angle));
+                    var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
+
+                    TxLookup[bullet] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
+                    VelLookup[bullet] = new BulletVelocityComponent { Value = dir * Speed };
+                    LifeLookup[bullet] = new BulletLifetimeComponent { Value = Lifetime };
+                    KindLookup[bullet] = new BulletKindComponent { Value = Kind };
+
+                    ActiveLookup.SetComponentEnabled(bullet, true);
+                    RenderLookup.SetComponentEnabled(bullet, true);
+                }
+            }
+        }
+
+        [BurstCompile]
+        public struct ClearCellMapJob : IJob
+        {
+            public NativeParallelMultiHashMap<int, Entity> CellMap;
+
+            public void Execute()
+            {
+                CellMap.Clear();
+            }
+        }
 
         [BurstCompile]
         public partial struct BulletMoveJob : IJobEntity
         {
             public float DeltaTime;
-            public EntityCommandBuffer.ParallelWriter ECB;
+            public NativeQueue<Entity>.ParallelWriter FreeList;
 
-            private void Execute([EntityIndexInQuery] int sortKey, Entity e,
+            private void Execute(Entity e,
                 ref LocalTransform tx,
                 ref BulletLifetimeComponent life,
                 in BulletVelocityComponent vel,
-                in BulletActiveTag _)
+                EnabledRefRW<BulletActiveTag> active,
+                EnabledRefRW<MaterialMeshInfo> render)
             {
                 tx.Position += new float3(vel.Value.x, 0f, vel.Value.y) * DeltaTime;
 
                 life.Value -= DeltaTime;
                 if (life.Value <= 0f)
                 {
-                    // 시뮬레이션 off + 렌더 off
-                    ECB.SetComponentEnabled<BulletActiveTag>(sortKey, e, false);
-                    ECB.SetComponentEnabled<MaterialMeshInfo>(sortKey, e, false);
+                    // 디스폰: 시뮬레이션 off + 렌더 off + free-list 반납
+                    active.ValueRW = false;
+                    render.ValueRW = false;
+                    FreeList.Enqueue(e);
                 }
             }
         }
@@ -302,8 +380,13 @@ namespace SweepnDodge.DotsBullets
             public ComponentLookup<BulletVelocityComponent> VelLookup;
             [ReadOnly] public ComponentLookup<BulletKindComponent> KindLookup;
 
-            public EntityCommandBuffer ECB;
-            public NativeReference<long> Collected;
+            public ComponentLookup<BulletActiveTag> ActiveLookup;
+            public ComponentLookup<MaterialMeshInfo> RenderLookup;
+
+            public NativeQueue<Entity> FreeList;
+
+            public Entity ScoreEntity;
+            public ComponentLookup<ScoreComponent> ScoreLookup;
 
             public void Execute()
             {
@@ -342,9 +425,10 @@ namespace SweepnDodge.DotsBullets
 
                             if (distSq <= collectSq)
                             {
-                                // 수거: 시뮬레이션 off + 렌더 off
-                                ECB.SetComponentEnabled<BulletActiveTag>(bullet, false);
-                                ECB.SetComponentEnabled<MaterialMeshInfo>(bullet, false);
+                                // 수거: 시뮬레이션 off + 렌더 off + free-list 반납
+                                ActiveLookup.SetComponentEnabled(bullet, false);
+                                RenderLookup.SetComponentEnabled(bullet, false);
+                                FreeList.Enqueue(bullet);
                                 collected++;
                                 continue;
                             }
@@ -359,25 +443,12 @@ namespace SweepnDodge.DotsBullets
                         } while (CellMap.TryGetNextValue(out bullet, ref it));
                     }
 
-                Collected.Value += collected;
-            }
-        }
-
-        [BurstCompile]
-        public struct ApplyCollectedToScoreJob : IJob
-        {
-            public Entity ScoreEntity;
-            public ComponentLookup<ScoreComponent> ScoreLookup;
-            [ReadOnly] public NativeReference<long> Collected;
-
-            public void Execute()
-            {
-                long add = Collected.Value;
-                if (add <= 0) return;
-
-                var score = ScoreLookup[ScoreEntity];
-                score.Value += add;
-                ScoreLookup[ScoreEntity] = score;
+                if (collected > 0)
+                {
+                    var score = ScoreLookup[ScoreEntity];
+                    score.Value += collected;
+                    ScoreLookup[ScoreEntity] = score;
+                }
             }
         }
     }

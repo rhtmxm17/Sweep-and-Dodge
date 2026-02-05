@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 
-namespace SweepnDodge.DotsBullets
+namespace SweepNDodge.DotsBullets
 {
     // Grid 기반 공간 해시 유틸리티
     public static class SpatialHashUtility

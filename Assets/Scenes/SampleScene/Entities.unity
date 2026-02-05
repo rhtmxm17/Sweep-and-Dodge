@@ -196,7 +196,7 @@ MonoBehaviour:
   PlayerRadius: 0.35
   Range: 3.2
   Strength: 75
-  CollectRadius: 0.35
+  CollectRadius: 3
   ActiveTime: 0.22
   Cooldown: 1.8
 --- !u!4 &1191526536
@@ -242,7 +242,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bc5b79cc033d3af459338dea93bdc522, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SweepnDodge.DotsBullets.BulletFieldConfigAuthoring
+  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.BulletFieldConfigAuthoring
   PoolSize: 120000
   MaxActiveTarget: 100000
   CellSize: 1.6
