@@ -26,6 +26,11 @@ namespace SweepNDodge.DotsBullets
 
                 // 풀에서 enable/disable로 운용
                 AddComponent<BulletActiveTag>(root);
+                SetComponentEnabled<BulletActiveTag>(root, false);
+
+                // 제거 요청 태그 (항상 존재, 기본 disabled)
+                AddComponent<BulletDespawnRequestTag>(root);
+                SetComponentEnabled<BulletDespawnRequestTag>(root, false);
 
                 // ------ 이 이후는 아직 실제로 사용되지 않음 ------
                 // (Bullet 활성/비활성 사이클 조정 후 사용 예정)
