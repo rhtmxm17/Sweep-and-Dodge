@@ -1,3 +1,15 @@
+// Bullet의 생성, 이동, 수명 관리, 제거를 담당하는 ECS 시스템
+// - 업데이트 그룹 파이프라인 구성
+//   BulletExecutionBeginGroup  : 풀 Dequeue(스폰 실행)
+//   BulletSimulationGroup      : Move/Lifetime + SpatialHash(Build) 단일 소유(Write)
+//   BulletRequestGroup         : 제거 행동(예: 탄환 흡입)
+//                                - 외부에서 정의될 요청 시스템의 위치
+//                                - SpatialHash ReadOnly 조회로 디스폰 요청 태그 enable
+//   BulletExecutionEndGroup    : 디스폰 실행 + 풀 Enqueue(반납 실행)
+// - FreeList(풀) 접근은 Begin/End "Owner 영역"으로만 제한(다른 시스템은 요청만 남김)
+// - SpatialHash(CellMap) writer는 Simulation으로 고정, Request는 ReadOnly 소비
+// - 메인 스레드에서 LocalTransform 직접 읽기 금지(타입 충돌 방지): Request는 Job 스케줄로 처리
+
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -8,25 +20,13 @@ using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets
 {
-    /*
-     * - 파이프라인 구성
-     *   BulletExecutionBeginGroup  : 풀 Dequeue(스폰 실행)
-     *   BulletSimulationGroup      : Move/Lifetime + SpatialHash 소유(Build + Write)
-     *   BulletRequestGroup         : Vacuum/Bomb/... 등 디스폰 요청 생성 전용 (SpatialHash ReadOnly)
-     *   BulletExecutionGroup       : 요청/만료 기반 디스폰 실행(비활성 + 풀 반납)
-     *   
-     * - LocalTransform 타입 충돌 방지: 메인 스레드에서 LocalTransform을 직접 읽지 않고 Job으로 스케줄
-     * 
-     */
+    // ----------------------------------------------------------------------
+    // Pipeline Groups
+    // ----------------------------------------------------------------------
 
-    // ---------------------------------------------------------------------
-    // 파이프라인 그룹
-    // ---------------------------------------------------------------------
+    // 탄막 필드 파이프라인 그룹들.
+    // - 별도의 루트 그룹을 두지 않고, SimulationSystemGroup에서 순서를 강제한다.
 
-    /// <summary>
-    /// 탄막 필드 파이프라인 그룹들.
-    /// - 별도의 루트 그룹을 두지 않고, SimulationSystemGroup에서 순서를 강제한다.
-    /// </summary>
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateBefore(typeof(BulletSimulationGroup))]
     public partial class BulletExecutionBeginGroup : ComponentSystemGroup { }
@@ -34,58 +34,77 @@ namespace SweepNDodge.DotsBullets
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     public partial class BulletSimulationGroup : ComponentSystemGroup { }
 
+    /// <summary>
+    /// Bullet에 대한 외부 요청 시스템들이 위치할 그룹
+    /// </summary>
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(BulletSimulationGroup))]
     public partial class BulletRequestGroup : ComponentSystemGroup { }
 
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(BulletRequestGroup))]
-    public partial class BulletExecutionGroup : ComponentSystemGroup { }
+    public partial class BulletExecutionEndGroup : ComponentSystemGroup { }
 
-    // ---------------------------------------------------------------------
-    // Shared
-    // ---------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+    // Shared (Pool + SpatialHash)
+    // ----------------------------------------------------------------------
 
-    internal static class BulletPoolShared
+    /// <summary>
+    /// Burst/Job에서 사용 가능한 정적 공유 저장소.
+    /// - FreeList(풀): Begin/End Owner 영역에서만 접근
+    /// - CellMap(SpatialHash): Simulation이 Write, Request가 ReadOnly
+    ///
+    /// 주의: SharedStatic은 프로세스 전역이므로, 멀티 월드 사용 시 관리 전략이 추가로 필요할 수 있다.
+    /// (현재 스코프에서는 단일 월드 전제로 사용)
+    /// </summary>
+    public static class BulletFieldShared
     {
-        public static NativeQueue<Entity> FreeList;
-        public static NativeArray<Entity> Pool;
+        private struct FlagsKey { }
+        private struct FreeListKey { }
+        private struct FreeListFenceKey { }
+        private struct CellMapKey { }
+        private struct CellMapFenceKey { }
 
-        // NativeQueue는 Entities dependency tracking 밖의 컨테이너이므로,
-        // 시스템 간 동시 접근(Dequeue/Enqueue)을 방지하기 위한 수동 시퀀싱 핸들.
-        public static JobHandle FreeListAccessHandle;
+        private static readonly SharedStatic<byte> _flags = SharedStatic<byte>.GetOrCreate<FlagsKey>();
+        private static readonly SharedStatic<NativeQueue<Entity>> _freeList = SharedStatic<NativeQueue<Entity>>.GetOrCreate<FreeListKey>();
+        private static readonly SharedStatic<JobHandle> _freeListFence = SharedStatic<JobHandle>.GetOrCreate<FreeListFenceKey>();
+        private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _cellMap = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<CellMapKey>();
+        private static readonly SharedStatic<JobHandle> _cellMapFence = SharedStatic<JobHandle>.GetOrCreate<CellMapFenceKey>();
 
-        public static bool IsCreated;
+        public static bool IsInitialized => _flags.Data != 0;
 
-        public static void Dispose()
-        {
-            FreeListAccessHandle.Complete();
+        public static ref NativeQueue<Entity> FreeList => ref _freeList.Data;
+        public static ref JobHandle FreeListFence => ref _freeListFence.Data;
 
-            if (FreeList.IsCreated) FreeList.Dispose();
-            if (Pool.IsCreated) Pool.Dispose();
+        public static ref NativeParallelMultiHashMap<int, Entity> CellMap => ref _cellMap.Data;
+        public static ref JobHandle CellMapFence => ref _cellMapFence.Data;
 
-            IsCreated = false;
-            FreeListAccessHandle = default;
-        }
+        public static void MarkInitialized() => _flags.Data = 1;
+        public static void MarkUninitialized() => _flags.Data = 0;
     }
 
-    // ---------------------------------------------------------------------
-    // Bootstrap: 풀 생성 + 초기화
-    // ---------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+    // Pool Owner: Bootstrap
+    // ----------------------------------------------------------------------
 
+    /// <summary>
+    /// 풀/SpatialHash 컨테이너 초기화 및 해제.
+    /// - FreeList, CellMap을 Persistent로 생성
+    /// - BulletVisualPrefabComponent 기반으로 PoolSize 만큼 Instantiate 후 FreeList에 전부 반납
+    /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(BulletSimulationGroup))]
-    public partial struct BulletPoolBootstrapSystem : ISystem, ISystemStartStop
+    [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
+    public partial struct BulletPoolOwnerBootstrapSystem : ISystem, ISystemStartStop
     {
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<BulletVisualPrefabComponent>();
+            state.RequireForUpdate<PlayerTag>();
         }
 
         public void OnStartRunning(ref SystemState state)
         {
-            if (BulletPoolShared.IsCreated)
+            if (BulletFieldShared.IsInitialized)
                 return;
 
             var em = state.EntityManager;
@@ -110,107 +129,136 @@ namespace SweepNDodge.DotsBullets
             }
 
             var cfgSingleton = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+            int poolSize = math.max(0, cfgSingleton.PoolSize);
 
-            BulletPoolShared.FreeList = new NativeQueue<Entity>(Allocator.Persistent);
-            BulletPoolShared.Pool = new NativeArray<Entity>(cfgSingleton.PoolSize, Allocator.Persistent);
+            BulletFieldShared.FreeList = new NativeQueue<Entity>(Allocator.Persistent);
+            BulletFieldShared.FreeListFence = default;
+
+            BulletFieldShared.CellMap = new NativeParallelMultiHashMap<int, Entity>(poolSize, Allocator.Persistent);
+            BulletFieldShared.CellMapFence = default;
 
             // Entity Prefab Instantiate로 풀 구성
             var visualPrefab = SystemAPI.GetSingleton<BulletVisualPrefabComponent>().Value;
-            em.Instantiate(visualPrefab, BulletPoolShared.Pool);
+            using var pool = new NativeArray<Entity>(poolSize, Allocator.Temp);
+            em.Instantiate(visualPrefab, pool);
 
-            // 풀 초기화(비활성 + 기본값 세팅)
-            for (int i = 0; i < BulletPoolShared.Pool.Length; i++)
+            // 풀 초기화(비활성 + 기본값 세팅) + FreeList 반납
+            for (int i = 0; i < pool.Length; i++)
             {
-                var b = BulletPoolShared.Pool[i];
+                var b = pool[i];
 
                 // 시뮬레이션 off
                 if (em.HasComponent<BulletActiveTag>(b))
                     em.SetComponentEnabled<BulletActiveTag>(b, false);
 
-                // 렌더 off
-                if (em.HasComponent<MaterialMeshInfo>(b))
-                    em.SetComponentEnabled<MaterialMeshInfo>(b, false);
-
-                // 디스폰 요청 off
+                // 요청 off
                 if (em.HasComponent<BulletDespawnRequestTag>(b))
                     em.SetComponentEnabled<BulletDespawnRequestTag>(b, false);
 
-                // 기본 데이터
-                em.SetComponentData(b, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
-                em.SetComponentData(b, new BulletVelocityComponent { Value = float2.zero });
-                em.SetComponentData(b, new BulletLifetimeComponent { Value = 0f });
-                em.SetComponentData(b, new BulletKindComponent { Value = BulletKindId.Trash });
+                // 렌더 off (프리펩이 Renderable로 베이크되면 MaterialMeshInfo가 존재)
+                if (em.HasComponent<MaterialMeshInfo>(b))
+                    em.SetComponentEnabled<MaterialMeshInfo>(b, false);
 
-                BulletPoolShared.FreeList.Enqueue(b);
+                // 기본 데이터
+                if (em.HasComponent<LocalTransform>(b))
+                    em.SetComponentData(b, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
+                if (em.HasComponent<BulletVelocityComponent>(b))
+                    em.SetComponentData(b, new BulletVelocityComponent { Value = float2.zero });
+                if (em.HasComponent<BulletLifetimeComponent>(b))
+                    em.SetComponentData(b, new BulletLifetimeComponent { Value = 0f });
+                if (em.HasComponent<BulletKindComponent>(b))
+                    em.SetComponentData(b, new BulletKindComponent { Value = BulletKindId.Trash });
+
+                BulletFieldShared.FreeList.Enqueue(b);
             }
 
-            BulletPoolShared.FreeListAccessHandle = default;
-            BulletPoolShared.IsCreated = true;
+            BulletFieldShared.MarkInitialized();
         }
 
         public void OnStopRunning(ref SystemState state)
         {
-            // 시스템/잡 종료 전 안전하게 정리
-            state.Dependency.Complete();
-            BulletPoolShared.Dispose();
+            // SharedStatic 컨테이너 접근을 안전하게 마무리
+            JobHandle.CombineDependencies(BulletFieldShared.FreeListFence, BulletFieldShared.CellMapFence).Complete();
+
+            if (BulletFieldShared.CellMap.IsCreated)
+                BulletFieldShared.CellMap.Dispose();
+            if (BulletFieldShared.FreeList.IsCreated)
+                BulletFieldShared.FreeList.Dispose();
+
+            BulletFieldShared.FreeListFence = default;
+            BulletFieldShared.CellMapFence = default;
+            BulletFieldShared.MarkUninitialized();
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Simulation: 스폰 + 이동 + 수명관리
-    // ---------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+    // Pool Owner: Spawn (Begin)
+    // ----------------------------------------------------------------------
 
+    /// <summary>
+    /// 동프레임 반영을 위한 스폰 실행 단계.
+    /// - FreeList.TryDequeue()로 스폰 엔티티 확보
+    /// - 데이터 세팅 + BulletActiveTag/MaterialMeshInfo enable
+    /// - BulletDespawnRequestTag reset(disable)
+    /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(BulletSimulationGroup))]
-    [UpdateAfter(typeof(BulletPoolBootstrapSystem))]
-    public partial struct BulletSimulationSystem : ISystem
+    [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
+    [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
+    public partial struct BulletSpawnFromPoolSystem : ISystem
     {
         private float _spawnAcc;
         private uint _spawnSequence;
 
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<BulletFieldConfigComponent>();
+            state.RequireForUpdate<PlayerTag>();
+            _spawnAcc = 0f;
+            _spawnSequence = 1;
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var dt = SystemAPI.Time.DeltaTime;
-            var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+            if (!BulletFieldShared.IsInitialized)
+                return;
 
-            // 이번 프레임 스폰 개수 산출(메인)
+            var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+            float dt = SystemAPI.Time.DeltaTime;
+
             _spawnAcc += cfg.SpawnRate * dt;
             int spawnCount = (int)_spawnAcc;
             _spawnAcc -= spawnCount;
 
-            uint spawnSeqStart = _spawnSequence;
-            _spawnSequence += (uint)math.max(0, spawnCount);
+            if (spawnCount <= 0)
+                return;
 
-            // Spawn: NativeQueue 접근은 수동 핸들로 시퀀싱
-            var deps = JobHandle.CombineDependencies(state.Dependency, BulletPoolShared.FreeListAccessHandle);
+            uint spawnSeed = _spawnSequence;
+            _spawnSequence += (uint)spawnCount;
 
-            var txLookupSpawn = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: false);
-            var velLookupSpawn = SystemAPI.GetComponentLookup<BulletVelocityComponent>(isReadOnly: false);
-            var lifeLookupSpawn = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(isReadOnly: false);
-            var kindLookupSpawn = SystemAPI.GetComponentLookup<BulletKindComponent>(isReadOnly: false);
-            var activeLookupSpawn = SystemAPI.GetComponentLookup<BulletActiveTag>(isReadOnly: false);
-            var renderLookupSpawn = SystemAPI.GetComponentLookup<MaterialMeshInfo>(isReadOnly: false);
-            var requestLookupSpawn = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
+            var tx = SystemAPI.GetComponentLookup<LocalTransform>(false);
+            var vel = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
+            var life = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
+            var kind = SystemAPI.GetComponentLookup<BulletKindComponent>(false);
+            var active = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
+            var request = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
+            var render = SystemAPI.GetComponentLookup<MaterialMeshInfo>(false);
 
-            txLookupSpawn.Update(ref state);
-            velLookupSpawn.Update(ref state);
-            lifeLookupSpawn.Update(ref state);
-            kindLookupSpawn.Update(ref state);
-            activeLookupSpawn.Update(ref state);
-            renderLookupSpawn.Update(ref state);
-            requestLookupSpawn.Update(ref state);
+            tx.Update(ref state);
+            vel.Update(ref state);
+            life.Update(ref state);
+            kind.Update(ref state);
+            active.Update(ref state);
+            request.Update(ref state);
+            render.Update(ref state);
 
-            var spawnHandle = new SpawnFromFreeListJob
+            // FreeList는 ECS 의존성 추적 밖이므로, 전용 fence로 접근 순서를 강제
+            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.FreeListFence);
+
+            var job = new SpawnFromPoolJob
             {
                 SpawnCount = spawnCount,
-                SpawnSeed = spawnSeqStart,
+                SpawnSeed = spawnSeed,
 
                 PosMin = -20f,
                 PosMax = 20f,
@@ -218,32 +266,23 @@ namespace SweepNDodge.DotsBullets
                 Lifetime = cfg.BulletLifetime,
                 Kind = BulletKindId.Trash,
 
-                FreeList = BulletPoolShared.FreeList,
+                FreeList = BulletFieldShared.FreeList,
 
-                TxLookup = txLookupSpawn,
-                VelLookup = velLookupSpawn,
-                LifeLookup = lifeLookupSpawn,
-                KindLookup = kindLookupSpawn,
-                ActiveLookup = activeLookupSpawn,
-                RenderLookup = renderLookupSpawn,
-                RequestLookup = requestLookupSpawn,
-            }.Schedule(deps);
+                TxLookup = tx,
+                VelLookup = vel,
+                LifeLookup = life,
+                KindLookup = kind,
+                ActiveLookup = active,
+                RequestLookup = request,
+                RenderLookup = render,
+            };
 
-            BulletPoolShared.FreeListAccessHandle = spawnHandle;
-
-            // Move + Lifetime 감소 + 만료 시 디스폰 태그 활성화(실제 디스폰은 Execution 단계)
-            var moveHandle = new BulletMoveAndExpireRequestJob
-            {
-                DeltaTime = dt
-            }.ScheduleParallel(spawnHandle);
-
-            state.Dependency = moveHandle;
+            state.Dependency = job.Schedule(deps);
+            BulletFieldShared.FreeListFence = state.Dependency;
         }
 
-        // ---------------- Jobs ----------------
-
         [BurstCompile]
-        private struct SpawnFromFreeListJob : IJob
+        private struct SpawnFromPoolJob : IJob
         {
             public int SpawnCount;
             public uint SpawnSeed;
@@ -254,7 +293,6 @@ namespace SweepNDodge.DotsBullets
             public float Lifetime;
             public BulletKindId Kind;
 
-            // 단일 소비자(Dequeue) Job
             public NativeQueue<Entity> FreeList;
 
             public ComponentLookup<LocalTransform> TxLookup;
@@ -262,50 +300,100 @@ namespace SweepNDodge.DotsBullets
             public ComponentLookup<BulletLifetimeComponent> LifeLookup;
             public ComponentLookup<BulletKindComponent> KindLookup;
             public ComponentLookup<BulletActiveTag> ActiveLookup;
-            public ComponentLookup<MaterialMeshInfo> RenderLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
+            public ComponentLookup<MaterialMeshInfo> RenderLookup;
 
             public void Execute()
             {
-                if (SpawnCount <= 0)
-                    return;
-
-                var rand = Random.CreateFromIndex(math.max(1u, SpawnSeed));
+                var random = Unity.Mathematics.Random.CreateFromIndex(math.max(1u, SpawnSeed));
 
                 for (int i = 0; i < SpawnCount; i++)
                 {
-                    if (!FreeList.TryDequeue(out var bullet))
+                    if (!FreeList.TryDequeue(out var e))
                         break;
 
                     float3 pos = new float3(
-                        rand.NextFloat(PosMin, PosMax),
+                        random.NextFloat(PosMin, PosMax),
                         0f,
-                        rand.NextFloat(PosMin, PosMax));
+                        random.NextFloat(PosMin, PosMax));
 
-                    float angle = rand.NextFloat(0f, math.PI * 2f);
+                    float angle = random.NextFloat(0f, math.PI * 2f);
                     float2 dir = new float2(math.cos(angle), math.sin(angle));
                     var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
 
-                    TxLookup[bullet] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
-                    VelLookup[bullet] = new BulletVelocityComponent { Value = dir * Speed };
-                    LifeLookup[bullet] = new BulletLifetimeComponent { Value = Lifetime };
-                    KindLookup[bullet] = new BulletKindComponent { Value = Kind };
+                    if (TxLookup.HasComponent(e))
+                        TxLookup[e] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
+                    if (VelLookup.HasComponent(e))
+                        VelLookup[e] = new BulletVelocityComponent { Value = dir * Speed };
+                    if (LifeLookup.HasComponent(e))
+                        LifeLookup[e] = new BulletLifetimeComponent { Value = Lifetime };
+                    if (KindLookup.HasComponent(e))
+                        KindLookup[e] = new BulletKindComponent { Value = Kind };
 
-                    // 요청 리셋(재스폰 즉시 제거 버그 방지)
-                    if (RequestLookup.HasComponent(bullet))
-                        RequestLookup.SetComponentEnabled(bullet, false);
+                    if (RequestLookup.HasComponent(e))
+                        RequestLookup.SetComponentEnabled(e, false);
 
-                    if (ActiveLookup.HasComponent(bullet))
-                        ActiveLookup.SetComponentEnabled(bullet, true);
-
-                    if (RenderLookup.HasComponent(bullet))
-                        RenderLookup.SetComponentEnabled(bullet, true);
+                    if (ActiveLookup.HasComponent(e))
+                        ActiveLookup.SetComponentEnabled(e, true);
+                    if (RenderLookup.HasComponent(e))
+                        RenderLookup.SetComponentEnabled(e, true);
                 }
             }
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // Simulation: Move/Lifetime + SpatialHash Build (Owner)
+    // ----------------------------------------------------------------------
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletSimulationGroup))]
+    public partial struct BulletSimulationSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<BulletFieldConfigComponent>();
+            state.RequireForUpdate<PlayerTag>();
+        }
 
         [BurstCompile]
-        private partial struct BulletMoveAndExpireRequestJob : IJobEntity
+        public void OnUpdate(ref SystemState state)
+        {
+            if (!BulletFieldShared.IsInitialized)
+                return;
+
+            float dt = SystemAPI.Time.DeltaTime;
+            var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+
+            // 1) Move + Lifetime (활성 탄만). 만료 시 디스폰 요청 태그 enable
+            state.Dependency = new BulletMoveAndLifetimeJob
+            {
+                DeltaTime = dt
+            }.ScheduleParallel(state.Dependency);
+
+            // 2) SpatialHash Build (활성 탄만)
+            // - CellMap은 SharedStatic이므로 이전 프레임/요청 시스템의 read가 끝난 뒤 Clear/Build해야 한다.
+            var cellMapDeps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.CellMapFence);
+
+            var clearHandle = new ClearCellMapJob
+            {
+                CellMap = BulletFieldShared.CellMap
+            }.Schedule(cellMapDeps);
+
+            var buildDeps = JobHandle.CombineDependencies(state.Dependency, clearHandle);
+            var buildHandle = new BuildSpatialHashJob
+            {
+                InvCellSize = cfg.InvCellSize,
+                Writer = BulletFieldShared.CellMap.AsParallelWriter()
+            }.ScheduleParallel(buildDeps);
+
+            state.Dependency = buildHandle;
+            BulletFieldShared.CellMapFence = buildHandle; // RequestGroup이 이 fence에 의존하도록
+        }
+
+        [BurstCompile]
+        [WithOptions(EntityQueryOptions.IgnoreComponentEnabledState)] // 수명 종료시 BulletDespawnRequestTag 활성화 필요
+        private partial struct BulletMoveAndLifetimeJob : IJobEntity
         {
             public float DeltaTime;
 
@@ -313,57 +401,77 @@ namespace SweepNDodge.DotsBullets
                 ref LocalTransform tx,
                 ref BulletLifetimeComponent life,
                 in BulletVelocityComponent vel,
-                EnabledRefRO<BulletActiveTag> active,
-                EnabledRefRW<BulletDespawnRequestTag> despawnRequest)
+                in BulletActiveTag _,
+                EnabledRefRW<BulletDespawnRequestTag> request)
             {
-                if (!active.ValueRO)
-                    return;
-
                 tx.Position += new float3(vel.Value.x, 0f, vel.Value.y) * DeltaTime;
 
                 life.Value -= DeltaTime;
                 if (life.Value <= 0f)
-                {
-                    // 만료는 요청 태그만 남기고, 실제 비활성/풀 반납은 Execution 단계에서 수행
-                    despawnRequest.ValueRW = true;
-                }
+                    request.ValueRW = true;
+            }
+        }
+
+        [BurstCompile]
+        private struct ClearCellMapJob : IJob
+        {
+            public NativeParallelMultiHashMap<int, Entity> CellMap;
+            public void Execute() => CellMap.Clear();
+        }
+
+        [BurstCompile]
+        private partial struct BuildSpatialHashJob : IJobEntity
+        {
+            public float InvCellSize;
+            public NativeParallelMultiHashMap<int, Entity>.ParallelWriter Writer;
+
+            private void Execute(Entity e, in LocalTransform tx, in BulletActiveTag _)
+            {
+                var cell = SpatialHashUtility.ToCell(tx.Position, InvCellSize);
+                Writer.Add(SpatialHashUtility.Hash(cell), e);
             }
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Execution: 디스폰 태그 실행
-    // ---------------------------------------------------------------------
+    // ----------------------------------------------------------------------
+    // Execution End: Despawn + Return to Pool (Owner)
+    // ----------------------------------------------------------------------
 
+    /// <summary>
+    /// 디스폰 실행 단일 책임.
+    /// - BulletDespawnRequestTag(enabled) 또는 만료(시뮬레이션에서 request로 전환)된 탄을 비활성화
+    /// - 렌더 off + request reset + free-list enqueue
+    /// </summary>
     [BurstCompile]
-    [UpdateInGroup(typeof(BulletExecutionGroup))]
+    [UpdateInGroup(typeof(BulletExecutionEndGroup))]
     public partial struct BulletDespawnExecutionSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<BulletFieldConfigComponent>();
+            state.RequireForUpdate<PlayerTag>();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            if (!BulletPoolShared.IsCreated)
+            if (!BulletFieldShared.IsInitialized)
                 return;
 
-            // NativeQueue 접근은 수동 핸들로 시퀀싱
-            var deps = JobHandle.CombineDependencies(state.Dependency, BulletPoolShared.FreeListAccessHandle);
+            // FreeList는 ECS 의존성 추적 밖이므로 fence로 시퀀싱
+            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.FreeListFence);
 
-            var handle = new DespawnExecutionJob
+            var job = new DespawnAndReturnJob
             {
-                FreeList = BulletPoolShared.FreeList.AsParallelWriter()
-            }.ScheduleParallel(deps);
+                FreeList = BulletFieldShared.FreeList.AsParallelWriter(),
+            };
 
-            BulletPoolShared.FreeListAccessHandle = handle;
-            state.Dependency = handle;
+            state.Dependency = job.ScheduleParallel(deps);
+            BulletFieldShared.FreeListFence = state.Dependency;
         }
 
         [BurstCompile]
-        private partial struct DespawnExecutionJob : IJobEntity
+        private partial struct DespawnAndReturnJob : IJobEntity
         {
             public NativeQueue<Entity>.ParallelWriter FreeList;
 
@@ -374,11 +482,10 @@ namespace SweepNDodge.DotsBullets
                 EnabledRefRW<MaterialMeshInfo> render,
                 EnabledRefRW<BulletDespawnRequestTag> request)
             {
-                // 요청이 없으면 스킵(만료 요청은 Simulation 단계에서 이미 request=true로 전환)
                 if (!request.ValueRO)
                     return;
 
-                // 중복 반납 방지: active true→false 전이에서만 enqueue
+                // 이미 비활성인 경우(이중 요청) 방어
                 if (active.ValueRO)
                 {
                     active.ValueRW = false;
@@ -386,7 +493,6 @@ namespace SweepNDodge.DotsBullets
                     FreeList.Enqueue(e);
                 }
 
-                // 요청 리셋
                 request.ValueRW = false;
                 life.Value = 0f;
             }

@@ -1,14 +1,16 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// Vacuum 제거 행동: 활성 시간 동안 Range 내 탄환(Trash)을 즉시 디스폰 요청.
-    /// - 실제 비활성/풀 반납은 BulletExecutionGroup의 BulletDespawnExecutionSystem이 단일 책임으로 수행
+    /// - 실제 비활성/풀 반납은 BulletExecutionEndGroup의 BulletDespawnExecutionSystem이 단일 책임으로 수행
     /// - LocalTransform 타입 충돌 방지: 메인 스레드에서 LocalTransform을 직접 읽지 않고 Job으로 스케줄
     /// </summary>
     [BurstCompile]
@@ -26,6 +28,7 @@ namespace SweepNDodge.DotsBullets
         {
             var dt = SystemAPI.Time.DeltaTime;
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
+            var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
 
             // Vacuum 상태 갱신(플레이어 단일)
             var vacuumRW = SystemAPI.GetComponentRW<VacuumBurstComponent>(playerEntity);
@@ -34,18 +37,57 @@ namespace SweepNDodge.DotsBullets
             if (vacuumRW.ValueRO.IsActive == 0)
                 return;
 
+            if (!BulletFieldShared.IsInitialized)
+                return;
+
+            Debug.Log($"[Vacuum System] 흡입 작동 중... / dt: {dt}");
+
+            // LocalTransform은 메인 스레드에서 읽지 않는다 (타입 충돌 방지).
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
             var kindLookup = SystemAPI.GetComponentLookup<BulletKindComponent>(isReadOnly: true);
+            var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
+
             txLookup.Update(ref state);
             kindLookup.Update(ref state);
+            reqLookup.Update(ref state);
 
-            state.Dependency = new VacuumRequestJob
+            // 점수 반영: 새로 요청된 탄 개수만 누적
+            var scoreEntity = SystemAPI.GetSingletonEntity<BulletFieldConfigComponent>();
+            var scoreLookup = SystemAPI.GetComponentLookup<ScoreComponent>(isReadOnly: false);
+            scoreLookup.Update(ref state);
+
+            var newlyRequested = new NativeReference<int>(Allocator.TempJob);
+            newlyRequested.Value = 0;
+
+            // CellMap은 SharedStatic이며, Simulation에서 Write → Request에서 ReadOnly로 소비한다.
+            // 이전 프레임/이전 Request의 read가 끝난 뒤에만 다음 Simulation이 Clear/Build 하도록 fence를 갱신한다.
+            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.CellMapFence);
+
+            state.Dependency = new VacuumRequestFromCellMapJob
             {
                 PlayerEntity = playerEntity,
-                RangeSq = vacuumRW.ValueRO.Range * vacuumRW.ValueRO.Range,
+                InvCellSize = cfg.InvCellSize,
+
+                Range = vacuumRW.ValueRO.Range,
+
+                CellMap = BulletFieldShared.CellMap,
                 TxLookup = txLookup,
                 KindLookup = kindLookup,
-            }.ScheduleParallel(state.Dependency);
+                RequestLookup = reqLookup,
+                NewlyRequested = newlyRequested,
+            }.Schedule(deps);
+
+            state.Dependency = new ApplyVacuumScoreJob
+            {
+                ScoreEntity = scoreEntity,
+                ScoreLookup = scoreLookup,
+                Add = newlyRequested,
+            }.Schedule(state.Dependency);
+
+            state.Dependency = newlyRequested.Dispose(state.Dependency);
+
+            // 다음 프레임 Simulation의 Clear/Build가 안전하게 기다릴 수 있도록 fence 갱신
+            BulletFieldShared.CellMapFence = state.Dependency;
         }
 
         private static void UpdateVacuumState(ref VacuumBurstComponent v, float dt)
@@ -78,40 +120,81 @@ namespace SweepNDodge.DotsBullets
         }
 
         [BurstCompile]
-        private partial struct VacuumRequestJob : IJobEntity
+        private struct VacuumRequestFromCellMapJob : IJob
         {
             public Entity PlayerEntity;
-            public float RangeSq;
+            public float InvCellSize;
+            public float Range;
 
+            [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
             [ReadOnly] public ComponentLookup<BulletKindComponent> KindLookup;
+            public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
 
-            private void Execute(
-                Entity e,
-                EnabledRefRO<BulletActiveTag> active,
-                EnabledRefRW<BulletDespawnRequestTag> request)
+            public NativeReference<int> NewlyRequested;
+
+            public void Execute()
             {
-                if (!active.ValueRO)
+                if (!TxLookup.HasComponent(PlayerEntity))
                     return;
 
-                // 이미 요청된 탄은 스킵(중복 작업/중복 점수 방지용)
-                if (request.ValueRO)
-                    return;
+                float3 playerPos = TxLookup[PlayerEntity].Position;
+                float rangeSq = Range * Range;
 
-                if (!TxLookup.HasComponent(PlayerEntity) || !TxLookup.HasComponent(e))
-                    return;
-                if (!KindLookup.HasComponent(e) || KindLookup[e].Value != BulletKindId.Trash)
-                    return;
+                int2 center = SpatialHashUtility.ToCell(playerPos, InvCellSize);
+                int cellRadius = (int)math.ceil(Range * InvCellSize);
 
-                // 메인 스레드에서 Player LocalTransform을 읽지 않기 위해, Job 안에서 lookup으로 참조
-                var playerPos = TxLookup[PlayerEntity].Position;
-                var p = TxLookup[e].Position;
-                float dx = p.x - playerPos.x;
-                float dz = p.z - playerPos.z;
-                float distSq = dx * dx + dz * dz;
+                int add = 0;
 
-                if (distSq <= RangeSq)
-                    request.ValueRW = true;
+                for (int dy = -cellRadius; dy <= cellRadius; dy++)
+                    for (int dx = -cellRadius; dx <= cellRadius; dx++)
+                    {
+                        int2 c = center + new int2(dx, dy);
+                        int key = SpatialHashUtility.Hash(c);
+
+                        if (!CellMap.TryGetFirstValue(key, out var bullet, out var it))
+                            continue;
+
+                        do
+                        {
+                            if (!TxLookup.HasComponent(bullet)) continue;
+                            if (!KindLookup.HasComponent(bullet)) continue;
+                            if (KindLookup[bullet].Value != BulletKindId.Trash) continue;
+                            if (!RequestLookup.HasComponent(bullet)) continue;
+                            if (RequestLookup.IsComponentEnabled(bullet)) continue;
+
+                            var p = TxLookup[bullet].Position;
+                            float dxp = p.x - playerPos.x;
+                            float dzp = p.z - playerPos.z;
+                            float distSq = dxp * dxp + dzp * dzp;
+                            if (distSq > rangeSq) continue;
+
+                            RequestLookup.SetComponentEnabled(bullet, true);
+                            add++;
+                        }
+                        while (CellMap.TryGetNextValue(out bullet, ref it));
+                    }
+
+                NewlyRequested.Value += add;
+                Debug.Log($"[Vacuum Job] 흡입 대상 Bullet: {add} 개");
+            }
+        }
+
+        [BurstCompile]
+        private struct ApplyVacuumScoreJob : IJob
+        {
+            public Entity ScoreEntity;
+            public ComponentLookup<ScoreComponent> ScoreLookup;
+            [ReadOnly] public NativeReference<int> Add;
+
+            public void Execute()
+            {
+                int add = Add.Value;
+                if (add <= 0) return;
+
+                var score = ScoreLookup[ScoreEntity];
+                score.Value += add;
+                ScoreLookup[ScoreEntity] = score;
             }
         }
     }
