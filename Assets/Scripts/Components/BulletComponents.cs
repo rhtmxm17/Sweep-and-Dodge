@@ -36,7 +36,7 @@ namespace SweepNDodge.DotsBullets
     public struct BulletDespawnRequestTag : IComponentData, IEnableableComponent { }
 
     // Render 관련 버퍼 (엔티티 활성/비활성 시 참조용)
-    public struct BulletRenderEntityBufferElement : IBufferElementData
+    public struct EntityRenderElementBuffer : IBufferElementData
     {
         public Entity Value;
     }

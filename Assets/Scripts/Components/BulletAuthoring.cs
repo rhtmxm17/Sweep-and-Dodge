@@ -36,7 +36,7 @@ namespace SweepNDodge.DotsBullets
                 // (Bullet 활성/비활성 사이클 조정 후 사용 예정)
 
                 // 다중 렌더 파츠 목록
-                var renderTargets = AddBuffer<BulletRenderEntityBufferElement>(root);
+                var renderTargets = AddBuffer<EntityRenderElementBuffer>(root);
 
                 // MeshRenderer/SkinnedMeshRenderer 기반으로 렌더 엔티티 수집
                 // '*수정'에서 분리된 렌더 엔티티
@@ -46,14 +46,14 @@ namespace SweepNDodge.DotsBullets
                 {
                     var e = GetEntity(renderer, TransformUsageFlags.Renderable);
                     if (unique.Add(e))
-                        renderTargets.Add(new BulletRenderEntityBufferElement { Value = e });
+                        renderTargets.Add(new EntityRenderElementBuffer { Value = e });
                 }
 
                 foreach (var renderer in authoring.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 {
                     var e = GetEntity(renderer, TransformUsageFlags.Renderable);
                     if (unique.Add(e))
-                        renderTargets.Add(new BulletRenderEntityBufferElement { Value = e });
+                        renderTargets.Add(new EntityRenderElementBuffer { Value = e });
                 }
 
             }
