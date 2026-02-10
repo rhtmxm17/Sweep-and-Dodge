@@ -121,6 +121,20 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 설계 전환점마다 `Docs/ADR/ADR-YYYYMMDD-*.md`에 기록:
   - 문제(왜), 결정(무엇), 대안(비교), 결과(리스크/후속)
 - AGENTS.md는 "현재 합의된 기준"만 유지, 상세 논의는 ADR로 분리
+- ADR 파일 규칙
+  - 파일명 / 제목: 영어 (kebab-case)
+  - 첫 줄: 영어 제목
+  - 둘째 줄: 한국어 1문장 요약
+  - 본문: 한국어 (필요 시 영어 병기)
+  - 예시:
+
+```markdown
+# ADR-012-ecb-vs-flag-state
+> 대량 엔티티 상태 전환에서 ECB 대신 Flag 기반 접근을 채택한 결정
+
+## Context
+...
+```
 
 ---
 
