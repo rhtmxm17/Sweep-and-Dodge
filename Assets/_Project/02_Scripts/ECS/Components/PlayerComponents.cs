@@ -34,5 +34,4 @@ namespace SweepNDodge.DotsBullets
         public byte IsActive;           // 0/1
         public byte ActivateRequested;  // 0/1 (입력 시스템이 1로 세팅 → 이 시스템이 소모)
     }
-
 }
