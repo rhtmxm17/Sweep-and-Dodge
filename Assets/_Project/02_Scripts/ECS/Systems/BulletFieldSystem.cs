@@ -402,11 +402,14 @@ namespace SweepNDodge.DotsBullets
 
             float dt = SystemAPI.Time.DeltaTime;
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+            var requestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
+            requestLookup.Update(ref state);
 
             // 1) Move + Lifetime (활성 탄만). 만료 시 디스폰 요청 태그 enable
             state.Dependency = new BulletMoveAndLifetimeJob
             {
-                DeltaTime = dt
+                DeltaTime = dt,
+                RequestLookup = requestLookup
             }.ScheduleParallel(state.Dependency);
 
             // 2) SpatialHash Build (활성 탄만)
@@ -430,23 +433,28 @@ namespace SweepNDodge.DotsBullets
         }
 
         [BurstCompile]
-        [WithOptions(EntityQueryOptions.IgnoreComponentEnabledState)] // 수명 종료시 BulletDespawnRequestTag 활성화 필요
         private partial struct BulletMoveAndLifetimeJob : IJobEntity
         {
             public float DeltaTime;
+            // 주의: Enableable 토글을 위해 Lookup을 병렬 Job에서 사용.
+            // 동일 엔티티에만 접근하므로 안전하지만, 교차 엔티티 write가 섞이면 레이스 위험이 있음.
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
 
             private void Execute(
+                Entity e,
                 ref LocalTransform tx,
                 ref BulletLifetimeComponent life,
                 in BulletVelocityComponent vel,
-                in BulletActiveTag _,
-                EnabledRefRW<BulletDespawnRequestTag> request)
+                in BulletActiveTag _)
             {
                 tx.Position += new float3(vel.Value.x, 0f, vel.Value.y) * DeltaTime;
 
                 life.Value -= DeltaTime;
                 if (life.Value <= 0f)
-                    request.ValueRW = true;
+                {
+                    if (RequestLookup.HasComponent(e))
+                        RequestLookup.SetComponentEnabled(e, true);
+                }
             }
         }
 
