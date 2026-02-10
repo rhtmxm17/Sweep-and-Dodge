@@ -44,6 +44,14 @@ namespace SweepNDodge.DotsBullets
                     IsActive = 0,
                     ActivateRequested = 0
                 });
+
+                AddComponent(e, new PlayerGoSyncComponent
+                {
+                    Position = authoring.transform.position,
+                    Rotation = authoring.transform.rotation,
+                    SyncRotation = 1,
+                    VacuumRequested = 0
+                });
             }
         }
     }

@@ -38,21 +38,14 @@ namespace SweepNDodge.DotsBullets
                 TryBind();
                 if (!_hasPlayerEntity) return;
             }
-
-            // GO -> ECS : Transform 동기화
-            var tx = _em.GetComponentData<LocalTransform>(_playerEntity);
-            tx.Position = transform.position;
-            if (SyncRotation)
-                tx.Rotation = transform.rotation;
-            _em.SetComponentData(_playerEntity, tx);
-
-            // GO -> ECS : Vacuum 입력 요청
-            if (Input.GetKeyDown(VacuumKey))
-            {
-                var v = _em.GetComponentData<VacuumBurstComponent>(_playerEntity);
-                v.ActivateRequested = 1;
-                _em.SetComponentData(_playerEntity, v);
-            }
+            
+            // GO -> ECS 동기화
+            var sync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
+            sync.Position = transform.position;
+            sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
+            if (SyncRotation) sync.Rotation = transform.rotation;
+            if (Input.GetKeyDown(VacuumKey)) sync.VacuumRequested = 1;
+            _em.SetComponentData(_playerEntity, sync);
 
             // ECS -> GO : Vacuum 상태를 Animator에 반영(옵션)
             if (Animator != null)
