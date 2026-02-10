@@ -14,10 +14,10 @@ namespace SweepNDodge.DotsBullets
         {
             public override void Bake(BulletAuthoring authoring)
             {
-                // Renderable 프리펩이어야 MaterialMeshInfo 등이 함께 베이크됨
-                // *수정 예정: 로직/이동 기준 루트 엔티티와 출력 담당 자식 엔티티 분리
-                //             (TransformUsageFlags Renderable → Dynamic)
-                var root = GetEntity(TransformUsageFlags.Renderable);
+                // 로직/이동 기준 루트 엔티티는 Dynamic로 베이크하고,
+                // 출력(렌더) 담당 자식 엔티티들은 Renderable로 베이크해 RenderParts 버퍼에 기록한다.
+                // 로직/이동 기준 루트는 Dynamic
+                var root = GetEntity(TransformUsageFlags.Dynamic);
 
                 AddComponent(root, new BulletVelocityComponent { Value = Unity.Mathematics.float2.zero });
                 AddComponent(root, new BulletRadiusComponent { Value = authoring.Radius });
@@ -32,10 +32,8 @@ namespace SweepNDodge.DotsBullets
                 AddComponent<BulletDespawnRequestTag>(root);
                 SetComponentEnabled<BulletDespawnRequestTag>(root, false);
 
-                // ------ 이 이후는 아직 실제로 사용되지 않음 ------
-                // (Bullet 활성/비활성 사이클 조정 후 사용 예정)
-
-                // 다중 렌더 파츠 목록
+                // 다중 렌더 파츠 목록(스폰/디스폰 시 MaterialMeshInfo enable 토글 용도)
+                // - 버퍼에는 렌더 파츠 엔티티만 포함됨(외형 이외 사용 없음 전제)
                 var renderTargets = AddBuffer<EntityRenderElementBuffer>(root);
 
                 // MeshRenderer/SkinnedMeshRenderer 기반으로 렌더 엔티티 수집

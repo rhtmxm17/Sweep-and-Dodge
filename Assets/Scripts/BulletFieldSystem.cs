@@ -9,6 +9,11 @@
 // - FreeList(풀) 접근은 Begin/End "Owner 영역"으로만 제한(다른 시스템은 요청만 남김)
 // - SpatialHash(CellMap) writer는 Simulation으로 고정, Request는 ReadOnly 소비
 // - 메인 스레드에서 LocalTransform 직접 읽기 금지(타입 충돌 방지): Request는 Job 스케줄로 처리
+// - 풀링 시스템에서 렌더 토글 처리:
+//   - 풀 초기화/스폰/디스폰에서 EntityRenderElementBuffer(렌더 파츠)를 통해 MaterialMeshInfo 토글
+//   - 디스폰 병렬 잡에서 렌더 파츠 OFF는 ECB.ParallelWriter로 기록(교차 엔티티 쓰기 제약 회피)
+//   - SpawnFromPoolJob에 BufferLookup<EntityRenderElementBuffer> 추가(렌더 파츠 ON)
+//   - Bootstrap에서 렌더 파츠 OFF 처리
 
 using Unity.Burst;
 using Unity.Collections;
@@ -155,9 +160,23 @@ namespace SweepNDodge.DotsBullets
                 if (em.HasComponent<BulletDespawnRequestTag>(b))
                     em.SetComponentEnabled<BulletDespawnRequestTag>(b, false);
 
-                // 렌더 off (프리펩이 Renderable로 베이크되면 MaterialMeshInfo가 존재)
-                if (em.HasComponent<MaterialMeshInfo>(b))
-                    em.SetComponentEnabled<MaterialMeshInfo>(b, false);
+                // 렌더 off: 루트가 아닌 RenderParts(자식 렌더 엔티티)에 대해 토글
+                if (em.HasBuffer<EntityRenderElementBuffer>(b))
+                {
+                    var parts = em.GetBuffer<EntityRenderElementBuffer>(b);
+                    for (int p = 0; p < parts.Length; p++)
+                    {
+                        var pe = parts[p].Value;
+                        if (em.HasComponent<MaterialMeshInfo>(pe))
+                            em.SetComponentEnabled<MaterialMeshInfo>(pe, false);
+                    }
+                }
+                // fallback) 루트에 렌더가 있는 단일 프리팹 대응
+                else
+                {
+                    if (em.HasComponent<MaterialMeshInfo>(b))
+                        em.SetComponentEnabled<MaterialMeshInfo>(b, false);
+                }
 
                 // 기본 데이터
                 if (em.HasComponent<LocalTransform>(b))
@@ -243,6 +262,7 @@ namespace SweepNDodge.DotsBullets
             var active = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
             var request = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
             var render = SystemAPI.GetComponentLookup<MaterialMeshInfo>(false);
+            var renderParts = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
 
             tx.Update(ref state);
             vel.Update(ref state);
@@ -251,6 +271,7 @@ namespace SweepNDodge.DotsBullets
             active.Update(ref state);
             request.Update(ref state);
             render.Update(ref state);
+            renderParts.Update(ref state);
 
             // FreeList는 ECS 의존성 추적 밖이므로, 전용 fence로 접근 순서를 강제
             var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.FreeListFence);
@@ -260,9 +281,9 @@ namespace SweepNDodge.DotsBullets
                 SpawnCount = spawnCount,
                 SpawnSeed = spawnSeed,
 
-                PosMin = -20f,
-                PosMax = 20f,
-                Speed = 6.5f,
+                PosMin = -100f,
+                PosMax = 100f,
+                Speed = 2.5f,
                 Lifetime = cfg.BulletLifetime,
                 Kind = BulletKindId.Trash,
 
@@ -274,6 +295,7 @@ namespace SweepNDodge.DotsBullets
                 KindLookup = kind,
                 ActiveLookup = active,
                 RequestLookup = request,
+                RenderPartsLookup = renderParts,
                 RenderLookup = render,
             };
 
@@ -301,6 +323,7 @@ namespace SweepNDodge.DotsBullets
             public ComponentLookup<BulletKindComponent> KindLookup;
             public ComponentLookup<BulletActiveTag> ActiveLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
+            [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
             public ComponentLookup<MaterialMeshInfo> RenderLookup;
 
             public void Execute()
@@ -335,8 +358,23 @@ namespace SweepNDodge.DotsBullets
 
                     if (ActiveLookup.HasComponent(e))
                         ActiveLookup.SetComponentEnabled(e, true);
-                    if (RenderLookup.HasComponent(e))
-                        RenderLookup.SetComponentEnabled(e, true);
+                    // 렌더 on: RenderParts(자식 렌더 엔티티) MaterialMeshInfo enable
+                    if (RenderPartsLookup.HasBuffer(e))
+                    {
+                        var parts = RenderPartsLookup[e];
+                        for (int p = 0; p < parts.Length; p++)
+                        {
+                            var pe = parts[p].Value;
+                            if (RenderLookup.HasComponent(pe))
+                                RenderLookup.SetComponentEnabled(pe, true);
+                        }
+                    }
+                    // 초기화 시점에 fallback 이 적용된, 루트에 렌더가 있는 단일 프리팹 대응
+                    else
+                    {
+                        if (RenderLookup.HasComponent(e))
+                            RenderLookup.SetComponentEnabled(e, true);
+                    }
                 }
             }
         }
@@ -461,9 +499,17 @@ namespace SweepNDodge.DotsBullets
             // FreeList는 ECS 의존성 추적 밖이므로 fence로 시퀀싱
             var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.FreeListFence);
 
+            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
+
+            var renderParts = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
+            renderParts.Update(ref state);
+
             var job = new DespawnAndReturnJob
             {
                 FreeList = BulletFieldShared.FreeList.AsParallelWriter(),
+                Ecb = ecb,
+                RenderPartsLookup = renderParts,
             };
 
             state.Dependency = job.ScheduleParallel(deps);
@@ -474,12 +520,14 @@ namespace SweepNDodge.DotsBullets
         private partial struct DespawnAndReturnJob : IJobEntity
         {
             public NativeQueue<Entity>.ParallelWriter FreeList;
+            public EntityCommandBuffer.ParallelWriter Ecb;
+            [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
 
             private void Execute(
+                [EntityIndexInQuery] int sortKey,
                 Entity e,
                 ref BulletLifetimeComponent life,
                 EnabledRefRW<BulletActiveTag> active,
-                EnabledRefRW<MaterialMeshInfo> render,
                 EnabledRefRW<BulletDespawnRequestTag> request)
             {
                 if (!request.ValueRO)
@@ -489,7 +537,22 @@ namespace SweepNDodge.DotsBullets
                 if (active.ValueRO)
                 {
                     active.ValueRW = false;
-                    render.ValueRW = false;
+
+                    // 렌더 off: RenderParts(자식 렌더 엔티티) MaterialMeshInfo disable
+                    if (RenderPartsLookup.TryGetBuffer(e, out var parts))
+                    {
+                        for (int p = 0; p < parts.Length; p++)
+                        {
+                            var pe = parts[p].Value;
+                            Ecb.SetComponentEnabled<MaterialMeshInfo>(sortKey, pe, false);
+                        }
+                    }
+                    else
+                    {
+                        // (fallback) 루트에 렌더가 있는 단일 프리팹 대응
+                        Ecb.SetComponentEnabled<MaterialMeshInfo>(sortKey, e, false);
+                    }
+
                     FreeList.Enqueue(e);
                 }
 
