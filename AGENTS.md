@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 > Portfolio mini-game (Unity + C#, DOTS 중심). 설계 대화 기반으로 반복적으로 구조를 조정하며 구현한다.
 
 ## 0. TL;DR (프로젝트 요약)
@@ -125,6 +125,8 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 ---
 
 ## 9. 보안/권한(코딩 에이전트 운영)
+- 한국어 주석이 있는 Assets/_Project 아래 .cs 파일을 읽을 때는 UTF-8로 강제(Get-Content -Encoding UTF8).
 - 기본 모드: read-only
 - 파일 수정/명령 실행이 필요한 경우에만 권한 상승(최소 권한 원칙)
 - 네트워크/외부 업로드는 기본 금지(필요 시 명시적 승인)
+
