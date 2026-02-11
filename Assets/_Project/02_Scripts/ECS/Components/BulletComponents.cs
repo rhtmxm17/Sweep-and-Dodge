@@ -29,6 +29,12 @@ namespace SweepNDodge.DotsBullets
         public float Value;
     }
 
+    // Source 기반 스폰/고갈 추적을 위한 출처 참조
+    public struct BulletSourceRefComponent : IComponentData
+    {
+        public Entity Value;
+    }
+
     // Enableable Tag (활성/비활성 토글용)
     public struct BulletActiveTag : IComponentData, IEnableableComponent { }
 

@@ -22,6 +22,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -126,7 +127,6 @@ namespace SweepNDodge.DotsBullets
                     CellSize = 1.6f,
                     InvCellSize = 1f / 1.6f,
                     BulletLifetime = 4.0f,
-                    SpawnRate = 25_000f,
                 };
 
                 em.SetComponentData(configEntity, cfg);
@@ -187,6 +187,8 @@ namespace SweepNDodge.DotsBullets
                     em.SetComponentData(b, new BulletLifetimeComponent { Value = 0f });
                 if (em.HasComponent<BulletKindComponent>(b))
                     em.SetComponentData(b, new BulletKindComponent { Value = BulletKindId.Trash });
+                if (em.HasComponent<BulletSourceRefComponent>(b))
+                    em.SetComponentData(b, new BulletSourceRefComponent { Value = Entity.Null });
 
                 BulletFieldShared.FreeList.Enqueue(b);
             }
@@ -225,15 +227,11 @@ namespace SweepNDodge.DotsBullets
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
     public partial struct BulletSpawnFromPoolSystem : ISystem
     {
-        private float _spawnAcc;
-        private uint _spawnSequence;
-
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<PlayerTag>();
-            _spawnAcc = 0f;
-            _spawnSequence = 1;
+            state.RequireForUpdate<SourceSpawnComponent>();
         }
 
         [BurstCompile]
@@ -243,22 +241,13 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
-            float dt = SystemAPI.Time.DeltaTime;
-
-            _spawnAcc += cfg.SpawnRate * dt;
-            int spawnCount = (int)_spawnAcc;
-            _spawnAcc -= spawnCount;
-
-            if (spawnCount <= 0)
-                return;
-
-            uint spawnSeed = _spawnSequence;
-            _spawnSequence += (uint)spawnCount;
+            float deltaTime = SystemAPI.Time.DeltaTime;
 
             var tx = SystemAPI.GetComponentLookup<LocalTransform>(false);
             var vel = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
             var life = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
             var kind = SystemAPI.GetComponentLookup<BulletKindComponent>(false);
+            var sourceRef = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(false);
             var active = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
             var request = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
             var render = SystemAPI.GetComponentLookup<MaterialMeshInfo>(false);
@@ -268,6 +257,7 @@ namespace SweepNDodge.DotsBullets
             vel.Update(ref state);
             life.Update(ref state);
             kind.Update(ref state);
+            sourceRef.Update(ref state);
             active.Update(ref state);
             request.Update(ref state);
             render.Update(ref state);
@@ -276,13 +266,9 @@ namespace SweepNDodge.DotsBullets
             // FreeList는 ECS 의존성 추적 밖이므로, 전용 fence로 접근 순서를 강제
             var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.FreeListFence);
 
-            var job = new SpawnFromPoolJob
+            var job = new SpawnFromSourcesJob
             {
-                SpawnCount = spawnCount,
-                SpawnSeed = spawnSeed,
-
-                PosMin = -100f,
-                PosMax = 100f,
+                DeltaTime = deltaTime,
                 Speed = 2.5f,
                 Lifetime = cfg.BulletLifetime,
                 Kind = BulletKindId.Trash,
@@ -293,6 +279,7 @@ namespace SweepNDodge.DotsBullets
                 VelLookup = vel,
                 LifeLookup = life,
                 KindLookup = kind,
+                SourceRefLookup = sourceRef,
                 ActiveLookup = active,
                 RequestLookup = request,
                 RenderPartsLookup = renderParts,
@@ -304,13 +291,9 @@ namespace SweepNDodge.DotsBullets
         }
 
         [BurstCompile]
-        private struct SpawnFromPoolJob : IJob
+        private partial struct SpawnFromSourcesJob : IJobEntity
         {
-            public int SpawnCount;
-            public uint SpawnSeed;
-
-            public float PosMin;
-            public float PosMax;
+            public float DeltaTime;
             public float Speed;
             public float Lifetime;
             public BulletKindId Kind;
@@ -321,24 +304,49 @@ namespace SweepNDodge.DotsBullets
             public ComponentLookup<BulletVelocityComponent> VelLookup;
             public ComponentLookup<BulletLifetimeComponent> LifeLookup;
             public ComponentLookup<BulletKindComponent> KindLookup;
+            public ComponentLookup<BulletSourceRefComponent> SourceRefLookup;
             public ComponentLookup<BulletActiveTag> ActiveLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
             [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
             public ComponentLookup<MaterialMeshInfo> RenderLookup;
 
-            public void Execute()
+            private void Execute(
+                Entity sourceEntity,
+                in SourceAnchorComponent sourceAnchor,
+                ref SourceSpawnComponent source,
+                ref SourceSpawnRuntimeComponent runtime)
             {
-                var random = Unity.Mathematics.Random.CreateFromIndex(math.max(1u, SpawnSeed));
+                float rate = source.SpawnRateNormal;
+                if (source.State == SourceStateId.Weakened)
+                    rate *= source.WeakenedMultiplier;
+                else if (source.State == SourceStateId.Depleted)
+                    rate = 0f;
 
-                for (int i = 0; i < SpawnCount; i++)
+                if (rate <= 0f)
+                    return;
+
+                runtime.SpawnAccumulator += rate * DeltaTime;
+                int spawnCount = (int)runtime.SpawnAccumulator;
+                runtime.SpawnAccumulator -= spawnCount;
+
+                if (spawnCount <= 0)
+                    return;
+
+                uint seed = math.max(1u, runtime.SpawnSequence);
+                runtime.SpawnSequence = seed + (uint)spawnCount;
+                var random = Unity.Mathematics.Random.CreateFromIndex(seed);
+                float radius = math.max(0f, source.Radius);
+                float3 center = sourceAnchor.Position;
+
+                for (int i = 0; i < spawnCount; i++)
                 {
                     if (!FreeList.TryDequeue(out var e))
                         break;
 
-                    float3 pos = new float3(
-                        random.NextFloat(PosMin, PosMax),
-                        0f,
-                        random.NextFloat(PosMin, PosMax));
+                    float anglePos = random.NextFloat(0f, math.PI * 2f);
+                    float dist = math.sqrt(random.NextFloat(0f, 1f)) * radius;
+                    float2 offset = new float2(math.cos(anglePos), math.sin(anglePos)) * dist;
+                    float3 pos = new float3(center.x + offset.x, center.y, center.z + offset.y);
 
                     float angle = random.NextFloat(0f, math.PI * 2f);
                     float2 dir = new float2(math.cos(angle), math.sin(angle));
@@ -352,6 +360,8 @@ namespace SweepNDodge.DotsBullets
                         LifeLookup[e] = new BulletLifetimeComponent { Value = Lifetime };
                     if (KindLookup.HasComponent(e))
                         KindLookup[e] = new BulletKindComponent { Value = Kind };
+                    if (SourceRefLookup.HasComponent(e))
+                        SourceRefLookup[e] = new BulletSourceRefComponent { Value = sourceEntity };
 
                     if (RequestLookup.HasComponent(e))
                         RequestLookup.SetComponentEnabled(e, false);

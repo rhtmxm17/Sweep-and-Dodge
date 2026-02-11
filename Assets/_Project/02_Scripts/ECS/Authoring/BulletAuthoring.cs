@@ -23,6 +23,7 @@ namespace SweepNDodge.DotsBullets
                 AddComponent(root, new BulletRadiusComponent { Value = authoring.Radius });
                 AddComponent(root, new BulletKindComponent { Value = authoring.Kind });
                 AddComponent(root, new BulletLifetimeComponent { Value = 0f });
+                AddComponent(root, new BulletSourceRefComponent { Value = Entity.Null });
 
                 // 풀에서 enable/disable로 운용
                 AddComponent<BulletActiveTag>(root);

@@ -14,7 +14,6 @@ namespace SweepNDodge.DotsBullets
 
         [Header("Bullets")]
         public float BulletLifetime = 4.0f;
-        public float SpawnRate = 25_000f;
 
         private class Baker : Baker<BulletFieldConfigAuthoring>
         {
@@ -30,8 +29,7 @@ namespace SweepNDodge.DotsBullets
                     CellSize = authoring.CellSize,
                     InvCellSize = authoring.CellSize > 0f ? 1f / authoring.CellSize : 1f,
 
-                    BulletLifetime = authoring.BulletLifetime,
-                    SpawnRate = authoring.SpawnRate
+                    BulletLifetime = authoring.BulletLifetime
                 });
 
                 // 점수 싱글톤도 동일 엔티티에 추가

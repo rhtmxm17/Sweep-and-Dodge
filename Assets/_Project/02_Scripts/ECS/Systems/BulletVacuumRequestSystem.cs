@@ -45,11 +45,15 @@ namespace SweepNDodge.DotsBullets
             // LocalTransform은 메인 스레드에서 읽지 않는다 (타입 충돌 방지).
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
             var kindLookup = SystemAPI.GetComponentLookup<BulletKindComponent>(isReadOnly: true);
+            var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
             var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
+            var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
 
             txLookup.Update(ref state);
             kindLookup.Update(ref state);
+            bulletSourceLookup.Update(ref state);
             reqLookup.Update(ref state);
+            sourceLookup.Update(ref state);
 
             // 점수 반영: 새로 요청된 탄 개수만 누적
             var scoreEntity = SystemAPI.GetSingletonEntity<BulletFieldConfigComponent>();
@@ -73,7 +77,9 @@ namespace SweepNDodge.DotsBullets
                 CellMap = BulletFieldShared.CellMap,
                 TxLookup = txLookup,
                 KindLookup = kindLookup,
+                BulletSourceLookup = bulletSourceLookup,
                 RequestLookup = reqLookup,
+                SourceLookup = sourceLookup,
                 NewlyRequested = newlyRequested,
             }.Schedule(deps);
 
@@ -129,7 +135,9 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
             [ReadOnly] public ComponentLookup<BulletKindComponent> KindLookup;
+            [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
+            public ComponentLookup<SourceSpawnComponent> SourceLookup;
 
             public NativeReference<int> NewlyRequested;
 
@@ -170,6 +178,7 @@ namespace SweepNDodge.DotsBullets
                             if (distSq > rangeSq) continue;
 
                             RequestLookup.SetComponentEnabled(bullet, true);
+                            TryAccumulateDepletion(bullet);
                             add++;
                         }
                         while (CellMap.TryGetNextValue(out bullet, ref it));
@@ -177,6 +186,33 @@ namespace SweepNDodge.DotsBullets
 
                 NewlyRequested.Value += add;
                 Debug.Log($"[Vacuum Job] 흡입 대상 Bullet: {add} 개");
+            }
+
+            private void TryAccumulateDepletion(Entity bullet)
+            {
+                if (!BulletSourceLookup.HasComponent(bullet))
+                    return;
+
+                var sourceEntity = BulletSourceLookup[bullet].Value;
+                if (sourceEntity == Entity.Null)
+                    return;
+                if (!SourceLookup.HasComponent(sourceEntity))
+                    return;
+
+                var source = SourceLookup[sourceEntity];
+                source.CollectedCount++;
+
+                int weakenedThreshold = math.max(0, source.ThresholdWeakened);
+                int depletedThreshold = math.max(weakenedThreshold, source.ThresholdDepleted);
+
+                if (source.CollectedCount >= depletedThreshold)
+                    source.State = SourceStateId.Depleted;
+                else if (source.CollectedCount >= weakenedThreshold)
+                    source.State = SourceStateId.Weakened;
+                else
+                    source.State = SourceStateId.Normal;
+
+                SourceLookup[sourceEntity] = source;
             }
         }
 
