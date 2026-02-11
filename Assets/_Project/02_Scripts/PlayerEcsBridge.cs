@@ -1,5 +1,4 @@
-
-using Unity.Entities;
+﻿using Unity.Entities;
 using Unity.Transforms;
 using UnityEngine;
 
@@ -22,9 +21,14 @@ namespace SweepNDodge.DotsBullets
         public Animator Animator;
         public string VacuumActiveBool = "VacuumActive";
 
+        private const float VacuumGizmoDuration = 0.2f;
+        private const float VacuumGizmoRadius = 2.88f;
+        private const int VacuumGizmoSegments = 48;
+
         private EntityManager _em;
         private Entity _playerEntity;
         private bool _hasPlayerEntity;
+        private float _vacuumGizmoUntilTime;
 
         private void Awake()
         {
@@ -38,13 +42,17 @@ namespace SweepNDodge.DotsBullets
                 TryBind();
                 if (!_hasPlayerEntity) return;
             }
-            
+
             // GO -> ECS 동기화
             var sync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
             sync.Position = transform.position;
             sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
             if (SyncRotation) sync.Rotation = transform.rotation;
-            if (Input.GetKeyDown(VacuumKey)) sync.VacuumRequested = 1;
+            if (Input.GetKeyDown(VacuumKey))
+            {
+                sync.VacuumRequested = 1;
+                _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
+            }
             _em.SetComponentData(_playerEntity, sync);
 
             // ECS -> GO : Vacuum 상태를 Animator에 반영(옵션)
@@ -52,6 +60,27 @@ namespace SweepNDodge.DotsBullets
             {
                 var v = _em.GetComponentData<VacuumBurstComponent>(_playerEntity);
                 Animator.SetBool(VacuumActiveBool, v.IsActive != 0);
+            }
+        }
+
+        private void OnDrawGizmos()
+        {
+            bool isActiveWindow = Application.isPlaying && Time.time <= _vacuumGizmoUntilTime;
+            Gizmos.color = isActiveWindow ? new Color(1f, 0.35f, 0.35f) : Color.cyan;
+            DrawXZCircle(transform.position, VacuumGizmoRadius, VacuumGizmoSegments);
+        }
+
+        private static void DrawXZCircle(Vector3 center, float radius, int segments)
+        {
+            float step = 2f * Mathf.PI / segments;
+            Vector3 prev = center + new Vector3(radius, 0f, 0f);
+
+            for (int i = 1; i <= segments; i++)
+            {
+                float angle = step * i;
+                Vector3 next = center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+                Gizmos.DrawLine(prev, next);
+                prev = next;
             }
         }
 
