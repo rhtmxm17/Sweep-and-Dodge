@@ -269,6 +269,7 @@ GameObject:
   - component: {fileID: 352435929}
   - component: {fileID: 352435928}
   - component: {fileID: 352435932}
+  - component: {fileID: 352435933}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -387,6 +388,19 @@ MonoBehaviour:
   SyncRotation: 1
   Animator: {fileID: 0}
   VacuumActiveBool: VacuumActive
+--- !u!114 &352435933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 352435927}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5326703ba0b9ab54baf679a6eff3f594, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.PlayerWasdMovement
+  MoveSpeed: 6
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
