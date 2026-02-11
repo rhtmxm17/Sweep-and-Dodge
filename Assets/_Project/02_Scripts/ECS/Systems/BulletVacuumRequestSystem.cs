@@ -46,13 +46,13 @@ namespace SweepNDodge.DotsBullets
 
             // LocalTransform은 메인 스레드에서 읽지 않는다 (타입 충돌 방지).
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
-            var kindLookup = SystemAPI.GetComponentLookup<BulletKindComponent>(isReadOnly: true);
+            var captureRuleLookup = SystemAPI.GetComponentLookup<BulletCaptureRuleComponent>(isReadOnly: true);
             var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
             var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
 
             txLookup.Update(ref state);
-            kindLookup.Update(ref state);
+            captureRuleLookup.Update(ref state);
             bulletSourceLookup.Update(ref state);
             reqLookup.Update(ref state);
             sourceLookup.Update(ref state);
@@ -81,7 +81,7 @@ namespace SweepNDodge.DotsBullets
 
                 CellMap = BulletFieldShared.CellMap,
                 TxLookup = txLookup,
-                KindLookup = kindLookup,
+                CaptureRuleLookup = captureRuleLookup,
                 BulletSourceLookup = bulletSourceLookup,
                 RequestLookup = reqLookup,
                 SourceLookup = sourceLookup,
@@ -163,7 +163,7 @@ namespace SweepNDodge.DotsBullets
 
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
-            [ReadOnly] public ComponentLookup<BulletKindComponent> KindLookup;
+            [ReadOnly] public ComponentLookup<BulletCaptureRuleComponent> CaptureRuleLookup;
             [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
             public ComponentLookup<SourceSpawnComponent> SourceLookup;
@@ -195,7 +195,7 @@ namespace SweepNDodge.DotsBullets
                         do
                         {
                             if (!TxLookup.HasComponent(bullet)) continue;
-                            if (!KindLookup.HasComponent(bullet)) continue;
+                            if (!CaptureRuleLookup.HasComponent(bullet)) continue;
                             if (!RequestLookup.HasComponent(bullet)) continue;
                             if (RequestLookup.IsComponentEnabled(bullet)) continue;
 
@@ -203,14 +203,14 @@ namespace SweepNDodge.DotsBullets
                             float dxp = p.x - playerPos.x;
                             float dzp = p.z - playerPos.z;
                             float distSq = dxp * dxp + dzp * dzp;
-                            var kind = KindLookup[bullet].Value;
+                            var captureRule = CaptureRuleLookup[bullet].Value;
 
                             bool canCapture = false;
-                            if (kind == BulletKindId.Trash)
+                            if (captureRule == BulletCaptureRuleId.StandardCollectible)
                             {
                                 canCapture = distSq <= rangeSq;
                             }
-                            else if (kind == BulletKindId.Hazard && IsHazardCaptureActive != 0)
+                            else if (captureRule == BulletCaptureRuleId.RiskTimedResolve && IsHazardCaptureActive != 0)
                             {
                                 canCapture = distSq >= HazardRingInnerSq && distSq <= HazardRingOuterSq;
                             }

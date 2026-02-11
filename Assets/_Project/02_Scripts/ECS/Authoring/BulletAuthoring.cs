@@ -8,7 +8,8 @@ namespace SweepNDodge.DotsBullets
     {
         [Header("Default Bullet Data (spawn 시 덮어씌워짐)")]
         public float Radius = 0.05f;
-        public BulletKindId Kind = BulletKindId.Trash;
+        public int TypeKey = 0;
+        public BulletCaptureRuleId CaptureRule = BulletCaptureRuleId.StandardCollectible;
 
         private class Baker : Baker<BulletAuthoring>
         {
@@ -21,7 +22,8 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(root, new BulletVelocityComponent { Value = Unity.Mathematics.float2.zero });
                 AddComponent(root, new BulletRadiusComponent { Value = authoring.Radius });
-                AddComponent(root, new BulletKindComponent { Value = authoring.Kind });
+                AddComponent(root, new BulletTypeKeyComponent { Value = authoring.TypeKey });
+                AddComponent(root, new BulletCaptureRuleComponent { Value = authoring.CaptureRule });
                 AddComponent(root, new BulletLifetimeComponent { Value = 0f });
                 AddComponent(root, new BulletSourceRefComponent { Value = Entity.Null });
 

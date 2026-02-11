@@ -3,10 +3,10 @@ using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
-    public enum BulletKindId : byte
+    public enum BulletCaptureRuleId : byte
     {
-        Trash = 0,
-        Hazard = 1
+        StandardCollectible = 0,
+        RiskTimedResolve = 1
     }
 
     public struct BulletVelocityComponent : IComponentData
@@ -19,9 +19,14 @@ namespace SweepNDodge.DotsBullets
         public float Value;
     }
 
-    public struct BulletKindComponent : IComponentData
+    public struct BulletTypeKeyComponent : IComponentData
     {
-        public BulletKindId Value;
+        public int Value;
+    }
+
+    public struct BulletCaptureRuleComponent : IComponentData
+    {
+        public BulletCaptureRuleId Value;
     }
 
     public struct BulletLifetimeComponent : IComponentData
@@ -48,8 +53,14 @@ namespace SweepNDodge.DotsBullets
         public Entity Value;
     }
 
-    public struct BulletVisualPrefabComponent : IComponentData
+    public struct BulletPoolRegistryTag : IComponentData { }
+
+    [InternalBufferCapacity(8)]
+    public struct BulletPoolDefinitionBuffer : IBufferElementData
     {
-        public Entity Value; // baked entity prefab
+        public int TypeKey;
+        public Entity Prefab;
+        public int PoolSize;
+        public BulletCaptureRuleId CaptureRule;
     }
 }

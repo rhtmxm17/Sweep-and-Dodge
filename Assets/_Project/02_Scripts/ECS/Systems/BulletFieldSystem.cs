@@ -6,7 +6,7 @@
 //                                - 외부에서 정의될 요청 시스템의 위치
 //                                - SpatialHash ReadOnly 조회로 디스폰 요청 태그 enable
 //   BulletExecutionEndGroup    : 디스폰 실행 + 풀 Enqueue(반납 실행)
-// - FreeList(풀) 접근은 Begin/End "Owner 영역"으로만 제한(다른 시스템은 요청만 남김)
+// - FreeByKey(키 기반 풀) 접근은 Begin/End "Owner 영역"으로만 제한(다른 시스템은 요청만 남김)
 // - SpatialHash(CellMap) writer는 Simulation으로 고정, Request는 ReadOnly 소비
 // - 메인 스레드에서 LocalTransform 직접 읽기 금지(타입 충돌 방지): Request는 Job 스케줄로 처리
 // - 풀링 시스템에서 렌더 토글 처리:
@@ -22,7 +22,6 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
-using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -57,7 +56,7 @@ namespace SweepNDodge.DotsBullets
 
     /// <summary>
     /// Burst/Job에서 사용 가능한 정적 공유 저장소.
-    /// - FreeList(풀): Begin/End Owner 영역에서만 접근
+    /// - FreeByKey(키 기반 풀): Begin/End Owner 영역에서만 접근
     /// - CellMap(SpatialHash): Simulation이 Write, Request가 ReadOnly
     ///
     /// 주의: SharedStatic은 프로세스 전역이므로, 멀티 월드 사용 시 관리 전략이 추가로 필요할 수 있다.
@@ -66,21 +65,27 @@ namespace SweepNDodge.DotsBullets
     public static class BulletFieldShared
     {
         private struct FlagsKey { }
-        private struct FreeListKey { }
-        private struct FreeListFenceKey { }
+        private struct FreeByKeyKey { }
+        private struct PoolFenceKey { }
+        private struct StandardTypeKeysKey { }
+        private struct RiskTypeKeysKey { }
         private struct CellMapKey { }
         private struct CellMapFenceKey { }
 
         private static readonly SharedStatic<byte> _flags = SharedStatic<byte>.GetOrCreate<FlagsKey>();
-        private static readonly SharedStatic<NativeQueue<Entity>> _freeList = SharedStatic<NativeQueue<Entity>>.GetOrCreate<FreeListKey>();
-        private static readonly SharedStatic<JobHandle> _freeListFence = SharedStatic<JobHandle>.GetOrCreate<FreeListFenceKey>();
+        private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _freeByKey = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<FreeByKeyKey>();
+        private static readonly SharedStatic<JobHandle> _poolFence = SharedStatic<JobHandle>.GetOrCreate<PoolFenceKey>();
+        private static readonly SharedStatic<NativeList<int>> _standardTypeKeys = SharedStatic<NativeList<int>>.GetOrCreate<StandardTypeKeysKey>();
+        private static readonly SharedStatic<NativeList<int>> _riskTypeKeys = SharedStatic<NativeList<int>>.GetOrCreate<RiskTypeKeysKey>();
         private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _cellMap = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<CellMapKey>();
         private static readonly SharedStatic<JobHandle> _cellMapFence = SharedStatic<JobHandle>.GetOrCreate<CellMapFenceKey>();
 
         public static bool IsInitialized => _flags.Data != 0;
 
-        public static ref NativeQueue<Entity> FreeList => ref _freeList.Data;
-        public static ref JobHandle FreeListFence => ref _freeListFence.Data;
+        public static ref NativeParallelMultiHashMap<int, Entity> FreeByKey => ref _freeByKey.Data;
+        public static ref JobHandle PoolFence => ref _poolFence.Data;
+        public static ref NativeList<int> StandardTypeKeys => ref _standardTypeKeys.Data;
+        public static ref NativeList<int> RiskTypeKeys => ref _riskTypeKeys.Data;
 
         public static ref NativeParallelMultiHashMap<int, Entity> CellMap => ref _cellMap.Data;
         public static ref JobHandle CellMapFence => ref _cellMapFence.Data;
@@ -95,8 +100,8 @@ namespace SweepNDodge.DotsBullets
 
     /// <summary>
     /// 풀/SpatialHash 컨테이너 초기화 및 해제.
-    /// - FreeList, CellMap을 Persistent로 생성
-    /// - BulletVisualPrefabComponent 기반으로 PoolSize 만큼 Instantiate 후 FreeList에 전부 반납
+    /// - FreeByKey, CellMap을 Persistent로 생성
+    /// - BulletPoolDefinitionBuffer 기반으로 타입별 Instantiate 후 FreeByKey에 반납
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
@@ -104,7 +109,7 @@ namespace SweepNDodge.DotsBullets
     {
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<BulletVisualPrefabComponent>();
+            state.RequireForUpdate<BulletPoolRegistryTag>();
             state.RequireForUpdate<PlayerTag>();
         }
 
@@ -133,64 +138,78 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(configEntity, new ScoreComponent { Value = 0 });
             }
 
+            var poolRegistryEntity = SystemAPI.GetSingletonEntity<BulletPoolRegistryTag>();
+            var poolDefs = SystemAPI.GetBuffer<BulletPoolDefinitionBuffer>(poolRegistryEntity);
+
+            int totalPoolSize = 0;
+            for (int i = 0; i < poolDefs.Length; i++)
+                totalPoolSize += math.max(0, poolDefs[i].PoolSize);
+
             var cfgSingleton = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
-            int poolSize = math.max(0, cfgSingleton.PoolSize);
+            int poolCapacity = math.max(math.max(1, totalPoolSize), cfgSingleton.PoolSize);
 
-            BulletFieldShared.FreeList = new NativeQueue<Entity>(Allocator.Persistent);
-            BulletFieldShared.FreeListFence = default;
+            BulletFieldShared.FreeByKey = new NativeParallelMultiHashMap<int, Entity>(poolCapacity, Allocator.Persistent);
+            BulletFieldShared.PoolFence = default;
+            BulletFieldShared.StandardTypeKeys = new NativeList<int>(Allocator.Persistent);
+            BulletFieldShared.RiskTypeKeys = new NativeList<int>(Allocator.Persistent);
 
-            BulletFieldShared.CellMap = new NativeParallelMultiHashMap<int, Entity>(poolSize, Allocator.Persistent);
+            BulletFieldShared.CellMap = new NativeParallelMultiHashMap<int, Entity>(poolCapacity, Allocator.Persistent);
             BulletFieldShared.CellMapFence = default;
 
-            // Entity Prefab Instantiate로 풀 구성
-            var visualPrefab = SystemAPI.GetSingleton<BulletVisualPrefabComponent>().Value;
-            using var pool = new NativeArray<Entity>(poolSize, Allocator.Temp);
-            em.Instantiate(visualPrefab, pool);
-
-            // 풀 초기화(비활성 + 기본값 세팅) + FreeList 반납
-            for (int i = 0; i < pool.Length; i++)
+            // Key-Pool 구성: 타입 정의별로 프리팹 인스턴스를 생성해 FreeByKey로 반납
+            for (int i = 0; i < poolDefs.Length; i++)
             {
-                var b = pool[i];
+                var def = poolDefs[i];
+                if (def.Prefab == Entity.Null || def.PoolSize <= 0)
+                    continue;
 
-                // 시뮬레이션 off
-                if (em.HasComponent<BulletActiveTag>(b))
-                    em.SetComponentEnabled<BulletActiveTag>(b, false);
-
-                // 요청 off
-                if (em.HasComponent<BulletDespawnRequestTag>(b))
-                    em.SetComponentEnabled<BulletDespawnRequestTag>(b, false);
-
-                // 렌더 off: 루트가 아닌 RenderParts(자식 렌더 엔티티)에 대해 토글
-                if (em.HasBuffer<EntityRenderElementBuffer>(b))
-                {
-                    var parts = em.GetBuffer<EntityRenderElementBuffer>(b);
-                    for (int p = 0; p < parts.Length; p++)
-                    {
-                        var pe = parts[p].Value;
-                        if (em.HasComponent<MaterialMeshInfo>(pe))
-                            em.SetComponentEnabled<MaterialMeshInfo>(pe, false);
-                    }
-                }
-                // fallback) 루트에 렌더가 있는 단일 프리팹 대응
+                if (def.CaptureRule == BulletCaptureRuleId.RiskTimedResolve)
+                    BulletFieldShared.RiskTypeKeys.Add(def.TypeKey);
                 else
+                    BulletFieldShared.StandardTypeKeys.Add(def.TypeKey);
+
+                using var pool = new NativeArray<Entity>(def.PoolSize, Allocator.Temp);
+                em.Instantiate(def.Prefab, pool);
+
+                for (int p = 0; p < pool.Length; p++)
                 {
-                    if (em.HasComponent<MaterialMeshInfo>(b))
+                    var b = pool[p];
+
+                    if (em.HasComponent<BulletActiveTag>(b))
+                        em.SetComponentEnabled<BulletActiveTag>(b, false);
+                    if (em.HasComponent<BulletDespawnRequestTag>(b))
+                        em.SetComponentEnabled<BulletDespawnRequestTag>(b, false);
+
+                    if (em.HasBuffer<EntityRenderElementBuffer>(b))
+                    {
+                        var parts = em.GetBuffer<EntityRenderElementBuffer>(b);
+                        for (int k = 0; k < parts.Length; k++)
+                        {
+                            var pe = parts[k].Value;
+                            if (em.HasComponent<MaterialMeshInfo>(pe))
+                                em.SetComponentEnabled<MaterialMeshInfo>(pe, false);
+                        }
+                    }
+                    else if (em.HasComponent<MaterialMeshInfo>(b))
+                    {
                         em.SetComponentEnabled<MaterialMeshInfo>(b, false);
+                    }
+
+                    if (em.HasComponent<LocalTransform>(b))
+                        em.SetComponentData(b, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
+                    if (em.HasComponent<BulletVelocityComponent>(b))
+                        em.SetComponentData(b, new BulletVelocityComponent { Value = float2.zero });
+                    if (em.HasComponent<BulletLifetimeComponent>(b))
+                        em.SetComponentData(b, new BulletLifetimeComponent { Value = 0f });
+                    if (em.HasComponent<BulletTypeKeyComponent>(b))
+                        em.SetComponentData(b, new BulletTypeKeyComponent { Value = def.TypeKey });
+                    if (em.HasComponent<BulletCaptureRuleComponent>(b))
+                        em.SetComponentData(b, new BulletCaptureRuleComponent { Value = def.CaptureRule });
+                    if (em.HasComponent<BulletSourceRefComponent>(b))
+                        em.SetComponentData(b, new BulletSourceRefComponent { Value = Entity.Null });
+
+                    BulletFieldShared.FreeByKey.Add(def.TypeKey, b);
                 }
-
-                // 기본 데이터
-                if (em.HasComponent<LocalTransform>(b))
-                    em.SetComponentData(b, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
-                if (em.HasComponent<BulletVelocityComponent>(b))
-                    em.SetComponentData(b, new BulletVelocityComponent { Value = float2.zero });
-                if (em.HasComponent<BulletLifetimeComponent>(b))
-                    em.SetComponentData(b, new BulletLifetimeComponent { Value = 0f });
-                if (em.HasComponent<BulletKindComponent>(b))
-                    em.SetComponentData(b, new BulletKindComponent { Value = BulletKindId.Trash });
-                if (em.HasComponent<BulletSourceRefComponent>(b))
-                    em.SetComponentData(b, new BulletSourceRefComponent { Value = Entity.Null });
-
-                BulletFieldShared.FreeList.Enqueue(b);
             }
 
             BulletFieldShared.MarkInitialized();
@@ -199,14 +218,18 @@ namespace SweepNDodge.DotsBullets
         public void OnStopRunning(ref SystemState state)
         {
             // SharedStatic 컨테이너 접근을 안전하게 마무리
-            JobHandle.CombineDependencies(BulletFieldShared.FreeListFence, BulletFieldShared.CellMapFence).Complete();
+            JobHandle.CombineDependencies(BulletFieldShared.PoolFence, BulletFieldShared.CellMapFence).Complete();
 
             if (BulletFieldShared.CellMap.IsCreated)
                 BulletFieldShared.CellMap.Dispose();
-            if (BulletFieldShared.FreeList.IsCreated)
-                BulletFieldShared.FreeList.Dispose();
+            if (BulletFieldShared.FreeByKey.IsCreated)
+                BulletFieldShared.FreeByKey.Dispose();
+            if (BulletFieldShared.StandardTypeKeys.IsCreated)
+                BulletFieldShared.StandardTypeKeys.Dispose();
+            if (BulletFieldShared.RiskTypeKeys.IsCreated)
+                BulletFieldShared.RiskTypeKeys.Dispose();
 
-            BulletFieldShared.FreeListFence = default;
+            BulletFieldShared.PoolFence = default;
             BulletFieldShared.CellMapFence = default;
             BulletFieldShared.MarkUninitialized();
         }
@@ -218,7 +241,7 @@ namespace SweepNDodge.DotsBullets
 
     /// <summary>
     /// 동프레임 반영을 위한 스폰 실행 단계.
-    /// - FreeList.TryDequeue()로 스폰 엔티티 확보
+    /// - FreeByKey에서 TypeKey 기준으로 스폰 엔티티 확보
     /// - 데이터 세팅 + BulletActiveTag/MaterialMeshInfo enable
     /// - BulletDespawnRequestTag reset(disable)
     /// </summary>
@@ -246,7 +269,8 @@ namespace SweepNDodge.DotsBullets
             var tx = SystemAPI.GetComponentLookup<LocalTransform>(false);
             var vel = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
             var life = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
-            var kind = SystemAPI.GetComponentLookup<BulletKindComponent>(false);
+            var typeKey = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
+            var captureRule = SystemAPI.GetComponentLookup<BulletCaptureRuleComponent>(false);
             var sourceRef = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(false);
             var active = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
             var request = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
@@ -256,15 +280,16 @@ namespace SweepNDodge.DotsBullets
             tx.Update(ref state);
             vel.Update(ref state);
             life.Update(ref state);
-            kind.Update(ref state);
+            typeKey.Update(ref state);
+            captureRule.Update(ref state);
             sourceRef.Update(ref state);
             active.Update(ref state);
             request.Update(ref state);
             render.Update(ref state);
             renderParts.Update(ref state);
 
-            // FreeList는 ECS 의존성 추적 밖이므로, 전용 fence로 접근 순서를 강제
-            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.FreeListFence);
+            // FreeByKey는 ECS 의존성 추적 밖이므로, 전용 fence로 접근 순서를 강제
+            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);
 
             var job = new SpawnFromSourcesJob
             {
@@ -272,12 +297,15 @@ namespace SweepNDodge.DotsBullets
                 Speed = 2.5f,
                 Lifetime = cfg.BulletLifetime,
 
-                FreeList = BulletFieldShared.FreeList,
+                FreeByKey = BulletFieldShared.FreeByKey,
+                StandardTypeKeys = BulletFieldShared.StandardTypeKeys,
+                RiskTypeKeys = BulletFieldShared.RiskTypeKeys,
 
                 TxLookup = tx,
                 VelLookup = vel,
                 LifeLookup = life,
-                KindLookup = kind,
+                TypeKeyLookup = typeKey,
+                CaptureRuleLookup = captureRule,
                 SourceRefLookup = sourceRef,
                 ActiveLookup = active,
                 RequestLookup = request,
@@ -286,7 +314,7 @@ namespace SweepNDodge.DotsBullets
             };
 
             state.Dependency = job.Schedule(deps);
-            BulletFieldShared.FreeListFence = state.Dependency;
+            BulletFieldShared.PoolFence = state.Dependency;
         }
 
         [BurstCompile]
@@ -296,12 +324,15 @@ namespace SweepNDodge.DotsBullets
             public float Speed;
             public float Lifetime;
 
-            public NativeQueue<Entity> FreeList;
+            public NativeParallelMultiHashMap<int, Entity> FreeByKey;
+            [ReadOnly] public NativeList<int> StandardTypeKeys;
+            [ReadOnly] public NativeList<int> RiskTypeKeys;
 
             public ComponentLookup<LocalTransform> TxLookup;
             public ComponentLookup<BulletVelocityComponent> VelLookup;
             public ComponentLookup<BulletLifetimeComponent> LifeLookup;
-            public ComponentLookup<BulletKindComponent> KindLookup;
+            public ComponentLookup<BulletTypeKeyComponent> TypeKeyLookup;
+            public ComponentLookup<BulletCaptureRuleComponent> CaptureRuleLookup;
             public ComponentLookup<BulletSourceRefComponent> SourceRefLookup;
             public ComponentLookup<BulletActiveTag> ActiveLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
@@ -338,7 +369,8 @@ namespace SweepNDodge.DotsBullets
 
                 for (int i = 0; i < spawnCount; i++)
                 {
-                    if (!FreeList.TryDequeue(out var e))
+                    bool preferRiskType = random.NextFloat(0f, 1f) < GetHazardRatio(source);
+                    if (!TryDequeueForSpawn(ref random, preferRiskType, out var e, out var spawnTypeKey, out var spawnCaptureRule))
                         break;
 
                     float anglePos = random.NextFloat(0f, math.PI * 2f);
@@ -356,12 +388,10 @@ namespace SweepNDodge.DotsBullets
                         VelLookup[e] = new BulletVelocityComponent { Value = dir * Speed };
                     if (LifeLookup.HasComponent(e))
                         LifeLookup[e] = new BulletLifetimeComponent { Value = Lifetime };
-                    if (KindLookup.HasComponent(e))
-                    {
-                        float hazardRatio = GetHazardRatio(source);
-                        var kind = random.NextFloat(0f, 1f) < hazardRatio ? BulletKindId.Hazard : BulletKindId.Trash;
-                        KindLookup[e] = new BulletKindComponent { Value = kind };
-                    }
+                    if (TypeKeyLookup.HasComponent(e))
+                        TypeKeyLookup[e] = new BulletTypeKeyComponent { Value = spawnTypeKey };
+                    if (CaptureRuleLookup.HasComponent(e))
+                        CaptureRuleLookup[e] = new BulletCaptureRuleComponent { Value = spawnCaptureRule };
                     if (SourceRefLookup.HasComponent(e))
                         SourceRefLookup[e] = new BulletSourceRefComponent { Value = sourceEntity };
 
@@ -397,6 +427,65 @@ namespace SweepNDodge.DotsBullets
                 if (source.State == SourceStateId.Weakened)
                     return math.saturate(source.HazardRatioWeakened);
                 return math.saturate(source.HazardRatioNormal);
+            }
+
+            private bool TryDequeueForSpawn(
+                ref Unity.Mathematics.Random random,
+                bool preferRiskType,
+                out Entity entity,
+                out int typeKey,
+                out BulletCaptureRuleId captureRule)
+            {
+                var primaryRule = preferRiskType ? BulletCaptureRuleId.RiskTimedResolve : BulletCaptureRuleId.StandardCollectible;
+                if (TryDequeueFromRule(ref random, primaryRule, out entity, out typeKey, out captureRule))
+                    return true;
+
+                var fallbackRule = preferRiskType ? BulletCaptureRuleId.StandardCollectible : BulletCaptureRuleId.RiskTimedResolve;
+                return TryDequeueFromRule(ref random, fallbackRule, out entity, out typeKey, out captureRule);
+            }
+
+            private bool TryDequeueFromRule(
+                ref Unity.Mathematics.Random random,
+                BulletCaptureRuleId rule,
+                out Entity entity,
+                out int typeKey,
+                out BulletCaptureRuleId captureRule)
+            {
+                var keys = rule == BulletCaptureRuleId.RiskTimedResolve ? RiskTypeKeys : StandardTypeKeys;
+                if (!keys.IsCreated || keys.Length <= 0)
+                {
+                    entity = Entity.Null;
+                    typeKey = 0;
+                    captureRule = BulletCaptureRuleId.StandardCollectible;
+                    return false;
+                }
+
+                int start = keys.Length == 1 ? 0 : random.NextInt(0, keys.Length);
+                for (int i = 0; i < keys.Length; i++)
+                {
+                    int index = (start + i) % keys.Length;
+                    int candidateKey = keys[index];
+                    if (!TryDequeueByKey(candidateKey, out entity))
+                        continue;
+
+                    typeKey = candidateKey;
+                    captureRule = rule;
+                    return true;
+                }
+
+                entity = Entity.Null;
+                typeKey = 0;
+                captureRule = rule;
+                return false;
+            }
+
+            private bool TryDequeueByKey(int key, out Entity e)
+            {
+                if (!FreeByKey.TryGetFirstValue(key, out e, out var it))
+                    return false;
+
+                FreeByKey.Remove(key, e);
+                return true;
             }
         }
     }
@@ -525,8 +614,8 @@ namespace SweepNDodge.DotsBullets
             if (!BulletFieldShared.IsInitialized)
                 return;
 
-            // FreeList는 ECS 의존성 추적 밖이므로 fence로 시퀀싱
-            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.FreeListFence);
+            // FreeByKey는 ECS 의존성 추적 밖이므로 fence로 시퀀싱
+            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);
 
             var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
             var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
@@ -536,19 +625,19 @@ namespace SweepNDodge.DotsBullets
 
             var job = new DespawnAndReturnJob
             {
-                FreeList = BulletFieldShared.FreeList.AsParallelWriter(),
+                FreeByKey = BulletFieldShared.FreeByKey.AsParallelWriter(),
                 Ecb = ecb,
                 RenderPartsLookup = renderParts,
             };
 
             state.Dependency = job.ScheduleParallel(deps);
-            BulletFieldShared.FreeListFence = state.Dependency;
+            BulletFieldShared.PoolFence = state.Dependency;
         }
 
         [BurstCompile]
         private partial struct DespawnAndReturnJob : IJobEntity
         {
-            public NativeQueue<Entity>.ParallelWriter FreeList;
+            public NativeParallelMultiHashMap<int, Entity>.ParallelWriter FreeByKey;
             public EntityCommandBuffer.ParallelWriter Ecb;
             [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
 
@@ -556,6 +645,7 @@ namespace SweepNDodge.DotsBullets
                 [EntityIndexInQuery] int sortKey,
                 Entity e,
                 ref BulletLifetimeComponent life,
+                in BulletTypeKeyComponent typeKey,
                 EnabledRefRW<BulletActiveTag> active,
                 EnabledRefRW<BulletDespawnRequestTag> request)
             {
@@ -582,7 +672,7 @@ namespace SweepNDodge.DotsBullets
                         Ecb.SetComponentEnabled<MaterialMeshInfo>(sortKey, e, false);
                     }
 
-                    FreeList.Enqueue(e);
+                    FreeByKey.Add(typeKey.Value, e);
                 }
 
                 request.ValueRW = false;
