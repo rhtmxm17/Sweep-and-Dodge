@@ -271,7 +271,6 @@ namespace SweepNDodge.DotsBullets
                 DeltaTime = deltaTime,
                 Speed = 2.5f,
                 Lifetime = cfg.BulletLifetime,
-                Kind = BulletKindId.Trash,
 
                 FreeList = BulletFieldShared.FreeList,
 
@@ -296,7 +295,6 @@ namespace SweepNDodge.DotsBullets
             public float DeltaTime;
             public float Speed;
             public float Lifetime;
-            public BulletKindId Kind;
 
             public NativeQueue<Entity> FreeList;
 
@@ -359,7 +357,11 @@ namespace SweepNDodge.DotsBullets
                     if (LifeLookup.HasComponent(e))
                         LifeLookup[e] = new BulletLifetimeComponent { Value = Lifetime };
                     if (KindLookup.HasComponent(e))
-                        KindLookup[e] = new BulletKindComponent { Value = Kind };
+                    {
+                        float hazardRatio = GetHazardRatio(source);
+                        var kind = random.NextFloat(0f, 1f) < hazardRatio ? BulletKindId.Hazard : BulletKindId.Trash;
+                        KindLookup[e] = new BulletKindComponent { Value = kind };
+                    }
                     if (SourceRefLookup.HasComponent(e))
                         SourceRefLookup[e] = new BulletSourceRefComponent { Value = sourceEntity };
 
@@ -386,6 +388,15 @@ namespace SweepNDodge.DotsBullets
                             RenderLookup.SetComponentEnabled(e, true);
                     }
                 }
+            }
+
+            private static float GetHazardRatio(in SourceSpawnComponent source)
+            {
+                if (source.State == SourceStateId.Depleted)
+                    return math.saturate(source.HazardRatioNearDepleted);
+                if (source.State == SourceStateId.Weakened)
+                    return math.saturate(source.HazardRatioWeakened);
+                return math.saturate(source.HazardRatioNormal);
             }
         }
     }

@@ -33,6 +33,9 @@ namespace SweepNDodge.DotsBullets
         public float Radius;
         public float SpawnRateNormal;
         public float WeakenedMultiplier;
+        public float HazardRatioNormal;
+        public float HazardRatioWeakened;
+        public float HazardRatioNearDepleted;
 
         public int ThresholdWeakened;
         public int ThresholdDepleted;

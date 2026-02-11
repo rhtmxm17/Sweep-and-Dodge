@@ -10,6 +10,9 @@ namespace SweepNDodge.DotsBullets
         public float Radius = 8f;
         public float SpawnRateNormal = 5000f;
         [Range(0f, 1f)] public float WeakenedMultiplier = 0.5f;
+        [Range(0f, 1f)] public float HazardRatioNormal = 0.04f;
+        [Range(0f, 1f)] public float HazardRatioWeakened = 0.10f;
+        [Range(0f, 1f)] public float HazardRatioNearDepleted = 0.18f;
 
         [Header("Depletion Threshold (externally injectable)")]
         public int ThresholdWeakened = 2000;
@@ -35,6 +38,9 @@ namespace SweepNDodge.DotsBullets
                     Radius = Mathf.Max(0f, authoring.Radius),
                     SpawnRateNormal = Mathf.Max(0f, authoring.SpawnRateNormal),
                     WeakenedMultiplier = Mathf.Clamp01(authoring.WeakenedMultiplier),
+                    HazardRatioNormal = Mathf.Clamp01(authoring.HazardRatioNormal),
+                    HazardRatioWeakened = Mathf.Clamp01(authoring.HazardRatioWeakened),
+                    HazardRatioNearDepleted = Mathf.Clamp01(authoring.HazardRatioNearDepleted),
                     ThresholdWeakened = thresholdWeakened,
                     ThresholdDepleted = thresholdDepleted,
                     CollectedCount = Mathf.Max(0, authoring.InitialCollectedCount),

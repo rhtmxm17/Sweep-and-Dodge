@@ -12,6 +12,10 @@ namespace SweepNDodge.DotsBullets
         public float Range = 3.2f;
         public float Strength = 75f;
         public float CollectRadius = 0.35f;
+        public float CaptureActiveTime = 0.20f;
+        public float CaptureRingRadius = 2.88f;
+        public float CaptureRingWidth = 0.8f;
+        public float CaptureCooldown = 0.0f;
 
         public float ActiveTime = 0.22f;
         public float Cooldown = 1.8f;
@@ -34,6 +38,12 @@ namespace SweepNDodge.DotsBullets
                     Range = authoring.Range,
                     Strength = authoring.Strength,
                     CollectRadius = authoring.CollectRadius,
+                    CaptureActiveTime = Mathf.Max(0f, authoring.CaptureActiveTime),
+                    CaptureActiveTimer = 0f,
+                    CaptureRingRadius = Mathf.Max(0f, authoring.CaptureRingRadius),
+                    CaptureRingWidth = Mathf.Max(0f, authoring.CaptureRingWidth),
+                    CaptureCooldown = Mathf.Max(0f, authoring.CaptureCooldown),
+                    CaptureCooldownTimer = 0f,
 
                     ActiveTime = authoring.ActiveTime,
                     ActiveTimer = 0f,

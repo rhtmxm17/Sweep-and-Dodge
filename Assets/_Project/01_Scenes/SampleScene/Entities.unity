@@ -132,7 +132,7 @@ GameObject:
   - component: {fileID: 469743333}
   - component: {fileID: 469743332}
   m_Layer: 0
-  m_Name: Source (3)
+  m_Name: Default Source
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -153,10 +153,15 @@ MonoBehaviour:
   Radius: 8
   SpawnRateNormal: 5000
   WeakenedMultiplier: 0.3
+  HazardRatioNormal: 0.04
+  HazardRatioWeakened: 0.1
+  HazardRatioNearDepleted: 0.18
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
   InitialCollectedCount: 0
   InitialState: 0
+  DrawGizmo: 1
+  DrawGizmoWhenNotSelected: 0
 --- !u!23 &469743333
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -242,7 +247,7 @@ GameObject:
   - component: {fileID: 681103046}
   - component: {fileID: 681103045}
   m_Layer: 0
-  m_Name: Source (2)
+  m_Name: No Hazard Source
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -263,10 +268,15 @@ MonoBehaviour:
   Radius: 8
   SpawnRateNormal: 5000
   WeakenedMultiplier: 0.5
+  HazardRatioNormal: 0
+  HazardRatioWeakened: 0.1
+  HazardRatioNearDepleted: 0.18
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
   InitialCollectedCount: 0
   InitialState: 0
+  DrawGizmo: 1
+  DrawGizmoWhenNotSelected: 0
 --- !u!23 &681103046
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -352,7 +362,7 @@ GameObject:
   - component: {fileID: 932628464}
   - component: {fileID: 932628463}
   m_Layer: 0
-  m_Name: Source (1)
+  m_Name: Half Hazard Source
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -373,10 +383,15 @@ MonoBehaviour:
   Radius: 8
   SpawnRateNormal: 5000
   WeakenedMultiplier: 0.5
+  HazardRatioNormal: 0.5
+  HazardRatioWeakened: 0.1
+  HazardRatioNearDepleted: 0.18
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
   InitialCollectedCount: 0
   InitialState: 0
+  DrawGizmo: 1
+  DrawGizmoWhenNotSelected: 0
 --- !u!23 &932628464
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -462,7 +477,7 @@ GameObject:
   - component: {fileID: 950319076}
   - component: {fileID: 950319075}
   m_Layer: 0
-  m_Name: Source
+  m_Name: Hazard Only Source
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -483,10 +498,15 @@ MonoBehaviour:
   Radius: 8
   SpawnRateNormal: 5000
   WeakenedMultiplier: 0.5
+  HazardRatioNormal: 1
+  HazardRatioWeakened: 0.1
+  HazardRatioNearDepleted: 0.18
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
   InitialCollectedCount: 0
   InitialState: 0
+  DrawGizmo: 1
+  DrawGizmoWhenNotSelected: 0
 --- !u!23 &950319076
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -637,6 +657,10 @@ MonoBehaviour:
   Range: 3.2
   Strength: 75
   CollectRadius: 3
+  CaptureActiveTime: 0.2
+  CaptureRingRadius: 2.88
+  CaptureRingWidth: 0.8
+  CaptureCooldown: 0
   ActiveTime: 0.22
   Cooldown: 1.8
 --- !u!4 &1191526536
@@ -687,7 +711,6 @@ MonoBehaviour:
   MaxActiveTarget: 100000
   CellSize: 1.6
   BulletLifetime: 4
-  SpawnRate: 25000
 --- !u!4 &1246925445
 Transform:
   m_ObjectHideFlags: 0

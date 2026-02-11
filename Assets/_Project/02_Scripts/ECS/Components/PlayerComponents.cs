@@ -24,6 +24,12 @@ namespace SweepNDodge.DotsBullets
         public float Range;
         public float Strength;
         public float CollectRadius;
+        public float CaptureActiveTime;
+        public float CaptureActiveTimer;
+        public float CaptureRingRadius;
+        public float CaptureRingWidth;
+        public float CaptureCooldown;
+        public float CaptureCooldownTimer;
 
         public float ActiveTime;
         public float ActiveTimer;

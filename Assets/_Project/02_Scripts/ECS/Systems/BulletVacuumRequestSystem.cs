@@ -9,7 +9,9 @@ using UnityEngine;
 namespace SweepNDodge.DotsBullets
 {
     /// <summary>
-    /// Vacuum 제거 행동: 활성 시간 동안 Range 내 탄환(Trash)을 즉시 디스폰 요청.
+    /// Vacuum 제거 행동:
+    /// - Trash  : 활성 시간 동안 Range 내 즉시 디스폰 요청
+    /// - Hazard : Vacuum ON 직후 Capture 타이밍 동안 Ring 밴드 내에서만 디스폰 요청
     /// - 실제 비활성/풀 반납은 BulletExecutionEndGroup의 BulletDespawnExecutionSystem이 단일 책임으로 수행
     /// - LocalTransform 타입 충돌 방지: 메인 스레드에서 LocalTransform을 직접 읽지 않고 Job으로 스케줄
     /// </summary>
@@ -73,6 +75,9 @@ namespace SweepNDodge.DotsBullets
                 InvCellSize = cfg.InvCellSize,
 
                 Range = vacuumRW.ValueRO.Range,
+                IsHazardCaptureActive = vacuumRW.ValueRO.CaptureActiveTimer > 0f ? (byte)1 : (byte)0,
+                HazardRingInnerSq = GetHazardRingInnerSq(in vacuumRW.ValueRO),
+                HazardRingOuterSq = GetHazardRingOuterSq(in vacuumRW.ValueRO),
 
                 CellMap = BulletFieldShared.CellMap,
                 TxLookup = txLookup,
@@ -100,6 +105,10 @@ namespace SweepNDodge.DotsBullets
         {
             if (v.CooldownTimer > 0f)
                 v.CooldownTimer = math.max(0f, v.CooldownTimer - dt);
+            if (v.CaptureCooldownTimer > 0f)
+                v.CaptureCooldownTimer = math.max(0f, v.CaptureCooldownTimer - dt);
+            if (v.CaptureActiveTimer > 0f)
+                v.CaptureActiveTimer = math.max(0f, v.CaptureActiveTimer - dt);
 
             if (v.IsActive != 0)
             {
@@ -112,11 +121,13 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            if (v.ActivateRequested != 0 && v.CooldownTimer <= 0f)
+            if (v.ActivateRequested != 0 && v.CooldownTimer <= 0f && v.CaptureCooldownTimer <= 0f)
             {
                 v.ActivateRequested = 0;
                 v.IsActive = 1;
                 v.ActiveTimer = v.ActiveTime;
+                v.CaptureActiveTimer = v.CaptureActiveTime;
+                v.CaptureCooldownTimer = v.CaptureCooldown;
             }
             else
             {
@@ -125,12 +136,30 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
+        private static float GetHazardRingInnerSq(in VacuumBurstComponent v)
+        {
+            float halfWidth = math.max(0f, v.CaptureRingWidth * 0.5f);
+            float inner = math.max(0f, v.CaptureRingRadius - halfWidth);
+            return inner * inner;
+        }
+
+        private static float GetHazardRingOuterSq(in VacuumBurstComponent v)
+        {
+            float halfWidth = math.max(0f, v.CaptureRingWidth * 0.5f);
+            float inner = math.max(0f, v.CaptureRingRadius - halfWidth);
+            float outer = math.max(inner, v.CaptureRingRadius + halfWidth);
+            return outer * outer;
+        }
+
         [BurstCompile]
         private struct VacuumRequestFromCellMapJob : IJob
         {
             public Entity PlayerEntity;
             public float InvCellSize;
             public float Range;
+            public byte IsHazardCaptureActive;
+            public float HazardRingInnerSq;
+            public float HazardRingOuterSq;
 
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
@@ -167,7 +196,6 @@ namespace SweepNDodge.DotsBullets
                         {
                             if (!TxLookup.HasComponent(bullet)) continue;
                             if (!KindLookup.HasComponent(bullet)) continue;
-                            if (KindLookup[bullet].Value != BulletKindId.Trash) continue;
                             if (!RequestLookup.HasComponent(bullet)) continue;
                             if (RequestLookup.IsComponentEnabled(bullet)) continue;
 
@@ -175,7 +203,19 @@ namespace SweepNDodge.DotsBullets
                             float dxp = p.x - playerPos.x;
                             float dzp = p.z - playerPos.z;
                             float distSq = dxp * dxp + dzp * dzp;
-                            if (distSq > rangeSq) continue;
+                            var kind = KindLookup[bullet].Value;
+
+                            bool canCapture = false;
+                            if (kind == BulletKindId.Trash)
+                            {
+                                canCapture = distSq <= rangeSq;
+                            }
+                            else if (kind == BulletKindId.Hazard && IsHazardCaptureActive != 0)
+                            {
+                                canCapture = distSq >= HazardRingInnerSq && distSq <= HazardRingOuterSq;
+                            }
+
+                            if (!canCapture) continue;
 
                             RequestLookup.SetComponentEnabled(bullet, true);
                             TryAccumulateDepletion(bullet);
