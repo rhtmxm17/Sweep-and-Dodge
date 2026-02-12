@@ -1,9 +1,9 @@
-# ADR-20260206-bullet-pipeline-ownership-and-update-order
+﻿# ADR-20260206-bullet-pipeline-ownership-and-update-order
 > 대량 탄막 처리를 위해 풀/CellMap 소유권과 프레임 내 업데이트 순서를 4단 파이프라인으로 고정한다
 
 ## 상태
 - 반영됨
-- 다음에서 일부 대체됨: [ADR: 비활성 탄환의 불필요한 시뮬레이션을 제거](ADR-20260210-bullet-active-filtering-and-despawn-request.md)
+- 다음에서 일부 대체됨: [ADR: 비활성 탄환의 불필요한 시뮬레이션을 제거](ADR-20260210-01-bullet-active-filtering-and-despawn-request.md)
 
 ## 배경
 - 대량 Bullet(수만~10만+)을 DOTS로 처리하는 과정에서 다음 문제가 관찰되었다.
@@ -117,3 +117,6 @@ enableable 쿼리 규칙:
 - Entities Profiler:
   - 활성 Bullet 수(ActiveTag enabled)와 Simulation 대상 수가 일치하는지 확인
   - 극단 케이스(예: 10만 탄 동프레임 제거)에서 프레임 타임 관찰
+
+
+

@@ -1,4 +1,4 @@
-# ADR-20260211-source-based-spawn-and-depletion
+﻿# ADR-20260211-01-source-based-spawn-and-depletion
 > 탄환 스폰을 전역 랜덤에서 Source 독립 스폰 + 수거 기반 고갈(통상/약화/고갈)로 전환
 
 ## 상태
@@ -40,3 +40,5 @@
 - Play Mode에서 Source별 고갈 전이 시점과 밀도 체감 확인.
 - Entities Profiler로 Source 수 증가 시 `ExecutionBegin` 비용 변화 측정.
 - Source 이동이 필요해지면 `SourceAnchorComponent` 갱신 시스템을 추가하거나, 스폰을 2단계(요청 생성/소비)로 분리하는 확장을 검토한다.
+
+

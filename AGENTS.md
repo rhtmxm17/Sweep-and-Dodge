@@ -118,18 +118,20 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 ---
 
 ## 8. 문서/결정 기록(ADR)
-- 설계 전환점마다 `Docs/ADR/ADR-YYYYMMDD-*.md`에 기록:
+- 설계 전환점마다 `Docs/ADR/ADR-YYYYMMDD-NN-*.md`에 기록:
   - 문제(왜), 결정(무엇), 대안(비교), 결과(리스크/후속)
 - AGENTS.md는 "현재 합의된 기준"만 유지, 상세 논의는 ADR로 분리
 - ADR 파일 규칙
-  - 파일명 / 제목: 영어 (kebab-case)
-  - 첫 줄: 영어 제목
+  - 파일명: `ADR-YYYYMMDD-NN-kebab-case.md`
+  - NN은 **논리 의존순**(기반 결정 -> 파생 결정)으로 부여한다.
+  - 작성 시점 순서와 충돌하면, 탐색성과 읽기 흐름을 위해 논리 의존순을 우선한다.
+  - 첫 줄: 파일명과 동일한 영어 제목(`# ADR-YYYYMMDD-NN-kebab-case`)
   - 둘째 줄: 한국어 1문장 요약
   - 본문: 한국어 (필요 시 영어 병기)
   - 예시:
 
 ```markdown
-# ADR-012-ecb-vs-flag-state
+# ADR-20260212-01-ecb-vs-flag-state
 > 대량 엔티티 상태 전환에서 ECB 대신 Flag 기반 접근을 채택한 결정
 
 ## 배경

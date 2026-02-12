@@ -1,4 +1,4 @@
-# ADR-20260210-bullet-active-filtering-and-despawn-request
+﻿# ADR-20260210-01-bullet-active-filtering-and-despawn-request
 > 비활성 탄환의 불필요한 시뮬레이션을 제거하고 디스폰 요청/실행 책임을 분리
 
 ## 상태
@@ -36,3 +36,5 @@
 ## 후속
 - Play Mode 스모크 테스트로 활성/비활성 탄환 갱신 여부 확인.
 - Entities Profiler로 Simulation 단계의 대상 수가 기대대로 감소하는지 확인.
+
+

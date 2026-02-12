@@ -1,4 +1,4 @@
-# ADR-20260211-bullet-type-key-pool-set
+﻿# ADR-20260211-02-bullet-type-key-pool-set
 > 탄환 종류를 2종 고정 enum에서 TypeKey 기반 Key-Pool Set으로 전환해 다종 확장성과 소유권 일관성을 확보한다.
 
 ## 상태
@@ -52,3 +52,5 @@
 - `BulletPoolDefinitionBuffer`에 `SpawnWeight`를 추가해 그룹 내 타입 가중치 스폰을 지원한다.
 - 타입별 `DequeueFailCount`, `ActivePeak` 계측을 추가해 풀 사이즈 튜닝 근거를 확보한다.
 - 필요 시 `MaxActiveTarget`을 실제 스폰 가드로 연결해 과부하 프레임 보호를 강화한다.
+
+

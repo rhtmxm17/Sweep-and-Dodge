@@ -1,4 +1,4 @@
-﻿# ADR-20260212-area-density-based-spawn-and-field-shapes
+﻿# ADR-20260212-02-area-density-based-spawn-and-field-shapes
 > Source 스폰 정책을 면적 밀도 기준으로 전환하고 BulletField 형태를 원형/사각형으로 확장한 결정
 
 ## 배경
@@ -43,3 +43,5 @@
   - `Rectangle`에서 `Size.x == 0` 또는 `Size.y == 0` 경고
 - 디버그 표시 개선
   - Source Gizmo에 면적/예상 초당 스폰량 표시
+
+

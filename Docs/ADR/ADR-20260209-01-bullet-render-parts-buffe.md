@@ -1,11 +1,11 @@
-# ADR-20260209-bullet-render-parts-buffer
+﻿# ADR-20260209-bullet-render-parts-buffer
 > 프리팹 하위에 다중 렌더 엔티티가 존재하는 탄환을 위해, 베이킹 시 렌더 파츠 엔티티 목록을 루트 버퍼에 저장하고 런타임 토글은 버퍼 기반으로 수행한다.
 
 ## 상태
 - 반영됨
 
 ## 배경
-- 이는 기존 파이프라인 ADR([20260206](ADR-20260206-bullet-pipeline-ownership.md))에서 TODO로 명시된, 다중 렌더 파츠를 고려하여 단일 `MaterialMeshInfo` 토글 대신 렌더 파츠 버퍼를 적용해 Bake 시 루트에 버퍼를 채우고 Owner가 순회 토글하는 설계 및 구현이다.
+- 이는 기존 파이프라인 ADR([20260206](ADR-20260206-01-bullet-pipeline-ownership.md))에서 TODO로 명시된, 다중 렌더 파츠를 고려하여 단일 `MaterialMeshInfo` 토글 대신 렌더 파츠 버퍼를 적용해 Bake 시 루트에 버퍼를 채우고 Owner가 순회 토글하는 설계 및 구현이다.
 - Bullet 프리팹은 "루트(로직/풀링/이동) + 자식(외형)" 형태를 전제로 하며, 외형은 1개가 아니라 **여러 개의 렌더 파츠(엔티티)** 로 구성될 수 있다.
 - 프리팹에서 렌더는 루트가 아닌 자식에 붙는 경우가 흔하며, 이때 엔티티라면 루트 엔티티만 렌더 on/off 해서는 외형이 함께 꺼지지 않는다.
 - 풀링 정책상 Bullet의 스폰/디스폰은 구조 변경(Add/Remove) 대신 enable/disable 기반 상태 전환을 기본으로 하며, 렌더 on/off 역시 Owner 단계(Spawn/Despawn/Bootstrap)에서 일관되게 제어되어야 한다.
@@ -73,3 +73,6 @@
 - 계약 강화(선택)
   - Baker 단계에서 “버퍼에는 `MaterialMeshInfo`를 가진 엔티티만” 넣도록 보장해,
     런타임 `HasComponent` 가드를 제거할지 결정
+
+
+
