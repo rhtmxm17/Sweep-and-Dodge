@@ -7,7 +7,9 @@
 //                                - SpatialHash ReadOnly 조회로 디스폰 요청 태그 enable
 //   BulletExecutionEndGroup    : 디스폰 실행 + 풀 Enqueue(반납 실행)
 // - FreeByKey(키 기반 풀) 접근은 Begin/End "Owner 영역"으로만 제한(다른 시스템은 요청만 남김)
-// - SpatialHash(CellMap) writer는 Simulation으로 고정, Request는 ReadOnly 소비
+// - SpatialHash writer는 Simulation으로 고정, Request는 ReadOnly 소비
+//   - CellMap: 전체 활성 탄
+//   - HazardCellMap: 위험탄(BulletHazardTag enabled) 전용
 // - 메인 스레드에서 LocalTransform 직접 읽기 금지(타입 충돌 방지): Request는 Job 스케줄로 처리
 // - 풀링 시스템에서 렌더 토글 처리:
 //   - 풀 초기화/스폰/디스폰에서 EntityRenderElementBuffer(렌더 파츠)를 통해 MaterialMeshInfo 토글
@@ -57,7 +59,8 @@ namespace SweepNDodge.DotsBullets
     /// <summary>
     /// Burst/Job에서 사용 가능한 정적 공유 저장소.
     /// - FreeByKey(키 기반 풀): Begin/End Owner 영역에서만 접근
-    /// - CellMap(SpatialHash): Simulation이 Write, Request가 ReadOnly
+    /// - CellMap(SpatialHash): 전체 활성 탄 (Simulation Write / Request ReadOnly)
+    /// - HazardCellMap(SpatialHash): 위험탄 전용 (Simulation Write / Request ReadOnly)
     ///
     /// 주의: SharedStatic은 프로세스 전역이므로, 멀티 월드 사용 시 관리 전략이 추가로 필요할 수 있다.
     /// (현재 스코프에서는 단일 월드 전제로 사용)
@@ -68,12 +71,14 @@ namespace SweepNDodge.DotsBullets
         private struct FreeByKeyKey { }
         private struct PoolFenceKey { }
         private struct CellMapKey { }
+        private struct HazardCellMapKey { }
         private struct CellMapFenceKey { }
 
         private static readonly SharedStatic<byte> _flags = SharedStatic<byte>.GetOrCreate<FlagsKey>();
         private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _freeByKey = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<FreeByKeyKey>();
         private static readonly SharedStatic<JobHandle> _poolFence = SharedStatic<JobHandle>.GetOrCreate<PoolFenceKey>();
         private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _cellMap = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<CellMapKey>();
+        private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _hazardCellMap = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<HazardCellMapKey>();
         private static readonly SharedStatic<JobHandle> _cellMapFence = SharedStatic<JobHandle>.GetOrCreate<CellMapFenceKey>();
 
         public static bool IsInitialized => _flags.Data != 0;
@@ -82,6 +87,7 @@ namespace SweepNDodge.DotsBullets
         public static ref JobHandle PoolFence => ref _poolFence.Data;
 
         public static ref NativeParallelMultiHashMap<int, Entity> CellMap => ref _cellMap.Data;
+        public static ref NativeParallelMultiHashMap<int, Entity> HazardCellMap => ref _hazardCellMap.Data;
         public static ref JobHandle CellMapFence => ref _cellMapFence.Data;
 
         public static void MarkInitialized() => _flags.Data = 1;
@@ -94,7 +100,7 @@ namespace SweepNDodge.DotsBullets
 
     /// <summary>
     /// 풀/SpatialHash 컨테이너 초기화 및 해제.
-    /// - FreeByKey, CellMap을 Persistent로 생성
+    /// - FreeByKey, CellMap, HazardCellMap을 Persistent로 생성
     /// - BulletPoolDefinitionBuffer 기반으로 타입별 Instantiate 후 FreeByKey에 반납
     /// </summary>
     [BurstCompile]
@@ -146,6 +152,7 @@ namespace SweepNDodge.DotsBullets
             BulletFieldShared.PoolFence = default;
 
             BulletFieldShared.CellMap = new NativeParallelMultiHashMap<int, Entity>(poolCapacity, Allocator.Persistent);
+            BulletFieldShared.HazardCellMap = new NativeParallelMultiHashMap<int, Entity>(poolCapacity, Allocator.Persistent);
             BulletFieldShared.CellMapFence = default;
 
             // Key-Pool 구성: 타입 정의별로 프리팹 인스턴스를 생성해 FreeByKey로 반납
@@ -192,6 +199,8 @@ namespace SweepNDodge.DotsBullets
                         em.SetComponentData(b, new BulletTypeKeyComponent { Value = def.TypeKey });
                     if (em.HasComponent<BulletCaptureRuleComponent>(b))
                         em.SetComponentData(b, new BulletCaptureRuleComponent { Value = def.CaptureRule });
+                    if (em.HasComponent<BulletHazardTag>(b))
+                        em.SetComponentEnabled<BulletHazardTag>(b, def.CaptureRule == BulletCaptureRuleId.RiskTimedResolve);
                     if (em.HasComponent<BulletSourceRefComponent>(b))
                         em.SetComponentData(b, new BulletSourceRefComponent { Value = Entity.Null });
 
@@ -209,6 +218,8 @@ namespace SweepNDodge.DotsBullets
 
             if (BulletFieldShared.CellMap.IsCreated)
                 BulletFieldShared.CellMap.Dispose();
+            if (BulletFieldShared.HazardCellMap.IsCreated)
+                BulletFieldShared.HazardCellMap.Dispose();
             if (BulletFieldShared.FreeByKey.IsCreated)
                 BulletFieldShared.FreeByKey.Dispose();
 
@@ -552,24 +563,36 @@ namespace SweepNDodge.DotsBullets
                 RequestLookup = requestLookup
             }.ScheduleParallel(state.Dependency);
 
-            // 2) SpatialHash Build (활성 탄만)
-            // - CellMap은 SharedStatic이므로 이전 프레임/요청 시스템의 read가 끝난 뒤 Clear/Build해야 한다.
+            // 2) SpatialHash Build
+            // - CellMap: 전체 활성 탄
+            // - HazardCellMap: 위험탄(BulletHazardTag enabled)만
+            // - SharedStatic이므로 이전 프레임/요청 시스템의 read가 끝난 뒤 Clear/Build해야 한다.
             var cellMapDeps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.CellMapFence);
 
             var clearHandle = new ClearCellMapJob
             {
                 CellMap = BulletFieldShared.CellMap
             }.Schedule(cellMapDeps);
+            var clearHazardHandle = new ClearCellMapJob
+            {
+                CellMap = BulletFieldShared.HazardCellMap
+            }.Schedule(cellMapDeps);
 
-            var buildDeps = JobHandle.CombineDependencies(state.Dependency, clearHandle);
+            var clearDeps = JobHandle.CombineDependencies(clearHandle, clearHazardHandle);
+            var buildDeps = JobHandle.CombineDependencies(state.Dependency, clearDeps);
             var buildHandle = new BuildSpatialHashJob
             {
                 InvCellSize = cfg.InvCellSize,
                 Writer = BulletFieldShared.CellMap.AsParallelWriter()
             }.ScheduleParallel(buildDeps);
+            var buildHazardHandle = new BuildHazardSpatialHashJob
+            {
+                InvCellSize = cfg.InvCellSize,
+                Writer = BulletFieldShared.HazardCellMap.AsParallelWriter()
+            }.ScheduleParallel(buildDeps);
 
-            state.Dependency = buildHandle;
-            BulletFieldShared.CellMapFence = buildHandle; // RequestGroup이 이 fence에 의존하도록
+            state.Dependency = JobHandle.CombineDependencies(buildHandle, buildHazardHandle);
+            BulletFieldShared.CellMapFence = state.Dependency; // RequestGroup이 이 fence에 의존하도록
         }
 
         [BurstCompile]
@@ -612,6 +635,19 @@ namespace SweepNDodge.DotsBullets
             public NativeParallelMultiHashMap<int, Entity>.ParallelWriter Writer;
 
             private void Execute(Entity e, in LocalTransform tx, in BulletActiveTag _)
+            {
+                var cell = SpatialHashUtility.ToCell(tx.Position, InvCellSize);
+                Writer.Add(SpatialHashUtility.Hash(cell), e);
+            }
+        }
+
+        [BurstCompile]
+        private partial struct BuildHazardSpatialHashJob : IJobEntity
+        {
+            public float InvCellSize;
+            public NativeParallelMultiHashMap<int, Entity>.ParallelWriter Writer;
+
+            private void Execute(Entity e, in LocalTransform tx, in BulletActiveTag _, in BulletHazardTag __)
             {
                 var cell = SpatialHashUtility.ToCell(tx.Position, InvCellSize);
                 Writer.Add(SpatialHashUtility.Hash(cell), e);

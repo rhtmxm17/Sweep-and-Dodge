@@ -35,6 +35,10 @@ namespace SweepNDodge.DotsBullets
                 AddComponent<BulletDespawnRequestTag>(root);
                 SetComponentEnabled<BulletDespawnRequestTag>(root, false);
 
+                // 위험탄 분류 태그(항상 존재). CaptureRule 기준으로 enable 상태를 설정한다.
+                AddComponent<BulletHazardTag>(root);
+                SetComponentEnabled<BulletHazardTag>(root, authoring.CaptureRule == BulletCaptureRuleId.RiskTimedResolve);
+
                 // 다중 렌더 파츠 목록(스폰/디스폰 시 MaterialMeshInfo enable 토글 용도)
                 // - 버퍼에는 렌더 파츠 엔티티만 포함됨(외형 이외 사용 없음 전제)
                 var renderTargets = AddBuffer<EntityRenderElementBuffer>(root);

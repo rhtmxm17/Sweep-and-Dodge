@@ -40,4 +40,8 @@ namespace SweepNDodge.DotsBullets
         public byte IsActive;           // 0/1
         public byte ActivateRequested;  // 0/1 (입력 시스템이 1로 세팅 → 이 시스템이 소모)
     }
+
+    // 위험탄 충돌이 감지되었음을 알리는 요청 태그.
+    // Request 단계에서 enable, Execution 단계에서 consume(disable)한다.
+    public struct PlayerHazardHitRequestTag : IComponentData, IEnableableComponent { }
 }

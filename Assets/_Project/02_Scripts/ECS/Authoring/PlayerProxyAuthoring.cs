@@ -62,6 +62,9 @@ namespace SweepNDodge.DotsBullets
                     SyncRotation = 1,
                     VacuumRequested = 0
                 });
+
+                AddComponent<PlayerHazardHitRequestTag>(e);
+                SetComponentEnabled<PlayerHazardHitRequestTag>(e, false);
             }
         }
     }
