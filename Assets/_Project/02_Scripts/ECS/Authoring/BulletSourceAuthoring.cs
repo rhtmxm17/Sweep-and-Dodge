@@ -8,11 +8,7 @@ namespace SweepNDodge.DotsBullets
     {
         [Header("Source Spawn")]
         public float Radius = 8f;
-        public float SpawnRateNormal = 5000f;
-        [Range(0f, 1f)] public float WeakenedMultiplier = 0.5f;
-        [Range(0f, 1f)] public float HazardRatioNormal = 0.04f;
-        [Range(0f, 1f)] public float HazardRatioWeakened = 0.10f;
-        [Range(0f, 1f)] public float HazardRatioNearDepleted = 0.18f;
+        public BulletSourceProfileSO SpawnProfile;
 
         [Header("Depletion Threshold (externally injectable)")]
         public int ThresholdWeakened = 2000;
@@ -36,11 +32,6 @@ namespace SweepNDodge.DotsBullets
                 AddComponent(e, new SourceSpawnComponent
                 {
                     Radius = Mathf.Max(0f, authoring.Radius),
-                    SpawnRateNormal = Mathf.Max(0f, authoring.SpawnRateNormal),
-                    WeakenedMultiplier = Mathf.Clamp01(authoring.WeakenedMultiplier),
-                    HazardRatioNormal = Mathf.Clamp01(authoring.HazardRatioNormal),
-                    HazardRatioWeakened = Mathf.Clamp01(authoring.HazardRatioWeakened),
-                    HazardRatioNearDepleted = Mathf.Clamp01(authoring.HazardRatioNearDepleted),
                     ThresholdWeakened = thresholdWeakened,
                     ThresholdDepleted = thresholdDepleted,
                     CollectedCount = Mathf.Max(0, authoring.InitialCollectedCount),
@@ -49,14 +40,63 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(e, new SourceSpawnRuntimeComponent
                 {
-                    SpawnAccumulator = 0f,
                     SpawnSequence = 1u
                 });
+
+                var patternBuffer = AddBuffer<SourceSpawnPatternBuffer>(e);
+                var activeCountBuffer = AddBuffer<SourceActiveBulletCountBuffer>(e);
+                BakeSpawnProfile(authoring.SpawnProfile, patternBuffer, activeCountBuffer);
 
                 AddComponent(e, new SourceAnchorComponent
                 {
                     Position = (float3)authoring.transform.position
                 });
+            }
+
+            private void BakeSpawnProfile(
+                BulletSourceProfileSO profile,
+                DynamicBuffer<SourceSpawnPatternBuffer> patternBuffer,
+                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer)
+            {
+                if (profile == null || profile.States == null)
+                    return;
+
+                var activeCountKeys = new System.Collections.Generic.HashSet<int>();
+
+                for (int i = 0; i < profile.States.Length; i++)
+                {
+                    var stateConfig = profile.States[i];
+                    var entries = stateConfig.Entries;
+                    if (entries == null)
+                        continue;
+
+                    for (int j = 0; j < entries.Length; j++)
+                    {
+                        var entry = entries[j];
+                        if (entry.Bullet == null)
+                            continue;
+
+                        int typeKey = entry.Bullet.DefinitionId;
+                        patternBuffer.Add(new SourceSpawnPatternBuffer
+                        {
+                            State = stateConfig.State,
+                            BulletTypeKey = typeKey,
+                            SpawnMode = entry.SpawnMode,
+                            SpawnRatePerSec = Mathf.Max(0f, entry.SpawnRatePerSec),
+                            MaxActive = Mathf.Max(0, entry.MaxActive),
+                            SpawnAccumulator = 0f
+                        });
+
+                        if (activeCountKeys.Add(typeKey))
+                        {
+                            activeCountBuffer.Add(new SourceActiveBulletCountBuffer
+                            {
+                                BulletTypeKey = typeKey,
+                                ActiveCount = 0
+                            });
+                        }
+                    }
+                }
             }
         }
 

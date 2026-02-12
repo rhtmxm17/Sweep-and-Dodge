@@ -67,16 +67,12 @@ namespace SweepNDodge.DotsBullets
         private struct FlagsKey { }
         private struct FreeByKeyKey { }
         private struct PoolFenceKey { }
-        private struct StandardTypeKeysKey { }
-        private struct RiskTypeKeysKey { }
         private struct CellMapKey { }
         private struct CellMapFenceKey { }
 
         private static readonly SharedStatic<byte> _flags = SharedStatic<byte>.GetOrCreate<FlagsKey>();
         private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _freeByKey = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<FreeByKeyKey>();
         private static readonly SharedStatic<JobHandle> _poolFence = SharedStatic<JobHandle>.GetOrCreate<PoolFenceKey>();
-        private static readonly SharedStatic<NativeList<int>> _standardTypeKeys = SharedStatic<NativeList<int>>.GetOrCreate<StandardTypeKeysKey>();
-        private static readonly SharedStatic<NativeList<int>> _riskTypeKeys = SharedStatic<NativeList<int>>.GetOrCreate<RiskTypeKeysKey>();
         private static readonly SharedStatic<NativeParallelMultiHashMap<int, Entity>> _cellMap = SharedStatic<NativeParallelMultiHashMap<int, Entity>>.GetOrCreate<CellMapKey>();
         private static readonly SharedStatic<JobHandle> _cellMapFence = SharedStatic<JobHandle>.GetOrCreate<CellMapFenceKey>();
 
@@ -84,8 +80,6 @@ namespace SweepNDodge.DotsBullets
 
         public static ref NativeParallelMultiHashMap<int, Entity> FreeByKey => ref _freeByKey.Data;
         public static ref JobHandle PoolFence => ref _poolFence.Data;
-        public static ref NativeList<int> StandardTypeKeys => ref _standardTypeKeys.Data;
-        public static ref NativeList<int> RiskTypeKeys => ref _riskTypeKeys.Data;
 
         public static ref NativeParallelMultiHashMap<int, Entity> CellMap => ref _cellMap.Data;
         public static ref JobHandle CellMapFence => ref _cellMapFence.Data;
@@ -150,8 +144,6 @@ namespace SweepNDodge.DotsBullets
 
             BulletFieldShared.FreeByKey = new NativeParallelMultiHashMap<int, Entity>(poolCapacity, Allocator.Persistent);
             BulletFieldShared.PoolFence = default;
-            BulletFieldShared.StandardTypeKeys = new NativeList<int>(Allocator.Persistent);
-            BulletFieldShared.RiskTypeKeys = new NativeList<int>(Allocator.Persistent);
 
             BulletFieldShared.CellMap = new NativeParallelMultiHashMap<int, Entity>(poolCapacity, Allocator.Persistent);
             BulletFieldShared.CellMapFence = default;
@@ -162,11 +154,6 @@ namespace SweepNDodge.DotsBullets
                 var def = poolDefs[i];
                 if (def.Prefab == Entity.Null || def.PoolSize <= 0)
                     continue;
-
-                if (def.CaptureRule == BulletCaptureRuleId.RiskTimedResolve)
-                    BulletFieldShared.RiskTypeKeys.Add(def.TypeKey);
-                else
-                    BulletFieldShared.StandardTypeKeys.Add(def.TypeKey);
 
                 using var pool = new NativeArray<Entity>(def.PoolSize, Allocator.Temp);
                 em.Instantiate(def.Prefab, pool);
@@ -224,10 +211,6 @@ namespace SweepNDodge.DotsBullets
                 BulletFieldShared.CellMap.Dispose();
             if (BulletFieldShared.FreeByKey.IsCreated)
                 BulletFieldShared.FreeByKey.Dispose();
-            if (BulletFieldShared.StandardTypeKeys.IsCreated)
-                BulletFieldShared.StandardTypeKeys.Dispose();
-            if (BulletFieldShared.RiskTypeKeys.IsCreated)
-                BulletFieldShared.RiskTypeKeys.Dispose();
 
             BulletFieldShared.PoolFence = default;
             BulletFieldShared.CellMapFence = default;
@@ -270,7 +253,6 @@ namespace SweepNDodge.DotsBullets
             var vel = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
             var life = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
             var typeKey = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
-            var captureRule = SystemAPI.GetComponentLookup<BulletCaptureRuleComponent>(false);
             var sourceRef = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(false);
             var active = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
             var request = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
@@ -281,7 +263,6 @@ namespace SweepNDodge.DotsBullets
             vel.Update(ref state);
             life.Update(ref state);
             typeKey.Update(ref state);
-            captureRule.Update(ref state);
             sourceRef.Update(ref state);
             active.Update(ref state);
             request.Update(ref state);
@@ -298,14 +279,11 @@ namespace SweepNDodge.DotsBullets
                 Lifetime = cfg.BulletLifetime,
 
                 FreeByKey = BulletFieldShared.FreeByKey,
-                StandardTypeKeys = BulletFieldShared.StandardTypeKeys,
-                RiskTypeKeys = BulletFieldShared.RiskTypeKeys,
 
                 TxLookup = tx,
                 VelLookup = vel,
                 LifeLookup = life,
                 TypeKeyLookup = typeKey,
-                CaptureRuleLookup = captureRule,
                 SourceRefLookup = sourceRef,
                 ActiveLookup = active,
                 RequestLookup = request,
@@ -325,14 +303,11 @@ namespace SweepNDodge.DotsBullets
             public float Lifetime;
 
             public NativeParallelMultiHashMap<int, Entity> FreeByKey;
-            [ReadOnly] public NativeList<int> StandardTypeKeys;
-            [ReadOnly] public NativeList<int> RiskTypeKeys;
 
             public ComponentLookup<LocalTransform> TxLookup;
             public ComponentLookup<BulletVelocityComponent> VelLookup;
             public ComponentLookup<BulletLifetimeComponent> LifeLookup;
             public ComponentLookup<BulletTypeKeyComponent> TypeKeyLookup;
-            public ComponentLookup<BulletCaptureRuleComponent> CaptureRuleLookup;
             public ComponentLookup<BulletSourceRefComponent> SourceRefLookup;
             public ComponentLookup<BulletActiveTag> ActiveLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
@@ -343,140 +318,110 @@ namespace SweepNDodge.DotsBullets
                 Entity sourceEntity,
                 in SourceAnchorComponent sourceAnchor,
                 ref SourceSpawnComponent source,
-                ref SourceSpawnRuntimeComponent runtime)
+                ref SourceSpawnRuntimeComponent runtime,
+                DynamicBuffer<SourceSpawnPatternBuffer> patterns,
+                DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts)
             {
-                float rate = source.SpawnRateNormal;
-                if (source.State == SourceStateId.Weakened)
-                    rate *= source.WeakenedMultiplier;
-                else if (source.State == SourceStateId.Depleted)
-                    rate = 0f;
-
-                if (rate <= 0f)
+                if (source.State == SourceStateId.Depleted)
                     return;
 
-                runtime.SpawnAccumulator += rate * DeltaTime;
-                int spawnCount = (int)runtime.SpawnAccumulator;
-                runtime.SpawnAccumulator -= spawnCount;
-
-                if (spawnCount <= 0)
+                if (patterns.Length <= 0)
                     return;
 
                 uint seed = math.max(1u, runtime.SpawnSequence);
-                runtime.SpawnSequence = seed + (uint)spawnCount;
-                var random = Unity.Mathematics.Random.CreateFromIndex(seed);
+                var random = Unity.Mathematics.Random.CreateFromIndex(seed ^ (uint)sourceEntity.Index);
                 float radius = math.max(0f, source.Radius);
                 float3 center = sourceAnchor.Position;
 
-                for (int i = 0; i < spawnCount; i++)
+                int spawnedTotal = 0;
+                for (int i = 0; i < patterns.Length; i++)
                 {
-                    bool preferRiskType = random.NextFloat(0f, 1f) < GetHazardRatio(source);
-                    if (!TryDequeueForSpawn(ref random, preferRiskType, out var e, out var spawnTypeKey, out var spawnCaptureRule))
-                        break;
-
-                    float anglePos = random.NextFloat(0f, math.PI * 2f);
-                    float dist = math.sqrt(random.NextFloat(0f, 1f)) * radius;
-                    float2 offset = new float2(math.cos(anglePos), math.sin(anglePos)) * dist;
-                    float3 pos = new float3(center.x + offset.x, center.y, center.z + offset.y);
-
-                    float angle = random.NextFloat(0f, math.PI * 2f);
-                    float2 dir = new float2(math.cos(angle), math.sin(angle));
-                    var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
-
-                    if (TxLookup.HasComponent(e))
-                        TxLookup[e] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
-                    if (VelLookup.HasComponent(e))
-                        VelLookup[e] = new BulletVelocityComponent { Value = dir * Speed };
-                    if (LifeLookup.HasComponent(e))
-                        LifeLookup[e] = new BulletLifetimeComponent { Value = Lifetime };
-                    if (TypeKeyLookup.HasComponent(e))
-                        TypeKeyLookup[e] = new BulletTypeKeyComponent { Value = spawnTypeKey };
-                    if (CaptureRuleLookup.HasComponent(e))
-                        CaptureRuleLookup[e] = new BulletCaptureRuleComponent { Value = spawnCaptureRule };
-                    if (SourceRefLookup.HasComponent(e))
-                        SourceRefLookup[e] = new BulletSourceRefComponent { Value = sourceEntity };
-
-                    if (RequestLookup.HasComponent(e))
-                        RequestLookup.SetComponentEnabled(e, false);
-
-                    if (ActiveLookup.HasComponent(e))
-                        ActiveLookup.SetComponentEnabled(e, true);
-                    // 렌더 on: RenderParts(자식 렌더 엔티티) MaterialMeshInfo enable
-                    if (RenderPartsLookup.HasBuffer(e))
-                    {
-                        var parts = RenderPartsLookup[e];
-                        for (int p = 0; p < parts.Length; p++)
-                        {
-                            var pe = parts[p].Value;
-                            if (RenderLookup.HasComponent(pe))
-                                RenderLookup.SetComponentEnabled(pe, true);
-                        }
-                    }
-                    // 초기화 시점에 fallback 이 적용된, 루트에 렌더가 있는 단일 프리팹 대응
-                    else
-                    {
-                        if (RenderLookup.HasComponent(e))
-                            RenderLookup.SetComponentEnabled(e, true);
-                    }
-                }
-            }
-
-            private static float GetHazardRatio(in SourceSpawnComponent source)
-            {
-                if (source.State == SourceStateId.Depleted)
-                    return math.saturate(source.HazardRatioNearDepleted);
-                if (source.State == SourceStateId.Weakened)
-                    return math.saturate(source.HazardRatioWeakened);
-                return math.saturate(source.HazardRatioNormal);
-            }
-
-            private bool TryDequeueForSpawn(
-                ref Unity.Mathematics.Random random,
-                bool preferRiskType,
-                out Entity entity,
-                out int typeKey,
-                out BulletCaptureRuleId captureRule)
-            {
-                var primaryRule = preferRiskType ? BulletCaptureRuleId.RiskTimedResolve : BulletCaptureRuleId.StandardCollectible;
-                if (TryDequeueFromRule(ref random, primaryRule, out entity, out typeKey, out captureRule))
-                    return true;
-
-                var fallbackRule = preferRiskType ? BulletCaptureRuleId.StandardCollectible : BulletCaptureRuleId.RiskTimedResolve;
-                return TryDequeueFromRule(ref random, fallbackRule, out entity, out typeKey, out captureRule);
-            }
-
-            private bool TryDequeueFromRule(
-                ref Unity.Mathematics.Random random,
-                BulletCaptureRuleId rule,
-                out Entity entity,
-                out int typeKey,
-                out BulletCaptureRuleId captureRule)
-            {
-                var keys = rule == BulletCaptureRuleId.RiskTimedResolve ? RiskTypeKeys : StandardTypeKeys;
-                if (!keys.IsCreated || keys.Length <= 0)
-                {
-                    entity = Entity.Null;
-                    typeKey = 0;
-                    captureRule = BulletCaptureRuleId.StandardCollectible;
-                    return false;
-                }
-
-                int start = keys.Length == 1 ? 0 : random.NextInt(0, keys.Length);
-                for (int i = 0; i < keys.Length; i++)
-                {
-                    int index = (start + i) % keys.Length;
-                    int candidateKey = keys[index];
-                    if (!TryDequeueByKey(candidateKey, out entity))
+                    var pattern = patterns[i];
+                    if (pattern.State != source.State)
                         continue;
 
-                    typeKey = candidateKey;
-                    captureRule = rule;
-                    return true;
+                    int spawnCount = ResolveSpawnCount(ref pattern, activeCounts);
+                    patterns[i] = pattern;
+                    if (spawnCount <= 0)
+                        continue;
+
+                    for (int s = 0; s < spawnCount; s++)
+                    {
+                        if (!TryDequeueByKey(pattern.BulletTypeKey, out var e))
+                            break;
+
+                        float anglePos = random.NextFloat(0f, math.PI * 2f);
+                        float dist = math.sqrt(random.NextFloat(0f, 1f)) * radius;
+                        float2 offset = new float2(math.cos(anglePos), math.sin(anglePos)) * dist;
+                        float3 pos = new float3(center.x + offset.x, center.y, center.z + offset.y);
+
+                        float angle = random.NextFloat(0f, math.PI * 2f);
+                        float2 dir = new float2(math.cos(angle), math.sin(angle));
+                        var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
+
+                        if (TxLookup.HasComponent(e))
+                            TxLookup[e] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
+                        if (VelLookup.HasComponent(e))
+                            VelLookup[e] = new BulletVelocityComponent { Value = dir * Speed };
+                        if (LifeLookup.HasComponent(e))
+                            LifeLookup[e] = new BulletLifetimeComponent { Value = Lifetime };
+                        if (TypeKeyLookup.HasComponent(e))
+                            TypeKeyLookup[e] = new BulletTypeKeyComponent { Value = pattern.BulletTypeKey };
+                        if (SourceRefLookup.HasComponent(e))
+                            SourceRefLookup[e] = new BulletSourceRefComponent { Value = sourceEntity };
+
+                        if (RequestLookup.HasComponent(e))
+                            RequestLookup.SetComponentEnabled(e, false);
+
+                        if (ActiveLookup.HasComponent(e))
+                            ActiveLookup.SetComponentEnabled(e, true);
+
+                        if (RenderPartsLookup.HasBuffer(e))
+                        {
+                            var parts = RenderPartsLookup[e];
+                            for (int p = 0; p < parts.Length; p++)
+                            {
+                                var pe = parts[p].Value;
+                                if (RenderLookup.HasComponent(pe))
+                                    RenderLookup.SetComponentEnabled(pe, true);
+                            }
+                        }
+                        else if (RenderLookup.HasComponent(e))
+                        {
+                            RenderLookup.SetComponentEnabled(e, true);
+                        }
+
+                        IncrementActiveCount(ref activeCounts, pattern.BulletTypeKey);
+                        spawnedTotal++;
+                    }
                 }
 
-                entity = Entity.Null;
-                typeKey = 0;
-                captureRule = rule;
-                return false;
+                runtime.SpawnSequence = seed + (uint)math.max(1, spawnedTotal);
+            }
+
+            private int ResolveSpawnCount(ref SourceSpawnPatternBuffer pattern, DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts)
+            {
+                float rate = math.max(0f, pattern.SpawnRatePerSec);
+
+                if (rate <= 0f)
+                {
+                    pattern.SpawnAccumulator = 0f;
+                    return 0;
+                }
+
+                pattern.SpawnAccumulator += rate * DeltaTime;
+                int spawnCount = (int)pattern.SpawnAccumulator;
+                pattern.SpawnAccumulator -= spawnCount;
+
+                if (spawnCount <= 0)
+                    return 0;
+
+                if (pattern.SpawnMode != SourceSpawnModeId.CapAndMaxRate)
+                    return spawnCount;
+
+                int active = GetActiveCount(activeCounts, pattern.BulletTypeKey);
+                int room = math.max(0, pattern.MaxActive - active);
+                return math.min(spawnCount, room);
             }
 
             private bool TryDequeueByKey(int key, out Entity e)
@@ -486,6 +431,36 @@ namespace SweepNDodge.DotsBullets
 
                 FreeByKey.Remove(key, e);
                 return true;
+            }
+
+            private static int GetActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
+            {
+                for (int i = 0; i < activeCounts.Length; i++)
+                {
+                    if (activeCounts[i].BulletTypeKey == typeKey)
+                        return activeCounts[i].ActiveCount;
+                }
+                return 0;
+            }
+
+            private static void IncrementActiveCount(ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
+            {
+                for (int i = 0; i < activeCounts.Length; i++)
+                {
+                    var item = activeCounts[i];
+                    if (item.BulletTypeKey != typeKey)
+                        continue;
+
+                    item.ActiveCount++;
+                    activeCounts[i] = item;
+                    return;
+                }
+
+                activeCounts.Add(new SourceActiveBulletCountBuffer
+                {
+                    BulletTypeKey = typeKey,
+                    ActiveCount = 1
+                });
             }
         }
     }
@@ -621,16 +596,29 @@ namespace SweepNDodge.DotsBullets
             var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
 
             var renderParts = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
+            var sourceActiveCounts = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(false);
             renderParts.Update(ref state);
+            sourceActiveCounts.Update(ref state);
+
+            var countDeltaQueue = new NativeQueue<SourceActiveCountDelta>(Allocator.TempJob);
 
             var job = new DespawnAndReturnJob
             {
                 FreeByKey = BulletFieldShared.FreeByKey.AsParallelWriter(),
                 Ecb = ecb,
                 RenderPartsLookup = renderParts,
+                CountDeltaWriter = countDeltaQueue.AsParallelWriter(),
             };
 
-            state.Dependency = job.ScheduleParallel(deps);
+            var despawnHandle = job.ScheduleParallel(deps);
+            var applyCountJob = new ApplySourceActiveCountDeltaJob
+            {
+                CountDeltas = countDeltaQueue,
+                SourceActiveCountLookup = sourceActiveCounts,
+            };
+
+            var applyHandle = applyCountJob.Schedule(despawnHandle);
+            state.Dependency = countDeltaQueue.Dispose(applyHandle);
             BulletFieldShared.PoolFence = state.Dependency;
         }
 
@@ -640,12 +628,14 @@ namespace SweepNDodge.DotsBullets
             public NativeParallelMultiHashMap<int, Entity>.ParallelWriter FreeByKey;
             public EntityCommandBuffer.ParallelWriter Ecb;
             [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
+            public NativeQueue<SourceActiveCountDelta>.ParallelWriter CountDeltaWriter;
 
             private void Execute(
                 [EntityIndexInQuery] int sortKey,
                 Entity e,
                 ref BulletLifetimeComponent life,
                 in BulletTypeKeyComponent typeKey,
+                in BulletSourceRefComponent sourceRef,
                 EnabledRefRW<BulletActiveTag> active,
                 EnabledRefRW<BulletDespawnRequestTag> request)
             {
@@ -673,11 +663,54 @@ namespace SweepNDodge.DotsBullets
                     }
 
                     FreeByKey.Add(typeKey.Value, e);
+                    if (sourceRef.Value != Entity.Null)
+                    {
+                        CountDeltaWriter.Enqueue(new SourceActiveCountDelta
+                        {
+                            Source = sourceRef.Value,
+                            BulletTypeKey = typeKey.Value,
+                            Delta = -1
+                        });
+                    }
                 }
 
                 request.ValueRW = false;
                 life.Value = 0f;
             }
+        }
+
+        [BurstCompile]
+        private struct ApplySourceActiveCountDeltaJob : IJob
+        {
+            public NativeQueue<SourceActiveCountDelta> CountDeltas;
+            public BufferLookup<SourceActiveBulletCountBuffer> SourceActiveCountLookup;
+
+            public void Execute()
+            {
+                while (CountDeltas.TryDequeue(out var item))
+                {
+                    if (item.Source == Entity.Null || !SourceActiveCountLookup.TryGetBuffer(item.Source, out var buffer))
+                        continue;
+
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        var entry = buffer[i];
+                        if (entry.BulletTypeKey != item.BulletTypeKey)
+                            continue;
+
+                        entry.ActiveCount = math.max(0, entry.ActiveCount + item.Delta);
+                        buffer[i] = entry;
+                        break;
+                    }
+                }
+            }
+        }
+
+        private struct SourceActiveCountDelta
+        {
+            public Entity Source;
+            public int BulletTypeKey;
+            public int Delta;
         }
     }
 }

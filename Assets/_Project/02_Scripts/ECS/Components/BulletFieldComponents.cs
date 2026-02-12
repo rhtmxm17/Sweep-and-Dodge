@@ -27,15 +27,16 @@ namespace SweepNDodge.DotsBullets
         Depleted = 2
     }
 
+    public enum SourceSpawnModeId : byte
+    {
+        FixedRate = 0,
+        CapAndMaxRate = 1
+    }
+
     // Source별 고정 설정 + 런타임 누적치(외부 초기값 주입 가능)
     public struct SourceSpawnComponent : IComponentData
     {
         public float Radius;
-        public float SpawnRateNormal;
-        public float WeakenedMultiplier;
-        public float HazardRatioNormal;
-        public float HazardRatioWeakened;
-        public float HazardRatioNearDepleted;
 
         public int ThresholdWeakened;
         public int ThresholdDepleted;
@@ -47,8 +48,25 @@ namespace SweepNDodge.DotsBullets
     // Source별 독립 스폰 루프 상태
     public struct SourceSpawnRuntimeComponent : IComponentData
     {
-        public float SpawnAccumulator;
         public uint SpawnSequence;
+    }
+
+    [InternalBufferCapacity(8)]
+    public struct SourceSpawnPatternBuffer : IBufferElementData
+    {
+        public SourceStateId State;
+        public int BulletTypeKey;
+        public SourceSpawnModeId SpawnMode;
+        public float SpawnRatePerSec;
+        public int MaxActive; // FixedRated 일 경우 무시
+        public float SpawnAccumulator;
+    }
+
+    [InternalBufferCapacity(8)]
+    public struct SourceActiveBulletCountBuffer : IBufferElementData
+    {
+        public int BulletTypeKey;
+        public int ActiveCount;
     }
 
     // Source 기준 위치(스폰 계산용). LocalTransform RO/RW alias 충돌 회피용.

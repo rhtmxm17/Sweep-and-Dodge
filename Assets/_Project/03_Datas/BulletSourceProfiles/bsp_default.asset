@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77a8f6b847402174b936974fa0d36660, type: 3}
+  m_Name: bsp_default
+  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.BulletSourceProfileSO
+  States:
+  - State: 0
+    Entries:
+    - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      SpawnMode: 0
+      SpawnRatePerSec: 5000
+      MaxActive: 0
+    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      SpawnMode: 0
+      SpawnRatePerSec: 100
+      MaxActive: 0
+  - State: 1
+    Entries:
+    - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      SpawnMode: 0
+      SpawnRatePerSec: 2000
+      MaxActive: 0
+    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      SpawnMode: 0
+      SpawnRatePerSec: 120
+      MaxActive: 0

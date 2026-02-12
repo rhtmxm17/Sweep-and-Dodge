@@ -3,22 +3,13 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
-    [System.Serializable]
-    public struct BulletPoolEntryAuthoring
-    {
-        public int TypeKey;
-        public GameObject Prefab;
-        public int PoolSize;
-        public BulletCaptureRuleId CaptureRule;
-    }
-
     /// <summary>
     /// 키 기반 Bullet 풀 정의 목록을 엔티티 버퍼로 베이크한다.
     /// </summary>
     public class BulletVisualPrefabAuthoring : MonoBehaviour
     {
-        [Header("Key-Pool Definitions")]
-        public BulletPoolEntryAuthoring[] Entries;
+        [Header("Bullet Definitions")]
+        public BulletDefinitionSO[] Definitions;
 
         private class BulletVisualPrefabBaker : Baker<BulletVisualPrefabAuthoring>
         {
@@ -28,22 +19,28 @@ namespace SweepNDodge.DotsBullets
                 AddComponent<BulletPoolRegistryTag>(e);
                 var buffer = AddBuffer<BulletPoolDefinitionBuffer>(e);
 
-                if (authoring.Entries == null)
+                if (authoring.Definitions == null)
                     return;
 
-                for (int i = 0; i < authoring.Entries.Length; i++)
+                var uniqueKeys = new System.Collections.Generic.HashSet<int>();
+                for (int i = 0; i < authoring.Definitions.Length; i++)
                 {
-                    var entry = authoring.Entries[i];
-                    if (entry.Prefab == null)
+                    var def = authoring.Definitions[i];
+                    if (def == null || def.Prefab == null)
                         continue;
+                    if (!uniqueKeys.Add(def.DefinitionId))
+                    {
+                        Debug.LogWarning($"[BulletVisualPrefabAuthoring] Duplicate DefinitionId detected: {def.DefinitionId}. Skipping.");
+                        continue;
+                    }
 
-                    var prefabEntity = GetEntity(entry.Prefab, TransformUsageFlags.Renderable);
+                    var prefabEntity = GetEntity(def.Prefab, TransformUsageFlags.Renderable);
                     buffer.Add(new BulletPoolDefinitionBuffer
                     {
-                        TypeKey = entry.TypeKey,
+                        TypeKey = def.DefinitionId,
                         Prefab = prefabEntity,
-                        PoolSize = Mathf.Max(0, entry.PoolSize),
-                        CaptureRule = entry.CaptureRule
+                        PoolSize = Mathf.Max(0, def.PoolSize),
+                        CaptureRule = def.CaptureRule
                     });
                 }
             }
