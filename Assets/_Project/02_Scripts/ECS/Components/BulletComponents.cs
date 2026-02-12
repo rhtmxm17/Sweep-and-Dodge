@@ -19,6 +19,21 @@ namespace SweepNDodge.DotsBullets
         public float Value;
     }
 
+    public struct BulletSpeedComponent : IComponentData
+    {
+        public float Value;
+    }
+
+    public struct BulletLifetimeMaxComponent : IComponentData
+    {
+        public float Value;
+    }
+
+    public struct BulletScoreValueComponent : IComponentData
+    {
+        public int Value;
+    }
+
     public struct BulletTypeKeyComponent : IComponentData
     {
         public int Value;
@@ -66,5 +81,9 @@ namespace SweepNDodge.DotsBullets
         public Entity Prefab;
         public int PoolSize;
         public BulletCaptureRuleId CaptureRule;
+        public float Speed;
+        public float Lifetime;
+        public float Radius;
+        public int ScoreValue;
     }
 }

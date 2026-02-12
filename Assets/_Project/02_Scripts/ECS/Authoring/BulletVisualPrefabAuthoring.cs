@@ -40,7 +40,11 @@ namespace SweepNDodge.DotsBullets
                         TypeKey = def.DefinitionId,
                         Prefab = prefabEntity,
                         PoolSize = Mathf.Max(0, def.PoolSize),
-                        CaptureRule = def.CaptureRule
+                        CaptureRule = def.CaptureRule,
+                        Speed = Mathf.Max(0f, def.Speed),
+                        Lifetime = Mathf.Max(0f, def.Lifetime),
+                        Radius = Mathf.Max(0f, def.Radius),
+                        ScoreValue = Mathf.Max(0, def.ScoreValue),
                     });
                 }
             }

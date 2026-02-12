@@ -21,7 +21,10 @@ namespace SweepNDodge.DotsBullets
                 var root = GetEntity(TransformUsageFlags.Dynamic);
 
                 AddComponent(root, new BulletVelocityComponent { Value = Unity.Mathematics.float2.zero });
+                AddComponent(root, new BulletSpeedComponent { Value = 0.5f });
+                AddComponent(root, new BulletLifetimeMaxComponent { Value = 4.0f });
                 AddComponent(root, new BulletRadiusComponent { Value = authoring.Radius });
+                AddComponent(root, new BulletScoreValueComponent { Value = 1 });
                 AddComponent(root, new BulletTypeKeyComponent { Value = authoring.TypeKey });
                 AddComponent(root, new BulletCaptureRuleComponent { Value = authoring.CaptureRule });
                 AddComponent(root, new BulletLifetimeComponent { Value = 0f });

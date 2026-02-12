@@ -193,8 +193,16 @@ namespace SweepNDodge.DotsBullets
                         em.SetComponentData(b, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
                     if (em.HasComponent<BulletVelocityComponent>(b))
                         em.SetComponentData(b, new BulletVelocityComponent { Value = float2.zero });
+                    if (em.HasComponent<BulletSpeedComponent>(b))
+                        em.SetComponentData(b, new BulletSpeedComponent { Value = def.Speed });
+                    if (em.HasComponent<BulletLifetimeMaxComponent>(b))
+                        em.SetComponentData(b, new BulletLifetimeMaxComponent { Value = def.Lifetime });
                     if (em.HasComponent<BulletLifetimeComponent>(b))
                         em.SetComponentData(b, new BulletLifetimeComponent { Value = 0f });
+                    if (em.HasComponent<BulletRadiusComponent>(b))
+                        em.SetComponentData(b, new BulletRadiusComponent { Value = def.Radius });
+                    if (em.HasComponent<BulletScoreValueComponent>(b))
+                        em.SetComponentData(b, new BulletScoreValueComponent { Value = def.ScoreValue });
                     if (em.HasComponent<BulletTypeKeyComponent>(b))
                         em.SetComponentData(b, new BulletTypeKeyComponent { Value = def.TypeKey });
                     if (em.HasComponent<BulletCaptureRuleComponent>(b))
@@ -294,12 +302,13 @@ namespace SweepNDodge.DotsBullets
             if (!BulletFieldShared.IsInitialized)
                 return;
 
-            var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             float deltaTime = SystemAPI.Time.DeltaTime;
 
             var tx = SystemAPI.GetComponentLookup<LocalTransform>(false);
             var vel = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
             var life = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
+            var speed = SystemAPI.GetComponentLookup<BulletSpeedComponent>(true);
+            var lifeMax = SystemAPI.GetComponentLookup<BulletLifetimeMaxComponent>(true);
             var typeKey = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
             var sourceRef = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(false);
             var active = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
@@ -310,6 +319,8 @@ namespace SweepNDodge.DotsBullets
             tx.Update(ref state);
             vel.Update(ref state);
             life.Update(ref state);
+            speed.Update(ref state);
+            lifeMax.Update(ref state);
             typeKey.Update(ref state);
             sourceRef.Update(ref state);
             active.Update(ref state);
@@ -323,14 +334,14 @@ namespace SweepNDodge.DotsBullets
             var job = new SpawnFromSourcesJob
             {
                 DeltaTime = deltaTime,
-                Speed = 0.5f,
-                Lifetime = cfg.BulletLifetime,
 
                 FreeByKey = BulletFieldShared.FreeByKey,
 
                 TxLookup = tx,
                 VelLookup = vel,
                 LifeLookup = life,
+                SpeedLookup = speed,
+                LifeMaxLookup = lifeMax,
                 TypeKeyLookup = typeKey,
                 SourceRefLookup = sourceRef,
                 ActiveLookup = active,
@@ -347,14 +358,14 @@ namespace SweepNDodge.DotsBullets
         private partial struct SpawnFromSourcesJob : IJobEntity
         {
             public float DeltaTime;
-            public float Speed;
-            public float Lifetime;
 
             public NativeParallelMultiHashMap<int, Entity> FreeByKey;
 
             public ComponentLookup<LocalTransform> TxLookup;
             public ComponentLookup<BulletVelocityComponent> VelLookup;
             public ComponentLookup<BulletLifetimeComponent> LifeLookup;
+            [ReadOnly] public ComponentLookup<BulletSpeedComponent> SpeedLookup;
+            [ReadOnly] public ComponentLookup<BulletLifetimeMaxComponent> LifeMaxLookup;
             public ComponentLookup<BulletTypeKeyComponent> TypeKeyLookup;
             public ComponentLookup<BulletSourceRefComponent> SourceRefLookup;
             public ComponentLookup<BulletActiveTag> ActiveLookup;
@@ -404,13 +415,15 @@ namespace SweepNDodge.DotsBullets
                         float angle = random.NextFloat(0f, math.PI * 2f);
                         float2 dir = new float2(math.cos(angle), math.sin(angle));
                         var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
+                        float bulletSpeed = SpeedLookup.HasComponent(e) ? math.max(0f, SpeedLookup[e].Value) : 0f;
+                        float bulletLifetime = LifeMaxLookup.HasComponent(e) ? math.max(0f, LifeMaxLookup[e].Value) : 0f;
 
                         if (TxLookup.HasComponent(e))
                             TxLookup[e] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
                         if (VelLookup.HasComponent(e))
-                            VelLookup[e] = new BulletVelocityComponent { Value = dir * Speed };
+                            VelLookup[e] = new BulletVelocityComponent { Value = dir * bulletSpeed };
                         if (LifeLookup.HasComponent(e))
-                            LifeLookup[e] = new BulletLifetimeComponent { Value = Lifetime };
+                            LifeLookup[e] = new BulletLifetimeComponent { Value = bulletLifetime };
                         if (TypeKeyLookup.HasComponent(e))
                             TypeKeyLookup[e] = new BulletTypeKeyComponent { Value = pattern.BulletTypeKey };
                         if (SourceRefLookup.HasComponent(e))

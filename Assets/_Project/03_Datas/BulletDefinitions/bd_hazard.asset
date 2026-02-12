@@ -16,3 +16,7 @@ MonoBehaviour:
   Prefab: {fileID: 8586366626638814962, guid: 0e7fe2c4e4562fc4f9973ad83b6e00c0, type: 3}
   PoolSize: 2000
   CaptureRule: 1
+  Speed: 1.8
+  Lifetime: 4
+  Radius: 0.05
+  ScoreValue: 5

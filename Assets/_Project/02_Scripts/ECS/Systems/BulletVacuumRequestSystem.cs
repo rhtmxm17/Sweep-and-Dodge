@@ -47,12 +47,16 @@ namespace SweepNDodge.DotsBullets
             // LocalTransform은 메인 스레드에서 읽지 않는다 (타입 충돌 방지).
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
             var captureRuleLookup = SystemAPI.GetComponentLookup<BulletCaptureRuleComponent>(isReadOnly: true);
+            var bulletRadiusLookup = SystemAPI.GetComponentLookup<BulletRadiusComponent>(isReadOnly: true);
+            var scoreValueLookup = SystemAPI.GetComponentLookup<BulletScoreValueComponent>(isReadOnly: true);
             var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
             var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
 
             txLookup.Update(ref state);
             captureRuleLookup.Update(ref state);
+            bulletRadiusLookup.Update(ref state);
+            scoreValueLookup.Update(ref state);
             bulletSourceLookup.Update(ref state);
             reqLookup.Update(ref state);
             sourceLookup.Update(ref state);
@@ -76,12 +80,14 @@ namespace SweepNDodge.DotsBullets
 
                 Range = vacuumRW.ValueRO.Range,
                 IsHazardCaptureActive = vacuumRW.ValueRO.CaptureActiveTimer > 0f ? (byte)1 : (byte)0,
-                HazardRingInnerSq = GetHazardRingInnerSq(in vacuumRW.ValueRO),
-                HazardRingOuterSq = GetHazardRingOuterSq(in vacuumRW.ValueRO),
+                HazardRingInner = GetHazardRingInner(in vacuumRW.ValueRO),
+                HazardRingOuter = GetHazardRingOuter(in vacuumRW.ValueRO),
 
                 CellMap = BulletFieldShared.CellMap,
                 TxLookup = txLookup,
                 CaptureRuleLookup = captureRuleLookup,
+                BulletRadiusLookup = bulletRadiusLookup,
+                ScoreValueLookup = scoreValueLookup,
                 BulletSourceLookup = bulletSourceLookup,
                 RequestLookup = reqLookup,
                 SourceLookup = sourceLookup,
@@ -136,19 +142,17 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static float GetHazardRingInnerSq(in VacuumBurstComponent v)
+        private static float GetHazardRingInner(in VacuumBurstComponent v)
         {
             float halfWidth = math.max(0f, v.CaptureRingWidth * 0.5f);
-            float inner = math.max(0f, v.CaptureRingRadius - halfWidth);
-            return inner * inner;
+            return math.max(0f, v.CaptureRingRadius - halfWidth);
         }
 
-        private static float GetHazardRingOuterSq(in VacuumBurstComponent v)
+        private static float GetHazardRingOuter(in VacuumBurstComponent v)
         {
             float halfWidth = math.max(0f, v.CaptureRingWidth * 0.5f);
             float inner = math.max(0f, v.CaptureRingRadius - halfWidth);
-            float outer = math.max(inner, v.CaptureRingRadius + halfWidth);
-            return outer * outer;
+            return math.max(inner, v.CaptureRingRadius + halfWidth);
         }
 
         [BurstCompile]
@@ -158,12 +162,14 @@ namespace SweepNDodge.DotsBullets
             public float InvCellSize;
             public float Range;
             public byte IsHazardCaptureActive;
-            public float HazardRingInnerSq;
-            public float HazardRingOuterSq;
+            public float HazardRingInner;
+            public float HazardRingOuter;
 
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
             [ReadOnly] public ComponentLookup<BulletCaptureRuleComponent> CaptureRuleLookup;
+            [ReadOnly] public ComponentLookup<BulletRadiusComponent> BulletRadiusLookup;
+            [ReadOnly] public ComponentLookup<BulletScoreValueComponent> ScoreValueLookup;
             [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
             public ComponentLookup<SourceSpawnComponent> SourceLookup;
@@ -176,10 +182,9 @@ namespace SweepNDodge.DotsBullets
                     return;
 
                 float3 playerPos = TxLookup[PlayerEntity].Position;
-                float rangeSq = Range * Range;
 
                 int2 center = SpatialHashUtility.ToCell(playerPos, InvCellSize);
-                int cellRadius = (int)math.ceil(Range * InvCellSize);
+                int cellRadius = (int)math.ceil(Range * InvCellSize) + 1;
 
                 int add = 0;
 
@@ -203,29 +208,38 @@ namespace SweepNDodge.DotsBullets
                             float dxp = p.x - playerPos.x;
                             float dzp = p.z - playerPos.z;
                             float distSq = dxp * dxp + dzp * dzp;
+                            float bulletRadius = BulletRadiusLookup.HasComponent(bullet)
+                                ? math.max(0f, BulletRadiusLookup[bullet].Value)
+                                : 0f;
                             var captureRule = CaptureRuleLookup[bullet].Value;
 
                             bool canCapture = false;
                             if (captureRule == BulletCaptureRuleId.StandardCollectible)
                             {
-                                canCapture = distSq <= rangeSq;
+                                float collectRange = Range + bulletRadius;
+                                canCapture = distSq <= collectRange * collectRange;
                             }
                             else if (captureRule == BulletCaptureRuleId.RiskTimedResolve && IsHazardCaptureActive != 0)
                             {
-                                canCapture = distSq >= HazardRingInnerSq && distSq <= HazardRingOuterSq;
+                                float inner = math.max(0f, HazardRingInner - bulletRadius);
+                                float outer = math.max(inner, HazardRingOuter + bulletRadius);
+                                canCapture = distSq >= inner * inner && distSq <= outer * outer;
                             }
 
                             if (!canCapture) continue;
 
                             RequestLookup.SetComponentEnabled(bullet, true);
                             TryAccumulateDepletion(bullet);
-                            add++;
+                            int scoreValue = 1;
+                            if (ScoreValueLookup.HasComponent(bullet))
+                                scoreValue = math.max(0, ScoreValueLookup[bullet].Value);
+                            add += scoreValue;
                         }
                         while (CellMap.TryGetNextValue(out bullet, ref it));
                     }
 
                 NewlyRequested.Value += add;
-                Debug.Log($"[Vacuum Job] 흡입 대상 Bullet: {add} 개");
+                Debug.Log($"[Vacuum Job] 이번 프레임 추가 점수: {add}");
             }
 
             private void TryAccumulateDepletion(Entity bullet)

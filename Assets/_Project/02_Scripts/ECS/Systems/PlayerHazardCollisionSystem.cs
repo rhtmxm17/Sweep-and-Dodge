@@ -113,13 +113,14 @@ namespace SweepNDodge.DotsBullets
                         do
                         {
                             if (!TxLookup.HasComponent(bullet)) continue;
-                            if (!BulletRadiusLookup.HasComponent(bullet)) continue;
                             if (!DespawnRequestLookup.HasComponent(bullet)) continue;
 
                             // 제거 요청이 있으면 충돌 후보에서 제외(제거 우선)
                             if (DespawnRequestLookup.IsComponentEnabled(bullet)) continue;
 
-                            float bulletRadius = math.max(0f, BulletRadiusLookup[bullet].Value);
+                            float bulletRadius = BulletRadiusLookup.HasComponent(bullet)
+                                ? math.max(0f, BulletRadiusLookup[bullet].Value)
+                                : 0f;
                             float combined = playerRadius + bulletRadius;
                             float3 bp = TxLookup[bullet].Position;
                             float dxp = bp.x - playerPos.x;

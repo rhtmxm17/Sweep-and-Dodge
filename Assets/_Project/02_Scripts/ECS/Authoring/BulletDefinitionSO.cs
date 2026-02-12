@@ -14,6 +14,12 @@ namespace SweepNDodge.DotsBullets
         public int PoolSize = 1024;
         public BulletCaptureRuleId CaptureRule = BulletCaptureRuleId.StandardCollectible;
 
+        [Header("Gameplay")]
+        public float Speed = 0.5f;
+        public float Lifetime = 4.0f;
+        public float Radius = 0.05f;
+        public int ScoreValue = 1;
+
 #if UNITY_EDITOR
         public void Editor_SetDefinitionId(int newId)
         {
