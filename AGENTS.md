@@ -132,7 +132,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 # ADR-012-ecb-vs-flag-state
 > 대량 엔티티 상태 전환에서 ECB 대신 Flag 기반 접근을 채택한 결정
 
-## Context
+## 배경
 ...
 ```
 
@@ -143,4 +143,3 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 기본 모드: read-only
 - 파일 수정/명령 실행이 필요한 경우에만 권한 상승(최소 권한 원칙)
 - 네트워크/외부 업로드는 기본 금지(필요 시 명시적 승인)
-

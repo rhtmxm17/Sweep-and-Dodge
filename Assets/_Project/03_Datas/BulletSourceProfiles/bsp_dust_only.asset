@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77a8f6b847402174b936974fa0d36660, type: 3}
-  m_Name: bsp_default
+  m_Name: bsp_dust_only
   m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.BulletSourceProfileSO
   States:
   - State: 0
@@ -19,17 +19,9 @@ MonoBehaviour:
       SpawnMode: 0
       SpawnDensityPerSecPerArea: 10
       MaxActiveDensityPerArea: 0
-    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
-      SpawnMode: 0
-      SpawnDensityPerSecPerArea: 0.05
-      MaxActiveDensityPerArea: 0
   - State: 1
     Entries:
     - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
       SpawnMode: 0
       SpawnDensityPerSecPerArea: 4
-      MaxActiveDensityPerArea: 0
-    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
-      SpawnMode: 0
-      SpawnDensityPerSecPerArea: 0.08
       MaxActiveDensityPerArea: 0

@@ -6,8 +6,10 @@ namespace SweepNDodge.DotsBullets
 {
     public class BulletSourceAuthoring : MonoBehaviour
     {
-        [Header("Source Spawn")]
-        public float Radius = 8f;
+        [Header("Source Field")]
+        public BulletFieldShapeId FieldShape = BulletFieldShapeId.Circle;
+        public float FieldRadius = 8f;
+        public Vector2 FieldSize = new Vector2(12f, 8f);
         public BulletSourceProfileSO SpawnProfile;
 
         [Header("Depletion Threshold (externally injectable)")]
@@ -31,11 +33,18 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(e, new SourceSpawnComponent
                 {
-                    Radius = Mathf.Max(0f, authoring.Radius),
                     ThresholdWeakened = thresholdWeakened,
                     ThresholdDepleted = thresholdDepleted,
                     CollectedCount = Mathf.Max(0, authoring.InitialCollectedCount),
                     State = authoring.InitialState
+                });
+
+                AddComponent(e, new BulletFieldAreaComponent
+                {
+                    Shape = authoring.FieldShape,
+                    Radius = Mathf.Max(0f, authoring.FieldRadius),
+                    Size = new float2(Mathf.Max(0f, authoring.FieldSize.x), Mathf.Max(0f, authoring.FieldSize.y)),
+                    ComputedArea = ComputeArea(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize)
                 });
 
                 AddComponent(e, new SourceSpawnRuntimeComponent
@@ -82,8 +91,8 @@ namespace SweepNDodge.DotsBullets
                             State = stateConfig.State,
                             BulletTypeKey = typeKey,
                             SpawnMode = entry.SpawnMode,
-                            SpawnRatePerSec = Mathf.Max(0f, entry.SpawnRatePerSec),
-                            MaxActive = Mathf.Max(0, entry.MaxActive),
+                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.SpawnDensityPerSecPerArea),
+                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.MaxActiveDensityPerArea),
                             SpawnAccumulator = 0f
                         });
 
@@ -98,6 +107,15 @@ namespace SweepNDodge.DotsBullets
                     }
                 }
             }
+        }
+
+        private static float ComputeArea(BulletFieldShapeId shape, float radius, Vector2 size)
+        {
+            if (shape == BulletFieldShapeId.Rectangle)
+                return Mathf.Max(0f, size.x) * Mathf.Max(0f, size.y);
+
+            float r = Mathf.Max(0f, radius);
+            return Mathf.PI * r * r;
         }
 
         private void OnDrawGizmos()
@@ -116,10 +134,22 @@ namespace SweepNDodge.DotsBullets
 
         private void DrawSourceGizmo()
         {
+            var prevMatrix = Gizmos.matrix;
             var prev = Gizmos.color;
             Gizmos.color = new Color(0.2f, 0.9f, 0.3f, 1f);
-            Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, Radius));
+            if (FieldShape == BulletFieldShapeId.Rectangle)
+            {
+                var size = new Vector3(Mathf.Max(0f, FieldSize.x), 0f, Mathf.Max(0f, FieldSize.y));
+                Gizmos.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
+                Gizmos.DrawWireCube(Vector3.zero, size);
+                Gizmos.matrix = prevMatrix;
+            }
+            else
+            {
+                Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, FieldRadius));
+            }
             Gizmos.color = prev;
+            Gizmos.matrix = prevMatrix;
         }
     }
 }

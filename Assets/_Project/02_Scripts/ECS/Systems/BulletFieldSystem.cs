@@ -222,6 +222,42 @@ namespace SweepNDodge.DotsBullets
     // Pool Owner: Spawn (Begin)
     // ----------------------------------------------------------------------
 
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
+    [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
+    [UpdateBefore(typeof(BulletSpawnFromPoolSystem))]
+    public partial struct BulletFieldAreaUpdateSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<SourceSpawnComponent>();
+            state.RequireForUpdate<BulletFieldAreaComponent>();
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            state.Dependency = new UpdateFieldAreaJob().ScheduleParallel(state.Dependency);
+        }
+
+        [BurstCompile]
+        private partial struct UpdateFieldAreaJob : IJobEntity
+        {
+            private void Execute(ref BulletFieldAreaComponent area)
+            {
+                if (area.Shape == BulletFieldShapeId.Rectangle)
+                {
+                    area.Size = math.max(0f, area.Size);
+                    area.ComputedArea = area.Size.x * area.Size.y;
+                    return;
+                }
+
+                area.Radius = math.max(0f, area.Radius);
+                area.ComputedArea = math.PI * area.Radius * area.Radius;
+            }
+        }
+    }
+
     /// <summary>
     /// 동프레임 반영을 위한 스폰 실행 단계.
     /// - FreeByKey에서 TypeKey 기준으로 스폰 엔티티 확보
@@ -238,6 +274,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<SourceSpawnComponent>();
+            state.RequireForUpdate<BulletFieldAreaComponent>();
         }
 
         [BurstCompile]
@@ -275,7 +312,7 @@ namespace SweepNDodge.DotsBullets
             var job = new SpawnFromSourcesJob
             {
                 DeltaTime = deltaTime,
-                Speed = 2.5f,
+                Speed = 0.5f,
                 Lifetime = cfg.BulletLifetime,
 
                 FreeByKey = BulletFieldShared.FreeByKey,
@@ -318,6 +355,7 @@ namespace SweepNDodge.DotsBullets
                 Entity sourceEntity,
                 in SourceAnchorComponent sourceAnchor,
                 ref SourceSpawnComponent source,
+                in BulletFieldAreaComponent fieldArea,
                 ref SourceSpawnRuntimeComponent runtime,
                 DynamicBuffer<SourceSpawnPatternBuffer> patterns,
                 DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts)
@@ -330,7 +368,7 @@ namespace SweepNDodge.DotsBullets
 
                 uint seed = math.max(1u, runtime.SpawnSequence);
                 var random = Unity.Mathematics.Random.CreateFromIndex(seed ^ (uint)sourceEntity.Index);
-                float radius = math.max(0f, source.Radius);
+                float area = math.max(0f, fieldArea.ComputedArea);
                 float3 center = sourceAnchor.Position;
 
                 int spawnedTotal = 0;
@@ -340,7 +378,7 @@ namespace SweepNDodge.DotsBullets
                     if (pattern.State != source.State)
                         continue;
 
-                    int spawnCount = ResolveSpawnCount(ref pattern, activeCounts);
+                    int spawnCount = ResolveSpawnCount(ref pattern, activeCounts, area);
                     patterns[i] = pattern;
                     if (spawnCount <= 0)
                         continue;
@@ -350,10 +388,7 @@ namespace SweepNDodge.DotsBullets
                         if (!TryDequeueByKey(pattern.BulletTypeKey, out var e))
                             break;
 
-                        float anglePos = random.NextFloat(0f, math.PI * 2f);
-                        float dist = math.sqrt(random.NextFloat(0f, 1f)) * radius;
-                        float2 offset = new float2(math.cos(anglePos), math.sin(anglePos)) * dist;
-                        float3 pos = new float3(center.x + offset.x, center.y, center.z + offset.y);
+                        float3 pos = SampleSpawnPosition(ref random, center, fieldArea);
 
                         float angle = random.NextFloat(0f, math.PI * 2f);
                         float2 dir = new float2(math.cos(angle), math.sin(angle));
@@ -399,9 +434,10 @@ namespace SweepNDodge.DotsBullets
                 runtime.SpawnSequence = seed + (uint)math.max(1, spawnedTotal);
             }
 
-            private int ResolveSpawnCount(ref SourceSpawnPatternBuffer pattern, DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts)
+            private int ResolveSpawnCount(ref SourceSpawnPatternBuffer pattern, DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, float area)
             {
-                float rate = math.max(0f, pattern.SpawnRatePerSec);
+                float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
+                float rate = density * area;
 
                 if (rate <= 0f)
                 {
@@ -416,12 +452,31 @@ namespace SweepNDodge.DotsBullets
                 if (spawnCount <= 0)
                     return 0;
 
-                if (pattern.SpawnMode != SourceSpawnModeId.CapAndMaxRate)
+                if (pattern.SpawnMode != SourceSpawnModeId.CapAndMaxDensity)
                     return spawnCount;
 
                 int active = GetActiveCount(activeCounts, pattern.BulletTypeKey);
-                int room = math.max(0, pattern.MaxActive - active);
+                int maxActive = (int)math.floor(math.max(0f, pattern.MaxActiveDensityPerArea) * area);
+                int room = math.max(0, maxActive - active);
                 return math.min(spawnCount, room);
+            }
+
+            private static float3 SampleSpawnPosition(ref Unity.Mathematics.Random random, float3 center, in BulletFieldAreaComponent fieldArea)
+            {
+                if (fieldArea.Shape == BulletFieldShapeId.Rectangle)
+                {
+                    float2 half = math.max(0f, fieldArea.Size) * 0.5f;
+                    float2 offsetRect = new float2(
+                        random.NextFloat(-half.x, half.x),
+                        random.NextFloat(-half.y, half.y));
+                    return new float3(center.x + offsetRect.x, center.y, center.z + offsetRect.y);
+                }
+
+                float radius = math.max(0f, fieldArea.Radius);
+                float angle = random.NextFloat(0f, math.PI * 2f);
+                float dist = math.sqrt(random.NextFloat(0f, 1f)) * radius;
+                float2 offsetCircle = new float2(math.cos(angle), math.sin(angle)) * dist;
+                return new float3(center.x + offsetCircle.x, center.y, center.z + offsetCircle.y);
             }
 
             private bool TryDequeueByKey(int key, out Entity e)

@@ -3,6 +3,12 @@ using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
+    public enum BulletFieldShapeId : byte
+    {
+        Circle = 0,
+        Rectangle = 1
+    }
+
     // Singleton Config
     public struct BulletFieldConfigComponent : IComponentData
     {
@@ -29,15 +35,13 @@ namespace SweepNDodge.DotsBullets
 
     public enum SourceSpawnModeId : byte
     {
-        FixedRate = 0,
-        CapAndMaxRate = 1
+        FixedDensity = 0,
+        CapAndMaxDensity = 1
     }
 
     // Source별 고정 설정 + 런타임 누적치(외부 초기값 주입 가능)
     public struct SourceSpawnComponent : IComponentData
     {
-        public float Radius;
-
         public int ThresholdWeakened;
         public int ThresholdDepleted;
         public int CollectedCount;
@@ -57,8 +61,8 @@ namespace SweepNDodge.DotsBullets
         public SourceStateId State;
         public int BulletTypeKey;
         public SourceSpawnModeId SpawnMode;
-        public float SpawnRatePerSec;
-        public int MaxActive; // FixedRated 일 경우 무시
+        public float SpawnDensityPerSecPerArea;
+        public float MaxActiveDensityPerArea; // FixedDensity 일 경우 무시
         public float SpawnAccumulator;
     }
 
@@ -73,5 +77,14 @@ namespace SweepNDodge.DotsBullets
     public struct SourceAnchorComponent : IComponentData
     {
         public float3 Position;
+    }
+
+    // Source가 탄환을 뿌리는 영역 정의(형태 + 면적 캐시)
+    public struct BulletFieldAreaComponent : IComponentData
+    {
+        public BulletFieldShapeId Shape;
+        public float Radius;
+        public float2 Size;
+        public float ComputedArea;
     }
 }

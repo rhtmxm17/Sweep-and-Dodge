@@ -10,8 +10,8 @@ namespace SweepNDodge.DotsBullets
         {
             public BulletDefinitionSO Bullet;
             public SourceSpawnModeId SpawnMode;
-            public float SpawnRatePerSec;
-            public int MaxActive;  // FixedRated 일 경우 무시
+            public float SpawnDensityPerSecPerArea;
+            public float MaxActiveDensityPerArea; // FixedDensity 일 경우 무시
         }
 
         [System.Serializable]
