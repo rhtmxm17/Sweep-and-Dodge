@@ -20,6 +20,16 @@ namespace SweepNDodge.DotsBullets
         public float ActiveTime = 0.22f;
         public float Cooldown = 1.8f;
 
+        [Header("CarryBin")]
+        public int CarryCapacity = 300;
+
+        [Header("Hazard Penalty")]
+        [Range(0f, 1f)] public float CarryLossFrac = 0.15f;
+        public int CarryLossMin = 5;
+        public int CarryLossMax = 30;
+        public float IFrameTime = 0.7f;
+        public float VacuumLockTime = 0.7f;
+
         private class PlayerProxyBaker : Baker<PlayerProxyAuthoring>
         {
             public override void Bake(PlayerProxyAuthoring authoring)
@@ -61,6 +71,27 @@ namespace SweepNDodge.DotsBullets
                     Rotation = authoring.transform.rotation,
                     SyncRotation = 1,
                     VacuumRequested = 0
+                });
+
+                AddComponent(e, new PlayerCarryBinComponent
+                {
+                    Load = 0,
+                    Capacity = Mathf.Max(0, authoring.CarryCapacity)
+                });
+
+                AddComponent(e, new PlayerHazardPenaltyConfigComponent
+                {
+                    CarryLossFrac = Mathf.Clamp01(authoring.CarryLossFrac),
+                    CarryLossMin = Mathf.Max(0, authoring.CarryLossMin),
+                    CarryLossMax = Mathf.Max(0, authoring.CarryLossMax),
+                    IFrameTime = Mathf.Max(0f, authoring.IFrameTime),
+                    VacuumLockTime = Mathf.Max(0f, authoring.VacuumLockTime)
+                });
+
+                AddComponent(e, new PlayerHazardPenaltyStateComponent
+                {
+                    IFrameTimer = 0f,
+                    VacuumLockTimer = 0f
                 });
 
                 AddComponent<PlayerHazardHitRequestTag>(e);

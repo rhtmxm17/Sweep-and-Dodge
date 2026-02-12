@@ -23,6 +23,8 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<BulletFieldConfigComponent>();
+            state.RequireForUpdate<PlayerCarryBinComponent>();
+            state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
         }
 
         [BurstCompile]
@@ -34,7 +36,9 @@ namespace SweepNDodge.DotsBullets
 
             // Vacuum 상태 갱신(플레이어 단일)
             var vacuumRW = SystemAPI.GetComponentRW<VacuumBurstComponent>(playerEntity);
-            UpdateVacuumState(ref vacuumRW.ValueRW, dt);
+            var penaltyRW = SystemAPI.GetComponentRW<PlayerHazardPenaltyStateComponent>(playerEntity);
+            CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
+            UpdateVacuumState(ref vacuumRW.ValueRW, in penaltyRW.ValueRO, dt);
 
             if (vacuumRW.ValueRO.IsActive == 0)
                 return;
@@ -61,10 +65,8 @@ namespace SweepNDodge.DotsBullets
             reqLookup.Update(ref state);
             sourceLookup.Update(ref state);
 
-            // 점수 반영: 새로 요청된 탄 개수만 누적
-            var scoreEntity = SystemAPI.GetSingletonEntity<BulletFieldConfigComponent>();
-            var scoreLookup = SystemAPI.GetComponentLookup<ScoreComponent>(isReadOnly: false);
-            scoreLookup.Update(ref state);
+            var carryLookup = SystemAPI.GetComponentLookup<PlayerCarryBinComponent>(isReadOnly: false);
+            carryLookup.Update(ref state);
 
             var newlyRequested = new NativeReference<int>(Allocator.TempJob);
             newlyRequested.Value = 0;
@@ -94,10 +96,10 @@ namespace SweepNDodge.DotsBullets
                 NewlyRequested = newlyRequested,
             }.Schedule(deps);
 
-            state.Dependency = new ApplyVacuumScoreJob
+            state.Dependency = new ApplyVacuumCarryLoadJob
             {
-                ScoreEntity = scoreEntity,
-                ScoreLookup = scoreLookup,
+                PlayerEntity = playerEntity,
+                CarryLookup = carryLookup,
                 Add = newlyRequested,
             }.Schedule(state.Dependency);
 
@@ -107,7 +109,7 @@ namespace SweepNDodge.DotsBullets
             BulletFieldShared.CellMapFence = state.Dependency;
         }
 
-        private static void UpdateVacuumState(ref VacuumBurstComponent v, float dt)
+        private static void UpdateVacuumState(ref VacuumBurstComponent v, in PlayerHazardPenaltyStateComponent penalty, float dt)
         {
             if (v.CooldownTimer > 0f)
                 v.CooldownTimer = math.max(0f, v.CooldownTimer - dt);
@@ -115,6 +117,9 @@ namespace SweepNDodge.DotsBullets
                 v.CaptureCooldownTimer = math.max(0f, v.CaptureCooldownTimer - dt);
             if (v.CaptureActiveTimer > 0f)
                 v.CaptureActiveTimer = math.max(0f, v.CaptureActiveTimer - dt);
+
+            if (CarryBinRules.ApplyVacuumLock(ref v, in penalty))
+                return;
 
             if (v.IsActive != 0)
             {
@@ -239,7 +244,7 @@ namespace SweepNDodge.DotsBullets
                     }
 
                 NewlyRequested.Value += add;
-                Debug.Log($"[Vacuum Job] 이번 프레임 추가 점수: {add}");
+                Debug.Log($"[Vacuum Job] 이번 프레임 CarryBin 증가량: {add}");
             }
 
             private void TryAccumulateDepletion(Entity bullet)
@@ -271,20 +276,21 @@ namespace SweepNDodge.DotsBullets
         }
 
         [BurstCompile]
-        private struct ApplyVacuumScoreJob : IJob
+        private struct ApplyVacuumCarryLoadJob : IJob
         {
-            public Entity ScoreEntity;
-            public ComponentLookup<ScoreComponent> ScoreLookup;
+            public Entity PlayerEntity;
+            public ComponentLookup<PlayerCarryBinComponent> CarryLookup;
             [ReadOnly] public NativeReference<int> Add;
 
             public void Execute()
             {
                 int add = Add.Value;
                 if (add <= 0) return;
+                if (!CarryLookup.HasComponent(PlayerEntity)) return;
 
-                var score = ScoreLookup[ScoreEntity];
-                score.Value += add;
-                ScoreLookup[ScoreEntity] = score;
+                var carry = CarryLookup[PlayerEntity];
+                carry.Load = CarryBinRules.AddLoadClamped(carry.Load, add, carry.Capacity);
+                CarryLookup[PlayerEntity] = carry;
             }
         }
     }

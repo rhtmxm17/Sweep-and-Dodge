@@ -23,6 +23,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<BulletFieldConfigComponent>();
+            state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
         }
 
         [BurstCompile]
@@ -33,6 +34,11 @@ namespace SweepNDodge.DotsBullets
 
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+            var penaltyState = SystemAPI.GetComponent<PlayerHazardPenaltyStateComponent>(playerEntity);
+
+            // 무적 프레임 중에는 피격 판정을 만들지 않는다.
+            if (CarryBinRules.IsHazardHitBlocked(in penaltyState))
+                return;
 
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
             var playerRadiusLookup = SystemAPI.GetComponentLookup<PlayerRadiusComponent>(isReadOnly: true);
@@ -141,8 +147,10 @@ namespace SweepNDodge.DotsBullets
     }
 
     /// <summary>
-    /// 위험탄 충돌 요청 소비(현재 단계: 로그 출력).
-    /// 이후 넉백/패널티/무적 프레임 로직을 이 시스템에 확장한다.
+    /// 위험탄 충돌 요청 소비.
+    /// - CarryBin 손실 적용
+    /// - 무적 프레임, Vacuum 봉인 타이머 갱신
+    /// - 요청 소비(disable)
     /// </summary>
     [UpdateInGroup(typeof(BulletExecutionEndGroup))]
     [UpdateBefore(typeof(BulletDespawnExecutionSystem))]
@@ -151,16 +159,35 @@ namespace SweepNDodge.DotsBullets
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
+            state.RequireForUpdate<PlayerCarryBinComponent>();
+            state.RequireForUpdate<PlayerHazardPenaltyConfigComponent>();
+            state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
-            foreach (var hitReq in SystemAPI.Query<EnabledRefRW<PlayerHazardHitRequestTag>>().WithAll<PlayerTag>())
+            foreach (var (hitReq, carryBin, penaltyConfig, penaltyState) in
+                     SystemAPI.Query<
+                         EnabledRefRW<PlayerHazardHitRequestTag>,
+                         RefRW<PlayerCarryBinComponent>,
+                         RefRO<PlayerHazardPenaltyConfigComponent>,
+                         RefRW<PlayerHazardPenaltyStateComponent>>().WithAll<PlayerTag>())
             {
                 if (!hitReq.ValueRO)
                     continue;
 
-                Debug.Log("[HazardCollision] 플레이어 위험탄 충돌 감지 (frame당 1회)");
+                int load = math.max(0, carryBin.ValueRO.Load);
+                int loss = CarryBinRules.ComputeHazardLoss(
+                    load,
+                    penaltyConfig.ValueRO.CarryLossFrac,
+                    penaltyConfig.ValueRO.CarryLossMin,
+                    penaltyConfig.ValueRO.CarryLossMax);
+
+                carryBin.ValueRW.Load = load - loss;
+                penaltyState.ValueRW.IFrameTimer = math.max(0f, penaltyConfig.ValueRO.IFrameTime);
+                penaltyState.ValueRW.VacuumLockTimer = math.max(0f, penaltyConfig.ValueRO.VacuumLockTime);
+
+                Debug.Log($"[HazardCollision] 피격 처리 / loss={loss}, load={carryBin.ValueRO.Load}, iFrame={penaltyState.ValueRO.IFrameTimer:0.00}, vacuumLock={penaltyState.ValueRO.VacuumLockTimer:0.00}");
                 hitReq.ValueRW = false;
             }
         }

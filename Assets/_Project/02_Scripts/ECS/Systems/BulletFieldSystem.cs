@@ -120,10 +120,10 @@ namespace SweepNDodge.DotsBullets
 
             var em = state.EntityManager;
 
-            // Config + Score 싱글톤이 없으면 기본값 생성(테스트 편의)
+            // Config + MetaScrap 싱글톤이 없으면 기본값 생성(테스트 편의)
             if (!SystemAPI.TryGetSingleton<BulletFieldConfigComponent>(out _))
             {
-                var configEntity = em.CreateEntity(typeof(BulletFieldConfigComponent), typeof(ScoreComponent));
+                var configEntity = em.CreateEntity(typeof(BulletFieldConfigComponent), typeof(MetaScrapComponent));
 
                 var cfg = new BulletFieldConfigComponent
                 {
@@ -135,7 +135,7 @@ namespace SweepNDodge.DotsBullets
                 };
 
                 em.SetComponentData(configEntity, cfg);
-                em.SetComponentData(configEntity, new ScoreComponent { Value = 0 });
+                em.SetComponentData(configEntity, new MetaScrapComponent { Value = 0 });
             }
 
             var poolRegistryEntity = SystemAPI.GetSingletonEntity<BulletPoolRegistryTag>();

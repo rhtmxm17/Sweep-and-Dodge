@@ -21,7 +21,7 @@ namespace SweepNDodge.DotsBullets
         public float BulletLifetime;
     }
 
-    public struct ScoreComponent : IComponentData
+    public struct MetaScrapComponent : IComponentData
     {
         public long Value;
     }

@@ -32,8 +32,7 @@ namespace SweepNDodge.DotsBullets
                     BulletLifetime = authoring.BulletLifetime
                 });
 
-                // 점수 싱글톤도 동일 엔티티에 추가
-                AddComponent(e, new ScoreComponent { Value = 0 });
+                AddComponent(e, new MetaScrapComponent { Value = 0 });
             }
         }
     }
