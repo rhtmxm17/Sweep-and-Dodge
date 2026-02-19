@@ -96,6 +96,11 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent<PlayerHazardHitRequestTag>(e);
                 SetComponentEnabled<PlayerHazardHitRequestTag>(e, false);
+
+                AddComponent(e, new PlayerHazardHitContextComponent
+                {
+                    SourceEntity = Entity.Null
+                });
             }
         }
     }

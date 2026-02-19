@@ -43,14 +43,18 @@ namespace SweepNDodge.DotsBullets
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
             var playerRadiusLookup = SystemAPI.GetComponentLookup<PlayerRadiusComponent>(isReadOnly: true);
             var bulletRadiusLookup = SystemAPI.GetComponentLookup<BulletRadiusComponent>(isReadOnly: true);
+            var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
             var despawnRequestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
             var playerHitRequestLookup = SystemAPI.GetComponentLookup<PlayerHazardHitRequestTag>(isReadOnly: false);
+            var playerHitContextLookup = SystemAPI.GetComponentLookup<PlayerHazardHitContextComponent>(isReadOnly: false);
 
             txLookup.Update(ref state);
             playerRadiusLookup.Update(ref state);
             bulletRadiusLookup.Update(ref state);
+            bulletSourceLookup.Update(ref state);
             despawnRequestLookup.Update(ref state);
             playerHitRequestLookup.Update(ref state);
+            playerHitContextLookup.Update(ref state);
 
             if (!playerHitRequestLookup.HasComponent(playerEntity))
                 return;
@@ -70,8 +74,10 @@ namespace SweepNDodge.DotsBullets
                 TxLookup = txLookup,
                 PlayerRadiusLookup = playerRadiusLookup,
                 BulletRadiusLookup = bulletRadiusLookup,
+                BulletSourceLookup = bulletSourceLookup,
                 DespawnRequestLookup = despawnRequestLookup,
                 PlayerHitRequestLookup = playerHitRequestLookup,
+                PlayerHitContextLookup = playerHitContextLookup,
             }.Schedule(deps);
 
             // Simulation 단계가 Request read를 기다릴 수 있도록 fence 갱신
@@ -88,8 +94,10 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
             [ReadOnly] public ComponentLookup<PlayerRadiusComponent> PlayerRadiusLookup;
             [ReadOnly] public ComponentLookup<BulletRadiusComponent> BulletRadiusLookup;
+            [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
             public ComponentLookup<BulletDespawnRequestTag> DespawnRequestLookup;
             public ComponentLookup<PlayerHazardHitRequestTag> PlayerHitRequestLookup;
+            public ComponentLookup<PlayerHazardHitContextComponent> PlayerHitContextLookup;
 
             public void Execute()
             {
@@ -98,6 +106,8 @@ namespace SweepNDodge.DotsBullets
                 if (!PlayerRadiusLookup.HasComponent(PlayerEntity))
                     return;
                 if (!PlayerHitRequestLookup.HasComponent(PlayerEntity))
+                    return;
+                if (!PlayerHitContextLookup.HasComponent(PlayerEntity))
                     return;
 
                 float3 playerPos = TxLookup[PlayerEntity].Position;
@@ -136,6 +146,11 @@ namespace SweepNDodge.DotsBullets
 
                             // 충돌 확인 단계에서도 즉시 제거 요청을 남겨 중복 충돌을 완화한다.
                             DespawnRequestLookup.SetComponentEnabled(bullet, true);
+                            var hitContext = PlayerHitContextLookup[PlayerEntity];
+                            hitContext.SourceEntity = BulletSourceLookup.HasComponent(bullet)
+                                ? BulletSourceLookup[bullet].Value
+                                : Entity.Null;
+                            PlayerHitContextLookup[PlayerEntity] = hitContext;
                             PlayerHitRequestLookup.SetComponentEnabled(PlayerEntity, true);
                             return;
                         }
@@ -162,16 +177,22 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyConfigComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
+            state.RequireForUpdate<PlayerHazardHitContextComponent>();
+            state.RequireForUpdate<SourceSpawnComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
-            foreach (var (hitReq, carryBin, penaltyConfig, penaltyState) in
+            var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
+            sourceLookup.Update(ref state);
+
+            foreach (var (hitReq, carryBin, penaltyConfig, penaltyState, hitContext) in
                      SystemAPI.Query<
                          EnabledRefRW<PlayerHazardHitRequestTag>,
                          RefRW<PlayerCarryBinComponent>,
                          RefRO<PlayerHazardPenaltyConfigComponent>,
-                         RefRW<PlayerHazardPenaltyStateComponent>>().WithAll<PlayerTag>())
+                         RefRW<PlayerHazardPenaltyStateComponent>,
+                         RefRW<PlayerHazardHitContextComponent>>().WithAll<PlayerTag>())
             {
                 if (!hitReq.ValueRO)
                     continue;
@@ -187,7 +208,17 @@ namespace SweepNDodge.DotsBullets
                 penaltyState.ValueRW.IFrameTimer = math.max(0f, penaltyConfig.ValueRO.IFrameTime);
                 penaltyState.ValueRW.VacuumLockTimer = math.max(0f, penaltyConfig.ValueRO.VacuumLockTime);
 
-                Debug.Log($"[HazardCollision] 피격 처리 / loss={loss}, load={carryBin.ValueRO.Load}, iFrame={penaltyState.ValueRO.IFrameTimer:0.00}, vacuumLock={penaltyState.ValueRO.VacuumLockTimer:0.00}");
+                var sourceEntity = hitContext.ValueRO.SourceEntity;
+                bool contaminationApplied = false;
+                if (sourceEntity != Entity.Null && sourceLookup.HasComponent(sourceEntity))
+                {
+                    var source = sourceLookup[sourceEntity];
+                    contaminationApplied = CarryBinRules.TryApplyHazardLossToSource(ref source, loss);
+                    sourceLookup[sourceEntity] = source;
+                }
+
+                hitContext.ValueRW.SourceEntity = Entity.Null;
+                Debug.Log($"[HazardCollision] 피격 처리 / loss={loss}, load={carryBin.ValueRO.Load}, contaminationApplied={(contaminationApplied ? 1 : 0)}, iFrame={penaltyState.ValueRO.IFrameTimer:0.00}, vacuumLock={penaltyState.ValueRO.VacuumLockTimer:0.00}");
                 hitReq.ValueRW = false;
             }
         }

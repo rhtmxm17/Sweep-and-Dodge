@@ -263,13 +263,17 @@ namespace SweepNDodge.DotsBullets
 
                 int weakenedThreshold = math.max(0, source.ThresholdWeakened);
                 int depletedThreshold = math.max(weakenedThreshold, source.ThresholdDepleted);
-
+                SourceStateId nextStateByCount;
                 if (source.CollectedCount >= depletedThreshold)
-                    source.State = SourceStateId.Depleted;
+                    nextStateByCount = SourceStateId.Depleted;
                 else if (source.CollectedCount >= weakenedThreshold)
-                    source.State = SourceStateId.Weakened;
+                    nextStateByCount = SourceStateId.Weakened;
                 else
-                    source.State = SourceStateId.Normal;
+                    nextStateByCount = SourceStateId.Normal;
+
+                // 상태 전이는 단방향만 허용한다(Normal -> Weakened -> Depleted).
+                if ((byte)nextStateByCount > (byte)source.State)
+                    source.State = nextStateByCount;
 
                 SourceLookup[sourceEntity] = source;
             }

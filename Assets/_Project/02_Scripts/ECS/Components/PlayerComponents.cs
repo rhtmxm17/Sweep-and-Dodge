@@ -65,4 +65,11 @@ namespace SweepNDodge.DotsBullets
     // 위험탄 충돌이 감지되었음을 알리는 요청 태그.
     // Request 단계에서 enable, Execution 단계에서 consume(disable)한다.
     public struct PlayerHazardHitRequestTag : IComponentData, IEnableableComponent { }
+
+    // 위험탄 피격 요청에 대한 컨텍스트(payload).
+    // - SourceEntity: 피격을 유발한 위험탄의 소스
+    public struct PlayerHazardHitContextComponent : IComponentData
+    {
+        public Entity SourceEntity;
+    }
 }

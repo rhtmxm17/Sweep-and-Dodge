@@ -431,6 +431,12 @@ MonoBehaviour:
   CaptureCooldown: 0
   ActiveTime: 0.22
   Cooldown: 1.8
+  CarryCapacity: 1500
+  CarryLossFrac: 0.6
+  CarryLossMin: 10
+  CarryLossMax: 450
+  IFrameTime: 0.7
+  VacuumLockTime: 0.7
 --- !u!4 &1191526536
 Transform:
   m_ObjectHideFlags: 0

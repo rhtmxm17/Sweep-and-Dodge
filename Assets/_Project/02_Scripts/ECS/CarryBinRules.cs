@@ -48,5 +48,24 @@ namespace SweepNDodge.DotsBullets
             vacuum.ActivateRequested = 0;
             return true;
         }
+
+        // 피격 손실량을 Source의 "현재 단계 남은 필요량 증가"로 환산한다.
+        // CollectedCount는 phase와 독립적으로 감소시킨다(단, state 변경은 다른 시스템에서 단방향으로만 처리).
+        public static bool TryApplyHazardLossToSource(ref SourceSpawnComponent source, int loss)
+        {
+            int safeLoss = math.max(0, loss);
+            if (safeLoss <= 0)
+                return false;
+            if (source.State == SourceStateId.Depleted)
+                return false;
+
+            int safeCollected = math.max(0, source.CollectedCount);
+            int nextCollected = math.max(0, safeCollected - safeLoss);
+            if (nextCollected == safeCollected)
+                return false;
+
+            source.CollectedCount = nextCollected;
+            return true;
+        }
     }
 }
