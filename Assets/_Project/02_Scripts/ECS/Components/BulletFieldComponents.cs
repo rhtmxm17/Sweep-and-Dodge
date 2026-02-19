@@ -39,6 +39,11 @@ namespace SweepNDodge.DotsBullets
         CapAndMaxDensity = 1
     }
 
+    public enum SourcePollutionSamplingModeId : byte
+    {
+        TopK = 0,
+    }
+
     // Source별 고정 설정 + 런타임 누적치(외부 초기값 주입 가능)
     public struct SourceSpawnComponent : IComponentData
     {
@@ -53,6 +58,28 @@ namespace SweepNDodge.DotsBullets
     public struct SourceSpawnRuntimeComponent : IComponentData
     {
         public uint SpawnSequence;
+    }
+
+    // Source별 청소 흔적(오염도) 설정.
+    public struct SourcePollutionConfigComponent : IComponentData
+    {
+        public float MinValue;
+        public float MaxValue;
+        public float RegenPerSec;
+        public float DropPerCollect;
+        public int TopKSampleCount;
+        public SourcePollutionSamplingModeId SamplingMode;
+    }
+
+    // Source별 청소 흔적 격자 메타데이터.
+    // 실제 형상은 셀 valid mask로 제한한다.
+    public struct SourcePollutionGridComponent : IComponentData
+    {
+        public int Cols;
+        public int Rows;
+        public float CellSize;
+        public float InvCellSize;
+        public float2 HalfExtents;
     }
 
     [InternalBufferCapacity(8)]
@@ -71,6 +98,26 @@ namespace SweepNDodge.DotsBullets
     {
         public int BulletTypeKey;
         public int ActiveCount;
+    }
+
+    [InternalBufferCapacity(128)]
+    public struct SourcePollutionCellBuffer : IBufferElementData
+    {
+        public float Value;
+        public byte IsValid;
+    }
+
+    [InternalBufferCapacity(32)]
+    public struct SourcePollutionDropRequestBuffer : IBufferElementData
+    {
+        public int CellIndex;
+        public int Count;
+    }
+
+    [InternalBufferCapacity(64)]
+    public struct SourcePollutionValidCellIndexBuffer : IBufferElementData
+    {
+        public int Value;
     }
 
     // Source 기준 위치(스폰 계산용). LocalTransform RO/RW alias 충돌 회피용.

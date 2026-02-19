@@ -103,6 +103,10 @@ namespace SweepNDodge.DotsBullets
             var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
             var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
+            var sourceAnchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(isReadOnly: true);
+            var sourcePollutionGridLookup = SystemAPI.GetComponentLookup<SourcePollutionGridComponent>(isReadOnly: true);
+            var sourcePollutionCellLookup = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(isReadOnly: true);
+            var sourcePollutionDropRequestLookup = SystemAPI.GetBufferLookup<SourcePollutionDropRequestBuffer>(isReadOnly: false);
             var uiFeedbackLookup = SystemAPI.GetBufferLookup<PlayerUiFeedbackEventBufferElement>(isReadOnly: false);
 
             txLookup.Update(ref state);
@@ -112,6 +116,10 @@ namespace SweepNDodge.DotsBullets
             bulletSourceLookup.Update(ref state);
             reqLookup.Update(ref state);
             sourceLookup.Update(ref state);
+            sourceAnchorLookup.Update(ref state);
+            sourcePollutionGridLookup.Update(ref state);
+            sourcePollutionCellLookup.Update(ref state);
+            sourcePollutionDropRequestLookup.Update(ref state);
             uiFeedbackLookup.Update(ref state);
 
             var carryLookup = SystemAPI.GetComponentLookup<PlayerCarryBinComponent>(isReadOnly: false);
@@ -148,6 +156,10 @@ namespace SweepNDodge.DotsBullets
                 BulletSourceLookup = bulletSourceLookup,
                 RequestLookup = reqLookup,
                 SourceLookup = sourceLookup,
+                SourceAnchorLookup = sourceAnchorLookup,
+                SourcePollutionGridLookup = sourcePollutionGridLookup,
+                SourcePollutionCellLookup = sourcePollutionCellLookup,
+                SourcePollutionDropRequestLookup = sourcePollutionDropRequestLookup,
                 UiFeedbackLookup = uiFeedbackLookup,
                 NewlyRequested = newlyRequested,
                 Frame = frame,
@@ -334,6 +346,10 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
             public ComponentLookup<SourceSpawnComponent> SourceLookup;
+            [ReadOnly] public ComponentLookup<SourceAnchorComponent> SourceAnchorLookup;
+            [ReadOnly] public ComponentLookup<SourcePollutionGridComponent> SourcePollutionGridLookup;
+            [ReadOnly] public BufferLookup<SourcePollutionCellBuffer> SourcePollutionCellLookup;
+            public BufferLookup<SourcePollutionDropRequestBuffer> SourcePollutionDropRequestLookup;
             public BufferLookup<PlayerUiFeedbackEventBufferElement> UiFeedbackLookup;
 
             public NativeReference<int> NewlyRequested;
@@ -386,7 +402,7 @@ namespace SweepNDodge.DotsBullets
                             if (!canCapture) continue;
 
                             RequestLookup.SetComponentEnabled(bullet, true);
-                            TryAccumulateDepletion(bullet);
+                            TryAccumulateDepletionAndPollution(bullet, p);
                             int scoreValue = 1;
                             if (ScoreValueLookup.HasComponent(bullet))
                                 scoreValue = math.max(0, ScoreValueLookup[bullet].Value);
@@ -458,7 +474,7 @@ namespace SweepNDodge.DotsBullets
                 return distSq >= inner * inner && distSq <= outer * outer;
             }
 
-            private void TryAccumulateDepletion(Entity bullet)
+            private void TryAccumulateDepletionAndPollution(Entity bullet, in float3 bulletPos)
             {
                 if (!BulletSourceLookup.HasComponent(bullet))
                     return;
@@ -490,6 +506,58 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 SourceLookup[sourceEntity] = source;
+                AppendPollutionDropRequest(sourceEntity, bulletPos);
+            }
+
+            private void AppendPollutionDropRequest(Entity sourceEntity, in float3 bulletPos)
+            {
+                if (!SourcePollutionGridLookup.HasComponent(sourceEntity))
+                    return;
+                if (!SourceAnchorLookup.HasComponent(sourceEntity))
+                    return;
+                if (!SourcePollutionCellLookup.HasBuffer(sourceEntity))
+                    return;
+                if (!SourcePollutionDropRequestLookup.TryGetBuffer(sourceEntity, out var requests))
+                    return;
+
+                var grid = SourcePollutionGridLookup[sourceEntity];
+                var cells = SourcePollutionCellLookup[sourceEntity];
+                int cols = math.max(1, grid.Cols);
+                int rows = math.max(1, grid.Rows);
+                if (grid.InvCellSize <= 0f)
+                    return;
+
+                float2 local = new float2(
+                    bulletPos.x - SourceAnchorLookup[sourceEntity].Position.x,
+                    bulletPos.z - SourceAnchorLookup[sourceEntity].Position.z);
+                float2 uv = (local + grid.HalfExtents) * grid.InvCellSize;
+                int cellX = (int)math.floor(uv.x);
+                int cellY = (int)math.floor(uv.y);
+                if ((uint)cellX >= (uint)cols || (uint)cellY >= (uint)rows)
+                    return;
+
+                int cellIndex = cellY * cols + cellX;
+                if ((uint)cellIndex >= (uint)cells.Length)
+                    return;
+                if (cells[cellIndex].IsValid == 0)
+                    return;
+
+                for (int i = 0; i < requests.Length; i++)
+                {
+                    var item = requests[i];
+                    if (item.CellIndex != cellIndex)
+                        continue;
+
+                    item.Count = math.min(int.MaxValue, item.Count + 1);
+                    requests[i] = item;
+                    return;
+                }
+
+                requests.Add(new SourcePollutionDropRequestBuffer
+                {
+                    CellIndex = cellIndex,
+                    Count = 1,
+                });
             }
 
             private void EmitSourceStateChanged(Entity sourceEntity, SourceStateId nextState)

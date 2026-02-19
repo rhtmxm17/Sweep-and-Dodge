@@ -315,6 +315,10 @@ namespace SweepNDodge.DotsBullets
             var request = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
             var render = SystemAPI.GetComponentLookup<MaterialMeshInfo>(false);
             var renderParts = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
+            var sourcePollutionConfig = SystemAPI.GetComponentLookup<SourcePollutionConfigComponent>(true);
+            var sourcePollutionGrid = SystemAPI.GetComponentLookup<SourcePollutionGridComponent>(true);
+            var sourcePollutionCells = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(true);
+            var sourcePollutionValidCellIndices = SystemAPI.GetBufferLookup<SourcePollutionValidCellIndexBuffer>(true);
 
             tx.Update(ref state);
             vel.Update(ref state);
@@ -327,6 +331,10 @@ namespace SweepNDodge.DotsBullets
             request.Update(ref state);
             render.Update(ref state);
             renderParts.Update(ref state);
+            sourcePollutionConfig.Update(ref state);
+            sourcePollutionGrid.Update(ref state);
+            sourcePollutionCells.Update(ref state);
+            sourcePollutionValidCellIndices.Update(ref state);
 
             // FreeByKey는 ECS 의존성 추적 밖이므로, 전용 fence로 접근 순서를 강제
             var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);
@@ -348,6 +356,10 @@ namespace SweepNDodge.DotsBullets
                 RequestLookup = request,
                 RenderPartsLookup = renderParts,
                 RenderLookup = render,
+                PollutionConfigLookup = sourcePollutionConfig,
+                PollutionGridLookup = sourcePollutionGrid,
+                PollutionCellsLookup = sourcePollutionCells,
+                PollutionValidCellIndicesLookup = sourcePollutionValidCellIndices,
             };
 
             state.Dependency = job.Schedule(deps);
@@ -372,6 +384,10 @@ namespace SweepNDodge.DotsBullets
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
             [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
             public ComponentLookup<MaterialMeshInfo> RenderLookup;
+            [ReadOnly] public ComponentLookup<SourcePollutionConfigComponent> PollutionConfigLookup;
+            [ReadOnly] public ComponentLookup<SourcePollutionGridComponent> PollutionGridLookup;
+            [ReadOnly] public BufferLookup<SourcePollutionCellBuffer> PollutionCellsLookup;
+            [ReadOnly] public BufferLookup<SourcePollutionValidCellIndexBuffer> PollutionValidCellIndicesLookup;
 
             private void Execute(
                 Entity sourceEntity,
@@ -410,7 +426,7 @@ namespace SweepNDodge.DotsBullets
                         if (!TryDequeueByKey(pattern.BulletTypeKey, out var e))
                             break;
 
-                        float3 pos = SampleSpawnPosition(ref random, center, fieldArea);
+                        float3 pos = SampleSpawnPosition(ref random, sourceEntity, center, fieldArea);
 
                         float angle = random.NextFloat(0f, math.PI * 2f);
                         float2 dir = new float2(math.cos(angle), math.sin(angle));
@@ -485,7 +501,126 @@ namespace SweepNDodge.DotsBullets
                 return math.min(spawnCount, room);
             }
 
-            private static float3 SampleSpawnPosition(ref Unity.Mathematics.Random random, float3 center, in BulletFieldAreaComponent fieldArea)
+            private float3 SampleSpawnPosition(
+                ref Unity.Mathematics.Random random,
+                Entity sourceEntity,
+                float3 center,
+                in BulletFieldAreaComponent fieldArea)
+            {
+                if (TrySampleSpawnPositionFromPollution(
+                        ref random,
+                        sourceEntity,
+                        center,
+                        out var pollutionPosition))
+                {
+                    return pollutionPosition;
+                }
+
+                return SampleSpawnPositionUniform(ref random, center, fieldArea);
+            }
+
+            private bool TrySampleSpawnPositionFromPollution(
+                ref Unity.Mathematics.Random random,
+                Entity sourceEntity,
+                float3 center,
+                out float3 position)
+            {
+                position = center;
+                if (!PollutionConfigLookup.HasComponent(sourceEntity))
+                    return false;
+                if (!PollutionGridLookup.HasComponent(sourceEntity))
+                    return false;
+                if (!PollutionCellsLookup.HasBuffer(sourceEntity))
+                    return false;
+                if (!PollutionValidCellIndicesLookup.HasBuffer(sourceEntity))
+                    return false;
+
+                var config = PollutionConfigLookup[sourceEntity];
+                if (config.SamplingMode != SourcePollutionSamplingModeId.TopK)
+                    return false;
+
+                var grid = PollutionGridLookup[sourceEntity];
+                int cols = math.max(1, grid.Cols);
+                int rows = math.max(1, grid.Rows);
+                var cells = PollutionCellsLookup[sourceEntity];
+                var validCellIndices = PollutionValidCellIndicesLookup[sourceEntity];
+                int validCount = validCellIndices.Length;
+                if (validCount <= 0)
+                    return false;
+
+                int topK = math.clamp(config.TopKSampleCount, 1, validCount);
+                int bestCellIndex = -1;
+                float bestWeight = -1f;
+
+                for (int i = 0; i < topK; i++)
+                {
+                    int listIndex = random.NextInt(0, validCount);
+                    int candidate = validCellIndices[listIndex].Value;
+                    float weight = GetValidCellWeight(cells, candidate);
+                    if (weight < 0f)
+                        continue;
+
+                    if (bestCellIndex < 0)
+                    {
+                        bestWeight = weight;
+                        bestCellIndex = candidate;
+                        continue;
+                    }
+
+                    if (weight <= bestWeight)
+                        continue;
+
+                    bestWeight = weight;
+                    bestCellIndex = candidate;
+                }
+
+                if (bestCellIndex < 0)
+                    return false;
+
+                position = SampleInsidePollutionCell(ref random, bestCellIndex, center, cols, rows, in grid);
+                return true;
+            }
+
+            private static float GetValidCellWeight(DynamicBuffer<SourcePollutionCellBuffer> cells, int cellIndex)
+            {
+                if ((uint)cellIndex >= (uint)cells.Length)
+                    return -1f;
+
+                var cell = cells[cellIndex];
+                if (cell.IsValid == 0)
+                    return -1f;
+
+                return math.max(0f, cell.Value);
+            }
+
+            private static float3 SampleInsidePollutionCell(
+                ref Unity.Mathematics.Random random,
+                int cellIndex,
+                float3 center,
+                int cols,
+                int rows,
+                in SourcePollutionGridComponent grid)
+            {
+                int safeCols = math.max(1, cols);
+                int safeRows = math.max(1, rows);
+                int clampedIndex = math.clamp(cellIndex, 0, safeCols * safeRows - 1);
+                int cellX = clampedIndex % safeCols;
+                int cellY = math.clamp(clampedIndex / safeCols, 0, safeRows - 1);
+
+                float cellSize = math.max(0.001f, grid.CellSize);
+                float2 half = math.max(0f, grid.HalfExtents);
+
+                float localX = -half.x + (cellX + random.NextFloat(0f, 1f)) * cellSize;
+                float localZ = -half.y + (cellY + random.NextFloat(0f, 1f)) * cellSize;
+                localX = math.clamp(localX, -half.x, half.x);
+                localZ = math.clamp(localZ, -half.y, half.y);
+                return new float3(center.x + localX, center.y, center.z + localZ);
+            }
+
+            private static float3 SampleSpawnPositionUniform(
+                ref Unity.Mathematics.Random random,
+                float3 center,
+                in BulletFieldAreaComponent fieldArea)
             {
                 if (fieldArea.Shape == BulletFieldShapeId.Rectangle)
                 {

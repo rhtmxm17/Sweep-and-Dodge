@@ -18,6 +18,14 @@ namespace SweepNDodge.DotsBullets
         public int InitialCollectedCount = 0;
         public SourceStateId InitialState = SourceStateId.Normal;
 
+        [Header("Cleaning Trail (Pollution Grid)")]
+        public float PollutionCellSize = 2.0f;
+        public float PollutionMin = 0f;
+        public float PollutionMax = 1f;
+        public float PollutionRegenPerSec = 0.08f;
+        public float PollutionDropPerCollect = 0.12f;
+        public int PollutionTopKSampleCount = 6;
+
         [Header("Debug")]
         public bool DrawGizmo = true;
         public bool DrawGizmoWhenNotSelected = false;
@@ -52,9 +60,50 @@ namespace SweepNDodge.DotsBullets
                     SpawnSequence = 1u
                 });
 
+                var halfExtents = ComputeHalfExtents(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize);
+                float cellSize = Mathf.Max(0.1f, authoring.PollutionCellSize);
+                int cols = Mathf.Max(1, Mathf.CeilToInt((halfExtents.x * 2f) / cellSize));
+                int rows = Mathf.Max(1, Mathf.CeilToInt((halfExtents.y * 2f) / cellSize));
+                float minValue = Mathf.Max(0f, authoring.PollutionMin);
+                float maxValue = Mathf.Max(minValue, authoring.PollutionMax);
+
+                AddComponent(e, new SourcePollutionConfigComponent
+                {
+                    MinValue = minValue,
+                    MaxValue = maxValue,
+                    RegenPerSec = Mathf.Max(0f, authoring.PollutionRegenPerSec),
+                    DropPerCollect = Mathf.Max(0f, authoring.PollutionDropPerCollect),
+                    TopKSampleCount = Mathf.Max(1, authoring.PollutionTopKSampleCount),
+                    SamplingMode = SourcePollutionSamplingModeId.TopK,
+                });
+
+                AddComponent(e, new SourcePollutionGridComponent
+                {
+                    Cols = cols,
+                    Rows = rows,
+                    CellSize = cellSize,
+                    InvCellSize = 1f / cellSize,
+                    HalfExtents = halfExtents,
+                });
+
                 var patternBuffer = AddBuffer<SourceSpawnPatternBuffer>(e);
                 var activeCountBuffer = AddBuffer<SourceActiveBulletCountBuffer>(e);
                 BakeSpawnProfile(authoring.SpawnProfile, patternBuffer, activeCountBuffer);
+
+                var pollutionCells = AddBuffer<SourcePollutionCellBuffer>(e);
+                var pollutionDrops = AddBuffer<SourcePollutionDropRequestBuffer>(e);
+                var pollutionValidCellIndices = AddBuffer<SourcePollutionValidCellIndexBuffer>(e);
+                BakePollutionGrid(
+                    pollutionCells,
+                    pollutionDrops,
+                    pollutionValidCellIndices,
+                    cols,
+                    rows,
+                    cellSize,
+                    halfExtents,
+                    authoring.FieldShape,
+                    authoring.FieldRadius,
+                    maxValue);
 
                 AddComponent(e, new SourceAnchorComponent
                 {
@@ -107,6 +156,68 @@ namespace SweepNDodge.DotsBullets
                     }
                 }
             }
+
+            private static void BakePollutionGrid(
+                DynamicBuffer<SourcePollutionCellBuffer> pollutionCells,
+                DynamicBuffer<SourcePollutionDropRequestBuffer> pollutionDrops,
+                DynamicBuffer<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndices,
+                int cols,
+                int rows,
+                float cellSize,
+                float2 halfExtents,
+                BulletFieldShapeId shape,
+                float fieldRadius,
+                float maxValue)
+            {
+                int cellCount = Mathf.Max(1, cols * rows);
+                pollutionCells.ResizeUninitialized(cellCount);
+                pollutionValidCellIndices.Clear();
+
+                float safeCellSize = Mathf.Max(0.001f, cellSize);
+                float safeRadius = Mathf.Max(0f, fieldRadius);
+                float radiusSq = safeRadius * safeRadius;
+
+                for (int y = 0; y < rows; y++)
+                {
+                    for (int x = 0; x < cols; x++)
+                    {
+                        int i = y * cols + x;
+
+                        float centerX = -halfExtents.x + (x + 0.5f) * safeCellSize;
+                        float centerZ = -halfExtents.y + (y + 0.5f) * safeCellSize;
+                        bool isValid = shape == BulletFieldShapeId.Rectangle
+                            || (centerX * centerX + centerZ * centerZ) <= radiusSq;
+
+                        pollutionCells[i] = new SourcePollutionCellBuffer
+                        {
+                            Value = maxValue,
+                            IsValid = isValid ? (byte)1 : (byte)0,
+                        };
+
+                        if (isValid)
+                        {
+                            pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
+                            {
+                                Value = i,
+                            });
+                        }
+                    }
+                }
+
+                if (pollutionValidCellIndices.Length <= 0)
+                {
+                    int centerIndex = Mathf.Clamp((rows / 2) * cols + (cols / 2), 0, cellCount - 1);
+                    var cell = pollutionCells[centerIndex];
+                    cell.IsValid = 1;
+                    pollutionCells[centerIndex] = cell;
+                    pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
+                    {
+                        Value = centerIndex,
+                    });
+                }
+
+                pollutionDrops.Clear();
+            }
         }
 
         private static float ComputeArea(BulletFieldShapeId shape, float radius, Vector2 size)
@@ -116,6 +227,18 @@ namespace SweepNDodge.DotsBullets
 
             float r = Mathf.Max(0f, radius);
             return Mathf.PI * r * r;
+        }
+
+        private static float2 ComputeHalfExtents(BulletFieldShapeId shape, float radius, Vector2 size)
+        {
+            if (shape == BulletFieldShapeId.Rectangle)
+            {
+                float2 safe = new float2(Mathf.Max(0f, size.x), Mathf.Max(0f, size.y));
+                return safe * 0.5f;
+            }
+
+            float r = Mathf.Max(0f, radius);
+            return new float2(r, r);
         }
 
         private void OnDrawGizmos()
