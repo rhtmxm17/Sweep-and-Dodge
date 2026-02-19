@@ -12,6 +12,13 @@ namespace SweepNDodge.DotsBullets
             return math.min(safeCapacity, safeLoad + safeAdd);
         }
 
+        public static bool IsFull(in PlayerCarryBinComponent carry)
+        {
+            int safeCapacity = math.max(0, carry.Capacity);
+            int safeLoad = math.max(0, carry.Load);
+            return safeLoad >= safeCapacity;
+        }
+
         public static int ComputeHazardLoss(int load, float lossFrac, int lossMin, int lossMax)
         {
             int safeLoad = math.max(0, load);

@@ -47,6 +47,21 @@ namespace SweepNDodge.DotsBullets
         public int Capacity;
     }
 
+    public enum VacuumStartBlockReasonId : byte
+    {
+        None = 0,
+        CarryBinFull = 1,
+    }
+
+    // 흡입 시작 실패 피드백(프레임 이벤트).
+    // - HasBlockEvent: 이번 프레임에 시작 거부 이벤트가 발생했는지 여부
+    // - Reason: 시작 거부 사유
+    public struct PlayerVacuumStartBlockFeedbackComponent : IComponentData
+    {
+        public byte HasBlockEvent;
+        public VacuumStartBlockReasonId Reason;
+    }
+
     public struct PlayerHazardPenaltyConfigComponent : IComponentData
     {
         public float CarryLossFrac;

@@ -12,6 +12,18 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void IsFull_ReturnsTrueWhenLoadReachesCapacity()
+        {
+            var carry = new PlayerCarryBinComponent
+            {
+                Load = 300,
+                Capacity = 300
+            };
+
+            Assert.That(CarryBinRules.IsFull(in carry), Is.True);
+        }
+
+        [Test]
         public void ComputeHazardLoss_UsesConfiguredFormulaBounds()
         {
             // 기본값: frac=0.15, min=5, max=30

@@ -79,6 +79,12 @@ namespace SweepNDodge.DotsBullets
                     Capacity = Mathf.Max(0, authoring.CarryCapacity)
                 });
 
+                AddComponent(e, new PlayerVacuumStartBlockFeedbackComponent
+                {
+                    HasBlockEvent = 0,
+                    Reason = VacuumStartBlockReasonId.None
+                });
+
                 AddComponent(e, new PlayerHazardPenaltyConfigComponent
                 {
                     CarryLossFrac = Mathf.Clamp01(authoring.CarryLossFrac),

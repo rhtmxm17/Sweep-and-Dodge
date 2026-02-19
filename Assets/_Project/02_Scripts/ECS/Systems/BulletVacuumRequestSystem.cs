@@ -25,6 +25,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
+            state.RequireForUpdate<PlayerVacuumStartBlockFeedbackComponent>();
         }
 
         [BurstCompile]
@@ -37,8 +38,15 @@ namespace SweepNDodge.DotsBullets
             // Vacuum 상태 갱신(플레이어 단일)
             var vacuumRW = SystemAPI.GetComponentRW<VacuumBurstComponent>(playerEntity);
             var penaltyRW = SystemAPI.GetComponentRW<PlayerHazardPenaltyStateComponent>(playerEntity);
+            var carryBinRO = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
+            var startBlockFeedbackRW = SystemAPI.GetComponentRW<PlayerVacuumStartBlockFeedbackComponent>(playerEntity);
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
-            UpdateVacuumState(ref vacuumRW.ValueRW, in penaltyRW.ValueRO, dt);
+            UpdateVacuumState(
+                ref vacuumRW.ValueRW,
+                in penaltyRW.ValueRO,
+                in carryBinRO,
+                ref startBlockFeedbackRW.ValueRW,
+                dt);
 
             if (vacuumRW.ValueRO.IsActive == 0)
                 return;
@@ -109,8 +117,16 @@ namespace SweepNDodge.DotsBullets
             BulletFieldShared.CellMapFence = state.Dependency;
         }
 
-        private static void UpdateVacuumState(ref VacuumBurstComponent v, in PlayerHazardPenaltyStateComponent penalty, float dt)
+        private static void UpdateVacuumState(
+            ref VacuumBurstComponent v,
+            in PlayerHazardPenaltyStateComponent penalty,
+            in PlayerCarryBinComponent carry,
+            ref PlayerVacuumStartBlockFeedbackComponent startBlockFeedback,
+            float dt)
         {
+            startBlockFeedback.HasBlockEvent = 0;
+            startBlockFeedback.Reason = VacuumStartBlockReasonId.None;
+
             if (v.CooldownTimer > 0f)
                 v.CooldownTimer = math.max(0f, v.CooldownTimer - dt);
             if (v.CaptureCooldownTimer > 0f)
@@ -135,6 +151,14 @@ namespace SweepNDodge.DotsBullets
             if (v.ActivateRequested != 0 && v.CooldownTimer <= 0f && v.CaptureCooldownTimer <= 0f)
             {
                 v.ActivateRequested = 0;
+
+                if (CarryBinRules.IsFull(in carry))
+                {
+                    startBlockFeedback.HasBlockEvent = 1;
+                    startBlockFeedback.Reason = VacuumStartBlockReasonId.CarryBinFull;
+                    return;
+                }
+
                 v.IsActive = 1;
                 v.ActiveTimer = v.ActiveTime;
                 v.CaptureActiveTimer = v.CaptureActiveTime;
