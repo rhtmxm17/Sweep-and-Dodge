@@ -29,6 +29,7 @@ namespace SweepNDodge.DotsBullets
         public int CarryLossMax = 30;
         public float IFrameTime = 0.7f;
         public float VacuumLockTime = 0.7f;
+        public float HitImpulseMagnitude = 1.0f;
 
         private class PlayerProxyBaker : Baker<PlayerProxyAuthoring>
         {
@@ -79,19 +80,14 @@ namespace SweepNDodge.DotsBullets
                     Capacity = Mathf.Max(0, authoring.CarryCapacity)
                 });
 
-                AddComponent(e, new PlayerVacuumStartBlockFeedbackComponent
-                {
-                    HasBlockEvent = 0,
-                    Reason = VacuumStartBlockReasonId.None
-                });
-
                 AddComponent(e, new PlayerHazardPenaltyConfigComponent
                 {
                     CarryLossFrac = Mathf.Clamp01(authoring.CarryLossFrac),
                     CarryLossMin = Mathf.Max(0, authoring.CarryLossMin),
                     CarryLossMax = Mathf.Max(0, authoring.CarryLossMax),
                     IFrameTime = Mathf.Max(0f, authoring.IFrameTime),
-                    VacuumLockTime = Mathf.Max(0f, authoring.VacuumLockTime)
+                    VacuumLockTime = Mathf.Max(0f, authoring.VacuumLockTime),
+                    HitImpulseMagnitude = Mathf.Max(0f, authoring.HitImpulseMagnitude)
                 });
 
                 AddComponent(e, new PlayerHazardPenaltyStateComponent
@@ -105,8 +101,16 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(e, new PlayerHazardHitContextComponent
                 {
-                    SourceEntity = Entity.Null
+                    SourceEntity = Entity.Null,
+                    HitDirX = 0f,
+                    HitDirZ = 0f
                 });
+
+                var uiFeedbackBuffer = AddBuffer<PlayerUiFeedbackEventBufferElement>(e);
+                uiFeedbackBuffer.EnsureCapacity(16);
+
+                var impulseBuffer = AddBuffer<PlayerImpulseEventBufferElement>(e);
+                impulseBuffer.EnsureCapacity(8);
             }
         }
     }

@@ -25,28 +25,42 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
-            state.RequireForUpdate<PlayerVacuumStartBlockFeedbackComponent>();
+            state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var dt = SystemAPI.Time.DeltaTime;
+            var time = SystemAPI.Time;
+            var dt = time.DeltaTime;
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
+            uint frame = FrameSequenceUtility.EstimateFrame(time.ElapsedTime, dt);
 
             // Vacuum 상태 갱신(플레이어 단일)
             var vacuumRW = SystemAPI.GetComponentRW<VacuumBurstComponent>(playerEntity);
             var penaltyRW = SystemAPI.GetComponentRW<PlayerHazardPenaltyStateComponent>(playerEntity);
             var carryBinRO = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
-            var startBlockFeedbackRW = SystemAPI.GetComponentRW<PlayerVacuumStartBlockFeedbackComponent>(playerEntity);
+            var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
-            UpdateVacuumState(
+            byte blockReason = UpdateVacuumState(
                 ref vacuumRW.ValueRW,
                 in penaltyRW.ValueRO,
                 in carryBinRO,
-                ref startBlockFeedbackRW.ValueRW,
                 dt);
+
+            if (blockReason != (byte)PlayerUiFeedbackReasonId.None)
+            {
+                uiFeedbackBuffer.Add(new PlayerUiFeedbackEventBufferElement
+                {
+                    Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
+                    Reason = blockReason,
+                    Value = 0,
+                    RelatedEntity = Entity.Null,
+                    Frame = frame,
+                    Sequence = (uint)uiFeedbackBuffer.Length,
+                });
+            }
 
             if (vacuumRW.ValueRO.IsActive == 0)
                 return;
@@ -64,6 +78,7 @@ namespace SweepNDodge.DotsBullets
             var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
             var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
+            var uiFeedbackLookup = SystemAPI.GetBufferLookup<PlayerUiFeedbackEventBufferElement>(isReadOnly: false);
 
             txLookup.Update(ref state);
             captureRuleLookup.Update(ref state);
@@ -72,6 +87,7 @@ namespace SweepNDodge.DotsBullets
             bulletSourceLookup.Update(ref state);
             reqLookup.Update(ref state);
             sourceLookup.Update(ref state);
+            uiFeedbackLookup.Update(ref state);
 
             var carryLookup = SystemAPI.GetComponentLookup<PlayerCarryBinComponent>(isReadOnly: false);
             carryLookup.Update(ref state);
@@ -101,7 +117,9 @@ namespace SweepNDodge.DotsBullets
                 BulletSourceLookup = bulletSourceLookup,
                 RequestLookup = reqLookup,
                 SourceLookup = sourceLookup,
+                UiFeedbackLookup = uiFeedbackLookup,
                 NewlyRequested = newlyRequested,
+                Frame = frame,
             }.Schedule(deps);
 
             state.Dependency = new ApplyVacuumCarryLoadJob
@@ -117,16 +135,12 @@ namespace SweepNDodge.DotsBullets
             BulletFieldShared.CellMapFence = state.Dependency;
         }
 
-        private static void UpdateVacuumState(
+        private static byte UpdateVacuumState(
             ref VacuumBurstComponent v,
             in PlayerHazardPenaltyStateComponent penalty,
             in PlayerCarryBinComponent carry,
-            ref PlayerVacuumStartBlockFeedbackComponent startBlockFeedback,
             float dt)
         {
-            startBlockFeedback.HasBlockEvent = 0;
-            startBlockFeedback.Reason = VacuumStartBlockReasonId.None;
-
             if (v.CooldownTimer > 0f)
                 v.CooldownTimer = math.max(0f, v.CooldownTimer - dt);
             if (v.CaptureCooldownTimer > 0f)
@@ -134,8 +148,13 @@ namespace SweepNDodge.DotsBullets
             if (v.CaptureActiveTimer > 0f)
                 v.CaptureActiveTimer = math.max(0f, v.CaptureActiveTimer - dt);
 
+            bool hadActivateRequest = v.ActivateRequested != 0;
             if (CarryBinRules.ApplyVacuumLock(ref v, in penalty))
-                return;
+            {
+                return hadActivateRequest
+                    ? (byte)PlayerUiFeedbackReasonId.VacuumLocked
+                    : (byte)PlayerUiFeedbackReasonId.None;
+            }
 
             if (v.IsActive != 0)
             {
@@ -145,30 +164,32 @@ namespace SweepNDodge.DotsBullets
                     v.IsActive = 0;
                     v.CooldownTimer = v.Cooldown;
                 }
-                return;
+                return (byte)PlayerUiFeedbackReasonId.None;
             }
 
-            if (v.ActivateRequested != 0 && v.CooldownTimer <= 0f && v.CaptureCooldownTimer <= 0f)
+            if (v.ActivateRequested != 0)
             {
+                if (v.CooldownTimer > 0f || v.CaptureCooldownTimer > 0f)
+                {
+                    v.ActivateRequested = 0;
+                    return (byte)PlayerUiFeedbackReasonId.CooldownActive;
+                }
+
                 v.ActivateRequested = 0;
 
                 if (CarryBinRules.IsFull(in carry))
                 {
-                    startBlockFeedback.HasBlockEvent = 1;
-                    startBlockFeedback.Reason = VacuumStartBlockReasonId.CarryBinFull;
-                    return;
+                    return (byte)PlayerUiFeedbackReasonId.CarryBinFull;
                 }
 
                 v.IsActive = 1;
                 v.ActiveTimer = v.ActiveTime;
                 v.CaptureActiveTimer = v.CaptureActiveTime;
                 v.CaptureCooldownTimer = v.CaptureCooldown;
+                return (byte)PlayerUiFeedbackReasonId.None;
             }
-            else
-            {
-                // 선입력 버림(쿨타임 중 요청은 폐기)
-                v.ActivateRequested = 0;
-            }
+
+            return (byte)PlayerUiFeedbackReasonId.None;
         }
 
         private static float GetHazardRingInner(in VacuumBurstComponent v)
@@ -202,8 +223,10 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
             public ComponentLookup<SourceSpawnComponent> SourceLookup;
+            public BufferLookup<PlayerUiFeedbackEventBufferElement> UiFeedbackLookup;
 
             public NativeReference<int> NewlyRequested;
+            public uint Frame;
 
             public void Execute()
             {
@@ -297,9 +320,38 @@ namespace SweepNDodge.DotsBullets
 
                 // 상태 전이는 단방향만 허용한다(Normal -> Weakened -> Depleted).
                 if ((byte)nextStateByCount > (byte)source.State)
+                {
                     source.State = nextStateByCount;
+                    EmitSourceStateChanged(sourceEntity, nextStateByCount);
+                }
 
                 SourceLookup[sourceEntity] = source;
+            }
+
+            private void EmitSourceStateChanged(Entity sourceEntity, SourceStateId nextState)
+            {
+                if (!UiFeedbackLookup.TryGetBuffer(PlayerEntity, out var uiFeedbackBuffer))
+                    return;
+
+                byte reason = nextState switch
+                {
+                    SourceStateId.Weakened => (byte)PlayerUiFeedbackReasonId.SourceToWeakened,
+                    SourceStateId.Depleted => (byte)PlayerUiFeedbackReasonId.SourceToDepleted,
+                    _ => (byte)PlayerUiFeedbackReasonId.None,
+                };
+
+                if (reason == (byte)PlayerUiFeedbackReasonId.None)
+                    return;
+
+                uiFeedbackBuffer.Add(new PlayerUiFeedbackEventBufferElement
+                {
+                    Type = PlayerUiFeedbackEventType.SourceStateChanged,
+                    Reason = reason,
+                    Value = 0,
+                    RelatedEntity = sourceEntity,
+                    Frame = Frame,
+                    Sequence = (uint)uiFeedbackBuffer.Length,
+                });
             }
         }
 

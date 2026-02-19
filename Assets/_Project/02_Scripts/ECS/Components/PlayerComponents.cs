@@ -47,21 +47,6 @@ namespace SweepNDodge.DotsBullets
         public int Capacity;
     }
 
-    public enum VacuumStartBlockReasonId : byte
-    {
-        None = 0,
-        CarryBinFull = 1,
-    }
-
-    // 흡입 시작 실패 피드백(프레임 이벤트).
-    // - HasBlockEvent: 이번 프레임에 시작 거부 이벤트가 발생했는지 여부
-    // - Reason: 시작 거부 사유
-    public struct PlayerVacuumStartBlockFeedbackComponent : IComponentData
-    {
-        public byte HasBlockEvent;
-        public VacuumStartBlockReasonId Reason;
-    }
-
     public struct PlayerHazardPenaltyConfigComponent : IComponentData
     {
         public float CarryLossFrac;
@@ -69,6 +54,7 @@ namespace SweepNDodge.DotsBullets
         public int CarryLossMax;
         public float IFrameTime;
         public float VacuumLockTime;
+        public float HitImpulseMagnitude;
     }
 
     public struct PlayerHazardPenaltyStateComponent : IComponentData
@@ -86,5 +72,54 @@ namespace SweepNDodge.DotsBullets
     public struct PlayerHazardHitContextComponent : IComponentData
     {
         public Entity SourceEntity;
+        public float HitDirX;
+        public float HitDirZ;
+    }
+
+    public enum PlayerUiFeedbackEventType : byte
+    {
+        None = 0,
+        VacuumStartBlocked = 1,
+        SourceStateChanged = 2,
+        PlayerHazardHit = 3,
+    }
+
+    public enum PlayerUiFeedbackReasonId : byte
+    {
+        None = 0,
+        CarryBinFull = 1,
+        VacuumLocked = 2,
+        CooldownActive = 3,
+        SourceToWeakened = 4,
+        SourceToDepleted = 5,
+        Default = 255,
+    }
+
+    public enum PlayerImpulseReasonId : byte
+    {
+        None = 0,
+        Default = 1,
+    }
+
+    [InternalBufferCapacity(16)]
+    public struct PlayerUiFeedbackEventBufferElement : IBufferElementData
+    {
+        public PlayerUiFeedbackEventType Type;
+        public byte Reason;
+        public int Value;
+        public Entity RelatedEntity;
+        public uint Frame;
+        public uint Sequence;
+    }
+
+    [InternalBufferCapacity(8)]
+    public struct PlayerImpulseEventBufferElement : IBufferElementData
+    {
+        public byte Reason;
+        public float DirX;
+        public float DirZ;
+        public float Magnitude;
+        public uint Frame;
+        public uint Sequence;
     }
 }

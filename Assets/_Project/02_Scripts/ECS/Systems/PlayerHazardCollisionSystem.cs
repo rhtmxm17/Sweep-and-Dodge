@@ -147,9 +147,16 @@ namespace SweepNDodge.DotsBullets
                             // 충돌 확인 단계에서도 즉시 제거 요청을 남겨 중복 충돌을 완화한다.
                             DespawnRequestLookup.SetComponentEnabled(bullet, true);
                             var hitContext = PlayerHitContextLookup[PlayerEntity];
+                            float2 away = new float2(playerPos.x - bp.x, playerPos.z - bp.z);
+                            if (math.lengthsq(away) < 1e-8f)
+                                away = new float2(0f, 1f);
+                            else
+                                away = math.normalize(away);
                             hitContext.SourceEntity = BulletSourceLookup.HasComponent(bullet)
                                 ? BulletSourceLookup[bullet].Value
                                 : Entity.Null;
+                            hitContext.HitDirX = away.x;
+                            hitContext.HitDirZ = away.y;
                             PlayerHitContextLookup[PlayerEntity] = hitContext;
                             PlayerHitRequestLookup.SetComponentEnabled(PlayerEntity, true);
                             return;
@@ -179,10 +186,18 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerHazardHitContextComponent>();
             state.RequireForUpdate<SourceSpawnComponent>();
+            state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
+            state.RequireForUpdate<PlayerImpulseEventBufferElement>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
+            var time = SystemAPI.Time;
+            var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
+            var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
+            var impulseBuffer = SystemAPI.GetBuffer<PlayerImpulseEventBufferElement>(playerEntity);
+            uint frame = FrameSequenceUtility.EstimateFrame(time.ElapsedTime, time.DeltaTime);
+
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
             sourceLookup.Update(ref state);
 
@@ -217,10 +232,33 @@ namespace SweepNDodge.DotsBullets
                     sourceLookup[sourceEntity] = source;
                 }
 
+                uiFeedbackBuffer.Add(new PlayerUiFeedbackEventBufferElement
+                {
+                    Type = PlayerUiFeedbackEventType.PlayerHazardHit,
+                    Reason = (byte)PlayerUiFeedbackReasonId.Default,
+                    Value = loss,
+                    RelatedEntity = sourceEntity,
+                    Frame = frame,
+                    Sequence = (uint)uiFeedbackBuffer.Length,
+                });
+
+                impulseBuffer.Add(new PlayerImpulseEventBufferElement
+                {
+                    Reason = (byte)PlayerImpulseReasonId.Default,
+                    DirX = hitContext.ValueRO.HitDirX,
+                    DirZ = hitContext.ValueRO.HitDirZ,
+                    Magnitude = math.max(0f, penaltyConfig.ValueRO.HitImpulseMagnitude),
+                    Frame = frame,
+                    Sequence = (uint)impulseBuffer.Length,
+                });
+
                 hitContext.ValueRW.SourceEntity = Entity.Null;
+                hitContext.ValueRW.HitDirX = 0f;
+                hitContext.ValueRW.HitDirZ = 0f;
                 Debug.Log($"[HazardCollision] 피격 처리 / loss={loss}, load={carryBin.ValueRO.Load}, contaminationApplied={(contaminationApplied ? 1 : 0)}, iFrame={penaltyState.ValueRO.IFrameTimer:0.00}, vacuumLock={penaltyState.ValueRO.VacuumLockTimer:0.00}");
                 hitReq.ValueRW = false;
             }
         }
+
     }
 }
