@@ -20,6 +20,12 @@ namespace SweepNDodge.DotsBullets
         public float ActiveTime = 0.22f;
         public float Cooldown = 1.8f;
 
+        [Header("Cleanup Action (Forward Sample)")]
+        public float ForwardTrashRange = 3.4f;
+        public float ForwardTrashFanHalfAngleDeg = 40f;
+        public float ForwardHazardLineLength = 3.8f;
+        public float ForwardHazardLineHalfWidth = 0.55f;
+
         [Header("CarryBin")]
         public int CarryCapacity = 300;
 
@@ -71,7 +77,39 @@ namespace SweepNDodge.DotsBullets
                     Position = authoring.transform.position,
                     Rotation = authoring.transform.rotation,
                     SyncRotation = 1,
-                    VacuumRequested = 0
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionId = (byte)PlayerCleanupActionId.None
+                });
+
+                AddComponent(e, new PlayerCleanupActionStateComponent
+                {
+                    SelectedActionId = PlayerCleanupActionId.RadialRing,
+                    PendingActionId = PlayerCleanupActionId.None,
+                    Version = 0,
+                });
+
+                var actionProfileBuffer = AddBuffer<PlayerCleanupActionProfileBufferElement>(e);
+                actionProfileBuffer.EnsureCapacity(4);
+                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
+                {
+                    ActionId = PlayerCleanupActionId.RadialRing,
+                    TrashRange = Mathf.Max(0f, authoring.Range),
+                    TrashFanHalfAngleDeg = 180f,
+                    HazardRingRadius = Mathf.Max(0f, authoring.CaptureRingRadius),
+                    HazardRingWidth = Mathf.Max(0f, authoring.CaptureRingWidth),
+                    HazardLineLength = 0f,
+                    HazardLineHalfWidth = 0f,
+                });
+                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
+                {
+                    ActionId = PlayerCleanupActionId.ForwardFanLine,
+                    TrashRange = Mathf.Max(0f, authoring.ForwardTrashRange),
+                    TrashFanHalfAngleDeg = Mathf.Clamp(authoring.ForwardTrashFanHalfAngleDeg, 0f, 90f),
+                    HazardRingRadius = 0f,
+                    HazardRingWidth = 0f,
+                    HazardLineLength = Mathf.Max(0f, authoring.ForwardHazardLineLength),
+                    HazardLineHalfWidth = Mathf.Max(0f, authoring.ForwardHazardLineHalfWidth),
                 });
 
                 AddComponent(e, new PlayerCarryBinComponent

@@ -9,8 +9,8 @@ namespace SweepNDodge.DotsBullets
     {
         public void OnUpdate(ref SystemState state)
         {
-            foreach (var (sync, tx, vacuum) in
-                     SystemAPI.Query<RefRW<PlayerGoSyncComponent>, RefRW<LocalTransform>, RefRW<VacuumBurstComponent>>()
+            foreach (var (sync, tx, vacuum, actionState) in
+                     SystemAPI.Query<RefRW<PlayerGoSyncComponent>, RefRW<LocalTransform>, RefRW<VacuumBurstComponent>, RefRW<PlayerCleanupActionStateComponent>>()
                               .WithAll<PlayerTag>())
             {
                 tx.ValueRW.Position = sync.ValueRO.Position;
@@ -19,10 +19,13 @@ namespace SweepNDodge.DotsBullets
 
                 if (sync.ValueRO.VacuumRequested != 0)
                     vacuum.ValueRW.ActivateRequested = 1;
+                if (sync.ValueRO.CleanupActionRequested != 0)
+                    actionState.ValueRW.PendingActionId = (PlayerCleanupActionId)sync.ValueRO.RequestedCleanupActionId;
 
                 // 1회성 입력 소비
                 var s = sync.ValueRW;
                 s.VacuumRequested = 0;
+                s.CleanupActionRequested = 0;
                 sync.ValueRW = s;
             }
         }

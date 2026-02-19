@@ -12,7 +12,10 @@ namespace SweepNDodge.DotsBullets
     public sealed class PlayerEcsBridge : MonoBehaviour
     {
         [Header("Input")]
-        public KeyCode VacuumKey = KeyCode.Space;
+        public int PrimaryVacuumMouseButton = 0;   // Left Click
+        public int SecondaryVacuumMouseButton = 1; // Right Click
+        public PlayerCleanupActionId PrimaryAction = PlayerCleanupActionId.RadialRing;
+        public PlayerCleanupActionId SecondaryAction = PlayerCleanupActionId.ForwardFanLine;
 
         [Header("Sync")]
         public bool SyncRotation = true;
@@ -48,9 +51,14 @@ namespace SweepNDodge.DotsBullets
             sync.Position = transform.position;
             sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
             if (SyncRotation) sync.Rotation = transform.rotation;
-            if (Input.GetKeyDown(VacuumKey))
+
+            bool primaryPressed = Input.GetMouseButtonDown(PrimaryVacuumMouseButton);
+            bool secondaryPressed = Input.GetMouseButtonDown(SecondaryVacuumMouseButton);
+            if (primaryPressed || secondaryPressed)
             {
                 sync.VacuumRequested = 1;
+                sync.CleanupActionRequested = 1;
+                sync.RequestedCleanupActionId = (byte)(secondaryPressed ? SecondaryAction : PrimaryAction);
                 _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
             }
             _em.SetComponentData(_playerEntity, sync);

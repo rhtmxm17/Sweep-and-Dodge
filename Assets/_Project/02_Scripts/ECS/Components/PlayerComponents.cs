@@ -12,6 +12,8 @@ namespace SweepNDodge.DotsBullets
         public quaternion Rotation;
         public byte SyncRotation;
         public byte VacuumRequested; // 1이면 이번 프레임 요청
+        public byte CleanupActionRequested; // 1이면 이번 프레임 행동 전환 요청
+        public byte RequestedCleanupActionId; // PlayerCleanupActionId(byte) 직렬화 값
     }
 
     public struct PlayerRadiusComponent : IComponentData

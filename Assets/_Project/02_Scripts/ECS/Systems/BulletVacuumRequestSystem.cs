@@ -10,8 +10,10 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// Vacuum 제거 행동:
-    /// - Trash  : 활성 시간 동안 Range 내 즉시 디스폰 요청
-    /// - Hazard : Vacuum ON 직후 Capture 타이밍 동안 Ring 밴드 내에서만 디스폰 요청
+    /// - ActionId별 프로파일 기반으로 Trash/Hazard 판정 기하를 분기한다.
+    /// - 기본 제공:
+    ///   - RadialRing: 원형 흡입 + 외곽 링 위험탄 처리
+    ///   - ForwardFanLine: 전방 부채꼴 + 전방 직선 위험탄 처리
     /// - 실제 비활성/풀 반납은 BulletExecutionEndGroup의 BulletDespawnExecutionSystem이 단일 책임으로 수행
     /// - LocalTransform 타입 충돌 방지: 메인 스레드에서 LocalTransform을 직접 읽지 않고 Job으로 스케줄
     /// </summary>
@@ -22,10 +24,13 @@ namespace SweepNDodge.DotsBullets
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
+            state.RequireForUpdate<PlayerGoSyncComponent>();
             state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
+            state.RequireForUpdate<PlayerCleanupActionStateComponent>();
+            state.RequireForUpdate<PlayerCleanupActionProfileBufferElement>();
         }
 
         [BurstCompile]
@@ -41,6 +46,9 @@ namespace SweepNDodge.DotsBullets
             var vacuumRW = SystemAPI.GetComponentRW<VacuumBurstComponent>(playerEntity);
             var penaltyRW = SystemAPI.GetComponentRW<PlayerHazardPenaltyStateComponent>(playerEntity);
             var carryBinRO = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
+            var goSyncRO = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
+            var actionStateRO = SystemAPI.GetComponent<PlayerCleanupActionStateComponent>(playerEntity);
+            var actionProfiles = SystemAPI.GetBuffer<PlayerCleanupActionProfileBufferElement>(playerEntity);
             var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
             byte blockReason = UpdateVacuumState(
@@ -67,6 +75,11 @@ namespace SweepNDodge.DotsBullets
 
             if (!BulletFieldShared.IsInitialized)
                 return;
+
+            var actionId = NormalizeActionId(actionStateRO.SelectedActionId);
+            var actionProfile = ResolveActionProfile(actionProfiles, actionId, in vacuumRW.ValueRO);
+            float3 playerForward = GetPlayerForward(in goSyncRO);
+            float searchRange = ComputeSearchRange(in actionProfile);
 
             Debug.Log($"[Vacuum System] 흡입 작동 중... / dt: {dt}");
 
@@ -103,11 +116,17 @@ namespace SweepNDodge.DotsBullets
             {
                 PlayerEntity = playerEntity,
                 InvCellSize = cfg.InvCellSize,
-
-                Range = vacuumRW.ValueRO.Range,
+                SearchRange = searchRange,
                 IsHazardCaptureActive = vacuumRW.ValueRO.CaptureActiveTimer > 0f ? (byte)1 : (byte)0,
-                HazardRingInner = GetHazardRingInner(in vacuumRW.ValueRO),
-                HazardRingOuter = GetHazardRingOuter(in vacuumRW.ValueRO),
+                ActionId = actionId,
+                PlayerForward = playerForward,
+                RadialTrashRange = actionProfile.TrashRange,
+                RadialHazardRingInner = GetHazardRingInner(in actionProfile),
+                RadialHazardRingOuter = GetHazardRingOuter(in actionProfile),
+                ForwardTrashRange = actionProfile.TrashRange,
+                ForwardTrashCosHalfAngle = math.cos(math.radians(actionProfile.TrashFanHalfAngleDeg)),
+                ForwardHazardLineLength = actionProfile.HazardLineLength,
+                ForwardHazardLineHalfWidth = actionProfile.HazardLineHalfWidth,
 
                 CellMap = BulletFieldShared.CellMap,
                 TxLookup = txLookup,
@@ -192,17 +211,88 @@ namespace SweepNDodge.DotsBullets
             return (byte)PlayerUiFeedbackReasonId.None;
         }
 
-        private static float GetHazardRingInner(in VacuumBurstComponent v)
+        private static PlayerCleanupActionId NormalizeActionId(PlayerCleanupActionId actionId)
         {
-            float halfWidth = math.max(0f, v.CaptureRingWidth * 0.5f);
-            return math.max(0f, v.CaptureRingRadius - halfWidth);
+            return actionId switch
+            {
+                PlayerCleanupActionId.ForwardFanLine => PlayerCleanupActionId.ForwardFanLine,
+                _ => PlayerCleanupActionId.RadialRing,
+            };
         }
 
-        private static float GetHazardRingOuter(in VacuumBurstComponent v)
+        private static PlayerCleanupActionProfileBufferElement ResolveActionProfile(
+            DynamicBuffer<PlayerCleanupActionProfileBufferElement> profiles,
+            PlayerCleanupActionId actionId,
+            in VacuumBurstComponent vacuum)
         {
-            float halfWidth = math.max(0f, v.CaptureRingWidth * 0.5f);
-            float inner = math.max(0f, v.CaptureRingRadius - halfWidth);
-            return math.max(inner, v.CaptureRingRadius + halfWidth);
+            for (int i = 0; i < profiles.Length; i++)
+            {
+                if (profiles[i].ActionId == actionId)
+                {
+                    var profile = profiles[i];
+                    profile.TrashRange = math.max(0f, profile.TrashRange);
+                    profile.TrashFanHalfAngleDeg = math.clamp(profile.TrashFanHalfAngleDeg, 0f, 180f);
+                    profile.HazardRingRadius = math.max(0f, profile.HazardRingRadius);
+                    profile.HazardRingWidth = math.max(0f, profile.HazardRingWidth);
+                    profile.HazardLineLength = math.max(0f, profile.HazardLineLength);
+                    profile.HazardLineHalfWidth = math.max(0f, profile.HazardLineHalfWidth);
+                    return profile;
+                }
+            }
+
+            if (actionId == PlayerCleanupActionId.ForwardFanLine)
+            {
+                return new PlayerCleanupActionProfileBufferElement
+                {
+                    ActionId = PlayerCleanupActionId.ForwardFanLine,
+                    TrashRange = math.max(0f, vacuum.Range),
+                    TrashFanHalfAngleDeg = 40f,
+                    HazardRingRadius = 0f,
+                    HazardRingWidth = 0f,
+                    HazardLineLength = math.max(0f, vacuum.Range),
+                    HazardLineHalfWidth = 0.5f,
+                };
+            }
+
+            return new PlayerCleanupActionProfileBufferElement
+            {
+                ActionId = PlayerCleanupActionId.RadialRing,
+                TrashRange = math.max(0f, vacuum.Range),
+                TrashFanHalfAngleDeg = 180f,
+                HazardRingRadius = math.max(0f, vacuum.CaptureRingRadius),
+                HazardRingWidth = math.max(0f, vacuum.CaptureRingWidth),
+                HazardLineLength = 0f,
+                HazardLineHalfWidth = 0f,
+            };
+        }
+
+        private static float3 GetPlayerForward(in PlayerGoSyncComponent sync)
+        {
+            float3 forward = math.forward(sync.Rotation);
+            forward.y = 0f;
+            if (math.lengthsq(forward) < 1e-8f)
+                return new float3(0f, 0f, 1f);
+            return math.normalize(forward);
+        }
+
+        private static float ComputeSearchRange(in PlayerCleanupActionProfileBufferElement profile)
+        {
+            float radialOuter = GetHazardRingOuter(in profile);
+            float forwardRange = math.max(profile.TrashRange, profile.HazardLineLength + profile.HazardLineHalfWidth);
+            return math.max(0f, math.max(radialOuter, forwardRange));
+        }
+
+        private static float GetHazardRingInner(in PlayerCleanupActionProfileBufferElement profile)
+        {
+            float halfWidth = math.max(0f, profile.HazardRingWidth * 0.5f);
+            return math.max(0f, profile.HazardRingRadius - halfWidth);
+        }
+
+        private static float GetHazardRingOuter(in PlayerCleanupActionProfileBufferElement profile)
+        {
+            float halfWidth = math.max(0f, profile.HazardRingWidth * 0.5f);
+            float inner = math.max(0f, profile.HazardRingRadius - halfWidth);
+            return math.max(inner, profile.HazardRingRadius + halfWidth);
         }
 
         [BurstCompile]
@@ -210,10 +300,17 @@ namespace SweepNDodge.DotsBullets
         {
             public Entity PlayerEntity;
             public float InvCellSize;
-            public float Range;
+            public float SearchRange;
             public byte IsHazardCaptureActive;
-            public float HazardRingInner;
-            public float HazardRingOuter;
+            public PlayerCleanupActionId ActionId;
+            public float3 PlayerForward;
+            public float RadialTrashRange;
+            public float RadialHazardRingInner;
+            public float RadialHazardRingOuter;
+            public float ForwardTrashRange;
+            public float ForwardTrashCosHalfAngle;
+            public float ForwardHazardLineLength;
+            public float ForwardHazardLineHalfWidth;
 
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
@@ -236,7 +333,7 @@ namespace SweepNDodge.DotsBullets
                 float3 playerPos = TxLookup[PlayerEntity].Position;
 
                 int2 center = SpatialHashUtility.ToCell(playerPos, InvCellSize);
-                int cellRadius = (int)math.ceil(Range * InvCellSize) + 1;
+                int cellRadius = (int)math.ceil(SearchRange * InvCellSize) + 1;
 
                 int add = 0;
 
@@ -265,18 +362,12 @@ namespace SweepNDodge.DotsBullets
                                 : 0f;
                             var captureRule = CaptureRuleLookup[bullet].Value;
 
-                            bool canCapture = false;
-                            if (captureRule == BulletCaptureRuleId.StandardCollectible)
-                            {
-                                float collectRange = Range + bulletRadius;
-                                canCapture = distSq <= collectRange * collectRange;
-                            }
-                            else if (captureRule == BulletCaptureRuleId.RiskTimedResolve && IsHazardCaptureActive != 0)
-                            {
-                                float inner = math.max(0f, HazardRingInner - bulletRadius);
-                                float outer = math.max(inner, HazardRingOuter + bulletRadius);
-                                canCapture = distSq >= inner * inner && distSq <= outer * outer;
-                            }
+                            bool canCapture = EvaluateCapture(
+                                captureRule,
+                                distSq,
+                                dxp,
+                                dzp,
+                                bulletRadius);
 
                             if (!canCapture) continue;
 
@@ -292,6 +383,65 @@ namespace SweepNDodge.DotsBullets
 
                 NewlyRequested.Value += add;
                 Debug.Log($"[Vacuum Job] 이번 프레임 CarryBin 증가량: {add}");
+            }
+
+            private bool EvaluateCapture(
+                BulletCaptureRuleId captureRule,
+                float distSq,
+                float dxp,
+                float dzp,
+                float bulletRadius)
+            {
+                if (captureRule == BulletCaptureRuleId.StandardCollectible)
+                    return EvaluateTrashCapture(distSq, dxp, dzp, bulletRadius);
+
+                if (captureRule == BulletCaptureRuleId.RiskTimedResolve && IsHazardCaptureActive != 0)
+                    return EvaluateHazardCapture(distSq, dxp, dzp, bulletRadius);
+
+                return false;
+            }
+
+            private bool EvaluateTrashCapture(float distSq, float dxp, float dzp, float bulletRadius)
+            {
+                if (ActionId == PlayerCleanupActionId.ForwardFanLine)
+                {
+                    float range = math.max(0f, ForwardTrashRange + bulletRadius);
+                    if (distSq > range * range)
+                        return false;
+
+                    float lenSq = math.max(1e-8f, distSq);
+                    float invLen = math.rsqrt(lenSq);
+                    float dotForward = (dxp * PlayerForward.x + dzp * PlayerForward.z) * invLen;
+                    float cosHalf = math.clamp(ForwardTrashCosHalfAngle, -1f, 1f);
+                    return dotForward >= cosHalf;
+                }
+
+                float collectRange = math.max(0f, RadialTrashRange + bulletRadius);
+                return distSq <= collectRange * collectRange;
+            }
+
+            private bool EvaluateHazardCapture(float distSq, float dxp, float dzp, float bulletRadius)
+            {
+                if (ActionId == PlayerCleanupActionId.ForwardFanLine)
+                {
+                    float forwardProjection = dxp * PlayerForward.x + dzp * PlayerForward.z;
+                    if (forwardProjection < -bulletRadius)
+                        return false;
+
+                    float lineLength = math.max(0f, ForwardHazardLineLength + bulletRadius);
+                    if (forwardProjection > lineLength)
+                        return false;
+
+                    float sideX = -PlayerForward.z;
+                    float sideZ = PlayerForward.x;
+                    float lateral = math.abs(dxp * sideX + dzp * sideZ);
+                    float halfWidth = math.max(0f, ForwardHazardLineHalfWidth + bulletRadius);
+                    return lateral <= halfWidth;
+                }
+
+                float inner = math.max(0f, RadialHazardRingInner - bulletRadius);
+                float outer = math.max(inner, RadialHazardRingOuter + bulletRadius);
+                return distSq >= inner * inner && distSq <= outer * outer;
             }
 
             private void TryAccumulateDepletion(Entity bullet)

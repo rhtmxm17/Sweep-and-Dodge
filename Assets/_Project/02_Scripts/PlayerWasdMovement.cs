@@ -9,6 +9,7 @@ namespace SweepNDodge.DotsBullets
     {
         [Min(0f)]
         public float MoveSpeed = 6f;
+        public Camera TargetCamera;
 
         private void Update()
         {
@@ -24,6 +25,20 @@ namespace SweepNDodge.DotsBullets
             if (move.sqrMagnitude > 1f) move.Normalize();
 
             transform.position += move * (MoveSpeed * Time.deltaTime);
+
+            var cameraToUse = TargetCamera != null ? TargetCamera : Camera.main;
+            if (cameraToUse == null) return;
+
+            var ray = cameraToUse.ScreenPointToRay(Input.mousePosition);
+            var groundPlane = new Plane(Vector3.up, Vector3.zero);
+            if (!groundPlane.Raycast(ray, out var enter)) return;
+
+            var hitPoint = ray.GetPoint(enter);
+            var lookDirection = hitPoint - transform.position;
+            lookDirection.y = 0f;
+            if (lookDirection.sqrMagnitude <= 0.0001f) return;
+
+            transform.rotation = Quaternion.LookRotation(lookDirection);
         }
     }
 }
