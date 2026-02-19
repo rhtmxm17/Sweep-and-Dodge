@@ -21,24 +21,20 @@ namespace SweepNDodge.DotsBullets
         public float Value;
     }
 
-    public struct VacuumBurstComponent : IComponentData
+    public struct VacuumActivationConfigComponent : IComponentData
     {
-        public float Range;
-        public float Strength;
-        public float CollectRadius;
         public float CaptureActiveTime;
-        public float CaptureActiveTimer;
-        public float CaptureRingRadius;
-        public float CaptureRingWidth;
         public float CaptureCooldown;
-        public float CaptureCooldownTimer;
-
         public float ActiveTime;
-        public float ActiveTimer;
-
         public float Cooldown;
-        public float CooldownTimer;
+    }
 
+    public struct VacuumRuntimeStateComponent : IComponentData
+    {
+        public float CaptureActiveTimer;
+        public float CaptureCooldownTimer;
+        public float ActiveTimer;
+        public float CooldownTimer;
         public byte IsActive;           // 0/1
         public byte ActivateRequested;  // 0/1 (입력 시스템이 1로 세팅 → 이 시스템이 소모)
     }

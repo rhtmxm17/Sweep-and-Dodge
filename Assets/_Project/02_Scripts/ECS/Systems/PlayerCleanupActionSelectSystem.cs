@@ -18,13 +18,13 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerCleanupActionStateComponent>();
-            state.RequireForUpdate<VacuumBurstComponent>();
+            state.RequireForUpdate<VacuumRuntimeStateComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
             foreach (var (actionState, vacuum) in
-                     SystemAPI.Query<RefRW<PlayerCleanupActionStateComponent>, RefRO<VacuumBurstComponent>>().WithAll<PlayerTag>())
+                     SystemAPI.Query<RefRW<PlayerCleanupActionStateComponent>, RefRO<VacuumRuntimeStateComponent>>().WithAll<PlayerTag>())
             {
                 var pending = Normalize(actionState.ValueRO.PendingActionId);
                 var selected = Normalize(actionState.ValueRO.SelectedActionId);

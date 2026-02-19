@@ -8,10 +8,8 @@ namespace SweepNDodge.DotsBullets
         [Header("Proxy Radius")]
         public float PlayerRadius = 0.35f;
 
-        [Header("Vacuum")]
+        [Header("Vacuum Fallback(CleanupActionSet이 없을 때)")]
         public float Range = 3.2f;
-        public float Strength = 75f;
-        public float CollectRadius = 0.35f;
         public float CaptureActiveTime = 0.20f;
         public float CaptureRingRadius = 2.88f;
         public float CaptureRingWidth = 0.8f;
@@ -47,24 +45,20 @@ namespace SweepNDodge.DotsBullets
                     Value = authoring.PlayerRadius
                 });
 
-                AddComponent(e, new VacuumBurstComponent
+                AddComponent(e, new VacuumActivationConfigComponent
                 {
-                    Range = authoring.Range,
-                    Strength = authoring.Strength,
-                    CollectRadius = authoring.CollectRadius,
                     CaptureActiveTime = Mathf.Max(0f, authoring.CaptureActiveTime),
-                    CaptureActiveTimer = 0f,
-                    CaptureRingRadius = Mathf.Max(0f, authoring.CaptureRingRadius),
-                    CaptureRingWidth = Mathf.Max(0f, authoring.CaptureRingWidth),
                     CaptureCooldown = Mathf.Max(0f, authoring.CaptureCooldown),
-                    CaptureCooldownTimer = 0f,
-
                     ActiveTime = authoring.ActiveTime,
-                    ActiveTimer = 0f,
-
                     Cooldown = authoring.Cooldown,
-                    CooldownTimer = 0f,
+                });
 
+                AddComponent(e, new VacuumRuntimeStateComponent
+                {
+                    CaptureActiveTimer = 0f,
+                    CaptureCooldownTimer = 0f,
+                    ActiveTimer = 0f,
+                    CooldownTimer = 0f,
                     IsActive = 0,
                     ActivateRequested = 0
                 });

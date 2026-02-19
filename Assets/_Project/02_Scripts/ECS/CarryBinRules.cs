@@ -44,15 +44,15 @@ namespace SweepNDodge.DotsBullets
             return penalty.IFrameTimer > 0f;
         }
 
-        public static bool ApplyVacuumLock(ref VacuumBurstComponent vacuum, in PlayerHazardPenaltyStateComponent penalty)
+        public static bool ApplyVacuumLock(ref VacuumRuntimeStateComponent vacuumState, in PlayerHazardPenaltyStateComponent penalty)
         {
             if (penalty.VacuumLockTimer <= 0f)
                 return false;
 
-            vacuum.IsActive = 0;
-            vacuum.ActiveTimer = 0f;
-            vacuum.CaptureActiveTimer = 0f;
-            vacuum.ActivateRequested = 0;
+            vacuumState.IsActive = 0;
+            vacuumState.ActiveTimer = 0f;
+            vacuumState.CaptureActiveTimer = 0f;
+            vacuumState.ActivateRequested = 0;
             return true;
         }
 

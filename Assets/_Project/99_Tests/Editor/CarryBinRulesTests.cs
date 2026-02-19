@@ -51,7 +51,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ApplyVacuumLock_DisablesVacuumWhileLocked()
         {
-            var vacuum = new VacuumBurstComponent
+            var vacuum = new VacuumRuntimeStateComponent
             {
                 IsActive = 1,
                 ActiveTimer = 0.2f,

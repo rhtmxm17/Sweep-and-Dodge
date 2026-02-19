@@ -21,11 +21,21 @@ namespace SweepNDodge.DotsBullets
     [UpdateInGroup(typeof(BulletRequestGroup))]
     public partial struct BulletVacuumRequestSystem : ISystem
     {
+        private const float FallbackRadialTrashRange = 3.2f;
+        private const float FallbackRadialHazardRingRadius = 2.88f;
+        private const float FallbackRadialHazardRingWidth = 0.8f;
+        private const float FallbackForwardTrashRange = 3.2f;
+        private const float FallbackForwardTrashHalfAngleDeg = 40f;
+        private const float FallbackForwardHazardLineLength = 3.2f;
+        private const float FallbackForwardHazardLineHalfWidth = 0.5f;
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerGoSyncComponent>();
             state.RequireForUpdate<BulletFieldConfigComponent>();
+            state.RequireForUpdate<VacuumActivationConfigComponent>();
+            state.RequireForUpdate<VacuumRuntimeStateComponent>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
@@ -43,7 +53,8 @@ namespace SweepNDodge.DotsBullets
             uint frame = FrameSequenceUtility.EstimateFrame(time.ElapsedTime, dt);
 
             // Vacuum 상태 갱신(플레이어 단일)
-            var vacuumRW = SystemAPI.GetComponentRW<VacuumBurstComponent>(playerEntity);
+            var vacuumConfigRO = SystemAPI.GetComponent<VacuumActivationConfigComponent>(playerEntity);
+            var vacuumStateRW = SystemAPI.GetComponentRW<VacuumRuntimeStateComponent>(playerEntity);
             var penaltyRW = SystemAPI.GetComponentRW<PlayerHazardPenaltyStateComponent>(playerEntity);
             var carryBinRO = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
             var goSyncRO = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
@@ -52,7 +63,8 @@ namespace SweepNDodge.DotsBullets
             var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
             byte blockReason = UpdateVacuumState(
-                ref vacuumRW.ValueRW,
+                in vacuumConfigRO,
+                ref vacuumStateRW.ValueRW,
                 in penaltyRW.ValueRO,
                 in carryBinRO,
                 dt);
@@ -70,14 +82,14 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
-            if (vacuumRW.ValueRO.IsActive == 0)
+            if (vacuumStateRW.ValueRO.IsActive == 0)
                 return;
 
             if (!BulletFieldShared.IsInitialized)
                 return;
 
             var actionId = NormalizeActionId(actionStateRO.SelectedActionId);
-            var actionProfile = ResolveActionProfile(actionProfiles, actionId, in vacuumRW.ValueRO);
+            var actionProfile = ResolveActionProfile(actionProfiles, actionId);
             float3 playerForward = GetPlayerForward(in goSyncRO);
             float searchRange = ComputeSearchRange(in actionProfile);
 
@@ -117,7 +129,7 @@ namespace SweepNDodge.DotsBullets
                 PlayerEntity = playerEntity,
                 InvCellSize = cfg.InvCellSize,
                 SearchRange = searchRange,
-                IsHazardCaptureActive = vacuumRW.ValueRO.CaptureActiveTimer > 0f ? (byte)1 : (byte)0,
+                IsHazardCaptureActive = vacuumStateRW.ValueRO.CaptureActiveTimer > 0f ? (byte)1 : (byte)0,
                 ActionId = actionId,
                 PlayerForward = playerForward,
                 RadialTrashRange = actionProfile.TrashRange,
@@ -155,58 +167,59 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static byte UpdateVacuumState(
-            ref VacuumBurstComponent v,
+            in VacuumActivationConfigComponent config,
+            ref VacuumRuntimeStateComponent state,
             in PlayerHazardPenaltyStateComponent penalty,
             in PlayerCarryBinComponent carry,
             float dt)
         {
-            if (v.CooldownTimer > 0f)
-                v.CooldownTimer = math.max(0f, v.CooldownTimer - dt);
-            if (v.CaptureCooldownTimer > 0f)
-                v.CaptureCooldownTimer = math.max(0f, v.CaptureCooldownTimer - dt);
-            if (v.CaptureActiveTimer > 0f)
-                v.CaptureActiveTimer = math.max(0f, v.CaptureActiveTimer - dt);
+            if (state.CooldownTimer > 0f)
+                state.CooldownTimer = math.max(0f, state.CooldownTimer - dt);
+            if (state.CaptureCooldownTimer > 0f)
+                state.CaptureCooldownTimer = math.max(0f, state.CaptureCooldownTimer - dt);
+            if (state.CaptureActiveTimer > 0f)
+                state.CaptureActiveTimer = math.max(0f, state.CaptureActiveTimer - dt);
 
-            bool hadActivateRequest = v.ActivateRequested != 0;
-            if (CarryBinRules.ApplyVacuumLock(ref v, in penalty))
+            bool hadActivateRequest = state.ActivateRequested != 0;
+            if (CarryBinRules.ApplyVacuumLock(ref state, in penalty))
             {
                 return hadActivateRequest
                     ? (byte)PlayerUiFeedbackReasonId.VacuumLocked
                     : (byte)PlayerUiFeedbackReasonId.None;
             }
 
-            if (v.IsActive != 0)
+            if (state.IsActive != 0)
             {
                 // 기존 동작 중 들어온 발동 입력은 다음 프레임으로 넘기지 않고 즉시 소비한다.
-                v.ActivateRequested = 0;
-                v.ActiveTimer = math.max(0f, v.ActiveTimer - dt);
-                if (v.ActiveTimer <= 0f)
+                state.ActivateRequested = 0;
+                state.ActiveTimer = math.max(0f, state.ActiveTimer - dt);
+                if (state.ActiveTimer <= 0f)
                 {
-                    v.IsActive = 0;
-                    v.CooldownTimer = v.Cooldown;
+                    state.IsActive = 0;
+                    state.CooldownTimer = config.Cooldown;
                 }
                 return (byte)PlayerUiFeedbackReasonId.None;
             }
 
-            if (v.ActivateRequested != 0)
+            if (state.ActivateRequested != 0)
             {
-                if (v.CooldownTimer > 0f || v.CaptureCooldownTimer > 0f)
+                if (state.CooldownTimer > 0f || state.CaptureCooldownTimer > 0f)
                 {
-                    v.ActivateRequested = 0;
+                    state.ActivateRequested = 0;
                     return (byte)PlayerUiFeedbackReasonId.CooldownActive;
                 }
 
-                v.ActivateRequested = 0;
+                state.ActivateRequested = 0;
 
                 if (CarryBinRules.IsFull(in carry))
                 {
                     return (byte)PlayerUiFeedbackReasonId.CarryBinFull;
                 }
 
-                v.IsActive = 1;
-                v.ActiveTimer = v.ActiveTime;
-                v.CaptureActiveTimer = v.CaptureActiveTime;
-                v.CaptureCooldownTimer = v.CaptureCooldown;
+                state.IsActive = 1;
+                state.ActiveTimer = config.ActiveTime;
+                state.CaptureActiveTimer = config.CaptureActiveTime;
+                state.CaptureCooldownTimer = config.CaptureCooldown;
                 return (byte)PlayerUiFeedbackReasonId.None;
             }
 
@@ -224,8 +237,7 @@ namespace SweepNDodge.DotsBullets
 
         private static PlayerCleanupActionProfileBufferElement ResolveActionProfile(
             DynamicBuffer<PlayerCleanupActionProfileBufferElement> profiles,
-            PlayerCleanupActionId actionId,
-            in VacuumBurstComponent vacuum)
+            PlayerCleanupActionId actionId)
         {
             for (int i = 0; i < profiles.Length; i++)
             {
@@ -247,22 +259,22 @@ namespace SweepNDodge.DotsBullets
                 return new PlayerCleanupActionProfileBufferElement
                 {
                     ActionId = PlayerCleanupActionId.ForwardFanLine,
-                    TrashRange = math.max(0f, vacuum.Range),
-                    TrashFanHalfAngleDeg = 40f,
+                    TrashRange = FallbackForwardTrashRange,
+                    TrashFanHalfAngleDeg = FallbackForwardTrashHalfAngleDeg,
                     HazardRingRadius = 0f,
                     HazardRingWidth = 0f,
-                    HazardLineLength = math.max(0f, vacuum.Range),
-                    HazardLineHalfWidth = 0.5f,
+                    HazardLineLength = FallbackForwardHazardLineLength,
+                    HazardLineHalfWidth = FallbackForwardHazardLineHalfWidth,
                 };
             }
 
             return new PlayerCleanupActionProfileBufferElement
             {
                 ActionId = PlayerCleanupActionId.RadialRing,
-                TrashRange = math.max(0f, vacuum.Range),
+                TrashRange = FallbackRadialTrashRange,
                 TrashFanHalfAngleDeg = 180f,
-                HazardRingRadius = math.max(0f, vacuum.CaptureRingRadius),
-                HazardRingWidth = math.max(0f, vacuum.CaptureRingWidth),
+                HazardRingRadius = FallbackRadialHazardRingRadius,
+                HazardRingWidth = FallbackRadialHazardRingWidth,
                 HazardLineLength = 0f,
                 HazardLineHalfWidth = 0f,
             };

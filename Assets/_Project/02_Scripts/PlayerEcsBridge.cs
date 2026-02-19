@@ -66,7 +66,7 @@ namespace SweepNDodge.DotsBullets
             // ECS -> GO : Vacuum 상태를 Animator에 반영(옵션)
             if (Animator != null)
             {
-                var v = _em.GetComponentData<VacuumBurstComponent>(_playerEntity);
+                var v = _em.GetComponentData<VacuumRuntimeStateComponent>(_playerEntity);
                 Animator.SetBool(VacuumActiveBool, v.IsActive != 0);
             }
         }

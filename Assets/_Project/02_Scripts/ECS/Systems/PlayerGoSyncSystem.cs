@@ -13,7 +13,7 @@ namespace SweepNDodge.DotsBullets
                      SystemAPI.Query<
                          RefRW<PlayerGoSyncComponent>,
                          RefRW<LocalTransform>,
-                         RefRW<VacuumBurstComponent>,
+                         RefRW<VacuumRuntimeStateComponent>,
                          RefRW<PlayerCleanupActionStateComponent>,
                          RefRO<PlayerCleanupActionSlotMapComponent>>()
                               .WithAll<PlayerTag>())
