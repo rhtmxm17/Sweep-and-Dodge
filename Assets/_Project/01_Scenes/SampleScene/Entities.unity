@@ -431,12 +431,14 @@ MonoBehaviour:
   CaptureCooldown: 0
   ActiveTime: 0.22
   Cooldown: 1.8
+  CleanupActionSet: {fileID: 11400000, guid: cdc49966bde420b4bb9c3c3557620125, type: 2}
   CarryCapacity: 1500
   CarryLossFrac: 0.6
   CarryLossMin: 10
   CarryLossMax: 450
   IFrameTime: 0.7
   VacuumLockTime: 0.7
+  HitImpulseMagnitude: 1
 --- !u!4 &1191526536
 Transform:
   m_ObjectHideFlags: 0

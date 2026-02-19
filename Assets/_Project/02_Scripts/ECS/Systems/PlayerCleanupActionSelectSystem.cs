@@ -18,16 +18,25 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerCleanupActionStateComponent>();
+            state.RequireForUpdate<VacuumBurstComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
-            foreach (var actionState in SystemAPI.Query<RefRW<PlayerCleanupActionStateComponent>>().WithAll<PlayerTag>())
+            foreach (var (actionState, vacuum) in
+                     SystemAPI.Query<RefRW<PlayerCleanupActionStateComponent>, RefRO<VacuumBurstComponent>>().WithAll<PlayerTag>())
             {
                 var pending = Normalize(actionState.ValueRO.PendingActionId);
                 var selected = Normalize(actionState.ValueRO.SelectedActionId);
                 if (pending == PlayerCleanupActionId.None)
                     continue;
+
+                if (vacuum.ValueRO.IsActive != 0)
+                {
+                    // 기존 동작 진행 중 들어온 전환 입력은 무시(소비)한다.
+                    actionState.ValueRW.PendingActionId = PlayerCleanupActionId.None;
+                    continue;
+                }
 
                 if (pending == selected)
                 {

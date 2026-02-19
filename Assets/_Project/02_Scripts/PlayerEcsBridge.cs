@@ -14,8 +14,8 @@ namespace SweepNDodge.DotsBullets
         [Header("Input")]
         public int PrimaryVacuumMouseButton = 0;   // Left Click
         public int SecondaryVacuumMouseButton = 1; // Right Click
-        public PlayerCleanupActionId PrimaryAction = PlayerCleanupActionId.RadialRing;
-        public PlayerCleanupActionId SecondaryAction = PlayerCleanupActionId.ForwardFanLine;
+        public PlayerCleanupActionSlotId PrimarySlot = PlayerCleanupActionSlotId.Primary;
+        public PlayerCleanupActionSlotId SecondarySlot = PlayerCleanupActionSlotId.Secondary;
 
         [Header("Sync")]
         public bool SyncRotation = true;
@@ -58,7 +58,7 @@ namespace SweepNDodge.DotsBullets
             {
                 sync.VacuumRequested = 1;
                 sync.CleanupActionRequested = 1;
-                sync.RequestedCleanupActionId = (byte)(secondaryPressed ? SecondaryAction : PrimaryAction);
+                sync.RequestedCleanupActionSlot = (byte)(secondaryPressed ? SecondarySlot : PrimarySlot);
                 _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
             }
             _em.SetComponentData(_playerEntity, sync);

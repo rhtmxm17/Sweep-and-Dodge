@@ -20,11 +20,8 @@ namespace SweepNDodge.DotsBullets
         public float ActiveTime = 0.22f;
         public float Cooldown = 1.8f;
 
-        [Header("Cleanup Action (Forward Sample)")]
-        public float ForwardTrashRange = 3.4f;
-        public float ForwardTrashFanHalfAngleDeg = 40f;
-        public float ForwardHazardLineLength = 3.8f;
-        public float ForwardHazardLineHalfWidth = 0.55f;
+        [Header("Cleanup Action Set")]
+        public PlayerCleanupActionSetSO CleanupActionSet;
 
         [Header("CarryBin")]
         public int CarryCapacity = 300;
@@ -79,38 +76,25 @@ namespace SweepNDodge.DotsBullets
                     SyncRotation = 1,
                     VacuumRequested = 0,
                     CleanupActionRequested = 0,
-                    RequestedCleanupActionId = (byte)PlayerCleanupActionId.None
+                    RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None
                 });
 
                 AddComponent(e, new PlayerCleanupActionStateComponent
                 {
-                    SelectedActionId = PlayerCleanupActionId.RadialRing,
+                    SelectedActionId = ResolveInitialSelectedAction(authoring),
                     PendingActionId = PlayerCleanupActionId.None,
                     Version = 0,
                 });
 
+                AddComponent(e, new PlayerCleanupActionSlotMapComponent
+                {
+                    PrimaryActionId = ResolvePrimarySlotAction(authoring),
+                    SecondaryActionId = ResolveSecondarySlotAction(authoring),
+                });
+
                 var actionProfileBuffer = AddBuffer<PlayerCleanupActionProfileBufferElement>(e);
                 actionProfileBuffer.EnsureCapacity(4);
-                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
-                {
-                    ActionId = PlayerCleanupActionId.RadialRing,
-                    TrashRange = Mathf.Max(0f, authoring.Range),
-                    TrashFanHalfAngleDeg = 180f,
-                    HazardRingRadius = Mathf.Max(0f, authoring.CaptureRingRadius),
-                    HazardRingWidth = Mathf.Max(0f, authoring.CaptureRingWidth),
-                    HazardLineLength = 0f,
-                    HazardLineHalfWidth = 0f,
-                });
-                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
-                {
-                    ActionId = PlayerCleanupActionId.ForwardFanLine,
-                    TrashRange = Mathf.Max(0f, authoring.ForwardTrashRange),
-                    TrashFanHalfAngleDeg = Mathf.Clamp(authoring.ForwardTrashFanHalfAngleDeg, 0f, 90f),
-                    HazardRingRadius = 0f,
-                    HazardRingWidth = 0f,
-                    HazardLineLength = Mathf.Max(0f, authoring.ForwardHazardLineLength),
-                    HazardLineHalfWidth = Mathf.Max(0f, authoring.ForwardHazardLineHalfWidth),
-                });
+                BakeCleanupActionProfiles(authoring, actionProfileBuffer);
 
                 AddComponent(e, new PlayerCarryBinComponent
                 {
@@ -149,6 +133,89 @@ namespace SweepNDodge.DotsBullets
 
                 var impulseBuffer = AddBuffer<PlayerImpulseEventBufferElement>(e);
                 impulseBuffer.EnsureCapacity(8);
+            }
+
+            private static void BakeCleanupActionProfiles(
+                PlayerProxyAuthoring authoring,
+                DynamicBuffer<PlayerCleanupActionProfileBufferElement> actionProfileBuffer)
+            {
+                var actionSet = authoring.CleanupActionSet;
+                if (actionSet != null && actionSet.Profiles != null && actionSet.Profiles.Length > 0)
+                {
+                    for (int i = 0; i < actionSet.Profiles.Length; i++)
+                    {
+                        var profile = actionSet.Profiles[i];
+                        if (profile.ActionId == PlayerCleanupActionId.None)
+                            continue;
+
+                        actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
+                        {
+                            ActionId = profile.ActionId,
+                            TrashRange = Mathf.Max(0f, profile.TrashRange),
+                            TrashFanHalfAngleDeg = Mathf.Clamp(profile.TrashFanHalfAngleDeg, 0f, 180f),
+                            HazardRingRadius = Mathf.Max(0f, profile.HazardRingRadius),
+                            HazardRingWidth = Mathf.Max(0f, profile.HazardRingWidth),
+                            HazardLineLength = Mathf.Max(0f, profile.HazardLineLength),
+                            HazardLineHalfWidth = Mathf.Max(0f, profile.HazardLineHalfWidth),
+                        });
+                    }
+                }
+
+                if (actionProfileBuffer.Length > 0)
+                    return;
+
+                // fallback default 설정 추가
+                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
+                {
+                    ActionId = PlayerCleanupActionId.RadialRing,
+                    TrashRange = Mathf.Max(0f, authoring.Range),
+                    TrashFanHalfAngleDeg = 180f,
+                    HazardRingRadius = Mathf.Max(0f, authoring.CaptureRingRadius),
+                    HazardRingWidth = Mathf.Max(0f, authoring.CaptureRingWidth),
+                    HazardLineLength = 0f,
+                    HazardLineHalfWidth = 0f,
+                });
+                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
+                {
+                    ActionId = PlayerCleanupActionId.ForwardFanLine,
+                    TrashRange = Mathf.Max(0f, authoring.Range),
+                    TrashFanHalfAngleDeg = 40f,
+                    HazardRingRadius = 0f,
+                    HazardRingWidth = 0f,
+                    HazardLineLength = Mathf.Max(0f, authoring.Range),
+                    HazardLineHalfWidth = 0.55f,
+                });
+            }
+
+            private static PlayerCleanupActionId ResolveInitialSelectedAction(PlayerProxyAuthoring authoring)
+            {
+                return authoring.CleanupActionSet != null
+                    ? NormalizeActionId(authoring.CleanupActionSet.InitialSelectedAction)
+                    : PlayerCleanupActionId.RadialRing;
+            }
+
+            private static PlayerCleanupActionId ResolvePrimarySlotAction(PlayerProxyAuthoring authoring)
+            {
+                return authoring.CleanupActionSet != null
+                    ? NormalizeActionId(authoring.CleanupActionSet.PrimarySlotAction)
+                    : PlayerCleanupActionId.RadialRing;
+            }
+
+            private static PlayerCleanupActionId ResolveSecondarySlotAction(PlayerProxyAuthoring authoring)
+            {
+                return authoring.CleanupActionSet != null
+                    ? NormalizeActionId(authoring.CleanupActionSet.SecondarySlotAction)
+                    : PlayerCleanupActionId.ForwardFanLine;
+            }
+
+            private static PlayerCleanupActionId NormalizeActionId(PlayerCleanupActionId actionId)
+            {
+                return actionId switch
+                {
+                    PlayerCleanupActionId.RadialRing => PlayerCleanupActionId.RadialRing,
+                    PlayerCleanupActionId.ForwardFanLine => PlayerCleanupActionId.ForwardFanLine,
+                    _ => PlayerCleanupActionId.RadialRing,
+                };
             }
         }
     }

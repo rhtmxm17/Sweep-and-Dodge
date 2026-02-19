@@ -177,6 +177,8 @@ namespace SweepNDodge.DotsBullets
 
             if (v.IsActive != 0)
             {
+                // 기존 동작 중 들어온 발동 입력은 다음 프레임으로 넘기지 않고 즉시 소비한다.
+                v.ActivateRequested = 0;
                 v.ActiveTimer = math.max(0f, v.ActiveTimer - dt);
                 if (v.ActiveTimer <= 0f)
                 {

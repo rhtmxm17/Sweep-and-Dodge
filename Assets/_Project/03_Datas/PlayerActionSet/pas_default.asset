@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5cf0dcf2ac72c344b98d2e933e0ab2d, type: 3}
+  m_Name: pas_default
+  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.PlayerCleanupActionSetSO
+  InitialSelectedAction: 1
+  PrimarySlotAction: 1
+  SecondarySlotAction: 2
+  Profiles:
+  - ActionId: 1
+    TrashRange: 3.2
+    TrashFanHalfAngleDeg: 180
+    HazardRingRadius: 2.88
+    HazardRingWidth: 0.8
+    HazardLineLength: 0
+    HazardLineHalfWidth: 0
+  - ActionId: 2
+    TrashRange: 5.8
+    TrashFanHalfAngleDeg: 50
+    HazardRingRadius: 0
+    HazardRingWidth: 0
+    HazardLineLength: 6
+    HazardLineHalfWidth: 0.55
