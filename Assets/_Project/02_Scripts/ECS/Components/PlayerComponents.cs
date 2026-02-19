@@ -61,6 +61,16 @@ namespace SweepNDodge.DotsBullets
         public float VacuumLockTimer;
     }
 
+    // Deposit 접촉이 감지되었음을 알리는 요청 태그.
+    // Request 단계에서 enable, Execution 단계에서 consume(disable)한다.
+    public struct PlayerCarryBinDepositRequestTag : IComponentData, IEnableableComponent { }
+
+    // Deposit 요청 컨텍스트(payload).
+    public struct PlayerCarryBinDepositContextComponent : IComponentData
+    {
+        public Entity DepositEntity;
+    }
+
     // 위험탄 충돌이 감지되었음을 알리는 요청 태그.
     // Request 단계에서 enable, Execution 단계에서 consume(disable)한다.
     public struct PlayerHazardHitRequestTag : IComponentData, IEnableableComponent { }

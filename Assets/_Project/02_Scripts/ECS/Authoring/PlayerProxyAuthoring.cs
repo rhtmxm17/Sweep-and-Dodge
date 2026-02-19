@@ -112,6 +112,14 @@ namespace SweepNDodge.DotsBullets
                     VacuumLockTimer = 0f
                 });
 
+                AddComponent<PlayerCarryBinDepositRequestTag>(e);
+                SetComponentEnabled<PlayerCarryBinDepositRequestTag>(e, false);
+
+                AddComponent(e, new PlayerCarryBinDepositContextComponent
+                {
+                    DepositEntity = Entity.Null
+                });
+
                 AddComponent<PlayerHazardHitRequestTag>(e);
                 SetComponentEnabled<PlayerHazardHitRequestTag>(e, false);
 
