@@ -5,7 +5,9 @@
 - type: `ProjectOps`
 - status: `active`
 - last_updated: `2026-02-20`
-- related_adr: [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
+- related_adr:
+  - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
+  - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
 
 > 15~20분 규모 1인 플레이 미니게임 프로토타입을 빠르게 안정화하기 위한 코어 기능 우선순위 문서
 
@@ -31,8 +33,8 @@
   - `BLOCK`: 외부 의존/이슈로 진행 차단
 
 ## 3. 진행 현황 스냅샷
-- 전체(10): `DONE 1 | WIP 2 | TODO 7 | BLOCK 0` (완료율 10%)
-- `P0`(5): 1/5 완료 (20%)
+- 전체(10): `DONE 2 | WIP 2 | TODO 6 | BLOCK 0` (완료율 20%)
+- `P0`(5): 2/5 완료 (40%)
 - `P1`(4): 0/4 완료 (0%)
 - `P2`(1): 0/1 완료 (0%)
 
@@ -40,8 +42,8 @@
 | 순서 | 코어 기능 | 중요도 | 구조 고착 리스크 | 상대 공수 비율 | 상태 | 진행률 | 다음 액션 | 최근 갱신 |
 |---|---|---|---:|---:|---|---:|---|---|
 | 1 | 프레임 파이프라인 고정 (`ExecutionBegin -> Simulation -> Request -> ExecutionEnd`) | P0 | 5 | 4% | DONE | 100% | 계약 테스트 유지보수 | 2026-02-20 |
-| 2 | Spawn/Despawn 요청-소비 구조 (Enableable 플래그 기반) | P0 | 5 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
-| 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | WIP | 60% | PoolFence/CellMapFence 사용처 일괄 점검 + 스트레스 수치 첨부 | 2026-02-20 |
+| 2 | Spawn/Despawn 요청-소비 구조 (Aggregated 요청 버퍼 + Owner 소비) | P0 | 5 | 8% | DONE | 100% | 스트레스 자동화 루틴에 운영 임계치 검증 추가 | 2026-02-20 |
+| 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | WIP | 75% | PoolFence/CellMapFence 사용처 일괄 점검 + 스트레스 수치 첨부 | 2026-02-20 |
 | 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | WIP | 20% | Editor 계약 테스트 확장 + PlayMode 스모크 자동화 | 2026-02-20 |
 | 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
@@ -69,7 +71,7 @@
 
 ## 7. 코어 기능 상세(항목별 1줄)
 1. 프레임 파이프라인 고정: `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`를 코드로 강제해 시스템 소유권/순서 꼬임을 초기에 차단한다.
-2. Spawn/Despawn 요청-소비 구조: 즉시 구조 변경 대신 Enableable 플래그 + Owner 시스템 소비로 통일해 대량 엔티티 안정성을 확보한다.
+2. Spawn/Despawn 요청-소비 구조: Spawn은 Aggregated 요청 버퍼를 Request에서 생성하고 ExecutionBegin Owner가 예산 기반으로 소비하며, Despawn은 요청-소비 경계를 유지해 대량 엔티티 안정성을 확보한다.
 3. 풀링 + Fence 표준화: Bullet Pool/FreeList, CellMap 접근을 Fence(JobHandle) 규약으로 묶어 race condition을 예방한다.
 4. 디버그 HUD + 스트레스 스위치: 엔티티 수/스폰/디스폰량/프레임타임을 실시간 표시하고 극단 부하 테스트를 즉시 실행 가능하게 만든다.
 5. 스모크 테스트 루틴: Play Mode 진입, 핵심 루프 1회, 대량 스폰/제거 1회를 자동 검사해 변경-검증 반복 비용을 낮춘다.
@@ -95,3 +97,10 @@
   - CellMapFence 최종 publish 단일화는 반영했으며, 전체 사용처 점검과 스트레스 수치화는 후속이다.
 - `#5 스모크 테스트 루틴`을 `WIP`로 갱신했다.
   - Editor 계약 테스트를 추가했고, PlayMode 자동 스모크는 후속이다.
+- `#2 Spawn/Despawn 요청-소비 구조` 상세 합의를 ADR로 분리했다.
+  - OPS에는 우선순위/실행 순서만 유지하고, 설계 상세는 `ADR-20260220-02`를 참조한다.
+- `#2 Spawn/Despawn 요청-소비 구조`를 `DONE`으로 갱신했다.
+  - `SourceSpawnRequestBuildSystem` + `SpawnRequestRoundRobinExecutionSystem` + `SpawnBacklogWarningSystem` 분리/정리 반영.
+  - backlog 정책 기본값을 `BudgetPerFrame=1024`, `MaxPendingCount=32768`, `MaxPendingAgeFrames=120`으로 조정.
+- `#3 풀링 + Fence 표준화` 진행률을 상향했다.
+  - 비활성화된 `BulletSpawnFromPoolSystem`를 기본 경로에서 제거하고 레거시 파일로 분리해 Owner 경계를 단순화했다.

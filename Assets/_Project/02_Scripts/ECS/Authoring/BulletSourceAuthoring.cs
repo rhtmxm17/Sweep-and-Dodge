@@ -88,7 +88,9 @@ namespace SweepNDodge.DotsBullets
 
                 var patternBuffer = AddBuffer<SourceSpawnPatternBuffer>(e);
                 var activeCountBuffer = AddBuffer<SourceActiveBulletCountBuffer>(e);
+                var spawnRequestBuffer = AddBuffer<SourceSpawnRequestBuffer>(e);
                 BakeSpawnProfile(authoring.SpawnProfile, patternBuffer, activeCountBuffer);
+                spawnRequestBuffer.Clear();
 
                 var pollutionCells = AddBuffer<SourcePollutionCellBuffer>(e);
                 var pollutionDrops = AddBuffer<SourcePollutionDropRequestBuffer>(e);

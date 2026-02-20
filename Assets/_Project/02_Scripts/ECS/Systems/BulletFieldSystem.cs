@@ -15,7 +15,7 @@
 // - 풀링 시스템에서 렌더 토글 처리:
 //   - 풀 초기화/스폰/디스폰에서 EntityRenderElementBuffer(렌더 파츠)를 통해 MaterialMeshInfo 토글
 //   - 디스폰 병렬 잡에서 렌더 파츠 OFF는 ECB.ParallelWriter로 기록(교차 엔티티 쓰기 제약 회피)
-//   - SpawnFromPoolJob에 BufferLookup<EntityRenderElementBuffer> 추가(렌더 파츠 ON)
+//   - 스폰 실행 Owner에서 렌더 파츠 ON 처리
 //   - Bootstrap에서 렌더 파츠 OFF 처리
 
 using Unity.Burst;
@@ -169,6 +169,8 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(configEntity, new MetaScrapComponent { Value = 0 });
             }
 
+            EnsureSpawnRequestRuntimeSingletons(em);
+
             var poolRegistryEntity = SystemAPI.GetSingletonEntity<BulletPoolRegistryTag>();
             var poolDefs = SystemAPI.GetBuffer<BulletPoolDefinitionBuffer>(poolRegistryEntity);
 
@@ -266,6 +268,44 @@ namespace SweepNDodge.DotsBullets
             BulletFieldShared.CellMapFence = default;
             BulletFieldShared.MarkUninitialized();
         }
+
+        private static void EnsureSpawnRequestRuntimeSingletons(EntityManager em)
+        {
+            if (!HasSingleton<SpawnRequestPolicyComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(SpawnRequestPolicyComponent));
+                em.SetComponentData(e, new SpawnRequestPolicyComponent
+                {
+                    BudgetPerFrame = 1024,
+                    MaxPendingCount = 32768,
+                    MaxPendingAgeFrames = 120,
+                    WarningLogCooldownFrames = 60,
+                    WarningBacklogPercent = 70,
+                    WarningHighBacklogPercent = 85,
+                });
+            }
+
+            if (!HasSingleton<SpawnBacklogMetricsComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(SpawnBacklogMetricsComponent));
+                em.SetComponentData(e, default(SpawnBacklogMetricsComponent));
+            }
+
+            if (!HasSingleton<SpawnBudgetCursorComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(SpawnBudgetCursorComponent));
+                em.SetComponentData(e, new SpawnBudgetCursorComponent
+                {
+                    SourceStartIndex = 0,
+                });
+            }
+        }
+
+        private static bool HasSingleton<T>(EntityManager em) where T : unmanaged, IComponentData
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            return !query.IsEmptyIgnoreFilter;
+        }
     }
 
     // ----------------------------------------------------------------------
@@ -275,7 +315,7 @@ namespace SweepNDodge.DotsBullets
     [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
-    [UpdateBefore(typeof(BulletSpawnFromPoolSystem))]
+    [UpdateBefore(typeof(SpawnRequestRoundRobinExecutionSystem))]
     public partial struct BulletFieldAreaUpdateSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
@@ -304,408 +344,6 @@ namespace SweepNDodge.DotsBullets
 
                 area.Radius = math.max(0f, area.Radius);
                 area.ComputedArea = math.PI * area.Radius * area.Radius;
-            }
-        }
-    }
-
-    /// <summary>
-    /// 동프레임 반영을 위한 스폰 실행 단계.
-    /// - FreeByKey에서 TypeKey 기준으로 스폰 엔티티 확보
-    /// - 데이터 세팅 + BulletActiveTag/MaterialMeshInfo enable
-    /// - BulletDespawnRequestTag reset(disable)
-    /// </summary>
-    [BurstCompile]
-    [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
-    [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
-    public partial struct BulletSpawnFromPoolSystem : ISystem
-    {
-        public void OnCreate(ref SystemState state)
-        {
-            state.RequireForUpdate<BulletFieldConfigComponent>();
-            state.RequireForUpdate<PlayerTag>();
-            state.RequireForUpdate<SourceSpawnComponent>();
-            state.RequireForUpdate<BulletFieldAreaComponent>();
-        }
-
-        [BurstCompile]
-        public void OnUpdate(ref SystemState state)
-        {
-            if (!BulletFieldShared.IsInitialized)
-                return;
-
-            float deltaTime = SystemAPI.Time.DeltaTime;
-
-            var tx = SystemAPI.GetComponentLookup<LocalTransform>(false);
-            var vel = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
-            var life = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
-            var speed = SystemAPI.GetComponentLookup<BulletSpeedComponent>(true);
-            var lifeMax = SystemAPI.GetComponentLookup<BulletLifetimeMaxComponent>(true);
-            var typeKey = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
-            var sourceRef = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(false);
-            var active = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
-            var request = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
-            var render = SystemAPI.GetComponentLookup<MaterialMeshInfo>(false);
-            var renderParts = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
-            var sourcePollutionConfig = SystemAPI.GetComponentLookup<SourcePollutionConfigComponent>(true);
-            var sourcePollutionGrid = SystemAPI.GetComponentLookup<SourcePollutionGridComponent>(true);
-            var sourcePollutionCells = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(true);
-            var sourcePollutionValidCellIndices = SystemAPI.GetBufferLookup<SourcePollutionValidCellIndexBuffer>(true);
-
-            tx.Update(ref state);
-            vel.Update(ref state);
-            life.Update(ref state);
-            speed.Update(ref state);
-            lifeMax.Update(ref state);
-            typeKey.Update(ref state);
-            sourceRef.Update(ref state);
-            active.Update(ref state);
-            request.Update(ref state);
-            render.Update(ref state);
-            renderParts.Update(ref state);
-            sourcePollutionConfig.Update(ref state);
-            sourcePollutionGrid.Update(ref state);
-            sourcePollutionCells.Update(ref state);
-            sourcePollutionValidCellIndices.Update(ref state);
-
-            // FreeByKey는 ECS 의존성 추적 밖이므로, 전용 fence로 접근 순서를 강제
-            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);
-
-            var job = new SpawnFromSourcesJob
-            {
-                DeltaTime = deltaTime,
-
-                FreeByKey = BulletFieldShared.FreeByKey,
-
-                TxLookup = tx,
-                VelLookup = vel,
-                LifeLookup = life,
-                SpeedLookup = speed,
-                LifeMaxLookup = lifeMax,
-                TypeKeyLookup = typeKey,
-                SourceRefLookup = sourceRef,
-                ActiveLookup = active,
-                RequestLookup = request,
-                RenderPartsLookup = renderParts,
-                RenderLookup = render,
-                PollutionConfigLookup = sourcePollutionConfig,
-                PollutionGridLookup = sourcePollutionGrid,
-                PollutionCellsLookup = sourcePollutionCells,
-                PollutionValidCellIndicesLookup = sourcePollutionValidCellIndices,
-            };
-
-            state.Dependency = job.Schedule(deps);
-            BulletFieldShared.PoolFence = state.Dependency;
-        }
-
-        [BurstCompile]
-        private partial struct SpawnFromSourcesJob : IJobEntity
-        {
-            public float DeltaTime;
-
-            public NativeParallelMultiHashMap<int, Entity> FreeByKey;
-
-            public ComponentLookup<LocalTransform> TxLookup;
-            public ComponentLookup<BulletVelocityComponent> VelLookup;
-            public ComponentLookup<BulletLifetimeComponent> LifeLookup;
-            [ReadOnly] public ComponentLookup<BulletSpeedComponent> SpeedLookup;
-            [ReadOnly] public ComponentLookup<BulletLifetimeMaxComponent> LifeMaxLookup;
-            public ComponentLookup<BulletTypeKeyComponent> TypeKeyLookup;
-            public ComponentLookup<BulletSourceRefComponent> SourceRefLookup;
-            public ComponentLookup<BulletActiveTag> ActiveLookup;
-            public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
-            [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
-            public ComponentLookup<MaterialMeshInfo> RenderLookup;
-            [ReadOnly] public ComponentLookup<SourcePollutionConfigComponent> PollutionConfigLookup;
-            [ReadOnly] public ComponentLookup<SourcePollutionGridComponent> PollutionGridLookup;
-            [ReadOnly] public BufferLookup<SourcePollutionCellBuffer> PollutionCellsLookup;
-            [ReadOnly] public BufferLookup<SourcePollutionValidCellIndexBuffer> PollutionValidCellIndicesLookup;
-
-            private void Execute(
-                Entity sourceEntity,
-                in SourceAnchorComponent sourceAnchor,
-                ref SourceSpawnComponent source,
-                in BulletFieldAreaComponent fieldArea,
-                ref SourceSpawnRuntimeComponent runtime,
-                DynamicBuffer<SourceSpawnPatternBuffer> patterns,
-                DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts)
-            {
-                if (source.State == SourceStateId.Depleted)
-                    return;
-
-                if (patterns.Length <= 0)
-                    return;
-
-                uint seed = math.max(1u, runtime.SpawnSequence);
-                var random = Unity.Mathematics.Random.CreateFromIndex(seed ^ (uint)sourceEntity.Index);
-                float area = math.max(0f, fieldArea.ComputedArea);
-                float3 center = sourceAnchor.Position;
-
-                int spawnedTotal = 0;
-                for (int i = 0; i < patterns.Length; i++)
-                {
-                    var pattern = patterns[i];
-                    if (pattern.State != source.State)
-                        continue;
-
-                    int spawnCount = ResolveSpawnCount(ref pattern, activeCounts, area);
-                    patterns[i] = pattern;
-                    if (spawnCount <= 0)
-                        continue;
-
-                    for (int s = 0; s < spawnCount; s++)
-                    {
-                        if (!TryDequeueByKey(pattern.BulletTypeKey, out var e))
-                            break;
-
-                        float3 pos = SampleSpawnPosition(ref random, sourceEntity, center, fieldArea);
-
-                        float angle = random.NextFloat(0f, math.PI * 2f);
-                        float2 dir = new float2(math.cos(angle), math.sin(angle));
-                        var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
-                        float bulletSpeed = SpeedLookup.HasComponent(e) ? math.max(0f, SpeedLookup[e].Value) : 0f;
-                        float bulletLifetime = LifeMaxLookup.HasComponent(e) ? math.max(0f, LifeMaxLookup[e].Value) : 0f;
-
-                        if (TxLookup.HasComponent(e))
-                            TxLookup[e] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
-                        if (VelLookup.HasComponent(e))
-                            VelLookup[e] = new BulletVelocityComponent { Value = dir * bulletSpeed };
-                        if (LifeLookup.HasComponent(e))
-                            LifeLookup[e] = new BulletLifetimeComponent { Value = bulletLifetime };
-                        if (TypeKeyLookup.HasComponent(e))
-                            TypeKeyLookup[e] = new BulletTypeKeyComponent { Value = pattern.BulletTypeKey };
-                        if (SourceRefLookup.HasComponent(e))
-                            SourceRefLookup[e] = new BulletSourceRefComponent { Value = sourceEntity };
-
-                        if (RequestLookup.HasComponent(e))
-                            RequestLookup.SetComponentEnabled(e, false);
-
-                        if (ActiveLookup.HasComponent(e))
-                            ActiveLookup.SetComponentEnabled(e, true);
-
-                        if (RenderPartsLookup.HasBuffer(e))
-                        {
-                            var parts = RenderPartsLookup[e];
-                            for (int p = 0; p < parts.Length; p++)
-                            {
-                                var pe = parts[p].Value;
-                                if (RenderLookup.HasComponent(pe))
-                                    RenderLookup.SetComponentEnabled(pe, true);
-                            }
-                        }
-                        else if (RenderLookup.HasComponent(e))
-                        {
-                            RenderLookup.SetComponentEnabled(e, true);
-                        }
-
-                        IncrementActiveCount(ref activeCounts, pattern.BulletTypeKey);
-                        spawnedTotal++;
-                    }
-                }
-
-                runtime.SpawnSequence = seed + (uint)math.max(1, spawnedTotal);
-            }
-
-            private int ResolveSpawnCount(ref SourceSpawnPatternBuffer pattern, DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, float area)
-            {
-                float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
-                float rate = density * area;
-
-                if (rate <= 0f)
-                {
-                    pattern.SpawnAccumulator = 0f;
-                    return 0;
-                }
-
-                pattern.SpawnAccumulator += rate * DeltaTime;
-                int spawnCount = (int)pattern.SpawnAccumulator;
-                pattern.SpawnAccumulator -= spawnCount;
-
-                if (spawnCount <= 0)
-                    return 0;
-
-                if (pattern.SpawnMode != SourceSpawnModeId.CapAndMaxDensity)
-                    return spawnCount;
-
-                int active = GetActiveCount(activeCounts, pattern.BulletTypeKey);
-                int maxActive = (int)math.floor(math.max(0f, pattern.MaxActiveDensityPerArea) * area);
-                int room = math.max(0, maxActive - active);
-                return math.min(spawnCount, room);
-            }
-
-            private float3 SampleSpawnPosition(
-                ref Unity.Mathematics.Random random,
-                Entity sourceEntity,
-                float3 center,
-                in BulletFieldAreaComponent fieldArea)
-            {
-                if (TrySampleSpawnPositionFromPollution(
-                        ref random,
-                        sourceEntity,
-                        center,
-                        out var pollutionPosition))
-                {
-                    return pollutionPosition;
-                }
-
-                return SampleSpawnPositionUniform(ref random, center, fieldArea);
-            }
-
-            private bool TrySampleSpawnPositionFromPollution(
-                ref Unity.Mathematics.Random random,
-                Entity sourceEntity,
-                float3 center,
-                out float3 position)
-            {
-                position = center;
-                if (!PollutionConfigLookup.HasComponent(sourceEntity))
-                    return false;
-                if (!PollutionGridLookup.HasComponent(sourceEntity))
-                    return false;
-                if (!PollutionCellsLookup.HasBuffer(sourceEntity))
-                    return false;
-                if (!PollutionValidCellIndicesLookup.HasBuffer(sourceEntity))
-                    return false;
-
-                var config = PollutionConfigLookup[sourceEntity];
-                if (config.SamplingMode != SourcePollutionSamplingModeId.TopK)
-                    return false;
-
-                var grid = PollutionGridLookup[sourceEntity];
-                int cols = math.max(1, grid.Cols);
-                int rows = math.max(1, grid.Rows);
-                var cells = PollutionCellsLookup[sourceEntity];
-                var validCellIndices = PollutionValidCellIndicesLookup[sourceEntity];
-                int validCount = validCellIndices.Length;
-                if (validCount <= 0)
-                    return false;
-
-                int topK = math.clamp(config.TopKSampleCount, 1, validCount);
-                int bestCellIndex = -1;
-                float bestWeight = -1f;
-
-                for (int i = 0; i < topK; i++)
-                {
-                    int listIndex = random.NextInt(0, validCount);
-                    int candidate = validCellIndices[listIndex].Value;
-                    float weight = GetValidCellWeight(cells, candidate);
-                    if (weight < 0f)
-                        continue;
-
-                    if (bestCellIndex < 0)
-                    {
-                        bestWeight = weight;
-                        bestCellIndex = candidate;
-                        continue;
-                    }
-
-                    if (weight <= bestWeight)
-                        continue;
-
-                    bestWeight = weight;
-                    bestCellIndex = candidate;
-                }
-
-                if (bestCellIndex < 0)
-                    return false;
-
-                position = SampleInsidePollutionCell(ref random, bestCellIndex, center, cols, rows, in grid);
-                return true;
-            }
-
-            private static float GetValidCellWeight(DynamicBuffer<SourcePollutionCellBuffer> cells, int cellIndex)
-            {
-                if ((uint)cellIndex >= (uint)cells.Length)
-                    return -1f;
-
-                var cell = cells[cellIndex];
-                if (cell.IsValid == 0)
-                    return -1f;
-
-                return math.max(0f, cell.Value);
-            }
-
-            private static float3 SampleInsidePollutionCell(
-                ref Unity.Mathematics.Random random,
-                int cellIndex,
-                float3 center,
-                int cols,
-                int rows,
-                in SourcePollutionGridComponent grid)
-            {
-                int safeCols = math.max(1, cols);
-                int safeRows = math.max(1, rows);
-                int clampedIndex = math.clamp(cellIndex, 0, safeCols * safeRows - 1);
-                int cellX = clampedIndex % safeCols;
-                int cellY = math.clamp(clampedIndex / safeCols, 0, safeRows - 1);
-
-                float cellSize = math.max(0.001f, grid.CellSize);
-                float2 half = math.max(0f, grid.HalfExtents);
-
-                float localX = -half.x + (cellX + random.NextFloat(0f, 1f)) * cellSize;
-                float localZ = -half.y + (cellY + random.NextFloat(0f, 1f)) * cellSize;
-                localX = math.clamp(localX, -half.x, half.x);
-                localZ = math.clamp(localZ, -half.y, half.y);
-                return new float3(center.x + localX, center.y, center.z + localZ);
-            }
-
-            private static float3 SampleSpawnPositionUniform(
-                ref Unity.Mathematics.Random random,
-                float3 center,
-                in BulletFieldAreaComponent fieldArea)
-            {
-                if (fieldArea.Shape == BulletFieldShapeId.Rectangle)
-                {
-                    float2 half = math.max(0f, fieldArea.Size) * 0.5f;
-                    float2 offsetRect = new float2(
-                        random.NextFloat(-half.x, half.x),
-                        random.NextFloat(-half.y, half.y));
-                    return new float3(center.x + offsetRect.x, center.y, center.z + offsetRect.y);
-                }
-
-                float radius = math.max(0f, fieldArea.Radius);
-                float angle = random.NextFloat(0f, math.PI * 2f);
-                float dist = math.sqrt(random.NextFloat(0f, 1f)) * radius;
-                float2 offsetCircle = new float2(math.cos(angle), math.sin(angle)) * dist;
-                return new float3(center.x + offsetCircle.x, center.y, center.z + offsetCircle.y);
-            }
-
-            private bool TryDequeueByKey(int key, out Entity e)
-            {
-                if (!FreeByKey.TryGetFirstValue(key, out e, out var it))
-                    return false;
-
-                FreeByKey.Remove(key, e);
-                return true;
-            }
-
-            private static int GetActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
-            {
-                for (int i = 0; i < activeCounts.Length; i++)
-                {
-                    if (activeCounts[i].BulletTypeKey == typeKey)
-                        return activeCounts[i].ActiveCount;
-                }
-                return 0;
-            }
-
-            private static void IncrementActiveCount(ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
-            {
-                for (int i = 0; i < activeCounts.Length; i++)
-                {
-                    var item = activeCounts[i];
-                    if (item.BulletTypeKey != typeKey)
-                        continue;
-
-                    item.ActiveCount++;
-                    activeCounts[i] = item;
-                    return;
-                }
-
-                activeCounts.Add(new SourceActiveBulletCountBuffer
-                {
-                    BulletTypeKey = typeKey,
-                    ActiveCount = 1
-                });
             }
         }
     }

@@ -29,6 +29,11 @@
   -
 - 프로파일링:
   - Profiler(Entities Profiler 포함), Frame Debugger(필요 시)
+- 코드 생성/수정 후 기본 검증 절차(MCP 연결 시):
+  1. `refresh_unity(compile=request, wait_for_ready=true)`로 컴파일 요청
+  2. `read_console(action=get, types=["error"], include_stacktrace=true)`로 에러 확인
+  3. 에러가 있으면 수정 후 1~2 반복
+  4. 에러 0건일 때 작업 완료 보고
 
 ---
 
@@ -110,10 +115,13 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 
 ## 7. Definition of Done (DoD)
 - 컴파일 성공, 경고/에러 증가 없음
+- MCP 검증 기준: Unity Console `error` 0건
 - 최소 스모크 테스트 통과(Play Mode 진입, 핵심 루프 1회 이상)
 - 성능 리스크 변화시 근거(수치/캡처) 첨부
 - 코드 리뷰 관점:
   - 소유권/업데이트 순서/플래그 전환 규칙이 문서·코드에서 일치
+- 예외 처리:
+  - Unity/MCP 미연결 등으로 검증 불가하면 사유와 미검증 범위를 완료 보고에 명시
 
 ---
 
@@ -154,7 +162,6 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 ---
 
 ## 10. MCP 사용 원칙 (MCP 연결 시)
-- MCP는 에디터 자동화 도구로만 사용하고, 설계/리팩터링 최종 판단은 사람이 한다.
 - MCP 기본 사용 범위:
   - 관측(Observability): 콘솔, 씬 상태, 에셋 참조 관계 조회
   - 반영(Apply): 프리팹, 씬, ScriptableObject 변경 적용

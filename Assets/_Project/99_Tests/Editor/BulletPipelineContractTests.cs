@@ -46,6 +46,16 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertUpdateBefore(typeof(SourcePollutionUpdateSystem), typeof(PlayerHazardCollisionRequestSystem));
             AssertUpdateAfter(typeof(PlayerHazardCollisionRequestSystem), typeof(BulletVacuumRequestSystem));
             AssertUpdateAfter(typeof(PlayerCarryBinDepositRequestSystem), typeof(PlayerHazardCollisionRequestSystem));
+            AssertUpdateAfter(typeof(SourceSpawnRequestBuildSystem), typeof(PlayerCarryBinDepositRequestSystem));
+            AssertUpdateBefore(typeof(SourceSpawnRequestBuildSystem), typeof(BulletRequestFencePublishSystem));
+        }
+
+        [Test]
+        public void ExecutionBeginSpawnSubSequence_StaysInContractOrder()
+        {
+            AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
+            AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
+            AssertUpdateAfter(typeof(SpawnBacklogWarningSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
         }
 
         [Test]
