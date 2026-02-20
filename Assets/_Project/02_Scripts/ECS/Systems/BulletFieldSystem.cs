@@ -169,6 +169,8 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(configEntity, new MetaScrapComponent { Value = 0 });
             }
 
+            EnsureSpawnRequestRuntimeSingletons(em);
+
             var poolRegistryEntity = SystemAPI.GetSingletonEntity<BulletPoolRegistryTag>();
             var poolDefs = SystemAPI.GetBuffer<BulletPoolDefinitionBuffer>(poolRegistryEntity);
 
@@ -266,6 +268,44 @@ namespace SweepNDodge.DotsBullets
             BulletFieldShared.CellMapFence = default;
             BulletFieldShared.MarkUninitialized();
         }
+
+        private static void EnsureSpawnRequestRuntimeSingletons(EntityManager em)
+        {
+            if (!HasSingleton<SpawnRequestPolicyComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(SpawnRequestPolicyComponent));
+                em.SetComponentData(e, new SpawnRequestPolicyComponent
+                {
+                    BudgetPerFrame = 4096,
+                    MaxPendingCount = 65536,
+                    MaxPendingAgeFrames = 8,
+                    WarningLogCooldownFrames = 60,
+                    WarningBacklogPercent = 70,
+                    WarningHighBacklogPercent = 85,
+                });
+            }
+
+            if (!HasSingleton<SpawnBacklogMetricsComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(SpawnBacklogMetricsComponent));
+                em.SetComponentData(e, default(SpawnBacklogMetricsComponent));
+            }
+
+            if (!HasSingleton<SpawnBudgetCursorComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(SpawnBudgetCursorComponent));
+                em.SetComponentData(e, new SpawnBudgetCursorComponent
+                {
+                    SourceStartIndex = 0,
+                });
+            }
+        }
+
+        private static bool HasSingleton<T>(EntityManager em) where T : unmanaged, IComponentData
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            return !query.IsEmptyIgnoreFilter;
+        }
     }
 
     // ----------------------------------------------------------------------
@@ -275,6 +315,7 @@ namespace SweepNDodge.DotsBullets
     [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
+    [UpdateBefore(typeof(SpawnRequestRoundRobinExecutionSystem))]
     [UpdateBefore(typeof(BulletSpawnFromPoolSystem))]
     public partial struct BulletFieldAreaUpdateSystem : ISystem
     {
@@ -315,6 +356,7 @@ namespace SweepNDodge.DotsBullets
     /// - BulletDespawnRequestTag reset(disable)
     /// </summary>
     [BurstCompile]
+    [DisableAutoCreation]
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
     public partial struct BulletSpawnFromPoolSystem : ISystem

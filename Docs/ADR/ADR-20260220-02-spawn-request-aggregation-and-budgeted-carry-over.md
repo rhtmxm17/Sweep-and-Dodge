@@ -24,11 +24,19 @@
 - 프레임당 스폰 실행량은 예산(`Budget Cap`)으로 상한을 둔다.
 - 예산 초과분은 이월하되, `최대 이월량`과 `유효 프레임`으로 상한을 둔다.
 
-4. 운영 목표와 가드레일
+4. Build 단계 실행 방식
+- `SourceSpawnRequestBuildSystem`은 `BulletRequestGroup`에서 `단일 스레드`로 고정한다.
+- 이유: 현재 스코프는 Source 개수는 적고 Source당 스폰량이 큰 구조라, 전역 cap 적용의 결정성과 단순성이 우선이다.
+
+5. 예산 부족 시 공정성 정책
+- 예산 부족 시 소비 순서는 `라운드로빈`을 사용한다.
+- 프레임 간 커서를 유지해 특정 Source가 장기적으로 굶주리지 않게 한다.
+
+6. 운영 목표와 가드레일
 - 완료판 목표: 정상/스트레스 시나리오에서 `최대 이월량`/`유효 프레임` 제한에 실제로 도달하지 않도록 튜닝한다.
 - 제한은 안정성 안전장치이며, 일상적인 경로가 되어서는 안 된다.
 
-5. 관측/경고 규약
+7. 관측/경고 규약
 - 최소 관측 지표:
   - `frame_spawn_budget_used`
   - `pending_backlog_count`
@@ -39,6 +47,7 @@
   - backlog 사용률 `>= 70%`: `Warning`
   - backlog 사용률 `>= 85%`: `Warning(High)`
   - `oldest_backlog_age >= 유효프레임 - 1`: `Warning(Critical)`
+- 경고 로그 레이트 리밋 기본값은 `60프레임`으로 한다.
 - 제한 초과/만료 발생 시 `Error` 로그로 승격하고 카운터를 누적한다.
 - 경고 로그는 레이트 리밋을 적용해 로그 폭주를 방지한다.
 
@@ -60,5 +69,5 @@
 
 ## 후속
 - Spawn 요청 버퍼/컴포넌트 스키마(`Source + TypeKey + Count + Age`)를 확정한다.
-- ExecutionBegin 소비 시스템에 Budget Cap + carry-over 처리와 임계치 로그를 구현한다.
+- ExecutionBegin 소비 시스템에 Budget Cap + carry-over + 라운드로빈 커서 처리를 구현한다.
 - 스모크/스트레스 루틴에 `drop_count == 0`, `expired_by_age == 0` 검증을 포함한다.
