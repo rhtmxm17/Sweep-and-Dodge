@@ -86,4 +86,11 @@ namespace SweepNDodge.DotsBullets
         public float Radius;
         public int ScoreValue;
     }
+
+    // 프레임 파이프라인 기준 단조 증가 프레임 ID.
+    // ExecutionBegin에서 프레임당 1회 증가한다.
+    public struct BulletFrameCounterComponent : IComponentData
+    {
+        public uint Value;
+    }
 }

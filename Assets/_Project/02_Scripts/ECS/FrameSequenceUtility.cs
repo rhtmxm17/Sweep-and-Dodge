@@ -1,13 +1,12 @@
-using Unity.Mathematics;
+using Unity.Entities;
 
 namespace SweepNDodge.DotsBullets
 {
     public static class FrameSequenceUtility
     {
-        public static uint EstimateFrame(double elapsedTime, float deltaTime)
+        public static uint GetCurrentFrame(in BulletFrameCounterComponent counter)
         {
-            float safeDt = math.max(1e-6f, deltaTime);
-            return (uint)math.floor(elapsedTime / safeDt);
+            return counter.Value;
         }
     }
 }

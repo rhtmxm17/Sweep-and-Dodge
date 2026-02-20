@@ -41,16 +41,17 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
             state.RequireForUpdate<PlayerCleanupActionStateComponent>();
             state.RequireForUpdate<PlayerCleanupActionProfileBufferElement>();
+            state.RequireForUpdate<BulletFrameCounterComponent>();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var time = SystemAPI.Time;
-            var dt = time.DeltaTime;
+            var dt = SystemAPI.Time.DeltaTime;
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
-            uint frame = FrameSequenceUtility.EstimateFrame(time.ElapsedTime, dt);
+            var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
+            uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
 
             // Vacuum 상태 갱신(플레이어 단일)
             var vacuumConfigRO = SystemAPI.GetComponent<VacuumActivationConfigComponent>(playerEntity);
@@ -129,7 +130,7 @@ namespace SweepNDodge.DotsBullets
             newlyRequested.Value = 0;
 
             // CellMap은 SharedStatic이며, Simulation에서 Write → Request에서 ReadOnly로 소비한다.
-            // 이전 프레임/이전 Request의 read가 끝난 뒤에만 다음 Simulation이 Clear/Build 하도록 fence를 갱신한다.
+            // 이전 단계 fence와 결합해 read 순서를 보장한다(최종 fence publish는 Request 그룹 마지막 시스템에서 수행).
             var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.CellMapFence);
 
             state.Dependency = new VacuumRequestFromCellMapJob
@@ -174,8 +175,6 @@ namespace SweepNDodge.DotsBullets
 
             state.Dependency = newlyRequested.Dispose(state.Dependency);
 
-            // 다음 프레임 Simulation의 Clear/Build가 안전하게 기다릴 수 있도록 fence 갱신
-            BulletFieldShared.CellMapFence = state.Dependency;
         }
 
         private static byte UpdateVacuumState(

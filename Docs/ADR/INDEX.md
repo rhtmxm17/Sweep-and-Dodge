@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md): 루트 파이프라인 그룹 도입 + Request fence publish 단일화 + 프레임 카운터 기반 Frame ID 전환
 - [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md): 청소 흔적 도입의 Request 단일 writer, Top-K 샘플링, 원형 Valid 마스크 결정
 - [ADR-20260219-05-carrybin-deposit-touch-request-execution.md](ADR-20260219-05-carrybin-deposit-touch-request-execution.md): CarryBin 내려놓기 접촉 기반 Request-Execution 파이프라인 결정
 - [ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md](ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md): 입력 슬롯 매핑과 동작 중 입력 소비 정책 결정

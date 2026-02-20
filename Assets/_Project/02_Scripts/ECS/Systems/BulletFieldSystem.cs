@@ -1,5 +1,6 @@
 // Bullet의 생성, 이동, 수명 관리, 제거를 담당하는 ECS 시스템
 // - 업데이트 그룹 파이프라인 구성
+//   BulletFramePipelineGroup   : 탄막 파이프라인 루트 그룹
 //   BulletExecutionBeginGroup  : 풀 Dequeue(스폰 실행)
 //   BulletSimulationGroup      : Move/Lifetime + SpatialHash(Build) 단일 소유(Write)
 //   BulletRequestGroup         : 제거 행동(예: 탄환 흡입)
@@ -32,25 +33,55 @@ namespace SweepNDodge.DotsBullets
     // ----------------------------------------------------------------------
 
     // 탄막 필드 파이프라인 그룹들.
-    // - 별도의 루트 그룹을 두지 않고, SimulationSystemGroup에서 순서를 강제한다.
+    // - 루트 그룹(BulletFramePipelineGroup) 아래에서 순서를 강제한다.
 
     [UpdateInGroup(typeof(SimulationSystemGroup))]
+    public partial class BulletFramePipelineGroup : ComponentSystemGroup { }
+
+    [UpdateInGroup(typeof(BulletFramePipelineGroup))]
     [UpdateBefore(typeof(BulletSimulationGroup))]
     public partial class BulletExecutionBeginGroup : ComponentSystemGroup { }
 
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(BulletFramePipelineGroup))]
+    [UpdateAfter(typeof(BulletExecutionBeginGroup))]
     public partial class BulletSimulationGroup : ComponentSystemGroup { }
 
     /// <summary>
     /// Bullet에 대한 외부 요청 시스템들이 위치할 그룹
     /// </summary>
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(BulletFramePipelineGroup))]
     [UpdateAfter(typeof(BulletSimulationGroup))]
     public partial class BulletRequestGroup : ComponentSystemGroup { }
 
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateInGroup(typeof(BulletFramePipelineGroup))]
     [UpdateAfter(typeof(BulletRequestGroup))]
     public partial class BulletExecutionEndGroup : ComponentSystemGroup { }
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletExecutionBeginGroup), OrderFirst = true)]
+    public partial struct BulletFrameCounterAdvanceSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            var em = state.EntityManager;
+            var frameQuery = SystemAPI.QueryBuilder().WithAll<BulletFrameCounterComponent>().Build();
+            if (frameQuery.IsEmptyIgnoreFilter)
+            {
+                var e = em.CreateEntity(typeof(BulletFrameCounterComponent));
+                em.SetComponentData(e, new BulletFrameCounterComponent { Value = 0 });
+            }
+
+            state.RequireForUpdate<PlayerTag>();
+            state.RequireForUpdate<BulletFrameCounterComponent>();
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            var counter = SystemAPI.GetSingletonRW<BulletFrameCounterComponent>();
+            counter.ValueRW.Value += 1;
+        }
+    }
 
     // ----------------------------------------------------------------------
     // Shared (Pool + SpatialHash)
@@ -800,6 +831,19 @@ namespace SweepNDodge.DotsBullets
                 var cell = SpatialHashUtility.ToCell(tx.Position, InvCellSize);
                 Writer.Add(SpatialHashUtility.Hash(cell), e);
             }
+        }
+    }
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletRequestGroup), OrderLast = true)]
+    public partial struct BulletRequestFencePublishSystem : ISystem
+    {
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            BulletFieldShared.CellMapFence = JobHandle.CombineDependencies(
+                BulletFieldShared.CellMapFence,
+                state.Dependency);
         }
     }
 

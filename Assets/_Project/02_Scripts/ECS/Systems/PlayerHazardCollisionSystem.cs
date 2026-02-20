@@ -79,9 +79,6 @@ namespace SweepNDodge.DotsBullets
                 PlayerHitRequestLookup = playerHitRequestLookup,
                 PlayerHitContextLookup = playerHitContextLookup,
             }.Schedule(deps);
-
-            // Simulation 단계가 Request read를 기다릴 수 있도록 fence 갱신
-            BulletFieldShared.CellMapFence = state.Dependency;
         }
 
         [BurstCompile]
@@ -188,15 +185,16 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceSpawnComponent>();
             state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
             state.RequireForUpdate<PlayerImpulseEventBufferElement>();
+            state.RequireForUpdate<BulletFrameCounterComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
-            var time = SystemAPI.Time;
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
             var impulseBuffer = SystemAPI.GetBuffer<PlayerImpulseEventBufferElement>(playerEntity);
-            uint frame = FrameSequenceUtility.EstimateFrame(time.ElapsedTime, time.DeltaTime);
+            var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
+            uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
             sourceLookup.Update(ref state);
