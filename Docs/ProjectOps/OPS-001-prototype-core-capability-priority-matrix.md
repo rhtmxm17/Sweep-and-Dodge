@@ -33,8 +33,8 @@
   - `BLOCK`: 외부 의존/이슈로 진행 차단
 
 ## 3. 진행 현황 스냅샷
-- 전체(10): `DONE 2 | WIP 2 | TODO 6 | BLOCK 0` (완료율 20%)
-- `P0`(5): 2/5 완료 (40%)
+- 전체(10): `DONE 3 | WIP 1 | TODO 6 | BLOCK 0` (완료율 30%)
+- `P0`(5): 3/5 완료 (60%)
 - `P1`(4): 0/4 완료 (0%)
 - `P2`(1): 0/1 완료 (0%)
 
@@ -43,9 +43,9 @@
 |---|---|---|---:|---:|---|---:|---|---|
 | 1 | 프레임 파이프라인 고정 (`ExecutionBegin -> Simulation -> Request -> ExecutionEnd`) | P0 | 5 | 4% | DONE | 100% | 계약 테스트 유지보수 | 2026-02-20 |
 | 2 | Spawn/Despawn 요청-소비 구조 (Aggregated 요청 버퍼 + Owner 소비) | P0 | 5 | 8% | DONE | 100% | 스트레스 자동화 루틴에 운영 임계치 검증 추가 | 2026-02-20 |
-| 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | WIP | 75% | PoolFence/CellMapFence 사용처 일괄 점검 + 스트레스 수치 첨부 | 2026-02-20 |
+| 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | DONE | 100% | 계약 테스트 + 스트레스 지표 회귀 추적 유지 | 2026-02-20 |
 | 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | TODO | 0% | 착수 전 | 2026-02-20 |
-| 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | WIP | 20% | Editor 계약 테스트 확장 + PlayMode 스모크 자동화 | 2026-02-20 |
+| 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | WIP | 55% | PlayMode 스모크 자동화 보강 + 운영 씬 기준 검증 | 2026-02-20 |
 | 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 8 | 런 타임라인 디렉터 (15~20분 페이싱) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
@@ -104,3 +104,56 @@
   - backlog 정책 기본값을 `BudgetPerFrame=1024`, `MaxPendingCount=32768`, `MaxPendingAgeFrames=120`으로 조정.
 - `#3 풀링 + Fence 표준화` 진행률을 상향했다.
   - 비활성화된 `BulletSpawnFromPoolSystem`를 기본 경로에서 제거하고 레거시 파일로 분리해 Owner 경계를 단순화했다.
+- `#3 풀링 + Fence 표준화` 계약 테스트를 확장했다.
+  - `FenceOwnershipContractTests`를 추가해 `PoolFence/CellMapFence` 런타임 publish owner와 Request reader 결합 규칙을 고정했다.
+  - Editor 스모크/스트레스 테스트(`BulletSmokeAndStressTests`)를 추가해 수치 첨부를 완료했다.
+  - 측정값(자동 테스트): `maxBudgetUsed=5000`, `maxPending=5000`, `maxOldestAge=0`, `dropCount=0`, `expiredByAge=0`.
+  - `#3`를 `DONE`으로 전환했다.
+- `#5 스모크 테스트 루틴` 진행률을 상향했다.
+  - `Smoke_CoreLoopAndBurstSpawnDespawn_RunWithoutHardLimit` 테스트를 추가해 핵심 루프 + 대량 스폰/디스폰 자동 검증을 도입했다.
+  - 현재는 Editor World 기반 자동화까지 반영됐고, 운영 씬 기반 PlayMode 자동화는 후속이다.
+
+## 11. Fence 점검 체크리스트 (실행용)
+- 대상: `FreeByKey`, `CellMap`, `HazardCellMap`, `PoolFence`, `CellMapFence`
+- 규칙 1: SharedStatic 컨테이너를 직접 읽거나 쓰는 시스템은 반드시 대응 fence를 `Combine(state.Dependency, fence)`로 결합한다.
+- 규칙 2: `CellMapFence` 최종 publish는 `BulletRequestFencePublishSystem` 단일 책임으로 유지한다.
+- 규칙 3: `PoolFence` 런타임 publish는 Spawn Owner/Despawn Owner만 수행한다.
+- 규칙 4: Request 단계는 CellMap `ReadOnly` 조회 + 요청 태그(enable)만 수행하고, 풀 반납/렌더 off는 ExecutionEnd에서만 수행한다.
+- 검증 소스:
+  - `Assets/_Project/99_Tests/Editor/BulletPipelineContractTests.cs`
+  - `Assets/_Project/99_Tests/Editor/FenceOwnershipContractTests.cs`
+
+## 12. 스트레스 수치 기록 템플릿
+- 실행 날짜: `YYYY-MM-DD`
+- Unity: `6000.3.6f1`
+- 시나리오:
+  - `A`: 대량 스폰 지속(`N`프레임)
+  - `B`: 동프레임 대량 제거(목표 `10만`)
+- 정책값:
+  - `BudgetPerFrame=`
+  - `MaxPendingCount=`
+  - `MaxPendingAgeFrames=`
+- 관측값(최소):
+  - `frame_spawn_budget_used(최대/평균)=`
+  - `pending_backlog_count(최대)=`
+  - `oldest_backlog_age(최대)=`
+  - `drop_count(합계)=`
+  - `expired_by_age(합계)=`
+- 판정:
+  - 완료판 목표: `drop_count == 0`, `expired_by_age == 0`
+  - 임계치 도달/초과 시 원인과 조정값을 1~2줄로 기록
+
+### 최근 측정값 (2026-02-20, Editor 자동 테스트)
+- 실행 테스트: `BulletSmokeAndStressTests.Smoke_CoreLoopAndBurstSpawnDespawn_RunWithoutHardLimit`
+- Unity: `6000.3.6f1`
+- 시나리오: `A+B` (핵심 루프 180프레임, 버스트 스폰/즉시 디스폰 반복)
+- 정책값:
+  - `BudgetPerFrame=6000`
+  - `MaxPendingCount=32768`
+  - `MaxPendingAgeFrames=120`
+- 관측값:
+  - `maxBudgetUsed=5000`
+  - `maxPending=5000`
+  - `maxOldestAge=0`
+  - `dropCount=0`
+  - `expiredByAge=0`

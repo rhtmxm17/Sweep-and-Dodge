@@ -26,7 +26,8 @@
 - 빌드/실행:
   - Unity Editor에서 Play Mode / Standalone Build
 - 테스트:
-  -
+  - 기본: Agent는 `Editor(EditMode)` 테스트를 우선한다.
+  - `PlayMode` 테스트는 실제 Play/씬 라이프사이클 검증이 필요한 경우에만 적용한다.
 - 프로파일링:
   - Profiler(Entities Profiler 포함), Frame Debugger(필요 시)
 - 코드 생성/수정 후 기본 검증 절차(MCP 연결 시):
