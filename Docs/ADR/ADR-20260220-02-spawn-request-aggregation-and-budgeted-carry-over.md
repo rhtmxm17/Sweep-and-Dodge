@@ -2,7 +2,7 @@
 > Spawn 요청을 aggregated 단위로 전환하고, 풀 부족 시 Budget Cap + bounded carry-over 정책을 채택한다
 
 ## 상태
-- 채택됨
+- 반영됨
 
 ## 배경
 - 파이프라인은 `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`로 고정되어 있고, Despawn은 요청-소비 구조가 이미 정착되어 있다.
@@ -71,3 +71,17 @@
 - Spawn 요청 버퍼/컴포넌트 스키마(`Source + TypeKey + Count + Age`)를 확정한다.
 - ExecutionBegin 소비 시스템에 Budget Cap + carry-over + 라운드로빈 커서 처리를 구현한다.
 - 스모크/스트레스 루틴에 `drop_count == 0`, `expired_by_age == 0` 검증을 포함한다.
+
+## 진행 메모 (2026-02-20)
+- 반영 완료:
+  - `SourceSpawnRequestBuildSystem`(Request)에서 aggregated 요청 생성 + 전역 pending cap 적용.
+  - `SpawnRequestRoundRobinExecutionSystem`(ExecutionBegin)에서 Budget Cap + carry-over + 라운드로빈 커서 소비.
+  - `SpawnBacklogWarningSystem` 분리로 관측/경고 책임을 독립.
+  - 기존 비활성 `BulletSpawnFromPoolSystem`는 기본 경로에서 제거하고 레거시 파일로 분리.
+- 기본값 초기 튜닝:
+  - `BudgetPerFrame=1024`
+  - `MaxPendingCount=32768`
+  - `MaxPendingAgeFrames=120`
+- 확인 메모:
+  - 강제 풀 부족 스트레스에서 기존(`MaxPendingAgeFrames=8`) 대비 `expired_by_age` 최초 발생 프레임이 지연되어 초기 만료 폭주가 완화됨.
+  - 완료판 목표(`drop_count == 0`, `expired_by_age == 0`)를 만족하는 운영값은 추가 튜닝이 필요함.

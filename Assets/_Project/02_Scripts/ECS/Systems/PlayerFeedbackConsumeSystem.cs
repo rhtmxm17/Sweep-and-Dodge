@@ -8,8 +8,7 @@ namespace SweepNDodge.DotsBullets
     /// - 실제 브리지 적용 위치를 이 시스템으로 고정한다.
     /// - 현재는 소비 확장 전 단계이므로 clear만 수행한다.
     /// </summary>
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
-    [UpdateAfter(typeof(BulletExecutionEndGroup))]
+    [UpdateInGroup(typeof(BulletExecutionEndGroup), OrderLast = true)]
     public partial struct PlayerUiFeedbackConsumeSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
@@ -41,8 +40,7 @@ namespace SweepNDodge.DotsBullets
     /// - GO Bridge/컨트롤러 연동 시 이 시스템에서 소비한다.
     /// - 현재는 소비 확장 전 단계이므로 clear만 수행한다.
     /// </summary>
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
-    [UpdateAfter(typeof(BulletExecutionEndGroup))]
+    [UpdateInGroup(typeof(BulletExecutionEndGroup), OrderLast = true)]
     public partial struct PlayerImpulseConsumeSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
