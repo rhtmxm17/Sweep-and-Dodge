@@ -26,7 +26,7 @@
 - 빌드/실행:
   - Unity Editor에서 Play Mode / Standalone Build
 - 테스트:
-  - 
+  -
 - 프로파일링:
   - Profiler(Entities Profiler 포함), Frame Debugger(필요 시)
 
@@ -150,3 +150,14 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 기본 모드: read-only
 - 파일 수정/명령 실행이 필요한 경우에만 권한 상승(최소 권한 원칙)
 - 네트워크/외부 업로드는 기본 금지(필요 시 명시적 승인)
+
+---
+
+## 10. MCP 사용 원칙 (MCP 연결 시)
+- MCP는 에디터 자동화 도구로만 사용하고, 설계/리팩터링 최종 판단은 사람이 한다.
+- MCP 기본 사용 범위:
+  - 관측(Observability): 콘솔, 씬 상태, 에셋 참조 관계 조회
+  - 반영(Apply): 프리팹, 씬, ScriptableObject 변경 적용
+  - 검증(Verify): refresh, 콘솔 확인, 테스트 실행
+- 예외: 사용자가 명시적으로 요청하면 범위를 확장할 수 있다.
+- 스크립트 편집은 MCP 대상에서 제외하고 일반 파일 편집 워크플로우를 사용한다.
