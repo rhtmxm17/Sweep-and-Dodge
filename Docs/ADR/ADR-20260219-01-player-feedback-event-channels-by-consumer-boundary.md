@@ -65,5 +65,5 @@
   3. 과도기 전용 컴포넌트 제거 시점 확정
 
 ## 관련 문서
-- `Docs/Planning/player-feedback-event-channel.md`
-- `Docs/ADR/ADR-20260212-03-player-hazard-collision-request-consume.md`
+- [Docs/TechnicalDesign/TD-001-player-feedback-event-channel.md](../TechnicalDesign/TD-001-player-feedback-event-channel.md)
+- [Docs/ADR/ADR-20260212-03-player-hazard-collision-request-consume.md](ADR-20260212-03-player-hazard-collision-request-consume.md)

@@ -1,5 +1,12 @@
 ﻿# ECS 피드백 이벤트 채널 설계 정리
 
+## Metadata
+- doc_id: `TD-001`
+- type: `TechnicalDesign`
+- status: `active`
+- last_updated: `2026-02-19`
+- related_adr: [ADR-20260219-01-player-feedback-event-channels-by-consumer-boundary.md](../ADR/ADR-20260219-01-player-feedback-event-channels-by-consumer-boundary.md)
+
 본 문서는 다음 채팅에서 설계/구현 논의를 빠르게 이어가기 위한 설계 정리다.
 대상 이벤트는 아래 4가지다.
 - 흡입 시작 차단(Vacuum blocked)
@@ -218,3 +225,5 @@
 - Impulse 강도 정책: 고정값
 - `loss` 반영 정책: Impulse 강도에는 미반영, VFX 강도/길이에 반영
 - clear 소유권/중복 억제 최소 규칙/처리 순서 규칙 확정
+
+

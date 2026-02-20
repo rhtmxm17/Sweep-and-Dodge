@@ -1,7 +1,14 @@
-# Hazard 조건부 수거 시스템 기획서
+﻿# Hazard 조건부 수거 시스템 기획서
+
+## Metadata
+- doc_id: `GD-006`
+- type: `GameDesign`
+- status: `active`
+- last_updated: `2026-02-11`
+- related_adr: [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
 
 ## 0. 전제
-- 본 문서는 [`Source 기반 스폰 & 고갈 시스템`](source-based-spawn-and-depletion.md)이 이미 적용된 상태를 전제로 한다.
+- 본 문서는 [`Source 기반 스폰 & 고갈 시스템`](GD-002-source-based-spawn-and-depletion.md)이 이미 적용된 상태를 전제로 한다.
 - 목표는 Trash(자원) 수거 흐름을 유지하면서도, "집중해야 하는 순간"을 추가해 플레이 밀도를 높이는 것이다.
 
 ---
@@ -218,3 +225,5 @@ Hazard 수거의 보상은 "점수 증가"만으로는 부족하다. 아래 중 
 ## 13. 요약 한 줄
 **Hazard는 ‘상시 회피’가 아니라 ‘켜는 순간의 집중’이며,  
 큰 보상으로 욕심을 유도하고, 실패는 Carry 손실로 납득되게 만든다.**
+
+

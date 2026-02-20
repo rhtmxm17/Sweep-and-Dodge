@@ -1,4 +1,11 @@
-# 위험탄 충돌 패널티 기획서
+﻿# 위험탄 충돌 패널티 기획서
+
+## Metadata
+- doc_id: `GD-005`
+- type: `GameDesign`
+- status: `active`
+- last_updated: `2026-02-12`
+- related_adr: [ADR-20260212-03-player-hazard-collision-request-consume.md](../ADR/ADR-20260212-03-player-hazard-collision-request-consume.md)
 
 ## 목적
 Hazard는 즉사 요소가 아니라 "욕심/실수의 대가"를 짧고 명확하게 체감시키는 위험 요소다.
@@ -137,3 +144,5 @@ Hazard는 즉사 요소가 아니라 "욕심/실수의 대가"를 짧고 명확�
 - 피격 후 `vacuumLockTime` 동안 Vacuum이 비활성/비유지된다.
 - 피격이 확정된 Hazard는 즉시 소멸한다.
 - 패킷 상황에서도 1프레임 다중 히트로 손실이 폭발하지 않는다(최대 1회 처리).
+
+

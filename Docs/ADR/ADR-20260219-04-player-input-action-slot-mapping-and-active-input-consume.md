@@ -41,5 +41,5 @@
   2. 캐릭터 선택 화면에서 슬롯 맵 재구성 경로 연결
 
 ## 관련 문서
-- `Docs/ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md`
-- `Docs/ADR/ADR-20260219-03-player-cleanup-action-profile-so-externalization.md`
+- [Docs/ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md](ADR-20260219-02-cleanup-action-branching-by-profile.md)
+- [Docs/ADR/ADR-20260219-03-player-cleanup-action-profile-so-externalization.md](ADR-20260219-03-player-cleanup-action-profile-so-externalization.md)

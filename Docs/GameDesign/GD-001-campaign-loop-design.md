@@ -1,4 +1,11 @@
-# 선형 캠페인 게임 루프 기획 정리
+﻿# 선형 캠페인 게임 루프 기획 정리
+
+## Metadata
+- doc_id: `GD-001`
+- type: `GameDesign`
+- status: `active`
+- last_updated: `2026-02-19`
+- related_adr: [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
 
 본 문서는 "단일 스테이지 내 플레이(수거/Deposit/위험탄/Source 고갈)"를
 **15분 내외 분량의 선형 캠페인**으로 구성하기 위한 상위 게임 루프 정의다.
@@ -180,3 +187,5 @@
 - HUD/연출 상세(피격 피드백, Source 상태 표시 방식 등)
 - Hazard 제거 룰의 세부 규칙 튜닝(타이밍, 링 폭, 보상/리스크)
 - 메타 자원/정산(캠페인 외부 진행) 및 영구 성장
+
+

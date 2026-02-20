@@ -41,4 +41,4 @@
   3. 성능 이슈 발생 시 BlobAsset 이관 ADR 작성
 
 ## 관련 문서
-- `Docs/ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md`
+- [Docs/ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md](ADR-20260219-02-cleanup-action-branching-by-profile.md)

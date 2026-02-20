@@ -1,4 +1,11 @@
-# Source 기반 스폰 & 고갈 시스템 기획서
+﻿# Source 기반 스폰 & 고갈 시스템 기획서
+
+## Metadata
+- doc_id: `GD-002`
+- type: `GameDesign`
+- status: `active`
+- last_updated: `2026-02-11`
+- related_adr: [ADR-20260211-01-source-based-spawn-and-depletion.md](../ADR/ADR-20260211-01-source-based-spawn-and-depletion.md), [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
 
 ## 1. 시스템 도입 목적
 
@@ -180,3 +187,5 @@
 
 Source는 "청소 대상", 고갈은 "청소 완료의 증거"이며
 이 둘만으로도 플레이어 이동은 충분히 발생해야 한다.
+
+

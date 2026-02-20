@@ -1,4 +1,11 @@
-# CarryBin 기획서 (v1)
+﻿# CarryBin 기획서 (v1)
+
+## Metadata
+- doc_id: `GD-004`
+- type: `GameDesign`
+- status: `active`
+- last_updated: `2026-02-12`
+- related_adr: [ADR-20260212-04-carrybin-replaces-score-placeholder.md](../ADR/ADR-20260212-04-carrybin-replaces-score-placeholder.md), [ADR-20260219-05-carrybin-deposit-touch-request-execution.md](../ADR/ADR-20260219-05-carrybin-deposit-touch-request-execution.md)
 
 ## 0. 목적
 CarryBin은 "수거량"을 런 내 규칙으로 승격시켜,
@@ -163,3 +170,5 @@ CarryBinLoad가 높을수록:
    - "일반 쓰레기 몇 개 분량"을 기준으로 초기 목표치를 고정할지
 
 ---
+
+

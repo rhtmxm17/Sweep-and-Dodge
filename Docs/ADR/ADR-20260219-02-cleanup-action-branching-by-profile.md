@@ -56,6 +56,6 @@
   3. 행동별 프로파일 ScriptableObject 데이터화 여부 평가
 
 ## 관련 문서
-- `Docs/Planning/hazard-conditional-capture-system.md`
-- `Docs/Planning/campaign-loop-design.md`
-- `Docs/ADR/ADR-20260219-01-player-feedback-event-channels-by-consumer-boundary.md`
+- [Docs/GameDesign/GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
+- [Docs/GameDesign/GD-001-campaign-loop-design.md](../GameDesign/GD-001-campaign-loop-design.md)
+- [Docs/ADR/ADR-20260219-01-player-feedback-event-channels-by-consumer-boundary.md](ADR-20260219-01-player-feedback-event-channels-by-consumer-boundary.md)

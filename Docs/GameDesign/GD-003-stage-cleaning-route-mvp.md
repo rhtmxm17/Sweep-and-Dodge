@@ -1,4 +1,12 @@
-# 청소 동선 기획서 (v1)
+﻿# 청소 동선 기획서 (v1)
+
+## Metadata
+- doc_id: `GD-003`
+- type: `GameDesign`
+- status: `active`
+- last_updated: `2026-02-19`
+- related_adr: [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](../ADR/ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md)
+
 > 적용 범위: 스테이지 공통 규칙 중 **동선/스폰 분포(체감)** 파트
 > 본 문서는 다음 2개 방안을 **우선 적용**한다.
 > 1) "청소 흔적" 기반 스폰 분포(자리 이동 유도)
@@ -147,3 +155,5 @@ Source 영역을 셀/섹터 단위로 분할하고, 각 단위는 "오염도(스
 - 진입/탈출 동선 분리(토폴로지로 핑퐁 억제)
 
 ---
+
+

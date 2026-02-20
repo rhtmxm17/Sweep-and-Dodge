@@ -48,4 +48,4 @@
   3. 경계 정확도 요구가 커질 경우 4샘플/커버리지 기반 mask로 확장 검토
 
 ## 관련 문서
-- `Docs/Planning/stage-cleaning-route-mvp.md`
+- [Docs/GameDesign/GD-003-stage-cleaning-route-mvp.md](../GameDesign/GD-003-stage-cleaning-route-mvp.md)
