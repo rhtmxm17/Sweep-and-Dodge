@@ -407,8 +407,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SweepnDodge.DotsBullets.PlayerEcsBridge
   PrimaryVacuumMouseButton: 0
   SecondaryVacuumMouseButton: 1
-  PrimaryAction: 1
-  SecondaryAction: 2
+  PrimarySlot: 1
+  SecondarySlot: 2
   SyncRotation: 1
   Animator: {fileID: 0}
   VacuumActiveBool: VacuumActive
