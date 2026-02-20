@@ -5,7 +5,9 @@
 - type: `ProjectOps`
 - status: `active`
 - last_updated: `2026-02-20`
-- related_adr: [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
+- related_adr:
+  - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
+  - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
 
 > 15~20분 규모 1인 플레이 미니게임 프로토타입을 빠르게 안정화하기 위한 코어 기능 우선순위 문서
 
@@ -40,7 +42,7 @@
 | 순서 | 코어 기능 | 중요도 | 구조 고착 리스크 | 상대 공수 비율 | 상태 | 진행률 | 다음 액션 | 최근 갱신 |
 |---|---|---|---:|---:|---|---:|---|---|
 | 1 | 프레임 파이프라인 고정 (`ExecutionBegin -> Simulation -> Request -> ExecutionEnd`) | P0 | 5 | 4% | DONE | 100% | 계약 테스트 유지보수 | 2026-02-20 |
-| 2 | Spawn/Despawn 요청-소비 구조 (Enableable 플래그 기반) | P0 | 5 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
+| 2 | Spawn/Despawn 요청-소비 구조 (Enableable 플래그 기반) | P0 | 5 | 8% | TODO | 0% | ADR 기준으로 설계/구현 착수 | 2026-02-20 |
 | 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | WIP | 60% | PoolFence/CellMapFence 사용처 일괄 점검 + 스트레스 수치 첨부 | 2026-02-20 |
 | 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | WIP | 20% | Editor 계약 테스트 확장 + PlayMode 스모크 자동화 | 2026-02-20 |
@@ -95,3 +97,5 @@
   - CellMapFence 최종 publish 단일화는 반영했으며, 전체 사용처 점검과 스트레스 수치화는 후속이다.
 - `#5 스모크 테스트 루틴`을 `WIP`로 갱신했다.
   - Editor 계약 테스트를 추가했고, PlayMode 자동 스모크는 후속이다.
+- `#2 Spawn/Despawn 요청-소비 구조` 상세 합의를 ADR로 분리했다.
+  - OPS에는 우선순위/실행 순서만 유지하고, 설계 상세는 `ADR-20260220-02`를 참조한다.
