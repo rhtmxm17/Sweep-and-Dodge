@@ -89,11 +89,12 @@ namespace SweepNDodge.DotsBullets
                 var patternBuffer = AddBuffer<SourceSpawnPatternBuffer>(e);
                 var activeCountBuffer = AddBuffer<SourceActiveBulletCountBuffer>(e);
                 var spawnRequestBuffer = AddBuffer<SourceSpawnRequestBuffer>(e);
-                BakeSustainFromWaveTimeline(authoring.WaveTimeline, patternBuffer, activeCountBuffer);
+                int nextDirectiveId = 1;
+                BakeSustainFromWaveTimeline(authoring.WaveTimeline, patternBuffer, activeCountBuffer, ref nextDirectiveId);
                 spawnRequestBuffer.Clear();
 
                 var openingWaveBuffer = AddBuffer<SourceOpeningWavePatternBuffer>(e);
-                BakeOpeningWaveFromTimeline(authoring.WaveTimeline, openingWaveBuffer, activeCountBuffer);
+                BakeOpeningWaveFromTimeline(authoring.WaveTimeline, openingWaveBuffer, activeCountBuffer, ref nextDirectiveId);
                 AddComponent(e, new SourceOpeningWaveRuntimeComponent
                 {
                     LastState = authoring.InitialState,
@@ -126,7 +127,8 @@ namespace SweepNDodge.DotsBullets
             private void BakeSustainFromWaveTimeline(
                 WaveTimelineSO timeline,
                 DynamicBuffer<SourceSpawnPatternBuffer> patternBuffer,
-                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer)
+                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer,
+                ref int nextDirectiveId)
             {
                 if (timeline == null || timeline.Segments == null)
                     return;
@@ -140,17 +142,29 @@ namespace SweepNDodge.DotsBullets
                     for (int e = 0; e < segment.Entries.Length; e++)
                     {
                         var entry = segment.Entries[e];
-                        if (entry.Bullet == null)
+                        var bullet = entry.ResolveBullet();
+                        if (bullet == null)
                             continue;
 
-                        int typeKey = entry.Bullet.DefinitionId;
+                        int typeKey = bullet.DefinitionId;
+                        var fixedPoint = entry.ResolveFixedPoint();
+                        var spawnOffset = entry.ResolveSpawnOffset();
                         patternBuffer.Add(new SourceSpawnPatternBuffer
                         {
+                            DirectiveId = nextDirectiveId++,
                             State = segment.TargetState,
                             BulletTypeKey = typeKey,
-                            SpawnMode = entry.SpawnMode,
-                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.SpawnDensityPerSecPerArea),
-                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.MaxActiveDensityPerArea),
+                            EmissionMode = entry.ResolveEmissionMode(),
+                            SpawnMode = entry.ResolveSpawnMode(),
+                            SamplingMode = entry.ResolveSamplingMode(),
+                            CenterMode = entry.ResolveCenterMode(),
+                            FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
+                            SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
+                            SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
+                            PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
+                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
+                            MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
+                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
                             SpawnAccumulator = 0f
                         });
 
@@ -162,7 +176,8 @@ namespace SweepNDodge.DotsBullets
             private void BakeOpeningWaveFromTimeline(
                 WaveTimelineSO timeline,
                 DynamicBuffer<SourceOpeningWavePatternBuffer> openingWaveBuffer,
-                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer)
+                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer,
+                ref int nextDirectiveId)
             {
                 if (timeline == null || timeline.Segments == null)
                     return;
@@ -180,19 +195,31 @@ namespace SweepNDodge.DotsBullets
                     for (int e = 0; e < segment.Entries.Length; e++)
                     {
                         var entry = segment.Entries[e];
-                        if (entry.Bullet == null)
+                        var bullet = entry.ResolveBullet();
+                        if (bullet == null)
                             continue;
 
-                        int typeKey = entry.Bullet.DefinitionId;
+                        int typeKey = bullet.DefinitionId;
+                        var fixedPoint = entry.ResolveFixedPoint();
+                        var spawnOffset = entry.ResolveSpawnOffset();
                         openingWaveBuffer.Add(new SourceOpeningWavePatternBuffer
                         {
+                            DirectiveId = nextDirectiveId++,
                             TriggerState = segment.TargetState,
                             StartSec = Mathf.Max(0f, segment.StartSec),
                             EndSec = Mathf.Max(segment.StartSec, segment.EndSec),
                             BulletTypeKey = typeKey,
-                            SpawnMode = entry.SpawnMode,
-                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.SpawnDensityPerSecPerArea),
-                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.MaxActiveDensityPerArea),
+                            EmissionMode = entry.ResolveEmissionMode(),
+                            SpawnMode = entry.ResolveSpawnMode(),
+                            SamplingMode = entry.ResolveSamplingMode(),
+                            CenterMode = entry.ResolveCenterMode(),
+                            FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
+                            SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
+                            SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
+                            PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
+                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
+                            MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
+                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
                             SpawnAccumulator = 0f
                         });
 

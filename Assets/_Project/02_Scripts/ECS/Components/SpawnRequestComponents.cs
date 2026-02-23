@@ -6,7 +6,14 @@ namespace SweepNDodge.DotsBullets
     [InternalBufferCapacity(8)]
     public struct SourceSpawnRequestBuffer : IBufferElementData
     {
+        public int DirectiveId;
         public int BulletTypeKey;
+        public SourceSpawnSamplingModeId SamplingMode;
+        public SourceSpawnCenterModeId CenterMode;
+        public Unity.Mathematics.float2 FixedPoint;
+        public Unity.Mathematics.float2 SpawnOffset;
+        public int SpawnSampleBudget;
+        public float PlayerNoSpawnRadius;
         public int Count;
         public uint OldestFrame;
     }

@@ -86,7 +86,7 @@ namespace SweepNDodge.DotsBullets
                     if (suppressStateSustainedPattern)
                         continue;
 
-                    int requested = ResolveSpawnCount(ref pattern, activeCounts, requestsRW, area, deltaTime);
+                    int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requestsRW, area, deltaTime);
                     patternsRW[i] = pattern;
                     if (requested <= 0)
                         continue;
@@ -94,7 +94,7 @@ namespace SweepNDodge.DotsBullets
                     int accepted = math.min(requested, remainingCapacity);
                     if (accepted > 0)
                     {
-                        AddOrMergeRequest(requestsRW, pattern.BulletTypeKey, accepted, frame);
+                        AddOrMergeRequest(requestsRW, in pattern, accepted, frame);
                         pendingTotal = SafeAdd(pendingTotal, accepted);
                         remainingCapacity -= accepted;
                     }
@@ -116,23 +116,38 @@ namespace SweepNDodge.DotsBullets
 
         private static int ResolveSpawnCount(
             ref SourceSpawnPatternBuffer pattern,
+            Entity sourceEntity,
+            uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
             float area,
             float deltaTime)
         {
-            float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
-            float rate = density * area;
-
-            if (rate <= 0f)
+            int spawnCount;
+            if (pattern.EmissionMode == SourceSpawnEmissionModeId.Poisson)
             {
                 pattern.SpawnAccumulator = 0f;
-                return 0;
-            }
+                float lambda = math.max(0f, pattern.MeanEventsPerSec) * math.max(0f, deltaTime);
+                if (lambda <= 0f)
+                    return 0;
 
-            pattern.SpawnAccumulator += rate * deltaTime;
-            int spawnCount = (int)pattern.SpawnAccumulator;
-            pattern.SpawnAccumulator -= spawnCount;
+                var random = CreateDeterministicRandom(sourceEntity, pattern.DirectiveId, frame, 0xB5297A4Du);
+                spawnCount = SamplePoisson(lambda, ref random);
+            }
+            else
+            {
+                float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
+                float rate = density * area;
+                if (rate <= 0f)
+                {
+                    pattern.SpawnAccumulator = 0f;
+                    return 0;
+                }
+
+                pattern.SpawnAccumulator += rate * deltaTime;
+                spawnCount = (int)pattern.SpawnAccumulator;
+                pattern.SpawnAccumulator -= spawnCount;
+            }
 
             if (spawnCount <= 0)
                 return 0;
@@ -175,7 +190,11 @@ namespace SweepNDodge.DotsBullets
             return pending;
         }
 
-        private static void AddOrMergeRequest(DynamicBuffer<SourceSpawnRequestBuffer> requests, int typeKey, int count, uint frame)
+        private static void AddOrMergeRequest(
+            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            in SourceSpawnPatternBuffer pattern,
+            int count,
+            uint frame)
         {
             if (count <= 0)
                 return;
@@ -183,7 +202,7 @@ namespace SweepNDodge.DotsBullets
             for (int i = 0; i < requests.Length; i++)
             {
                 var item = requests[i];
-                if (item.BulletTypeKey != typeKey)
+                if (item.DirectiveId != pattern.DirectiveId)
                     continue;
 
                 if (item.Count <= 0)
@@ -196,10 +215,58 @@ namespace SweepNDodge.DotsBullets
 
             requests.Add(new SourceSpawnRequestBuffer
             {
-                BulletTypeKey = typeKey,
+                DirectiveId = pattern.DirectiveId,
+                BulletTypeKey = pattern.BulletTypeKey,
+                SamplingMode = pattern.SamplingMode,
+                CenterMode = pattern.CenterMode,
+                FixedPoint = pattern.FixedPoint,
+                SpawnOffset = pattern.SpawnOffset,
+                SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
+                PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
                 Count = count,
                 OldestFrame = frame,
             });
+        }
+
+        private static Unity.Mathematics.Random CreateDeterministicRandom(Entity sourceEntity, int directiveId, uint frame, uint salt)
+        {
+            uint seed = math.hash(new uint4(
+                frame,
+                (uint)math.max(0, sourceEntity.Index + 1),
+                (uint)math.max(0, directiveId + 1),
+                salt));
+            return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
+        }
+
+        private static int SamplePoisson(float lambda, ref Unity.Mathematics.Random random)
+        {
+            if (lambda <= 0f)
+                return 0;
+
+            if (lambda < 30f)
+            {
+                float l = math.exp(-lambda);
+                int k = 0;
+                float p = 1f;
+                do
+                {
+                    k++;
+                    p *= random.NextFloat(0f, 1f);
+                } while (p > l);
+
+                return math.max(0, k - 1);
+            }
+
+            float stdDev = math.sqrt(lambda);
+            float n = SampleStandardNormal(ref random);
+            return math.max(0, (int)math.round(lambda + stdDev * n));
+        }
+
+        private static float SampleStandardNormal(ref Unity.Mathematics.Random random)
+        {
+            float u1 = math.max(1e-7f, random.NextFloat(0f, 1f));
+            float u2 = random.NextFloat(0f, 1f);
+            return math.sqrt(-2f * math.log(u1)) * math.cos(2f * math.PI * u2);
         }
 
         private static void CompactRequestBuffer(DynamicBuffer<SourceSpawnRequestBuffer> requests)
@@ -349,6 +416,14 @@ namespace SweepNDodge.DotsBullets
             int cursorIndex = math.clamp(cursorRW.ValueRO.SourceStartIndex, 0, math.max(0, sourceCount - 1));
             int budgetUsed = 0;
             int noSpawnPasses = 0;
+            bool hasPlayer = false;
+            float3 playerPosition = float3.zero;
+            foreach (var tx in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<PlayerTag>())
+            {
+                hasPlayer = true;
+                playerPosition = tx.ValueRO.Position;
+                break;
+            }
 
             while (remainingBudget > 0 && pending > 0)
             {
@@ -372,10 +447,10 @@ namespace SweepNDodge.DotsBullets
                     if (requestIndex < 0)
                         continue;
 
-                    int typeKey = requests[requestIndex].BulletTypeKey;
+                    var requestItem = requests[requestIndex];
                     spawned = TrySpawnOneFromRequest(
                         sourceEntity,
-                        typeKey,
+                        in requestItem,
                         ref sourceRuntimeLookup,
                         ref sourceAnchorLookup,
                         ref sourceAreaLookup,
@@ -398,6 +473,8 @@ namespace SweepNDodge.DotsBullets
                         ref renderLookup,
                         ref parentLookup,
                         ref activeCountLookup,
+                        hasPlayer,
+                        playerPosition,
                         frame);
 
                     if (spawned)
@@ -524,7 +601,7 @@ namespace SweepNDodge.DotsBullets
 
         private static bool TrySpawnOneFromRequest(
             Entity sourceEntity,
-            int requestedTypeKey,
+            in SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
             ref ComponentLookup<BulletFieldAreaComponent> sourceAreaLookup,
@@ -547,15 +624,21 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<MaterialMeshInfo> renderLookup,
             ref ComponentLookup<Parent> parentLookup,
             ref BufferLookup<SourceActiveBulletCountBuffer> activeCountLookup,
+            bool hasPlayer,
+            float3 playerPosition,
             uint frame)
         {
+            int requestedTypeKey = request.BulletTypeKey;
             if (!TryDequeueByKey(ref BulletFieldShared.FreeByKey, requestedTypeKey, out var bulletEntity))
                 return false;
 
             var random = CreateSourceRandom(sourceEntity, ref sourceRuntimeLookup);
-            float3 center = sourceAnchorLookup.HasComponent(sourceEntity)
-                ? sourceAnchorLookup[sourceEntity].Position
-                : float3.zero;
+            float3 center = ResolveSpawnCenter(
+                sourceEntity,
+                in request,
+                ref sourceAnchorLookup,
+                hasPlayer,
+                playerPosition);
             var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
                 ? sourceAreaLookup[sourceEntity]
                 : default;
@@ -563,8 +646,11 @@ namespace SweepNDodge.DotsBullets
             float3 pos = SampleSpawnPosition(
                 ref random,
                 sourceEntity,
+                in request,
                 center,
                 in fieldArea,
+                hasPlayer,
+                playerPosition,
                 ref pollutionConfigLookup,
                 ref pollutionGridLookup,
                 ref pollutionCellsLookup,
@@ -644,6 +730,36 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
+        private static float3 ResolveSpawnCenter(
+            Entity sourceEntity,
+            in SourceSpawnRequestBuffer request,
+            ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
+            bool hasPlayer,
+            float3 playerPosition)
+        {
+            float3 sourceCenter = sourceAnchorLookup.HasComponent(sourceEntity)
+                ? sourceAnchorLookup[sourceEntity].Position
+                : float3.zero;
+
+            switch (request.CenterMode)
+            {
+                case SourceSpawnCenterModeId.FixedPoint:
+                    return new float3(request.FixedPoint.x, sourceCenter.y, request.FixedPoint.y);
+                case SourceSpawnCenterModeId.PlayerRelative:
+                    if (hasPlayer)
+                    {
+                        return new float3(
+                            playerPosition.x + request.SpawnOffset.x,
+                            playerPosition.y,
+                            playerPosition.z + request.SpawnOffset.y);
+                    }
+
+                    return sourceCenter;
+                default:
+                    return sourceCenter;
+            }
+        }
+
         private static Unity.Mathematics.Random CreateSourceRandom(
             Entity sourceEntity,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup)
@@ -663,27 +779,56 @@ namespace SweepNDodge.DotsBullets
         private static float3 SampleSpawnPosition(
             ref Unity.Mathematics.Random random,
             Entity sourceEntity,
+            in SourceSpawnRequestBuffer request,
             float3 center,
             in BulletFieldAreaComponent fieldArea,
+            bool hasPlayer,
+            float3 playerPosition,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
             ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
         {
-            if (TrySampleSpawnPositionFromPollution(
-                    ref random,
-                    sourceEntity,
-                    center,
-                    out var pollutionPos,
-                    ref pollutionConfigLookup,
-                    ref pollutionGridLookup,
-                    ref pollutionCellsLookup,
-                    ref pollutionValidCellIndicesLookup))
+            int sampleBudget = math.max(1, request.SpawnSampleBudget);
+            float noSpawnRadius = math.max(0f, request.PlayerNoSpawnRadius);
+            float noSpawnRadiusSq = noSpawnRadius * noSpawnRadius;
+            float3 lastSample = center;
+
+            for (int i = 0; i < sampleBudget; i++)
             {
-                return pollutionPos;
+                if (request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
+                {
+                    if (TrySampleSpawnPositionFromPollution(
+                            ref random,
+                            sourceEntity,
+                            center,
+                            out var pollutionPos,
+                            ref pollutionConfigLookup,
+                            ref pollutionGridLookup,
+                            ref pollutionCellsLookup,
+                            ref pollutionValidCellIndicesLookup))
+                    {
+                        lastSample = pollutionPos;
+                    }
+                    else
+                    {
+                        lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                    }
+                }
+                else
+                {
+                    lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                }
+
+                if (!hasPlayer || noSpawnRadius <= 0f)
+                    return lastSample;
+
+                float2 delta = new float2(lastSample.x - playerPosition.x, lastSample.z - playerPosition.z);
+                if (math.lengthsq(delta) >= noSpawnRadiusSq)
+                    return lastSample;
             }
 
-            return SampleSpawnPositionUniform(ref random, center, fieldArea);
+            return lastSample;
         }
 
         private static bool TrySampleSpawnPositionFromPollution(
@@ -707,9 +852,6 @@ namespace SweepNDodge.DotsBullets
                 return false;
 
             var config = pollutionConfigLookup[sourceEntity];
-            if (config.SamplingMode != SourcePollutionSamplingModeId.TopK)
-                return false;
-
             var grid = pollutionGridLookup[sourceEntity];
             var cells = pollutionCellsLookup[sourceEntity];
             var validIndices = pollutionValidCellIndicesLookup[sourceEntity];

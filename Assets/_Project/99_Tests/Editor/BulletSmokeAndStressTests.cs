@@ -135,6 +135,439 @@ namespace SweepNDodge.DotsBullets.Tests
             ForceDisposeSharedContainersIfNeeded();
         }
 
+        [Test]
+        public void SpawnRequestBuild_MergesByDirectiveId_AndSeparatesDifferentDirective()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnDirectiveMergeWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+
+                var patterns = em.GetBuffer<SourceSpawnPatternBuffer>(source);
+                patterns.Clear();
+                patterns.Add(new SourceSpawnPatternBuffer
+                {
+                    DirectiveId = 101,
+                    State = SourceStateId.Normal,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                    SpawnDensityPerSecPerArea = 2f,
+                    MeanEventsPerSec = 0f,
+                    MaxActiveDensityPerArea = 0f,
+                    SpawnAccumulator = 0f,
+                });
+                patterns.Add(new SourceSpawnPatternBuffer
+                {
+                    DirectiveId = 101,
+                    State = SourceStateId.Normal,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                    SpawnDensityPerSecPerArea = 3f,
+                    MeanEventsPerSec = 0f,
+                    MaxActiveDensityPerArea = 0f,
+                    SpawnAccumulator = 0f,
+                });
+                patterns.Add(new SourceSpawnPatternBuffer
+                {
+                    DirectiveId = 202,
+                    State = SourceStateId.Normal,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                    SpawnDensityPerSecPerArea = 5f,
+                    MeanEventsPerSec = 0f,
+                    MaxActiveDensityPerArea = 0f,
+                    SpawnAccumulator = 0f,
+                });
+
+                world.SetTime(new TimeData(1d, 1f));
+                simGroup.Update();
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requests.Length, Is.EqualTo(2), "Different DirectiveId entries must remain separated");
+                Assert.That(GetRequestCountByDirective(requests, 101), Is.EqualTo(5), "Same DirectiveId entries must be merged");
+                Assert.That(GetRequestCountByDirective(requests, 202), Is.EqualTo(5));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_FixedPointCenter_SpawnsAtFixedPointWhenAreaIsZero()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnFixedPointWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 7f, 0f) });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5001,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = new float2(3f, 4f),
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 1,
+                    OldestFrame = 0,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                Assert.That(TryGetSingleActiveBulletPositionForSource(em, source, out var position), Is.True);
+                Assert.That(position.x, Is.EqualTo(3f).Within(0.0001f));
+                Assert.That(position.y, Is.EqualTo(7f).Within(0.0001f));
+                Assert.That(position.z, Is.EqualTo(4f).Within(0.0001f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerRelativeCenter_SpawnsAtPlayerOffsetWhenAreaIsZero()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerRelativeWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 1f, 20f));
+                CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5002,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.PlayerRelative,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = new float2(2f, -3f),
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 1,
+                    OldestFrame = 0,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                Assert.That(TryGetSingleActiveBulletPositionForSource(em, source, out var position), Is.True);
+                Assert.That(position.x, Is.EqualTo(12f).Within(0.0001f));
+                Assert.That(position.y, Is.EqualTo(1f).Within(0.0001f));
+                Assert.That(position.z, Is.EqualTo(17f).Within(0.0001f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_NoSpawnRadiusWithBudget_UsesFallbackWhenAllSamplesRejected()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnNoSpawnRadiusBudgetWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                var playerPos = new float3(0f, 0f, 0f);
+                CreatePlayerWithTransform(em, playerPos);
+                CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5003,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.PlayerRelative,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 2,
+                    PlayerNoSpawnRadius = 5f,
+                    Count = 1,
+                    OldestFrame = 0,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                Assert.That(TryGetSingleActiveBulletPositionForSource(em, source, out var position), Is.True);
+                float2 delta = new float2(position.x - playerPos.x, position.z - playerPos.z);
+                Assert.That(math.lengthsq(delta), Is.LessThan(25f), "When every sample is rejected, last-sample fallback is expected");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnRequestBuild_PoissonMeanPositive_AccumulatesPendingRequests()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPoissonAccumulationWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+
+                var patterns = em.GetBuffer<SourceSpawnPatternBuffer>(source);
+                patterns.Clear();
+                patterns.Add(new SourceSpawnPatternBuffer
+                {
+                    DirectiveId = 7001,
+                    State = SourceStateId.Normal,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                    SpawnDensityPerSecPerArea = 0f,
+                    MeanEventsPerSec = 3600f,
+                    MaxActiveDensityPerArea = 0f,
+                    SpawnAccumulator = 0f,
+                });
+
+                var pendingAfterFrame = new int[3];
+                double elapsed = 0d;
+                const float delta = 1f / 60f;
+                for (int i = 0; i < pendingAfterFrame.Length; i++)
+                {
+                    elapsed += delta;
+                    world.SetTime(new TimeData(elapsed, delta));
+                    simGroup.Update();
+                    pendingAfterFrame[i] = SumPendingRequestCount(em.GetBuffer<SourceSpawnRequestBuffer>(source));
+                }
+
+                Assert.That(pendingAfterFrame[0], Is.GreaterThan(0));
+                Assert.That(pendingAfterFrame[1], Is.GreaterThanOrEqualTo(pendingAfterFrame[0]));
+                Assert.That(pendingAfterFrame[2], Is.GreaterThanOrEqualTo(pendingAfterFrame[1]));
+                Assert.That(pendingAfterFrame[2], Is.GreaterThan(pendingAfterFrame[0]));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void Smoke_MultiDirectiveSameTypeKey_DoesNotRegressBacklogAgeOrDrop()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("BulletSmokeStressMultiDirectiveWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 0f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 7000);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 7000, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var sourceEntity = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var patterns = em.GetBuffer<SourceSpawnPatternBuffer>(sourceEntity);
+                patterns.Clear();
+                patterns.Add(new SourceSpawnPatternBuffer
+                {
+                    DirectiveId = 801,
+                    State = SourceStateId.Normal,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                    SpawnDensityPerSecPerArea = 450f,
+                    MeanEventsPerSec = 0f,
+                    MaxActiveDensityPerArea = 0f,
+                    SpawnAccumulator = 0f,
+                });
+                patterns.Add(new SourceSpawnPatternBuffer
+                {
+                    DirectiveId = 802,
+                    State = SourceStateId.Normal,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                    SpawnDensityPerSecPerArea = 450f,
+                    MeanEventsPerSec = 0f,
+                    MaxActiveDensityPerArea = 0f,
+                    SpawnAccumulator = 0f,
+                });
+
+                int maxBudgetUsed = 0;
+                int maxPending = 0;
+                int maxOldestAge = 0;
+                int droppedTotal = 0;
+                int expiredTotal = 0;
+                int spawnedFrames = 0;
+
+                double elapsed = 0d;
+                const double delta = 1d / 60d;
+                for (int frame = 0; frame < 180; frame++)
+                {
+                    elapsed += delta;
+                    world.SetTime(new TimeData(elapsed, (float)delta));
+                    simGroup.Update();
+
+                    if (frame == 0)
+                    {
+                        var requests = em.GetBuffer<SourceSpawnRequestBuffer>(sourceEntity);
+                        Assert.That(HasDirective(requests, 801), Is.True);
+                        Assert.That(HasDirective(requests, 802), Is.True);
+                    }
+
+                    if (!TryGetSingleton(em, out SpawnBacklogMetricsComponent metrics))
+                        continue;
+                    if (!TryGetSingleton(em, out BulletFrameCounterComponent frameCounter))
+                        continue;
+
+                    maxBudgetUsed = math.max(maxBudgetUsed, metrics.LastFrameBudgetUsed);
+                    maxPending = math.max(maxPending, math.max(0, metrics.PendingCount));
+                    droppedTotal = math.max(droppedTotal, metrics.DroppedByCapacity);
+                    expiredTotal = math.max(expiredTotal, metrics.ExpiredByAge);
+                    if (metrics.LastFrameBudgetUsed > 0)
+                        spawnedFrames++;
+
+                    int oldestAge = ComputeOldestBacklogAge(em, FrameSequenceUtility.GetCurrentFrame(in frameCounter));
+                    maxOldestAge = math.max(maxOldestAge, oldestAge);
+                }
+
+                Assert.That(spawnedFrames, Is.GreaterThan(0));
+                Assert.That(maxBudgetUsed, Is.GreaterThan(0));
+                Assert.That(droppedTotal, Is.EqualTo(0));
+                Assert.That(expiredTotal, Is.EqualTo(0));
+                Assert.That(maxOldestAge, Is.LessThan(120));
+                Assert.That(maxPending, Is.LessThan(32768));
+
+                Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(sourceEntity).Length, Is.GreaterThan(0));
+                foreach (var item in em.GetBuffer<SourceActiveBulletCountBuffer>(sourceEntity))
+                    Assert.That(item.ActiveCount, Is.EqualTo(0));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
+        {
+            var world = new World(worldName);
+            var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
+            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
+            simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
+            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+            return world;
+        }
+
         private static Entity CreateBulletPrefab(EntityManager em, int typeKey, float lifetime)
         {
             var prefab = em.CreateEntity();
@@ -187,6 +620,13 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var player = em.CreateEntity(typeof(PlayerTag));
             em.SetName(player, "SmokeStress_Player");
+        }
+
+        private static void CreatePlayerWithTransform(EntityManager em, float3 position)
+        {
+            var player = em.CreateEntity(typeof(PlayerTag), typeof(LocalTransform));
+            em.SetName(player, "SmokeStress_Player_WithTransform");
+            em.SetComponentData(player, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
         }
 
         private static void CreateConfigSingletons(EntityManager em, int budgetPerFrame, int maxPendingCount, uint maxPendingAgeFrames)
@@ -248,10 +688,19 @@ namespace SweepNDodge.DotsBullets.Tests
             var patterns = em.AddBuffer<SourceSpawnPatternBuffer>(source);
             patterns.Add(new SourceSpawnPatternBuffer
             {
+                DirectiveId = 1,
                 State = SourceStateId.Normal,
                 BulletTypeKey = typeKey,
+                EmissionMode = SourceSpawnEmissionModeId.RateField,
                 SpawnMode = SourceSpawnModeId.FixedDensity,
+                SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                FixedPoint = float2.zero,
+                SpawnOffset = float2.zero,
+                SpawnSampleBudget = 16,
+                PlayerNoSpawnRadius = 0f,
                 SpawnDensityPerSecPerArea = spawnDensityPerSecPerArea,
+                MeanEventsPerSec = 0f,
                 MaxActiveDensityPerArea = 0f,
                 SpawnAccumulator = 0f,
             });
@@ -279,6 +728,72 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return oldest;
+        }
+
+        private static int GetRequestCountByDirective(DynamicBuffer<SourceSpawnRequestBuffer> requests, int directiveId)
+        {
+            int total = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                var item = requests[i];
+                if (item.DirectiveId != directiveId)
+                    continue;
+                if (item.Count <= 0)
+                    continue;
+
+                total += item.Count;
+            }
+
+            return total;
+        }
+
+        private static int SumPendingRequestCount(DynamicBuffer<SourceSpawnRequestBuffer> requests)
+        {
+            int total = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                if (requests[i].Count <= 0)
+                    continue;
+
+                total += requests[i].Count;
+            }
+
+            return total;
+        }
+
+        private static bool HasDirective(DynamicBuffer<SourceSpawnRequestBuffer> requests, int directiveId)
+        {
+            for (int i = 0; i < requests.Length; i++)
+            {
+                if (requests[i].DirectiveId == directiveId && requests[i].Count > 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetSingleActiveBulletPositionForSource(EntityManager em, Entity sourceEntity, out float3 position)
+        {
+            var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<BulletActiveTag>(),
+                ComponentType.ReadOnly<BulletSourceRefComponent>(),
+                ComponentType.ReadOnly<LocalTransform>());
+            using var entities = query.ToEntityArray(Allocator.Temp);
+
+            int count = 0;
+            position = float3.zero;
+            for (int i = 0; i < entities.Length; i++)
+            {
+                var entity = entities[i];
+                var sourceRef = em.GetComponentData<BulletSourceRefComponent>(entity);
+                if (sourceRef.Value != sourceEntity)
+                    continue;
+
+                position = em.GetComponentData<LocalTransform>(entity).Position;
+                count++;
+            }
+
+            return count == 1;
         }
 
         private static bool TryGetSingleton<T>(EntityManager em, out T value) where T : unmanaged, IComponentData

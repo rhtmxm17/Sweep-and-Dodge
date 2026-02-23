@@ -11,6 +11,7 @@
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
 
 > GD-007의 기획 의도를 ECS 런타임 데이터 계약으로 변환한 기술 설계 문서.
+> SpawnDirective 분해 모델(Sampling/Emission/Payload) 상세는 `TD-003`을 참조한다.
 
 ## 1. 문제 정의
 - GD-007은 기획 의도와 밸런싱 방향을 명확히 정의하지만, 구현에 필요한 필드/수식/검증 규칙 상세는 분리 관리가 필요하다.
@@ -27,37 +28,29 @@
 
 ## 3. 설계안
 ### 3.1 데이터 모델
-#### PatternDefinitionSlim
+#### SpawnDirectiveDefinitionSlim (현재 기준)
 
 | Field | Type | 설명 | 기본/범위 |
 | --- | --- | --- | --- |
-| PatternId | int | 고유 ID | > 0, 중복 금지 |
-| BulletTypeKey | int | 탄 타입 키 | 풀 레지스트리에 존재 |
-| CaptureRuleId | byte | 수거 규칙 | `BulletCaptureRuleId` 매핑 |
-| DurationSec | float | 패턴 지속 시간 | > 0 |
-| IntensityMode | enum | Flat / RampUp / RampDown / Pulse | 필수 |
-| PulsePeriodSec | float | Pulse 주기 | Pulse일 때 > 0 |
-| PulseDuty01 | float | Pulse 듀티 | 0~1, 기본 0.5 |
-| SpawnDensityPerSecPerArea | float | 면적당 초당 스폰 밀도 | >= 0 |
-
-#### WaveSpawnContextSlim
-
-| Field | Type | 설명 | 기본/범위 |
-| --- | --- | --- | --- |
-| FieldShape | enum | 필드 형태 | Circle / Rectangle |
-| FieldParamA | float | 필드 파라미터 A | Shape별 해석 |
-| FieldParamB | float | 필드 파라미터 B | Shape별 해석 |
-| SpawnCenterMode | enum | 중심 계산 모드 | SourceCenter / FixedPoint / PlayerRelative |
-| SpawnOffset | float2 | 중심 오프셋 | PlayerRelative에 사용 |
-| FixedPoint | float2 | 고정 중심점 | FixedPoint에 사용 |
+| DirectiveId | int | 요청/소비 추적 키 | > 0, Source 내 고유 |
+| TriggerState | enum | Source 상태 조건 | Normal / Weakened / Depleted |
+| Phase | enum | 구간 타입 | Sustain / OnStateEnterOnce |
+| StartSec | float | 활성 시작 시간 | >= 0 |
+| EndSec | float | 활성 종료 시간 | > StartSec |
+| BulletTypeKey | int | Payload 탄 타입 | 풀 레지스트리에 존재 |
+| EmissionMode | enum | 방출 모드 | RateField / Poisson |
+| RatePerSecPerArea | float | RateField 밀도 | >= 0 |
+| MeanEventsPerSec | float | Poisson 평균 이벤트율 | >= 0 |
+| SpawnMode | enum | 활성 캡 정책 | FixedDensity / CapAndMaxDensity |
+| MaxActiveDensityPerArea | float | Cap 모드 상한 | Cap 모드에서 >= 0 |
+| SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK |
+| CenterMode | enum | 중심 모드 | SourceCenter / FixedPoint / PlayerRelative |
+| FixedPoint | float2 | 고정 중심점 | CenterMode=FixedPoint |
+| SpawnOffset | float2 | 플레이어 상대 오프셋 | CenterMode=PlayerRelative |
+| SpawnSampleBudget | int | 샘플링 재시도 예산 | >= 1 (기본 16) |
 | PlayerNoSpawnRadius | float | 플레이어 주변 제외 반경 | >= 0 |
-| SpawnSampleBudget | int | 샘플링 시도 예산 | >= 1, 기본 16 |
-| MaxActiveSoftCap | int | 활성 탄 소프트 캡 | >= 0 |
 
-`SpawnCenterMode` 규약:
-- `SourceCenter`: `C = SourcePos`
-- `FixedPoint`: `C = FixedPoint`
-- `PlayerRelative`: `C = PlayerPos + Rotate(SpawnOffset, PlayerFacing)`
+`PatternDefinitionSlim`은 밀도 기반 구버전 용어이며, 스폰 모델은 `TD-003`의 SpawnDirective 용어를 기준으로 유지한다.
 
 ### 3.2 Progress 모델
 #### StageProgressProfile
@@ -103,9 +96,11 @@ Hit:
 
 ## 4. 업데이트 순서/소유권
 - Request 단계:
-- Pattern/Wave 데이터를 사용해 `SourceSpawnRequestBuffer`를 누적 생성한다.
+- Directive 데이터를 사용해 `SourceSpawnRequestBuffer`를 누적 생성한다.
+- 요청 집계 키는 `BulletTypeKey` 단독이 아니라 `DirectiveId`를 기본 키로 사용한다.
 - ExecutionBegin 단계:
 - Owner(`SpawnRequestRoundRobinExecutionSystem`)가 요청을 소비해 실제 스폰을 수행한다.
+- Sampling(중심 계산/샘플링/NoSpawn 반경 검증)은 ExecutionBegin에서 최종 평가한다.
 - ExecutionEnd 단계:
 - 디스폰 owner가 반납과 렌더 토글을 처리한다.
 
@@ -125,25 +120,27 @@ Hit:
 ## 6. 검증 계획
 ### 6.1 콘텐츠 검증 규칙 초안
 - Error:
-- 중복 `PatternId`.
-- `DurationSec <= 0`.
-- `SpawnDensityPerSecPerArea < 0`.
-- `Pulse` 모드인데 `PulsePeriodSec <= 0`.
-- `PulseDuty01`이 0~1 범위를 벗어남.
-- `BulletTypeKey`가 풀 레지스트리/정의에 없음.
 - Wave segment의 `EndSec <= StartSec` (`CV010`).
 - Wave segment 간 시간 겹침 (`CV011`).
+- Wave entry의 `RatePerSecPerArea < 0` (`CV015`, RateField 모드).
+- Wave entry의 `MeanEventsPerSec < 0` (`CV017`, Poisson 모드).
+- `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0` (`CV016`).
+- Wave entry의 `SpawnSampleBudget < 0` (`CV018`).
+- Wave entry의 `PlayerNoSpawnRadius < 0` (`CV019`).
 - Warning:
 - `SpawnSampleBudget`가 권장 범위 초과.
-- `MaxActiveSoftCap`이 Stage 목표 대비 과도함.
+- `MaxActiveDensityPerArea`가 Stage 목표 대비 과도함.
 - `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
 
 검증 코드 매핑(현재 구현):
 - `CV012`: Wave segment의 `Entries` 비어 있음
 - `CV013`: Wave entry의 `Bullet == null`
 - `CV014`: Wave entry가 미등록 `DefinitionId` 참조
-- `CV015`: Wave entry의 `SpawnDensityPerSecPerArea < 0`
+- `CV015`: Wave entry의 `RatePerSecPerArea < 0` (RateField)
 - `CV016`: `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0`
+- `CV017`: Wave entry의 `MeanEventsPerSec < 0` (Poisson)
+- `CV018`: Wave entry의 `SpawnSampleBudget < 0`
+- `CV019`: Wave entry의 `PlayerNoSpawnRadius < 0`
 - `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
 - `CV011`: Wave segment 중첩
 
@@ -157,5 +154,6 @@ Hit:
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 8. 변경 이력
+- 2026-02-23: Spawn 계약을 `PatternDefinitionSlim` 중심에서 `SpawnDirectiveDefinitionSlim` 중심으로 전환하고, 요청 집계 키를 `DirectiveId` 기준으로 명시
 - 2026-02-23: GD-007에서 구현 계약 항목(필드/수식/검증)을 분리해 `TD-002` 초안 작성
 - 2026-02-23: Wave 정책을 "동시 지속 금지"로 확정하고 중첩 우선순위 이슈를 해소

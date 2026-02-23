@@ -6,3 +6,4 @@
 ## Documents
 - [TD-001-player-feedback-event-channel.md](TD-001-player-feedback-event-channel.md): ECS 피드백 이벤트 채널 설계 정리
 - [TD-002-pattern-wave-progress-runtime-contract.md](TD-002-pattern-wave-progress-runtime-contract.md): Pattern/Wave/Progress 런타임 데이터/수식/검증 계약
+- [TD-003-spawn-directive-model.md](TD-003-spawn-directive-model.md): SpawnDirective 분해 모델(Sampling/Emission/Payload)과 모드 조합 규칙

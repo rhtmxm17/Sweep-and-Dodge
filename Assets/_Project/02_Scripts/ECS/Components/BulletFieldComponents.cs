@@ -39,6 +39,25 @@ namespace SweepNDodge.DotsBullets
         CapAndMaxDensity = 1
     }
 
+    public enum SourceSpawnEmissionModeId : byte
+    {
+        RateField = 0,
+        Poisson = 1,
+    }
+
+    public enum SourceSpawnSamplingModeId : byte
+    {
+        UniformField = 0,
+        PollutionTopK = 1,
+    }
+
+    public enum SourceSpawnCenterModeId : byte
+    {
+        SourceCenter = 0,
+        FixedPoint = 1,
+        PlayerRelative = 2,
+    }
+
     public enum SourcePollutionSamplingModeId : byte
     {
         TopK = 0,
@@ -85,10 +104,19 @@ namespace SweepNDodge.DotsBullets
     [InternalBufferCapacity(8)]
     public struct SourceSpawnPatternBuffer : IBufferElementData
     {
+        public int DirectiveId;
         public SourceStateId State;
         public int BulletTypeKey;
+        public SourceSpawnEmissionModeId EmissionMode;
         public SourceSpawnModeId SpawnMode;
-        public float SpawnDensityPerSecPerArea;
+        public SourceSpawnSamplingModeId SamplingMode;
+        public SourceSpawnCenterModeId CenterMode;
+        public float2 FixedPoint;
+        public float2 SpawnOffset;
+        public int SpawnSampleBudget;
+        public float PlayerNoSpawnRadius;
+        public float SpawnDensityPerSecPerArea; // RateField
+        public float MeanEventsPerSec;          // Poisson
         public float MaxActiveDensityPerArea; // FixedDensity 일 경우 무시
         public float SpawnAccumulator;
     }
@@ -103,12 +131,21 @@ namespace SweepNDodge.DotsBullets
     [InternalBufferCapacity(16)]
     public struct SourceOpeningWavePatternBuffer : IBufferElementData
     {
+        public int DirectiveId;
         public SourceStateId TriggerState;
         public float StartSec;
         public float EndSec;
         public int BulletTypeKey;
+        public SourceSpawnEmissionModeId EmissionMode;
         public SourceSpawnModeId SpawnMode;
-        public float SpawnDensityPerSecPerArea;
+        public SourceSpawnSamplingModeId SamplingMode;
+        public SourceSpawnCenterModeId CenterMode;
+        public float2 FixedPoint;
+        public float2 SpawnOffset;
+        public int SpawnSampleBudget;
+        public float PlayerNoSpawnRadius;
+        public float SpawnDensityPerSecPerArea; // RateField
+        public float MeanEventsPerSec;          // Poisson
         public float MaxActiveDensityPerArea;
         public float SpawnAccumulator;
     }

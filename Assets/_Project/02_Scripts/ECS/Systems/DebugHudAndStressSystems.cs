@@ -14,7 +14,14 @@ namespace SweepNDodge.DotsBullets
         private struct StressTarget
         {
             public Entity Entity;
+            public int DirectiveId;
             public int BulletTypeKey;
+            public SourceSpawnSamplingModeId SamplingMode;
+            public SourceSpawnCenterModeId CenterMode;
+            public float2 FixedPoint;
+            public float2 SpawnOffset;
+            public int SpawnSampleBudget;
+            public float PlayerNoSpawnRadius;
         }
 
         public void OnCreate(ref SystemState state)
@@ -99,14 +106,20 @@ namespace SweepNDodge.DotsBullets
                 if (!patternLookup.TryGetBuffer(sourceEntity, out var patterns))
                     continue;
 
-                int typeKey = ResolveTypeKey(preferredTypeKey, sourceLookup[sourceEntity].State, patterns);
-                if (typeKey == int.MinValue)
+                if (!TryResolveDirective(preferredTypeKey, sourceLookup[sourceEntity].State, patterns, out var resolved))
                     continue;
 
                 targets.Add(new StressTarget
                 {
                     Entity = sourceEntity,
-                    BulletTypeKey = typeKey,
+                    DirectiveId = resolved.DirectiveId,
+                    BulletTypeKey = resolved.BulletTypeKey,
+                    SamplingMode = resolved.SamplingMode,
+                    CenterMode = resolved.CenterMode,
+                    FixedPoint = resolved.FixedPoint,
+                    SpawnOffset = resolved.SpawnOffset,
+                    SpawnSampleBudget = resolved.SpawnSampleBudget,
+                    PlayerNoSpawnRadius = resolved.PlayerNoSpawnRadius,
                 });
             }
 
@@ -126,34 +139,58 @@ namespace SweepNDodge.DotsBullets
                 if (!requestLookup.TryGetBuffer(target.Entity, out var requests))
                     continue;
 
-                AddOrMergeRequest(requests, target.BulletTypeKey, count, frame);
+                AddOrMergeRequest(requests, in target, count, frame);
             }
         }
 
-        private int ResolveTypeKey(int preferredTypeKey, SourceStateId sourceState, DynamicBuffer<SourceSpawnPatternBuffer> patterns)
+        private bool TryResolveDirective(
+            int preferredTypeKey,
+            SourceStateId sourceState,
+            DynamicBuffer<SourceSpawnPatternBuffer> patterns,
+            out SourceSpawnPatternBuffer resolved)
         {
-            if (preferredTypeKey >= 0)
-                return preferredTypeKey;
+            resolved = default;
+            if (patterns.Length <= 0)
+                return false;
 
             for (int i = 0; i < patterns.Length; i++)
             {
                 var pattern = patterns[i];
+                if (preferredTypeKey >= 0 && pattern.BulletTypeKey != preferredTypeKey)
+                    continue;
                 if (pattern.State == sourceState)
-                    return pattern.BulletTypeKey;
+                {
+                    resolved = pattern;
+                    return true;
+                }
             }
 
-            if (patterns.Length > 0)
-                return patterns[0].BulletTypeKey;
+            if (preferredTypeKey >= 0)
+            {
+                for (int i = 0; i < patterns.Length; i++)
+                {
+                    if (patterns[i].BulletTypeKey != preferredTypeKey)
+                        continue;
 
-            return int.MinValue;
+                    resolved = patterns[i];
+                    return true;
+                }
+            }
+
+            resolved = patterns[0];
+            return true;
         }
 
-        private void AddOrMergeRequest(DynamicBuffer<SourceSpawnRequestBuffer> requests, int typeKey, int count, uint frame)
+        private void AddOrMergeRequest(
+            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            in StressTarget target,
+            int count,
+            uint frame)
         {
             for (int i = 0; i < requests.Length; i++)
             {
                 var item = requests[i];
-                if (item.BulletTypeKey != typeKey)
+                if (item.DirectiveId != target.DirectiveId)
                     continue;
 
                 if (item.Count <= 0)
@@ -166,7 +203,14 @@ namespace SweepNDodge.DotsBullets
 
             requests.Add(new SourceSpawnRequestBuffer
             {
-                BulletTypeKey = typeKey,
+                DirectiveId = target.DirectiveId,
+                BulletTypeKey = target.BulletTypeKey,
+                SamplingMode = target.SamplingMode,
+                CenterMode = target.CenterMode,
+                FixedPoint = target.FixedPoint,
+                SpawnOffset = target.SpawnOffset,
+                SpawnSampleBudget = math.max(1, target.SpawnSampleBudget),
+                PlayerNoSpawnRadius = math.max(0f, target.PlayerNoSpawnRadius),
                 Count = count,
                 OldestFrame = frame,
             });

@@ -212,7 +212,8 @@ namespace SweepNDodge.DotsBullets.Editor
                         for (int e = 0; e < entries.Length; e++)
                         {
                             var entry = entries[e];
-                            if (entry.Bullet == null)
+                            var bullet = entry.ResolveBullet();
+                            if (bullet == null)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
@@ -222,31 +223,59 @@ namespace SweepNDodge.DotsBullets.Editor
                                 continue;
                             }
 
-                            if (!knownKeys.Contains(entry.Bullet.DefinitionId))
+                            if (!knownKeys.Contains(bullet.DefinitionId))
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV014",
                                     timelines[i].Location,
-                                    $"Wave segment references unknown DefinitionId {entry.Bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
+                                    $"Wave segment references unknown DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (entry.SpawnDensityPerSecPerArea < 0f)
+                            var emissionMode = entry.ResolveEmissionMode();
+                            if (emissionMode == SourceSpawnEmissionModeId.RateField && entry.ResolveRatePerSecPerArea() < 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV015",
                                     timelines[i].Location,
-                                    $"Wave segment has negative SpawnDensityPerSecPerArea at segmentIndex={s}, entryIndex={e}."));
+                                    $"Wave segment has negative RatePerSecPerArea at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (entry.SpawnMode == SourceSpawnModeId.CapAndMaxDensity && entry.MaxActiveDensityPerArea < 0f)
+                            if (emissionMode == SourceSpawnEmissionModeId.Poisson && entry.ResolveMeanEventsPerSec() < 0f)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV017",
+                                    timelines[i].Location,
+                                    $"Wave segment has negative MeanEventsPerSec at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if (entry.ResolveSpawnMode() == SourceSpawnModeId.CapAndMaxDensity && entry.ResolveMaxActiveDensityPerArea() < 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV016",
                                     timelines[i].Location,
                                     $"Wave segment has negative MaxActiveDensityPerArea for CapAndMaxDensity at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if (entry.Sampling.SpawnSampleBudget < 0)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV018",
+                                    timelines[i].Location,
+                                    $"Wave segment has negative SpawnSampleBudget at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if (entry.ResolvePlayerNoSpawnRadius() < 0f)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV019",
+                                    timelines[i].Location,
+                                    $"Wave segment has negative PlayerNoSpawnRadius at segmentIndex={s}, entryIndex={e}."));
                             }
                         }
                     }

@@ -40,14 +40,15 @@ namespace SweepNDodge.DotsBullets
 
             int remainingCapacity = math.max(0, policy.MaxPendingCount - pendingTotal);
 
-            foreach (var (source, fieldArea, openingPatterns, runtimeRW, activeCounts, requests) in
+            foreach (var (source, fieldArea, openingPatterns, runtimeRW, activeCounts, requests, sourceEntity) in
                      SystemAPI.Query<
                          RefRO<SourceSpawnComponent>,
                          RefRO<BulletFieldAreaComponent>,
                          DynamicBuffer<SourceOpeningWavePatternBuffer>,
                          RefRW<SourceOpeningWaveRuntimeComponent>,
                          DynamicBuffer<SourceActiveBulletCountBuffer>,
-                         DynamicBuffer<SourceSpawnRequestBuffer>>())
+                         DynamicBuffer<SourceSpawnRequestBuffer>>()
+                         .WithEntityAccess())
             {
                 var runtime = runtimeRW.ValueRO;
                 var sourceState = source.ValueRO.State;
@@ -98,7 +99,7 @@ namespace SweepNDodge.DotsBullets
                         continue;
                     }
 
-                    int requested = ResolveSpawnCount(ref pattern, activeCounts, requestsRW, area, deltaTime);
+                    int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requestsRW, area, deltaTime);
                     patternsRW[i] = pattern;
                     if (requested <= 0)
                         continue;
@@ -106,7 +107,7 @@ namespace SweepNDodge.DotsBullets
                     int accepted = math.min(requested, remainingCapacity);
                     if (accepted > 0)
                     {
-                        AddOrMergeRequest(requestsRW, pattern.BulletTypeKey, accepted, frame);
+                        AddOrMergeRequest(requestsRW, in pattern, accepted, frame);
                         pendingTotal = SafeAdd(pendingTotal, accepted);
                         remainingCapacity -= accepted;
                     }
@@ -149,22 +150,39 @@ namespace SweepNDodge.DotsBullets
 
         private static int ResolveSpawnCount(
             ref SourceOpeningWavePatternBuffer pattern,
+            Entity sourceEntity,
+            uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
             float area,
             float deltaTime)
         {
-            float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
-            float rate = density * area;
-            if (rate <= 0f)
+            int spawnCount;
+            if (pattern.EmissionMode == SourceSpawnEmissionModeId.Poisson)
             {
                 pattern.SpawnAccumulator = 0f;
-                return 0;
+                float lambda = math.max(0f, pattern.MeanEventsPerSec) * math.max(0f, deltaTime);
+                if (lambda <= 0f)
+                    return 0;
+
+                var random = CreateDeterministicRandom(sourceEntity, pattern.DirectiveId, frame, 0x68E31DA4u);
+                spawnCount = SamplePoisson(lambda, ref random);
+            }
+            else
+            {
+                float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
+                float rate = density * area;
+                if (rate <= 0f)
+                {
+                    pattern.SpawnAccumulator = 0f;
+                    return 0;
+                }
+
+                pattern.SpawnAccumulator += rate * deltaTime;
+                spawnCount = (int)pattern.SpawnAccumulator;
+                pattern.SpawnAccumulator -= spawnCount;
             }
 
-            pattern.SpawnAccumulator += rate * deltaTime;
-            int spawnCount = (int)pattern.SpawnAccumulator;
-            pattern.SpawnAccumulator -= spawnCount;
             if (spawnCount <= 0)
                 return 0;
 
@@ -204,7 +222,11 @@ namespace SweepNDodge.DotsBullets
             return pending;
         }
 
-        private static void AddOrMergeRequest(DynamicBuffer<SourceSpawnRequestBuffer> requests, int typeKey, int count, uint frame)
+        private static void AddOrMergeRequest(
+            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            in SourceOpeningWavePatternBuffer pattern,
+            int count,
+            uint frame)
         {
             if (count <= 0)
                 return;
@@ -212,7 +234,7 @@ namespace SweepNDodge.DotsBullets
             for (int i = 0; i < requests.Length; i++)
             {
                 var item = requests[i];
-                if (item.BulletTypeKey != typeKey)
+                if (item.DirectiveId != pattern.DirectiveId)
                     continue;
 
                 if (item.Count <= 0)
@@ -225,10 +247,58 @@ namespace SweepNDodge.DotsBullets
 
             requests.Add(new SourceSpawnRequestBuffer
             {
-                BulletTypeKey = typeKey,
+                DirectiveId = pattern.DirectiveId,
+                BulletTypeKey = pattern.BulletTypeKey,
+                SamplingMode = pattern.SamplingMode,
+                CenterMode = pattern.CenterMode,
+                FixedPoint = pattern.FixedPoint,
+                SpawnOffset = pattern.SpawnOffset,
+                SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
+                PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
                 Count = count,
                 OldestFrame = frame
             });
+        }
+
+        private static Unity.Mathematics.Random CreateDeterministicRandom(Entity sourceEntity, int directiveId, uint frame, uint salt)
+        {
+            uint seed = math.hash(new uint4(
+                frame,
+                (uint)math.max(0, sourceEntity.Index + 1),
+                (uint)math.max(0, directiveId + 1),
+                salt));
+            return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
+        }
+
+        private static int SamplePoisson(float lambda, ref Unity.Mathematics.Random random)
+        {
+            if (lambda <= 0f)
+                return 0;
+
+            if (lambda < 30f)
+            {
+                float l = math.exp(-lambda);
+                int k = 0;
+                float p = 1f;
+                do
+                {
+                    k++;
+                    p *= random.NextFloat(0f, 1f);
+                } while (p > l);
+
+                return math.max(0, k - 1);
+            }
+
+            float stdDev = math.sqrt(lambda);
+            float n = SampleStandardNormal(ref random);
+            return math.max(0, (int)math.round(lambda + stdDev * n));
+        }
+
+        private static float SampleStandardNormal(ref Unity.Mathematics.Random random)
+        {
+            float u1 = math.max(1e-7f, random.NextFloat(0f, 1f));
+            float u2 = random.NextFloat(0f, 1f);
+            return math.sqrt(-2f * math.log(u1)) * math.cos(2f * math.PI * u2);
         }
 
         private static int SafeAdd(int lhs, int rhs)

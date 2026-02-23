@@ -23,6 +23,22 @@ MonoBehaviour:
       SpawnMode: 0
       SpawnDensityPerSecPerArea: 0.04
       MaxActiveDensityPerArea: 0
+      UseDirectiveProfiles: 1
+      Payload:
+        Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      Emission:
+        EmissionMode: 0
+        SpawnMode: 0
+        RatePerSecPerArea: 0.04
+        MeanEventsPerSec: 0
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 1
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        SpawnSampleBudget: 16
+        PlayerNoSpawnRadius: 0
   - WaveId: 1002
     TargetState: 1
     Phase: 0
@@ -33,3 +49,19 @@ MonoBehaviour:
       SpawnMode: 0
       SpawnDensityPerSecPerArea: 5
       MaxActiveDensityPerArea: 0
+      UseDirectiveProfiles: 1
+      Payload:
+        Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      Emission:
+        EmissionMode: 0
+        SpawnMode: 0
+        RatePerSecPerArea: 5
+        MeanEventsPerSec: 0
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 1
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        SpawnSampleBudget: 16
+        PlayerNoSpawnRadius: 0
