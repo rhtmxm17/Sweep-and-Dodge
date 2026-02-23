@@ -44,17 +44,20 @@ namespace SweepNDodge.DotsBullets.Editor
         public readonly IReadOnlyList<ContentValidationRecord<BulletSourceProfileSO>> SourceProfiles;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> SourceAuthorings;
+        public readonly IReadOnlyList<ContentValidationRecord<BulletAuthoring>> BulletAuthorings;
 
         public ContentValidationInput(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             IReadOnlyList<ContentValidationRecord<BulletSourceProfileSO>> sourceProfiles,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
-            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings)
+            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
         {
             Definitions = definitions ?? Array.Empty<ContentValidationRecord<BulletDefinitionSO>>();
             SourceProfiles = sourceProfiles ?? Array.Empty<ContentValidationRecord<BulletSourceProfileSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<BulletSourceAuthoring>>();
+            BulletAuthorings = bulletAuthorings ?? Array.Empty<ContentValidationRecord<BulletAuthoring>>();
         }
     }
 
@@ -68,6 +71,8 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateSourceProfileReferences(input.Definitions, input.SourceProfiles, issues);
+            ValidateSourceAuthoringContracts(input.SourceAuthorings, issues);
+            ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
             ValidateAutoCorrectionWarnings(input.Definitions, input.VisualAuthorings, input.SourceAuthorings, issues);
 
             return issues;
@@ -278,6 +283,53 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
 
             issues.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, code, location, message));
+        }
+
+        private static void ValidateSourceAuthoringContracts(
+            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < sourceAuthorings.Count; i++)
+            {
+                var source = sourceAuthorings[i].Value;
+                if (source == null)
+                    continue;
+
+                if (source.SpawnProfile == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV006",
+                        sourceAuthorings[i].Location,
+                        "BulletSourceAuthoring.SpawnProfile is null."));
+                }
+            }
+        }
+
+        private static void ValidateBulletAuthoringRenderContracts(
+            IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < bulletAuthorings.Count; i++)
+            {
+                var bullet = bulletAuthorings[i].Value;
+                if (bullet == null)
+                    continue;
+
+                var meshRenderers = bullet.GetComponentsInChildren<MeshRenderer>(true);
+                var skinnedRenderers = bullet.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+                bool hasRenderablePart = (meshRenderers != null && meshRenderers.Length > 0)
+                    || (skinnedRenderers != null && skinnedRenderers.Length > 0);
+
+                if (!hasRenderablePart)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV007",
+                        bulletAuthorings[i].Location,
+                        "BulletAuthoring has no MeshRenderer/SkinnedMeshRenderer render parts."));
+                }
+            }
         }
     }
 }

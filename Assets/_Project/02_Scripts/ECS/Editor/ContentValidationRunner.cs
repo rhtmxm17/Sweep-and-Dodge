@@ -9,6 +9,7 @@ namespace SweepNDodge.DotsBullets.Editor
     public static class ContentValidationRunner
     {
         private static readonly string[] SearchRoots = { "Assets/_Project" };
+        private const int MaxWarningLogs = 100;
 
         [MenuItem("Tools/Project/Validate Content")]
         private static void ValidateContentMenu()
@@ -23,11 +24,12 @@ namespace SweepNDodge.DotsBullets.Editor
             var profiles = CollectScriptableObjects<BulletSourceProfileSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<BulletSourceAuthoring>>();
+            var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
 
-            CollectAuthoringsFromPrefabs(visuals, sources);
-            CollectAuthoringsFromScenes(visuals, sources);
+            CollectAuthoringsFromPrefabs(visuals, sources, bullets);
+            CollectAuthoringsFromScenes(visuals, sources, bullets);
 
-            var input = new ContentValidationInput(definitions, profiles, visuals, sources);
+            var input = new ContentValidationInput(definitions, profiles, visuals, sources, bullets);
             return ContentValidationRules.Validate(input);
         }
 
@@ -50,7 +52,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static void CollectAuthoringsFromPrefabs(
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
-            List<ContentValidationRecord<BulletSourceAuthoring>> sources)
+            List<ContentValidationRecord<BulletSourceAuthoring>> sources,
+            List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             string[] guids = AssetDatabase.FindAssets("t:Prefab", SearchRoots);
             for (int i = 0; i < guids.Length; i++)
@@ -60,13 +63,14 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (root == null)
                     continue;
 
-                CollectAuthoringsInHierarchy(path, root, visuals, sources);
+                CollectAuthoringsInHierarchy(path, root, visuals, sources, bullets);
             }
         }
 
         private static void CollectAuthoringsFromScenes(
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
-            List<ContentValidationRecord<BulletSourceAuthoring>> sources)
+            List<ContentValidationRecord<BulletSourceAuthoring>> sources,
+            List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             string[] guids = AssetDatabase.FindAssets("t:Scene", SearchRoots);
             var previous = EditorSceneManager.GetSceneManagerSetup();
@@ -83,7 +87,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     var roots = scene.GetRootGameObjects();
                     for (int r = 0; r < roots.Length; r++)
                     {
-                        CollectAuthoringsInHierarchy(path, roots[r], visuals, sources);
+                        CollectAuthoringsInHierarchy(path, roots[r], visuals, sources, bullets);
                     }
 
                     EditorSceneManager.CloseScene(scene, removeScene: true);
@@ -106,7 +110,8 @@ namespace SweepNDodge.DotsBullets.Editor
             string assetPath,
             GameObject root,
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
-            List<ContentValidationRecord<BulletSourceAuthoring>> sources)
+            List<ContentValidationRecord<BulletSourceAuthoring>> sources,
+            List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             var visualComponents = root.GetComponentsInChildren<BulletVisualPrefabAuthoring>(includeInactive: true);
             for (int i = 0; i < visualComponents.Length; i++)
@@ -120,6 +125,13 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 string location = $"{assetPath}::{BuildHierarchyPath(sourceComponents[i].transform)}";
                 sources.Add(new ContentValidationRecord<BulletSourceAuthoring>(sourceComponents[i], location));
+            }
+
+            var bulletComponents = root.GetComponentsInChildren<BulletAuthoring>(includeInactive: true);
+            for (int i = 0; i < bulletComponents.Length; i++)
+            {
+                string location = $"{assetPath}::{BuildHierarchyPath(bulletComponents[i].transform)}";
+                bullets.Add(new ContentValidationRecord<BulletAuthoring>(bulletComponents[i], location));
             }
         }
 
@@ -140,8 +152,17 @@ namespace SweepNDodge.DotsBullets.Editor
                 else
                 {
                     warningCount++;
-                    Debug.LogWarning(line);
+                    if (warningCount <= MaxWarningLogs)
+                    {
+                        Debug.LogWarning(line);
+                    }
                 }
+            }
+
+            int suppressedWarningCount = Mathf.Max(0, warningCount - MaxWarningLogs);
+            if (suppressedWarningCount > 0)
+            {
+                Debug.LogWarning($"[ContentValidation] Warning log cap reached ({MaxWarningLogs}). Suppressed warnings={suppressedWarningCount}");
             }
 
             Debug.Log($"[ContentValidation] Done. errors={errorCount}, warnings={warningCount}, total={issues.Count}");

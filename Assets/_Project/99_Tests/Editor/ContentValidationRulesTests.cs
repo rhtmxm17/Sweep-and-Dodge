@@ -30,6 +30,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                     null,
                     null,
+                    null,
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
@@ -50,6 +51,7 @@ namespace SweepNDodge.DotsBullets.Tests
         public void AutoCorrectionInputs_AreReportedAsWarningsOnly()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var profile = ScriptableObject.CreateInstance<BulletSourceProfileSO>();
             var sourceRoot = new GameObject("source_root");
             var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
 
@@ -62,6 +64,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Lifetime = -3f;
                 def.Radius = -0.5f;
                 def.ScoreValue = -7;
+                profile.States = System.Array.Empty<BulletSourceProfileSO.StateConfig>();
+                sourceAuthoring.SpawnProfile = profile;
 
                 sourceAuthoring.ThresholdWeakened = -1;
                 sourceAuthoring.ThresholdDepleted = -2;
@@ -85,7 +89,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     new List<ContentValidationRecord<BulletSourceAuthoring>>
                     {
                         new ContentValidationRecord<BulletSourceAuthoring>(sourceAuthoring, "source"),
-                    });
+                    },
+                    null);
 
                 var issues = ContentValidationRules.Validate(input);
                 var warnings = issues.Where(i => i.Code.StartsWith("CVW")).ToArray();
@@ -99,7 +104,67 @@ namespace SweepNDodge.DotsBullets.Tests
                 if (def.Prefab != null)
                     Object.DestroyImmediate(def.Prefab);
                 Object.DestroyImmediate(def);
+                Object.DestroyImmediate(profile);
                 Object.DestroyImmediate(sourceRoot);
+            }
+        }
+
+        [Test]
+        public void SourceAuthoring_WithNullSpawnProfile_IsError()
+        {
+            var sourceRoot = new GameObject("source_root");
+            var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
+
+            try
+            {
+                sourceAuthoring.SpawnProfile = null;
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<BulletSourceAuthoring>>
+                    {
+                        new ContentValidationRecord<BulletSourceAuthoring>(sourceAuthoring, "source"),
+                    },
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var spawnProfileErrors = issues.Where(i => i.Code == "CV006").ToArray();
+                Assert.That(spawnProfileErrors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(spawnProfileErrors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(sourceRoot);
+            }
+        }
+
+        [Test]
+        public void BulletAuthoring_WithoutRenderParts_IsError()
+        {
+            var root = new GameObject("bullet_root");
+            var bullet = root.AddComponent<BulletAuthoring>();
+
+            try
+            {
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<BulletAuthoring>>
+                    {
+                        new ContentValidationRecord<BulletAuthoring>(bullet, "bullet"),
+                    });
+
+                var issues = ContentValidationRules.Validate(input);
+                var renderErrors = issues.Where(i => i.Code == "CV007").ToArray();
+                Assert.That(renderErrors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(renderErrors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
             }
         }
     }
