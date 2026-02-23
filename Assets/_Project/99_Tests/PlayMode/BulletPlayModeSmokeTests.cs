@@ -22,6 +22,62 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_DedicatedScene_StressSwitch_BurstRequest_ImpactsBacklogAndHud()
+        {
+            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    CountByComponentType<PlayerTag>(em) > 0 &&
+                    CountByComponentType<SourceSpawnComponent>(em) > 0 &&
+                    CountByComponentType<BulletFrameCounterComponent>(em) > 0 &&
+                    HasSingleton<StressSwitchStateComponent>(em) &&
+                    HasSingleton<SpawnBacklogMetricsComponent>(em) &&
+                    HasSingleton<DebugHudMetricsComponent>(em),
+                300,
+                "ECS singleton setup for stress/HUD was not ready within timeout.");
+
+            int baselineMaxPending = 0;
+            for (int i = 0; i < 20; i++)
+            {
+                yield return null;
+                var baselineMetrics = GetSingleton<SpawnBacklogMetricsComponent>(em);
+                baselineMaxPending = Mathf.Max(baselineMaxPending, baselineMetrics.PendingCount);
+            }
+
+            var stressEntity = GetSingletonEntity<StressSwitchStateComponent>(em);
+            var stress = em.GetComponentData<StressSwitchStateComponent>(stressEntity);
+            stress.Mode = (byte)StressSwitchModeId.BurstOnce;
+            stress.BurstCount = 20000;
+            stress.PreferredBulletTypeKey = -1;
+            stress.RequestExecute = 1;
+            em.SetComponentData(stressEntity, stress);
+
+            int postMaxPending = 0;
+            int postMaxHudSpawned = 0;
+            for (int i = 0; i < 90; i++)
+            {
+                yield return null;
+                var postMetrics = GetSingleton<SpawnBacklogMetricsComponent>(em);
+                var hud = GetSingleton<DebugHudMetricsComponent>(em);
+                postMaxPending = Mathf.Max(postMaxPending, postMetrics.PendingCount);
+                postMaxHudSpawned = Mathf.Max(postMaxHudSpawned, hud.SpawnedThisFrame);
+            }
+
+            var stressAfter = GetSingleton<StressSwitchStateComponent>(em);
+            Assert.That(stressAfter.RequestExecute, Is.EqualTo(0), "Stress request flag must be consumed");
+            Assert.That(stressAfter.Mode, Is.EqualTo((byte)StressSwitchModeId.None), "Burst mode must finish as one-shot request");
+            Assert.That(postMaxPending, Is.GreaterThan(baselineMaxPending + 1000), "Burst request should noticeably increase pending backlog");
+            Assert.That(postMaxHudSpawned, Is.GreaterThan(0), "HUD spawned metric should be updated during burst run");
+        }
+
+        [UnityTest]
         [Category("PeriodicOperationalScene")]
         public IEnumerator PlayMode_OperationalScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
         {
@@ -88,6 +144,24 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.CalculateEntityCount();
+        }
+
+        private static bool HasSingleton<T>(EntityManager em) where T : unmanaged, IComponentData
+        {
+            var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            return !query.IsEmptyIgnoreFilter;
+        }
+
+        private static Entity GetSingletonEntity<T>(EntityManager em) where T : unmanaged, IComponentData
+        {
+            var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            return query.GetSingletonEntity();
+        }
+
+        private static T GetSingleton<T>(EntityManager em) where T : unmanaged, IComponentData
+        {
+            var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            return query.GetSingleton<T>();
         }
     }
 }

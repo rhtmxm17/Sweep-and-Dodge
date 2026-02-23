@@ -182,6 +182,27 @@ namespace SweepNDodge.DotsBullets
                     SourceStartIndex = 0,
                 });
             }
+
+            if (!HasSingleton<DebugHudMetricsComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(DebugHudMetricsComponent));
+                em.SetComponentData(e, default(DebugHudMetricsComponent));
+            }
+
+            if (!HasSingleton<StressSwitchStateComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(StressSwitchStateComponent));
+                em.SetComponentData(e, new StressSwitchStateComponent
+                {
+                    RequestExecute = 0,
+                    Mode = (byte)StressSwitchModeId.None,
+                    BurstCount = 100000,
+                    SustainFrames = 300,
+                    SustainPerFrame = 2000,
+                    PreferredBulletTypeKey = -1,
+                    RemainingFrames = 0,
+                });
+            }
         }
 
         private static bool HasSingleton<T>(EntityManager em) where T : unmanaged, IComponentData

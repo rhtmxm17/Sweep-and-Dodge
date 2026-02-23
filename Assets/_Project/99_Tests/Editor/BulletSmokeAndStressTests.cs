@@ -79,6 +79,62 @@ namespace SweepNDodge.DotsBullets.Tests
             ForceDisposeSharedContainersIfNeeded();
         }
 
+        [Test]
+        public void StressSwitch_BurstOnce_InjectsRequests_AndUpdatesHudMetrics()
+        {
+            using var world = new World("BulletStressSwitchWorld");
+            var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
+            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
+            var simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
+            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+
+            var em = world.EntityManager;
+
+            var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 10f);
+            CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 1000, lifetime: 10f);
+            CreatePlayer(em);
+            CreateConfigSingletons(em, budgetPerFrame: 100, maxPendingCount: 10000, maxPendingAgeFrames: 120);
+            CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+            var hudEntity = em.CreateEntity(typeof(DebugHudMetricsComponent));
+            em.SetComponentData(hudEntity, default(DebugHudMetricsComponent));
+
+            var stressEntity = em.CreateEntity(typeof(StressSwitchStateComponent));
+            em.SetComponentData(stressEntity, new StressSwitchStateComponent
+            {
+                RequestExecute = 1,
+                Mode = (byte)StressSwitchModeId.BurstOnce,
+                BurstCount = 300,
+                SustainFrames = 0,
+                SustainPerFrame = 0,
+                PreferredBulletTypeKey = -1,
+                RemainingFrames = 0
+            });
+
+            // Frame #1: Request 단계에서 burst가 요청 버퍼로 들어간다.
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            simGroup.Update();
+            var metricsAfterFrame1 = em.CreateEntityQuery(ComponentType.ReadOnly<SpawnBacklogMetricsComponent>()).GetSingleton<SpawnBacklogMetricsComponent>();
+            Assert.That(metricsAfterFrame1.PendingCount, Is.GreaterThan(0), "Burst command must enqueue pending requests in Request group");
+
+            // Frame #2: ExecutionBegin에서 budget만큼 실제 스폰된다.
+            world.SetTime(new TimeData(2d / 60d, 1f / 60f));
+            simGroup.Update();
+
+            var metricsAfterFrame2 = em.CreateEntityQuery(ComponentType.ReadOnly<SpawnBacklogMetricsComponent>()).GetSingleton<SpawnBacklogMetricsComponent>();
+            Assert.That(metricsAfterFrame2.LastFrameBudgetUsed, Is.GreaterThan(0), "Round-robin execution must consume requests with available budget");
+
+            var hud = em.CreateEntityQuery(ComponentType.ReadOnly<DebugHudMetricsComponent>()).GetSingleton<DebugHudMetricsComponent>();
+            Assert.That(hud.SpawnedThisFrame, Is.GreaterThan(0), "HUD metrics must expose spawned throughput");
+            Assert.That(hud.ActiveBullets, Is.GreaterThan(0), "HUD metrics must expose active bullet count");
+
+            var stress = em.CreateEntityQuery(ComponentType.ReadOnly<StressSwitchStateComponent>()).GetSingleton<StressSwitchStateComponent>();
+            Assert.That(stress.RequestExecute, Is.EqualTo(0), "Stress request flag must be consumed");
+            Assert.That(stress.Mode, Is.EqualTo((byte)StressSwitchModeId.None), "Burst mode must complete in a single request cycle");
+
+            ForceDisposeSharedContainersIfNeeded();
+        }
+
         private static Entity CreateBulletPrefab(EntityManager em, int typeKey, float lifetime)
         {
             var prefab = em.CreateEntity();
@@ -110,7 +166,7 @@ namespace SweepNDodge.DotsBullets.Tests
             return prefab;
         }
 
-        private static void CreatePoolRegistry(EntityManager em, Entity prefab, int typeKey, int poolSize)
+        private static void CreatePoolRegistry(EntityManager em, Entity prefab, int typeKey, int poolSize, float lifetime = 0f)
         {
             var registry = em.CreateEntity(typeof(BulletPoolRegistryTag));
             var defs = em.AddBuffer<BulletPoolDefinitionBuffer>(registry);
@@ -121,7 +177,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 PoolSize = poolSize,
                 CaptureRule = BulletCaptureRuleId.StandardCollectible,
                 Speed = 0f,
-                Lifetime = 0f,
+                Lifetime = lifetime,
                 Radius = 0.2f,
                 ScoreValue = 1,
             });

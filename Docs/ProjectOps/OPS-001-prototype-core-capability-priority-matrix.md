@@ -33,8 +33,8 @@
   - `BLOCK`: 외부 의존/이슈로 진행 차단
 
 ## 3. 진행 현황 스냅샷
-- 전체(10): `DONE 4 | WIP 0 | TODO 6 | BLOCK 0` (완료율 40%)
-- `P0`(5): 4/5 완료 (80%)
+- 전체(10): `DONE 5 | WIP 0 | TODO 5 | BLOCK 0` (완료율 50%)
+- `P0`(5): 5/5 완료 (100%)
 - `P1`(4): 0/4 완료 (0%)
 - `P2`(1): 0/1 완료 (0%)
 
@@ -44,7 +44,7 @@
 | 1 | 프레임 파이프라인 고정 (`ExecutionBegin -> Simulation -> Request -> ExecutionEnd`) | P0 | 5 | 4% | DONE | 100% | 계약 테스트 유지보수 | 2026-02-20 |
 | 2 | Spawn/Despawn 요청-소비 구조 (Aggregated 요청 버퍼 + Owner 소비) | P0 | 5 | 8% | DONE | 100% | 스트레스 자동화 루틴에 운영 임계치 검증 추가 | 2026-02-20 |
 | 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | DONE | 100% | 계약 테스트 + 스트레스 지표 회귀 추적 유지 | 2026-02-20 |
-| 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | TODO | 0% | 착수 전 | 2026-02-20 |
+| 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | DONE | 100% | 운영 씬 적용 범위/표시 정책 확정 | 2026-02-23 |
 | 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | DONE | 100% | 전용 씬(작업 완료) + 운영 씬(정기) 2트랙 유지 | 2026-02-23 |
 | 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
@@ -92,6 +92,14 @@
 
 ## 10. 변경 메모
 ### 2026-02-23
+- `#4 디버그 HUD + 스트레스 스위치`를 `WIP`로 전환했다.
+  - ECS 단일 singleton 지표(`DebugHudMetricsComponent`)를 추가해 active/spawn/despawn(back-calc)/pending/frameTime을 프레임 단위로 수집한다.
+  - 스트레스 명령 singleton(`StressSwitchStateComponent`)과 Request 단계 소비 시스템을 추가해 `BurstOnce`/`Sustain`/`StopSustain`을 기존 요청-소비 파이프라인 안에서 실행한다.
+  - Mono 브리지(`BulletDebugHudBridge`)를 추가해 OnGUI에서 실시간 지표 표시와 스트레스 스위치 입력을 제공한다.
+  - EditMode 테스트(`StressSwitch_BurstOnce_InjectsRequests_AndUpdatesHudMetrics`)를 추가해 burst 요청 주입/소비와 HUD 수집값 반영을 검증했다.
+- `#4 디버그 HUD + 스트레스 스위치`를 `DONE`으로 전환했다.
+  - 전용 PlayMode 테스트 씬(`PlayModeSmoke_Dedicated`)에 `BulletDebugHudBridge`를 배치했다.
+  - PlayMode 스모크 테스트(`PlayMode_DedicatedScene_StressSwitch_BurstRequest_ImpactsBacklogAndHud`)를 추가해 스트레스 burst가 backlog/HUD에 반영되는 경로를 자동 검증했다.
 - `#5 스모크 테스트 루틴` 운영 합의를 갱신했다.
   - `작업 완료마다 전용 PlayMode 테스트 씬 스모크 강제` + `정기 운영 씬 스모크` 2트랙으로 운영한다.
   - PlayMode 1차 판정은 기동/루프 정상성으로 고정하고, 성능 임계치는 추적 항목으로 분리한다.
