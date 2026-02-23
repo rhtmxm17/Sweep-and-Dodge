@@ -33,9 +33,9 @@
   - `BLOCK`: 외부 의존/이슈로 진행 차단
 
 ## 3. 진행 현황 스냅샷
-- 전체(10): `DONE 5 | WIP 0 | TODO 5 | BLOCK 0` (완료율 50%)
+- 전체(10): `DONE 5 | WIP 1 | TODO 4 | BLOCK 0` (완료율 50%)
 - `P0`(5): 5/5 완료 (100%)
-- `P1`(4): 0/4 완료 (0%)
+- `P1`(4): 0/4 완료 (0%) + `WIP 1`
 - `P2`(1): 0/1 완료 (0%)
 
 ## 4. 우선순위 표
@@ -46,7 +46,7 @@
 | 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | DONE | 100% | 계약 테스트 + 스트레스 지표 회귀 추적 유지 | 2026-02-20 |
 | 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | DONE | 100% | 운영 씬 적용 범위/표시 정책 확정 | 2026-02-23 |
 | 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | DONE | 100% | 전용 씬(작업 완료) + 운영 씬(정기) 2트랙 유지 | 2026-02-23 |
-| 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
+| 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | WIP | 60% | 게이트 운영 안정화 + 규칙 확장(누락 버퍼/참조 무결성) | 2026-02-23 |
 | 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 8 | 런 타임라인 디렉터 (15~20분 페이싱) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 9 | 공통 전투 이벤트 채널 (피격/회피/수집/정리 집계) | P1 | 4 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
@@ -75,7 +75,7 @@
 3. 풀링 + Fence 표준화: Bullet Pool/FreeList, CellMap 접근을 Fence(JobHandle) 규약으로 묶어 race condition을 예방한다.
 4. 디버그 HUD + 스트레스 스위치: 엔티티 수/스폰/디스폰량/프레임타임을 실시간 표시하고 극단 부하 테스트를 즉시 실행 가능하게 만든다.
 5. 스모크 테스트 루틴: Play Mode 진입, 핵심 루프 1회, 대량 스폰/제거 1회를 자동 검사해 변경-검증 반복 비용을 낮춘다.
-6. 콘텐츠 검증기: 잘못된 프리팹, 누락 버퍼, 잘못된 파라미터를 실행 전 검사해 런타임 오류를 사전에 차단한다.
+6. 콘텐츠 검증기: 전용 규칙 파일(`ContentValidationRules.cs`)로 검사하며, `Duplicate DefinitionId`는 Error, 자동 보정 항목은 Warning으로 분리해 실행 전 오류를 차단한다.
 7. 데이터 주도 패턴 정의: 탄막 패턴/웨이브/보상량을 코드에서 분리해 밸런싱 및 반복 실험 속도를 높인다.
 8. 런 타임라인 디렉터: 15~20분 플레이 구간의 난이도 곡선(구간, 피크, 휴식)을 시간축으로 일관되게 관리한다.
 9. 공통 전투 이벤트 채널: 피격/회피/수집/정리 이벤트를 단일 집계 경로로 통합해 연출, 점수, 통계가 같은 소스를 보게 한다.
@@ -92,6 +92,15 @@
 
 ## 10. 변경 메모
 ### 2026-02-23
+- `#6 콘텐츠 검증기`를 `WIP`로 전환했다.
+  - 고정 규칙 파일(`ContentValidationRules.cs`)을 추가하고, 규칙 변경은 코드 리뷰 경로로만 반영하도록 시작점을 고정했다.
+  - 정책 확정:
+    - `Duplicate DefinitionId`는 즉시 `Error`로 승격한다.
+    - 베이크/런타임 자동 보정 대상 값은 동작을 유지하되 `Warning`으로 보고한다.
+  - 실행 루트(`ContentValidationRunner`)를 추가해 `Tools/Project/Validate Content`에서 수동 검증을 수행할 수 있게 했다.
+  - EditMode 테스트(`ContentValidationRulesTests`)를 추가해 위 정책(Error/Warning 분리)을 계약으로 고정했다.
+  - 검증 범위를 `Assets/_Project`로 제한해 운영 대상 콘텐츠만 검사하도록 고정했다.
+  - EditMode 게이트(`ContentValidationGateTests`)를 추가해 콘텐츠 검증 `Error` 0건을 CI/로컬 루틴에서 강제한다.
 - `#4 디버그 HUD + 스트레스 스위치`를 `WIP`로 전환했다.
   - ECS 단일 singleton 지표(`DebugHudMetricsComponent`)를 추가해 active/spawn/despawn(back-calc)/pending/frameTime을 프레임 단위로 수집한다.
   - 스트레스 명령 singleton(`StressSwitchStateComponent`)과 Request 단계 소비 시스템을 추가해 `BurstOnce`/`Sustain`/`StopSustain`을 기존 요청-소비 파이프라인 안에서 실행한다.
