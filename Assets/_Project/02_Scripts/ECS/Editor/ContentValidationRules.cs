@@ -41,7 +41,6 @@ namespace SweepNDodge.DotsBullets.Editor
     public readonly struct ContentValidationInput
     {
         public readonly IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> Definitions;
-        public readonly IReadOnlyList<ContentValidationRecord<BulletSourceProfileSO>> SourceProfiles;
         public readonly IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> WaveTimelines;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> SourceAuthorings;
@@ -49,14 +48,12 @@ namespace SweepNDodge.DotsBullets.Editor
 
         public ContentValidationInput(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
-            IReadOnlyList<ContentValidationRecord<BulletSourceProfileSO>> sourceProfiles,
             IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> waveTimelines,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
         {
             Definitions = definitions ?? Array.Empty<ContentValidationRecord<BulletDefinitionSO>>();
-            SourceProfiles = sourceProfiles ?? Array.Empty<ContentValidationRecord<BulletSourceProfileSO>>();
             WaveTimelines = waveTimelines ?? Array.Empty<ContentValidationRecord<WaveTimelineSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<BulletSourceAuthoring>>();
@@ -73,7 +70,6 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateDefinitionUniqueness(input.Definitions, issues);
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
-            ValidateSourceProfileReferences(input.Definitions, input.SourceProfiles, issues);
             ValidateWaveTimelineContracts(input.Definitions, input.WaveTimelines, issues);
             ValidateSourceAuthoringContracts(input.SourceAuthorings, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
@@ -164,75 +160,6 @@ namespace SweepNDodge.DotsBullets.Editor
                             "CV003",
                             authorings[i].Location,
                             $"BulletVisualPrefabAuthoring contains duplicate DefinitionId {def.DefinitionId}."));
-                    }
-                }
-            }
-        }
-
-        private static void ValidateSourceProfileReferences(
-            IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
-            IReadOnlyList<ContentValidationRecord<BulletSourceProfileSO>> profiles,
-            List<ContentValidationIssue> issues)
-        {
-            var knownKeys = new HashSet<int>();
-            for (int i = 0; i < definitions.Count; i++)
-            {
-                var def = definitions[i].Value;
-                if (def != null && def.DefinitionId != 0)
-                    knownKeys.Add(def.DefinitionId);
-            }
-
-            for (int i = 0; i < profiles.Count; i++)
-            {
-                var profile = profiles[i].Value;
-                if (profile == null || profile.States == null)
-                    continue;
-
-                for (int s = 0; s < profile.States.Length; s++)
-                {
-                    var entries = profile.States[s].Entries;
-                    if (entries == null)
-                        continue;
-
-                    for (int e = 0; e < entries.Length; e++)
-                    {
-                        var entry = entries[e];
-                        if (entry.SpawnDensityPerSecPerArea < 0f)
-                        {
-                            issues.Add(new ContentValidationIssue(
-                                ContentValidationSeverity.Error,
-                                "CV008",
-                                profiles[i].Location,
-                                $"Source profile has negative SpawnDensityPerSecPerArea at stateIndex={s}, entryIndex={e}."));
-                        }
-
-                        if (entry.SpawnMode == SourceSpawnModeId.CapAndMaxDensity && entry.MaxActiveDensityPerArea < 0f)
-                        {
-                            issues.Add(new ContentValidationIssue(
-                                ContentValidationSeverity.Error,
-                                "CV009",
-                                profiles[i].Location,
-                                $"Source profile has negative MaxActiveDensityPerArea for CapAndMaxDensity at stateIndex={s}, entryIndex={e}."));
-                        }
-
-                        if (entry.Bullet == null)
-                        {
-                            issues.Add(new ContentValidationIssue(
-                                ContentValidationSeverity.Error,
-                                "CV004",
-                                profiles[i].Location,
-                                $"Source profile contains null bullet reference at stateIndex={s}, entryIndex={e}."));
-                            continue;
-                        }
-
-                        if (!knownKeys.Contains(entry.Bullet.DefinitionId))
-                        {
-                            issues.Add(new ContentValidationIssue(
-                                ContentValidationSeverity.Error,
-                                "CV005",
-                                profiles[i].Location,
-                                $"Source profile references unknown DefinitionId {entry.Bullet.DefinitionId} at stateIndex={s}, entryIndex={e}."));
-                        }
                     }
                 }
             }
@@ -402,7 +329,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 WarnIf(authoring.PollutionRegenPerSec < 0f, "CVW029", location, "PollutionRegenPerSec < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.PollutionDropPerCollect < 0f, "CVW030", location, "PollutionDropPerCollect < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.PollutionTopKSampleCount < 1, "CVW031", location, "PollutionTopKSampleCount < 1 will be clamped to 1.", issues);
-                WarnIf(authoring.WaveTimeline == null && authoring.LegacySpawnProfile != null, "CVW032", location, "Using LegacySpawnProfile fallback. Migrate to WaveTimelineSO.", issues);
             }
         }
 
@@ -424,13 +350,13 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (source == null)
                     continue;
 
-                if (source.WaveTimeline == null && source.LegacySpawnProfile == null)
+                if (source.WaveTimeline == null)
                 {
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Error,
                         "CV006",
                         sourceAuthorings[i].Location,
-                        "BulletSourceAuthoring.WaveTimeline is null (and no legacy profile assigned)."));
+                        "BulletSourceAuthoring.WaveTimeline is null."));
                 }
             }
         }

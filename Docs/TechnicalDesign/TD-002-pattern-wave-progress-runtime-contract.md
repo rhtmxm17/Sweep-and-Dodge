@@ -139,8 +139,11 @@ Hit:
 - `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
 
 검증 코드 매핑(현재 구현):
-- `CV008`: `SpawnDensityPerSecPerArea < 0`
-- `CV009`: `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0`
+- `CV012`: Wave segment의 `Entries` 비어 있음
+- `CV013`: Wave entry의 `Bullet == null`
+- `CV014`: Wave entry가 미등록 `DefinitionId` 참조
+- `CV015`: Wave entry의 `SpawnDensityPerSecPerArea < 0`
+- `CV016`: `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0`
 - `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
 - `CV011`: Wave segment 중첩
 

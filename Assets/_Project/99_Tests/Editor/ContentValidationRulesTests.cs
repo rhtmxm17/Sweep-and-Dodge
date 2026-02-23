@@ -31,7 +31,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     null,
                     null,
                     null,
-                    null,
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
@@ -52,9 +51,9 @@ namespace SweepNDodge.DotsBullets.Tests
         public void AutoCorrectionInputs_AreReportedAsWarningsOnly()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var profile = ScriptableObject.CreateInstance<BulletSourceProfileSO>();
             var sourceRoot = new GameObject("source_root");
             var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
+            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
 
             try
             {
@@ -65,9 +64,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Lifetime = -3f;
                 def.Radius = -0.5f;
                 def.ScoreValue = -7;
-                profile.States = System.Array.Empty<BulletSourceProfileSO.StateConfig>();
-                sourceAuthoring.LegacySpawnProfile = profile;
 
+                sourceAuthoring.WaveTimeline = timeline;
                 sourceAuthoring.ThresholdWeakened = -1;
                 sourceAuthoring.ThresholdDepleted = -2;
                 sourceAuthoring.InitialCollectedCount = -3;
@@ -85,7 +83,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    null,
                     null,
                     null,
                     new List<ContentValidationRecord<BulletSourceAuthoring>>
@@ -106,13 +103,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 if (def.Prefab != null)
                     Object.DestroyImmediate(def.Prefab);
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(timeline);
                 Object.DestroyImmediate(sourceRoot);
             }
         }
 
         [Test]
-        public void SourceAuthoring_WithNullWaveTimelineAndLegacyProfile_IsError()
+        public void SourceAuthoring_WithNullWaveTimeline_IsError()
         {
             var sourceRoot = new GameObject("source_root");
             var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
@@ -120,9 +117,7 @@ namespace SweepNDodge.DotsBullets.Tests
             try
             {
                 sourceAuthoring.WaveTimeline = null;
-                sourceAuthoring.LegacySpawnProfile = null;
                 var input = new ContentValidationInput(
-                    null,
                     null,
                     null,
                     null,
@@ -133,9 +128,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                var spawnProfileErrors = issues.Where(i => i.Code == "CV006").ToArray();
-                Assert.That(spawnProfileErrors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(spawnProfileErrors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+                var errors = issues.Where(i => i.Code == "CV006").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
@@ -152,7 +147,6 @@ namespace SweepNDodge.DotsBullets.Tests
             try
             {
                 var input = new ContentValidationInput(
-                    null,
                     null,
                     null,
                     null,
@@ -174,10 +168,10 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SourceProfile_WithNegativeSpawnDensity_IsError()
+        public void WaveTimeline_WithNegativeSpawnDensity_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var profile = ScriptableObject.CreateInstance<BulletSourceProfileSO>();
+            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
             var prefab = new GameObject("bullet_prefab");
 
             try
@@ -185,14 +179,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Editor_SetDefinitionId(3001);
                 def.Prefab = prefab;
 
-                profile.States = new[]
+                timeline.Segments = new[]
                 {
-                    new BulletSourceProfileSO.StateConfig
+                    new WaveTimelineSO.WaveSegment
                     {
-                        State = SourceStateId.Normal,
+                        WaveId = 10,
+                        TargetState = SourceStateId.Normal,
+                        Phase = SourceWavePhaseId.Sustain,
+                        StartSec = 0f,
+                        EndSec = 1f,
                         Entries = new[]
                         {
-                            new BulletSourceProfileSO.SpawnEntry
+                            new WaveTimelineSO.SpawnEntry
                             {
                                 Bullet = def,
                                 SpawnMode = SourceSpawnModeId.FixedDensity,
@@ -208,33 +206,32 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    new List<ContentValidationRecord<BulletSourceProfileSO>>
+                    new List<ContentValidationRecord<WaveTimelineSO>>
                     {
-                        new ContentValidationRecord<BulletSourceProfileSO>(profile, "profile"),
+                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
                     },
-                    null,
                     null,
                     null,
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                var errors = issues.Where(i => i.Code == "CV008").ToArray();
+                var errors = issues.Where(i => i.Code == "CV015").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
                 Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(timeline);
                 Object.DestroyImmediate(prefab);
             }
         }
 
         [Test]
-        public void SourceProfile_CapModeWithNegativeMaxActiveDensity_IsError()
+        public void WaveTimeline_CapModeWithNegativeMaxActiveDensity_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var profile = ScriptableObject.CreateInstance<BulletSourceProfileSO>();
+            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
             var prefab = new GameObject("bullet_prefab");
 
             try
@@ -242,14 +239,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Editor_SetDefinitionId(3002);
                 def.Prefab = prefab;
 
-                profile.States = new[]
+                timeline.Segments = new[]
                 {
-                    new BulletSourceProfileSO.StateConfig
+                    new WaveTimelineSO.WaveSegment
                     {
-                        State = SourceStateId.Normal,
+                        WaveId = 20,
+                        TargetState = SourceStateId.Normal,
+                        Phase = SourceWavePhaseId.Sustain,
+                        StartSec = 0f,
+                        EndSec = 1f,
                         Entries = new[]
                         {
-                            new BulletSourceProfileSO.SpawnEntry
+                            new WaveTimelineSO.SpawnEntry
                             {
                                 Bullet = def,
                                 SpawnMode = SourceSpawnModeId.CapAndMaxDensity,
@@ -265,24 +266,23 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    new List<ContentValidationRecord<BulletSourceProfileSO>>
+                    new List<ContentValidationRecord<WaveTimelineSO>>
                     {
-                        new ContentValidationRecord<BulletSourceProfileSO>(profile, "profile"),
+                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
                     },
-                    null,
                     null,
                     null,
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                var errors = issues.Where(i => i.Code == "CV009").ToArray();
+                var errors = issues.Where(i => i.Code == "CV016").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
                 Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(timeline);
                 Object.DestroyImmediate(prefab);
             }
         }
@@ -304,6 +304,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveTimelineSO.WaveSegment
                     {
                         WaveId = 1,
+                        TargetState = SourceStateId.Normal,
+                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 0f,
                         EndSec = 5f,
                         Entries = new[]
@@ -320,6 +322,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveTimelineSO.WaveSegment
                     {
                         WaveId = 2,
+                        TargetState = SourceStateId.Weakened,
+                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 4f,
                         EndSec = 8f,
                         Entries = new[]
@@ -340,7 +344,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    null,
                     new List<ContentValidationRecord<WaveTimelineSO>>
                     {
                         new ContentValidationRecord<WaveTimelineSO>(timeline, "wave_timeline"),
@@ -379,6 +382,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveTimelineSO.WaveSegment
                     {
                         WaveId = 1,
+                        TargetState = SourceStateId.Normal,
+                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 0f,
                         EndSec = 5f,
                         Entries = new[]
@@ -395,6 +400,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveTimelineSO.WaveSegment
                     {
                         WaveId = 2,
+                        TargetState = SourceStateId.Weakened,
+                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 5f,
                         EndSec = 9f,
                         Entries = new[]
@@ -415,7 +422,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    null,
                     new List<ContentValidationRecord<WaveTimelineSO>>
                     {
                         new ContentValidationRecord<WaveTimelineSO>(timeline, "wave_timeline"),

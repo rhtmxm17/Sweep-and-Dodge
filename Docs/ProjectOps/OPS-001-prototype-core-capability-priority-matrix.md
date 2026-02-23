@@ -102,7 +102,7 @@
     - `Duplicate DefinitionId`는 즉시 `Error`로 승격한다.
     - 베이크/런타임 자동 보정 대상 값은 동작을 유지하되 `Warning`으로 보고한다.
     - 무렌더 Bullet(`BulletAuthoring`에 `MeshRenderer/SkinnedMeshRenderer` 없음)는 `Error`로 차단한다.
-    - `BulletSourceAuthoring.SpawnProfile == null`은 `Error`로 차단한다.
+    - `BulletSourceAuthoring.WaveTimeline == null`은 `Error`로 차단한다.
     - `Warning` 출력은 상한을 두고(기본 100건), 초과분은 집계로만 보고한다.
   - 실행 루트(`ContentValidationRunner`)를 추가해 `Tools/Project/Validate Content`에서 수동 검증을 수행할 수 있게 했다.
   - EditMode 테스트(`ContentValidationRulesTests`)를 추가해 위 정책(Error/Warning 분리)을 계약으로 고정했다.
