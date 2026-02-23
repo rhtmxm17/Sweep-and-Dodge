@@ -42,6 +42,7 @@ namespace SweepNDodge.DotsBullets.Editor
     {
         public readonly IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> Definitions;
         public readonly IReadOnlyList<ContentValidationRecord<BulletSourceProfileSO>> SourceProfiles;
+        public readonly IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> WaveTimelines;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> SourceAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletAuthoring>> BulletAuthorings;
@@ -49,12 +50,14 @@ namespace SweepNDodge.DotsBullets.Editor
         public ContentValidationInput(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             IReadOnlyList<ContentValidationRecord<BulletSourceProfileSO>> sourceProfiles,
+            IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> waveTimelines,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
         {
             Definitions = definitions ?? Array.Empty<ContentValidationRecord<BulletDefinitionSO>>();
             SourceProfiles = sourceProfiles ?? Array.Empty<ContentValidationRecord<BulletSourceProfileSO>>();
+            WaveTimelines = waveTimelines ?? Array.Empty<ContentValidationRecord<WaveTimelineSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<BulletSourceAuthoring>>();
             BulletAuthorings = bulletAuthorings ?? Array.Empty<ContentValidationRecord<BulletAuthoring>>();
@@ -71,6 +74,7 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateSourceProfileReferences(input.Definitions, input.SourceProfiles, issues);
+            ValidateWaveTimelineContracts(input.Definitions, input.WaveTimelines, issues);
             ValidateSourceAuthoringContracts(input.SourceAuthorings, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
             ValidateAutoCorrectionWarnings(input.Definitions, input.VisualAuthorings, input.SourceAuthorings, issues);
@@ -193,6 +197,24 @@ namespace SweepNDodge.DotsBullets.Editor
                     for (int e = 0; e < entries.Length; e++)
                     {
                         var entry = entries[e];
+                        if (entry.SpawnDensityPerSecPerArea < 0f)
+                        {
+                            issues.Add(new ContentValidationIssue(
+                                ContentValidationSeverity.Error,
+                                "CV008",
+                                profiles[i].Location,
+                                $"Source profile has negative SpawnDensityPerSecPerArea at stateIndex={s}, entryIndex={e}."));
+                        }
+
+                        if (entry.SpawnMode == SourceSpawnModeId.CapAndMaxDensity && entry.MaxActiveDensityPerArea < 0f)
+                        {
+                            issues.Add(new ContentValidationIssue(
+                                ContentValidationSeverity.Error,
+                                "CV009",
+                                profiles[i].Location,
+                                $"Source profile has negative MaxActiveDensityPerArea for CapAndMaxDensity at stateIndex={s}, entryIndex={e}."));
+                        }
+
                         if (entry.Bullet == null)
                         {
                             issues.Add(new ContentValidationIssue(
@@ -212,6 +234,112 @@ namespace SweepNDodge.DotsBullets.Editor
                                 $"Source profile references unknown DefinitionId {entry.Bullet.DefinitionId} at stateIndex={s}, entryIndex={e}."));
                         }
                     }
+                }
+            }
+        }
+
+        private static void ValidateWaveTimelineContracts(
+            IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
+            IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> timelines,
+            List<ContentValidationIssue> issues)
+        {
+            var knownKeys = new HashSet<int>();
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                var def = definitions[i].Value;
+                if (def != null && def.DefinitionId != 0)
+                    knownKeys.Add(def.DefinitionId);
+            }
+
+            for (int i = 0; i < timelines.Count; i++)
+            {
+                var timeline = timelines[i].Value;
+                if (timeline == null || timeline.Segments == null || timeline.Segments.Length <= 0)
+                    continue;
+
+                var validSegments = new List<(int Index, float Start, float End)>(timeline.Segments.Length);
+                for (int s = 0; s < timeline.Segments.Length; s++)
+                {
+                    var seg = timeline.Segments[s];
+                    if (seg.EndSec <= seg.StartSec)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV010",
+                            timelines[i].Location,
+                            $"Wave segment has invalid range at segmentIndex={s}. StartSec={seg.StartSec}, EndSec={seg.EndSec}."));
+                        continue;
+                    }
+
+                    var entries = seg.Entries;
+                    if (entries == null || entries.Length <= 0)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV012",
+                            timelines[i].Location,
+                            $"Wave segment has no entries at segmentIndex={s}."));
+                    }
+                    else
+                    {
+                        for (int e = 0; e < entries.Length; e++)
+                        {
+                            var entry = entries[e];
+                            if (entry.Bullet == null)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV013",
+                                    timelines[i].Location,
+                                    $"Wave segment has null bullet entry at segmentIndex={s}, entryIndex={e}."));
+                                continue;
+                            }
+
+                            if (!knownKeys.Contains(entry.Bullet.DefinitionId))
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV014",
+                                    timelines[i].Location,
+                                    $"Wave segment references unknown DefinitionId {entry.Bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if (entry.SpawnDensityPerSecPerArea < 0f)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV015",
+                                    timelines[i].Location,
+                                    $"Wave segment has negative SpawnDensityPerSecPerArea at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if (entry.SpawnMode == SourceSpawnModeId.CapAndMaxDensity && entry.MaxActiveDensityPerArea < 0f)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV016",
+                                    timelines[i].Location,
+                                    $"Wave segment has negative MaxActiveDensityPerArea for CapAndMaxDensity at segmentIndex={s}, entryIndex={e}."));
+                            }
+                        }
+                    }
+
+                    validSegments.Add((s, seg.StartSec, seg.EndSec));
+                }
+
+                validSegments.Sort((a, b) => a.Start.CompareTo(b.Start));
+                for (int s = 1; s < validSegments.Count; s++)
+                {
+                    var prev = validSegments[s - 1];
+                    var curr = validSegments[s];
+                    if (curr.Start >= prev.End)
+                        continue;
+
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV011",
+                        timelines[i].Location,
+                        $"Wave segments overlap: prev(segmentIndex={prev.Index}, [{prev.Start}, {prev.End})) and curr(segmentIndex={curr.Index}, [{curr.Start}, {curr.End}))."));
                 }
             }
         }

@@ -154,10 +154,17 @@ MonoBehaviour:
   FieldRadius: 8
   FieldSize: {x: 12, y: 8}
   SpawnProfile: {fileID: 11400000, guid: fa05f82677d89c14980e520052dc1fa5, type: 2}
+  WeakenedOpeningWave: {fileID: 11400000, guid: 337f7e4d624828549ad80847cbfec67d, type: 2}
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
   InitialCollectedCount: 0
   InitialState: 0
+  PollutionCellSize: 2
+  PollutionMin: 0
+  PollutionMax: 1
+  PollutionRegenPerSec: 0.08
+  PollutionDropPerCollect: 0.12
+  PollutionTopKSampleCount: 6
   DrawGizmo: 1
   DrawGizmoWhenNotSelected: 0
 --- !u!23 &469743333
@@ -267,10 +274,17 @@ MonoBehaviour:
   FieldRadius: 8
   FieldSize: {x: 12, y: 8}
   SpawnProfile: {fileID: 11400000, guid: 300a24bac61c49246948bd5a933dfe08, type: 2}
+  WeakenedOpeningWave: {fileID: 0}
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
   InitialCollectedCount: 0
   InitialState: 0
+  PollutionCellSize: 2
+  PollutionMin: 0
+  PollutionMax: 1
+  PollutionRegenPerSec: 0.08
+  PollutionDropPerCollect: 0.12
+  PollutionTopKSampleCount: 6
   DrawGizmo: 1
   DrawGizmoWhenNotSelected: 0
 --- !u!23 &681103046
@@ -582,10 +596,17 @@ MonoBehaviour:
   FieldRadius: 8
   FieldSize: {x: 16, y: 12}
   SpawnProfile: {fileID: 11400000, guid: fa05f82677d89c14980e520052dc1fa5, type: 2}
+  WeakenedOpeningWave: {fileID: 0}
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
   InitialCollectedCount: 0
   InitialState: 0
+  PollutionCellSize: 2
+  PollutionMin: 0
+  PollutionMax: 1
+  PollutionRegenPerSec: 0.08
+  PollutionDropPerCollect: 0.12
+  PollutionTopKSampleCount: 6
   DrawGizmo: 1
   DrawGizmoWhenNotSelected: 0
 --- !u!23 &1996037981

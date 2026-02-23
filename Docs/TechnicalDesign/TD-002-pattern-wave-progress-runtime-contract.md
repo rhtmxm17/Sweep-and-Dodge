@@ -94,6 +94,13 @@ Hit:
         Source Remaining 증가 (기존 반환 규칙 유지)
 ```
 
+### 3.4 Wave 중첩 정책 (확정)
+- 대원칙: 두 개 이상의 Wave가 같은 시점에 동시에 지속되도록 구성하지 않는다.
+- 운영 규칙:
+  - Wave 시간축은 서로 겹치지 않게 authoring한다.
+  - 경계 프레임은 `종료 후 시작` 순서를 기본으로 본다.
+  - 겹침이 발견되면 데이터 오류로 간주하고 수정 대상에 포함한다.
+
 ## 4. 업데이트 순서/소유권
 - Request 단계:
 - Pattern/Wave 데이터를 사용해 `SourceSpawnRequestBuffer`를 누적 생성한다.
@@ -124,10 +131,18 @@ Hit:
 - `Pulse` 모드인데 `PulsePeriodSec <= 0`.
 - `PulseDuty01`이 0~1 범위를 벗어남.
 - `BulletTypeKey`가 풀 레지스트리/정의에 없음.
+- Wave segment의 `EndSec <= StartSec` (`CV010`).
+- Wave segment 간 시간 겹침 (`CV011`).
 - Warning:
 - `SpawnSampleBudget`가 권장 범위 초과.
 - `MaxActiveSoftCap`이 Stage 목표 대비 과도함.
 - `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
+
+검증 코드 매핑(현재 구현):
+- `CV008`: `SpawnDensityPerSecPerArea < 0`
+- `CV009`: `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0`
+- `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
+- `CV011`: Wave segment 중첩
 
 ### 6.2 테스트 루프
 - EditMode: 데이터 무결성/매핑 규칙 검증.
@@ -135,9 +150,9 @@ Hit:
 - 스트레스: backlog/expired/drop 지표 회귀 추적.
 
 ## 7. 오픈 이슈
-- Wave 중첩 시 우선순위/블렌드 정책의 최종 확정.
 - Stage별 PlayerRelative 허용 비중 상한.
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 8. 변경 이력
 - 2026-02-23: GD-007에서 구현 계약 항목(필드/수식/검증)을 분리해 `TD-002` 초안 작성
+- 2026-02-23: Wave 정책을 "동시 지속 금지"로 확정하고 중첩 우선순위 이슈를 해소

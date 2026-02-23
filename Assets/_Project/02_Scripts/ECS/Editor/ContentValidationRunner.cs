@@ -22,6 +22,7 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             var definitions = CollectScriptableObjects<BulletDefinitionSO>();
             var profiles = CollectScriptableObjects<BulletSourceProfileSO>();
+            var waveTimelines = CollectScriptableObjects<WaveTimelineSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<BulletSourceAuthoring>>();
             var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
@@ -29,7 +30,7 @@ namespace SweepNDodge.DotsBullets.Editor
             CollectAuthoringsFromPrefabs(visuals, sources, bullets);
             CollectAuthoringsFromScenes(visuals, sources, bullets);
 
-            var input = new ContentValidationInput(definitions, profiles, visuals, sources, bullets);
+            var input = new ContentValidationInput(definitions, profiles, waveTimelines, visuals, sources, bullets);
             return ContentValidationRules.Validate(input);
         }
 

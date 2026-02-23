@@ -100,6 +100,27 @@ namespace SweepNDodge.DotsBullets
         public int ActiveCount;
     }
 
+    [InternalBufferCapacity(16)]
+    public struct SourceOpeningWavePatternBuffer : IBufferElementData
+    {
+        public SourceStateId TriggerState;
+        public float StartSec;
+        public float EndSec;
+        public int BulletTypeKey;
+        public SourceSpawnModeId SpawnMode;
+        public float SpawnDensityPerSecPerArea;
+        public float MaxActiveDensityPerArea;
+        public float SpawnAccumulator;
+    }
+
+    public struct SourceOpeningWaveRuntimeComponent : IComponentData
+    {
+        public SourceStateId LastState;
+        public SourceStateId ActiveTriggerState;
+        public byte IsPlaying;
+        public float ElapsedSec;
+    }
+
     [InternalBufferCapacity(128)]
     public struct SourcePollutionCellBuffer : IBufferElementData
     {

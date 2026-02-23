@@ -11,6 +11,7 @@ namespace SweepNDodge.DotsBullets
         public float FieldRadius = 8f;
         public Vector2 FieldSize = new Vector2(12f, 8f);
         public BulletSourceProfileSO SpawnProfile;
+        public WaveTimelineSO WeakenedOpeningWave;
 
         [Header("Depletion Threshold (externally injectable)")]
         public int ThresholdWeakened = 2000;
@@ -92,6 +93,16 @@ namespace SweepNDodge.DotsBullets
                 BakeSpawnProfile(authoring.SpawnProfile, patternBuffer, activeCountBuffer);
                 spawnRequestBuffer.Clear();
 
+                var openingWaveBuffer = AddBuffer<SourceOpeningWavePatternBuffer>(e);
+                BakeOpeningWave(authoring.WeakenedOpeningWave, openingWaveBuffer, activeCountBuffer);
+                AddComponent(e, new SourceOpeningWaveRuntimeComponent
+                {
+                    LastState = authoring.InitialState,
+                    ActiveTriggerState = SourceStateId.Normal,
+                    IsPlaying = 0,
+                    ElapsedSec = 0f
+                });
+
                 var pollutionCells = AddBuffer<SourcePollutionCellBuffer>(e);
                 var pollutionDrops = AddBuffer<SourcePollutionDropRequestBuffer>(e);
                 var pollutionValidCellIndices = AddBuffer<SourcePollutionValidCellIndexBuffer>(e);
@@ -140,6 +151,55 @@ namespace SweepNDodge.DotsBullets
                         patternBuffer.Add(new SourceSpawnPatternBuffer
                         {
                             State = stateConfig.State,
+                            BulletTypeKey = typeKey,
+                            SpawnMode = entry.SpawnMode,
+                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.SpawnDensityPerSecPerArea),
+                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.MaxActiveDensityPerArea),
+                            SpawnAccumulator = 0f
+                        });
+
+                        if (activeCountKeys.Add(typeKey))
+                        {
+                            activeCountBuffer.Add(new SourceActiveBulletCountBuffer
+                            {
+                                BulletTypeKey = typeKey,
+                                ActiveCount = 0
+                            });
+                        }
+                    }
+                }
+            }
+
+            private void BakeOpeningWave(
+                WaveTimelineSO timeline,
+                DynamicBuffer<SourceOpeningWavePatternBuffer> openingWaveBuffer,
+                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer)
+            {
+                if (timeline == null || timeline.Segments == null)
+                    return;
+
+                var activeCountKeys = new System.Collections.Generic.HashSet<int>();
+                for (int i = 0; i < activeCountBuffer.Length; i++)
+                    activeCountKeys.Add(activeCountBuffer[i].BulletTypeKey);
+
+                for (int s = 0; s < timeline.Segments.Length; s++)
+                {
+                    var segment = timeline.Segments[s];
+                    if (segment.EndSec <= segment.StartSec || segment.Entries == null)
+                        continue;
+
+                    for (int e = 0; e < segment.Entries.Length; e++)
+                    {
+                        var entry = segment.Entries[e];
+                        if (entry.Bullet == null)
+                            continue;
+
+                        int typeKey = entry.Bullet.DefinitionId;
+                        openingWaveBuffer.Add(new SourceOpeningWavePatternBuffer
+                        {
+                            TriggerState = SourceStateId.Weakened,
+                            StartSec = Mathf.Max(0f, segment.StartSec),
+                            EndSec = Mathf.Max(segment.StartSec, segment.EndSec),
                             BulletTypeKey = typeKey,
                             SpawnMode = entry.SpawnMode,
                             SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.SpawnDensityPerSecPerArea),

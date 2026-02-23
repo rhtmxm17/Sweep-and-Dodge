@@ -33,6 +33,8 @@ namespace SweepNDodge.DotsBullets
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
             float deltaTime = SystemAPI.Time.DeltaTime;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
+            var openingWaveRuntimeLookup = SystemAPI.GetComponentLookup<SourceOpeningWaveRuntimeComponent>(true);
+            openingWaveRuntimeLookup.Update(ref state);
 
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
             var metrics = metricsRW.ValueRO;
@@ -50,13 +52,14 @@ namespace SweepNDodge.DotsBullets
             int remainingCapacity = math.max(0, policy.MaxPendingCount - pendingTotal);
             int droppedByCapacity = 0;
 
-            foreach (var (source, fieldArea, patterns, activeCounts, requests) in
+            foreach (var (source, fieldArea, patterns, activeCounts, requests, sourceEntity) in
                      SystemAPI.Query<
                          RefRO<SourceSpawnComponent>,
                          RefRO<BulletFieldAreaComponent>,
                          DynamicBuffer<SourceSpawnPatternBuffer>,
                          DynamicBuffer<SourceActiveBulletCountBuffer>,
-                         DynamicBuffer<SourceSpawnRequestBuffer>>())
+                         DynamicBuffer<SourceSpawnRequestBuffer>>()
+                         .WithEntityAccess())
             {
                 var patternsRW = patterns;
                 var requestsRW = requests;
@@ -66,11 +69,21 @@ namespace SweepNDodge.DotsBullets
                 if (patternsRW.Length <= 0)
                     continue;
 
+                bool suppressStateSustainedPattern = false;
+                if (openingWaveRuntimeLookup.HasComponent(sourceEntity))
+                {
+                    var openingRuntime = openingWaveRuntimeLookup[sourceEntity];
+                    suppressStateSustainedPattern = openingRuntime.IsPlaying != 0
+                        && openingRuntime.ActiveTriggerState == source.ValueRO.State;
+                }
+
                 float area = math.max(0f, fieldArea.ValueRO.ComputedArea);
                 for (int i = 0; i < patternsRW.Length; i++)
                 {
                     var pattern = patternsRW[i];
                     if (pattern.State != source.ValueRO.State)
+                        continue;
+                    if (suppressStateSustainedPattern)
                         continue;
 
                     int requested = ResolveSpawnCount(ref pattern, activeCounts, requestsRW, area, deltaTime);
