@@ -402,6 +402,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 WarnIf(authoring.PollutionRegenPerSec < 0f, "CVW029", location, "PollutionRegenPerSec < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.PollutionDropPerCollect < 0f, "CVW030", location, "PollutionDropPerCollect < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.PollutionTopKSampleCount < 1, "CVW031", location, "PollutionTopKSampleCount < 1 will be clamped to 1.", issues);
+                WarnIf(authoring.WaveTimeline == null && authoring.LegacySpawnProfile != null, "CVW032", location, "Using LegacySpawnProfile fallback. Migrate to WaveTimelineSO.", issues);
             }
         }
 
@@ -423,13 +424,13 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (source == null)
                     continue;
 
-                if (source.SpawnProfile == null)
+                if (source.WaveTimeline == null && source.LegacySpawnProfile == null)
                 {
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Error,
                         "CV006",
                         sourceAuthorings[i].Location,
-                        "BulletSourceAuthoring.SpawnProfile is null."));
+                        "BulletSourceAuthoring.WaveTimeline is null (and no legacy profile assigned)."));
                 }
             }
         }

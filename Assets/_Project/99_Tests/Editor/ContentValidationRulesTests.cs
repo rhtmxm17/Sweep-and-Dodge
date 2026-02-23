@@ -66,7 +66,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Radius = -0.5f;
                 def.ScoreValue = -7;
                 profile.States = System.Array.Empty<BulletSourceProfileSO.StateConfig>();
-                sourceAuthoring.SpawnProfile = profile;
+                sourceAuthoring.LegacySpawnProfile = profile;
 
                 sourceAuthoring.ThresholdWeakened = -1;
                 sourceAuthoring.ThresholdDepleted = -2;
@@ -112,14 +112,15 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SourceAuthoring_WithNullSpawnProfile_IsError()
+        public void SourceAuthoring_WithNullWaveTimelineAndLegacyProfile_IsError()
         {
             var sourceRoot = new GameObject("source_root");
             var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
 
             try
             {
-                sourceAuthoring.SpawnProfile = null;
+                sourceAuthoring.WaveTimeline = null;
+                sourceAuthoring.LegacySpawnProfile = null;
                 var input = new ContentValidationInput(
                     null,
                     null,

@@ -10,26 +10,26 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7fcc4d603a26e7c4bbbdc4f95228825e, type: 3}
-  m_Name: bwt_sample_stage01
+  m_Name: bwt_from_bsp_dust_only
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.WaveTimelineSO
   Segments:
-  - WaveId: 1001
-    TargetState: 1
-    Phase: 1
-    StartSec: 0
-    EndSec: 6
-    Entries:
-    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
-      SpawnMode: 0
-      SpawnDensityPerSecPerArea: 0.04
-      MaxActiveDensityPerArea: 0
-  - WaveId: 1002
-    TargetState: 1
+  - WaveId: 200
+    TargetState: 0
     Phase: 0
-    StartSec: 6
-    EndSec: 12
+    StartSec: 0
+    EndSec: 1
     Entries:
     - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
       SpawnMode: 0
-      SpawnDensityPerSecPerArea: 5
+      SpawnDensityPerSecPerArea: 10
+      MaxActiveDensityPerArea: 0
+  - WaveId: 210
+    TargetState: 1
+    Phase: 0
+    StartSec: 1
+    EndSec: 2
+    Entries:
+    - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      SpawnMode: 0
+      SpawnDensityPerSecPerArea: 4
       MaxActiveDensityPerArea: 0

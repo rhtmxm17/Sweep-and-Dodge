@@ -56,12 +56,12 @@ namespace SweepNDodge.DotsBullets
 
                 if (sourceState != runtime.LastState)
                 {
-                    if (sourceState == SourceStateId.Weakened && HasTriggerPattern(patternsRW, SourceStateId.Weakened))
+                    if (HasTriggerPattern(patternsRW, sourceState))
                     {
                         runtime.IsPlaying = 1;
-                        runtime.ActiveTriggerState = SourceStateId.Weakened;
+                        runtime.ActiveTriggerState = sourceState;
                         runtime.ElapsedSec = 0f;
-                        ResetAccumulators(ref patternsRW, SourceStateId.Weakened);
+                        ResetAccumulators(ref patternsRW, sourceState);
                     }
                     else if (runtime.IsPlaying != 0 && sourceState != runtime.ActiveTriggerState)
                     {
