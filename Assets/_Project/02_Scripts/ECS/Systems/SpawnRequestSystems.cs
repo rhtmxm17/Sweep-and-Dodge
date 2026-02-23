@@ -256,16 +256,19 @@ namespace SweepNDodge.DotsBullets
             var requestLookup = SystemAPI.GetBufferLookup<SourceSpawnRequestBuffer>(false);
             var activeCountLookup = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(false);
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(false);
+            var localToWorldLookup = SystemAPI.GetComponentLookup<LocalToWorld>(false);
             var velLookup = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
             var lifeLookup = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
             var speedLookup = SystemAPI.GetComponentLookup<BulletSpeedComponent>(true);
             var lifeMaxLookup = SystemAPI.GetComponentLookup<BulletLifetimeMaxComponent>(true);
             var typeKeyLookup = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
             var sourceRefLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(false);
+            var lifeCycleLookup = SystemAPI.GetComponentLookup<BulletLifecycleTraceComponent>(false);
             var activeLookup = SystemAPI.GetComponentLookup<BulletActiveTag>(false);
             var despawnRequestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
             var renderLookup = SystemAPI.GetComponentLookup<MaterialMeshInfo>(false);
             var renderPartsLookup = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
+            var parentLookup = SystemAPI.GetComponentLookup<Parent>(true);
             var sourceAnchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(true);
             var sourceAreaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
             var sourceRuntimeLookup = SystemAPI.GetComponentLookup<SourceSpawnRuntimeComponent>(false);
@@ -277,16 +280,19 @@ namespace SweepNDodge.DotsBullets
             requestLookup.Update(ref state);
             activeCountLookup.Update(ref state);
             txLookup.Update(ref state);
+            localToWorldLookup.Update(ref state);
             velLookup.Update(ref state);
             lifeLookup.Update(ref state);
             speedLookup.Update(ref state);
             lifeMaxLookup.Update(ref state);
             typeKeyLookup.Update(ref state);
             sourceRefLookup.Update(ref state);
+            lifeCycleLookup.Update(ref state);
             activeLookup.Update(ref state);
             despawnRequestLookup.Update(ref state);
             renderLookup.Update(ref state);
             renderPartsLookup.Update(ref state);
+            parentLookup.Update(ref state);
             sourceAnchorLookup.Update(ref state);
             sourceAreaLookup.Update(ref state);
             sourceRuntimeLookup.Update(ref state);
@@ -365,17 +371,21 @@ namespace SweepNDodge.DotsBullets
                         ref pollutionCellsLookup,
                         ref pollutionValidCellIndicesLookup,
                         ref txLookup,
+                        ref localToWorldLookup,
                         ref velLookup,
                         ref lifeLookup,
                         ref speedLookup,
                         ref lifeMaxLookup,
                         ref typeKeyLookup,
                         ref sourceRefLookup,
+                        ref lifeCycleLookup,
                         ref activeLookup,
                         ref despawnRequestLookup,
                         ref renderPartsLookup,
                         ref renderLookup,
-                        ref activeCountLookup);
+                        ref parentLookup,
+                        ref activeCountLookup,
+                        frame);
 
                     if (spawned)
                     {
@@ -510,17 +520,21 @@ namespace SweepNDodge.DotsBullets
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
             ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup,
             ref ComponentLookup<LocalTransform> txLookup,
+            ref ComponentLookup<LocalToWorld> localToWorldLookup,
             ref ComponentLookup<BulletVelocityComponent> velLookup,
             ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
             ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
+            ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
             ref ComponentLookup<BulletActiveTag> activeLookup,
             ref ComponentLookup<BulletDespawnRequestTag> despawnRequestLookup,
             ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
             ref ComponentLookup<MaterialMeshInfo> renderLookup,
-            ref BufferLookup<SourceActiveBulletCountBuffer> activeCountLookup)
+            ref ComponentLookup<Parent> parentLookup,
+            ref BufferLookup<SourceActiveBulletCountBuffer> activeCountLookup,
+            uint frame)
         {
             if (!TryDequeueByKey(ref BulletFieldShared.FreeByKey, requestedTypeKey, out var bulletEntity))
                 return false;
@@ -555,6 +569,11 @@ namespace SweepNDodge.DotsBullets
 
             if (txLookup.HasComponent(bulletEntity))
                 txLookup[bulletEntity] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
+
+            var rootWorldMatrix = float4x4.TRS(pos, rot, new float3(1f, 1f, 1f));
+            if (localToWorldLookup.HasComponent(bulletEntity))
+                localToWorldLookup[bulletEntity] = new LocalToWorld { Value = rootWorldMatrix };
+
             if (velLookup.HasComponent(bulletEntity))
                 velLookup[bulletEntity] = new BulletVelocityComponent { Value = dir * bulletSpeed };
             if (lifeLookup.HasComponent(bulletEntity))
@@ -563,6 +582,12 @@ namespace SweepNDodge.DotsBullets
                 typeKeyLookup[bulletEntity] = new BulletTypeKeyComponent { Value = requestedTypeKey };
             if (sourceRefLookup.HasComponent(bulletEntity))
                 sourceRefLookup[bulletEntity] = new BulletSourceRefComponent { Value = sourceEntity };
+            if (lifeCycleLookup.HasComponent(bulletEntity))
+            {
+                var trace = lifeCycleLookup[bulletEntity];
+                trace.LastSpawnFrame = frame;
+                lifeCycleLookup[bulletEntity] = trace;
+            }
 
             if (despawnRequestLookup.HasComponent(bulletEntity))
                 despawnRequestLookup.SetComponentEnabled(bulletEntity, false);
@@ -572,12 +597,28 @@ namespace SweepNDodge.DotsBullets
             if (renderPartsLookup.HasBuffer(bulletEntity))
             {
                 var parts = renderPartsLookup[bulletEntity];
+                bool toggled = false;
                 for (int i = 0; i < parts.Length; i++)
                 {
                     var partEntity = parts[i].Value;
+                    if (localToWorldLookup.HasComponent(partEntity))
+                    {
+                        float4x4 partWorldMatrix = rootWorldMatrix;
+                        if (parentLookup.HasComponent(partEntity) && txLookup.HasComponent(partEntity))
+                            partWorldMatrix = math.mul(rootWorldMatrix, txLookup[partEntity].ToMatrix());
+                        localToWorldLookup[partEntity] = new LocalToWorld { Value = partWorldMatrix };
+                    }
+
                     if (renderLookup.HasComponent(partEntity))
+                    {
                         renderLookup.SetComponentEnabled(partEntity, true);
+                        toggled = true;
+                    }
                 }
+
+                // Guard: render-parts buffer exists but no valid render entity in it.
+                if (!toggled && renderLookup.HasComponent(bulletEntity))
+                    renderLookup.SetComponentEnabled(bulletEntity, true);
             }
             else if (renderLookup.HasComponent(bulletEntity))
             {

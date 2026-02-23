@@ -1,6 +1,9 @@
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Rendering;
+using Unity.Transforms;
+using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -202,6 +205,9 @@ namespace SweepNDodge.DotsBullets
             var spawnMetrics = SystemAPI.GetSingleton<SpawnBacklogMetricsComponent>();
             var hudRW = SystemAPI.GetSingletonRW<DebugHudMetricsComponent>();
             var hud = hudRW.ValueRO;
+            var traceMetrics = SystemAPI.TryGetSingleton<BulletRenderTraceMetricsComponent>(out var trace)
+                ? trace
+                : default;
 
             int activeBullets = _activeBulletQuery.CalculateEntityCount();
             int spawned = math.max(0, spawnMetrics.LastFrameBudgetUsed);
@@ -215,9 +221,161 @@ namespace SweepNDodge.DotsBullets
             hud.DeferredByPool = math.max(0, spawnMetrics.DeferredByPool);
             hud.DroppedThisFrame = math.max(0, spawnMetrics.LastFrameDroppedByCapacity);
             hud.ExpiredThisFrame = math.max(0, spawnMetrics.LastFrameExpiredByAge);
+            hud.GhostInactiveRendered = math.max(0, traceMetrics.GhostInactiveRendered);
+            hud.RequestedRendered = math.max(0, traceMetrics.RequestedRendered);
+            hud.ActiveHidden = math.max(0, traceMetrics.ActiveHidden);
+            hud.NonPositiveLifeRendered = math.max(0, traceMetrics.NonPositiveLifeRendered);
             hud.FrameTimeMs = math.max(0f, SystemAPI.Time.DeltaTime * 1000f);
             hud.PreviousActiveBullets = activeBullets;
             hudRW.ValueRW = hud;
         }
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    [UpdateInGroup(typeof(BulletExecutionEndGroup), OrderLast = true)]
+    [UpdateAfter(typeof(DebugHudMetricsCollectSystem))]
+    public partial struct BulletRenderTraceInvariantSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<BulletFrameCounterComponent>();
+            state.RequireForUpdate<BulletRenderTraceConfigComponent>();
+            state.RequireForUpdate<BulletRenderTraceMetricsComponent>();
+        }
+
+        public void OnUpdate(ref SystemState state)
+        {
+            var config = SystemAPI.GetSingleton<BulletRenderTraceConfigComponent>();
+            var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
+            uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
+
+            var metrics = new BulletRenderTraceMetricsComponent
+            {
+                Frame = frame,
+            };
+
+            if (config.EnableInvariantLog == 0)
+            {
+                SystemAPI.GetSingletonRW<BulletRenderTraceMetricsComponent>().ValueRW = metrics;
+                return;
+            }
+
+            var activeLookup = SystemAPI.GetComponentLookup<BulletActiveTag>(true);
+            var requestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(true);
+            var lifeLookup = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(true);
+            var traceLookup = SystemAPI.GetComponentLookup<BulletLifecycleTraceComponent>(true);
+            var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
+            var renderLookup = SystemAPI.GetComponentLookup<MaterialMeshInfo>(true);
+            var renderPartsLookup = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
+
+            activeLookup.Update(ref state);
+            requestLookup.Update(ref state);
+            lifeLookup.Update(ref state);
+            traceLookup.Update(ref state);
+            txLookup.Update(ref state);
+            renderLookup.Update(ref state);
+            renderPartsLookup.Update(ref state);
+
+            int scanCap = config.MaxEntitiesToScanPerFrame <= 0
+                ? int.MaxValue
+                : config.MaxEntitiesToScanPerFrame;
+            int maxLogs = math.max(0, config.MaxLogsPerFrame);
+
+            foreach (var (typeKeyRO, bullet) in SystemAPI
+                         .Query<RefRO<BulletTypeKeyComponent>>()
+                         .WithAll<BulletActiveTag, BulletDespawnRequestTag>()
+                         .WithOptions(EntityQueryOptions.IgnoreComponentEnabledState)
+                         .WithEntityAccess())
+            {
+                if (metrics.Scanned >= scanCap)
+                    break;
+
+                metrics.Scanned++;
+
+                bool active = activeLookup.HasComponent(bullet) && activeLookup.IsComponentEnabled(bullet);
+                bool requested = requestLookup.HasComponent(bullet) && requestLookup.IsComponentEnabled(bullet);
+                bool rendered = IsRendered(
+                    bullet,
+                    ref renderLookup,
+                    ref renderPartsLookup,
+                    out int enabledRenderParts,
+                    out int totalRenderParts);
+
+                float life = lifeLookup.HasComponent(bullet) ? lifeLookup[bullet].Value : 0f;
+                bool lifeNonPositive = life <= 0f;
+
+                bool ghostInactiveRendered = !active && rendered;
+                bool requestedRendered = requested && rendered;
+                bool activeHidden = active && !rendered;
+                bool nonPositiveLifeRendered = rendered && lifeNonPositive;
+
+                if (ghostInactiveRendered) metrics.GhostInactiveRendered++;
+                if (requestedRendered) metrics.RequestedRendered++;
+                if (activeHidden) metrics.ActiveHidden++;
+                if (nonPositiveLifeRendered) metrics.NonPositiveLifeRendered++;
+
+                if (!ghostInactiveRendered && !requestedRendered && !activeHidden && !nonPositiveLifeRendered)
+                    continue;
+
+                if (metrics.Logged >= maxLogs)
+                    continue;
+
+                var pos = txLookup.HasComponent(bullet) ? txLookup[bullet].Position : float3.zero;
+                int typeKey = typeKeyRO.ValueRO.Value;
+                var trace = traceLookup.HasComponent(bullet)
+                    ? traceLookup[bullet]
+                    : default;
+
+                Debug.LogWarning(
+                    $"[BulletTraceInvariant] frame={frame} entity={bullet.Index}:{bullet.Version} type={typeKey} " +
+                    $"active={active} request={requested} rendered={rendered} life={life:0.000} pos=({pos.x:0.000},{pos.y:0.000},{pos.z:0.000}) " +
+                    $"spawnFrame={trace.LastSpawnFrame} despawnFrame={trace.LastDespawnFrame} " +
+                    $"renderEnabledParts={enabledRenderParts}/{math.max(1, totalRenderParts)}");
+                metrics.Logged++;
+            }
+
+            SystemAPI.GetSingletonRW<BulletRenderTraceMetricsComponent>().ValueRW = metrics;
+        }
+
+        private static bool IsRendered(
+            Entity bullet,
+            ref ComponentLookup<MaterialMeshInfo> renderLookup,
+            ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
+            out int enabledRenderParts,
+            out int totalRenderParts)
+        {
+            enabledRenderParts = 0;
+            totalRenderParts = 0;
+
+            if (renderPartsLookup.HasBuffer(bullet))
+            {
+                var parts = renderPartsLookup[bullet];
+                totalRenderParts = parts.Length;
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var part = parts[i].Value;
+                    if (!renderLookup.HasComponent(part))
+                        continue;
+
+                    totalRenderParts = math.max(totalRenderParts, 1);
+                    if (renderLookup.IsComponentEnabled(part))
+                        enabledRenderParts++;
+                }
+
+                if (enabledRenderParts > 0)
+                    return true;
+            }
+
+            if (!renderLookup.HasComponent(bullet))
+                return false;
+
+            totalRenderParts = math.max(totalRenderParts, 1);
+            if (!renderLookup.IsComponentEnabled(bullet))
+                return false;
+
+            enabledRenderParts = math.max(enabledRenderParts, 1);
+            return true;
+        }
+    }
+#endif
 }

@@ -22,7 +22,31 @@ namespace SweepNDodge.DotsBullets
         public int DeferredByPool;
         public int DroppedThisFrame;
         public int ExpiredThisFrame;
+        public int GhostInactiveRendered;
+        public int RequestedRendered;
+        public int ActiveHidden;
+        public int NonPositiveLifeRendered;
         public float FrameTimeMs;
+    }
+
+    // 렌더-활성 불일치 추적 설정 싱글톤.
+    public struct BulletRenderTraceConfigComponent : IComponentData
+    {
+        public byte EnableInvariantLog;
+        public int MaxLogsPerFrame;
+        public int MaxEntitiesToScanPerFrame; // 0 이하: 전체 스캔
+    }
+
+    // 렌더-활성 불일치 추적 결과 싱글톤.
+    public struct BulletRenderTraceMetricsComponent : IComponentData
+    {
+        public uint Frame;
+        public int Scanned;
+        public int Logged;
+        public int GhostInactiveRendered;
+        public int RequestedRendered;
+        public int ActiveHidden;
+        public int NonPositiveLifeRendered;
     }
 
     // Debug stress command + state singleton.

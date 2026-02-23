@@ -110,6 +110,10 @@ namespace SweepNDodge.DotsBullets.Tests
 
             int maxActiveBullets = 0;
             int framesWithActiveBullets = 0;
+            int maxGhostInactiveRendered = 0;
+            int maxRequestedRendered = 0;
+            int maxActiveHidden = 0;
+            int maxNonPositiveLifeRendered = 0;
 
             for (int frame = 0; frame < frameCount; frame++)
             {
@@ -119,13 +123,24 @@ namespace SweepNDodge.DotsBullets.Tests
                     framesWithActiveBullets++;
                 if (activeCount > maxActiveBullets)
                     maxActiveBullets = activeCount;
+
+                if (HasSingleton<DebugHudMetricsComponent>(em))
+                {
+                    var hud = GetSingleton<DebugHudMetricsComponent>(em);
+                    maxGhostInactiveRendered = Mathf.Max(maxGhostInactiveRendered, hud.GhostInactiveRendered);
+                    maxRequestedRendered = Mathf.Max(maxRequestedRendered, hud.RequestedRendered);
+                    maxActiveHidden = Mathf.Max(maxActiveHidden, hud.ActiveHidden);
+                    maxNonPositiveLifeRendered = Mathf.Max(maxNonPositiveLifeRendered, hud.NonPositiveLifeRendered);
+                }
             }
 
             Assert.That(framesWithActiveBullets, Is.GreaterThan(0), $"Core loop should produce active bullets. scene={sceneLabel}");
             Assert.That(maxActiveBullets, Is.GreaterThan(0), $"At least one active bullet must be observed. scene={sceneLabel}");
 
             Debug.Log(
-                $"[PlayModeSmoke] scene={sceneLabel} frames={frameCount} maxActiveBullets={maxActiveBullets} framesWithActiveBullets={framesWithActiveBullets}");
+                $"[PlayModeSmoke] scene={sceneLabel} frames={frameCount} maxActiveBullets={maxActiveBullets} framesWithActiveBullets={framesWithActiveBullets} " +
+                $"traceGhostInactiveRendered={maxGhostInactiveRendered} traceRequestedRendered={maxRequestedRendered} " +
+                $"traceActiveHidden={maxActiveHidden} traceNonPositiveLifeRendered={maxNonPositiveLifeRendered}");
         }
 
         private static IEnumerator WaitForCondition(System.Func<bool> predicate, int timeoutFrames, string failMessage)

@@ -93,12 +93,20 @@ namespace SweepNDodge.DotsBullets
                     if (em.HasBuffer<EntityRenderElementBuffer>(b))
                     {
                         var parts = em.GetBuffer<EntityRenderElementBuffer>(b);
+                        bool toggled = false;
                         for (int k = 0; k < parts.Length; k++)
                         {
                             var pe = parts[k].Value;
                             if (em.HasComponent<MaterialMeshInfo>(pe))
+                            {
                                 em.SetComponentEnabled<MaterialMeshInfo>(pe, false);
+                                toggled = true;
+                            }
                         }
+
+                        // Guard: render-parts buffer exists but no valid render entity in it.
+                        if (!toggled && em.HasComponent<MaterialMeshInfo>(b))
+                            em.SetComponentEnabled<MaterialMeshInfo>(b, false);
                     }
                     else if (em.HasComponent<MaterialMeshInfo>(b))
                     {
@@ -127,6 +135,14 @@ namespace SweepNDodge.DotsBullets
                         em.SetComponentEnabled<BulletHazardTag>(b, def.CaptureRule == BulletCaptureRuleId.RiskTimedResolve);
                     if (em.HasComponent<BulletSourceRefComponent>(b))
                         em.SetComponentData(b, new BulletSourceRefComponent { Value = Entity.Null });
+                    if (em.HasComponent<BulletLifecycleTraceComponent>(b))
+                    {
+                        em.SetComponentData(b, new BulletLifecycleTraceComponent
+                        {
+                            LastSpawnFrame = 0,
+                            LastDespawnFrame = 0
+                        });
+                    }
 
                     BulletFieldShared.FreeByKey.Add(def.TypeKey, b);
                 }
@@ -188,6 +204,26 @@ namespace SweepNDodge.DotsBullets
                 var e = em.CreateEntity(typeof(DebugHudMetricsComponent));
                 em.SetComponentData(e, default(DebugHudMetricsComponent));
             }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!HasSingleton<BulletRenderTraceConfigComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(BulletRenderTraceConfigComponent));
+                em.SetComponentData(e, new BulletRenderTraceConfigComponent
+                {
+                    // Default OFF. Turn ON only when diagnosing render/order issues.
+                    EnableInvariantLog = 0,
+                    MaxLogsPerFrame = 8,
+                    MaxEntitiesToScanPerFrame = 4096,
+                });
+            }
+
+            if (!HasSingleton<BulletRenderTraceMetricsComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(BulletRenderTraceMetricsComponent));
+                em.SetComponentData(e, default(BulletRenderTraceMetricsComponent));
+            }
+#endif
 
             if (!HasSingleton<StressSwitchStateComponent>(em))
             {
@@ -269,6 +305,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<PlayerTag>();
+            state.RequireForUpdate<BulletFrameCounterComponent>();
         }
 
         [BurstCompile]
@@ -279,13 +316,15 @@ namespace SweepNDodge.DotsBullets
 
             // FreeByKey는 ECS 의존성 추적 밖이므로 fence로 시퀀싱
             var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);
-
-            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
-            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
+            uint frame = FrameSequenceUtility.GetCurrentFrame(SystemAPI.GetSingleton<BulletFrameCounterComponent>());
 
             var renderParts = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
+            var renderLookup = SystemAPI.GetComponentLookup<MaterialMeshInfo>(false);
+            var lifeCycleLookup = SystemAPI.GetComponentLookup<BulletLifecycleTraceComponent>(false);
             var sourceActiveCounts = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(false);
             renderParts.Update(ref state);
+            renderLookup.Update(ref state);
+            lifeCycleLookup.Update(ref state);
             sourceActiveCounts.Update(ref state);
 
             var countDeltaQueue = new NativeQueue<SourceActiveCountDelta>(Allocator.TempJob);
@@ -293,8 +332,10 @@ namespace SweepNDodge.DotsBullets
             var job = new DespawnAndReturnJob
             {
                 FreeByKey = BulletFieldShared.FreeByKey.AsParallelWriter(),
-                Ecb = ecb,
                 RenderPartsLookup = renderParts,
+                RenderLookup = renderLookup,
+                LifeCycleLookup = lifeCycleLookup,
+                CurrentFrame = frame,
                 CountDeltaWriter = countDeltaQueue.AsParallelWriter(),
             };
 
@@ -314,12 +355,13 @@ namespace SweepNDodge.DotsBullets
         private partial struct DespawnAndReturnJob : IJobEntity
         {
             public NativeParallelMultiHashMap<int, Entity>.ParallelWriter FreeByKey;
-            public EntityCommandBuffer.ParallelWriter Ecb;
             [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<MaterialMeshInfo> RenderLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleTraceComponent> LifeCycleLookup;
+            public uint CurrentFrame;
             public NativeQueue<SourceActiveCountDelta>.ParallelWriter CountDeltaWriter;
 
             private void Execute(
-                [EntityIndexInQuery] int sortKey,
                 Entity e,
                 ref BulletLifetimeComponent life,
                 in BulletTypeKeyComponent typeKey,
@@ -336,21 +378,33 @@ namespace SweepNDodge.DotsBullets
                     active.ValueRW = false;
 
                     // 렌더 off: RenderParts(자식 렌더 엔티티) MaterialMeshInfo disable
+                    bool toggled = false;
                     if (RenderPartsLookup.TryGetBuffer(e, out var parts))
                     {
                         for (int p = 0; p < parts.Length; p++)
                         {
                             var pe = parts[p].Value;
-                            Ecb.SetComponentEnabled<MaterialMeshInfo>(sortKey, pe, false);
+                            if (!RenderLookup.HasComponent(pe))
+                                continue;
+
+                            RenderLookup.SetComponentEnabled(pe, false);
+                            toggled = true;
                         }
                     }
-                    else
+
+                    if (!toggled && RenderLookup.HasComponent(e))
                     {
                         // (fallback) 루트에 렌더가 있는 단일 프리팹 대응
-                        Ecb.SetComponentEnabled<MaterialMeshInfo>(sortKey, e, false);
+                        RenderLookup.SetComponentEnabled(e, false);
                     }
 
                     FreeByKey.Add(typeKey.Value, e);
+                    if (LifeCycleLookup.HasComponent(e))
+                    {
+                        var trace = LifeCycleLookup[e];
+                        trace.LastDespawnFrame = CurrentFrame;
+                        LifeCycleLookup[e] = trace;
+                    }
                     if (sourceRef.Value != Entity.Null)
                     {
                         CountDeltaWriter.Enqueue(new SourceActiveCountDelta
