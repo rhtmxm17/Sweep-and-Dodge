@@ -1,0 +1,13 @@
+﻿{
+  "name": "SweepNDodge.Runtime",
+  "references": [
+    "Unity.Burst",
+    "Unity.Collections",
+    "Unity.Entities",
+    "Unity.Entities.Graphics",
+    "Unity.Entities.Hybrid",
+    "Unity.Mathematics",
+    "Unity.Transforms"
+  ],
+  "autoReferenced": true
+}

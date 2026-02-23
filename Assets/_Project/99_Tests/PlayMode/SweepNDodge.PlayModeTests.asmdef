@@ -1,0 +1,11 @@
+﻿{
+  "name": "SweepNDodge.PlayModeTests",
+  "references": [
+    "SweepNDodge.Runtime",
+    "Unity.Entities",
+    "Unity.Collections"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
