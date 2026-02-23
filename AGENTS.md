@@ -26,15 +26,17 @@
 - 빌드/실행:
   - Unity Editor에서 Play Mode / Standalone Build
 - 테스트:
-  - 기본: Agent는 `Editor(EditMode)` 테스트를 우선한다.
-  - `PlayMode` 테스트는 실제 Play/씬 라이프사이클 검증이 필요한 경우에만 적용한다.
+  - `PlayMode` 테스트는 작업 완료마다 `전용 PlayMode 테스트 씬` 스모크를 강제 실행한다.
+  - PlayMode 1차 판정은 `기동/루프 정상성`으로 하고, 성능 임계치 초과는 추적 항목으로 기록한다.
 - 프로파일링:
   - Profiler(Entities Profiler 포함), Frame Debugger(필요 시)
 - 코드 생성/수정 후 기본 검증 절차(MCP 연결 시):
   1. `refresh_unity(compile=request, wait_for_ready=true)`로 컴파일 요청
   2. `read_console(action=get, types=["error"], include_stacktrace=true)`로 에러 확인
-  3. 에러가 있으면 수정 후 1~2 반복
-  4. 에러 0건일 때 작업 완료 보고
+  3. `EditMode` 테스트 실행
+  4. `PlayMode` 전용 씬 스모크 실행
+  5. 에러/실패가 있으면 수정 후 1~4 반복
+  6. 에러 0건 + 테스트 통과 시 작업 완료 보고
 
 ---
 
@@ -117,7 +119,9 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 ## 7. Definition of Done (DoD)
 - 컴파일 성공, 경고/에러 증가 없음
 - MCP 검증 기준: Unity Console `error` 0건
-- 최소 스모크 테스트 통과(Play Mode 진입, 핵심 루프 1회 이상)
+- 최소 스모크 테스트 통과:
+  - `EditMode` 테스트 통과
+  - `PlayMode` 전용 씬 스모크 통과(작업 완료 기준)
 - 성능 리스크 변화시 근거(수치/캡처) 첨부
 - 코드 리뷰 관점:
   - 소유권/업데이트 순서/플래그 전환 규칙이 문서·코드에서 일치

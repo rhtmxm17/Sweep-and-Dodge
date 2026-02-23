@@ -4,7 +4,7 @@
 - doc_id: `OPS-001`
 - type: `ProjectOps`
 - status: `active`
-- last_updated: `2026-02-20`
+- last_updated: `2026-02-23`
 - related_adr:
   - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
@@ -33,8 +33,8 @@
   - `BLOCK`: 외부 의존/이슈로 진행 차단
 
 ## 3. 진행 현황 스냅샷
-- 전체(10): `DONE 3 | WIP 1 | TODO 6 | BLOCK 0` (완료율 30%)
-- `P0`(5): 3/5 완료 (60%)
+- 전체(10): `DONE 4 | WIP 0 | TODO 6 | BLOCK 0` (완료율 40%)
+- `P0`(5): 4/5 완료 (80%)
 - `P1`(4): 0/4 완료 (0%)
 - `P2`(1): 0/1 완료 (0%)
 
@@ -45,7 +45,7 @@
 | 2 | Spawn/Despawn 요청-소비 구조 (Aggregated 요청 버퍼 + Owner 소비) | P0 | 5 | 8% | DONE | 100% | 스트레스 자동화 루틴에 운영 임계치 검증 추가 | 2026-02-20 |
 | 3 | 풀링 + Fence 표준화 (FreeList/CellMap 접근 규약) | P0 | 5 | 11% | DONE | 100% | 계약 테스트 + 스트레스 지표 회귀 추적 유지 | 2026-02-20 |
 | 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | TODO | 0% | 착수 전 | 2026-02-20 |
-| 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | WIP | 55% | PlayMode 스모크 자동화 보강 + 운영 씬 기준 검증 | 2026-02-20 |
+| 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | DONE | 100% | 전용 씬(작업 완료) + 운영 씬(정기) 2트랙 유지 | 2026-02-23 |
 | 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 8 | 런 타임라인 디렉터 (15~20분 페이싱) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
@@ -86,11 +86,21 @@
 - 게임 고유성은 `7~9번(데이터/타임라인/이벤트 채널)`에서 조정한다.
 - `10번(시드/리플레이)`은 우선순위는 낮춰도, 최소한 RNG 시드 고정은 초반에 도입한다.
 
-## 9. 사용 규칙
+## 9. 문서 사용 규칙
 - 이 문서는 계획 문서이며, 되돌리기 비용이 크거나 파급 영향이 큰 **중요 결정**은 ADR로 기록한다.
 - 실제 구현에서 순서/소요가 바뀌면 스냅샷/표를 함께 갱신하고 변경 이유를 1~2줄 남긴다.
 
-## 10. 변경 메모 (2026-02-20)
+## 10. 변경 메모
+### 2026-02-23
+- `#5 스모크 테스트 루틴` 운영 합의를 갱신했다.
+  - `작업 완료마다 전용 PlayMode 테스트 씬 스모크 강제` + `정기 운영 씬 스모크` 2트랙으로 운영한다.
+  - PlayMode 1차 판정은 기동/루프 정상성으로 고정하고, 성능 임계치는 추적 항목으로 분리한다.
+- `#5 스모크 테스트 루틴`을 `DONE`으로 전환했다.
+  - 전용 씬 `Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity`를 추가했다.
+  - `BulletPlayModeSmokeTests`를 `전용 씬(기본)` + `운영 씬(정기)` 2개 테스트로 분리했다.
+  - 결과: 2개 PlayMode 스모크 모두 pass.
+
+### 2026-02-20
 - `#1 프레임 파이프라인 고정`을 `DONE`으로 갱신했다.
   - 루트 그룹(`BulletFramePipelineGroup`) 도입, Request fence publish 단일화, 프레임 카운터 기반 Frame ID 전환을 반영했다.
 - `#3 풀링 + Fence 표준화`를 `WIP`로 갱신했다.
@@ -157,3 +167,34 @@
   - `maxOldestAge=0`
   - `dropCount=0`
   - `expiredByAge=0`
+
+### 최근 측정값 (2026-02-23, PlayMode 자동 테스트)
+- 실행 테스트(기본): `BulletPlayModeSmokeTests.PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors`
+- Unity: `6000.3.6f1`
+- 씬: `Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity`
+- 관측값:
+  - `maxActiveBullets=25467`
+  - `framesWithActiveBullets=119`
+- 실행 테스트(정기): `BulletPlayModeSmokeTests.PlayMode_OperationalScene_PipelineBootAndCoreLoop_RunWithoutHardErrors`
+- Unity: `6000.3.6f1`
+- 씬: `Assets/_Project/01_Scenes/SampleScene.unity`
+- 관측값:
+  - `maxActiveBullets=25514`
+  - `framesWithActiveBullets=179`
+
+## 13. 스모크 테스트 절차/규약(운영 합의)
+- 테스트 구조:
+  - `EditMode 계약 테스트`: 파이프라인/소유권/규약 위반 탐지
+  - `EditMode 스모크/스트레스`: ECS 월드 기준 기능/부하 회귀 탐지
+  - `PlayMode 스모크`: `전용 씬(기본)` + `운영 씬(정기)` 기동/루프 정상성 탐지
+- 실행 절차:
+  1. `refresh_unity(compile=request, wait_for_ready=true)`
+  2. `read_console(action=get, types=["error"], include_stacktrace=true)`로 에러 0건 확인
+  3. `EditMode` 테스트 실행
+  4. `PlayMode` 스모크 실행
+- 운영 주기:
+  - 작업 완료마다: `PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors` 강제
+  - 정기 실행: `PlayMode_OperationalScene_PipelineBootAndCoreLoop_RunWithoutHardErrors` 별도 주기 실행(예: 일 1회, 머지 전 1회)
+- 판정 규약:
+  - PlayMode 1차 판정: 기동/루프 정상성
+  - 성능 임계치 초과: fail이 아닌 추적 항목으로 기록
