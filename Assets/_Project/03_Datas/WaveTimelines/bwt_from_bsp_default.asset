@@ -13,35 +13,15 @@ MonoBehaviour:
   m_Name: bwt_from_bsp_default
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.WaveTimelineSO
   Segments:
-  - WaveId: 100
-    TargetState: 0
-    Phase: 0
+  - WaveId: 110
+    TargetState: 1
+    Phase: 1
     StartSec: 0
-    EndSec: 1
+    EndSec: 0.6
     Entries:
-    - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
-      SpawnMode: 0
-      SpawnDensityPerSecPerArea: 10
-      MaxActiveDensityPerArea: 0
-      UseDirectiveProfiles: 1
-      Payload:
-        Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
-      Emission:
-        EmissionMode: 0
-        SpawnMode: 0
-        RatePerSecPerArea: 10
-        MeanEventsPerSec: 0
-        MaxActiveDensityPerArea: 0
-      Sampling:
-        SamplingMode: 1
-        CenterMode: 0
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 16
-        PlayerNoSpawnRadius: 0
     - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       SpawnMode: 0
-      SpawnDensityPerSecPerArea: 0.05
+      SpawnDensityPerSecPerArea: 0.12
       MaxActiveDensityPerArea: 0
       UseDirectiveProfiles: 1
       Payload:
@@ -49,42 +29,68 @@ MonoBehaviour:
       Emission:
         EmissionMode: 0
         SpawnMode: 0
-        RatePerSecPerArea: 0.05
+        RatePerSecPerArea: 0.12
         MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 1
         MaxActiveDensityPerArea: 0
       Sampling:
-        SamplingMode: 1
+        SamplingMode: 0
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 16
-        PlayerNoSpawnRadius: 0
-  - WaveId: 110
-    TargetState: 1
-    Phase: 0
-    StartSec: 1
-    EndSec: 2
-    Entries:
-    - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        WallMask: 0
+        WallInset: 0
+        SpawnSampleBudget: 24
+        PlayerNoSpawnRadius: 2.2
+      Direction:
+        DirectionMode: 2
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 24
+    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       SpawnMode: 0
-      SpawnDensityPerSecPerArea: 4
+      SpawnDensityPerSecPerArea: 0
       MaxActiveDensityPerArea: 0
       UseDirectiveProfiles: 1
       Payload:
-        Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+        Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 0
+        EmissionMode: 2
         SpawnMode: 0
-        RatePerSecPerArea: 4
+        RatePerSecPerArea: 0
         MeanEventsPerSec: 0
+        BurstRepeatCount: 3
+        BurstIntervalSec: 0.2
+        BurstShotsPerEvent: 12
         MaxActiveDensityPerArea: 0
       Sampling:
-        SamplingMode: 1
+        SamplingMode: 0
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 16
-        PlayerNoSpawnRadius: 0
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        WallMask: 0
+        WallInset: 0
+        SpawnSampleBudget: 24
+        PlayerNoSpawnRadius: 2.2
+      Direction:
+        DirectionMode: 3
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 0
+  - WaveId: 120
+    TargetState: 1
+    Phase: 0
+    StartSec: 0.6
+    EndSec: 1.6
+    Entries:
     - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       SpawnMode: 0
       SpawnDensityPerSecPerArea: 0.08
@@ -97,11 +103,195 @@ MonoBehaviour:
         SpawnMode: 0
         RatePerSecPerArea: 0.08
         MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 1
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 0
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        WallMask: 0
+        WallInset: 0
+        SpawnSampleBudget: 24
+        PlayerNoSpawnRadius: 2.2
+      Direction:
+        DirectionMode: 1
+        BaseAngleDeg: 0
+        NWayCount: 4
+        SpiralStepDeg: 0
+    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      SpawnMode: 0
+      SpawnDensityPerSecPerArea: 0
+      MaxActiveDensityPerArea: 0
+      UseDirectiveProfiles: 1
+      Payload:
+        Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      Emission:
+        EmissionMode: 2
+        SpawnMode: 0
+        RatePerSecPerArea: 0
+        MeanEventsPerSec: 0
+        BurstRepeatCount: -1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 6
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 2
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: -8, y: -7.5}
+        LineEnd: {x: -8, y: 7.5}
+        SampleSpacing: 3
+        WallMask: 0
+        WallInset: 0
+        SpawnSampleBudget: 12
+        PlayerNoSpawnRadius: 1.5
+      Direction:
+        DirectionMode: 4
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 0
+    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      SpawnMode: 0
+      SpawnDensityPerSecPerArea: 0
+      MaxActiveDensityPerArea: 0
+      UseDirectiveProfiles: 1
+      Payload:
+        Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      Emission:
+        EmissionMode: 2
+        SpawnMode: 0
+        RatePerSecPerArea: 0
+        MeanEventsPerSec: 0
+        BurstRepeatCount: -1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 6
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 2
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 8, y: -7.5}
+        LineEnd: {x: 8, y: 7.5}
+        SampleSpacing: 3
+        WallMask: 0
+        WallInset: 0
+        SpawnSampleBudget: 12
+        PlayerNoSpawnRadius: 1.5
+      Direction:
+        DirectionMode: 4
+        BaseAngleDeg: 180
+        NWayCount: 1
+        SpiralStepDeg: 0
+    - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      SpawnMode: 0
+      SpawnDensityPerSecPerArea: 4
+      MaxActiveDensityPerArea: 0
+      UseDirectiveProfiles: 1
+      Payload:
+        Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      Emission:
+        EmissionMode: 0
+        SpawnMode: 0
+        RatePerSecPerArea: 4
+        MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 1
         MaxActiveDensityPerArea: 0
       Sampling:
         SamplingMode: 1
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        WallMask: 0
+        WallInset: 0
         SpawnSampleBudget: 16
         PlayerNoSpawnRadius: 0
+      Direction:
+        DirectionMode: 0
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 0
+  - WaveId: 100
+    TargetState: 0
+    Phase: 0
+    StartSec: 1.6
+    EndSec: 2.6
+    Entries:
+    - Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      SpawnMode: 0
+      SpawnDensityPerSecPerArea: 0.05
+      MaxActiveDensityPerArea: 0
+      UseDirectiveProfiles: 1
+      Payload:
+        Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+      Emission:
+        EmissionMode: 0
+        SpawnMode: 0
+        RatePerSecPerArea: 0.05
+        MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 1
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 0
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        WallMask: 0
+        WallInset: 0
+        SpawnSampleBudget: 24
+        PlayerNoSpawnRadius: 2.2
+      Direction:
+        DirectionMode: 0
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 0
+    - Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      SpawnMode: 0
+      SpawnDensityPerSecPerArea: 10
+      MaxActiveDensityPerArea: 0
+      UseDirectiveProfiles: 1
+      Payload:
+        Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
+      Emission:
+        EmissionMode: 0
+        SpawnMode: 0
+        RatePerSecPerArea: 10
+        MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 1
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 1
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        WallMask: 0
+        WallInset: 0
+        SpawnSampleBudget: 16
+        PlayerNoSpawnRadius: 0
+      Direction:
+        DirectionMode: 0
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 0
