@@ -149,6 +149,8 @@ namespace SweepNDodge.DotsBullets
                         int typeKey = bullet.DefinitionId;
                         var fixedPoint = entry.ResolveFixedPoint();
                         var spawnOffset = entry.ResolveSpawnOffset();
+                        var lineStart = entry.ResolveLineStart();
+                        var lineEnd = entry.ResolveLineEnd();
                         patternBuffer.Add(new SourceSpawnPatternBuffer
                         {
                             DirectiveId = nextDirectiveId++,
@@ -158,14 +160,28 @@ namespace SweepNDodge.DotsBullets
                             SpawnMode = entry.ResolveSpawnMode(),
                             SamplingMode = entry.ResolveSamplingMode(),
                             CenterMode = entry.ResolveCenterMode(),
+                            DirectionMode = entry.ResolveDirectionMode(),
                             FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
                             SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
+                            LineStart = new float2(lineStart.x, lineStart.y),
+                            LineEnd = new float2(lineEnd.x, lineEnd.y),
+                            SampleSpacing = Mathf.Max(0.001f, entry.ResolveSampleSpacing()),
+                            WallMask = entry.ResolveWallMask(),
+                            WallInset = Mathf.Max(0f, entry.ResolveWallInset()),
                             SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
                             PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
+                            BaseAngleDeg = entry.ResolveBaseAngleDeg(),
+                            NWayCount = Mathf.Max(1, entry.ResolveNWayCount()),
+                            SpiralStepDeg = entry.ResolveSpiralStepDeg(),
                             SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
                             MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
+                            BurstRepeatCount = entry.ResolveBurstRepeatCount(),
+                            BurstIntervalSec = Mathf.Max(0.001f, entry.ResolveBurstIntervalSec()),
+                            BurstShotsPerEvent = Mathf.Max(1, entry.ResolveBurstShotsPerEvent()),
+                            SpawnPriority = entry.ResolveSpawnPriority(),
                             MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
-                            SpawnAccumulator = 0f
+                            SpawnAccumulator = 0f,
+                            BurstEventsEmitted = 0
                         });
 
                         EnsureActiveCountEntry(activeCountBuffer, typeKey);
@@ -202,6 +218,8 @@ namespace SweepNDodge.DotsBullets
                         int typeKey = bullet.DefinitionId;
                         var fixedPoint = entry.ResolveFixedPoint();
                         var spawnOffset = entry.ResolveSpawnOffset();
+                        var lineStart = entry.ResolveLineStart();
+                        var lineEnd = entry.ResolveLineEnd();
                         openingWaveBuffer.Add(new SourceOpeningWavePatternBuffer
                         {
                             DirectiveId = nextDirectiveId++,
@@ -213,14 +231,28 @@ namespace SweepNDodge.DotsBullets
                             SpawnMode = entry.ResolveSpawnMode(),
                             SamplingMode = entry.ResolveSamplingMode(),
                             CenterMode = entry.ResolveCenterMode(),
+                            DirectionMode = entry.ResolveDirectionMode(),
                             FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
                             SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
+                            LineStart = new float2(lineStart.x, lineStart.y),
+                            LineEnd = new float2(lineEnd.x, lineEnd.y),
+                            SampleSpacing = Mathf.Max(0.001f, entry.ResolveSampleSpacing()),
+                            WallMask = entry.ResolveWallMask(),
+                            WallInset = Mathf.Max(0f, entry.ResolveWallInset()),
                             SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
                             PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
+                            BaseAngleDeg = entry.ResolveBaseAngleDeg(),
+                            NWayCount = Mathf.Max(1, entry.ResolveNWayCount()),
+                            SpiralStepDeg = entry.ResolveSpiralStepDeg(),
                             SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
                             MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
+                            BurstRepeatCount = entry.ResolveBurstRepeatCount(),
+                            BurstIntervalSec = Mathf.Max(0.001f, entry.ResolveBurstIntervalSec()),
+                            BurstShotsPerEvent = Mathf.Max(1, entry.ResolveBurstShotsPerEvent()),
+                            SpawnPriority = entry.ResolveSpawnPriority(),
                             MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
-                            SpawnAccumulator = 0f
+                            SpawnAccumulator = 0f,
+                            BurstEventsEmitted = 0
                         });
 
                         EnsureActiveCountEntry(activeCountBuffer, typeKey, activeCountKeys);

@@ -251,6 +251,37 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"Wave segment has negative MeanEventsPerSec at segmentIndex={s}, entryIndex={e}."));
                             }
 
+                            if (emissionMode == SourceSpawnEmissionModeId.EventBurst)
+                            {
+                                if (entry.Emission.BurstIntervalSec <= 0f)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Error,
+                                        "CV020",
+                                        timelines[i].Location,
+                                        $"Wave segment has non-positive BurstIntervalSec at segmentIndex={s}, entryIndex={e}."));
+                                }
+
+                                int repeatCount = entry.Emission.BurstRepeatCount;
+                                if (repeatCount == 0 || repeatCount < -1)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Error,
+                                        "CV021",
+                                        timelines[i].Location,
+                                        $"Wave segment has invalid BurstRepeatCount at segmentIndex={s}, entryIndex={e}. Use -1 or >= 1."));
+                                }
+
+                                if (entry.Emission.BurstShotsPerEvent < 1)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Error,
+                                        "CV022",
+                                        timelines[i].Location,
+                                        $"Wave segment has invalid BurstShotsPerEvent at segmentIndex={s}, entryIndex={e}."));
+                                }
+                            }
+
                             if (entry.ResolveSpawnMode() == SourceSpawnModeId.CapAndMaxDensity && entry.ResolveMaxActiveDensityPerArea() < 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
@@ -276,6 +307,69 @@ namespace SweepNDodge.DotsBullets.Editor
                                     "CV019",
                                     timelines[i].Location,
                                     $"Wave segment has negative PlayerNoSpawnRadius at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            var directionMode = entry.ResolveDirectionMode();
+                            if (directionMode == SourceSpawnDirectionModeId.NWay && entry.ResolveNWayCount() < 2)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV023",
+                                    timelines[i].Location,
+                                    $"Wave segment uses NWay with NWayCount < 2 at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if (directionMode == SourceSpawnDirectionModeId.RadialBurst && entry.Emission.BurstShotsPerEvent < 2)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV024",
+                                    timelines[i].Location,
+                                    $"Wave segment uses RadialBurst with BurstShotsPerEvent < 2 at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if (directionMode == SourceSpawnDirectionModeId.Spiral && Mathf.Abs(entry.ResolveSpiralStepDeg()) < 0.0001f)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Warning,
+                                    "CVW032",
+                                    timelines[i].Location,
+                                    $"Wave segment uses Spiral with near-zero SpiralStepDeg at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            var samplingMode = entry.ResolveSamplingMode();
+                            if (samplingMode == SourceSpawnSamplingModeId.LineEven)
+                            {
+                                float len = (entry.ResolveLineEnd() - entry.ResolveLineStart()).magnitude;
+                                if (len <= 0f || entry.Sampling.SampleSpacing <= 0f)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Error,
+                                        "CV026",
+                                        timelines[i].Location,
+                                        $"Wave segment has invalid LineEven parameters at segmentIndex={s}, entryIndex={e}."));
+                                }
+                            }
+
+                            if (samplingMode == SourceSpawnSamplingModeId.WallEven)
+                            {
+                                if (entry.ResolveWallMask() == SourceSpawnWallMaskId.None || entry.Sampling.SampleSpacing <= 0f)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Error,
+                                        "CV027",
+                                        timelines[i].Location,
+                                        $"Wave segment has invalid WallEven parameters at segmentIndex={s}, entryIndex={e}."));
+                                }
+                            }
+
+                            if (samplingMode == SourceSpawnSamplingModeId.PointSet)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Warning,
+                                    "CVW033",
+                                    timelines[i].Location,
+                                    $"Wave segment uses PointSet at segmentIndex={s}, entryIndex={e}. PointSet runtime sampler is not enabled yet and falls back to UniformField."));
                             }
                         }
                     }

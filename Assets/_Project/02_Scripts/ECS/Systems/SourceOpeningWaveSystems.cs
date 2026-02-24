@@ -144,6 +144,7 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 item.SpawnAccumulator = 0f;
+                item.BurstEventsEmitted = 0;
                 patterns[i] = item;
             }
         }
@@ -167,6 +168,31 @@ namespace SweepNDodge.DotsBullets
 
                 var random = CreateDeterministicRandom(sourceEntity, pattern.DirectiveId, frame, 0x68E31DA4u);
                 spawnCount = SamplePoisson(lambda, ref random);
+            }
+            else if (pattern.EmissionMode == SourceSpawnEmissionModeId.EventBurst)
+            {
+                float interval = math.max(0.001f, pattern.BurstIntervalSec);
+                int shotsPerEvent = math.max(1, pattern.BurstShotsPerEvent);
+                pattern.SpawnAccumulator += math.max(0f, deltaTime);
+                int eventCount = (int)math.floor(pattern.SpawnAccumulator / interval);
+                if (eventCount <= 0)
+                    return 0;
+
+                if (pattern.BurstRepeatCount >= 0)
+                {
+                    int remaining = math.max(0, pattern.BurstRepeatCount - pattern.BurstEventsEmitted);
+                    if (remaining <= 0)
+                    {
+                        pattern.SpawnAccumulator = 0f;
+                        return 0;
+                    }
+
+                    eventCount = math.min(eventCount, remaining);
+                }
+
+                pattern.SpawnAccumulator -= eventCount * interval;
+                pattern.BurstEventsEmitted = SafeAdd(pattern.BurstEventsEmitted, eventCount);
+                spawnCount = SafeAdd(0, eventCount * shotsPerEvent);
             }
             else
             {
@@ -251,10 +277,22 @@ namespace SweepNDodge.DotsBullets
                 BulletTypeKey = pattern.BulletTypeKey,
                 SamplingMode = pattern.SamplingMode,
                 CenterMode = pattern.CenterMode,
+                DirectionMode = pattern.DirectionMode,
                 FixedPoint = pattern.FixedPoint,
                 SpawnOffset = pattern.SpawnOffset,
+                LineStart = pattern.LineStart,
+                LineEnd = pattern.LineEnd,
+                SampleSpacing = math.max(0.001f, pattern.SampleSpacing),
+                WallMask = pattern.WallMask,
+                WallInset = math.max(0f, pattern.WallInset),
                 SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
+                BaseAngleDeg = pattern.BaseAngleDeg,
+                NWayCount = math.max(1, pattern.NWayCount),
+                SpiralStepDeg = pattern.SpiralStepDeg,
+                BurstShotsPerEvent = math.max(1, pattern.BurstShotsPerEvent),
+                SpawnPriority = pattern.SpawnPriority,
+                SpawnSequence = 0u,
                 Count = count,
                 OldestFrame = frame
             });

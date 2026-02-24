@@ -4,7 +4,7 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-23`
+- last_updated: `2026-02-24`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -38,17 +38,29 @@
 | StartSec | float | 활성 시작 시간 | >= 0 |
 | EndSec | float | 활성 종료 시간 | > StartSec |
 | BulletTypeKey | int | Payload 탄 타입 | 풀 레지스트리에 존재 |
-| EmissionMode | enum | 방출 모드 | RateField / Poisson |
+| EmissionMode | enum | 방출 모드 | RateField / Poisson / EventBurst |
 | RatePerSecPerArea | float | RateField 밀도 | >= 0 |
 | MeanEventsPerSec | float | Poisson 평균 이벤트율 | >= 0 |
+| BurstRepeatCount | int | EventBurst 반복 수 | -1(무한) 또는 >= 1 |
+| BurstIntervalSec | float | EventBurst 반복 간격 | > 0 |
+| BurstShotsPerEvent | int | EventBurst 1회당 샷 수 | >= 1 |
 | SpawnMode | enum | 활성 캡 정책 | FixedDensity / CapAndMaxDensity |
 | MaxActiveDensityPerArea | float | Cap 모드 상한 | Cap 모드에서 >= 0 |
-| SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK |
+| SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK / LineEven / WallEven / PointSet |
 | CenterMode | enum | 중심 모드 | SourceCenter / FixedPoint / PlayerRelative |
 | FixedPoint | float2 | 고정 중심점 | CenterMode=FixedPoint |
 | SpawnOffset | float2 | 플레이어 상대 오프셋 | CenterMode=PlayerRelative |
+| LineStart / LineEnd | float2 | LineEven 기준 선분 | SamplingMode=LineEven |
+| SampleSpacing | float | Line/Wall 등간격 간격 | > 0 |
+| WallMask | flags | WallEven 벽 선택 | None 제외 |
+| WallInset | float | WallEven 안쪽 오프셋 | >= 0 |
+| DirectionMode | enum | 방향 모드 | Random / NWay / Spiral / RadialBurst |
+| BaseAngleDeg | float | 기준 각도 | 자유 범위 |
+| NWayCount | int | NWay 슬롯 수 | NWay에서 >= 2 |
+| SpiralStepDeg | float | Spiral 각도 증분 | Spiral에서 권장 != 0 |
 | SpawnSampleBudget | int | 샘플링 재시도 예산 | >= 1 (기본 16) |
 | PlayerNoSpawnRadius | float | 플레이어 주변 제외 반경 | >= 0 |
+| SpawnPriority | int | 요청 소비 우선순위 | 높을수록 우선 (Trash 최하) |
 
 `PatternDefinitionSlim`은 밀도 기반 구버전 용어이며, 스폰 모델은 `TD-003`의 SpawnDirective 용어를 기준으로 유지한다.
 
@@ -98,9 +110,12 @@ Hit:
 - Request 단계:
 - Directive 데이터를 사용해 `SourceSpawnRequestBuffer`를 누적 생성한다.
 - 요청 집계 키는 `BulletTypeKey` 단독이 아니라 `DirectiveId`를 기본 키로 사용한다.
+- EventBurst 소비 정책은 `carry`를 사용한다(미소비 샷은 다음 프레임 이월).
 - ExecutionBegin 단계:
 - Owner(`SpawnRequestRoundRobinExecutionSystem`)가 요청을 소비해 실제 스폰을 수행한다.
-- Sampling(중심 계산/샘플링/NoSpawn 반경 검증)은 ExecutionBegin에서 최종 평가한다.
+- Sampling(중심 계산/샘플링/NoSpawn 반경 검증)과 Direction 계산은 ExecutionBegin에서 최종 평가한다.
+- `BudgetPerFrame`은 요청 전체(탄 종류 공용)에서 공유한다.
+  - 우선순위: Hazard 우선, Trash는 최하 우선순위로 소비한다.
 - ExecutionEnd 단계:
 - 디스폰 owner가 반납과 렌더 토글을 처리한다.
 
@@ -127,10 +142,19 @@ Hit:
 - `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0` (`CV016`).
 - Wave entry의 `SpawnSampleBudget < 0` (`CV018`).
 - Wave entry의 `PlayerNoSpawnRadius < 0` (`CV019`).
+- EventBurst에서 `BurstIntervalSec <= 0` (`CV020`).
+- EventBurst에서 `BurstRepeatCount`가 `-1` 또는 `>=1`이 아님 (`CV021`).
+- EventBurst에서 `BurstShotsPerEvent < 1` (`CV022`).
+- NWay에서 `NWayCount < 2` (`CV023`).
+- RadialBurst에서 `BurstShotsPerEvent < 2` (`CV024`).
+- LineEven에서 선분 길이 0 또는 `SampleSpacing <= 0` (`CV026`).
+- WallEven에서 `WallMask=None` 또는 `SampleSpacing <= 0` (`CV027`).
 - Warning:
 - `SpawnSampleBudget`가 권장 범위 초과.
 - `MaxActiveDensityPerArea`가 Stage 목표 대비 과도함.
 - `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
+- Spiral에서 `SpiralStepDeg`가 0에 근접 (`CVW032`).
+- PointSet 사용(1차에서는 Uniform fallback) (`CVW033`).
 
 검증 코드 매핑(현재 구현):
 - `CV012`: Wave segment의 `Entries` 비어 있음
@@ -141,6 +165,15 @@ Hit:
 - `CV017`: Wave entry의 `MeanEventsPerSec < 0` (Poisson)
 - `CV018`: Wave entry의 `SpawnSampleBudget < 0`
 - `CV019`: Wave entry의 `PlayerNoSpawnRadius < 0`
+- `CV020`: EventBurst `BurstIntervalSec <= 0`
+- `CV021`: EventBurst `BurstRepeatCount` 범위 오류
+- `CV022`: EventBurst `BurstShotsPerEvent < 1`
+- `CV023`: NWay `NWayCount < 2`
+- `CV024`: RadialBurst `BurstShotsPerEvent < 2`
+- `CV026`: LineEven 파라미터 오류
+- `CV027`: WallEven 파라미터 오류
+- `CVW032`: Spiral `SpiralStepDeg` 0 근접 (Warning)
+- `CVW033`: PointSet 사용 시 1차 fallback 경고 (Warning)
 - `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
 - `CV011`: Wave segment 중첩
 
@@ -154,6 +187,8 @@ Hit:
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 8. 변경 이력
+- 2026-02-24: `EventBurst(carry)`, `DirectionProfile`, `LineEven/WallEven` 계약 및 CV020~CV027/CVW032/CVW033 규칙을 추가
+- 2026-02-24: 프레임 예산 공유 및 Trash 최하 우선순위 소비 규칙을 명시
 - 2026-02-23: Spawn 계약을 `PatternDefinitionSlim` 중심에서 `SpawnDirectiveDefinitionSlim` 중심으로 전환하고, 요청 집계 키를 `DirectiveId` 기준으로 명시
 - 2026-02-23: GD-007에서 구현 계약 항목(필드/수식/검증)을 분리해 `TD-002` 초안 작성
 - 2026-02-23: Wave 정책을 "동시 지속 금지"로 확정하고 중첩 우선순위 이슈를 해소

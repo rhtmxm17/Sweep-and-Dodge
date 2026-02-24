@@ -18,10 +18,21 @@ namespace SweepNDodge.DotsBullets
             public int BulletTypeKey;
             public SourceSpawnSamplingModeId SamplingMode;
             public SourceSpawnCenterModeId CenterMode;
+            public SourceSpawnDirectionModeId DirectionMode;
             public float2 FixedPoint;
             public float2 SpawnOffset;
+            public float2 LineStart;
+            public float2 LineEnd;
+            public float SampleSpacing;
+            public SourceSpawnWallMaskId WallMask;
+            public float WallInset;
             public int SpawnSampleBudget;
             public float PlayerNoSpawnRadius;
+            public float BaseAngleDeg;
+            public int NWayCount;
+            public float SpiralStepDeg;
+            public int BurstShotsPerEvent;
+            public int SpawnPriority;
         }
 
         public void OnCreate(ref SystemState state)
@@ -116,10 +127,21 @@ namespace SweepNDodge.DotsBullets
                     BulletTypeKey = resolved.BulletTypeKey,
                     SamplingMode = resolved.SamplingMode,
                     CenterMode = resolved.CenterMode,
+                    DirectionMode = resolved.DirectionMode,
                     FixedPoint = resolved.FixedPoint,
                     SpawnOffset = resolved.SpawnOffset,
+                    LineStart = resolved.LineStart,
+                    LineEnd = resolved.LineEnd,
+                    SampleSpacing = resolved.SampleSpacing,
+                    WallMask = resolved.WallMask,
+                    WallInset = resolved.WallInset,
                     SpawnSampleBudget = resolved.SpawnSampleBudget,
                     PlayerNoSpawnRadius = resolved.PlayerNoSpawnRadius,
+                    BaseAngleDeg = resolved.BaseAngleDeg,
+                    NWayCount = resolved.NWayCount,
+                    SpiralStepDeg = resolved.SpiralStepDeg,
+                    BurstShotsPerEvent = resolved.BurstShotsPerEvent,
+                    SpawnPriority = resolved.SpawnPriority,
                 });
             }
 
@@ -207,10 +229,22 @@ namespace SweepNDodge.DotsBullets
                 BulletTypeKey = target.BulletTypeKey,
                 SamplingMode = target.SamplingMode,
                 CenterMode = target.CenterMode,
+                DirectionMode = target.DirectionMode,
                 FixedPoint = target.FixedPoint,
                 SpawnOffset = target.SpawnOffset,
+                LineStart = target.LineStart,
+                LineEnd = target.LineEnd,
+                SampleSpacing = math.max(0.001f, target.SampleSpacing),
+                WallMask = target.WallMask,
+                WallInset = math.max(0f, target.WallInset),
                 SpawnSampleBudget = math.max(1, target.SpawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, target.PlayerNoSpawnRadius),
+                BaseAngleDeg = target.BaseAngleDeg,
+                NWayCount = math.max(1, target.NWayCount),
+                SpiralStepDeg = target.SpiralStepDeg,
+                BurstShotsPerEvent = math.max(1, target.BurstShotsPerEvent),
+                SpawnPriority = target.SpawnPriority,
+                SpawnSequence = 0u,
                 Count = count,
                 OldestFrame = frame,
             });

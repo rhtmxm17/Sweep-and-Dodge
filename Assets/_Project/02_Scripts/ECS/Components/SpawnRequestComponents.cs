@@ -10,10 +10,22 @@ namespace SweepNDodge.DotsBullets
         public int BulletTypeKey;
         public SourceSpawnSamplingModeId SamplingMode;
         public SourceSpawnCenterModeId CenterMode;
+        public SourceSpawnDirectionModeId DirectionMode;
         public Unity.Mathematics.float2 FixedPoint;
         public Unity.Mathematics.float2 SpawnOffset;
+        public Unity.Mathematics.float2 LineStart;
+        public Unity.Mathematics.float2 LineEnd;
+        public float SampleSpacing;
+        public SourceSpawnWallMaskId WallMask;
+        public float WallInset;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
+        public float BaseAngleDeg;
+        public int NWayCount;
+        public float SpiralStepDeg;
+        public int BurstShotsPerEvent;
+        public int SpawnPriority;
+        public uint SpawnSequence;
         public int Count;
         public uint OldestFrame;
     }

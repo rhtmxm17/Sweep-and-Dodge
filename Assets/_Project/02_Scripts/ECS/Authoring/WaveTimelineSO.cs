@@ -25,6 +25,9 @@ namespace SweepNDodge.DotsBullets
             public SourceSpawnModeId SpawnMode;
             public float RatePerSecPerArea;
             public float MeanEventsPerSec;
+            public int BurstRepeatCount;
+            public float BurstIntervalSec;
+            public int BurstShotsPerEvent;
             public float MaxActiveDensityPerArea;
         }
 
@@ -35,8 +38,22 @@ namespace SweepNDodge.DotsBullets
             public SourceSpawnCenterModeId CenterMode;
             public Vector2 FixedPoint;
             public Vector2 SpawnOffset;
+            public Vector2 LineStart;
+            public Vector2 LineEnd;
+            public float SampleSpacing;
+            public SourceSpawnWallMaskId WallMask;
+            public float WallInset;
             public int SpawnSampleBudget;
             public float PlayerNoSpawnRadius;
+        }
+
+        [System.Serializable]
+        public struct SpawnDirectionProfile
+        {
+            public SourceSpawnDirectionModeId DirectionMode;
+            public float BaseAngleDeg;
+            public int NWayCount;
+            public float SpiralStepDeg;
         }
 
         [System.Serializable]
@@ -56,6 +73,7 @@ namespace SweepNDodge.DotsBullets
             public SpawnPayloadProfile Payload;
             public SpawnEmissionProfile Emission;
             public SpawnSamplingProfile Sampling;
+            public SpawnDirectionProfile Direction;
 
             public BulletDefinitionSO ResolveBullet()
             {
@@ -100,6 +118,33 @@ namespace SweepNDodge.DotsBullets
                 return UseDirectiveProfiles ? Emission.MeanEventsPerSec : 0f;
             }
 
+            public int ResolveBurstRepeatCount()
+            {
+                if (!UseDirectiveProfiles)
+                    return 1;
+
+                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst)
+                    return 1;
+
+                return Emission.BurstRepeatCount == 0 ? 1 : Emission.BurstRepeatCount;
+            }
+
+            public float ResolveBurstIntervalSec()
+            {
+                if (!UseDirectiveProfiles || Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst)
+                    return 1f;
+
+                return Emission.BurstIntervalSec > 0f ? Emission.BurstIntervalSec : 1f;
+            }
+
+            public int ResolveBurstShotsPerEvent()
+            {
+                if (!UseDirectiveProfiles || Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst)
+                    return 1;
+
+                return Emission.BurstShotsPerEvent > 0 ? Emission.BurstShotsPerEvent : 1;
+            }
+
             public SourceSpawnSamplingModeId ResolveSamplingMode()
             {
                 return UseDirectiveProfiles
@@ -124,6 +169,75 @@ namespace SweepNDodge.DotsBullets
                 return UseDirectiveProfiles ? Sampling.SpawnOffset : Vector2.zero;
             }
 
+            public Vector2 ResolveLineStart()
+            {
+                return UseDirectiveProfiles ? Sampling.LineStart : Vector2.zero;
+            }
+
+            public Vector2 ResolveLineEnd()
+            {
+                return UseDirectiveProfiles ? Sampling.LineEnd : Vector2.zero;
+            }
+
+            public float ResolveSampleSpacing()
+            {
+                if (!UseDirectiveProfiles)
+                    return 1f;
+
+                return Sampling.SampleSpacing > 0f ? Sampling.SampleSpacing : 1f;
+            }
+
+            public SourceSpawnWallMaskId ResolveWallMask()
+            {
+                return UseDirectiveProfiles ? Sampling.WallMask : SourceSpawnWallMaskId.All;
+            }
+
+            public float ResolveWallInset()
+            {
+                if (!UseDirectiveProfiles)
+                    return 0f;
+
+                return Sampling.WallInset > 0f ? Sampling.WallInset : 0f;
+            }
+
+            public SourceSpawnDirectionModeId ResolveDirectionMode()
+            {
+                return UseDirectiveProfiles
+                    ? Direction.DirectionMode
+                    : SourceSpawnDirectionModeId.Random;
+            }
+
+            public float ResolveBaseAngleDeg()
+            {
+                return UseDirectiveProfiles ? Direction.BaseAngleDeg : 0f;
+            }
+
+            public int ResolveNWayCount()
+            {
+                if (!UseDirectiveProfiles)
+                    return 1;
+
+                return Direction.NWayCount > 0 ? Direction.NWayCount : 1;
+            }
+
+            public float ResolveSpiralStepDeg()
+            {
+                if (!UseDirectiveProfiles)
+                    return 0f;
+
+                return Direction.SpiralStepDeg;
+            }
+
+            public int ResolveSpawnPriority()
+            {
+                var bullet = ResolveBullet();
+                if (bullet == null)
+                    return 0;
+
+                // Trash(StandardCollectible)를 명시적으로 최하 우선순위로 둔다.
+                return bullet.CaptureRule == BulletCaptureRuleId.RiskTimedResolve ? 0 : -100;
+            }
+
             public int ResolveSpawnSampleBudget()
             {
                 if (!UseDirectiveProfiles)
@@ -146,6 +260,9 @@ namespace SweepNDodge.DotsBullets
                        || Emission.SpawnMode != SourceSpawnModeId.FixedDensity
                        || Emission.RatePerSecPerArea != 0f
                        || Emission.MeanEventsPerSec != 0f
+                       || Emission.BurstRepeatCount != 0
+                       || Emission.BurstIntervalSec != 0f
+                       || Emission.BurstShotsPerEvent != 0
                        || Emission.MaxActiveDensityPerArea != 0f;
             }
         }

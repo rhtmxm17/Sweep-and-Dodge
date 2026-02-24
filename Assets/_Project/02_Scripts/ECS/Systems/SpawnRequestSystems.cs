@@ -134,6 +134,31 @@ namespace SweepNDodge.DotsBullets
                 var random = CreateDeterministicRandom(sourceEntity, pattern.DirectiveId, frame, 0xB5297A4Du);
                 spawnCount = SamplePoisson(lambda, ref random);
             }
+            else if (pattern.EmissionMode == SourceSpawnEmissionModeId.EventBurst)
+            {
+                float interval = math.max(0.001f, pattern.BurstIntervalSec);
+                int shotsPerEvent = math.max(1, pattern.BurstShotsPerEvent);
+                pattern.SpawnAccumulator += math.max(0f, deltaTime);
+                int eventCount = (int)math.floor(pattern.SpawnAccumulator / interval);
+                if (eventCount <= 0)
+                    return 0;
+
+                if (pattern.BurstRepeatCount >= 0)
+                {
+                    int remaining = math.max(0, pattern.BurstRepeatCount - pattern.BurstEventsEmitted);
+                    if (remaining <= 0)
+                    {
+                        pattern.SpawnAccumulator = 0f;
+                        return 0;
+                    }
+
+                    eventCount = math.min(eventCount, remaining);
+                }
+
+                pattern.SpawnAccumulator -= eventCount * interval;
+                pattern.BurstEventsEmitted = SafeAdd(pattern.BurstEventsEmitted, eventCount);
+                spawnCount = SafeAdd(0, eventCount * shotsPerEvent);
+            }
             else
             {
                 float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
@@ -219,10 +244,22 @@ namespace SweepNDodge.DotsBullets
                 BulletTypeKey = pattern.BulletTypeKey,
                 SamplingMode = pattern.SamplingMode,
                 CenterMode = pattern.CenterMode,
+                DirectionMode = pattern.DirectionMode,
                 FixedPoint = pattern.FixedPoint,
                 SpawnOffset = pattern.SpawnOffset,
+                LineStart = pattern.LineStart,
+                LineEnd = pattern.LineEnd,
+                SampleSpacing = math.max(0.001f, pattern.SampleSpacing),
+                WallMask = pattern.WallMask,
+                WallInset = math.max(0f, pattern.WallInset),
                 SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
+                BaseAngleDeg = pattern.BaseAngleDeg,
+                NWayCount = math.max(1, pattern.NWayCount),
+                SpiralStepDeg = pattern.SpiralStepDeg,
+                BurstShotsPerEvent = math.max(1, pattern.BurstShotsPerEvent),
+                SpawnPriority = pattern.SpawnPriority,
+                SpawnSequence = 0u,
                 Count = count,
                 OldestFrame = frame,
             });
@@ -481,6 +518,7 @@ namespace SweepNDodge.DotsBullets
                     {
                         var item = requests[requestIndex];
                         item.Count = math.max(0, item.Count - 1);
+                        item.SpawnSequence = item.SpawnSequence + 1u;
                         if (item.Count <= 0)
                             item.OldestFrame = frame;
                         requests[requestIndex] = item;
@@ -585,6 +623,10 @@ namespace SweepNDodge.DotsBullets
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
             ref NativeParallelMultiHashMap<int, Entity> freeByKey)
         {
+            int bestIndex = -1;
+            int bestPriority = int.MinValue;
+            uint bestOldest = uint.MaxValue;
+
             for (int i = 0; i < requests.Length; i++)
             {
                 var item = requests[i];
@@ -593,10 +635,17 @@ namespace SweepNDodge.DotsBullets
                 if (!freeByKey.ContainsKey(item.BulletTypeKey))
                     continue;
 
-                return i;
+                if (bestIndex < 0
+                    || item.SpawnPriority > bestPriority
+                    || (item.SpawnPriority == bestPriority && item.OldestFrame < bestOldest))
+                {
+                    bestIndex = i;
+                    bestPriority = item.SpawnPriority;
+                    bestOldest = item.OldestFrame;
+                }
             }
 
-            return -1;
+            return bestIndex;
         }
 
         private static bool TrySpawnOneFromRequest(
@@ -656,8 +705,7 @@ namespace SweepNDodge.DotsBullets
                 ref pollutionCellsLookup,
                 ref pollutionValidCellIndicesLookup);
 
-            float angle = random.NextFloat(0f, math.PI * 2f);
-            float2 dir = new float2(math.cos(angle), math.sin(angle));
+            float2 dir = ResolveSpawnDirection(ref random, in request);
             var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
             float bulletSpeed = speedLookup.HasComponent(bulletEntity)
                 ? math.max(0f, speedLookup[bulletEntity].Value)
@@ -776,6 +824,50 @@ namespace SweepNDodge.DotsBullets
             return Unity.Mathematics.Random.CreateFromIndex(seed ^ (uint)sourceEntity.Index);
         }
 
+        private static float2 ResolveSpawnDirection(
+            ref Unity.Mathematics.Random random,
+            in SourceSpawnRequestBuffer request)
+        {
+            float baseRad = math.radians(request.BaseAngleDeg);
+            float angle;
+            switch (request.DirectionMode)
+            {
+                case SourceSpawnDirectionModeId.Spiral:
+                {
+                    float stepRad = math.radians(request.SpiralStepDeg);
+                    angle = baseRad + stepRad * request.SpawnSequence;
+                    break;
+                }
+                case SourceSpawnDirectionModeId.NWay:
+                case SourceSpawnDirectionModeId.RadialBurst:
+                {
+                    int slotCount = ResolveDirectionalSlotCount(in request);
+                    int slot = slotCount <= 1 ? 0 : (int)(request.SpawnSequence % (uint)slotCount);
+                    angle = baseRad + (slotCount <= 1 ? 0f : (math.PI * 2f * slot) / slotCount);
+                    break;
+                }
+                default:
+                    angle = random.NextFloat(0f, math.PI * 2f);
+                    break;
+            }
+
+            float2 dir = new float2(math.cos(angle), math.sin(angle));
+            float lenSq = math.lengthsq(dir);
+            if (lenSq <= 1e-6f)
+                return new float2(1f, 0f);
+
+            return dir * math.rsqrt(lenSq);
+        }
+
+        // NWay와 RadialBurst는 공통 슬롯 분배 로직으로 통합한다.
+        private static int ResolveDirectionalSlotCount(in SourceSpawnRequestBuffer request)
+        {
+            if (request.DirectionMode == SourceSpawnDirectionModeId.RadialBurst)
+                return math.max(1, request.BurstShotsPerEvent);
+
+            return math.max(1, request.NWayCount);
+        }
+
         private static float3 SampleSpawnPosition(
             ref Unity.Mathematics.Random random,
             Entity sourceEntity,
@@ -796,6 +888,7 @@ namespace SweepNDodge.DotsBullets
 
             for (int i = 0; i < sampleBudget; i++)
             {
+                uint sequence = request.SpawnSequence + (uint)i;
                 if (request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
                 {
                     if (TrySampleSpawnPositionFromPollution(
@@ -814,6 +907,22 @@ namespace SweepNDodge.DotsBullets
                     {
                         lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
                     }
+                }
+                else if (request.SamplingMode == SourceSpawnSamplingModeId.LineEven)
+                {
+                    lastSample = SampleSpawnPositionLineEven(center, in request, sequence);
+                }
+                else if (request.SamplingMode == SourceSpawnSamplingModeId.WallEven)
+                {
+                    if (fieldArea.Shape == BulletFieldShapeId.Rectangle)
+                        lastSample = SampleSpawnPositionWallEven(center, in fieldArea, in request, sequence);
+                    else
+                        lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                }
+                else if (request.SamplingMode == SourceSpawnSamplingModeId.PointSet)
+                {
+                    // PointSet 1차는 계약만 반영한다. 샘플러는 추후 전용 버퍼와 함께 활성화한다.
+                    lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
                 }
                 else
                 {
@@ -920,6 +1029,88 @@ namespace SweepNDodge.DotsBullets
             localX = math.clamp(localX, -halfExtents.x, halfExtents.x);
             localZ = math.clamp(localZ, -halfExtents.y, halfExtents.y);
             return new float3(center.x + localX, center.y, center.z + localZ);
+        }
+
+        private static float3 SampleSpawnPositionLineEven(
+            float3 center,
+            in SourceSpawnRequestBuffer request,
+            uint sequence)
+        {
+            float2 startOffset = request.LineStart;
+            float2 endOffset = request.LineEnd;
+            float2 segment = endOffset - startOffset;
+            float length = math.length(segment);
+            if (length <= 1e-5f)
+            {
+                float2 mid = (startOffset + endOffset) * 0.5f;
+                return new float3(center.x + mid.x, center.y, center.z + mid.y);
+            }
+
+            float spacing = math.max(0.001f, request.SampleSpacing);
+            int slotCount = ComputeEvenSlotCount(length, spacing);
+            int slotIndex = slotCount <= 1 ? 0 : (int)(sequence % (uint)slotCount);
+            float t = slotCount <= 1 ? 0.5f : slotIndex / (float)(slotCount - 1);
+            float2 local = math.lerp(startOffset, endOffset, t);
+            return new float3(center.x + local.x, center.y, center.z + local.y);
+        }
+
+        private static float3 SampleSpawnPositionWallEven(
+            float3 center,
+            in BulletFieldAreaComponent fieldArea,
+            in SourceSpawnRequestBuffer request,
+            uint sequence)
+        {
+            if (fieldArea.Shape != BulletFieldShapeId.Rectangle)
+                return center;
+
+            float inset = math.max(0f, request.WallInset);
+            float2 half = math.max(0f, fieldArea.Size * 0.5f - new float2(inset, inset));
+            if (half.x <= 1e-5f || half.y <= 1e-5f)
+                return center;
+
+            var mask = request.WallMask == SourceSpawnWallMaskId.None
+                ? SourceSpawnWallMaskId.All
+                : request.WallMask;
+            float spacing = math.max(0.001f, request.SampleSpacing);
+            int leftCount = (mask & SourceSpawnWallMaskId.Left) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.y * 2f, spacing) : 0;
+            int rightCount = (mask & SourceSpawnWallMaskId.Right) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.y * 2f, spacing) : 0;
+            int bottomCount = (mask & SourceSpawnWallMaskId.Bottom) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.x * 2f, spacing) : 0;
+            int topCount = (mask & SourceSpawnWallMaskId.Top) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.x * 2f, spacing) : 0;
+            int total = leftCount + rightCount + bottomCount + topCount;
+            if (total <= 0)
+                return center;
+
+            int pick = (int)(sequence % (uint)total);
+            if (pick < leftCount)
+            {
+                float t = leftCount <= 1 ? 0.5f : pick / (float)(leftCount - 1);
+                return new float3(center.x - half.x, center.y, center.z + math.lerp(-half.y, half.y, t));
+            }
+
+            pick -= leftCount;
+            if (pick < rightCount)
+            {
+                float t = rightCount <= 1 ? 0.5f : pick / (float)(rightCount - 1);
+                return new float3(center.x + half.x, center.y, center.z + math.lerp(-half.y, half.y, t));
+            }
+
+            pick -= rightCount;
+            if (pick < bottomCount)
+            {
+                float t = bottomCount <= 1 ? 0.5f : pick / (float)(bottomCount - 1);
+                return new float3(center.x + math.lerp(-half.x, half.x, t), center.y, center.z - half.y);
+            }
+
+            pick -= bottomCount;
+            float topT = topCount <= 1 ? 0.5f : pick / (float)(topCount - 1);
+            return new float3(center.x + math.lerp(-half.x, half.x, topT), center.y, center.z + half.y);
+        }
+
+        private static int ComputeEvenSlotCount(float length, float spacing)
+        {
+            float safeLength = math.max(0f, length);
+            float safeSpacing = math.max(0.001f, spacing);
+            return math.max(1, (int)math.floor(safeLength / safeSpacing) + 1);
         }
 
         private static float3 SampleSpawnPositionUniform(

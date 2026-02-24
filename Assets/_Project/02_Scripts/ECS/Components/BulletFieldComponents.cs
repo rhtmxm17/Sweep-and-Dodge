@@ -43,12 +43,16 @@ namespace SweepNDodge.DotsBullets
     {
         RateField = 0,
         Poisson = 1,
+        EventBurst = 2,
     }
 
     public enum SourceSpawnSamplingModeId : byte
     {
         UniformField = 0,
         PollutionTopK = 1,
+        LineEven = 2,
+        WallEven = 3,
+        PointSet = 4,
     }
 
     public enum SourceSpawnCenterModeId : byte
@@ -56,6 +60,25 @@ namespace SweepNDodge.DotsBullets
         SourceCenter = 0,
         FixedPoint = 1,
         PlayerRelative = 2,
+    }
+
+    public enum SourceSpawnDirectionModeId : byte
+    {
+        Random = 0,
+        NWay = 1,
+        Spiral = 2,
+        RadialBurst = 3,
+    }
+
+    [System.Flags]
+    public enum SourceSpawnWallMaskId : byte
+    {
+        None = 0,
+        Left = 1 << 0,
+        Right = 1 << 1,
+        Bottom = 1 << 2,
+        Top = 1 << 3,
+        All = Left | Right | Bottom | Top,
     }
 
     public enum SourcePollutionSamplingModeId : byte
@@ -111,14 +134,28 @@ namespace SweepNDodge.DotsBullets
         public SourceSpawnModeId SpawnMode;
         public SourceSpawnSamplingModeId SamplingMode;
         public SourceSpawnCenterModeId CenterMode;
+        public SourceSpawnDirectionModeId DirectionMode;
         public float2 FixedPoint;
         public float2 SpawnOffset;
+        public float2 LineStart;
+        public float2 LineEnd;
+        public float SampleSpacing;
+        public SourceSpawnWallMaskId WallMask;
+        public float WallInset;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
+        public float BaseAngleDeg;
+        public int NWayCount;
+        public float SpiralStepDeg;
         public float SpawnDensityPerSecPerArea; // RateField
         public float MeanEventsPerSec;          // Poisson
+        public int BurstRepeatCount;            // EventBurst (-1: infinite)
+        public float BurstIntervalSec;          // EventBurst
+        public int BurstShotsPerEvent;          // EventBurst
+        public int SpawnPriority;               // Higher first
         public float MaxActiveDensityPerArea; // FixedDensity 일 경우 무시
         public float SpawnAccumulator;
+        public int BurstEventsEmitted;
     }
 
     [InternalBufferCapacity(8)]
@@ -140,14 +177,28 @@ namespace SweepNDodge.DotsBullets
         public SourceSpawnModeId SpawnMode;
         public SourceSpawnSamplingModeId SamplingMode;
         public SourceSpawnCenterModeId CenterMode;
+        public SourceSpawnDirectionModeId DirectionMode;
         public float2 FixedPoint;
         public float2 SpawnOffset;
+        public float2 LineStart;
+        public float2 LineEnd;
+        public float SampleSpacing;
+        public SourceSpawnWallMaskId WallMask;
+        public float WallInset;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
+        public float BaseAngleDeg;
+        public int NWayCount;
+        public float SpiralStepDeg;
         public float SpawnDensityPerSecPerArea; // RateField
         public float MeanEventsPerSec;          // Poisson
+        public int BurstRepeatCount;            // EventBurst (-1: infinite)
+        public float BurstIntervalSec;          // EventBurst
+        public int BurstShotsPerEvent;          // EventBurst
+        public int SpawnPriority;               // Higher first
         public float MaxActiveDensityPerArea;
         public float SpawnAccumulator;
+        public int BurstEventsEmitted;
     }
 
     public struct SourceOpeningWaveRuntimeComponent : IComponentData
