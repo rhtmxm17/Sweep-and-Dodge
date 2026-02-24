@@ -34,9 +34,9 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 주요 필드:
   - `FieldShape` (`Circle` / `Rect`)
   - `CenterMode` (`SourceCenter` / `FixedPoint` / `PlayerRelative`)
-  - `SamplingMode` (`UniformField` / `PollutionTopK` / `LineEven` / `WallEven` / `PointSet`)
+  - `SamplingMode` (`UniformField` / `PollutionTopK` / `LineEven` / `WallEven(비활성)` / `PointSet`)
   - `LineStart`, `LineEnd`, `SampleSpacing` (LineEven)
-  - `WallMask`, `WallInset`, `SampleSpacing` (WallEven)
+  - `WallMask`, `WallInset`, `SampleSpacing` (WallEven 전용, 현재 비활성)
   - `PlayerNoSpawnRadius`
   - `SpawnSampleBudget`
 - 원칙:
@@ -70,6 +70,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 역할: 발사 벡터 분포/리듬 제어.
 - 모드:
   - `Random`
+  - `Fixed`
   - `NWay`
   - `Spiral`
   - `RadialBurst`
@@ -105,8 +106,9 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 
 ## 8. MVP 데이터 과잉 방지
 - EmissionMode는 `RateField` / `Poisson` / `EventBurst` 세 가지로 제한한다.
-- DirectionMode는 `Random` / `NWay` / `Spiral` / `RadialBurst` 네 가지로 제한한다.
-- Sampling 확장은 `LineEven` / `WallEven`까지 1차 활성화한다.
+- DirectionMode는 `Random` / `Fixed` / `NWay` / `Spiral` / `RadialBurst` 다섯 가지로 제한한다.
+- Sampling 확장은 `LineEven`만 1차 활성화한다.
+- `WallEven`은 정책상 비활성이다. 입력 시 `LineEven`으로 강제 폴백한다.
 - `PointSet`은 1차에서 계약만 반영하고 런타임 샘플러는 후속 활성화한다.
 
 ## 9. 마이그레이션 체크리스트
@@ -123,6 +125,8 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 본 문서는 스폰 분해 모델과 모드 조합 규칙을 관리한다.
 
 ## 11. 변경 이력
+- 2026-02-24: 혼동 방지를 위해 `WallEven`을 정책 비활성으로 전환하고 입력 시 `LineEven` 폴백 규칙을 추가
+- 2026-02-24: `DirectionMode.Fixed`를 추가해 `LineEven + 고정 방향` 시나리오를 명시적으로 지원
 - 2026-02-24: `EventBurst`를 정식 계약으로 승격하고 `carry` 소비 정책, `DirectionProfile`, `LineEven/WallEven` 1차 범위를 추가
 - 2026-02-24: 공유 예산 정책에서 Trash 최하 우선순위 규칙을 명시
 - 2026-02-23: 실무 적용용 마이그레이션 체크리스트(UseDirectiveProfiles 전환/매핑/검증 루프)를 추가

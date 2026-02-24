@@ -68,6 +68,7 @@ namespace SweepNDodge.DotsBullets
         NWay = 1,
         Spiral = 2,
         RadialBurst = 3,
+        Fixed = 4,
     }
 
     [System.Flags]

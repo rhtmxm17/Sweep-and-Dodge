@@ -147,9 +147,15 @@ namespace SweepNDodge.DotsBullets
 
             public SourceSpawnSamplingModeId ResolveSamplingMode()
             {
-                return UseDirectiveProfiles
-                    ? Sampling.SamplingMode
-                    : SourceSpawnSamplingModeId.PollutionTopK;
+                if (!UseDirectiveProfiles)
+                    return SourceSpawnSamplingModeId.PollutionTopK;
+
+                // Project policy (2026-02): WallEven은 사용하지 않는다.
+                // 기존 데이터 호환을 위해 WallEven 입력 시 LineEven으로 강제 폴백한다.
+                if (Sampling.SamplingMode == SourceSpawnSamplingModeId.WallEven)
+                    return SourceSpawnSamplingModeId.LineEven;
+
+                return Sampling.SamplingMode;
             }
 
             public SourceSpawnCenterModeId ResolveCenterMode()
@@ -189,15 +195,14 @@ namespace SweepNDodge.DotsBullets
 
             public SourceSpawnWallMaskId ResolveWallMask()
             {
-                return UseDirectiveProfiles ? Sampling.WallMask : SourceSpawnWallMaskId.All;
+                // WallEven 비활성 정책으로 전용 설정값은 사용하지 않는다.
+                return SourceSpawnWallMaskId.All;
             }
 
             public float ResolveWallInset()
             {
-                if (!UseDirectiveProfiles)
-                    return 0f;
-
-                return Sampling.WallInset > 0f ? Sampling.WallInset : 0f;
+                // WallEven 비활성 정책으로 전용 설정값은 사용하지 않는다.
+                return 0f;
             }
 
             public SourceSpawnDirectionModeId ResolveDirectionMode()

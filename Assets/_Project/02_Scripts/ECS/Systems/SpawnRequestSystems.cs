@@ -832,6 +832,9 @@ namespace SweepNDodge.DotsBullets
             float angle;
             switch (request.DirectionMode)
             {
+                case SourceSpawnDirectionModeId.Fixed:
+                    angle = baseRad;
+                    break;
                 case SourceSpawnDirectionModeId.Spiral:
                 {
                     float stepRad = math.radians(request.SpiralStepDeg);
@@ -914,10 +917,9 @@ namespace SweepNDodge.DotsBullets
                 }
                 else if (request.SamplingMode == SourceSpawnSamplingModeId.WallEven)
                 {
-                    if (fieldArea.Shape == BulletFieldShapeId.Rectangle)
-                        lastSample = SampleSpawnPositionWallEven(center, in fieldArea, in request, sequence);
-                    else
-                        lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                    // Project policy (2026-02): WallEven은 비활성.
+                    // 입력이 들어와도 LineEven 경로로만 처리한다.
+                    lastSample = SampleSpawnPositionLineEven(center, in request, sequence);
                 }
                 else if (request.SamplingMode == SourceSpawnSamplingModeId.PointSet)
                 {
@@ -1052,58 +1054,6 @@ namespace SweepNDodge.DotsBullets
             float t = slotCount <= 1 ? 0.5f : slotIndex / (float)(slotCount - 1);
             float2 local = math.lerp(startOffset, endOffset, t);
             return new float3(center.x + local.x, center.y, center.z + local.y);
-        }
-
-        private static float3 SampleSpawnPositionWallEven(
-            float3 center,
-            in BulletFieldAreaComponent fieldArea,
-            in SourceSpawnRequestBuffer request,
-            uint sequence)
-        {
-            if (fieldArea.Shape != BulletFieldShapeId.Rectangle)
-                return center;
-
-            float inset = math.max(0f, request.WallInset);
-            float2 half = math.max(0f, fieldArea.Size * 0.5f - new float2(inset, inset));
-            if (half.x <= 1e-5f || half.y <= 1e-5f)
-                return center;
-
-            var mask = request.WallMask == SourceSpawnWallMaskId.None
-                ? SourceSpawnWallMaskId.All
-                : request.WallMask;
-            float spacing = math.max(0.001f, request.SampleSpacing);
-            int leftCount = (mask & SourceSpawnWallMaskId.Left) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.y * 2f, spacing) : 0;
-            int rightCount = (mask & SourceSpawnWallMaskId.Right) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.y * 2f, spacing) : 0;
-            int bottomCount = (mask & SourceSpawnWallMaskId.Bottom) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.x * 2f, spacing) : 0;
-            int topCount = (mask & SourceSpawnWallMaskId.Top) != SourceSpawnWallMaskId.None ? ComputeEvenSlotCount(half.x * 2f, spacing) : 0;
-            int total = leftCount + rightCount + bottomCount + topCount;
-            if (total <= 0)
-                return center;
-
-            int pick = (int)(sequence % (uint)total);
-            if (pick < leftCount)
-            {
-                float t = leftCount <= 1 ? 0.5f : pick / (float)(leftCount - 1);
-                return new float3(center.x - half.x, center.y, center.z + math.lerp(-half.y, half.y, t));
-            }
-
-            pick -= leftCount;
-            if (pick < rightCount)
-            {
-                float t = rightCount <= 1 ? 0.5f : pick / (float)(rightCount - 1);
-                return new float3(center.x + half.x, center.y, center.z + math.lerp(-half.y, half.y, t));
-            }
-
-            pick -= rightCount;
-            if (pick < bottomCount)
-            {
-                float t = bottomCount <= 1 ? 0.5f : pick / (float)(bottomCount - 1);
-                return new float3(center.x + math.lerp(-half.x, half.x, t), center.y, center.z - half.y);
-            }
-
-            pick -= bottomCount;
-            float topT = topCount <= 1 ? 0.5f : pick / (float)(topCount - 1);
-            return new float3(center.x + math.lerp(-half.x, half.x, topT), center.y, center.z + half.y);
         }
 
         private static int ComputeEvenSlotCount(float length, float spacing)

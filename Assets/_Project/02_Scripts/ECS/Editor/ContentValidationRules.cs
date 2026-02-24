@@ -337,6 +337,28 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"Wave segment uses Spiral with near-zero SpiralStepDeg at segmentIndex={s}, entryIndex={e}."));
                             }
 
+                            var rawSamplingMode = entry.UseDirectiveProfiles
+                                ? entry.Sampling.SamplingMode
+                                : SourceSpawnSamplingModeId.PollutionTopK;
+                            if (rawSamplingMode == SourceSpawnSamplingModeId.WallEven)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV025",
+                                    timelines[i].Location,
+                                    $"Wave segment uses WallEven at segmentIndex={s}, entryIndex={e}, but WallEven is disabled by policy. Use LineEven."));
+                            }
+
+                            if (entry.UseDirectiveProfiles &&
+                                (entry.Sampling.WallMask != SourceSpawnWallMaskId.None || Mathf.Abs(entry.Sampling.WallInset) > 0.0001f))
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Warning,
+                                    "CVW034",
+                                    timelines[i].Location,
+                                    $"Wave segment sets WallEven-only fields (WallMask/WallInset) at segmentIndex={s}, entryIndex={e}. These values are ignored by policy."));
+                            }
+
                             var samplingMode = entry.ResolveSamplingMode();
                             if (samplingMode == SourceSpawnSamplingModeId.LineEven)
                             {
@@ -348,18 +370,6 @@ namespace SweepNDodge.DotsBullets.Editor
                                         "CV026",
                                         timelines[i].Location,
                                         $"Wave segment has invalid LineEven parameters at segmentIndex={s}, entryIndex={e}."));
-                                }
-                            }
-
-                            if (samplingMode == SourceSpawnSamplingModeId.WallEven)
-                            {
-                                if (entry.ResolveWallMask() == SourceSpawnWallMaskId.None || entry.Sampling.SampleSpacing <= 0f)
-                                {
-                                    issues.Add(new ContentValidationIssue(
-                                        ContentValidationSeverity.Error,
-                                        "CV027",
-                                        timelines[i].Location,
-                                        $"Wave segment has invalid WallEven parameters at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
 
