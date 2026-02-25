@@ -222,6 +222,9 @@ namespace SweepNDodge.DotsBullets
             requests.Add(new SourceSpawnRequestBuffer
             {
                 DirectiveId = target.DirectiveId,
+                Phase = SourceWavePhaseId.Sustain,
+                Lane = ResolveLegacyLane(target.SpawnPriority),
+                LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(ResolveLegacyLane(target.SpawnPriority)),
                 BulletTypeKey = target.BulletTypeKey,
                 SamplingMode = target.SamplingMode,
                 CenterMode = target.CenterMode,
@@ -242,6 +245,11 @@ namespace SweepNDodge.DotsBullets
                 Count = count,
                 OldestFrame = frame,
             });
+        }
+
+        private static SourceSpawnLaneId ResolveLegacyLane(int spawnPriority)
+        {
+            return spawnPriority <= -100 ? SourceSpawnLaneId.Trash : SourceSpawnLaneId.Hazard;
         }
 
         private int SafeAdd(int lhs, int rhs)

@@ -558,6 +558,261 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void V3_EventHardPreemption_RemovesSustainPendingImmediately()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("V3HardPreemptionWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 8192, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+                EnableV3Source(em, source, stableId: 101u, activeState: SourceStateId.Normal);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+
+                var sourceData = em.GetComponentData<SourceSpawnComponent>(source);
+                sourceData.State = SourceStateId.Weakened;
+                em.SetComponentData(source, sourceData);
+
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 9101,
+                    clipId: 1101,
+                    phase: SourceWavePhaseId.OnStateEnterOnce,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Weakened,
+                    startSec: 0f,
+                    endSec: 5f,
+                    ratePerSecPerArea: 6f));
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = 2001,
+                    ElapsedSec = 0.25f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8101,
+                    Phase = SourceWavePhaseId.Sustain,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    DirectionMode = SourceSpawnDirectionModeId.Random,
+                    FixedPoint = float2.zero,
+                    SpawnOffset = float2.zero,
+                    LineStart = float2.zero,
+                    LineEnd = float2.zero,
+                    SampleSpacing = 1f,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    BaseAngleDeg = 0f,
+                    NWayCount = 1,
+                    SpiralStepDeg = 0f,
+                    BurstShotsPerEvent = 1,
+                    SpawnPriority = 1,
+                    SpawnSequence = 0u,
+                    Count = 5,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d, 1f));
+                simGroup.Update();
+
+                var eventRuntime = em.GetComponentData<SourceEventRuntimeComponent>(source);
+                Assert.That(eventRuntime.IsPlaying, Is.EqualTo(1), "Event clip must start immediately on state-trigger");
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(HasPendingForPhase(requestsAfter, SourceWavePhaseId.Sustain), Is.False, "Hard preemption must remove pending sustain requests");
+                Assert.That(HasPendingForPhase(requestsAfter, SourceWavePhaseId.OnStateEnterOnce), Is.True, "Event clip requests should remain pending");
+
+                var laneAfter = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source)[0];
+                Assert.That(laneAfter.ActiveClipId, Is.EqualTo(0), "Sustain lane must be interrupted while event clip is active");
+                Assert.That(laneAfter.LastClipId, Is.EqualTo(2001), "Interrupted sustain clip should be retained as last clip for next selection");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void V3_EventQueue_DuplicateTriggers_AreQueuedAndConsumedSequentially()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("V3EventQueueWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 8192, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+                EnableV3Source(em, source, stableId: 102u, activeState: SourceStateId.Normal);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 9201,
+                    clipId: 3101,
+                    phase: SourceWavePhaseId.OnStateEnterOnce,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 0.5f,
+                    ratePerSecPerArea: 2f));
+
+                var eventQueue = em.GetBuffer<SourceEventQueueBuffer>(source);
+                eventQueue.Clear();
+                eventQueue.Add(new SourceEventQueueBuffer { TriggerState = SourceStateId.Normal, QueuedFrame = 0u });
+                eventQueue.Add(new SourceEventQueueBuffer { TriggerState = SourceStateId.Normal, QueuedFrame = 0u });
+
+                double elapsed = 0d;
+                elapsed += 0.1d;
+                world.SetTime(new TimeData(elapsed, 0.1f));
+                simGroup.Update();
+
+                Assert.That(em.GetBuffer<SourceEventQueueBuffer>(source).Length, Is.EqualTo(1), "One queued event should remain while first is playing");
+                Assert.That(em.GetComponentData<SourceEventRuntimeComponent>(source).IsPlaying, Is.EqualTo(1));
+
+                elapsed += 1.0d;
+                world.SetTime(new TimeData(elapsed, 1.0f));
+                simGroup.Update();
+
+                Assert.That(em.GetBuffer<SourceEventQueueBuffer>(source).Length, Is.EqualTo(1), "Second queued event must remain queued until next start window");
+                Assert.That(em.GetComponentData<SourceEventRuntimeComponent>(source).IsPlaying, Is.EqualTo(0), "First event should have ended");
+
+                elapsed += 0.1d;
+                world.SetTime(new TimeData(elapsed, 0.1f));
+                simGroup.Update();
+
+                Assert.That(em.GetBuffer<SourceEventQueueBuffer>(source).Length, Is.EqualTo(0), "Queued duplicate trigger must eventually be consumed");
+                Assert.That(em.GetComponentData<SourceEventRuntimeComponent>(source).IsPlaying, Is.EqualTo(1), "Second queued event should start after first completes");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void V3_SustainChain_ExcludesLastClip_WhenAlternativeExists()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("V3SustainChainWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 8192, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+                EnableV3Source(em, source, stableId: 103u, activeState: SourceStateId.Normal);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+
+                const int firstClipId = 4001;
+                const int secondClipId = 4002;
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 9301,
+                    clipId: firstClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 1f,
+                    ratePerSecPerArea: 0f));
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 9302,
+                    clipId: secondClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 1f,
+                    ratePerSecPerArea: 0f));
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Normal,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = firstClipId,
+                    Weight = 1f
+                });
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Normal,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = secondClipId,
+                    Weight = 1f
+                });
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = 0,
+                    ElapsedSec = 0f,
+                    LastClipId = firstClipId,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                var laneAfter = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source)[0];
+                Assert.That(laneAfter.ActiveClipId, Is.EqualTo(secondClipId), "When alternatives exist, sustain chain must exclude immediately previous clip");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);
@@ -658,6 +913,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var cursorEntity = em.CreateEntity(typeof(SpawnBudgetCursorComponent));
             em.SetComponentData(cursorEntity, new SpawnBudgetCursorComponent { SourceStartIndex = 0 });
+
+            var runSeedEntity = em.CreateEntity(typeof(SpawnRunSeedComponent));
+            em.SetComponentData(runSeedEntity, new SpawnRunSeedComponent { Value = 0x9E3779B9u });
         }
 
         private static Entity CreateSource(EntityManager em, int typeKey, float spawnDensityPerSecPerArea)
@@ -759,6 +1017,138 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return total;
+        }
+
+        private static bool HasPendingForPhase(DynamicBuffer<SourceSpawnRequestBuffer> requests, SourceWavePhaseId phase)
+        {
+            for (int i = 0; i < requests.Length; i++)
+            {
+                if (requests[i].Count <= 0)
+                    continue;
+                if (requests[i].Phase != phase)
+                    continue;
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void EnableV3Source(EntityManager em, Entity source, uint stableId, SourceStateId activeState)
+        {
+            if (!em.HasComponent<SourceStableIdComponent>(source))
+            {
+                em.AddComponentData(source, new SourceStableIdComponent
+                {
+                    Value = math.max(1u, stableId)
+                });
+            }
+            else
+            {
+                em.SetComponentData(source, new SourceStableIdComponent
+                {
+                    Value = math.max(1u, stableId)
+                });
+            }
+
+            if (!em.HasComponent<SourceSustainRuntimeComponent>(source))
+            {
+                em.AddComponentData(source, new SourceSustainRuntimeComponent
+                {
+                    ActiveState = activeState
+                });
+            }
+            else
+            {
+                em.SetComponentData(source, new SourceSustainRuntimeComponent
+                {
+                    ActiveState = activeState
+                });
+            }
+
+            if (!em.HasComponent<SourceEventRuntimeComponent>(source))
+            {
+                em.AddComponentData(source, new SourceEventRuntimeComponent
+                {
+                    IsPlaying = 0,
+                    ActiveEventClipId = 0,
+                    TriggerState = activeState,
+                    ElapsedSec = 0f,
+                    SelectionSequence = 1u,
+                });
+            }
+            else
+            {
+                em.SetComponentData(source, new SourceEventRuntimeComponent
+                {
+                    IsPlaying = 0,
+                    ActiveEventClipId = 0,
+                    TriggerState = activeState,
+                    ElapsedSec = 0f,
+                    SelectionSequence = 1u,
+                });
+            }
+
+            if (!em.HasBuffer<SourceClipPatternBuffer>(source))
+                em.AddBuffer<SourceClipPatternBuffer>(source);
+            if (!em.HasBuffer<SourceSustainSlotCandidateBuffer>(source))
+                em.AddBuffer<SourceSustainSlotCandidateBuffer>(source);
+            if (!em.HasBuffer<SourceSustainRuntimeLaneBuffer>(source))
+                em.AddBuffer<SourceSustainRuntimeLaneBuffer>(source);
+            if (!em.HasBuffer<SourceEventQueueBuffer>(source))
+                em.AddBuffer<SourceEventQueueBuffer>(source);
+
+            em.GetBuffer<SourceClipPatternBuffer>(source).Clear();
+            em.GetBuffer<SourceSustainSlotCandidateBuffer>(source).Clear();
+            em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source).Clear();
+            em.GetBuffer<SourceEventQueueBuffer>(source).Clear();
+        }
+
+        private static SourceClipPatternBuffer CreateClipPattern(
+            int directiveId,
+            int clipId,
+            SourceWavePhaseId phase,
+            SourceSpawnLaneId lane,
+            SourceStateId triggerState,
+            float startSec,
+            float endSec,
+            float ratePerSecPerArea)
+        {
+            return new SourceClipPatternBuffer
+            {
+                DirectiveId = directiveId,
+                ClipId = clipId,
+                Phase = phase,
+                Lane = lane,
+                TriggerState = triggerState,
+                LocalStartSec = startSec,
+                LocalEndSec = endSec,
+                BulletTypeKey = 1,
+                EmissionMode = SourceSpawnEmissionModeId.RateField,
+                SpawnMode = SourceSpawnModeId.FixedDensity,
+                SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                DirectionMode = SourceSpawnDirectionModeId.Random,
+                FixedPoint = float2.zero,
+                SpawnOffset = float2.zero,
+                LineStart = float2.zero,
+                LineEnd = float2.zero,
+                SampleSpacing = 1f,
+                SpawnSampleBudget = 16,
+                PlayerNoSpawnRadius = 0f,
+                BaseAngleDeg = 0f,
+                NWayCount = 1,
+                SpiralStepDeg = 0f,
+                SpawnDensityPerSecPerArea = ratePerSecPerArea,
+                MeanEventsPerSec = 0f,
+                BurstRepeatCount = 1,
+                BurstIntervalSec = 1f,
+                BurstShotsPerEvent = 1,
+                LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(lane),
+                MaxActiveDensityPerArea = 0f,
+                SpawnAccumulator = 0f,
+                BurstEventsEmitted = 0,
+            };
         }
 
         private static bool HasDirective(DynamicBuffer<SourceSpawnRequestBuffer> requests, int directiveId)

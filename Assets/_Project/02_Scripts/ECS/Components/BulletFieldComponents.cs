@@ -273,6 +273,7 @@ namespace SweepNDodge.DotsBullets
         public float ElapsedSec;
         public int LastClipId;
         public uint SelectionSequence;
+        public uint LastMissingLogFrame;
     }
 
     public struct SourceSustainRuntimeComponent : IComponentData
@@ -286,6 +287,7 @@ namespace SweepNDodge.DotsBullets
         public int ActiveEventClipId;
         public SourceStateId TriggerState;
         public float ElapsedSec;
+        public uint SelectionSequence;
     }
 
     [InternalBufferCapacity(8)]

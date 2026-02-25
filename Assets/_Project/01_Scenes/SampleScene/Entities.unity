@@ -154,6 +154,35 @@ MonoBehaviour:
   FieldRadius: 8
   FieldSize: {x: 12, y: 8}
   WaveTimeline: {fileID: 11400000, guid: 15d95fa8413245f44b92481c204d7663, type: 2}
+  SustainClipSlots:
+  - State: 0
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
+    Weights:
+    - 1
+  - State: 0
+    Lane: 1
+    Clips:
+    - {fileID: 11400000, guid: 7cc14ff5ce5f4a488af830fda539f93d, type: 2}
+    Weights:
+    - 1
+  - State: 1
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
+    Weights:
+    - 1
+  - State: 1
+    Lane: 1
+    Clips:
+    - {fileID: 11400000, guid: 13955e787a1b4edfa70b980acec4da95, type: 2}
+    Weights:
+    - 1
+  EventClipSlots:
+  - TriggerState: 1
+    EventClips:
+    - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
   WeakenedOpeningWave: {fileID: 11400000, guid: 337f7e4d624828549ad80847cbfec67d, type: 2}
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
@@ -274,6 +303,20 @@ MonoBehaviour:
   FieldRadius: 8
   FieldSize: {x: 12, y: 8}
   WaveTimeline: {fileID: 11400000, guid: 45fa3b8cc874098478af2f637c74c2a8, type: 2}
+  SustainClipSlots:
+  - State: 0
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
+    Weights:
+    - 1
+  - State: 1
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
+    Weights:
+    - 1
+  EventClipSlots: []
   WeakenedOpeningWave: {fileID: 0}
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000
@@ -596,6 +639,35 @@ MonoBehaviour:
   FieldRadius: 8
   FieldSize: {x: 16, y: 12}
   WaveTimeline: {fileID: 11400000, guid: 15d95fa8413245f44b92481c204d7663, type: 2}
+  SustainClipSlots:
+  - State: 0
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
+    Weights:
+    - 1
+  - State: 0
+    Lane: 1
+    Clips:
+    - {fileID: 11400000, guid: 7cc14ff5ce5f4a488af830fda539f93d, type: 2}
+    Weights:
+    - 1
+  - State: 1
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
+    Weights:
+    - 1
+  - State: 1
+    Lane: 1
+    Clips:
+    - {fileID: 11400000, guid: 13955e787a1b4edfa70b980acec4da95, type: 2}
+    Weights:
+    - 1
+  EventClipSlots:
+  - TriggerState: 1
+    EventClips:
+    - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
   WeakenedOpeningWave: {fileID: 0}
   ThresholdWeakened: 2000
   ThresholdDepleted: 4000

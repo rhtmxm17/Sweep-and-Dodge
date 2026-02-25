@@ -34,7 +34,9 @@ namespace SweepNDodge.DotsBullets
             float deltaTime = SystemAPI.Time.DeltaTime;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
             var openingWaveRuntimeLookup = SystemAPI.GetComponentLookup<SourceOpeningWaveRuntimeComponent>(true);
+            var clipPatternLookup = SystemAPI.GetBufferLookup<SourceClipPatternBuffer>(true);
             openingWaveRuntimeLookup.Update(ref state);
+            clipPatternLookup.Update(ref state);
 
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
             var metrics = metricsRW.ValueRO;
@@ -67,6 +69,8 @@ namespace SweepNDodge.DotsBullets
                 if (source.ValueRO.State == SourceStateId.Depleted)
                     continue;
                 if (patternsRW.Length <= 0)
+                    continue;
+                if (clipPatternLookup.HasBuffer(sourceEntity) && clipPatternLookup[sourceEntity].Length > 0)
                     continue;
 
                 bool suppressStateSustainedPattern = false;
@@ -241,6 +245,9 @@ namespace SweepNDodge.DotsBullets
             requests.Add(new SourceSpawnRequestBuffer
             {
                 DirectiveId = pattern.DirectiveId,
+                Phase = SourceWavePhaseId.Sustain,
+                Lane = ResolveLegacyLane(pattern.SpawnPriority),
+                LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(ResolveLegacyLane(pattern.SpawnPriority)),
                 BulletTypeKey = pattern.BulletTypeKey,
                 SamplingMode = pattern.SamplingMode,
                 CenterMode = pattern.CenterMode,
@@ -261,6 +268,11 @@ namespace SweepNDodge.DotsBullets
                 Count = count,
                 OldestFrame = frame,
             });
+        }
+
+        private static SourceSpawnLaneId ResolveLegacyLane(int spawnPriority)
+        {
+            return spawnPriority <= -100 ? SourceSpawnLaneId.Trash : SourceSpawnLaneId.Hazard;
         }
 
         private static Unity.Mathematics.Random CreateDeterministicRandom(Entity sourceEntity, int directiveId, uint frame, uint salt)
@@ -622,6 +634,7 @@ namespace SweepNDodge.DotsBullets
             ref NativeParallelMultiHashMap<int, Entity> freeByKey)
         {
             int bestIndex = -1;
+            int bestLanePriority = int.MinValue;
             int bestPriority = int.MinValue;
             uint bestOldest = uint.MaxValue;
 
@@ -634,10 +647,13 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 if (bestIndex < 0
-                    || item.SpawnPriority > bestPriority
-                    || (item.SpawnPriority == bestPriority && item.OldestFrame < bestOldest))
+                    || item.LanePriority > bestLanePriority
+                    || (item.LanePriority == bestLanePriority
+                        && (item.SpawnPriority > bestPriority
+                            || (item.SpawnPriority == bestPriority && item.OldestFrame < bestOldest))))
                 {
                     bestIndex = i;
+                    bestLanePriority = item.LanePriority;
                     bestPriority = item.SpawnPriority;
                     bestOldest = item.OldestFrame;
                 }

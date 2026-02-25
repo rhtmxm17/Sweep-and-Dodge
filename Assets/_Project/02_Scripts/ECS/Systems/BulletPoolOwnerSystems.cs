@@ -199,6 +199,15 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
+            if (!HasSingleton<SpawnRunSeedComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(SpawnRunSeedComponent));
+                em.SetComponentData(e, new SpawnRunSeedComponent
+                {
+                    Value = 1u,
+                });
+            }
+
             if (!HasSingleton<DebugHudMetricsComponent>(em))
             {
                 var e = em.CreateEntity(typeof(DebugHudMetricsComponent));

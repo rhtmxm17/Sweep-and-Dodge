@@ -30,6 +30,8 @@ namespace SweepNDodge.DotsBullets
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
             float deltaTime = SystemAPI.Time.DeltaTime;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
+            var clipPatternLookup = SystemAPI.GetBufferLookup<SourceClipPatternBuffer>(true);
+            clipPatternLookup.Update(ref state);
 
             int pendingTotal = 0;
             foreach (var requests in SystemAPI.Query<DynamicBuffer<SourceSpawnRequestBuffer>>())
@@ -54,6 +56,11 @@ namespace SweepNDodge.DotsBullets
                 var sourceState = source.ValueRO.State;
                 var patternsRW = openingPatterns;
                 var requestsRW = requests;
+                if (clipPatternLookup.HasBuffer(sourceEntity) && clipPatternLookup[sourceEntity].Length > 0)
+                {
+                    runtimeRW.ValueRW = runtime;
+                    continue;
+                }
 
                 if (sourceState != runtime.LastState)
                 {
@@ -274,6 +281,9 @@ namespace SweepNDodge.DotsBullets
             requests.Add(new SourceSpawnRequestBuffer
             {
                 DirectiveId = pattern.DirectiveId,
+                Phase = SourceWavePhaseId.OnStateEnterOnce,
+                Lane = ResolveLegacyLane(pattern.SpawnPriority),
+                LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(ResolveLegacyLane(pattern.SpawnPriority)),
                 BulletTypeKey = pattern.BulletTypeKey,
                 SamplingMode = pattern.SamplingMode,
                 CenterMode = pattern.CenterMode,
@@ -294,6 +304,11 @@ namespace SweepNDodge.DotsBullets
                 Count = count,
                 OldestFrame = frame
             });
+        }
+
+        private static SourceSpawnLaneId ResolveLegacyLane(int spawnPriority)
+        {
+            return spawnPriority <= -100 ? SourceSpawnLaneId.Trash : SourceSpawnLaneId.Hazard;
         }
 
         private static Unity.Mathematics.Random CreateDeterministicRandom(Entity sourceEntity, int directiveId, uint frame, uint salt)

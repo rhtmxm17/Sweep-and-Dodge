@@ -7,6 +7,9 @@ namespace SweepNDodge.DotsBullets
     public struct SourceSpawnRequestBuffer : IBufferElementData
     {
         public int DirectiveId;
+        public SourceWavePhaseId Phase;
+        public SourceSpawnLaneId Lane;
+        public int LanePriority;
         public int BulletTypeKey;
         public SourceSpawnSamplingModeId SamplingMode;
         public SourceSpawnCenterModeId CenterMode;
@@ -57,5 +60,17 @@ namespace SweepNDodge.DotsBullets
     public struct SpawnBudgetCursorComponent : IComponentData
     {
         public int SourceStartIndex;
+    }
+
+    // Global deterministic run seed for v3 clip/lane selection.
+    public struct SpawnRunSeedComponent : IComponentData
+    {
+        public uint Value;
+    }
+
+    // Stable per-source identifier used by deterministic lane selection.
+    public struct SourceStableIdComponent : IComponentData
+    {
+        public uint Value;
     }
 }

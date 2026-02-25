@@ -1,6 +1,7 @@
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using System.Text;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -65,6 +66,11 @@ namespace SweepNDodge.DotsBullets
                     ThresholdDepleted = thresholdDepleted,
                     CollectedCount = Mathf.Max(0, authoring.InitialCollectedCount),
                     State = authoring.InitialState
+                });
+
+                AddComponent(e, new SourceStableIdComponent
+                {
+                    Value = ComputeStableSourceId(authoring.transform, authoring.transform.position),
                 });
 
                 AddComponent(e, new BulletFieldAreaComponent
@@ -138,7 +144,8 @@ namespace SweepNDodge.DotsBullets
                     IsPlaying = 0,
                     ActiveEventClipId = 0,
                     TriggerState = authoring.InitialState,
-                    ElapsedSec = 0f
+                    ElapsedSec = 0f,
+                    SelectionSequence = 1u,
                 });
 
                 BakeV3ClipBindings(
@@ -501,7 +508,8 @@ namespace SweepNDodge.DotsBullets
                     ActiveClipId = 0,
                     ElapsedSec = 0f,
                     LastClipId = 0,
-                    SelectionSequence = 1u
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
                 });
             }
 
@@ -534,6 +542,41 @@ namespace SweepNDodge.DotsBullets
                     BulletTypeKey = typeKey,
                     ActiveCount = 0
                 });
+            }
+
+            private static uint ComputeStableSourceId(Transform sourceTransform, Vector3 sourcePosition)
+            {
+                if (sourceTransform == null)
+                    return 1u;
+
+                var sb = new StringBuilder(128);
+                AppendHierarchyPath(sb, sourceTransform);
+
+                // Quantized position is included to reduce collisions for same-name siblings.
+                int px = Mathf.RoundToInt(sourcePosition.x * 100f);
+                int py = Mathf.RoundToInt(sourcePosition.y * 100f);
+                int pz = Mathf.RoundToInt(sourcePosition.z * 100f);
+                sb.Append('|').Append(px).Append(',').Append(py).Append(',').Append(pz);
+
+                uint hash = 2166136261u;
+                for (int i = 0; i < sb.Length; i++)
+                {
+                    hash ^= sb[i];
+                    hash *= 16777619u;
+                }
+
+                return math.max(1u, hash);
+            }
+
+            private static void AppendHierarchyPath(StringBuilder sb, Transform t)
+            {
+                if (t.parent != null)
+                {
+                    AppendHierarchyPath(sb, t.parent);
+                    sb.Append('/');
+                }
+
+                sb.Append(t.name);
             }
 
             private static void BakePollutionGrid(
