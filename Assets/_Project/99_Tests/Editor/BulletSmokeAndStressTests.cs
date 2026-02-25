@@ -157,61 +157,58 @@ namespace SweepNDodge.DotsBullets.Tests
                     ComputedArea = 1f,
                 });
 
-                var patterns = em.GetBuffer<SourceSpawnPatternBuffer>(source);
-                patterns.Clear();
-                patterns.Add(new SourceSpawnPatternBuffer
+                EnableV3Source(em, source, stableId: 11u, activeState: SourceStateId.Normal);
+                const int mergeClipId = 1101;
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 101,
+                    clipId: mergeClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 1f,
+                    ratePerSecPerArea: 2f));
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 101,
+                    clipId: mergeClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 1f,
+                    ratePerSecPerArea: 3f));
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 202,
+                    clipId: mergeClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 1f,
+                    ratePerSecPerArea: 5f));
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
                 {
-                    DirectiveId = 101,
                     State = SourceStateId.Normal,
-                    BulletTypeKey = 1,
-                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = float2.zero,
-                    SpawnOffset = float2.zero,
-                    SpawnSampleBudget = 16,
-                    PlayerNoSpawnRadius = 0f,
-                    SpawnDensityPerSecPerArea = 2f,
-                    MeanEventsPerSec = 0f,
-                    MaxActiveDensityPerArea = 0f,
-                    SpawnAccumulator = 0f,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = mergeClipId,
+                    Weight = 1f
                 });
-                patterns.Add(new SourceSpawnPatternBuffer
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
                 {
-                    DirectiveId = 101,
-                    State = SourceStateId.Normal,
-                    BulletTypeKey = 1,
-                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = float2.zero,
-                    SpawnOffset = float2.zero,
-                    SpawnSampleBudget = 16,
-                    PlayerNoSpawnRadius = 0f,
-                    SpawnDensityPerSecPerArea = 3f,
-                    MeanEventsPerSec = 0f,
-                    MaxActiveDensityPerArea = 0f,
-                    SpawnAccumulator = 0f,
-                });
-                patterns.Add(new SourceSpawnPatternBuffer
-                {
-                    DirectiveId = 202,
-                    State = SourceStateId.Normal,
-                    BulletTypeKey = 1,
-                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = float2.zero,
-                    SpawnOffset = float2.zero,
-                    SpawnSampleBudget = 16,
-                    PlayerNoSpawnRadius = 0f,
-                    SpawnDensityPerSecPerArea = 5f,
-                    MeanEventsPerSec = 0f,
-                    MaxActiveDensityPerArea = 0f,
-                    SpawnAccumulator = 0f,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = mergeClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u
                 });
 
                 world.SetTime(new TimeData(1d, 1f));
@@ -407,25 +404,43 @@ namespace SweepNDodge.DotsBullets.Tests
                     ComputedArea = 1f,
                 });
 
-                var patterns = em.GetBuffer<SourceSpawnPatternBuffer>(source);
-                patterns.Clear();
-                patterns.Add(new SourceSpawnPatternBuffer
+                EnableV3Source(em, source, stableId: 12u, activeState: SourceStateId.Normal);
+                const int poissonClipId = 1201;
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                var poissonPattern = CreateClipPattern(
+                    directiveId: 7001,
+                    clipId: poissonClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 10f,
+                    ratePerSecPerArea: 0f);
+                poissonPattern.EmissionMode = SourceSpawnEmissionModeId.Poisson;
+                poissonPattern.MeanEventsPerSec = 3600f;
+                clipPatterns.Add(poissonPattern);
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
                 {
-                    DirectiveId = 7001,
                     State = SourceStateId.Normal,
-                    BulletTypeKey = 1,
-                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
-                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = float2.zero,
-                    SpawnOffset = float2.zero,
-                    SpawnSampleBudget = 16,
-                    PlayerNoSpawnRadius = 0f,
-                    SpawnDensityPerSecPerArea = 0f,
-                    MeanEventsPerSec = 3600f,
-                    MaxActiveDensityPerArea = 0f,
-                    SpawnAccumulator = 0f,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = poissonClipId,
+                    Weight = 1f
+                });
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = poissonClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u
                 });
 
                 var pendingAfterFrame = new int[3];
@@ -464,43 +479,49 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 7000, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var sourceEntity = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                var patterns = em.GetBuffer<SourceSpawnPatternBuffer>(sourceEntity);
-                patterns.Clear();
-                patterns.Add(new SourceSpawnPatternBuffer
+                EnableV3Source(em, sourceEntity, stableId: 13u, activeState: SourceStateId.Normal);
+                const int multiDirectiveClipId = 1301;
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(sourceEntity);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 801,
+                    clipId: multiDirectiveClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 1f,
+                    ratePerSecPerArea: 450f));
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 802,
+                    clipId: multiDirectiveClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 1f,
+                    ratePerSecPerArea: 450f));
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(sourceEntity);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
                 {
-                    DirectiveId = 801,
                     State = SourceStateId.Normal,
-                    BulletTypeKey = 1,
-                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = float2.zero,
-                    SpawnOffset = float2.zero,
-                    SpawnSampleBudget = 16,
-                    PlayerNoSpawnRadius = 0f,
-                    SpawnDensityPerSecPerArea = 450f,
-                    MeanEventsPerSec = 0f,
-                    MaxActiveDensityPerArea = 0f,
-                    SpawnAccumulator = 0f,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = multiDirectiveClipId,
+                    Weight = 1f
                 });
-                patterns.Add(new SourceSpawnPatternBuffer
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(sourceEntity);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
                 {
-                    DirectiveId = 802,
-                    State = SourceStateId.Normal,
-                    BulletTypeKey = 1,
-                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = float2.zero,
-                    SpawnOffset = float2.zero,
-                    SpawnSampleBudget = 16,
-                    PlayerNoSpawnRadius = 0f,
-                    SpawnDensityPerSecPerArea = 450f,
-                    MeanEventsPerSec = 0f,
-                    MaxActiveDensityPerArea = 0f,
-                    SpawnAccumulator = 0f,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = multiDirectiveClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u
                 });
 
                 int maxBudgetUsed = 0;
@@ -890,10 +911,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(cfgEntity, new BulletFieldConfigComponent
             {
                 PoolSize = 6000,
-                MaxActiveTarget = 6000,
-                CellSize = 1.6f,
                 InvCellSize = 1f / 1.6f,
-                BulletLifetime = 0f,
             });
             em.SetComponentData(cfgEntity, new MetaScrapComponent { Value = 0 });
 
@@ -943,28 +961,47 @@ namespace SweepNDodge.DotsBullets.Tests
                 ComputedArea = 400f,
             });
 
-            var patterns = em.AddBuffer<SourceSpawnPatternBuffer>(source);
-            patterns.Add(new SourceSpawnPatternBuffer
-            {
-                DirectiveId = 1,
-                State = SourceStateId.Normal,
-                BulletTypeKey = typeKey,
-                EmissionMode = SourceSpawnEmissionModeId.RateField,
-                SpawnMode = SourceSpawnModeId.FixedDensity,
-                SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                FixedPoint = float2.zero,
-                SpawnOffset = float2.zero,
-                SpawnSampleBudget = 16,
-                PlayerNoSpawnRadius = 0f,
-                SpawnDensityPerSecPerArea = spawnDensityPerSecPerArea,
-                MeanEventsPerSec = 0f,
-                MaxActiveDensityPerArea = 0f,
-                SpawnAccumulator = 0f,
-            });
-
             em.AddBuffer<SourceSpawnRequestBuffer>(source);
             em.AddBuffer<SourceActiveBulletCountBuffer>(source);
+            EnableV3Source(em, source, stableId: (uint)math.max(1, source.Index + 1), activeState: SourceStateId.Normal);
+
+            const int defaultClipId = 1001;
+            var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+            clipPatterns.Clear();
+            var defaultPattern = CreateClipPattern(
+                directiveId: 1,
+                clipId: defaultClipId,
+                phase: SourceWavePhaseId.Sustain,
+                lane: SourceSpawnLaneId.Hazard,
+                triggerState: SourceStateId.Normal,
+                startSec: 0f,
+                endSec: 1f,
+                ratePerSecPerArea: spawnDensityPerSecPerArea);
+            defaultPattern.BulletTypeKey = typeKey;
+            clipPatterns.Add(defaultPattern);
+
+            var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+            sustainCandidates.Clear();
+            sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+            {
+                State = SourceStateId.Normal,
+                Lane = SourceSpawnLaneId.Hazard,
+                ClipId = defaultClipId,
+                Weight = 1f
+            });
+
+            var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+            sustainLanes.Clear();
+            sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+            {
+                Lane = SourceSpawnLaneId.Hazard,
+                ActiveClipId = defaultClipId,
+                ElapsedSec = 0f,
+                LastClipId = 0,
+                SelectionSequence = 1u,
+                LastMissingLogFrame = 0u
+            });
+
             return source;
         }
 

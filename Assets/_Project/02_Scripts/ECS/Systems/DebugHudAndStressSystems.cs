@@ -8,7 +8,7 @@ using UnityEngine;
 namespace SweepNDodge.DotsBullets
 {
     [UpdateInGroup(typeof(BulletRequestGroup))]
-    [UpdateBefore(typeof(SourceSpawnRequestBuildSystem))]
+    [UpdateBefore(typeof(SourceClipRequestBuildSystem))]
     public partial struct DebugStressSwitchRequestSystem : ISystem
     {
         private struct StressTarget
@@ -95,11 +95,9 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
-            var patternLookup = SystemAPI.GetBufferLookup<SourceSpawnPatternBuffer>(true);
             var clipPatternLookup = SystemAPI.GetBufferLookup<SourceClipPatternBuffer>(true);
             var requestLookup = SystemAPI.GetBufferLookup<SourceSpawnRequestBuffer>(false);
             sourceLookup.Update(ref state);
-            patternLookup.Update(ref state);
             clipPatternLookup.Update(ref state);
             requestLookup.Update(ref state);
 
@@ -114,36 +112,6 @@ namespace SweepNDodge.DotsBullets
                 if (!sourceLookup.HasComponent(sourceEntity))
                     continue;
                 var sourceState = sourceLookup[sourceEntity].State;
-
-                if (patternLookup.TryGetBuffer(sourceEntity, out var patterns)
-                    && patterns.Length > 0
-                    && TryResolveLegacyDirective(preferredTypeKey, sourceState, patterns, out var resolvedLegacy))
-                {
-                    var legacyLane = ResolveLegacyLane(resolvedLegacy.SpawnPriority);
-                    targets.Add(new StressTarget
-                    {
-                        Entity = sourceEntity,
-                        DirectiveId = resolvedLegacy.DirectiveId,
-                        Lane = legacyLane,
-                        LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(legacyLane),
-                        BulletTypeKey = resolvedLegacy.BulletTypeKey,
-                        SamplingMode = resolvedLegacy.SamplingMode,
-                        CenterMode = resolvedLegacy.CenterMode,
-                        DirectionMode = resolvedLegacy.DirectionMode,
-                        FixedPoint = resolvedLegacy.FixedPoint,
-                        SpawnOffset = resolvedLegacy.SpawnOffset,
-                        LineStart = resolvedLegacy.LineStart,
-                        LineEnd = resolvedLegacy.LineEnd,
-                        SampleSpacing = resolvedLegacy.SampleSpacing,
-                        SpawnSampleBudget = resolvedLegacy.SpawnSampleBudget,
-                        PlayerNoSpawnRadius = resolvedLegacy.PlayerNoSpawnRadius,
-                        BaseAngleDeg = resolvedLegacy.BaseAngleDeg,
-                        NWayCount = resolvedLegacy.NWayCount,
-                        SpiralStepDeg = resolvedLegacy.SpiralStepDeg,
-                        BurstShotsPerEvent = resolvedLegacy.BurstShotsPerEvent,
-                    });
-                    continue;
-                }
 
                 if (clipPatternLookup.TryGetBuffer(sourceEntity, out var clipPatterns)
                     && clipPatterns.Length > 0
@@ -192,44 +160,6 @@ namespace SweepNDodge.DotsBullets
 
                 AddOrMergeRequest(requests, in target, count, frame);
             }
-        }
-
-        private bool TryResolveLegacyDirective(
-            int preferredTypeKey,
-            SourceStateId sourceState,
-            DynamicBuffer<SourceSpawnPatternBuffer> patterns,
-            out SourceSpawnPatternBuffer resolved)
-        {
-            resolved = default;
-            if (patterns.Length <= 0)
-                return false;
-
-            for (int i = 0; i < patterns.Length; i++)
-            {
-                var pattern = patterns[i];
-                if (preferredTypeKey >= 0 && pattern.BulletTypeKey != preferredTypeKey)
-                    continue;
-                if (pattern.State == sourceState)
-                {
-                    resolved = pattern;
-                    return true;
-                }
-            }
-
-            if (preferredTypeKey >= 0)
-            {
-                for (int i = 0; i < patterns.Length; i++)
-                {
-                    if (patterns[i].BulletTypeKey != preferredTypeKey)
-                        continue;
-
-                    resolved = patterns[i];
-                    return true;
-                }
-            }
-
-            resolved = patterns[0];
-            return true;
         }
 
         private bool TryResolveV3Directive(
@@ -291,61 +221,28 @@ namespace SweepNDodge.DotsBullets
             int count,
             uint frame)
         {
-            for (int i = 0; i < requests.Length; i++)
-            {
-                var item = requests[i];
-                if (item.DirectiveId != target.DirectiveId)
-                    continue;
-
-                if (item.Count <= 0)
-                    item.OldestFrame = frame;
-
-                item.Count = SafeAdd(item.Count, count);
-                requests[i] = item;
-                return;
-            }
-
-            requests.Add(new SourceSpawnRequestBuffer
-            {
-                DirectiveId = target.DirectiveId,
-                Phase = SourceWavePhaseId.Sustain,
-                Lane = target.Lane,
-                LanePriority = target.LanePriority,
-                BulletTypeKey = target.BulletTypeKey,
-                SamplingMode = target.SamplingMode,
-                CenterMode = target.CenterMode,
-                DirectionMode = target.DirectionMode,
-                FixedPoint = target.FixedPoint,
-                SpawnOffset = target.SpawnOffset,
-                LineStart = target.LineStart,
-                LineEnd = target.LineEnd,
-                SampleSpacing = math.max(0.001f, target.SampleSpacing),
-                SpawnSampleBudget = math.max(1, target.SpawnSampleBudget),
-                PlayerNoSpawnRadius = math.max(0f, target.PlayerNoSpawnRadius),
-                BaseAngleDeg = target.BaseAngleDeg,
-                NWayCount = math.max(1, target.NWayCount),
-                SpiralStepDeg = target.SpiralStepDeg,
-                BurstShotsPerEvent = math.max(1, target.BurstShotsPerEvent),
-                SpawnPriority = target.LanePriority,
-                SpawnSequence = 0u,
-                Count = count,
-                OldestFrame = frame,
-            });
-        }
-
-        private static SourceSpawnLaneId ResolveLegacyLane(int spawnPriority)
-        {
-            return spawnPriority <= -100 ? SourceSpawnLaneId.Trash : SourceSpawnLaneId.Hazard;
-        }
-
-        private int SafeAdd(int lhs, int rhs)
-        {
-            long v = (long)lhs + rhs;
-            if (v > int.MaxValue)
-                return int.MaxValue;
-            if (v < int.MinValue)
-                return int.MinValue;
-            return (int)v;
+            var template = SpawnRequestCommonUtility.CreateRequestTemplate(
+                target.DirectiveId,
+                SourceWavePhaseId.Sustain,
+                target.Lane,
+                target.LanePriority,
+                target.BulletTypeKey,
+                target.SamplingMode,
+                target.CenterMode,
+                target.DirectionMode,
+                target.FixedPoint,
+                target.SpawnOffset,
+                target.LineStart,
+                target.LineEnd,
+                target.SampleSpacing,
+                target.SpawnSampleBudget,
+                target.PlayerNoSpawnRadius,
+                target.BaseAngleDeg,
+                target.NWayCount,
+                target.SpiralStepDeg,
+                target.BurstShotsPerEvent,
+                target.LanePriority);
+            SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
         }
     }
 

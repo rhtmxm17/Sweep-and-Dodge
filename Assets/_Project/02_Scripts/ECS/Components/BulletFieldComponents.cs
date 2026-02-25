@@ -13,12 +13,7 @@ namespace SweepNDodge.DotsBullets
     public struct BulletFieldConfigComponent : IComponentData
     {
         public int PoolSize;
-        public int MaxActiveTarget;
-
-        public float CellSize;
         public float InvCellSize;
-
-        public float BulletLifetime;
     }
 
     public struct MetaScrapComponent : IComponentData
@@ -94,11 +89,6 @@ namespace SweepNDodge.DotsBullets
         }
     }
 
-    public enum SourcePollutionSamplingModeId : byte
-    {
-        TopK = 0,
-    }
-
     // Source별 고정 설정 + 런타임 누적치(외부 초기값 주입 가능)
     public struct SourceSpawnComponent : IComponentData
     {
@@ -123,7 +113,6 @@ namespace SweepNDodge.DotsBullets
         public float RegenPerSec;
         public float DropPerCollect;
         public int TopKSampleCount;
-        public SourcePollutionSamplingModeId SamplingMode;
     }
 
     // Source별 청소 흔적 격자 메타데이터.
@@ -138,84 +127,10 @@ namespace SweepNDodge.DotsBullets
     }
 
     [InternalBufferCapacity(8)]
-    public struct SourceSpawnPatternBuffer : IBufferElementData
-    {
-        public int DirectiveId;
-        public SourceStateId State;
-        public int BulletTypeKey;
-        public SourceSpawnEmissionModeId EmissionMode;
-        public SourceSpawnModeId SpawnMode;
-        public SourceSpawnSamplingModeId SamplingMode;
-        public SourceSpawnCenterModeId CenterMode;
-        public SourceSpawnDirectionModeId DirectionMode;
-        public float2 FixedPoint;
-        public float2 SpawnOffset;
-        public float2 LineStart;
-        public float2 LineEnd;
-        public float SampleSpacing;
-        public int SpawnSampleBudget;
-        public float PlayerNoSpawnRadius;
-        public float BaseAngleDeg;
-        public int NWayCount;
-        public float SpiralStepDeg;
-        public float SpawnDensityPerSecPerArea; // RateField
-        public float MeanEventsPerSec;          // Poisson
-        public int BurstRepeatCount;            // EventBurst (-1: infinite)
-        public float BurstIntervalSec;          // EventBurst
-        public int BurstShotsPerEvent;          // EventBurst
-        public int SpawnPriority;               // Higher first
-        public float MaxActiveDensityPerArea; // FixedDensity 일 경우 무시
-        public float SpawnAccumulator;
-        public int BurstEventsEmitted;
-    }
-
-    [InternalBufferCapacity(8)]
     public struct SourceActiveBulletCountBuffer : IBufferElementData
     {
         public int BulletTypeKey;
         public int ActiveCount;
-    }
-
-    [InternalBufferCapacity(16)]
-    public struct SourceOpeningWavePatternBuffer : IBufferElementData
-    {
-        public int DirectiveId;
-        public SourceStateId TriggerState;
-        public float StartSec;
-        public float EndSec;
-        public int BulletTypeKey;
-        public SourceSpawnEmissionModeId EmissionMode;
-        public SourceSpawnModeId SpawnMode;
-        public SourceSpawnSamplingModeId SamplingMode;
-        public SourceSpawnCenterModeId CenterMode;
-        public SourceSpawnDirectionModeId DirectionMode;
-        public float2 FixedPoint;
-        public float2 SpawnOffset;
-        public float2 LineStart;
-        public float2 LineEnd;
-        public float SampleSpacing;
-        public int SpawnSampleBudget;
-        public float PlayerNoSpawnRadius;
-        public float BaseAngleDeg;
-        public int NWayCount;
-        public float SpiralStepDeg;
-        public float SpawnDensityPerSecPerArea; // RateField
-        public float MeanEventsPerSec;          // Poisson
-        public int BurstRepeatCount;            // EventBurst (-1: infinite)
-        public float BurstIntervalSec;          // EventBurst
-        public int BurstShotsPerEvent;          // EventBurst
-        public int SpawnPriority;               // Higher first
-        public float MaxActiveDensityPerArea;
-        public float SpawnAccumulator;
-        public int BurstEventsEmitted;
-    }
-
-    public struct SourceOpeningWaveRuntimeComponent : IComponentData
-    {
-        public SourceStateId LastState;
-        public SourceStateId ActiveTriggerState;
-        public byte IsPlaying;
-        public float ElapsedSec;
     }
 
     // v3 clip patterns baked from WaveClipSO bindings.

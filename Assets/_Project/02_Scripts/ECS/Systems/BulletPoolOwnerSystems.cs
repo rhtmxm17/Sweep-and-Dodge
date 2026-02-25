@@ -42,10 +42,7 @@ namespace SweepNDodge.DotsBullets
                 var cfg = new BulletFieldConfigComponent
                 {
                     PoolSize = 120_000,
-                    MaxActiveTarget = 100_000,
-                    CellSize = 1.6f,
                     InvCellSize = 1f / 1.6f,
-                    BulletLifetime = 4.0f,
                 };
 
                 em.SetComponentData(configEntity, cfg);

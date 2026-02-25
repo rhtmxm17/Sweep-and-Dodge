@@ -9,336 +9,6 @@ using Unity.Transforms;
 namespace SweepNDodge.DotsBullets
 {
     [BurstCompile]
-    [UpdateInGroup(typeof(BulletRequestGroup))]
-    [UpdateAfter(typeof(PlayerCarryBinDepositRequestSystem))]
-    [UpdateBefore(typeof(BulletRequestFencePublishSystem))]
-    public partial struct SourceSpawnRequestBuildSystem : ISystem
-    {
-        public void OnCreate(ref SystemState state)
-        {
-            state.RequireForUpdate<BulletFrameCounterComponent>();
-            state.RequireForUpdate<SpawnRequestPolicyComponent>();
-            state.RequireForUpdate<SpawnBacklogMetricsComponent>();
-            state.RequireForUpdate<SourceSpawnComponent>();
-            state.RequireForUpdate<BulletFieldAreaComponent>();
-            state.RequireForUpdate<SourceSpawnPatternBuffer>();
-            state.RequireForUpdate<SourceActiveBulletCountBuffer>();
-            state.RequireForUpdate<SourceSpawnRequestBuffer>();
-        }
-
-        [BurstCompile]
-        public void OnUpdate(ref SystemState state)
-        {
-            var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
-            uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
-            float deltaTime = SystemAPI.Time.DeltaTime;
-            var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
-            var openingWaveRuntimeLookup = SystemAPI.GetComponentLookup<SourceOpeningWaveRuntimeComponent>(true);
-            var clipPatternLookup = SystemAPI.GetBufferLookup<SourceClipPatternBuffer>(true);
-            openingWaveRuntimeLookup.Update(ref state);
-            clipPatternLookup.Update(ref state);
-
-            var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
-            var metrics = metricsRW.ValueRO;
-            metrics.LastFrameDroppedByCapacity = 0;
-
-            int pendingTotal = 0;
-            foreach (var requests in SystemAPI.Query<DynamicBuffer<SourceSpawnRequestBuffer>>())
-            {
-                for (int i = 0; i < requests.Length; i++)
-                {
-                    int count = math.max(0, requests[i].Count);
-                    pendingTotal = SafeAdd(pendingTotal, count);
-                }
-            }
-            int remainingCapacity = math.max(0, policy.MaxPendingCount - pendingTotal);
-            int droppedByCapacity = 0;
-
-            foreach (var (source, fieldArea, patterns, activeCounts, requests, sourceEntity) in
-                     SystemAPI.Query<
-                         RefRO<SourceSpawnComponent>,
-                         RefRO<BulletFieldAreaComponent>,
-                         DynamicBuffer<SourceSpawnPatternBuffer>,
-                         DynamicBuffer<SourceActiveBulletCountBuffer>,
-                         DynamicBuffer<SourceSpawnRequestBuffer>>()
-                         .WithEntityAccess())
-            {
-                var patternsRW = patterns;
-                var requestsRW = requests;
-
-                if (source.ValueRO.State == SourceStateId.Depleted)
-                    continue;
-                if (patternsRW.Length <= 0)
-                    continue;
-                if (clipPatternLookup.HasBuffer(sourceEntity) && clipPatternLookup[sourceEntity].Length > 0)
-                    continue;
-
-                bool suppressStateSustainedPattern = false;
-                if (openingWaveRuntimeLookup.HasComponent(sourceEntity))
-                {
-                    var openingRuntime = openingWaveRuntimeLookup[sourceEntity];
-                    suppressStateSustainedPattern = openingRuntime.IsPlaying != 0
-                        && openingRuntime.ActiveTriggerState == source.ValueRO.State;
-                }
-
-                float area = math.max(0f, fieldArea.ValueRO.ComputedArea);
-                for (int i = 0; i < patternsRW.Length; i++)
-                {
-                    var pattern = patternsRW[i];
-                    if (pattern.State != source.ValueRO.State)
-                        continue;
-                    if (suppressStateSustainedPattern)
-                        continue;
-
-                    int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requestsRW, area, deltaTime);
-                    patternsRW[i] = pattern;
-                    if (requested <= 0)
-                        continue;
-
-                    int accepted = math.min(requested, remainingCapacity);
-                    if (accepted > 0)
-                    {
-                        AddOrMergeRequest(requestsRW, in pattern, accepted, frame);
-                        pendingTotal = SafeAdd(pendingTotal, accepted);
-                        remainingCapacity -= accepted;
-                    }
-
-                    int dropped = requested - accepted;
-                    if (dropped > 0)
-                        droppedByCapacity = SafeAdd(droppedByCapacity, dropped);
-                }
-
-                CompactRequestBuffer(requestsRW);
-            }
-
-            metrics.PendingCount = pendingTotal;
-            metrics.LastFrameDroppedByCapacity = droppedByCapacity;
-            if (droppedByCapacity > 0)
-                metrics.DroppedByCapacity = SafeAdd(metrics.DroppedByCapacity, droppedByCapacity);
-            metricsRW.ValueRW = metrics;
-        }
-
-        private static int ResolveSpawnCount(
-            ref SourceSpawnPatternBuffer pattern,
-            Entity sourceEntity,
-            uint frame,
-            DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
-            DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            float area,
-            float deltaTime)
-        {
-            int spawnCount;
-            if (pattern.EmissionMode == SourceSpawnEmissionModeId.Poisson)
-            {
-                pattern.SpawnAccumulator = 0f;
-                float lambda = math.max(0f, pattern.MeanEventsPerSec) * math.max(0f, deltaTime);
-                if (lambda <= 0f)
-                    return 0;
-
-                var random = CreateDeterministicRandom(sourceEntity, pattern.DirectiveId, frame, 0xB5297A4Du);
-                spawnCount = SamplePoisson(lambda, ref random);
-            }
-            else if (pattern.EmissionMode == SourceSpawnEmissionModeId.EventBurst)
-            {
-                float interval = math.max(0.001f, pattern.BurstIntervalSec);
-                int shotsPerEvent = math.max(1, pattern.BurstShotsPerEvent);
-                pattern.SpawnAccumulator += math.max(0f, deltaTime);
-                int eventCount = (int)math.floor(pattern.SpawnAccumulator / interval);
-                if (eventCount <= 0)
-                    return 0;
-
-                if (pattern.BurstRepeatCount >= 0)
-                {
-                    int remaining = math.max(0, pattern.BurstRepeatCount - pattern.BurstEventsEmitted);
-                    if (remaining <= 0)
-                    {
-                        pattern.SpawnAccumulator = 0f;
-                        return 0;
-                    }
-
-                    eventCount = math.min(eventCount, remaining);
-                }
-
-                pattern.SpawnAccumulator -= eventCount * interval;
-                pattern.BurstEventsEmitted = SafeAdd(pattern.BurstEventsEmitted, eventCount);
-                spawnCount = SafeAdd(0, eventCount * shotsPerEvent);
-            }
-            else
-            {
-                float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
-                float rate = density * area;
-                if (rate <= 0f)
-                {
-                    pattern.SpawnAccumulator = 0f;
-                    return 0;
-                }
-
-                pattern.SpawnAccumulator += rate * deltaTime;
-                spawnCount = (int)pattern.SpawnAccumulator;
-                pattern.SpawnAccumulator -= spawnCount;
-            }
-
-            if (spawnCount <= 0)
-                return 0;
-
-            if (pattern.SpawnMode != SourceSpawnModeId.CapAndMaxDensity)
-                return spawnCount;
-
-            int active = GetActiveCount(activeCounts, pattern.BulletTypeKey);
-            int pending = GetPendingCount(requests, pattern.BulletTypeKey);
-            int maxActive = (int)math.floor(math.max(0f, pattern.MaxActiveDensityPerArea) * area);
-            int room = math.max(0, maxActive - active - pending);
-            return math.min(spawnCount, room);
-        }
-
-        private static int GetActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
-        {
-            for (int i = 0; i < activeCounts.Length; i++)
-            {
-                if (activeCounts[i].BulletTypeKey == typeKey)
-                    return activeCounts[i].ActiveCount;
-            }
-
-            return 0;
-        }
-
-        private static int GetPendingCount(DynamicBuffer<SourceSpawnRequestBuffer> requests, int typeKey)
-        {
-            int pending = 0;
-            for (int i = 0; i < requests.Length; i++)
-            {
-                var item = requests[i];
-                if (item.BulletTypeKey != typeKey)
-                    continue;
-                if (item.Count <= 0)
-                    continue;
-
-                pending = SafeAdd(pending, item.Count);
-            }
-
-            return pending;
-        }
-
-        private static void AddOrMergeRequest(
-            DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            in SourceSpawnPatternBuffer pattern,
-            int count,
-            uint frame)
-        {
-            if (count <= 0)
-                return;
-
-            for (int i = 0; i < requests.Length; i++)
-            {
-                var item = requests[i];
-                if (item.DirectiveId != pattern.DirectiveId)
-                    continue;
-
-                if (item.Count <= 0)
-                    item.OldestFrame = frame;
-
-                item.Count = SafeAdd(item.Count, count);
-                requests[i] = item;
-                return;
-            }
-
-            requests.Add(new SourceSpawnRequestBuffer
-            {
-                DirectiveId = pattern.DirectiveId,
-                Phase = SourceWavePhaseId.Sustain,
-                Lane = ResolveLegacyLane(pattern.SpawnPriority),
-                LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(ResolveLegacyLane(pattern.SpawnPriority)),
-                BulletTypeKey = pattern.BulletTypeKey,
-                SamplingMode = pattern.SamplingMode,
-                CenterMode = pattern.CenterMode,
-                DirectionMode = pattern.DirectionMode,
-                FixedPoint = pattern.FixedPoint,
-                SpawnOffset = pattern.SpawnOffset,
-                LineStart = pattern.LineStart,
-                LineEnd = pattern.LineEnd,
-                SampleSpacing = math.max(0.001f, pattern.SampleSpacing),
-                SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
-                PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
-                BaseAngleDeg = pattern.BaseAngleDeg,
-                NWayCount = math.max(1, pattern.NWayCount),
-                SpiralStepDeg = pattern.SpiralStepDeg,
-                BurstShotsPerEvent = math.max(1, pattern.BurstShotsPerEvent),
-                SpawnPriority = pattern.SpawnPriority,
-                SpawnSequence = 0u,
-                Count = count,
-                OldestFrame = frame,
-            });
-        }
-
-        private static SourceSpawnLaneId ResolveLegacyLane(int spawnPriority)
-        {
-            return spawnPriority <= -100 ? SourceSpawnLaneId.Trash : SourceSpawnLaneId.Hazard;
-        }
-
-        private static Unity.Mathematics.Random CreateDeterministicRandom(Entity sourceEntity, int directiveId, uint frame, uint salt)
-        {
-            uint seed = math.hash(new uint4(
-                frame,
-                (uint)math.max(0, sourceEntity.Index + 1),
-                (uint)math.max(0, directiveId + 1),
-                salt));
-            return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
-        }
-
-        private static int SamplePoisson(float lambda, ref Unity.Mathematics.Random random)
-        {
-            if (lambda <= 0f)
-                return 0;
-
-            if (lambda < 30f)
-            {
-                float l = math.exp(-lambda);
-                int k = 0;
-                float p = 1f;
-                do
-                {
-                    k++;
-                    p *= random.NextFloat(0f, 1f);
-                } while (p > l);
-
-                return math.max(0, k - 1);
-            }
-
-            float stdDev = math.sqrt(lambda);
-            float n = SampleStandardNormal(ref random);
-            return math.max(0, (int)math.round(lambda + stdDev * n));
-        }
-
-        private static float SampleStandardNormal(ref Unity.Mathematics.Random random)
-        {
-            float u1 = math.max(1e-7f, random.NextFloat(0f, 1f));
-            float u2 = random.NextFloat(0f, 1f);
-            return math.sqrt(-2f * math.log(u1)) * math.cos(2f * math.PI * u2);
-        }
-
-        private static void CompactRequestBuffer(DynamicBuffer<SourceSpawnRequestBuffer> requests)
-        {
-            for (int i = requests.Length - 1; i >= 0; i--)
-            {
-                if (requests[i].Count > 0)
-                    continue;
-
-                requests.RemoveAtSwapBack(i);
-            }
-        }
-
-        private static int SafeAdd(int lhs, int rhs)
-        {
-            long v = (long)lhs + rhs;
-            if (v > int.MaxValue)
-                return int.MaxValue;
-            if (v < int.MinValue)
-                return int.MinValue;
-            return (int)v;
-        }
-    }
-
-    [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
     [UpdateAfter(typeof(BulletFieldAreaUpdateSystem))]
@@ -455,7 +125,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             if (expiredByAge > 0)
-                metrics.ExpiredByAge = SafeAdd(metrics.ExpiredByAge, expiredByAge);
+                metrics.ExpiredByAge = SpawnRequestCommonUtility.SafeAdd(metrics.ExpiredByAge, expiredByAge);
             metrics.LastFrameExpiredByAge = expiredByAge;
 
             int remainingBudget = math.max(0, policy.BudgetPerFrame);
@@ -567,7 +237,7 @@ namespace SweepNDodge.DotsBullets
                 if (!requestLookup.TryGetBuffer(sourceEntity, out var requests))
                     continue;
 
-                CompactRequestBuffer(requests);
+                SpawnRequestCommonUtility.CompactRequestBuffer(requests);
             }
 
             metrics.PendingCount = pending;
@@ -607,13 +277,13 @@ namespace SweepNDodge.DotsBullets
                     uint age = frame - item.OldestFrame;
                     if (age > maxAge)
                     {
-                        expiredByAge = SafeAdd(expiredByAge, item.Count);
+                        expiredByAge = SpawnRequestCommonUtility.SafeAdd(expiredByAge, item.Count);
                         requests.RemoveAtSwapBack(i);
                         continue;
                     }
                 }
 
-                pending = SafeAdd(pending, item.Count);
+                pending = SpawnRequestCommonUtility.SafeAdd(pending, item.Count);
                 requests[i] = item;
             }
         }
@@ -1112,7 +782,7 @@ namespace SweepNDodge.DotsBullets
                 if (item.BulletTypeKey != typeKey)
                     continue;
 
-                item.ActiveCount = SafeAdd(item.ActiveCount, 1);
+                item.ActiveCount = SpawnRequestCommonUtility.SafeAdd(item.ActiveCount, 1);
                 activeCounts[i] = item;
                 return;
             }
@@ -1124,26 +794,6 @@ namespace SweepNDodge.DotsBullets
             });
         }
 
-        private static void CompactRequestBuffer(DynamicBuffer<SourceSpawnRequestBuffer> requests)
-        {
-            for (int i = requests.Length - 1; i >= 0; i--)
-            {
-                if (requests[i].Count > 0)
-                    continue;
-
-                requests.RemoveAtSwapBack(i);
-            }
-        }
-
-        private static int SafeAdd(int lhs, int rhs)
-        {
-            long v = (long)lhs + rhs;
-            if (v > int.MaxValue)
-                return int.MaxValue;
-            if (v < int.MinValue)
-                return int.MinValue;
-            return (int)v;
-        }
     }
 
 }

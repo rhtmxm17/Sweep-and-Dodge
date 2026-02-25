@@ -7,7 +7,7 @@ using UnityEngine;
 namespace SweepNDodge.DotsBullets
 {
     [UpdateInGroup(typeof(BulletRequestGroup))]
-    [UpdateAfter(typeof(SourceSpawnRequestBuildSystem))]
+    [UpdateAfter(typeof(PlayerCarryBinDepositRequestSystem))]
     [UpdateBefore(typeof(BulletRequestFencePublishSystem))]
     public partial struct SourceClipRequestBuildSystem : ISystem
     {
@@ -42,7 +42,7 @@ namespace SweepNDodge.DotsBullets
             foreach (var requests in SystemAPI.Query<DynamicBuffer<SourceSpawnRequestBuffer>>())
             {
                 for (int i = 0; i < requests.Length; i++)
-                    pendingTotal = SafeAdd(pendingTotal, math.max(0, requests[i].Count));
+                    pendingTotal = SpawnRequestCommonUtility.SafeAdd(pendingTotal, math.max(0, requests[i].Count));
             }
 
             int remainingCapacity = math.max(0, policy.MaxPendingCount - pendingTotal);
@@ -169,7 +169,7 @@ namespace SweepNDodge.DotsBullets
                         ref droppedByCapacity);
                 }
 
-                CompactRequestBuffer(requestsRW);
+                SpawnRequestCommonUtility.CompactRequestBuffer(requestsRW);
                 sustainRuntimeLookup[sourceEntity] = sustainRuntime;
                 eventRuntimeLookup[sourceEntity] = eventRuntime;
             }
@@ -177,9 +177,9 @@ namespace SweepNDodge.DotsBullets
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
             var metrics = metricsRW.ValueRO;
             metrics.PendingCount = pendingTotal;
-            metrics.LastFrameDroppedByCapacity = SafeAdd(metrics.LastFrameDroppedByCapacity, droppedByCapacity);
+            metrics.LastFrameDroppedByCapacity = SpawnRequestCommonUtility.SafeAdd(metrics.LastFrameDroppedByCapacity, droppedByCapacity);
             if (droppedByCapacity > 0)
-                metrics.DroppedByCapacity = SafeAdd(metrics.DroppedByCapacity, droppedByCapacity);
+                metrics.DroppedByCapacity = SpawnRequestCommonUtility.SafeAdd(metrics.DroppedByCapacity, droppedByCapacity);
             metricsRW.ValueRW = metrics;
         }
 
@@ -246,7 +246,7 @@ namespace SweepNDodge.DotsBullets
                 if (removed > 0)
                 {
                     pendingTotal = math.max(0, pendingTotal - removed);
-                    remainingCapacity = SafeAdd(remainingCapacity, removed);
+                    remainingCapacity = SpawnRequestCommonUtility.SafeAdd(remainingCapacity, removed);
                 }
 
                 break;
@@ -333,13 +333,13 @@ namespace SweepNDodge.DotsBullets
                 if (accepted > 0)
                 {
                     AddOrMergeRequest(requests, in pattern, accepted, frame);
-                    pendingTotal = SafeAdd(pendingTotal, accepted);
+                    pendingTotal = SpawnRequestCommonUtility.SafeAdd(pendingTotal, accepted);
                     remainingCapacity -= accepted;
                 }
 
                 int dropped = requested - accepted;
                 if (dropped > 0)
-                    droppedByCapacity = SafeAdd(droppedByCapacity, dropped);
+                    droppedByCapacity = SpawnRequestCommonUtility.SafeAdd(droppedByCapacity, dropped);
             }
 
             eventRuntime.ElapsedSec += deltaTime;
@@ -421,13 +421,13 @@ namespace SweepNDodge.DotsBullets
                     if (accepted > 0)
                     {
                         AddOrMergeRequest(requests, in pattern, accepted, frame);
-                        pendingTotal = SafeAdd(pendingTotal, accepted);
+                        pendingTotal = SpawnRequestCommonUtility.SafeAdd(pendingTotal, accepted);
                         remainingCapacity -= accepted;
                     }
 
                     int dropped = requested - accepted;
                     if (dropped > 0)
-                        droppedByCapacity = SafeAdd(droppedByCapacity, dropped);
+                        droppedByCapacity = SpawnRequestCommonUtility.SafeAdd(droppedByCapacity, dropped);
                 }
 
                 laneRuntime.ElapsedSec += deltaTime;
@@ -544,94 +544,26 @@ namespace SweepNDodge.DotsBullets
             float area,
             float deltaTime)
         {
-            int spawnCount;
-            if (pattern.EmissionMode == SourceSpawnEmissionModeId.Poisson)
-            {
-                pattern.SpawnAccumulator = 0f;
-                float lambda = math.max(0f, pattern.MeanEventsPerSec) * math.max(0f, deltaTime);
-                if (lambda <= 0f)
-                    return 0;
-
-                var random = CreateDeterministicRandom(sourceEntity, pattern.DirectiveId, frame, 0xD8A89AF5u);
-                spawnCount = SamplePoisson(lambda, ref random);
-            }
-            else if (pattern.EmissionMode == SourceSpawnEmissionModeId.EventBurst)
-            {
-                float interval = math.max(0.001f, pattern.BurstIntervalSec);
-                int shotsPerEvent = math.max(1, pattern.BurstShotsPerEvent);
-                pattern.SpawnAccumulator += math.max(0f, deltaTime);
-                int eventCount = (int)math.floor(pattern.SpawnAccumulator / interval);
-                if (eventCount <= 0)
-                    return 0;
-
-                if (pattern.BurstRepeatCount >= 0)
-                {
-                    int remaining = math.max(0, pattern.BurstRepeatCount - pattern.BurstEventsEmitted);
-                    if (remaining <= 0)
-                    {
-                        pattern.SpawnAccumulator = 0f;
-                        return 0;
-                    }
-
-                    eventCount = math.min(eventCount, remaining);
-                }
-
-                pattern.SpawnAccumulator -= eventCount * interval;
-                pattern.BurstEventsEmitted = SafeAdd(pattern.BurstEventsEmitted, eventCount);
-                spawnCount = SafeAdd(0, eventCount * shotsPerEvent);
-            }
-            else
-            {
-                float density = math.max(0f, pattern.SpawnDensityPerSecPerArea);
-                float rate = density * area;
-                if (rate <= 0f)
-                {
-                    pattern.SpawnAccumulator = 0f;
-                    return 0;
-                }
-
-                pattern.SpawnAccumulator += rate * deltaTime;
-                spawnCount = (int)pattern.SpawnAccumulator;
-                pattern.SpawnAccumulator -= spawnCount;
-            }
-
-            if (spawnCount <= 0)
-                return 0;
-
-            if (pattern.SpawnMode != SourceSpawnModeId.CapAndMaxDensity)
-                return spawnCount;
-
-            int active = GetActiveCount(activeCounts, pattern.BulletTypeKey);
-            int pending = GetPendingCount(requests, pattern.BulletTypeKey);
-            int maxActive = (int)math.floor(math.max(0f, pattern.MaxActiveDensityPerArea) * area);
-            int room = math.max(0, maxActive - active - pending);
-            return math.min(spawnCount, room);
-        }
-
-        private static int GetActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
-        {
-            for (int i = 0; i < activeCounts.Length; i++)
-            {
-                if (activeCounts[i].BulletTypeKey == typeKey)
-                    return activeCounts[i].ActiveCount;
-            }
-
-            return 0;
-        }
-
-        private static int GetPendingCount(DynamicBuffer<SourceSpawnRequestBuffer> requests, int typeKey)
-        {
-            int pending = 0;
-            for (int i = 0; i < requests.Length; i++)
-            {
-                var item = requests[i];
-                if (item.BulletTypeKey != typeKey || item.Count <= 0)
-                    continue;
-
-                pending = SafeAdd(pending, item.Count);
-            }
-
-            return pending;
+            return SpawnRequestCommonUtility.ResolveSpawnCountCore(
+                ref pattern.SpawnAccumulator,
+                ref pattern.BurstEventsEmitted,
+                pattern.EmissionMode,
+                pattern.SpawnMode,
+                pattern.MeanEventsPerSec,
+                pattern.BurstIntervalSec,
+                pattern.BurstShotsPerEvent,
+                pattern.BurstRepeatCount,
+                pattern.SpawnDensityPerSecPerArea,
+                pattern.MaxActiveDensityPerArea,
+                pattern.BulletTypeKey,
+                sourceEntity,
+                pattern.DirectiveId,
+                frame,
+                activeCounts,
+                requests,
+                area,
+                deltaTime,
+                0xD8A89AF5u);
         }
 
         private static int RemoveSustainPendingRequests(ref DynamicBuffer<SourceSpawnRequestBuffer> requests)
@@ -643,7 +575,7 @@ namespace SweepNDodge.DotsBullets
                 if (item.Count <= 0 || item.Phase != SourceWavePhaseId.Sustain)
                     continue;
 
-                removed = SafeAdd(removed, item.Count);
+                removed = SpawnRequestCommonUtility.SafeAdd(removed, item.Count);
                 requests.RemoveAtSwapBack(i);
             }
 
@@ -692,49 +624,28 @@ namespace SweepNDodge.DotsBullets
             int count,
             uint frame)
         {
-            if (count <= 0)
-                return;
-
-            for (int i = 0; i < requests.Length; i++)
-            {
-                var item = requests[i];
-                if (item.DirectiveId != pattern.DirectiveId)
-                    continue;
-
-                if (item.Count <= 0)
-                    item.OldestFrame = frame;
-
-                item.Count = SafeAdd(item.Count, count);
-                requests[i] = item;
-                return;
-            }
-
-            requests.Add(new SourceSpawnRequestBuffer
-            {
-                DirectiveId = pattern.DirectiveId,
-                Phase = pattern.Phase,
-                Lane = pattern.Lane,
-                LanePriority = pattern.LanePriority,
-                BulletTypeKey = pattern.BulletTypeKey,
-                SamplingMode = pattern.SamplingMode,
-                CenterMode = pattern.CenterMode,
-                DirectionMode = pattern.DirectionMode,
-                FixedPoint = pattern.FixedPoint,
-                SpawnOffset = pattern.SpawnOffset,
-                LineStart = pattern.LineStart,
-                LineEnd = pattern.LineEnd,
-                SampleSpacing = math.max(0.001f, pattern.SampleSpacing),
-                SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
-                PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
-                BaseAngleDeg = pattern.BaseAngleDeg,
-                NWayCount = math.max(1, pattern.NWayCount),
-                SpiralStepDeg = pattern.SpiralStepDeg,
-                BurstShotsPerEvent = math.max(1, pattern.BurstShotsPerEvent),
-                SpawnPriority = pattern.LanePriority,
-                SpawnSequence = 0u,
-                Count = count,
-                OldestFrame = frame,
-            });
+            var template = SpawnRequestCommonUtility.CreateRequestTemplate(
+                pattern.DirectiveId,
+                pattern.Phase,
+                pattern.Lane,
+                pattern.LanePriority,
+                pattern.BulletTypeKey,
+                pattern.SamplingMode,
+                pattern.CenterMode,
+                pattern.DirectionMode,
+                pattern.FixedPoint,
+                pattern.SpawnOffset,
+                pattern.LineStart,
+                pattern.LineEnd,
+                pattern.SampleSpacing,
+                pattern.SpawnSampleBudget,
+                pattern.PlayerNoSpawnRadius,
+                pattern.BaseAngleDeg,
+                pattern.NWayCount,
+                pattern.SpiralStepDeg,
+                pattern.BurstShotsPerEvent,
+                pattern.LanePriority);
+            SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
         }
 
         private static bool ContainsClipId(NativeList<int> list, int value)
@@ -758,66 +669,5 @@ namespace SweepNDodge.DotsBullets
             return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
         }
 
-        private static Unity.Mathematics.Random CreateDeterministicRandom(Entity sourceEntity, int directiveId, uint frame, uint salt)
-        {
-            uint seed = math.hash(new uint4(
-                frame,
-                (uint)math.max(0, sourceEntity.Index + 1),
-                (uint)math.max(0, directiveId + 1),
-                salt));
-            return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
-        }
-
-        private static int SamplePoisson(float lambda, ref Unity.Mathematics.Random random)
-        {
-            if (lambda <= 0f)
-                return 0;
-
-            if (lambda < 30f)
-            {
-                float l = math.exp(-lambda);
-                int k = 0;
-                float p = 1f;
-                do
-                {
-                    k++;
-                    p *= random.NextFloat(0f, 1f);
-                } while (p > l);
-
-                return math.max(0, k - 1);
-            }
-
-            float stdDev = math.sqrt(lambda);
-            float n = SampleStandardNormal(ref random);
-            return math.max(0, (int)math.round(lambda + stdDev * n));
-        }
-
-        private static float SampleStandardNormal(ref Unity.Mathematics.Random random)
-        {
-            float u1 = math.max(1e-7f, random.NextFloat(0f, 1f));
-            float u2 = random.NextFloat(0f, 1f);
-            return math.sqrt(-2f * math.log(u1)) * math.cos(2f * math.PI * u2);
-        }
-
-        private static void CompactRequestBuffer(DynamicBuffer<SourceSpawnRequestBuffer> requests)
-        {
-            for (int i = requests.Length - 1; i >= 0; i--)
-            {
-                if (requests[i].Count > 0)
-                    continue;
-
-                requests.RemoveAtSwapBack(i);
-            }
-        }
-
-        private static int SafeAdd(int lhs, int rhs)
-        {
-            long v = (long)lhs + rhs;
-            if (v > int.MaxValue)
-                return int.MaxValue;
-            if (v < int.MinValue)
-                return int.MinValue;
-            return (int)v;
-        }
     }
 }

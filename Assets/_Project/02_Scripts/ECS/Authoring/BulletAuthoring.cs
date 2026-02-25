@@ -6,11 +6,6 @@ namespace SweepNDodge.DotsBullets
 {
     public class BulletAuthoring : MonoBehaviour
     {
-        [Header("Default Bullet Data (spawn 시 덮어씌워짐)")]
-        public float Radius = 0.05f;
-        public int TypeKey = 0;
-        public BulletCaptureRuleId CaptureRule = BulletCaptureRuleId.StandardCollectible;
-
         private class Baker : Baker<BulletAuthoring>
         {
             public override void Bake(BulletAuthoring authoring)
@@ -23,10 +18,10 @@ namespace SweepNDodge.DotsBullets
                 AddComponent(root, new BulletVelocityComponent { Value = Unity.Mathematics.float2.zero });
                 AddComponent(root, new BulletSpeedComponent { Value = 0.5f });
                 AddComponent(root, new BulletLifetimeMaxComponent { Value = 4.0f });
-                AddComponent(root, new BulletRadiusComponent { Value = authoring.Radius });
+                AddComponent(root, new BulletRadiusComponent { Value = 0.05f });
                 AddComponent(root, new BulletScoreValueComponent { Value = 1 });
-                AddComponent(root, new BulletTypeKeyComponent { Value = authoring.TypeKey });
-                AddComponent(root, new BulletCaptureRuleComponent { Value = authoring.CaptureRule });
+                AddComponent(root, new BulletTypeKeyComponent { Value = 0 });
+                AddComponent(root, new BulletCaptureRuleComponent { Value = BulletCaptureRuleId.StandardCollectible });
                 AddComponent(root, new BulletLifetimeComponent { Value = 0f });
                 AddComponent(root, new BulletSourceRefComponent { Value = Entity.Null });
                 AddComponent(root, new BulletLifecycleTraceComponent
@@ -45,7 +40,7 @@ namespace SweepNDodge.DotsBullets
 
                 // 위험탄 분류 태그(항상 존재). CaptureRule 기준으로 enable 상태를 설정한다.
                 AddComponent<BulletHazardTag>(root);
-                SetComponentEnabled<BulletHazardTag>(root, authoring.CaptureRule == BulletCaptureRuleId.RiskTimedResolve);
+                SetComponentEnabled<BulletHazardTag>(root, false);
 
                 // 다중 렌더 파츠 목록(스폰/디스폰 시 MaterialMeshInfo enable 토글 용도)
                 // - 버퍼에는 렌더 파츠 엔티티만 포함됨(외형 이외 사용 없음 전제)

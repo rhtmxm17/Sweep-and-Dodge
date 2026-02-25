@@ -99,7 +99,6 @@ namespace SweepNDodge.DotsBullets
                     RegenPerSec = Mathf.Max(0f, authoring.PollutionRegenPerSec),
                     DropPerCollect = Mathf.Max(0f, authoring.PollutionDropPerCollect),
                     TopKSampleCount = Mathf.Max(1, authoring.PollutionTopKSampleCount),
-                    SamplingMode = SourcePollutionSamplingModeId.TopK,
                 });
 
                 AddComponent(e, new SourcePollutionGridComponent
