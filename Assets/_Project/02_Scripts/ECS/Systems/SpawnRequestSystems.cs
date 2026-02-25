@@ -250,8 +250,6 @@ namespace SweepNDodge.DotsBullets
                 LineStart = pattern.LineStart,
                 LineEnd = pattern.LineEnd,
                 SampleSpacing = math.max(0.001f, pattern.SampleSpacing),
-                WallMask = pattern.WallMask,
-                WallInset = math.max(0f, pattern.WallInset),
                 SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
                 BaseAngleDeg = pattern.BaseAngleDeg,
@@ -913,12 +911,6 @@ namespace SweepNDodge.DotsBullets
                 }
                 else if (request.SamplingMode == SourceSpawnSamplingModeId.LineEven)
                 {
-                    lastSample = SampleSpawnPositionLineEven(center, in request, sequence);
-                }
-                else if (request.SamplingMode == SourceSpawnSamplingModeId.WallEven)
-                {
-                    // Project policy (2026-02): WallEven은 비활성.
-                    // 입력이 들어와도 LineEven 경로로만 처리한다.
                     lastSample = SampleSpawnPositionLineEven(center, in request, sequence);
                 }
                 else if (request.SamplingMode == SourceSpawnSamplingModeId.PointSet)

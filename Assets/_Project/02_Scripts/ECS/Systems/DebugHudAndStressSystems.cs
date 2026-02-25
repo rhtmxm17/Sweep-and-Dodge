@@ -24,8 +24,6 @@ namespace SweepNDodge.DotsBullets
             public float2 LineStart;
             public float2 LineEnd;
             public float SampleSpacing;
-            public SourceSpawnWallMaskId WallMask;
-            public float WallInset;
             public int SpawnSampleBudget;
             public float PlayerNoSpawnRadius;
             public float BaseAngleDeg;
@@ -133,8 +131,6 @@ namespace SweepNDodge.DotsBullets
                     LineStart = resolved.LineStart,
                     LineEnd = resolved.LineEnd,
                     SampleSpacing = resolved.SampleSpacing,
-                    WallMask = resolved.WallMask,
-                    WallInset = resolved.WallInset,
                     SpawnSampleBudget = resolved.SpawnSampleBudget,
                     PlayerNoSpawnRadius = resolved.PlayerNoSpawnRadius,
                     BaseAngleDeg = resolved.BaseAngleDeg,
@@ -235,8 +231,6 @@ namespace SweepNDodge.DotsBullets
                 LineStart = target.LineStart,
                 LineEnd = target.LineEnd,
                 SampleSpacing = math.max(0.001f, target.SampleSpacing),
-                WallMask = target.WallMask,
-                WallInset = math.max(0f, target.WallInset),
                 SpawnSampleBudget = math.max(1, target.SpawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, target.PlayerNoSpawnRadius),
                 BaseAngleDeg = target.BaseAngleDeg,

@@ -192,10 +192,24 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                Bullet = def,
-                                SpawnMode = SourceSpawnModeId.FixedDensity,
-                                SpawnDensityPerSecPerArea = -1f,
-                                MaxActiveDensityPerArea = 0f
+                                Payload = new WaveTimelineSO.SpawnPayloadProfile
+                                {
+                                    Bullet = def,
+                                },
+                                Emission = new WaveTimelineSO.SpawnEmissionProfile
+                                {
+                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                                    RatePerSecPerArea = -1f,
+                                    MaxActiveDensityPerArea = 0f,
+                                },
+                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                                {
+                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                                    SpawnSampleBudget = 16,
+                                    PlayerNoSpawnRadius = 0f,
+                                }
                             }
                         }
                     }
@@ -252,10 +266,24 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                Bullet = def,
-                                SpawnMode = SourceSpawnModeId.CapAndMaxDensity,
-                                SpawnDensityPerSecPerArea = 1f,
-                                MaxActiveDensityPerArea = -2f
+                                Payload = new WaveTimelineSO.SpawnPayloadProfile
+                                {
+                                    Bullet = def,
+                                },
+                                Emission = new WaveTimelineSO.SpawnEmissionProfile
+                                {
+                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                                    SpawnMode = SourceSpawnModeId.CapAndMaxDensity,
+                                    RatePerSecPerArea = 1f,
+                                    MaxActiveDensityPerArea = -2f,
+                                },
+                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                                {
+                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                                    SpawnSampleBudget = 16,
+                                    PlayerNoSpawnRadius = 0f,
+                                }
                             }
                         }
                     }
@@ -312,10 +340,24 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                Bullet = def,
-                                SpawnMode = SourceSpawnModeId.FixedDensity,
-                                SpawnDensityPerSecPerArea = 1f,
-                                MaxActiveDensityPerArea = 0f
+                                Payload = new WaveTimelineSO.SpawnPayloadProfile
+                                {
+                                    Bullet = def,
+                                },
+                                Emission = new WaveTimelineSO.SpawnEmissionProfile
+                                {
+                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                                    RatePerSecPerArea = 1f,
+                                    MaxActiveDensityPerArea = 0f,
+                                },
+                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                                {
+                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                                    SpawnSampleBudget = 16,
+                                    PlayerNoSpawnRadius = 0f,
+                                }
                             }
                         }
                     },
@@ -330,10 +372,24 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                Bullet = def,
-                                SpawnMode = SourceSpawnModeId.FixedDensity,
-                                SpawnDensityPerSecPerArea = 1f,
-                                MaxActiveDensityPerArea = 0f
+                                Payload = new WaveTimelineSO.SpawnPayloadProfile
+                                {
+                                    Bullet = def,
+                                },
+                                Emission = new WaveTimelineSO.SpawnEmissionProfile
+                                {
+                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                                    RatePerSecPerArea = 1f,
+                                    MaxActiveDensityPerArea = 0f,
+                                },
+                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                                {
+                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                                    SpawnSampleBudget = 16,
+                                    PlayerNoSpawnRadius = 0f,
+                                }
                             }
                         }
                     },
@@ -390,10 +446,24 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                Bullet = def,
-                                SpawnMode = SourceSpawnModeId.FixedDensity,
-                                SpawnDensityPerSecPerArea = 1f,
-                                MaxActiveDensityPerArea = 0f
+                                Payload = new WaveTimelineSO.SpawnPayloadProfile
+                                {
+                                    Bullet = def,
+                                },
+                                Emission = new WaveTimelineSO.SpawnEmissionProfile
+                                {
+                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                                    RatePerSecPerArea = 1f,
+                                    MaxActiveDensityPerArea = 0f,
+                                },
+                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                                {
+                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                                    SpawnSampleBudget = 16,
+                                    PlayerNoSpawnRadius = 0f,
+                                }
                             }
                         }
                     },
@@ -408,10 +478,24 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                Bullet = def,
-                                SpawnMode = SourceSpawnModeId.FixedDensity,
-                                SpawnDensityPerSecPerArea = 1f,
-                                MaxActiveDensityPerArea = 0f
+                                Payload = new WaveTimelineSO.SpawnPayloadProfile
+                                {
+                                    Bullet = def,
+                                },
+                                Emission = new WaveTimelineSO.SpawnEmissionProfile
+                                {
+                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                                    RatePerSecPerArea = 1f,
+                                    MaxActiveDensityPerArea = 0f,
+                                },
+                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                                {
+                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                                    SpawnSampleBudget = 16,
+                                    PlayerNoSpawnRadius = 0f,
+                                }
                             }
                         }
                     },
@@ -467,7 +551,6 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                UseDirectiveProfiles = true,
                                 Payload = new WaveTimelineSO.SpawnPayloadProfile
                                 {
                                     Bullet = def,
@@ -541,7 +624,6 @@ namespace SweepNDodge.DotsBullets.Tests
                         {
                             new WaveTimelineSO.SpawnEntry
                             {
-                                UseDirectiveProfiles = true,
                                 Payload = new WaveTimelineSO.SpawnPayloadProfile
                                 {
                                     Bullet = def,

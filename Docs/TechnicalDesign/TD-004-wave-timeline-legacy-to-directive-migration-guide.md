@@ -3,18 +3,20 @@
 ## Metadata
 - doc_id: `TD-004`
 - type: `TechnicalDesign`
-- status: `active`
-- last_updated: `2026-02-23`
+- status: `archived`
+- last_updated: `2026-02-25`
 - related_docs:
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
   - [OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
 
-> `WaveTimelineSO.SpawnEntry`의 legacy 필드에서 `Payload/Emission/Sampling` 신규 프로필로 이행할 때의 실무 기준 문서.
+> `WaveTimelineSO.SpawnEntry` legacy 필드가 제거되기 전 이행 절차를 기록한 아카이브 문서.
+
+> 2026-02-25 기준: `UseDirectiveProfiles`, legacy emission 필드, `WallEven` 전용 데이터는 코드에서 제거되었다.
 
 ## 1. 적용 대상
-- 대상: `SpawnEntry.UseDirectiveProfiles == false`인 기존 엔트리
-- 목표: 체감 밀도/활성 캡을 유지한 상태로 신규 계약(`TD-003`)을 우선 사용하도록 전환
+- 본 문서는 히스토리 참고용이다.
+- 현재 활성 계약은 `TD-003`(SpawnDirective 모델)과 `TD-002`(런타임 계약)를 기준으로 한다.
 
 ## 2. 필드 매핑표 (legacy -> directive)
 | legacy 필드 | directive 필드 | 매핑 규칙 |

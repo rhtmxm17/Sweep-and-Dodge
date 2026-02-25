@@ -4,7 +4,7 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-24`
+- last_updated: `2026-02-25`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -46,14 +46,12 @@
 | BurstShotsPerEvent | int | EventBurst 1회당 샷 수 | >= 1 |
 | SpawnMode | enum | 활성 캡 정책 | FixedDensity / CapAndMaxDensity |
 | MaxActiveDensityPerArea | float | Cap 모드 상한 | Cap 모드에서 >= 0 |
-| SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK / LineEven / WallEven(비활성) / PointSet |
+| SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK / LineEven / PointSet |
 | CenterMode | enum | 중심 모드 | SourceCenter / FixedPoint / PlayerRelative |
 | FixedPoint | float2 | 고정 중심점 | CenterMode=FixedPoint |
 | SpawnOffset | float2 | 플레이어 상대 오프셋 | CenterMode=PlayerRelative |
 | LineStart / LineEnd | float2 | LineEven 기준 선분 | SamplingMode=LineEven |
-| SampleSpacing | float | Line/Wall 등간격 간격 | > 0 |
-| WallMask | flags | WallEven 벽 선택 | None 제외 |
-| WallInset | float | WallEven 안쪽 오프셋 | >= 0 |
+| SampleSpacing | float | LineEven 등간격 간격 | > 0 |
 | DirectionMode | enum | 방향 모드 | Random / Fixed / NWay / Spiral / RadialBurst |
 | BaseAngleDeg | float | 기준 각도 | 자유 범위 |
 | NWayCount | int | NWay 슬롯 수 | NWay에서 >= 2 |
@@ -148,14 +146,12 @@ Hit:
 - NWay에서 `NWayCount < 2` (`CV023`).
 - RadialBurst에서 `BurstShotsPerEvent < 2` (`CV024`).
 - LineEven에서 선분 길이 0 또는 `SampleSpacing <= 0` (`CV026`).
-- WallEven 사용(`SamplingMode=WallEven`) (`CV025`).
 - Warning:
 - `SpawnSampleBudget`가 권장 범위 초과.
 - `MaxActiveDensityPerArea`가 Stage 목표 대비 과도함.
 - `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
 - Spiral에서 `SpiralStepDeg`가 0에 근접 (`CVW032`).
 - PointSet 사용(1차에서는 Uniform fallback) (`CVW033`).
-- WallEven 전용 설정값(`WallMask`, `WallInset`) 사용 시 무시됨 (`CVW034`).
 
 검증 코드 매핑(현재 구현):
 - `CV012`: Wave segment의 `Entries` 비어 있음
@@ -171,11 +167,9 @@ Hit:
 - `CV022`: EventBurst `BurstShotsPerEvent < 1`
 - `CV023`: NWay `NWayCount < 2`
 - `CV024`: RadialBurst `BurstShotsPerEvent < 2`
-- `CV025`: WallEven 사용 금지(정책상 비활성)
 - `CV026`: LineEven 파라미터 오류
 - `CVW032`: Spiral `SpiralStepDeg` 0 근접 (Warning)
 - `CVW033`: PointSet 사용 시 1차 fallback 경고 (Warning)
-- `CVW034`: WallEven 전용 설정값 사용 경고 (무시됨)
 - `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
 - `CV011`: Wave segment 중첩
 
@@ -189,6 +183,7 @@ Hit:
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 8. 변경 이력
+- 2026-02-25: `SpawnEntry` 레거시 fallback과 `WallEven` 전용 경로/검증 규칙(`CV025`, `CVW034`) 제거
 - 2026-02-24: `WallEven`을 정책 비활성으로 전환하고 `CV025`/`CVW034` 검증 규칙을 추가
 - 2026-02-24: `DirectionMode.Fixed`를 추가해 `LineEven + 고정 방향` 구성을 정식 지원
 - 2026-02-24: `EventBurst(carry)`, `DirectionProfile`, `LineEven/WallEven` 계약 및 CV020~CV024/CV026/CVW032/CVW033 규칙을 추가

@@ -283,8 +283,6 @@ namespace SweepNDodge.DotsBullets
                 LineStart = pattern.LineStart,
                 LineEnd = pattern.LineEnd,
                 SampleSpacing = math.max(0.001f, pattern.SampleSpacing),
-                WallMask = pattern.WallMask,
-                WallInset = math.max(0f, pattern.WallInset),
                 SpawnSampleBudget = math.max(1, pattern.SpawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius),
                 BaseAngleDeg = pattern.BaseAngleDeg,

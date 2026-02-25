@@ -4,7 +4,7 @@
 - doc_id: `TD-003`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-24`
+- last_updated: `2026-02-25`
 - related_adr:
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
@@ -34,9 +34,8 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 주요 필드:
   - `FieldShape` (`Circle` / `Rect`)
   - `CenterMode` (`SourceCenter` / `FixedPoint` / `PlayerRelative`)
-  - `SamplingMode` (`UniformField` / `PollutionTopK` / `LineEven` / `WallEven(비활성)` / `PointSet`)
+  - `SamplingMode` (`UniformField` / `PollutionTopK` / `LineEven` / `PointSet`)
   - `LineStart`, `LineEnd`, `SampleSpacing` (LineEven)
-  - `WallMask`, `WallInset`, `SampleSpacing` (WallEven 전용, 현재 비활성)
   - `PlayerNoSpawnRadius`
   - `SpawnSampleBudget`
 - 원칙:
@@ -100,7 +99,6 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - Sampling 최종 평가는 Request가 아니라 `ExecutionBegin` 스폰 소비 시점에서 수행한다.
 - 방향 계산(Direction)도 `ExecutionBegin` 스폰 소비 시점에서 수행한다.
 - `WaveTimelineSO`는 `SpawnEntry` 내부에 `Payload/Emission/Sampling` 인라인 프로필을 기본 구조로 사용한다.
-  - 이행기 호환을 위해 legacy 필드를 유지하되, `UseDirectiveProfiles`가 켜진 엔트리부터 신규 프로필을 우선 적용한다.
 - 프레임 예산(`BudgetPerFrame`)은 요청 전체(탄 종류 공용)에서 공유한다.
   - 우선순위 규칙: Trash(`StandardCollectible`)는 최하 우선순위로 소비한다.
 
@@ -108,13 +106,11 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - EmissionMode는 `RateField` / `Poisson` / `EventBurst` 세 가지로 제한한다.
 - DirectionMode는 `Random` / `Fixed` / `NWay` / `Spiral` / `RadialBurst` 다섯 가지로 제한한다.
 - Sampling 확장은 `LineEven`만 1차 활성화한다.
-- `WallEven`은 정책상 비활성이다. 입력 시 `LineEven`으로 강제 폴백한다.
 - `PointSet`은 1차에서 계약만 반영하고 런타임 샘플러는 후속 활성화한다.
 
 ## 9. 마이그레이션 체크리스트
-- [x] 대상 `WaveTimelineSO.SpawnEntry`에서 `UseDirectiveProfiles=true`로 전환했는가
-- [x] `Payload.Bullet`이 legacy `Bullet`과 동일 참조로 매핑되었는가
-- [x] `Emission`에 legacy 동등값(`SpawnMode`, `RatePerSecPerArea`, `MaxActiveDensityPerArea`)을 채웠는가
+- [x] 대상 `WaveTimelineSO.SpawnEntry`가 인라인 프로필(`Payload/Emission/Sampling/Direction`)만 사용하도록 정리되었는가
+- [x] `Payload.Bullet` 참조가 각 엔트리에 채워졌는가
 - [x] `Sampling` 기본값을 명시했는가 (`SamplingMode=PollutionTopK`, `CenterMode=SourceCenter`, `SpawnSampleBudget=16`)
 - [x] `Poisson` 사용 시 `EmissionMode=Poisson`, `MeanEventsPerSec>=0`를 확인했는가
 - [x] 검증 루프를 통과했는가 (`refresh_unity` -> 콘솔 error 0 -> EditMode -> PlayMode 전용 스모크)
@@ -125,7 +121,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 본 문서는 스폰 분해 모델과 모드 조합 규칙을 관리한다.
 
 ## 11. 변경 이력
-- 2026-02-24: 혼동 방지를 위해 `WallEven`을 정책 비활성으로 전환하고 입력 시 `LineEven` 폴백 규칙을 추가
+- 2026-02-25: `SpawnEntry` 레거시 fallback(`UseDirectiveProfiles`, legacy emission 필드)과 `WallEven` 전용 계약을 제거
 - 2026-02-24: `DirectionMode.Fixed`를 추가해 `LineEven + 고정 방향` 시나리오를 명시적으로 지원
 - 2026-02-24: `EventBurst`를 정식 계약으로 승격하고 `carry` 소비 정책, `DirectionProfile`, `LineEven/WallEven` 1차 범위를 추가
 - 2026-02-24: 공유 예산 정책에서 Trash 최하 우선순위 규칙을 명시

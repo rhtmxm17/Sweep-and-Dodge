@@ -16,8 +16,6 @@ namespace SweepNDodge.DotsBullets
         public Unity.Mathematics.float2 LineStart;
         public Unity.Mathematics.float2 LineEnd;
         public float SampleSpacing;
-        public SourceSpawnWallMaskId WallMask;
-        public float WallInset;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;

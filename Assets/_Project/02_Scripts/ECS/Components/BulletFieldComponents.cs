@@ -51,7 +51,6 @@ namespace SweepNDodge.DotsBullets
         UniformField = 0,
         PollutionTopK = 1,
         LineEven = 2,
-        WallEven = 3,
         PointSet = 4,
     }
 
@@ -69,17 +68,6 @@ namespace SweepNDodge.DotsBullets
         Spiral = 2,
         RadialBurst = 3,
         Fixed = 4,
-    }
-
-    [System.Flags]
-    public enum SourceSpawnWallMaskId : byte
-    {
-        None = 0,
-        Left = 1 << 0,
-        Right = 1 << 1,
-        Bottom = 1 << 2,
-        Top = 1 << 3,
-        All = Left | Right | Bottom | Top,
     }
 
     public enum SourcePollutionSamplingModeId : byte
@@ -141,8 +129,6 @@ namespace SweepNDodge.DotsBullets
         public float2 LineStart;
         public float2 LineEnd;
         public float SampleSpacing;
-        public SourceSpawnWallMaskId WallMask;
-        public float WallInset;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;
@@ -184,8 +170,6 @@ namespace SweepNDodge.DotsBullets
         public float2 LineStart;
         public float2 LineEnd;
         public float SampleSpacing;
-        public SourceSpawnWallMaskId WallMask;
-        public float WallInset;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;
