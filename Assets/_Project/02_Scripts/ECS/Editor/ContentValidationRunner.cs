@@ -22,7 +22,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public static List<ContentValidationIssue> ValidateProjectAssets()
         {
             var definitions = CollectScriptableObjects<BulletDefinitionSO>();
-            var waveTimelines = CollectScriptableObjects<WaveTimelineSO>();
+            var waveClips = CollectScriptableObjects<WaveClipSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<BulletSourceAuthoring>>();
             var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
@@ -31,12 +31,12 @@ namespace SweepNDodge.DotsBullets.Editor
             CollectAuthoringsFromScenes(visuals, sources, bullets);
 
             SortRecordsByLocation(definitions);
-            SortRecordsByLocation(waveTimelines);
+            SortRecordsByLocation(waveClips);
             SortRecordsByLocation(visuals);
             SortRecordsByLocation(sources);
             SortRecordsByLocation(bullets);
 
-            var input = new ContentValidationInput(definitions, waveTimelines, visuals, sources, bullets);
+            var input = new ContentValidationInput(definitions, waveClips, visuals, sources, bullets);
             var issues = ContentValidationRules.Validate(input);
             SortIssuesInPlace(issues);
             return issues;

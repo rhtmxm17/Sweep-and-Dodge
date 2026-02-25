@@ -1,4 +1,4 @@
-# WaveTimeline Legacy -> SpawnDirective 마이그레이션 가이드
+# WaveTimelineSO -> WaveClipSO 마이그레이션 완료 아카이브
 
 ## Metadata
 - doc_id: `TD-004`
@@ -6,64 +6,57 @@
 - status: `archived`
 - last_updated: `2026-02-25`
 - related_docs:
+  - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
-  - [OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
+  - [TD-005-spawn-directive-settings-reference.md](./TD-005-spawn-directive-settings-reference.md)
 
-> `WaveTimelineSO.SpawnEntry` legacy 필드가 제거되기 전 이행 절차를 기록한 아카이브 문서.
+> 본 문서는 `WaveTimelineSO` 기반 authoring/runtime 경로를 `WaveClipSO` 기반 경로로 전환한 결과를 기록한 히스토리 문서다.
 
-> 2026-02-25 기준: `UseDirectiveProfiles`, legacy emission 필드, `WallEven` 전용 데이터는 코드에서 제거되었다.
+## 1. 전환 결과 요약
+- `WaveClipSO` 도입: 완료.
+- `BulletSourceAuthoring` 바인딩 전환(`SustainClipSlots[]`, `EventClipSlots[]`): 완료.
+- `WaveTimelineSO` 타입 제거: 완료.
+- `Assets/_Project/03_Datas/WaveTimelines` 데이터 제거 및 `WaveClips` 경로 사용: 완료.
+- v3 단일 경로(클립/슬롯/채널) 전환: 완료.
 
-## 1. 적용 대상
-- 본 문서는 히스토리 참고용이다.
-- 현재 활성 계약은 `TD-003`(SpawnDirective 모델)과 `TD-002`(런타임 계약)를 기준으로 한다.
-
-## 2. 필드 매핑표 (legacy -> directive)
-| legacy 필드 | directive 필드 | 매핑 규칙 |
+## 2. 데이터/코드 매핑
+| 레거시 개념 | 전환 후 개념 | 반영 상태 |
 | --- | --- | --- |
-| `Bullet` | `Payload.Bullet` | 동일 참조 복사 |
-| `SpawnMode` | `Emission.SpawnMode` | 동일 enum 값 복사 |
-| `SpawnDensityPerSecPerArea` | `Emission.RatePerSecPerArea` | 동일 값 복사 |
-| `MaxActiveDensityPerArea` | `Emission.MaxActiveDensityPerArea` | 동일 값 복사 |
-| `(legacy에 없음)` | `Emission.EmissionMode` | 기본 `RateField(0)` |
-| `(legacy에 없음)` | `Emission.MeanEventsPerSec` | `0` (RateField 유지) |
-| `(legacy에 없음)` | `Sampling.SamplingMode` | legacy 동등값 `PollutionTopK(1)` |
-| `(legacy에 없음)` | `Sampling.CenterMode` | 기본 `SourceCenter(0)` |
-| `(legacy에 없음)` | `Sampling.FixedPoint` | `{x:0, y:0}` |
-| `(legacy에 없음)` | `Sampling.SpawnOffset` | `{x:0, y:0}` |
-| `(legacy에 없음)` | `Sampling.SpawnSampleBudget` | 기본 `16` |
-| `(legacy에 없음)` | `Sampling.PlayerNoSpawnRadius` | 기본 `0` |
-| `UseDirectiveProfiles` | `UseDirectiveProfiles` | `true`로 전환 |
+| Source 단위 통합 `WaveTimelineSO` | 재사용 가능한 `WaveClipSO` 단위 자산 | 완료 |
+| `WaveTimelineSO.SpawnEntry` | `WaveClipSO.Segments[].Entries[]` | 완료 |
+| Source 단일 Wave 참조 | `SustainClipSlots[]`, `EventClipSlots[]` 배열 바인딩 | 완료 |
+| `SpawnPriority` 중심 우선순위 | Lane 우선순위(`특수 > Hazard > Trash`) | 완료 |
+| 상태 진입 연출 + sustain 공존 | 이벤트 하드 프리엠션 + 큐잉 | 완료 |
+| 상태 전환 시 sustain 유지 | 상태 전환 시 sustain 즉시 중단 | 완료 |
 
-## 3. 권장 기본값
-- `SpawnSampleBudget`: `16`
-- `CenterMode`: `SourceCenter`
-- `SamplingMode`: `PollutionTopK`
+## 3. 마이그레이션 시 적용한 정책
+1. `WaveClipSO`의 `ClipId/Phase/Lane/DurationSec/Segments`를 기준 스키마로 고정했다.
+2. sustain 체인은 "직전 클립 제외 랜덤"을 사용하되, 후보가 1개면 재선택을 허용했다.
+3. 이벤트 트리거 중복은 큐잉하며, 이벤트 진입 시 기존 sustain pending을 폐기했다.
+4. 결정론 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey + SelectionSequence`로 고정했다.
 
-위 기본값은 현재 legacy resolve 동작(`WaveTimelineSO.Resolve*`)과 동등한 초기값이다.
+## 4. 검증/게이트 동기화
+- 콘텐츠 검증 입력을 `WaveClipSO` 기준으로 전환했다.
+- 주요 규칙:
+  - `CV006`: Source에 WaveClip 바인딩 없음
+  - `CV008`: Segments 비어 있음
+  - `CV009`: `ClipId` 중복
+  - `CV010`, `CV011`, `CV012`~`CV024`, `CV026`: 구간/엔트리 파라미터 오류
+- 테스트:
+  - EditMode 계약 테스트: 전환 후 규칙 기준 통과
+  - PlayMode 스모크: 전환 후 기본 시나리오 통과
 
-## 4. Poisson 도입 시 주의사항
-- `EmissionMode=Poisson`으로 전환할 때 `MeanEventsPerSec`를 0보다 큰 값으로 명시한다.
-- Poisson 도입 엔트리에서 `RatePerSecPerArea`는 체감 비교 기준으로만 유지하고, 운영 판단은 `MeanEventsPerSec` 중심으로 한다.
-- 동일 Wave 안에서 RateField/Poisson을 혼합하면 체감 분산이 커지므로 1차 마이그레이션에서는 혼합 도입을 피한다.
-- 검증 규칙:
-  - `MeanEventsPerSec < 0`이면 `CV017` 에러
-  - `SpawnSampleBudget < 0`이면 `CV018` 에러
-  - `PlayerNoSpawnRadius < 0`이면 `CV019` 에러
+## 5. 정리된 레거시 자산
+- 제거된 타입:
+  - `Assets/_Project/02_Scripts/ECS/Authoring/WaveTimelineSO.cs`
+- 제거된 데이터 경로:
+  - `Assets/_Project/03_Datas/WaveTimelines/*`
+- 운영 데이터 경로:
+  - `Assets/_Project/03_Datas/WaveClips/*`
 
-## 5. 권장 마이그레이션 절차
-1. 대상 `WaveTimeline`을 열고 엔트리 단위로 매핑표를 적용한다.
-2. `UseDirectiveProfiles`를 `true`로 설정한다.
-3. legacy 필드는 즉시 삭제하지 않고 fallback 검증 구간 동안 유지한다.
-4. 컴파일/검증 루프 실행:
-   - `refresh_unity(compile=request, wait_for_ready=true)`
-   - `read_console(action=get, types=["error"], include_stacktrace=true)`
-   - `EditMode` 테스트
-   - `PlayMode` 전용 스모크
-
-## 6. 이번 반영 샘플
-- `Assets/_Project/03_Datas/WaveTimelines/bwt_sample_stage01.asset`
-- `Assets/_Project/03_Datas/WaveTimelines/bwt_from_bsp_default.asset`
-- `Assets/_Project/03_Datas/WaveTimelines/bwt_from_bsp_dust_only.asset`
-
-세 에셋 모두 `Emission=RateField`, `Sampling=PollutionTopK + SourceCenter + budget 16`으로 전환해 legacy 체감을 유지했다.
+## 6. 현재 기준 문서
+- 정책/결정: `ADR-20260225-02`
+- 런타임 계약: `TD-002`
+- 스폰 모델: `TD-003`
+- 설정 레퍼런스: `TD-005`

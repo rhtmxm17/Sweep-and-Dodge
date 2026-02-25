@@ -41,20 +41,20 @@ namespace SweepNDodge.DotsBullets.Editor
     public readonly struct ContentValidationInput
     {
         public readonly IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> Definitions;
-        public readonly IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> WaveTimelines;
+        public readonly IReadOnlyList<ContentValidationRecord<WaveClipSO>> WaveClips;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> SourceAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletAuthoring>> BulletAuthorings;
 
         public ContentValidationInput(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
-            IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> waveTimelines,
+            IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
         {
             Definitions = definitions ?? Array.Empty<ContentValidationRecord<BulletDefinitionSO>>();
-            WaveTimelines = waveTimelines ?? Array.Empty<ContentValidationRecord<WaveTimelineSO>>();
+            WaveClips = waveClips ?? Array.Empty<ContentValidationRecord<WaveClipSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<BulletSourceAuthoring>>();
             BulletAuthorings = bulletAuthorings ?? Array.Empty<ContentValidationRecord<BulletAuthoring>>();
@@ -70,7 +70,7 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateDefinitionUniqueness(input.Definitions, issues);
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
-            ValidateWaveTimelineContracts(input.Definitions, input.WaveTimelines, issues);
+            ValidateWaveClipContracts(input.Definitions, input.WaveClips, issues);
             ValidateSourceAuthoringContracts(input.SourceAuthorings, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
             ValidateAutoCorrectionWarnings(input.Definitions, input.VisualAuthorings, input.SourceAuthorings, issues);
@@ -192,9 +192,9 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateWaveTimelineContracts(
+        private static void ValidateWaveClipContracts(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
-            IReadOnlyList<ContentValidationRecord<WaveTimelineSO>> timelines,
+            IReadOnlyList<ContentValidationRecord<WaveClipSO>> clips,
             List<ContentValidationIssue> issues)
         {
             var knownKeys = new HashSet<int>();
@@ -205,42 +205,65 @@ namespace SweepNDodge.DotsBullets.Editor
                     knownKeys.Add(def.DefinitionId);
             }
 
-            for (int i = 0; i < timelines.Count; i++)
+            var clipOwnersByClipId = new Dictionary<int, List<string>>();
+            for (int i = 0; i < clips.Count; i++)
             {
-                var timeline = timelines[i].Value;
-                if (timeline == null)
+                var clip = clips[i].Value;
+                if (clip == null || clip.ClipId <= 0)
                     continue;
 
-                if (timeline.Segments == null || timeline.Segments.Length <= 0)
+                if (!clipOwnersByClipId.TryGetValue(clip.ClipId, out var owners))
+                {
+                    owners = new List<string>(2);
+                    clipOwnersByClipId.Add(clip.ClipId, owners);
+                }
+
+                owners.Add(clips[i].Location);
+            }
+
+            foreach (var pair in clipOwnersByClipId)
+            {
+                if (pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV009",
+                        pair.Value[i],
+                        $"Duplicate ClipId detected: {pair.Key}. Owners: {joined}"));
+                }
+            }
+
+            for (int i = 0; i < clips.Count; i++)
+            {
+                var clip = clips[i].Value;
+                if (clip == null)
+                    continue;
+
+                if (clip.Segments == null || clip.Segments.Length <= 0)
                 {
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Error,
                         "CV008",
-                        timelines[i].Location,
-                        "WaveTimelineSO.Segments buffer is null or empty."));
+                        clips[i].Location,
+                        "WaveClipSO.Segments buffer is null or empty."));
                     continue;
                 }
 
-                var segmentOwnersByWaveId = new Dictionary<int, List<int>>();
-                var validSegments = new List<(int Index, float Start, float End)>(timeline.Segments.Length);
-                for (int s = 0; s < timeline.Segments.Length; s++)
+                var validSegments = new List<(int Index, float Start, float End)>(clip.Segments.Length);
+                for (int s = 0; s < clip.Segments.Length; s++)
                 {
-                    var seg = timeline.Segments[s];
-
-                    if (!segmentOwnersByWaveId.TryGetValue(seg.WaveId, out var segmentOwners))
-                    {
-                        segmentOwners = new List<int>(2);
-                        segmentOwnersByWaveId.Add(seg.WaveId, segmentOwners);
-                    }
-                    segmentOwners.Add(s);
-
+                    var seg = clip.Segments[s];
                     if (seg.EndSec <= seg.StartSec)
                     {
                         issues.Add(new ContentValidationIssue(
                             ContentValidationSeverity.Error,
                             "CV010",
-                            timelines[i].Location,
-                            $"Wave segment has invalid range at segmentIndex={s}. StartSec={seg.StartSec}, EndSec={seg.EndSec}."));
+                            clips[i].Location,
+                            $"Clip segment has invalid range at segmentIndex={s}. StartSec={seg.StartSec}, EndSec={seg.EndSec}."));
                         continue;
                     }
 
@@ -250,8 +273,8 @@ namespace SweepNDodge.DotsBullets.Editor
                         issues.Add(new ContentValidationIssue(
                             ContentValidationSeverity.Error,
                             "CV012",
-                            timelines[i].Location,
-                            $"Wave segment has no entries at segmentIndex={s}."));
+                            clips[i].Location,
+                            $"Clip segment has no entries at segmentIndex={s}."));
                     }
                     else
                     {
@@ -264,8 +287,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV013",
-                                    timelines[i].Location,
-                                    $"Wave segment has null bullet entry at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment has null bullet entry at segmentIndex={s}, entryIndex={e}."));
                                 continue;
                             }
 
@@ -274,8 +297,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV027",
-                                    timelines[i].Location,
-                                    $"Wave segment references invalid DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment references invalid DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
                                 continue;
                             }
 
@@ -284,8 +307,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV014",
-                                    timelines[i].Location,
-                                    $"Wave segment references unknown DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment references unknown DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             var emissionMode = entry.ResolveEmissionMode();
@@ -294,8 +317,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV015",
-                                    timelines[i].Location,
-                                    $"Wave segment has negative RatePerSecPerArea at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment has negative RatePerSecPerArea at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (emissionMode == SourceSpawnEmissionModeId.Poisson && entry.ResolveMeanEventsPerSec() < 0f)
@@ -303,8 +326,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV017",
-                                    timelines[i].Location,
-                                    $"Wave segment has negative MeanEventsPerSec at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment has negative MeanEventsPerSec at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (emissionMode == SourceSpawnEmissionModeId.EventBurst)
@@ -314,8 +337,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV020",
-                                        timelines[i].Location,
-                                        $"Wave segment has non-positive BurstIntervalSec at segmentIndex={s}, entryIndex={e}."));
+                                        clips[i].Location,
+                                        $"Clip segment has non-positive BurstIntervalSec at segmentIndex={s}, entryIndex={e}."));
                                 }
 
                                 int repeatCount = entry.Emission.BurstRepeatCount;
@@ -324,8 +347,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV021",
-                                        timelines[i].Location,
-                                        $"Wave segment has invalid BurstRepeatCount at segmentIndex={s}, entryIndex={e}. Use -1 or >= 1."));
+                                        clips[i].Location,
+                                        $"Clip segment has invalid BurstRepeatCount at segmentIndex={s}, entryIndex={e}. Use -1 or >= 1."));
                                 }
 
                                 if (entry.Emission.BurstShotsPerEvent < 1)
@@ -333,8 +356,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV022",
-                                        timelines[i].Location,
-                                        $"Wave segment has invalid BurstShotsPerEvent at segmentIndex={s}, entryIndex={e}."));
+                                        clips[i].Location,
+                                        $"Clip segment has invalid BurstShotsPerEvent at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
 
@@ -343,8 +366,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV016",
-                                    timelines[i].Location,
-                                    $"Wave segment has negative MaxActiveDensityPerArea for CapAndMaxDensity at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment has negative MaxActiveDensityPerArea for CapAndMaxDensity at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (entry.Sampling.SpawnSampleBudget < 0)
@@ -352,8 +375,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV018",
-                                    timelines[i].Location,
-                                    $"Wave segment has negative SpawnSampleBudget at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment has negative SpawnSampleBudget at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (entry.ResolvePlayerNoSpawnRadius() < 0f)
@@ -361,8 +384,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV019",
-                                    timelines[i].Location,
-                                    $"Wave segment has negative PlayerNoSpawnRadius at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment has negative PlayerNoSpawnRadius at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             var directionMode = entry.ResolveDirectionMode();
@@ -371,8 +394,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV023",
-                                    timelines[i].Location,
-                                    $"Wave segment uses NWay with NWayCount < 2 at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment uses NWay with NWayCount < 2 at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (directionMode == SourceSpawnDirectionModeId.RadialBurst && entry.Emission.BurstShotsPerEvent < 2)
@@ -380,8 +403,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV024",
-                                    timelines[i].Location,
-                                    $"Wave segment uses RadialBurst with BurstShotsPerEvent < 2 at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment uses RadialBurst with BurstShotsPerEvent < 2 at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (directionMode == SourceSpawnDirectionModeId.Spiral && Mathf.Abs(entry.ResolveSpiralStepDeg()) < 0.0001f)
@@ -389,8 +412,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Warning,
                                     "CVW032",
-                                    timelines[i].Location,
-                                    $"Wave segment uses Spiral with near-zero SpiralStepDeg at segmentIndex={s}, entryIndex={e}."));
+                                    clips[i].Location,
+                                    $"Clip segment uses Spiral with near-zero SpiralStepDeg at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             var samplingMode = entry.ResolveSamplingMode();
@@ -402,8 +425,8 @@ namespace SweepNDodge.DotsBullets.Editor
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV026",
-                                        timelines[i].Location,
-                                        $"Wave segment has invalid LineEven parameters at segmentIndex={s}, entryIndex={e}."));
+                                        clips[i].Location,
+                                        $"Clip segment has invalid LineEven parameters at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
 
@@ -412,29 +435,13 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Warning,
                                     "CVW033",
-                                    timelines[i].Location,
-                                    $"Wave segment uses PointSet at segmentIndex={s}, entryIndex={e}. PointSet runtime sampler is not enabled yet and falls back to UniformField."));
+                                    clips[i].Location,
+                                    $"Clip segment uses PointSet at segmentIndex={s}, entryIndex={e}. PointSet runtime sampler is not enabled yet and falls back to UniformField."));
                             }
                         }
                     }
 
                     validSegments.Add((s, seg.StartSec, seg.EndSec));
-                }
-
-                foreach (var pair in segmentOwnersByWaveId)
-                {
-                    if (pair.Value.Count <= 1)
-                        continue;
-
-                    string joined = string.Join(", ", pair.Value);
-                    for (int idx = 0; idx < pair.Value.Count; idx++)
-                    {
-                        issues.Add(new ContentValidationIssue(
-                            ContentValidationSeverity.Error,
-                            "CV009",
-                            timelines[i].Location,
-                            $"WaveTimeline contains duplicate WaveId {pair.Key}. segmentIndices={joined}"));
-                    }
                 }
 
                 validSegments.Sort((a, b) => a.Start.CompareTo(b.Start));
@@ -448,8 +455,8 @@ namespace SweepNDodge.DotsBullets.Editor
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Error,
                         "CV011",
-                        timelines[i].Location,
-                        $"Wave segments overlap: prev(segmentIndex={prev.Index}, [{prev.Start}, {prev.End})) and curr(segmentIndex={curr.Index}, [{curr.Start}, {curr.End}))."));
+                        clips[i].Location,
+                        $"Clip segments overlap: prev(segmentIndex={prev.Index}, [{prev.Start}, {prev.End})) and curr(segmentIndex={curr.Index}, [{curr.Start}, {curr.End}))."));
                 }
             }
         }
@@ -533,15 +540,55 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (source == null)
                     continue;
 
-                if (source.WaveTimeline == null)
+                if (!HasAnyWaveClipBinding(source))
                 {
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Error,
                         "CV006",
                         sourceAuthorings[i].Location,
-                        "BulletSourceAuthoring.WaveTimeline is null."));
+                        "BulletSourceAuthoring has no WaveClip bindings. Configure SustainClipSlots or EventClipSlots."));
                 }
             }
+        }
+
+        private static bool HasAnyWaveClipBinding(BulletSourceAuthoring source)
+        {
+            if (source == null)
+                return false;
+
+            if (source.SustainClipSlots != null)
+            {
+                for (int i = 0; i < source.SustainClipSlots.Length; i++)
+                {
+                    var slot = source.SustainClipSlots[i];
+                    if (slot.Clips == null)
+                        continue;
+
+                    for (int c = 0; c < slot.Clips.Length; c++)
+                    {
+                        if (slot.Clips[c] != null)
+                            return true;
+                    }
+                }
+            }
+
+            if (source.EventClipSlots != null)
+            {
+                for (int i = 0; i < source.EventClipSlots.Length; i++)
+                {
+                    var slot = source.EventClipSlots[i];
+                    if (slot.EventClips == null)
+                        continue;
+
+                    for (int c = 0; c < slot.EventClips.Length; c++)
+                    {
+                        if (slot.EventClips[c] != null)
+                            return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateBulletAuthoringRenderContracts(

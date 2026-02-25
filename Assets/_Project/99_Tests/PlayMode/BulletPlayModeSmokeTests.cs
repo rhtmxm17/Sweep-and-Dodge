@@ -108,18 +108,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 baselineMaxOldestAge = Mathf.Max(baselineMaxOldestAge, ComputeOldestPendingAgeFrames(em));
             }
 
-            Entity transitionedSource = FindSourceWithOpeningWave(em);
-            Assert.That(transitionedSource, Is.Not.EqualTo(Entity.Null), "Opening-wave source was not found for transition scenario.");
+            Entity transitionedSource = FindSourceWithEventClip(em);
+            Assert.That(transitionedSource, Is.Not.EqualTo(Entity.Null), "Event-clip source was not found for transition scenario.");
 
             var source = em.GetComponentData<SourceSpawnComponent>(transitionedSource);
             source.CollectedCount = Mathf.Max(source.CollectedCount, source.ThresholdWeakened);
             source.State = SourceStateId.Weakened;
             em.SetComponentData(transitionedSource, source);
 
-            if (em.HasComponent<SourceOpeningWaveRuntimeComponent>(transitionedSource))
+            if (em.HasComponent<SourceSustainRuntimeComponent>(transitionedSource))
             {
-                var runtime = em.GetComponentData<SourceOpeningWaveRuntimeComponent>(transitionedSource);
-                runtime.LastState = SourceStateId.Normal;
+                var runtime = em.GetComponentData<SourceSustainRuntimeComponent>(transitionedSource);
+                runtime.ActiveState = SourceStateId.Normal;
                 em.SetComponentData(transitionedSource, runtime);
             }
 
@@ -144,7 +144,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(maxPendingBacklog, Is.GreaterThanOrEqualTo(0), "Pending backlog metric must be observable.");
 
             Debug.Log(
-                $"[PlayModeBaseline] scenario=bwt_from_bsp_default baselineActive={baselineMaxActive} baselinePending={baselineMaxPending} baselineOldestAge={baselineMaxOldestAge} " +
+                $"[PlayModeBaseline] scenario=waveclip_v3_default baselineActive={baselineMaxActive} baselinePending={baselineMaxPending} baselineOldestAge={baselineMaxOldestAge} " +
                 $"maxActiveBullets={maxActiveBullets} maxPendingBacklog={maxPendingBacklog} maxOldestAge={maxOldestAge} dropCount={maxDropped} expiredByAge={maxExpired}");
         }
 
@@ -278,17 +278,20 @@ namespace SweepNDodge.DotsBullets.Tests
             return oldest;
         }
 
-        private static Entity FindSourceWithOpeningWave(EntityManager em)
+        private static Entity FindSourceWithEventClip(EntityManager em)
         {
             var query = em.CreateEntityQuery(
                 ComponentType.ReadOnly<SourceSpawnComponent>(),
-                ComponentType.ReadOnly<SourceOpeningWavePatternBuffer>());
+                ComponentType.ReadOnly<SourceClipPatternBuffer>());
             using var sources = query.ToEntityArray(Allocator.Temp);
             for (int i = 0; i < sources.Length; i++)
             {
-                var opening = em.GetBuffer<SourceOpeningWavePatternBuffer>(sources[i], isReadOnly: true);
-                if (opening.Length > 0)
-                    return sources[i];
+                var clips = em.GetBuffer<SourceClipPatternBuffer>(sources[i], isReadOnly: true);
+                for (int c = 0; c < clips.Length; c++)
+                {
+                    if (clips[c].Phase == SourceWavePhaseId.OnStateEnterOnce)
+                        return sources[i];
+                }
             }
 
             return Entity.Null;

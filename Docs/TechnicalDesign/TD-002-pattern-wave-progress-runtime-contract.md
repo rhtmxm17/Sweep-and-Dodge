@@ -59,7 +59,7 @@
 | SpiralStepDeg | float | Spiral 각도 증분 | Spiral에서 권장 != 0 |
 | SpawnSampleBudget | int | 샘플링 재시도 예산 | >= 1 (기본 16) |
 | PlayerNoSpawnRadius | float | 플레이어 주변 제외 반경 | >= 0 |
-| SpawnPriority | int | 요청 소비 우선순위 | 높을수록 우선 (Trash 최하) |
+| SpawnPriority | int | 요청 소비 우선순위(legacy) | v3 클립 경로에서는 `LanePriority` 사용 |
 
 `PatternDefinitionSlim`은 밀도 기반 구버전 용어이며, 스폰 모델은 `TD-003`의 SpawnDirective 용어를 기준으로 유지한다.
 
@@ -114,14 +114,16 @@ Hit:
 - Owner(`SpawnRequestRoundRobinExecutionSystem`)가 요청을 소비해 실제 스폰을 수행한다.
 - Sampling(중심 계산/샘플링/NoSpawn 반경 검증)과 Direction 계산은 ExecutionBegin에서 최종 평가한다.
 - `BudgetPerFrame`은 요청 전체(탄 종류 공용)에서 공유한다.
-  - 우선순위: Hazard 우선, Trash는 최하 우선순위로 소비한다.
+  - 우선순위: Lane 규칙(`특수 > Hazard > Trash`)을 최우선으로 적용한다.
 - ExecutionEnd 단계:
 - 디스폰 owner가 반납과 렌더 토글을 처리한다.
 
 현행 ECS 매핑 대상:
 - Source 패턴 런타임 버퍼: `SourceSpawnPatternBuffer`
+- Source 클립 런타임 버퍼: `SourceClipPatternBuffer`
+- Source 서스테인/이벤트 런타임: `SourceSustainRuntimeLaneBuffer`, `SourceEventRuntimeComponent`, `SourceEventQueueBuffer`
 - 요청 버퍼: `SourceSpawnRequestBuffer`
-- 정책/백로그: `SpawnRequestPolicyComponent`, `SpawnBacklogMetricsComponent`
+- 정책/백로그/시드: `SpawnRequestPolicyComponent`, `SpawnBacklogMetricsComponent`, `SpawnRunSeedComponent`, `SourceStableIdComponent`
 
 ## 5. 성능/리스크
 - Risk 1: 과밀 데이터로 인한 pending backlog 급증.
@@ -136,6 +138,9 @@ Hit:
 - Error:
 - Wave segment의 `EndSec <= StartSec` (`CV010`).
 - Wave segment 간 시간 겹침 (`CV011`).
+- Source에 WaveClip 바인딩이 전혀 없음 (`CV006`).
+- Wave clip `Segments` 비어 있음 (`CV008`).
+- `ClipId` 중복 (`CV009`).
 - Wave entry의 `RatePerSecPerArea < 0` (`CV015`, RateField 모드).
 - Wave entry의 `MeanEventsPerSec < 0` (`CV017`, Poisson 모드).
 - `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0` (`CV016`).
@@ -179,7 +184,7 @@ Hit:
 - PlayMode: 전용 씬 스모크로 기동/루프 정상성 확인.
 - 스트레스: backlog/expired/drop 지표 회귀 추적.
 
-## 7. 차기 확장(v3) 런타임 계약 초안 (미구현)
+## 7. v3 런타임 계약 (구현 반영)
 - 기준 ADR: [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 - 핵심 규약:
   - 슬롯 키: `State + Phase + Lane`
@@ -195,7 +200,7 @@ Hit:
 - 권장 ECS 스키마:
   - `SourceClipPatternBuffer` (`ClipId`, `Phase`, `Lane`, `LocalStartSec`, `LocalEndSec`, 기존 directive 필드)
   - `SourceSustainSlotCandidateBuffer` (`State`, `Lane`, `ClipId`, `Weight`)
-  - `SourceSustainRuntimeComponent` (`ActiveClipByLane`, `ElapsedByLane`, `LastClipByLane`, `SelectionSequenceByLane`)
+  - `SourceSustainRuntimeLaneBuffer` (`Lane`, `ActiveClipId`, `ElapsedSec`, `LastClipId`, `SelectionSequence`)
   - `SourceEventRuntimeComponent` (`IsPlaying`, `ActiveEventClipId`, `TriggerState`, `ElapsedSec`)
   - `SourceEventQueueBuffer` (`TriggerState`, `QueuedFrame`)
 - 결정론 요구:
@@ -207,6 +212,7 @@ Hit:
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 9. 변경 이력
+- 2026-02-25: `WaveClipSO` 기반 v3 단일 경로 반영 상태(규약/검증/CV 코드)로 문서를 동기화
 - 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, 상태전환 즉시중단, Lane 우선순위, RNG 키)으로 초안을 갱신
 - 2026-02-25: v3 클립/슬롯/채널 확장 초안 및 런타임 스키마 초안을 추가
 - 2026-02-25: `SpawnEntry` 레거시 fallback과 `WallEven` 전용 경로/검증 규칙(`CV025`, `CVW034`) 제거

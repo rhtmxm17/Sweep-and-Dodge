@@ -99,9 +99,9 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 요청 집계 키는 `BulletTypeKey` 단독이 아니라 `DirectiveId`를 기본 키로 사용한다.
 - Sampling 최종 평가는 Request가 아니라 `ExecutionBegin` 스폰 소비 시점에서 수행한다.
 - 방향 계산(Direction)도 `ExecutionBegin` 스폰 소비 시점에서 수행한다.
-- `WaveTimelineSO`는 `SpawnEntry` 내부에 `Payload/Emission/Sampling` 인라인 프로필을 기본 구조로 사용한다.
+- `WaveClipSO`는 `Segments[].Entries[]` 내부에 `Payload/Emission/Sampling/Direction` 인라인 프로필을 기본 구조로 사용한다.
 - 프레임 예산(`BudgetPerFrame`)은 요청 전체(탄 종류 공용)에서 공유한다.
-  - 우선순위 규칙: Trash(`StandardCollectible`)는 최하 우선순위로 소비한다.
+  - 우선순위 규칙: Lane 우선순위(`특수 > Hazard > Trash`)를 적용한다.
 
 ## 8. MVP 데이터 과잉 방지
 - EmissionMode는 `RateField` / `Poisson` / `EventBurst` 세 가지로 제한한다.
@@ -110,7 +110,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - `PointSet`은 1차에서 계약만 반영하고 런타임 샘플러는 후속 활성화한다.
 
 ## 9. 마이그레이션 체크리스트
-- [x] 대상 `WaveTimelineSO.SpawnEntry`가 인라인 프로필(`Payload/Emission/Sampling/Direction`)만 사용하도록 정리되었는가
+- [x] 대상 `WaveClipSO.Segments[].Entries[]`가 인라인 프로필(`Payload/Emission/Sampling/Direction`)만 사용하도록 정리되었는가
 - [x] `Payload.Bullet` 참조가 각 엔트리에 채워졌는가
 - [x] `Sampling` 기본값을 명시했는가 (`SamplingMode=PollutionTopK`, `CenterMode=SourceCenter`, `SpawnSampleBudget=16`)
 - [x] `Poisson` 사용 시 `EmissionMode=Poisson`, `MeanEventsPerSec>=0`를 확인했는가
@@ -121,10 +121,10 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - Pattern/Wave/Progress의 런타임 수식/검증 규칙은 `TD-002`에서 관리한다.
 - 본 문서는 스폰 분해 모델과 모드 조합 규칙을 관리한다.
 
-## 11. 차기 확장(v3) 초안 (미구현)
+## 11. v3 확장 계약 (구현 반영)
 - 상세 계약은 [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)를 기준으로 한다.
 - 확장 방향:
-  - 신규 `WaveClipSO`를 도입하고, `WaveTimelineSO`는 임시 레거시 경로로 유지 후 제거한다.
+  - `WaveClipSO`를 도입하고 `WaveTimelineSO` 타입/데이터/참조를 제거했다.
   - Source 런타임 슬롯 키를 `State + Phase + Lane`으로 고정한다(`Lane`은 확장 가능한 enum).
   - `Sustain`은 기본 `Hazard`/`Trash` Lane별 활성 클립 1개씩(최대 2개) 동시 실행한다.
   - 이벤트 클립(`OnStateEnterOnce`) 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)을 적용한다.
@@ -135,6 +135,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 12. 변경 이력
+- 2026-02-25: `WaveClipSO` 기반 v3 경로를 반영하고 `WaveTimelineSO` 제거 상태를 문서에 동기화
 - 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, Lane 우선순위, RNG/선택 규칙)으로 초안을 갱신
 - 2026-02-25: v3 확장 초안(클립/슬롯/채널, 이벤트 우선, sustain 체인) 및 ADR 링크를 추가
 - 2026-02-25: `SpawnEntry` 레거시 fallback(`UseDirectiveProfiles`, legacy emission 필드)과 `WallEven` 전용 계약을 제거

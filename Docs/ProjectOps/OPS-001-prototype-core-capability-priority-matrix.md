@@ -102,7 +102,7 @@
     - `Duplicate DefinitionId`는 즉시 `Error`로 승격한다.
     - 베이크/런타임 자동 보정 대상 값은 동작을 유지하되 `Warning`으로 보고한다.
     - 무렌더 Bullet(`BulletAuthoring`에 `MeshRenderer/SkinnedMeshRenderer` 없음)는 `Error`로 차단한다.
-    - `BulletSourceAuthoring.WaveTimeline == null`은 `Error`로 차단한다.
+    - `BulletSourceAuthoring`에 `SustainClipSlots`/`EventClipSlots` 바인딩이 모두 비어 있으면 `Error`로 차단한다.
     - `Warning` 출력은 상한을 두고(기본 100건), 초과분은 집계로만 보고한다.
   - 실행 루트(`ContentValidationRunner`)를 추가해 `Tools/Project/Validate Content`에서 수동 검증을 수행할 수 있게 했다.
   - EditMode 테스트(`ContentValidationRulesTests`)를 추가해 위 정책(Error/Warning 분리)을 계약으로 고정했다.
@@ -127,11 +127,11 @@
 ### 2026-02-25
 - `#7 데이터 주도 패턴 정의` 진행률을 상향했다.
   - Spawn 규약 업데이트를 반영했다:
-    - `WaveTimelineSO.SpawnEntry`는 인라인 프로필 전용(legacy fallback 제거)
+    - `WaveClipSO.Segments[].Entries[]`는 인라인 프로필 전용으로 운영한다.
     - 샘플링은 `LineEven` 중심으로 운영하고, 벽 발사는 `LineEven + Direction` 조합으로 표현
-    - EventBurst 소비는 carry 정책 유지, 예산은 탄종 공용, Trash 최하 우선순위
+    - EventBurst 소비는 carry 정책 유지, 예산은 탄종 공용, Lane 우선순위는 `특수 > Hazard > Trash`
   - 후속 작업:
-    - 샘플 시나리오용 실제 WaveTimeline 데이터 세팅(초기/전환/전환후 3구간)
+    - 샘플 시나리오용 WaveClip 슬롯 세팅(상태별 sustain + 이벤트) 유지보수
     - 시나리오 성립 검증용 PlayMode 스모크/지표 기준선 추가
 - `#6 콘텐츠 검증기`를 `DONE`으로 전환했다.
   - 게이트 실패 메시지 식별성을 강화했다(정렬된 에러 요약 + 코드 히스토그램).

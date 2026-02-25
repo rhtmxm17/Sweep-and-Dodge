@@ -2,7 +2,7 @@
 > SpawnDirective v2 계약(레거시 제거, LineEven 중심 샘플링, 방향/버스트/우선순위 규약)을 확정해 샘플 시나리오 성립 기준을 고정한다
 
 ## 상태
-- 반영됨
+- 반영됨(참고용, v3 WaveClip 경로로 확장됨)
 
 ## 배경
 - 스폰 모델이 `Sampling × Emission × Direction × Payload`로 확장되면서, 이행기 호환 경로와 정책 비활성 기능(`WallEven`)이 동시에 존재해 데이터/코드 의미가 분산됐다.
@@ -46,5 +46,5 @@
 - 리스크: 과거 에셋의 잔여 직렬화 키는 무시되지만, 장기적으로는 재저장 정리가 필요하다.
 
 ## 후속
-- 샘플 시나리오용 WaveTimeline authoring 프리셋(초기/전환/전환후)을 데이터 자산으로 확정한다.
+- v3 단일 경로(`WaveClipSO` + 슬롯/채널) 전환은 [ADR-20260225-02-wave-clip-slot-channel-contract.md](./ADR-20260225-02-wave-clip-slot-channel-contract.md) 기준으로 완료한다.
 - PlayMode 시나리오 스모크를 추가해 `EventBurst(0.2s x 3)`, `LineEven + Direction`, `Trash 저우선순위` 회귀를 자동 검증한다.

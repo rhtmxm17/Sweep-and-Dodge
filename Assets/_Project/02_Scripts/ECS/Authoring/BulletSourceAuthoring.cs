@@ -27,7 +27,6 @@ namespace SweepNDodge.DotsBullets
         public BulletFieldShapeId FieldShape = BulletFieldShapeId.Circle;
         public float FieldRadius = 8f;
         public Vector2 FieldSize = new Vector2(12f, 8f);
-        public WaveTimelineSO WaveTimeline;
 
         [Header("V3 Wave Clips (Experimental)")]
         public SustainClipSlotAuthoring[] SustainClipSlots;
@@ -112,22 +111,10 @@ namespace SweepNDodge.DotsBullets
                     HalfExtents = halfExtents,
                 });
 
-                var patternBuffer = AddBuffer<SourceSpawnPatternBuffer>(e);
                 var activeCountBuffer = AddBuffer<SourceActiveBulletCountBuffer>(e);
                 var spawnRequestBuffer = AddBuffer<SourceSpawnRequestBuffer>(e);
                 int nextDirectiveId = 1;
-                BakeSustainFromWaveTimeline(authoring.WaveTimeline, patternBuffer, activeCountBuffer, ref nextDirectiveId);
                 spawnRequestBuffer.Clear();
-
-                var openingWaveBuffer = AddBuffer<SourceOpeningWavePatternBuffer>(e);
-                BakeOpeningWaveFromTimeline(authoring.WaveTimeline, openingWaveBuffer, activeCountBuffer, ref nextDirectiveId);
-                AddComponent(e, new SourceOpeningWaveRuntimeComponent
-                {
-                    LastState = authoring.InitialState,
-                    ActiveTriggerState = SourceStateId.Normal,
-                    IsPlaying = 0,
-                    ElapsedSec = 0f
-                });
 
                 var clipPatternBuffer = AddBuffer<SourceClipPatternBuffer>(e);
                 var sustainSlotCandidateBuffer = AddBuffer<SourceSustainSlotCandidateBuffer>(e);
@@ -176,138 +163,6 @@ namespace SweepNDodge.DotsBullets
                 {
                     Position = (float3)authoring.transform.position
                 });
-            }
-
-            private void BakeSustainFromWaveTimeline(
-                WaveTimelineSO timeline,
-                DynamicBuffer<SourceSpawnPatternBuffer> patternBuffer,
-                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer,
-                ref int nextDirectiveId)
-            {
-                if (timeline == null || timeline.Segments == null)
-                    return;
-
-                for (int s = 0; s < timeline.Segments.Length; s++)
-                {
-                    var segment = timeline.Segments[s];
-                    if (segment.Phase != SourceWavePhaseId.Sustain || segment.Entries == null)
-                        continue;
-
-                    for (int e = 0; e < segment.Entries.Length; e++)
-                    {
-                        var entry = segment.Entries[e];
-                        var bullet = entry.ResolveBullet();
-                        if (bullet == null)
-                            continue;
-
-                        int typeKey = bullet.DefinitionId;
-                        var fixedPoint = entry.ResolveFixedPoint();
-                        var spawnOffset = entry.ResolveSpawnOffset();
-                        var lineStart = entry.ResolveLineStart();
-                        var lineEnd = entry.ResolveLineEnd();
-                        patternBuffer.Add(new SourceSpawnPatternBuffer
-                        {
-                            DirectiveId = nextDirectiveId++,
-                            State = segment.TargetState,
-                            BulletTypeKey = typeKey,
-                            EmissionMode = entry.ResolveEmissionMode(),
-                            SpawnMode = entry.ResolveSpawnMode(),
-                            SamplingMode = entry.ResolveSamplingMode(),
-                            CenterMode = entry.ResolveCenterMode(),
-                            DirectionMode = entry.ResolveDirectionMode(),
-                            FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
-                            SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
-                            LineStart = new float2(lineStart.x, lineStart.y),
-                            LineEnd = new float2(lineEnd.x, lineEnd.y),
-                            SampleSpacing = Mathf.Max(0.001f, entry.ResolveSampleSpacing()),
-                            SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
-                            PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
-                            BaseAngleDeg = entry.ResolveBaseAngleDeg(),
-                            NWayCount = Mathf.Max(1, entry.ResolveNWayCount()),
-                            SpiralStepDeg = entry.ResolveSpiralStepDeg(),
-                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
-                            MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
-                            BurstRepeatCount = entry.ResolveBurstRepeatCount(),
-                            BurstIntervalSec = Mathf.Max(0.001f, entry.ResolveBurstIntervalSec()),
-                            BurstShotsPerEvent = Mathf.Max(1, entry.ResolveBurstShotsPerEvent()),
-                            SpawnPriority = entry.ResolveSpawnPriority(),
-                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
-                            SpawnAccumulator = 0f,
-                            BurstEventsEmitted = 0
-                        });
-
-                        EnsureActiveCountEntry(activeCountBuffer, typeKey);
-                    }
-                }
-            }
-
-            private void BakeOpeningWaveFromTimeline(
-                WaveTimelineSO timeline,
-                DynamicBuffer<SourceOpeningWavePatternBuffer> openingWaveBuffer,
-                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer,
-                ref int nextDirectiveId)
-            {
-                if (timeline == null || timeline.Segments == null)
-                    return;
-
-                var activeCountKeys = new System.Collections.Generic.HashSet<int>();
-                for (int i = 0; i < activeCountBuffer.Length; i++)
-                    activeCountKeys.Add(activeCountBuffer[i].BulletTypeKey);
-
-                for (int s = 0; s < timeline.Segments.Length; s++)
-                {
-                    var segment = timeline.Segments[s];
-                    if (segment.Phase != SourceWavePhaseId.OnStateEnterOnce || segment.EndSec <= segment.StartSec || segment.Entries == null)
-                        continue;
-
-                    for (int e = 0; e < segment.Entries.Length; e++)
-                    {
-                        var entry = segment.Entries[e];
-                        var bullet = entry.ResolveBullet();
-                        if (bullet == null)
-                            continue;
-
-                        int typeKey = bullet.DefinitionId;
-                        var fixedPoint = entry.ResolveFixedPoint();
-                        var spawnOffset = entry.ResolveSpawnOffset();
-                        var lineStart = entry.ResolveLineStart();
-                        var lineEnd = entry.ResolveLineEnd();
-                        openingWaveBuffer.Add(new SourceOpeningWavePatternBuffer
-                        {
-                            DirectiveId = nextDirectiveId++,
-                            TriggerState = segment.TargetState,
-                            StartSec = Mathf.Max(0f, segment.StartSec),
-                            EndSec = Mathf.Max(segment.StartSec, segment.EndSec),
-                            BulletTypeKey = typeKey,
-                            EmissionMode = entry.ResolveEmissionMode(),
-                            SpawnMode = entry.ResolveSpawnMode(),
-                            SamplingMode = entry.ResolveSamplingMode(),
-                            CenterMode = entry.ResolveCenterMode(),
-                            DirectionMode = entry.ResolveDirectionMode(),
-                            FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
-                            SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
-                            LineStart = new float2(lineStart.x, lineStart.y),
-                            LineEnd = new float2(lineEnd.x, lineEnd.y),
-                            SampleSpacing = Mathf.Max(0.001f, entry.ResolveSampleSpacing()),
-                            SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
-                            PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
-                            BaseAngleDeg = entry.ResolveBaseAngleDeg(),
-                            NWayCount = Mathf.Max(1, entry.ResolveNWayCount()),
-                            SpiralStepDeg = entry.ResolveSpiralStepDeg(),
-                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
-                            MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
-                            BurstRepeatCount = entry.ResolveBurstRepeatCount(),
-                            BurstIntervalSec = Mathf.Max(0.001f, entry.ResolveBurstIntervalSec()),
-                            BurstShotsPerEvent = Mathf.Max(1, entry.ResolveBurstShotsPerEvent()),
-                            SpawnPriority = entry.ResolveSpawnPriority(),
-                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
-                            SpawnAccumulator = 0f,
-                            BurstEventsEmitted = 0
-                        });
-
-                        EnsureActiveCountEntry(activeCountBuffer, typeKey, activeCountKeys);
-                    }
-                }
             }
 
             private void BakeV3ClipBindings(

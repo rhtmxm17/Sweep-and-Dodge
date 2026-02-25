@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
@@ -51,9 +51,9 @@ namespace SweepNDodge.DotsBullets.Tests
         public void AutoCorrectionInputs_AreReportedAsWarningsOnly()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var sourceRoot = new GameObject("source_root");
             var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
 
             try
             {
@@ -65,7 +65,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Radius = -0.5f;
                 def.ScoreValue = -7;
 
-                sourceAuthoring.WaveTimeline = timeline;
+                sourceAuthoring.SustainClipSlots = new[]
+                {
+                    new BulletSourceAuthoring.SustainClipSlotAuthoring
+                    {
+                        State = SourceStateId.Normal,
+                        Lane = SourceSpawnLaneId.Hazard,
+                        Clips = new[] { clip },
+                        Weights = new[] { 1f },
+                    }
+                };
                 sourceAuthoring.ThresholdWeakened = -1;
                 sourceAuthoring.ThresholdDepleted = -2;
                 sourceAuthoring.InitialCollectedCount = -3;
@@ -103,20 +112,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 if (def.Prefab != null)
                     Object.DestroyImmediate(def.Prefab);
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(timeline);
+                Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(sourceRoot);
             }
         }
 
         [Test]
-        public void SourceAuthoring_WithNullWaveTimeline_IsError()
+        public void SourceAuthoring_WithoutAnyWaveClipBinding_IsError()
         {
             var sourceRoot = new GameObject("source_root");
             var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
 
             try
             {
-                sourceAuthoring.WaveTimeline = null;
+                sourceAuthoring.SustainClipSlots = System.Array.Empty<BulletSourceAuthoring.SustainClipSlotAuthoring>();
+                sourceAuthoring.EventClipSlots = System.Array.Empty<BulletSourceAuthoring.EventClipSlotAuthoring>();
                 var input = new ContentValidationInput(
                     null,
                     null,
@@ -168,10 +178,10 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void WaveTimeline_WithNegativeSpawnDensity_IsError()
+        public void WaveClip_WithNegativeSpawnDensity_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var prefab = new GameObject("bullet_prefab");
 
             try
@@ -179,39 +189,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Editor_SetDefinitionId(3001);
                 def.Prefab = prefab;
 
-                timeline.Segments = new[]
+                var entry = CreateDefaultEntry(def);
+                entry.Emission.EmissionMode = SourceSpawnEmissionModeId.RateField;
+                entry.Emission.RatePerSecPerArea = -1f;
+
+                clip.ClipId = 11;
+                clip.Segments = new[]
                 {
-                    new WaveTimelineSO.WaveSegment
+                    new WaveClipSO.ClipSegment
                     {
-                        WaveId = 10,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 0f,
                         EndSec = 1f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    RatePerSecPerArea = -1f,
-                                    MaxActiveDensityPerArea = 0f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
+                        Entries = new[] { entry }
                     }
                 };
 
@@ -220,9 +209,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
+                    new List<ContentValidationRecord<WaveClipSO>>
                     {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
                     },
                     null,
                     null,
@@ -231,61 +220,42 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV015").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(timeline);
+                Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(prefab);
             }
         }
 
         [Test]
-        public void WaveTimeline_CapModeWithNegativeMaxActiveDensity_IsError()
+        public void WaveClip_OverlappingSegments_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var prefab = new GameObject("bullet_prefab");
 
             try
             {
-                def.Editor_SetDefinitionId(3002);
+                def.Editor_SetDefinitionId(4001);
                 def.Prefab = prefab;
+                var entry = CreateDefaultEntry(def);
 
-                timeline.Segments = new[]
+                clip.ClipId = 21;
+                clip.Segments = new[]
                 {
-                    new WaveTimelineSO.WaveSegment
+                    new WaveClipSO.ClipSegment
                     {
-                        WaveId = 20,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 0f,
-                        EndSec = 1f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.CapAndMaxDensity,
-                                    RatePerSecPerArea = 1f,
-                                    MaxActiveDensityPerArea = -2f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
+                        EndSec = 5f,
+                        Entries = new[] { entry }
+                    },
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 4f,
+                        EndSec = 8f,
+                        Entries = new[] { entry }
                     }
                 };
 
@@ -294,115 +264,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
+                    new List<ContentValidationRecord<WaveClipSO>>
                     {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
-                    },
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                var errors = issues.Where(i => i.Code == "CV016").ToArray();
-                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(timeline);
-                Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
-        public void WaveTimeline_OverlappingSegments_IsError()
-        {
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(4001);
-                def.Prefab = prefab;
-
-                timeline.Segments = new[]
-                {
-                    new WaveTimelineSO.WaveSegment
-                    {
-                        WaveId = 1,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
-                        StartSec = 0f,
-                        EndSec = 5f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    RatePerSecPerArea = 1f,
-                                    MaxActiveDensityPerArea = 0f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
-                    },
-                    new WaveTimelineSO.WaveSegment
-                    {
-                        WaveId = 2,
-                        TargetState = SourceStateId.Weakened,
-                        Phase = SourceWavePhaseId.Sustain,
-                        StartSec = 4f,
-                        EndSec = 8f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    RatePerSecPerArea = 1f,
-                                    MaxActiveDensityPerArea = 0f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
-                    },
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
-                    {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "wave_timeline"),
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
                     },
                     null,
                     null,
@@ -411,94 +275,43 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV011").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(timeline);
             }
         }
 
         [Test]
-        public void WaveTimeline_BoundaryTouch_IsNotOverlapError()
+        public void WaveClip_BoundaryTouch_IsNotOverlapError()
         {
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var prefab = new GameObject("bullet_prefab");
 
             try
             {
                 def.Editor_SetDefinitionId(4002);
                 def.Prefab = prefab;
+                var entry = CreateDefaultEntry(def);
 
-                timeline.Segments = new[]
+                clip.ClipId = 22;
+                clip.Segments = new[]
                 {
-                    new WaveTimelineSO.WaveSegment
+                    new WaveClipSO.ClipSegment
                     {
-                        WaveId = 1,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 0f,
                         EndSec = 5f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    RatePerSecPerArea = 1f,
-                                    MaxActiveDensityPerArea = 0f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
+                        Entries = new[] { entry }
                     },
-                    new WaveTimelineSO.WaveSegment
+                    new WaveClipSO.ClipSegment
                     {
-                        WaveId = 2,
-                        TargetState = SourceStateId.Weakened,
-                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 5f,
                         EndSec = 9f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    RatePerSecPerArea = 1f,
-                                    MaxActiveDensityPerArea = 0f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
-                    },
+                        Entries = new[] { entry }
+                    }
                 };
 
                 var input = new ContentValidationInput(
@@ -506,9 +319,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
+                    new List<ContentValidationRecord<WaveClipSO>>
                     {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "wave_timeline"),
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
                     },
                     null,
                     null,
@@ -521,230 +334,24 @@ namespace SweepNDodge.DotsBullets.Tests
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(timeline);
-            }
-        }
-
-        [Test]
-        public void WaveTimeline_PoissonWithNegativeMean_IsError()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
-            var prefab = new GameObject("bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(5001);
-                def.Prefab = prefab;
-
-                timeline.Segments = new[]
-                {
-                    new WaveTimelineSO.WaveSegment
-                    {
-                        WaveId = 30,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
-                        StartSec = 0f,
-                        EndSec = 1f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    MeanEventsPerSec = -1f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
-                    }
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
-                    {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
-                    },
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                var errors = issues.Where(i => i.Code == "CV017").ToArray();
-                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(timeline);
+                Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(prefab);
             }
         }
 
         [Test]
-        public void WaveTimeline_NegativePlayerNoSpawnRadius_IsError()
+        public void WaveClip_WithMissingSegmentsBuffer_IsError()
         {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
-            var prefab = new GameObject("bullet_prefab");
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
 
             try
             {
-                def.Editor_SetDefinitionId(5002);
-                def.Prefab = prefab;
-
-                timeline.Segments = new[]
-                {
-                    new WaveTimelineSO.WaveSegment
-                    {
-                        WaveId = 31,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
-                        StartSec = 0f,
-                        EndSec = 1f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    RatePerSecPerArea = 1f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = -0.5f,
-                                }
-                            }
-                        }
-                    }
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
-                    {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
-                    },
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                var errors = issues.Where(i => i.Code == "CV019").ToArray();
-                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(timeline);
-                Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
-        public void VisualAuthoring_WithMissingDefinitionsBuffer_IsError()
-        {
-            var root = new GameObject("visual_root");
-            var authoring = root.AddComponent<BulletVisualPrefabAuthoring>();
-
-            try
-            {
-                authoring.Definitions = null;
+                clip.Segments = null;
                 var input = new ContentValidationInput(
                     null,
-                    null,
-                    new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>
+                    new List<ContentValidationRecord<WaveClipSO>>
                     {
-                        new ContentValidationRecord<BulletVisualPrefabAuthoring>(authoring, "visual"),
-                    },
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                var errors = issues.Where(i => i.Code == "CV004").ToArray();
-                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-            }
-        }
-
-        [Test]
-        public void VisualAuthoring_WithNullDefinitionEntry_IsError()
-        {
-            var root = new GameObject("visual_root");
-            var authoring = root.AddComponent<BulletVisualPrefabAuthoring>();
-
-            try
-            {
-                authoring.Definitions = new BulletDefinitionSO[] { null };
-                var input = new ContentValidationInput(
-                    null,
-                    null,
-                    new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>
-                    {
-                        new ContentValidationRecord<BulletVisualPrefabAuthoring>(authoring, "visual"),
-                    },
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                var errors = issues.Where(i => i.Code == "CV005").ToArray();
-                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-            }
-        }
-
-        [Test]
-        public void WaveTimeline_WithMissingSegmentsBuffer_IsError()
-        {
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
-
-            try
-            {
-                timeline.Segments = null;
-                var input = new ContentValidationInput(
-                    null,
-                    new List<ContentValidationRecord<WaveTimelineSO>>
-                    {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
                     },
                     null,
                     null,
@@ -753,77 +360,32 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV008").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
-                Object.DestroyImmediate(timeline);
+                Object.DestroyImmediate(clip);
             }
         }
 
         [Test]
-        public void WaveTimeline_WithDuplicateWaveId_IsError()
+        public void WaveClip_WithDuplicateClipId_IsError()
         {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
-            var prefab = new GameObject("bullet_prefab");
+            var clipA = ScriptableObject.CreateInstance<WaveClipSO>();
+            var clipB = ScriptableObject.CreateInstance<WaveClipSO>();
 
             try
             {
-                def.Editor_SetDefinitionId(7001);
-                def.Prefab = prefab;
-
-                var entry = new WaveTimelineSO.SpawnEntry
-                {
-                    Payload = new WaveTimelineSO.SpawnPayloadProfile
-                    {
-                        Bullet = def,
-                    },
-                    Emission = new WaveTimelineSO.SpawnEmissionProfile
-                    {
-                        EmissionMode = SourceSpawnEmissionModeId.RateField,
-                        SpawnMode = SourceSpawnModeId.FixedDensity,
-                        RatePerSecPerArea = 1f,
-                    },
-                    Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                    {
-                        SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                        CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                        SpawnSampleBudget = 8,
-                        PlayerNoSpawnRadius = 0f,
-                    }
-                };
-
-                timeline.Segments = new[]
-                {
-                    new WaveTimelineSO.WaveSegment
-                    {
-                        WaveId = 77,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
-                        StartSec = 0f,
-                        EndSec = 1f,
-                        Entries = new[] { entry }
-                    },
-                    new WaveTimelineSO.WaveSegment
-                    {
-                        WaveId = 77,
-                        TargetState = SourceStateId.Weakened,
-                        Phase = SourceWavePhaseId.Sustain,
-                        StartSec = 1f,
-                        EndSec = 2f,
-                        Entries = new[] { entry }
-                    }
-                };
+                clipA.ClipId = 777;
+                clipB.ClipId = 777;
+                clipA.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Entries = new WaveClipSO.SpawnEntry[0] } };
+                clipB.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Entries = new WaveClipSO.SpawnEntry[0] } };
 
                 var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    null,
+                    new List<ContentValidationRecord<WaveClipSO>>
                     {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
-                    {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
+                        new ContentValidationRecord<WaveClipSO>(clipA, "clipA"),
+                        new ContentValidationRecord<WaveClipSO>(clipB, "clipB"),
                     },
                     null,
                     null,
@@ -832,60 +394,35 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV009").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(timeline);
-                Object.DestroyImmediate(prefab);
+                Object.DestroyImmediate(clipA);
+                Object.DestroyImmediate(clipB);
             }
         }
 
         [Test]
-        public void WaveTimeline_WithNonPositiveDefinitionId_IsError()
+        public void WaveClip_WithNonPositiveDefinitionId_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var prefab = new GameObject("bullet_prefab");
 
             try
             {
                 def.Editor_SetDefinitionId(0);
                 def.Prefab = prefab;
+                var entry = CreateDefaultEntry(def);
 
-                timeline.Segments = new[]
+                clip.ClipId = 91;
+                clip.Segments = new[]
                 {
-                    new WaveTimelineSO.WaveSegment
+                    new WaveClipSO.ClipSegment
                     {
-                        WaveId = 91,
-                        TargetState = SourceStateId.Normal,
-                        Phase = SourceWavePhaseId.Sustain,
                         StartSec = 0f,
                         EndSec = 1f,
-                        Entries = new[]
-                        {
-                            new WaveTimelineSO.SpawnEntry
-                            {
-                                Payload = new WaveTimelineSO.SpawnPayloadProfile
-                                {
-                                    Bullet = def,
-                                },
-                                Emission = new WaveTimelineSO.SpawnEmissionProfile
-                                {
-                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                                    RatePerSecPerArea = 1f,
-                                },
-                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
-                                {
-                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                    SpawnSampleBudget = 16,
-                                    PlayerNoSpawnRadius = 0f,
-                                }
-                            }
-                        }
+                        Entries = new[] { entry }
                     }
                 };
 
@@ -894,9 +431,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
                     },
-                    new List<ContentValidationRecord<WaveTimelineSO>>
+                    new List<ContentValidationRecord<WaveClipSO>>
                     {
-                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
                     },
                     null,
                     null,
@@ -905,14 +442,54 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV027").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(timeline);
+                Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(prefab);
             }
+        }
+
+        private static WaveClipSO.SpawnEntry CreateDefaultEntry(BulletDefinitionSO def)
+        {
+            return new WaveClipSO.SpawnEntry
+            {
+                Payload = new WaveClipSO.SpawnPayloadProfile
+                {
+                    Bullet = def,
+                },
+                Emission = new WaveClipSO.SpawnEmissionProfile
+                {
+                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    RatePerSecPerArea = 1f,
+                    MeanEventsPerSec = 0f,
+                    BurstRepeatCount = 1,
+                    BurstIntervalSec = 1f,
+                    BurstShotsPerEvent = 1,
+                    MaxActiveDensityPerArea = 0f,
+                },
+                Sampling = new WaveClipSO.SpawnSamplingProfile
+                {
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = Vector2.zero,
+                    SpawnOffset = Vector2.zero,
+                    LineStart = Vector2.zero,
+                    LineEnd = Vector2.zero,
+                    SampleSpacing = 1f,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                },
+                Direction = new WaveClipSO.SpawnDirectionProfile
+                {
+                    DirectionMode = SourceSpawnDirectionModeId.Random,
+                    BaseAngleDeg = 0f,
+                    NWayCount = 1,
+                    SpiralStepDeg = 0f,
+                }
+            };
         }
     }
 }

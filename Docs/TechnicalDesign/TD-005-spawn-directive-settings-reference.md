@@ -11,10 +11,10 @@
   - [ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md](../ADR/ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md)
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 
-> 목적: `WaveTimelineSO.SpawnEntry`의 각 설정이 실제 런타임에서 무엇을 의미하는지 빠르게 확인하는 운영 레퍼런스.
+> 목적: `WaveClipSO.Segments[].Entries[]`(SpawnEntry)의 각 설정이 실제 런타임에서 무엇을 의미하는지 빠르게 확인하는 운영 레퍼런스.
 
 ## 1. 적용 범위
-- 대상: `WaveTimelineSO.SpawnEntry` 인라인 프로필
+- 대상: `WaveClipSO.Segments[].Entries[]` 인라인 프로필
   - `Payload`
   - `Emission`
   - `Sampling`
@@ -115,8 +115,9 @@
 
 ## 6. 우선순위/예산 해석
 - 예산(`BudgetPerFrame`)은 요청 전체에서 공유된다.
-- 같은 프레임에 경합 시 우선순위가 높은 요청을 먼저 소비한다.
-- Trash(`StandardCollectible`)는 최하 우선순위다.
+- 같은 프레임에 경합 시 Lane 우선순위를 먼저 적용한다.
+- Lane 우선순위는 `특수 > Hazard > Trash`다.
+- v3 클립 경로에서는 레거시 `SpawnPriority` 대신 Lane 기반 우선순위를 사용한다.
 
 ## 7. 샘플 시나리오 매핑 가이드
 1. 초기 구간
@@ -142,33 +143,33 @@
   - `DeferredByBudget`
   - `SpawnSkipRate01`
 
-## 9. 차기 v3 Authoring 스키마 초안 (미구현)
+## 9. v3 Authoring 스키마 (현행)
 - 기준 ADR: [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 - 운영 목표:
-  - 신규 `WaveClipSO`를 도입하고 `WaveTimelineSO`는 임시 레거시로 유지한다.
+  - `WaveClipSO` 기반 단일 경로로 운영한다(`WaveTimelineSO` 제거 완료).
   - Source 바인딩은 1차에서 `BulletSourceAuthoring` 직참조 배열로 운영한다.
-  - `Sustain`은 기본 `Hazard`/`Trash` 2 Lane을 독립 운영하고, Lane enum 확장을 허용한다.
-  - 채널 명칭은 `BulletType`과의 혼동을 줄이기 위해 `SpawnLane` 네이밍을 우선 검토한다.
+  - `Sustain`은 기본 `Hazard`/`Trash` 2 Lane을 독립 운영하고, Lane enum 확장을 허용한다(`SourceSpawnLaneId`).
+  - 특수 Lane 확장 시 Lane 우선순위는 `특수 > Hazard > Trash`를 유지한다.
 
 ### 9.1 WaveClipSO(클립 자산) 권장 필드
 | 필드 | 의미 | 운영 규칙 |
 | --- | --- | --- |
 | `ClipId` | 클립 식별자 | 전역 고유, `> 0` |
 | `Phase` | 클립 용도 | `Sustain` / `OnStateEnterOnce` |
-| `Lane` | 클립 Lane | 기본 `Hazard` / `Trash`, enum 확장 허용 |
+| `Lane` | 클립 Lane | 기본 운영 `Hazard` / `Trash`, `Special` 예약 + enum 확장 허용 |
 | `DurationSec` | 클립 총 길이 | `> 0` |
 | `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, non-overlap |
 | `Segments[].Entries[]` | SpawnDirective 인라인 프로필 | 현재 `Payload/Emission/Sampling/Direction` 규약 재사용 |
 
-### 9.2 BulletSourceAuthoring 직참조 권장 필드(1차)
+### 9.2 BulletSourceAuthoring 직참조 필드(현행)
 | 필드 | 의미 | 운영 규칙 |
 | --- | --- | --- |
-| `SustainSlots[].State` | Source 상태 슬롯 | `Normal` / `Weakened` / `Depleted` |
-| `SustainSlots[].Lane` | 슬롯 Lane | Lane enum 값 |
-| `SustainSlots[].Clips[]` | 해당 Lane 후보군 | 비어 있어도 런타임 skip + Error 로그 |
-| `SustainSlots[].Weights[]` | 선택 가중치(옵션) | 길이 불일치 시 균등 선택 fallback |
-| `EventSlots[].TriggerState` | 이벤트 트리거 상태 | 상태 전환 감지 시 발동 |
-| `EventSlots[].EventClips[]` | 이벤트 클립 참조 | 중복 트리거는 큐잉 |
+| `SustainClipSlots[].State` | Source 상태 슬롯 | `Normal` / `Weakened` / `Depleted` |
+| `SustainClipSlots[].Lane` | 슬롯 Lane | Lane enum 값 |
+| `SustainClipSlots[].Clips[]` | 해당 Lane 후보군 | 비어 있으면 런타임 skip + Error 로그 |
+| `SustainClipSlots[].Weights[]` | 선택 가중치(옵션) | 길이 불일치/0 이하는 1.0 fallback |
+| `EventClipSlots[].TriggerState` | 이벤트 트리거 상태 | 상태 전환 감지 시 발동 |
+| `EventClipSlots[].EventClips[]` | 이벤트 클립 참조 | 중복 트리거는 큐잉 |
 
 ### 9.3 실행 규약
 1. 슬롯 키는 `State + Phase + Lane`으로 고정한다.
@@ -180,3 +181,4 @@
 7. sustain 클립 종료 시 동일 슬롯 후보군에서 "직전 제외 랜덤"으로 다음 클립을 선택한다.
 8. Lane 우선순위는 `특수 > Hazard > Trash`를 적용하고, Lane 규칙을 요청 우선순위의 최상위 규칙으로 둔다.
 9. 결정론 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.
+10. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
