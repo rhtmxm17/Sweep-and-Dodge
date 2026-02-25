@@ -16,11 +16,6 @@ namespace SweepNDodge.DotsBullets
             return (int)v;
         }
 
-        public static SourceSpawnLaneId ResolveLegacyLane(int spawnPriority)
-        {
-            return spawnPriority <= -100 ? SourceSpawnLaneId.Trash : SourceSpawnLaneId.Hazard;
-        }
-
         public static void CompactRequestBuffer(DynamicBuffer<SourceSpawnRequestBuffer> requests)
         {
             for (int i = requests.Length - 1; i >= 0; i--)
