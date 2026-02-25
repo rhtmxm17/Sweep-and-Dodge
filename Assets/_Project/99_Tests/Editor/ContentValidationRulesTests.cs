@@ -671,5 +671,248 @@ namespace SweepNDodge.DotsBullets.Tests
                 Object.DestroyImmediate(prefab);
             }
         }
+
+        [Test]
+        public void VisualAuthoring_WithMissingDefinitionsBuffer_IsError()
+        {
+            var root = new GameObject("visual_root");
+            var authoring = root.AddComponent<BulletVisualPrefabAuthoring>();
+
+            try
+            {
+                authoring.Definitions = null;
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>
+                    {
+                        new ContentValidationRecord<BulletVisualPrefabAuthoring>(authoring, "visual"),
+                    },
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV004").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void VisualAuthoring_WithNullDefinitionEntry_IsError()
+        {
+            var root = new GameObject("visual_root");
+            var authoring = root.AddComponent<BulletVisualPrefabAuthoring>();
+
+            try
+            {
+                authoring.Definitions = new BulletDefinitionSO[] { null };
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>
+                    {
+                        new ContentValidationRecord<BulletVisualPrefabAuthoring>(authoring, "visual"),
+                    },
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV005").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void WaveTimeline_WithMissingSegmentsBuffer_IsError()
+        {
+            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
+
+            try
+            {
+                timeline.Segments = null;
+                var input = new ContentValidationInput(
+                    null,
+                    new List<ContentValidationRecord<WaveTimelineSO>>
+                    {
+                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV008").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(timeline);
+            }
+        }
+
+        [Test]
+        public void WaveTimeline_WithDuplicateWaveId_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(7001);
+                def.Prefab = prefab;
+
+                var entry = new WaveTimelineSO.SpawnEntry
+                {
+                    Payload = new WaveTimelineSO.SpawnPayloadProfile
+                    {
+                        Bullet = def,
+                    },
+                    Emission = new WaveTimelineSO.SpawnEmissionProfile
+                    {
+                        EmissionMode = SourceSpawnEmissionModeId.RateField,
+                        SpawnMode = SourceSpawnModeId.FixedDensity,
+                        RatePerSecPerArea = 1f,
+                    },
+                    Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                    {
+                        SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                        CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                        SpawnSampleBudget = 8,
+                        PlayerNoSpawnRadius = 0f,
+                    }
+                };
+
+                timeline.Segments = new[]
+                {
+                    new WaveTimelineSO.WaveSegment
+                    {
+                        WaveId = 77,
+                        TargetState = SourceStateId.Normal,
+                        Phase = SourceWavePhaseId.Sustain,
+                        StartSec = 0f,
+                        EndSec = 1f,
+                        Entries = new[] { entry }
+                    },
+                    new WaveTimelineSO.WaveSegment
+                    {
+                        WaveId = 77,
+                        TargetState = SourceStateId.Weakened,
+                        Phase = SourceWavePhaseId.Sustain,
+                        StartSec = 1f,
+                        EndSec = 2f,
+                        Entries = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveTimelineSO>>
+                    {
+                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV009").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(timeline);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveTimeline_WithNonPositiveDefinitionId_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var timeline = ScriptableObject.CreateInstance<WaveTimelineSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(0);
+                def.Prefab = prefab;
+
+                timeline.Segments = new[]
+                {
+                    new WaveTimelineSO.WaveSegment
+                    {
+                        WaveId = 91,
+                        TargetState = SourceStateId.Normal,
+                        Phase = SourceWavePhaseId.Sustain,
+                        StartSec = 0f,
+                        EndSec = 1f,
+                        Entries = new[]
+                        {
+                            new WaveTimelineSO.SpawnEntry
+                            {
+                                Payload = new WaveTimelineSO.SpawnPayloadProfile
+                                {
+                                    Bullet = def,
+                                },
+                                Emission = new WaveTimelineSO.SpawnEmissionProfile
+                                {
+                                    EmissionMode = SourceSpawnEmissionModeId.RateField,
+                                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                                    RatePerSecPerArea = 1f,
+                                },
+                                Sampling = new WaveTimelineSO.SpawnSamplingProfile
+                                {
+                                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                                    SpawnSampleBudget = 16,
+                                    PlayerNoSpawnRadius = 0f,
+                                }
+                            }
+                        }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveTimelineSO>>
+                    {
+                        new ContentValidationRecord<WaveTimelineSO>(timeline, "timeline"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV027").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(timeline);
+                Object.DestroyImmediate(prefab);
+            }
+        }
     }
 }

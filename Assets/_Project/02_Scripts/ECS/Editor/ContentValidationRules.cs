@@ -143,15 +143,42 @@ namespace SweepNDodge.DotsBullets.Editor
             for (int i = 0; i < authorings.Count; i++)
             {
                 var authoring = authorings[i].Value;
-                if (authoring == null || authoring.Definitions == null)
+                if (authoring == null)
                     continue;
+
+                if (authoring.Definitions == null || authoring.Definitions.Length <= 0)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV004",
+                        authorings[i].Location,
+                        "BulletVisualPrefabAuthoring.Definitions buffer is null or empty."));
+                    continue;
+                }
 
                 var duplicateCheck = new HashSet<int>();
                 for (int j = 0; j < authoring.Definitions.Length; j++)
                 {
                     var def = authoring.Definitions[j];
                     if (def == null)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV005",
+                            authorings[i].Location,
+                            $"BulletVisualPrefabAuthoring.Definitions[{j}] is null."));
                         continue;
+                    }
+
+                    if (def.DefinitionId <= 0)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV027",
+                            authorings[i].Location,
+                            $"BulletVisualPrefabAuthoring.Definitions[{j}] has invalid DefinitionId {def.DefinitionId}."));
+                        continue;
+                    }
 
                     if (!duplicateCheck.Add(def.DefinitionId))
                     {
@@ -181,13 +208,32 @@ namespace SweepNDodge.DotsBullets.Editor
             for (int i = 0; i < timelines.Count; i++)
             {
                 var timeline = timelines[i].Value;
-                if (timeline == null || timeline.Segments == null || timeline.Segments.Length <= 0)
+                if (timeline == null)
                     continue;
 
+                if (timeline.Segments == null || timeline.Segments.Length <= 0)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV008",
+                        timelines[i].Location,
+                        "WaveTimelineSO.Segments buffer is null or empty."));
+                    continue;
+                }
+
+                var segmentOwnersByWaveId = new Dictionary<int, List<int>>();
                 var validSegments = new List<(int Index, float Start, float End)>(timeline.Segments.Length);
                 for (int s = 0; s < timeline.Segments.Length; s++)
                 {
                     var seg = timeline.Segments[s];
+
+                    if (!segmentOwnersByWaveId.TryGetValue(seg.WaveId, out var segmentOwners))
+                    {
+                        segmentOwners = new List<int>(2);
+                        segmentOwnersByWaveId.Add(seg.WaveId, segmentOwners);
+                    }
+                    segmentOwners.Add(s);
+
                     if (seg.EndSec <= seg.StartSec)
                     {
                         issues.Add(new ContentValidationIssue(
@@ -220,6 +266,16 @@ namespace SweepNDodge.DotsBullets.Editor
                                     "CV013",
                                     timelines[i].Location,
                                     $"Wave segment has null bullet entry at segmentIndex={s}, entryIndex={e}."));
+                                continue;
+                            }
+
+                            if (bullet.DefinitionId <= 0)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV027",
+                                    timelines[i].Location,
+                                    $"Wave segment references invalid DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
                                 continue;
                             }
 
@@ -363,6 +419,22 @@ namespace SweepNDodge.DotsBullets.Editor
                     }
 
                     validSegments.Add((s, seg.StartSec, seg.EndSec));
+                }
+
+                foreach (var pair in segmentOwnersByWaveId)
+                {
+                    if (pair.Value.Count <= 1)
+                        continue;
+
+                    string joined = string.Join(", ", pair.Value);
+                    for (int idx = 0; idx < pair.Value.Count; idx++)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV009",
+                            timelines[i].Location,
+                            $"WaveTimeline contains duplicate WaveId {pair.Key}. segmentIndices={joined}"));
+                    }
                 }
 
                 validSegments.Sort((a, b) => a.Start.CompareTo(b.Start));
