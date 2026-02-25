@@ -145,33 +145,38 @@
 ## 9. 차기 v3 Authoring 스키마 초안 (미구현)
 - 기준 ADR: [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 - 운영 목표:
-  - `WaveTimelineSO`를 "클립 자산"으로 분리한다.
-  - Source는 상태/페이즈별 슬롯에 클립 후보군을 바인딩한다.
-  - `Sustain`은 `Hazard`/`Trash` 2채널을 독립 운영한다.
+  - 신규 `WaveClipSO`를 도입하고 `WaveTimelineSO`는 임시 레거시로 유지한다.
+  - Source 바인딩은 1차에서 `BulletSourceAuthoring` 직참조 배열로 운영한다.
+  - `Sustain`은 기본 `Hazard`/`Trash` 2 Lane을 독립 운영하고, Lane enum 확장을 허용한다.
+  - 채널 명칭은 `BulletType`과의 혼동을 줄이기 위해 `SpawnLane` 네이밍을 우선 검토한다.
 
-### 9.1 WaveTimelineSO(클립 자산) 권장 필드
+### 9.1 WaveClipSO(클립 자산) 권장 필드
 | 필드 | 의미 | 운영 규칙 |
 | --- | --- | --- |
 | `ClipId` | 클립 식별자 | 전역 고유, `> 0` |
 | `Phase` | 클립 용도 | `Sustain` / `OnStateEnterOnce` |
-| `Channel` | 클립 채널 | `Hazard` / `Trash` |
+| `Lane` | 클립 Lane | 기본 `Hazard` / `Trash`, enum 확장 허용 |
 | `DurationSec` | 클립 총 길이 | `> 0` |
 | `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, non-overlap |
 | `Segments[].Entries[]` | SpawnDirective 인라인 프로필 | 현재 `Payload/Emission/Sampling/Direction` 규약 재사용 |
 
-### 9.2 Source 바인딩 자산 권장 필드
+### 9.2 BulletSourceAuthoring 직참조 권장 필드(1차)
 | 필드 | 의미 | 운영 규칙 |
 | --- | --- | --- |
 | `SustainSlots[].State` | Source 상태 슬롯 | `Normal` / `Weakened` / `Depleted` |
-| `SustainSlots[].HazardClips[]` | Hazard 후보군 | 비어 있으면 Error |
-| `SustainSlots[].TrashClips[]` | Trash 후보군 | 비어 있으면 Error |
-| `SustainSlots[].HazardWeights[]` | Hazard 가중치(옵션) | 길이 불일치 시 균등 선택 fallback |
-| `SustainSlots[].TrashWeights[]` | Trash 가중치(옵션) | 길이 불일치 시 균등 선택 fallback |
+| `SustainSlots[].Lane` | 슬롯 Lane | Lane enum 값 |
+| `SustainSlots[].Clips[]` | 해당 Lane 후보군 | 비어 있어도 런타임 skip + Error 로그 |
+| `SustainSlots[].Weights[]` | 선택 가중치(옵션) | 길이 불일치 시 균등 선택 fallback |
 | `EventSlots[].TriggerState` | 이벤트 트리거 상태 | 상태 전환 감지 시 발동 |
-| `EventSlots[].EventClips[]` | 이벤트 클립 참조 | 실행 중에는 sustain 요청 중지 |
+| `EventSlots[].EventClips[]` | 이벤트 클립 참조 | 중복 트리거는 큐잉 |
 
 ### 9.3 실행 규약
-1. 슬롯 키는 `State + Phase + Channel`로 고정한다.
-2. 같은 `State + Sustain`에서 활성 클립은 채널별 1개씩, 최대 2개까지 허용한다.
-3. 이벤트 클립 실행 중에는 모든 sustain 요청 생성을 중지한다.
-4. sustain 클립 종료 시 동일 슬롯 후보군에서 무작위 다음 클립을 선택해 연속 실행한다.
+1. 슬롯 키는 `State + Phase + Lane`으로 고정한다.
+2. 같은 `State + Sustain`에서 활성 클립은 Lane별 1개씩 허용한다(기본 최대 2개).
+3. 이벤트 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)을 적용한다.
+4. 이벤트 중복 트리거는 큐잉한다.
+5. 상태 전환 시 기존 sustain 클립은 즉시 중단한다.
+6. sustain 클립 선택 시 로컬 시간은 0으로 리셋한다.
+7. sustain 클립 종료 시 동일 슬롯 후보군에서 "직전 제외 랜덤"으로 다음 클립을 선택한다.
+8. Lane 우선순위는 `특수 > Hazard > Trash`를 적용하고, Lane 규칙을 요청 우선순위의 최상위 규칙으로 둔다.
+9. 결정론 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.

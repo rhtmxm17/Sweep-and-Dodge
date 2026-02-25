@@ -182,25 +182,32 @@ Hit:
 ## 7. 차기 확장(v3) 런타임 계약 초안 (미구현)
 - 기준 ADR: [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 - 핵심 규약:
-  - 슬롯 키: `State + Phase + Channel`
-  - 채널: `Hazard`, `Trash` 2개 고정
-  - `Sustain`: 상태당 채널별 활성 클립 1개씩(최대 2개 동시)
-  - `OnStateEnterOnce` 실행 중 `Sustain` 요청 생성 중지
+  - 슬롯 키: `State + Phase + Lane`
+  - Lane enum은 확장 가능 구조로 설계한다(기본 운영: `Hazard`, `Trash`).
+  - `Sustain`: 상태당 Lane별 활성 클립 1개씩(기본 최대 2개 동시)
+  - `OnStateEnterOnce` 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)
+  - 이벤트 중복 트리거는 큐잉한다.
   - `Sustain`도 `StartSec/EndSec` 시간축 적용
-  - `Sustain` 클립 종료 시 동일 슬롯 후보군에서 무작위 다음 클립 선택
+  - 클립 선택 시 `Sustain` 로컬 시간은 0으로 리셋
+  - `Sustain` 클립 종료 시 동일 슬롯 후보군에서 "직전 제외 랜덤"으로 다음 클립 선택
+  - 상태 전환 시 기존 sustain 클립 즉시 중단
+  - Lane 우선순위는 `특수 > Hazard > Trash`이며 Lane 규칙이 최우선
 - 권장 ECS 스키마:
-  - `SourceClipPatternBuffer` (`ClipId`, `Phase`, `Channel`, `LocalStartSec`, `LocalEndSec`, 기존 directive 필드)
-  - `SourceSustainSlotCandidateBuffer` (`State`, `Channel`, `ClipId`, `Weight`)
-  - `SourceSustainRuntimeComponent` (`ActiveHazardClipId`, `ActiveTrashClipId`, `HazardElapsedSec`, `TrashElapsedSec`, `SelectionSequence`)
+  - `SourceClipPatternBuffer` (`ClipId`, `Phase`, `Lane`, `LocalStartSec`, `LocalEndSec`, 기존 directive 필드)
+  - `SourceSustainSlotCandidateBuffer` (`State`, `Lane`, `ClipId`, `Weight`)
+  - `SourceSustainRuntimeComponent` (`ActiveClipByLane`, `ElapsedByLane`, `LastClipByLane`, `SelectionSequenceByLane`)
   - `SourceEventRuntimeComponent` (`IsPlaying`, `ActiveEventClipId`, `TriggerState`, `ElapsedSec`)
+  - `SourceEventQueueBuffer` (`TriggerState`, `QueuedFrame`)
 - 결정론 요구:
-  - 무작위 선택 RNG는 `SourceEntity + State + Channel + SelectionSequence` 기반 시드를 사용한다.
+  - 무작위 선택 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.
+  - `Entity.Index` 단독 사용은 재현성 리스크로 지양한다.
 
 ## 8. 오픈 이슈
 - Stage별 PlayerRelative 허용 비중 상한.
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 9. 변경 이력
+- 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, 상태전환 즉시중단, Lane 우선순위, RNG 키)으로 초안을 갱신
 - 2026-02-25: v3 클립/슬롯/채널 확장 초안 및 런타임 스키마 초안을 추가
 - 2026-02-25: `SpawnEntry` 레거시 fallback과 `WallEven` 전용 경로/검증 규칙(`CV025`, `CVW034`) 제거
 - 2026-02-24: `WallEven`을 정책 비활성으로 전환하고 `CV025`/`CVW034` 검증 규칙을 추가

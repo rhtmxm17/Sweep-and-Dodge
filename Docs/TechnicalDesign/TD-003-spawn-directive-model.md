@@ -124,13 +124,18 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 ## 11. 차기 확장(v3) 초안 (미구현)
 - 상세 계약은 [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)를 기준으로 한다.
 - 확장 방향:
-  - `WaveTimelineSO`를 Source 전체 흐름이 아닌 "단일 클립 자산"으로 분리한다.
-  - Source 런타임 슬롯 키를 `State + Phase + Channel`로 고정한다.
-  - `Sustain`은 `Hazard`/`Trash` 채널별 활성 클립 1개씩(최대 2개) 동시 실행한다.
-  - 이벤트 클립(`OnStateEnterOnce`) 실행 중에는 `Sustain` 요청 생성을 중지한다.
-  - `Sustain`에도 시간축을 적용하고, 클립 종료 시 동일 슬롯 후보군에서 무작위 다음 클립을 선택한다.
+  - 신규 `WaveClipSO`를 도입하고, `WaveTimelineSO`는 임시 레거시 경로로 유지 후 제거한다.
+  - Source 런타임 슬롯 키를 `State + Phase + Lane`으로 고정한다(`Lane`은 확장 가능한 enum).
+  - `Sustain`은 기본 `Hazard`/`Trash` Lane별 활성 클립 1개씩(최대 2개) 동시 실행한다.
+  - 이벤트 클립(`OnStateEnterOnce`) 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)을 적용한다.
+  - 이벤트 중복 트리거는 큐잉한다.
+  - `Sustain` 시간축은 클립 선택 시 로컬 시간 리셋 기준으로 동작한다.
+  - 클립 종료 시 동일 슬롯 후보군에서 "직전 클립 제외 완전 랜덤"으로 다음 클립을 선택한다.
+  - 우선순위는 Lane 규칙 `특수 > Hazard > Trash`를 우선하며, v3에서는 레거시 `SpawnPriority` 제거를 기본안으로 둔다.
+  - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 12. 변경 이력
+- 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, Lane 우선순위, RNG/선택 규칙)으로 초안을 갱신
 - 2026-02-25: v3 확장 초안(클립/슬롯/채널, 이벤트 우선, sustain 체인) 및 ADR 링크를 추가
 - 2026-02-25: `SpawnEntry` 레거시 fallback(`UseDirectiveProfiles`, legacy emission 필드)과 `WallEven` 전용 계약을 제거
 - 2026-02-24: `DirectionMode.Fixed`를 추가해 `LineEven + 고정 방향` 시나리오를 명시적으로 지원
