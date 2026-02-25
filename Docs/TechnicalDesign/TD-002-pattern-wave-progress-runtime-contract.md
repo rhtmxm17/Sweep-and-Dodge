@@ -9,6 +9,7 @@
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
+  - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 
 > GD-007의 기획 의도를 ECS 런타임 데이터 계약으로 변환한 기술 설계 문서.
 > SpawnDirective 분해 모델(Sampling/Emission/Payload) 상세는 `TD-003`을 참조한다.
@@ -178,11 +179,29 @@ Hit:
 - PlayMode: 전용 씬 스모크로 기동/루프 정상성 확인.
 - 스트레스: backlog/expired/drop 지표 회귀 추적.
 
-## 7. 오픈 이슈
+## 7. 차기 확장(v3) 런타임 계약 초안 (미구현)
+- 기준 ADR: [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
+- 핵심 규약:
+  - 슬롯 키: `State + Phase + Channel`
+  - 채널: `Hazard`, `Trash` 2개 고정
+  - `Sustain`: 상태당 채널별 활성 클립 1개씩(최대 2개 동시)
+  - `OnStateEnterOnce` 실행 중 `Sustain` 요청 생성 중지
+  - `Sustain`도 `StartSec/EndSec` 시간축 적용
+  - `Sustain` 클립 종료 시 동일 슬롯 후보군에서 무작위 다음 클립 선택
+- 권장 ECS 스키마:
+  - `SourceClipPatternBuffer` (`ClipId`, `Phase`, `Channel`, `LocalStartSec`, `LocalEndSec`, 기존 directive 필드)
+  - `SourceSustainSlotCandidateBuffer` (`State`, `Channel`, `ClipId`, `Weight`)
+  - `SourceSustainRuntimeComponent` (`ActiveHazardClipId`, `ActiveTrashClipId`, `HazardElapsedSec`, `TrashElapsedSec`, `SelectionSequence`)
+  - `SourceEventRuntimeComponent` (`IsPlaying`, `ActiveEventClipId`, `TriggerState`, `ElapsedSec`)
+- 결정론 요구:
+  - 무작위 선택 RNG는 `SourceEntity + State + Channel + SelectionSequence` 기반 시드를 사용한다.
+
+## 8. 오픈 이슈
 - Stage별 PlayerRelative 허용 비중 상한.
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
-## 8. 변경 이력
+## 9. 변경 이력
+- 2026-02-25: v3 클립/슬롯/채널 확장 초안 및 런타임 스키마 초안을 추가
 - 2026-02-25: `SpawnEntry` 레거시 fallback과 `WallEven` 전용 경로/검증 규칙(`CV025`, `CVW034`) 제거
 - 2026-02-24: `WallEven`을 정책 비활성으로 전환하고 `CV025`/`CVW034` 검증 규칙을 추가
 - 2026-02-24: `DirectionMode.Fixed`를 추가해 `LineEven + 고정 방향` 구성을 정식 지원

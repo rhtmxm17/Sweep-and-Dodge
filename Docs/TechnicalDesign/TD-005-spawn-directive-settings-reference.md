@@ -9,6 +9,7 @@
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
   - [ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md](../ADR/ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md)
+  - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 
 > 목적: `WaveTimelineSO.SpawnEntry`의 각 설정이 실제 런타임에서 무엇을 의미하는지 빠르게 확인하는 운영 레퍼런스.
 
@@ -140,3 +141,37 @@
   - `PendingCount`
   - `DeferredByBudget`
   - `SpawnSkipRate01`
+
+## 9. 차기 v3 Authoring 스키마 초안 (미구현)
+- 기준 ADR: [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
+- 운영 목표:
+  - `WaveTimelineSO`를 "클립 자산"으로 분리한다.
+  - Source는 상태/페이즈별 슬롯에 클립 후보군을 바인딩한다.
+  - `Sustain`은 `Hazard`/`Trash` 2채널을 독립 운영한다.
+
+### 9.1 WaveTimelineSO(클립 자산) 권장 필드
+| 필드 | 의미 | 운영 규칙 |
+| --- | --- | --- |
+| `ClipId` | 클립 식별자 | 전역 고유, `> 0` |
+| `Phase` | 클립 용도 | `Sustain` / `OnStateEnterOnce` |
+| `Channel` | 클립 채널 | `Hazard` / `Trash` |
+| `DurationSec` | 클립 총 길이 | `> 0` |
+| `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, non-overlap |
+| `Segments[].Entries[]` | SpawnDirective 인라인 프로필 | 현재 `Payload/Emission/Sampling/Direction` 규약 재사용 |
+
+### 9.2 Source 바인딩 자산 권장 필드
+| 필드 | 의미 | 운영 규칙 |
+| --- | --- | --- |
+| `SustainSlots[].State` | Source 상태 슬롯 | `Normal` / `Weakened` / `Depleted` |
+| `SustainSlots[].HazardClips[]` | Hazard 후보군 | 비어 있으면 Error |
+| `SustainSlots[].TrashClips[]` | Trash 후보군 | 비어 있으면 Error |
+| `SustainSlots[].HazardWeights[]` | Hazard 가중치(옵션) | 길이 불일치 시 균등 선택 fallback |
+| `SustainSlots[].TrashWeights[]` | Trash 가중치(옵션) | 길이 불일치 시 균등 선택 fallback |
+| `EventSlots[].TriggerState` | 이벤트 트리거 상태 | 상태 전환 감지 시 발동 |
+| `EventSlots[].EventClips[]` | 이벤트 클립 참조 | 실행 중에는 sustain 요청 중지 |
+
+### 9.3 실행 규약
+1. 슬롯 키는 `State + Phase + Channel`로 고정한다.
+2. 같은 `State + Sustain`에서 활성 클립은 채널별 1개씩, 최대 2개까지 허용한다.
+3. 이벤트 클립 실행 중에는 모든 sustain 요청 생성을 중지한다.
+4. sustain 클립 종료 시 동일 슬롯 후보군에서 무작위 다음 클립을 선택해 연속 실행한다.

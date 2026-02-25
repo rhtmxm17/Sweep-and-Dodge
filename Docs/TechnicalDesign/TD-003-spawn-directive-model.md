@@ -8,6 +8,7 @@
 - related_adr:
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
+  - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
 
 > GD-007의 스폰 개념 보강안을 런타임 데이터 모델 관점으로 분리 정리한 기술 문서.
 
@@ -120,7 +121,17 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - Pattern/Wave/Progress의 런타임 수식/검증 규칙은 `TD-002`에서 관리한다.
 - 본 문서는 스폰 분해 모델과 모드 조합 규칙을 관리한다.
 
-## 11. 변경 이력
+## 11. 차기 확장(v3) 초안 (미구현)
+- 상세 계약은 [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)를 기준으로 한다.
+- 확장 방향:
+  - `WaveTimelineSO`를 Source 전체 흐름이 아닌 "단일 클립 자산"으로 분리한다.
+  - Source 런타임 슬롯 키를 `State + Phase + Channel`로 고정한다.
+  - `Sustain`은 `Hazard`/`Trash` 채널별 활성 클립 1개씩(최대 2개) 동시 실행한다.
+  - 이벤트 클립(`OnStateEnterOnce`) 실행 중에는 `Sustain` 요청 생성을 중지한다.
+  - `Sustain`에도 시간축을 적용하고, 클립 종료 시 동일 슬롯 후보군에서 무작위 다음 클립을 선택한다.
+
+## 12. 변경 이력
+- 2026-02-25: v3 확장 초안(클립/슬롯/채널, 이벤트 우선, sustain 체인) 및 ADR 링크를 추가
 - 2026-02-25: `SpawnEntry` 레거시 fallback(`UseDirectiveProfiles`, legacy emission 필드)과 `WallEven` 전용 계약을 제거
 - 2026-02-24: `DirectionMode.Fixed`를 추가해 `LineEven + 고정 방향` 시나리오를 명시적으로 지원
 - 2026-02-24: `EventBurst`를 정식 계약으로 승격하고 `carry` 소비 정책, `DirectionProfile`, `LineEven/WallEven` 1차 범위를 추가
