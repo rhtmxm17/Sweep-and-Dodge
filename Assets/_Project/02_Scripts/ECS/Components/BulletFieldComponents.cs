@@ -70,6 +70,30 @@ namespace SweepNDodge.DotsBullets
         Fixed = 4,
     }
 
+    // v3 lane model.
+    // - Trash/Hazard are default lanes.
+    // - values >= 2 are reserved for special/custom lanes.
+    public enum SourceSpawnLaneId : byte
+    {
+        Trash = 0,
+        Hazard = 1,
+        Special = 2,
+    }
+
+    public static class SourceSpawnLanePriorityUtility
+    {
+        public static int ResolvePriority(SourceSpawnLaneId lane)
+        {
+            if (lane == SourceSpawnLaneId.Trash)
+                return 0;
+            if (lane == SourceSpawnLaneId.Hazard)
+                return 1;
+
+            // Special/custom lanes outrank default lanes.
+            return 2 + (int)lane;
+        }
+    }
+
     public enum SourcePollutionSamplingModeId : byte
     {
         TopK = 0,
@@ -192,6 +216,83 @@ namespace SweepNDodge.DotsBullets
         public SourceStateId ActiveTriggerState;
         public byte IsPlaying;
         public float ElapsedSec;
+    }
+
+    // v3 clip patterns baked from WaveClipSO bindings.
+    [InternalBufferCapacity(32)]
+    public struct SourceClipPatternBuffer : IBufferElementData
+    {
+        public int DirectiveId;
+        public int ClipId;
+        public SourceWavePhaseId Phase;
+        public SourceSpawnLaneId Lane;
+        public SourceStateId TriggerState;
+        public float LocalStartSec;
+        public float LocalEndSec;
+        public int BulletTypeKey;
+        public SourceSpawnEmissionModeId EmissionMode;
+        public SourceSpawnModeId SpawnMode;
+        public SourceSpawnSamplingModeId SamplingMode;
+        public SourceSpawnCenterModeId CenterMode;
+        public SourceSpawnDirectionModeId DirectionMode;
+        public float2 FixedPoint;
+        public float2 SpawnOffset;
+        public float2 LineStart;
+        public float2 LineEnd;
+        public float SampleSpacing;
+        public int SpawnSampleBudget;
+        public float PlayerNoSpawnRadius;
+        public float BaseAngleDeg;
+        public int NWayCount;
+        public float SpiralStepDeg;
+        public float SpawnDensityPerSecPerArea;
+        public float MeanEventsPerSec;
+        public int BurstRepeatCount;
+        public float BurstIntervalSec;
+        public int BurstShotsPerEvent;
+        public int LanePriority;
+        public float MaxActiveDensityPerArea;
+        public float SpawnAccumulator;
+        public int BurstEventsEmitted;
+    }
+
+    [InternalBufferCapacity(16)]
+    public struct SourceSustainSlotCandidateBuffer : IBufferElementData
+    {
+        public SourceStateId State;
+        public SourceSpawnLaneId Lane;
+        public int ClipId;
+        public float Weight;
+    }
+
+    [InternalBufferCapacity(8)]
+    public struct SourceSustainRuntimeLaneBuffer : IBufferElementData
+    {
+        public SourceSpawnLaneId Lane;
+        public int ActiveClipId;
+        public float ElapsedSec;
+        public int LastClipId;
+        public uint SelectionSequence;
+    }
+
+    public struct SourceSustainRuntimeComponent : IComponentData
+    {
+        public SourceStateId ActiveState;
+    }
+
+    public struct SourceEventRuntimeComponent : IComponentData
+    {
+        public byte IsPlaying;
+        public int ActiveEventClipId;
+        public SourceStateId TriggerState;
+        public float ElapsedSec;
+    }
+
+    [InternalBufferCapacity(8)]
+    public struct SourceEventQueueBuffer : IBufferElementData
+    {
+        public SourceStateId TriggerState;
+        public uint QueuedFrame;
     }
 
     [InternalBufferCapacity(128)]

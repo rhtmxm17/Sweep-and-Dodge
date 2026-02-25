@@ -6,11 +6,31 @@ namespace SweepNDodge.DotsBullets
 {
     public class BulletSourceAuthoring : MonoBehaviour
     {
+        [System.Serializable]
+        public struct SustainClipSlotAuthoring
+        {
+            public SourceStateId State;
+            public SourceSpawnLaneId Lane;
+            public WaveClipSO[] Clips;
+            public float[] Weights;
+        }
+
+        [System.Serializable]
+        public struct EventClipSlotAuthoring
+        {
+            public SourceStateId TriggerState;
+            public WaveClipSO[] EventClips;
+        }
+
         [Header("Source Field")]
         public BulletFieldShapeId FieldShape = BulletFieldShapeId.Circle;
         public float FieldRadius = 8f;
         public Vector2 FieldSize = new Vector2(12f, 8f);
         public WaveTimelineSO WaveTimeline;
+
+        [Header("V3 Wave Clips (Experimental)")]
+        public SustainClipSlotAuthoring[] SustainClipSlots;
+        public EventClipSlotAuthoring[] EventClipSlots;
 
         [Header("Depletion Threshold (externally injectable)")]
         public int ThresholdWeakened = 2000;
@@ -102,6 +122,33 @@ namespace SweepNDodge.DotsBullets
                     IsPlaying = 0,
                     ElapsedSec = 0f
                 });
+
+                var clipPatternBuffer = AddBuffer<SourceClipPatternBuffer>(e);
+                var sustainSlotCandidateBuffer = AddBuffer<SourceSustainSlotCandidateBuffer>(e);
+                var sustainRuntimeLaneBuffer = AddBuffer<SourceSustainRuntimeLaneBuffer>(e);
+                var eventQueueBuffer = AddBuffer<SourceEventQueueBuffer>(e);
+
+                AddComponent(e, new SourceSustainRuntimeComponent
+                {
+                    ActiveState = authoring.InitialState,
+                });
+
+                AddComponent(e, new SourceEventRuntimeComponent
+                {
+                    IsPlaying = 0,
+                    ActiveEventClipId = 0,
+                    TriggerState = authoring.InitialState,
+                    ElapsedSec = 0f
+                });
+
+                BakeV3ClipBindings(
+                    authoring,
+                    clipPatternBuffer,
+                    sustainSlotCandidateBuffer,
+                    sustainRuntimeLaneBuffer,
+                    eventQueueBuffer,
+                    activeCountBuffer,
+                    ref nextDirectiveId);
 
                 var pollutionCells = AddBuffer<SourcePollutionCellBuffer>(e);
                 var pollutionDrops = AddBuffer<SourcePollutionDropRequestBuffer>(e);
@@ -254,6 +301,208 @@ namespace SweepNDodge.DotsBullets
                         EnsureActiveCountEntry(activeCountBuffer, typeKey, activeCountKeys);
                     }
                 }
+            }
+
+            private void BakeV3ClipBindings(
+                BulletSourceAuthoring authoring,
+                DynamicBuffer<SourceClipPatternBuffer> clipPatternBuffer,
+                DynamicBuffer<SourceSustainSlotCandidateBuffer> sustainSlotCandidateBuffer,
+                DynamicBuffer<SourceSustainRuntimeLaneBuffer> sustainRuntimeLaneBuffer,
+                DynamicBuffer<SourceEventQueueBuffer> eventQueueBuffer,
+                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer,
+                ref int nextDirectiveId)
+            {
+                clipPatternBuffer.Clear();
+                sustainSlotCandidateBuffer.Clear();
+                sustainRuntimeLaneBuffer.Clear();
+                eventQueueBuffer.Clear();
+
+                if (authoring.SustainClipSlots != null)
+                {
+                    for (int i = 0; i < authoring.SustainClipSlots.Length; i++)
+                    {
+                        var slot = authoring.SustainClipSlots[i];
+                        EnsureSustainLaneRuntimeEntry(sustainRuntimeLaneBuffer, slot.Lane);
+
+                        if (slot.Clips == null)
+                            continue;
+
+                        for (int c = 0; c < slot.Clips.Length; c++)
+                        {
+                            var clip = slot.Clips[c];
+                            if (clip == null)
+                                continue;
+
+                            if (clip.Phase != SourceWavePhaseId.Sustain)
+                            {
+                                Debug.LogWarning(
+                                    $"[WaveClipBake] Sustain slot references non-sustain clip. clip={clip.name}, phase={clip.Phase}, source={authoring.name}",
+                                    clip);
+                                continue;
+                            }
+
+                            sustainSlotCandidateBuffer.Add(new SourceSustainSlotCandidateBuffer
+                            {
+                                State = slot.State,
+                                Lane = slot.Lane,
+                                ClipId = clip.ClipId,
+                                Weight = ResolveClipWeight(slot.Weights, c)
+                            });
+
+                            BakeWaveClipToPatternBuffer(
+                                clip,
+                                slot.State,
+                                slot.Lane,
+                                clipPatternBuffer,
+                                activeCountBuffer,
+                                ref nextDirectiveId);
+                        }
+                    }
+                }
+
+                if (authoring.EventClipSlots == null)
+                    return;
+
+                for (int i = 0; i < authoring.EventClipSlots.Length; i++)
+                {
+                    var slot = authoring.EventClipSlots[i];
+                    if (slot.EventClips == null)
+                        continue;
+
+                    for (int c = 0; c < slot.EventClips.Length; c++)
+                    {
+                        var clip = slot.EventClips[c];
+                        if (clip == null)
+                            continue;
+
+                        if (clip.Phase != SourceWavePhaseId.OnStateEnterOnce)
+                        {
+                            Debug.LogWarning(
+                                $"[WaveClipBake] Event slot references non-event clip. clip={clip.name}, phase={clip.Phase}, source={authoring.name}",
+                                clip);
+                            continue;
+                        }
+
+                        BakeWaveClipToPatternBuffer(
+                            clip,
+                            slot.TriggerState,
+                            clip.Lane,
+                            clipPatternBuffer,
+                            activeCountBuffer,
+                            ref nextDirectiveId);
+                    }
+                }
+            }
+
+            private static void BakeWaveClipToPatternBuffer(
+                WaveClipSO clip,
+                SourceStateId triggerState,
+                SourceSpawnLaneId lane,
+                DynamicBuffer<SourceClipPatternBuffer> clipPatternBuffer,
+                DynamicBuffer<SourceActiveBulletCountBuffer> activeCountBuffer,
+                ref int nextDirectiveId)
+            {
+                if (clip == null || clip.Segments == null)
+                    return;
+
+                float clipDuration = Mathf.Max(0f, clip.DurationSec);
+                int lanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(lane);
+
+                for (int s = 0; s < clip.Segments.Length; s++)
+                {
+                    var segment = clip.Segments[s];
+                    if (segment.EndSec <= segment.StartSec || segment.Entries == null)
+                        continue;
+
+                    float startSec = Mathf.Max(0f, segment.StartSec);
+                    float endSec = Mathf.Max(startSec, segment.EndSec);
+                    if (clipDuration > 0f)
+                    {
+                        startSec = Mathf.Min(startSec, clipDuration);
+                        endSec = Mathf.Min(endSec, clipDuration);
+                        if (endSec <= startSec)
+                            continue;
+                    }
+
+                    for (int e = 0; e < segment.Entries.Length; e++)
+                    {
+                        var entry = segment.Entries[e];
+                        var bullet = entry.ResolveBullet();
+                        if (bullet == null)
+                            continue;
+
+                        int typeKey = bullet.DefinitionId;
+                        var fixedPoint = entry.ResolveFixedPoint();
+                        var spawnOffset = entry.ResolveSpawnOffset();
+                        var lineStart = entry.ResolveLineStart();
+                        var lineEnd = entry.ResolveLineEnd();
+                        clipPatternBuffer.Add(new SourceClipPatternBuffer
+                        {
+                            DirectiveId = nextDirectiveId++,
+                            ClipId = clip.ClipId,
+                            Phase = clip.Phase,
+                            Lane = lane,
+                            TriggerState = triggerState,
+                            LocalStartSec = startSec,
+                            LocalEndSec = endSec,
+                            BulletTypeKey = typeKey,
+                            EmissionMode = entry.ResolveEmissionMode(),
+                            SpawnMode = entry.ResolveSpawnMode(),
+                            SamplingMode = entry.ResolveSamplingMode(),
+                            CenterMode = entry.ResolveCenterMode(),
+                            DirectionMode = entry.ResolveDirectionMode(),
+                            FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
+                            SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
+                            LineStart = new float2(lineStart.x, lineStart.y),
+                            LineEnd = new float2(lineEnd.x, lineEnd.y),
+                            SampleSpacing = Mathf.Max(0.001f, entry.ResolveSampleSpacing()),
+                            SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
+                            PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
+                            BaseAngleDeg = entry.ResolveBaseAngleDeg(),
+                            NWayCount = Mathf.Max(1, entry.ResolveNWayCount()),
+                            SpiralStepDeg = entry.ResolveSpiralStepDeg(),
+                            SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
+                            MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
+                            BurstRepeatCount = entry.ResolveBurstRepeatCount(),
+                            BurstIntervalSec = Mathf.Max(0.001f, entry.ResolveBurstIntervalSec()),
+                            BurstShotsPerEvent = Mathf.Max(1, entry.ResolveBurstShotsPerEvent()),
+                            LanePriority = lanePriority,
+                            MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
+                            SpawnAccumulator = 0f,
+                            BurstEventsEmitted = 0
+                        });
+
+                        EnsureActiveCountEntry(activeCountBuffer, typeKey);
+                    }
+                }
+            }
+
+            private static float ResolveClipWeight(float[] weights, int index)
+            {
+                if (weights == null || index < 0 || index >= weights.Length)
+                    return 1f;
+
+                return weights[index] > 0f ? weights[index] : 1f;
+            }
+
+            private static void EnsureSustainLaneRuntimeEntry(
+                DynamicBuffer<SourceSustainRuntimeLaneBuffer> runtimeByLaneBuffer,
+                SourceSpawnLaneId lane)
+            {
+                for (int i = 0; i < runtimeByLaneBuffer.Length; i++)
+                {
+                    if (runtimeByLaneBuffer[i].Lane == lane)
+                        return;
+                }
+
+                runtimeByLaneBuffer.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = lane,
+                    ActiveClipId = 0,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u
+                });
             }
 
             private static void EnsureActiveCountEntry(
