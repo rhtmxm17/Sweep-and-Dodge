@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using NUnit.Framework;
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -75,6 +76,76 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(stressAfter.Mode, Is.EqualTo((byte)StressSwitchModeId.None), "Burst mode must finish as one-shot request");
             Assert.That(postMaxPending, Is.GreaterThan(baselineMaxPending + 1000), "Burst request should noticeably increase pending backlog");
             Assert.That(postMaxHudSpawned, Is.GreaterThan(0), "HUD spawned metric should be updated during burst run");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_DedicatedScene_DataDrivenPatternScenario_BaselineMetricsAreRecorded()
+        {
+            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    CountByComponentType<SourceSpawnComponent>(em) > 0 &&
+                    HasSingleton<SpawnBacklogMetricsComponent>(em) &&
+                    HasSingleton<BulletFrameCounterComponent>(em),
+                300,
+                "Data-driven scenario setup was not ready within timeout.");
+
+            int baselineMaxActive = 0;
+            int baselineMaxPending = 0;
+            int baselineMaxOldestAge = 0;
+            for (int i = 0; i < 30; i++)
+            {
+                yield return null;
+                baselineMaxActive = Mathf.Max(baselineMaxActive, CountByComponentType<BulletActiveTag>(em));
+                baselineMaxPending = Mathf.Max(baselineMaxPending, GetSingleton<SpawnBacklogMetricsComponent>(em).PendingCount);
+                baselineMaxOldestAge = Mathf.Max(baselineMaxOldestAge, ComputeOldestPendingAgeFrames(em));
+            }
+
+            Entity transitionedSource = FindSourceWithOpeningWave(em);
+            Assert.That(transitionedSource, Is.Not.EqualTo(Entity.Null), "Opening-wave source was not found for transition scenario.");
+
+            var source = em.GetComponentData<SourceSpawnComponent>(transitionedSource);
+            source.CollectedCount = Mathf.Max(source.CollectedCount, source.ThresholdWeakened);
+            source.State = SourceStateId.Weakened;
+            em.SetComponentData(transitionedSource, source);
+
+            if (em.HasComponent<SourceOpeningWaveRuntimeComponent>(transitionedSource))
+            {
+                var runtime = em.GetComponentData<SourceOpeningWaveRuntimeComponent>(transitionedSource);
+                runtime.LastState = SourceStateId.Normal;
+                em.SetComponentData(transitionedSource, runtime);
+            }
+
+            int maxActiveBullets = 0;
+            int maxPendingBacklog = 0;
+            int maxOldestAge = 0;
+            int maxDropped = 0;
+            int maxExpired = 0;
+            for (int i = 0; i < 180; i++)
+            {
+                yield return null;
+                maxActiveBullets = Mathf.Max(maxActiveBullets, CountByComponentType<BulletActiveTag>(em));
+
+                var metrics = GetSingleton<SpawnBacklogMetricsComponent>(em);
+                maxPendingBacklog = Mathf.Max(maxPendingBacklog, metrics.PendingCount);
+                maxDropped = Mathf.Max(maxDropped, metrics.DroppedByCapacity);
+                maxExpired = Mathf.Max(maxExpired, metrics.ExpiredByAge);
+                maxOldestAge = Mathf.Max(maxOldestAge, ComputeOldestPendingAgeFrames(em));
+            }
+
+            Assert.That(maxActiveBullets, Is.GreaterThan(0), "Scenario must produce active bullets.");
+            Assert.That(maxPendingBacklog, Is.GreaterThanOrEqualTo(0), "Pending backlog metric must be observable.");
+
+            Debug.Log(
+                $"[PlayModeBaseline] scenario=bwt_from_bsp_default baselineActive={baselineMaxActive} baselinePending={baselineMaxPending} baselineOldestAge={baselineMaxOldestAge} " +
+                $"maxActiveBullets={maxActiveBullets} maxPendingBacklog={maxPendingBacklog} maxOldestAge={maxOldestAge} dropCount={maxDropped} expiredByAge={maxExpired}");
         }
 
         [UnityTest]
@@ -177,6 +248,50 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.GetSingleton<T>();
+        }
+
+        private static int ComputeOldestPendingAgeFrames(EntityManager em)
+        {
+            if (!HasSingleton<BulletFrameCounterComponent>(em))
+                return 0;
+
+            var frameCounter = GetSingleton<BulletFrameCounterComponent>(em);
+            uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
+            int oldest = 0;
+
+            var query = em.CreateEntityQuery(ComponentType.ReadOnly<SourceSpawnRequestBuffer>());
+            using var sources = query.ToEntityArray(Allocator.Temp);
+            for (int s = 0; s < sources.Length; s++)
+            {
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(sources[s], isReadOnly: true);
+                for (int i = 0; i < requests.Length; i++)
+                {
+                    var request = requests[i];
+                    if (request.Count <= 0)
+                        continue;
+
+                    int age = frame >= request.OldestFrame ? (int)(frame - request.OldestFrame) : 0;
+                    oldest = Mathf.Max(oldest, age);
+                }
+            }
+
+            return oldest;
+        }
+
+        private static Entity FindSourceWithOpeningWave(EntityManager em)
+        {
+            var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<SourceSpawnComponent>(),
+                ComponentType.ReadOnly<SourceOpeningWavePatternBuffer>());
+            using var sources = query.ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < sources.Length; i++)
+            {
+                var opening = em.GetBuffer<SourceOpeningWavePatternBuffer>(sources[i], isReadOnly: true);
+                if (opening.Length > 0)
+                    return sources[i];
+            }
+
+            return Entity.Null;
         }
     }
 }

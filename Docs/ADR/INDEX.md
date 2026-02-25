@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md](ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md): SpawnDirective v2 계약(레거시 제거, LineEven 중심 샘플링, 방향/버스트/우선순위 규약) 확정
 - [ADR-20260220-03-ecs-file-splitting-boundaries-by-ownership.md](ADR-20260220-03-ecs-file-splitting-boundaries-by-ownership.md): ECS 파일 분리 기준을 소유권/업데이트 단계/응집도 중심으로 고정
 - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md): Spawn 요청 aggregated 단위와 Budget Cap + bounded carry-over 정책 결정
 - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md): 루트 파이프라인 그룹 도입 + Request fence publish 단일화 + 프레임 카운터 기반 Frame ID 전환

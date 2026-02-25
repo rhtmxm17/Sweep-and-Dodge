@@ -9,7 +9,8 @@ namespace SweepNDodge.DotsBullets.Editor
     public static class ContentValidationRunner
     {
         private static readonly string[] SearchRoots = { "Assets/_Project" };
-        private const int MaxWarningLogs = 100;
+        public const int DefaultWarningLogCap = 100;
+        public const int DefaultErrorSummaryLimit = 10;
 
         [MenuItem("Tools/Project/Validate Content")]
         private static void ValidateContentMenu()
@@ -29,14 +30,82 @@ namespace SweepNDodge.DotsBullets.Editor
             CollectAuthoringsFromPrefabs(visuals, sources, bullets);
             CollectAuthoringsFromScenes(visuals, sources, bullets);
 
+            SortRecordsByLocation(definitions);
+            SortRecordsByLocation(waveTimelines);
+            SortRecordsByLocation(visuals);
+            SortRecordsByLocation(sources);
+            SortRecordsByLocation(bullets);
+
             var input = new ContentValidationInput(definitions, waveTimelines, visuals, sources, bullets);
-            return ContentValidationRules.Validate(input);
+            var issues = ContentValidationRules.Validate(input);
+            SortIssuesInPlace(issues);
+            return issues;
+        }
+
+        public static void SortIssuesInPlace(List<ContentValidationIssue> issues)
+        {
+            if (issues == null || issues.Count <= 1)
+                return;
+
+            issues.Sort(CompareIssues);
+        }
+
+        public static string BuildErrorSummary(IReadOnlyList<ContentValidationIssue> issues, int maxEntries = DefaultErrorSummaryLimit)
+        {
+            if (issues == null || issues.Count <= 0)
+                return "errors=0, shown=0";
+
+            var errors = new List<ContentValidationIssue>();
+            for (int i = 0; i < issues.Count; i++)
+            {
+                if (issues[i].Severity == ContentValidationSeverity.Error)
+                    errors.Add(issues[i]);
+            }
+
+            SortIssuesInPlace(errors);
+            if (errors.Count <= 0)
+                return "errors=0, shown=0";
+
+            int capped = maxEntries < 0 ? 0 : maxEntries;
+            int showCount = Mathf.Min(capped, errors.Count);
+            if (showCount <= 0)
+                return $"errors={errors.Count}, shown=0";
+
+            var lines = new List<string>(showCount);
+            for (int i = 0; i < showCount; i++)
+            {
+                var error = errors[i];
+                lines.Add($"[{i + 1}] {error.Code} {error.Location} - {error.Message}");
+            }
+
+            return $"errors={errors.Count}, shown={showCount}\n{string.Join("\n", lines)}";
+        }
+
+        public static (int ErrorCount, int WarningCount, int WarningLogsToEmit, int SuppressedWarningCount) CalculateIssueReportCounts(
+            IReadOnlyList<ContentValidationIssue> issues,
+            int warningLogCap = DefaultWarningLogCap)
+        {
+            int errors = 0;
+            int warnings = 0;
+            for (int i = 0; i < (issues?.Count ?? 0); i++)
+            {
+                if (issues[i].Severity == ContentValidationSeverity.Error)
+                    errors++;
+                else
+                    warnings++;
+            }
+
+            int cap = warningLogCap < 0 ? 0 : warningLogCap;
+            int emittedWarnings = Mathf.Min(cap, warnings);
+            int suppressedWarnings = Mathf.Max(0, warnings - cap);
+            return (errors, warnings, emittedWarnings, suppressedWarnings);
         }
 
         private static List<ContentValidationRecord<T>> CollectScriptableObjects<T>() where T : ScriptableObject
         {
             var list = new List<ContentValidationRecord<T>>();
             string[] guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}", SearchRoots);
+            System.Array.Sort(guids, System.StringComparer.Ordinal);
             for (int i = 0; i < guids.Length; i++)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guids[i]);
@@ -56,6 +125,7 @@ namespace SweepNDodge.DotsBullets.Editor
             List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             string[] guids = AssetDatabase.FindAssets("t:Prefab", SearchRoots);
+            System.Array.Sort(guids, System.StringComparer.Ordinal);
             for (int i = 0; i < guids.Length; i++)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guids[i]);
@@ -73,6 +143,7 @@ namespace SweepNDodge.DotsBullets.Editor
             List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             string[] guids = AssetDatabase.FindAssets("t:Scene", SearchRoots);
+            System.Array.Sort(guids, System.StringComparer.Ordinal);
             var previous = EditorSceneManager.GetSceneManagerSetup();
 
             try
@@ -137,8 +208,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static void ReportToConsole(List<ContentValidationIssue> issues)
         {
-            int errorCount = 0;
-            int warningCount = 0;
+            var counts = CalculateIssueReportCounts(issues, DefaultWarningLogCap);
+            int warningLogsEmitted = 0;
 
             for (int i = 0; i < issues.Count; i++)
             {
@@ -146,26 +217,49 @@ namespace SweepNDodge.DotsBullets.Editor
                 string line = $"[ContentValidation][{issue.Severity}] {issue.Code} {issue.Location} - {issue.Message}";
                 if (issue.Severity == ContentValidationSeverity.Error)
                 {
-                    errorCount++;
                     Debug.LogError(line);
                 }
                 else
                 {
-                    warningCount++;
-                    if (warningCount <= MaxWarningLogs)
+                    if (warningLogsEmitted < counts.WarningLogsToEmit)
                     {
+                        warningLogsEmitted++;
                         Debug.LogWarning(line);
                     }
                 }
             }
 
-            int suppressedWarningCount = Mathf.Max(0, warningCount - MaxWarningLogs);
-            if (suppressedWarningCount > 0)
+            if (counts.SuppressedWarningCount > 0)
             {
-                Debug.LogWarning($"[ContentValidation] Warning log cap reached ({MaxWarningLogs}). Suppressed warnings={suppressedWarningCount}");
+                Debug.LogWarning($"[ContentValidation] Warning log cap reached ({DefaultWarningLogCap}). Suppressed warnings={counts.SuppressedWarningCount}");
             }
 
-            Debug.Log($"[ContentValidation] Done. errors={errorCount}, warnings={warningCount}, total={issues.Count}");
+            Debug.Log($"[ContentValidation] Done. errors={counts.ErrorCount}, warnings={counts.WarningCount}, total={issues.Count}");
+        }
+
+        private static void SortRecordsByLocation<T>(List<ContentValidationRecord<T>> records) where T : Object
+        {
+            if (records == null || records.Count <= 1)
+                return;
+
+            records.Sort((a, b) => string.CompareOrdinal(a.Location, b.Location));
+        }
+
+        private static int CompareIssues(ContentValidationIssue a, ContentValidationIssue b)
+        {
+            int severity = b.Severity.CompareTo(a.Severity);
+            if (severity != 0)
+                return severity;
+
+            int code = string.CompareOrdinal(a.Code, b.Code);
+            if (code != 0)
+                return code;
+
+            int location = string.CompareOrdinal(a.Location, b.Location);
+            if (location != 0)
+                return location;
+
+            return string.CompareOrdinal(a.Message, b.Message);
         }
 
         private static string BuildHierarchyPath(Transform transform)
