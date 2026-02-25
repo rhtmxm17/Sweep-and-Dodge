@@ -4,7 +4,7 @@
 - doc_id: `OPS-001`
 - type: `ProjectOps`
 - status: `active`
-- last_updated: `2026-02-23`
+- last_updated: `2026-02-25`
 - related_adr:
   - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
@@ -47,7 +47,7 @@
 | 4 | 디버그 HUD + 스트레스 스위치 (엔티티 수, 처리량, 프레임타임) | P0 | 2 | 7% | DONE | 100% | 운영 씬 적용 범위/표시 정책 확정 | 2026-02-23 |
 | 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | DONE | 100% | 전용 씬(작업 완료) + 운영 씬(정기) 2트랙 유지 | 2026-02-23 |
 | 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | WIP | 60% | 게이트 운영 안정화 + 규칙 확장(누락 버퍼/참조 무결성) | 2026-02-23 |
-| 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | WIP | 25% | `GD-007`/`TD-002`/`TD-003` 기준으로 MVP 필드/검증 규칙 확정 + `ContentValidationRules.cs` 1차 반영 | 2026-02-23 |
+| 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | WIP | 55% | 샘플 시나리오 Wave 데이터(authoring) + PlayMode 시나리오 스모크/회귀 기준선 추가 | 2026-02-25 |
 | 8 | 런 타임라인 디렉터 (15~20분 페이싱) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 9 | 공통 전투 이벤트 채널 (피격/회피/수집/정리 집계) | P1 | 4 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 10 | 재현 가능한 시드/리플레이 최소 기반 | P2 | 4 | 18% | TODO | 0% | 착수 전 | 2026-02-20 |
@@ -123,6 +123,16 @@
   - 전용 씬 `Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity`를 추가했다.
   - `BulletPlayModeSmokeTests`를 `전용 씬(기본)` + `운영 씬(정기)` 2개 테스트로 분리했다.
   - 결과: 2개 PlayMode 스모크 모두 pass.
+
+### 2026-02-25
+- `#7 데이터 주도 패턴 정의` 진행률을 상향했다.
+  - Spawn 규약 업데이트를 반영했다:
+    - `WaveTimelineSO.SpawnEntry`는 인라인 프로필 전용(legacy fallback 제거)
+    - 샘플링은 `LineEven` 중심으로 운영하고, 벽 발사는 `LineEven + Direction` 조합으로 표현
+    - EventBurst 소비는 carry 정책 유지, 예산은 탄종 공용, Trash 최하 우선순위
+  - 후속 작업:
+    - 샘플 시나리오용 실제 WaveTimeline 데이터 세팅(초기/전환/전환후 3구간)
+    - 시나리오 성립 검증용 PlayMode 스모크/지표 기준선 추가
 
 ### 2026-02-20
 - `#1 프레임 파이프라인 고정`을 `DONE`으로 갱신했다.
