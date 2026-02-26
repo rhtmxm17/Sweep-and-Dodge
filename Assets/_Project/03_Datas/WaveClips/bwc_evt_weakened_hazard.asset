@@ -24,9 +24,9 @@ MonoBehaviour:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 0
+        EmissionMode: 2
         SpawnMode: 0
-        RatePerSecPerArea: 0.12
+        RatePerSecPerArea: 0
         MeanEventsPerSec: 0
         BurstRepeatCount: 1
         BurstIntervalSec: 1

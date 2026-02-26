@@ -24,13 +24,13 @@ MonoBehaviour:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 0
+        EmissionMode: 1
         SpawnMode: 0
-        RatePerSecPerArea: 0.05
-        MeanEventsPerSec: 0
+        RatePerSecPerArea: 0
+        MeanEventsPerSec: 5
         BurstRepeatCount: 1
         BurstIntervalSec: 1
-        BurstShotsPerEvent: 1
+        BurstShotsPerEvent: 4
         MaxActiveDensityPerArea: 0
       Sampling:
         SamplingMode: 0
@@ -49,6 +49,6 @@ MonoBehaviour:
         PlayerNoSpawnRadius: 2.2
       Direction:
         DirectionMode: 1
-        BaseAngleDeg: 0
+        BaseAngleDeg: 45
         NWayCount: 4
-        SpiralStepDeg: 0
+        SpiralStepDeg: 15

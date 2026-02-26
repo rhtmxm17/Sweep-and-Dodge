@@ -17,16 +17,17 @@ MonoBehaviour:
   Lane: 1
   DurationSec: 1
   Segments:
-  - StartSec: 0
+  - editorOnlyDescription: 
+    StartSec: 0
     EndSec: 1
     Entries:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 0
+        EmissionMode: 1
         SpawnMode: 0
-        RatePerSecPerArea: 0.08
-        MeanEventsPerSec: 0
+        RatePerSecPerArea: 0
+        MeanEventsPerSec: 4
         BurstRepeatCount: 1
         BurstIntervalSec: 1
         BurstShotsPerEvent: 1
@@ -39,6 +40,11 @@ MonoBehaviour:
         LineStart: {x: 0, y: 0}
         LineEnd: {x: 0, y: 0}
         SampleSpacing: 1
+        PointCount: 0
+        Point0: {x: 0, y: 0}
+        Point1: {x: 0, y: 0}
+        Point2: {x: 0, y: 0}
+        Point3: {x: 0, y: 0}
         SpawnSampleBudget: 24
         PlayerNoSpawnRadius: 2.2
       Direction:
@@ -54,7 +60,7 @@ MonoBehaviour:
         RatePerSecPerArea: 0
         MeanEventsPerSec: 0
         BurstRepeatCount: -1
-        BurstIntervalSec: 2
+        BurstIntervalSec: 4
         BurstShotsPerEvent: 6
         MaxActiveDensityPerArea: 0
       Sampling:
@@ -65,36 +71,15 @@ MonoBehaviour:
         LineStart: {x: -8, y: -7.5}
         LineEnd: {x: -8, y: 7.5}
         SampleSpacing: 3
+        PointCount: 0
+        Point0: {x: 0, y: 0}
+        Point1: {x: 0, y: 0}
+        Point2: {x: 0, y: 0}
+        Point3: {x: 0, y: 0}
         SpawnSampleBudget: 12
         PlayerNoSpawnRadius: 1.5
       Direction:
         DirectionMode: 4
         BaseAngleDeg: 0
-        NWayCount: 1
-        SpiralStepDeg: 0
-    - Payload:
-        Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
-      Emission:
-        EmissionMode: 2
-        SpawnMode: 0
-        RatePerSecPerArea: 0
-        MeanEventsPerSec: 0
-        BurstRepeatCount: -1
-        BurstIntervalSec: 2
-        BurstShotsPerEvent: 6
-        MaxActiveDensityPerArea: 0
-      Sampling:
-        SamplingMode: 2
-        CenterMode: 0
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        LineStart: {x: 8, y: -7.5}
-        LineEnd: {x: 8, y: 7.5}
-        SampleSpacing: 3
-        SpawnSampleBudget: 12
-        PlayerNoSpawnRadius: 1.5
-      Direction:
-        DirectionMode: 4
-        BaseAngleDeg: 180
         NWayCount: 1
         SpiralStepDeg: 0

@@ -160,12 +160,15 @@ namespace SweepNDodge.DotsBullets
                         continue;
 
                     attempted = true;
-                    int requestIndex = FindFirstSpawnableRequestIndex(requests, ref BulletFieldShared.FreeByKey);
+                    int requestIndex = FindFirstSpawnableRequestIndex(
+                        requests,
+                        ref BulletFieldShared.FreeByKey,
+                        remainingBudget);
                     if (requestIndex < 0)
                         continue;
 
                     var requestItem = requests[requestIndex];
-                    spawned = TrySpawnOneFromRequest(
+                    spawned = TrySpawnFromRequest(
                         sourceEntity,
                         in requestItem,
                         ref sourceRuntimeLookup,
@@ -192,19 +195,21 @@ namespace SweepNDodge.DotsBullets
                         ref activeCountLookup,
                         hasPlayer,
                         playerPosition,
-                        frame);
+                        frame,
+                        out int consumedCount,
+                        out uint sequenceAdvance);
 
                     if (spawned)
                     {
                         var item = requests[requestIndex];
-                        item.Count = math.max(0, item.Count - 1);
-                        item.SpawnSequence = item.SpawnSequence + 1u;
+                        item.Count = math.max(0, item.Count - consumedCount);
+                        item.SpawnSequence = item.SpawnSequence + sequenceAdvance;
                         if (item.Count <= 0)
                             item.OldestFrame = frame;
                         requests[requestIndex] = item;
-                        pending--;
-                        remainingBudget--;
-                        budgetUsed++;
+                        pending = math.max(0, pending - consumedCount);
+                        remainingBudget = math.max(0, remainingBudget - consumedCount);
+                        budgetUsed = SpawnRequestCommonUtility.SafeAdd(budgetUsed, consumedCount);
                     }
 
                     chosenSourceIndex = sourceIndex;
@@ -242,10 +247,19 @@ namespace SweepNDodge.DotsBullets
 
             metrics.PendingCount = pending;
             metrics.LastFrameBudgetUsed = budgetUsed;
-            if (pending > 0 && remainingBudget <= 0)
-                metrics.DeferredByBudget = pending;
-            if (pending > 0 && remainingBudget > 0)
-                metrics.DeferredByPool = pending;
+            if (pending > 0)
+            {
+                bool deferredByBudget = remainingBudget <= 0
+                    || HasBudgetBlockedPendingRequest(
+                        sourceEntities,
+                        ref requestLookup,
+                        ref BulletFieldShared.FreeByKey,
+                        remainingBudget);
+                if (deferredByBudget)
+                    metrics.DeferredByBudget = pending;
+                else
+                    metrics.DeferredByPool = pending;
+            }
 
             metricsRW.ValueRW = metrics;
             cursorRW.ValueRW = new SpawnBudgetCursorComponent
@@ -253,6 +267,45 @@ namespace SweepNDodge.DotsBullets
                 SourceStartIndex = cursorIndex
             };
             BulletFieldShared.PoolFence = state.Dependency;
+        }
+
+        private static bool HasBudgetBlockedPendingRequest(
+            NativeList<Entity> sourceEntities,
+            ref BufferLookup<SourceSpawnRequestBuffer> requestLookup,
+            ref NativeParallelMultiHashMap<int, Entity> freeByKey,
+            int remainingBudget)
+        {
+            if (remainingBudget <= 0)
+                return true;
+
+            for (int s = 0; s < sourceEntities.Length; s++)
+            {
+                var sourceEntity = sourceEntities[s];
+                if (!requestLookup.TryGetBuffer(sourceEntity, out var requests))
+                    continue;
+
+                for (int i = 0; i < requests.Length; i++)
+                {
+                    var item = requests[i];
+                    if (item.Count <= 0)
+                        continue;
+
+                    int requiredCount = ResolveRequestConsumeUnitCount(in item);
+                    if (item.Count < requiredCount)
+                        continue;
+
+                    bool hasPoolCapacity = requiredCount <= 1
+                        ? freeByKey.ContainsKey(item.BulletTypeKey)
+                        : CountFreeByKey(ref freeByKey, item.BulletTypeKey) >= requiredCount;
+                    if (!hasPoolCapacity)
+                        continue;
+
+                    if (remainingBudget < requiredCount)
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private static void PruneExpiredAndCompactRequests(
@@ -301,7 +354,8 @@ namespace SweepNDodge.DotsBullets
 
         private static int FindFirstSpawnableRequestIndex(
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            ref NativeParallelMultiHashMap<int, Entity> freeByKey)
+            ref NativeParallelMultiHashMap<int, Entity> freeByKey,
+            int remainingBudget)
         {
             int bestIndex = -1;
             int bestLanePriority = int.MinValue;
@@ -313,7 +367,18 @@ namespace SweepNDodge.DotsBullets
                 var item = requests[i];
                 if (item.Count <= 0)
                     continue;
-                if (!freeByKey.ContainsKey(item.BulletTypeKey))
+
+                int requiredCount = ResolveRequestConsumeUnitCount(in item);
+                if (item.Count < requiredCount)
+                    continue;
+                if (remainingBudget < requiredCount)
+                    continue;
+                if (requiredCount <= 1)
+                {
+                    if (!freeByKey.ContainsKey(item.BulletTypeKey))
+                        continue;
+                }
+                else if (CountFreeByKey(ref freeByKey, item.BulletTypeKey) < requiredCount)
                     continue;
 
                 if (bestIndex < 0
@@ -330,6 +395,188 @@ namespace SweepNDodge.DotsBullets
             }
 
             return bestIndex;
+        }
+
+        private static int ResolveRequestConsumeUnitCount(in SourceSpawnRequestBuffer request)
+        {
+            // NWay는 "샘플 1지점의 NWay 1세트"를 원자 단위로 소비한다.
+            if (request.DirectionMode == SourceSpawnDirectionModeId.NWay)
+                return math.max(1, request.NWayCount);
+
+            return 1;
+        }
+
+        private static bool TrySpawnFromRequest(
+            Entity sourceEntity,
+            in SourceSpawnRequestBuffer request,
+            ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
+            ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
+            ref ComponentLookup<BulletFieldAreaComponent> sourceAreaLookup,
+            ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup,
+            ref ComponentLookup<LocalTransform> txLookup,
+            ref ComponentLookup<LocalToWorld> localToWorldLookup,
+            ref ComponentLookup<BulletVelocityComponent> velLookup,
+            ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
+            ref ComponentLookup<BulletSpeedComponent> speedLookup,
+            ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
+            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
+            ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
+            ref ComponentLookup<BulletActiveTag> activeLookup,
+            ref ComponentLookup<BulletDespawnRequestTag> despawnRequestLookup,
+            ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
+            ref ComponentLookup<MaterialMeshInfo> renderLookup,
+            ref ComponentLookup<Parent> parentLookup,
+            ref BufferLookup<SourceActiveBulletCountBuffer> activeCountLookup,
+            bool hasPlayer,
+            float3 playerPosition,
+            uint frame,
+            out int consumedCount,
+            out uint sequenceAdvance)
+        {
+            consumedCount = 0;
+            sequenceAdvance = 0u;
+
+            if (request.DirectionMode != SourceSpawnDirectionModeId.NWay)
+            {
+                bool singleSpawned = TrySpawnOneFromRequest(
+                    sourceEntity,
+                    in request,
+                    ref sourceRuntimeLookup,
+                    ref sourceAnchorLookup,
+                    ref sourceAreaLookup,
+                    ref pollutionConfigLookup,
+                    ref pollutionGridLookup,
+                    ref pollutionCellsLookup,
+                    ref pollutionValidCellIndicesLookup,
+                    ref txLookup,
+                    ref localToWorldLookup,
+                    ref velLookup,
+                    ref lifeLookup,
+                    ref speedLookup,
+                    ref lifeMaxLookup,
+                    ref typeKeyLookup,
+                    ref sourceRefLookup,
+                    ref lifeCycleLookup,
+                    ref activeLookup,
+                    ref despawnRequestLookup,
+                    ref renderPartsLookup,
+                    ref renderLookup,
+                    ref parentLookup,
+                    ref activeCountLookup,
+                    hasPlayer,
+                    playerPosition,
+                    frame);
+                if (!singleSpawned)
+                    return false;
+
+                consumedCount = 1;
+                sequenceAdvance = 1u;
+                return true;
+            }
+
+            int slotCount = math.max(1, request.NWayCount);
+            if (slotCount <= 1)
+            {
+                bool singleSpawned = TrySpawnOneFromRequest(
+                    sourceEntity,
+                    in request,
+                    ref sourceRuntimeLookup,
+                    ref sourceAnchorLookup,
+                    ref sourceAreaLookup,
+                    ref pollutionConfigLookup,
+                    ref pollutionGridLookup,
+                    ref pollutionCellsLookup,
+                    ref pollutionValidCellIndicesLookup,
+                    ref txLookup,
+                    ref localToWorldLookup,
+                    ref velLookup,
+                    ref lifeLookup,
+                    ref speedLookup,
+                    ref lifeMaxLookup,
+                    ref typeKeyLookup,
+                    ref sourceRefLookup,
+                    ref lifeCycleLookup,
+                    ref activeLookup,
+                    ref despawnRequestLookup,
+                    ref renderPartsLookup,
+                    ref renderLookup,
+                    ref parentLookup,
+                    ref activeCountLookup,
+                    hasPlayer,
+                    playerPosition,
+                    frame);
+                if (!singleSpawned)
+                    return false;
+
+                consumedCount = 1;
+                sequenceAdvance = 1u;
+                return true;
+            }
+
+            var random = CreateSourceRandom(sourceEntity, ref sourceRuntimeLookup);
+            float3 center = ResolveSpawnCenter(
+                sourceEntity,
+                in request,
+                ref sourceAnchorLookup,
+                hasPlayer,
+                playerPosition);
+            var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
+                ? sourceAreaLookup[sourceEntity]
+                : default;
+
+            float3 pos = SampleSpawnPosition(
+                ref random,
+                sourceEntity,
+                in request,
+                center,
+                in fieldArea,
+                hasPlayer,
+                playerPosition,
+                ref pollutionConfigLookup,
+                ref pollutionGridLookup,
+                ref pollutionCellsLookup,
+                ref pollutionValidCellIndicesLookup,
+                out uint sampledSequence);
+
+            for (int slotIndex = 0; slotIndex < slotCount; slotIndex++)
+            {
+                if (!TryDequeueByKey(ref BulletFieldShared.FreeByKey, request.BulletTypeKey, out var bulletEntity))
+                    return false;
+
+                float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence, slotIndex);
+                ApplySpawnedBulletState(
+                    bulletEntity,
+                    sourceEntity,
+                    request.BulletTypeKey,
+                    pos,
+                    dir,
+                    frame,
+                    ref txLookup,
+                    ref localToWorldLookup,
+                    ref velLookup,
+                    ref lifeLookup,
+                    ref speedLookup,
+                    ref lifeMaxLookup,
+                    ref typeKeyLookup,
+                    ref sourceRefLookup,
+                    ref lifeCycleLookup,
+                    ref activeLookup,
+                    ref despawnRequestLookup,
+                    ref renderPartsLookup,
+                    ref renderLookup,
+                    ref parentLookup);
+            }
+
+            if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
+                IncrementActiveCount(activeCounts, request.BulletTypeKey, slotCount);
+
+            consumedCount = slotCount;
+            sequenceAdvance = 1u;
+            return true;
         }
 
         private static bool TrySpawnOneFromRequest(
@@ -390,7 +637,57 @@ namespace SweepNDodge.DotsBullets
                 ref pollutionValidCellIndicesLookup,
                 out uint sampledSequence);
 
-            float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence);
+            float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence, -1);
+            ApplySpawnedBulletState(
+                bulletEntity,
+                sourceEntity,
+                requestedTypeKey,
+                pos,
+                dir,
+                frame,
+                ref txLookup,
+                ref localToWorldLookup,
+                ref velLookup,
+                ref lifeLookup,
+                ref speedLookup,
+                ref lifeMaxLookup,
+                ref typeKeyLookup,
+                ref sourceRefLookup,
+                ref lifeCycleLookup,
+                ref activeLookup,
+                ref despawnRequestLookup,
+                ref renderPartsLookup,
+                ref renderLookup,
+                ref parentLookup);
+
+            if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
+                IncrementActiveCount(activeCounts, requestedTypeKey);
+
+            return true;
+        }
+
+        private static void ApplySpawnedBulletState(
+            Entity bulletEntity,
+            Entity sourceEntity,
+            int requestedTypeKey,
+            float3 pos,
+            float2 dir,
+            uint frame,
+            ref ComponentLookup<LocalTransform> txLookup,
+            ref ComponentLookup<LocalToWorld> localToWorldLookup,
+            ref ComponentLookup<BulletVelocityComponent> velLookup,
+            ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
+            ref ComponentLookup<BulletSpeedComponent> speedLookup,
+            ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
+            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
+            ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
+            ref ComponentLookup<BulletActiveTag> activeLookup,
+            ref ComponentLookup<BulletDespawnRequestTag> despawnRequestLookup,
+            ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
+            ref ComponentLookup<MaterialMeshInfo> renderLookup,
+            ref ComponentLookup<Parent> parentLookup)
+        {
             var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
             float bulletSpeed = speedLookup.HasComponent(bulletEntity)
                 ? math.max(0f, speedLookup[bulletEntity].Value)
@@ -456,11 +753,6 @@ namespace SweepNDodge.DotsBullets
             {
                 renderLookup.SetComponentEnabled(bulletEntity, true);
             }
-
-            if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
-                IncrementActiveCount(activeCounts, requestedTypeKey);
-
-            return true;
         }
 
         private static float3 ResolveSpawnCenter(
@@ -512,7 +804,8 @@ namespace SweepNDodge.DotsBullets
         private static float2 ResolveSpawnDirection(
             ref Unity.Mathematics.Random random,
             in SourceSpawnRequestBuffer request,
-            uint spawnSequence)
+            uint spawnSequence,
+            int forcedSlotIndex)
         {
             float baseRad = math.radians(request.BaseAngleDeg);
             uint directionSequence = spawnSequence;
@@ -542,7 +835,11 @@ namespace SweepNDodge.DotsBullets
                 case SourceSpawnDirectionModeId.RadialBurst:
                 {
                     int slotCount = ResolveDirectionalSlotCount(in request);
-                    int slot = slotCount <= 1 ? 0 : (int)(directionSequence % (uint)slotCount);
+                    int slot = slotCount <= 1
+                        ? 0
+                        : (forcedSlotIndex >= 0
+                            ? math.abs(forcedSlotIndex) % slotCount
+                            : (int)(directionSequence % (uint)slotCount));
                     angle = baseRad + (slotCount <= 1 ? 0f : (math.PI * 2f * slot) / slotCount);
                     break;
                 }
@@ -831,7 +1128,24 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
+        private static int CountFreeByKey(ref NativeParallelMultiHashMap<int, Entity> freeByKey, int key)
+        {
+            if (!freeByKey.TryGetFirstValue(key, out var _, out var iterator))
+                return 0;
+
+            int count = 1;
+            while (freeByKey.TryGetNextValue(out _, ref iterator))
+                count++;
+
+            return count;
+        }
+
         private static void IncrementActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
+        {
+            IncrementActiveCount(activeCounts, typeKey, 1);
+        }
+
+        private static void IncrementActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey, int amount)
         {
             for (int i = 0; i < activeCounts.Length; i++)
             {
@@ -839,7 +1153,7 @@ namespace SweepNDodge.DotsBullets
                 if (item.BulletTypeKey != typeKey)
                     continue;
 
-                item.ActiveCount = SpawnRequestCommonUtility.SafeAdd(item.ActiveCount, 1);
+                item.ActiveCount = SpawnRequestCommonUtility.SafeAdd(item.ActiveCount, amount);
                 activeCounts[i] = item;
                 return;
             }
@@ -847,7 +1161,7 @@ namespace SweepNDodge.DotsBullets
             activeCounts.Add(new SourceActiveBulletCountBuffer
             {
                 BulletTypeKey = typeKey,
-                ActiveCount = 1
+                ActiveCount = math.max(0, amount)
             });
         }
 

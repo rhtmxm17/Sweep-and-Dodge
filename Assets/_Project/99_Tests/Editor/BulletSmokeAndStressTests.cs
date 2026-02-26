@@ -525,6 +525,211 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnExecution_LineEvenNWay_SpawnsAtomicSetsPerSamplePoint()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineEvenNWayAtomicWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 32, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 0f, 0f) });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5201,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 1f,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.NWay,
+                    BaseAngleDeg = 45f,
+                    NWayCount = 4,
+                    Count = 20,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(24);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(20));
+
+                float invSqrt2 = 0.70710677f;
+                float2 dir45 = new float2(invSqrt2, invSqrt2);
+                float2 dir135 = new float2(-invSqrt2, invSqrt2);
+                float2 dir225 = new float2(-invSqrt2, -invSqrt2);
+                float2 dir315 = new float2(invSqrt2, -invSqrt2);
+
+                for (int i = -2; i <= 2; i++)
+                {
+                    var point = new float3(i, 0f, 0f);
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir45, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir135, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir225, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir315, 0.0001f, 0.0001f), Is.EqualTo(1));
+                }
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requestsAfter.Length, Is.EqualTo(0));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_NWayAtomicity_BudgetAndPoolShortage_KeepSequenceAndPending()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnNWayAtomicityDeferralWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 3, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 3, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5202,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-1f, 0f),
+                    LineEnd = new float2(1f, 0f),
+                    SampleSpacing = 1f,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.NWay,
+                    BaseAngleDeg = 0f,
+                    NWayCount = 4,
+                    SpawnSequence = 7u,
+                    Count = 4,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(0), "NWay set must not partially spawn when budget/pool is insufficient.");
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requestsAfter.Length, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].Count, Is.EqualTo(4));
+                Assert.That(requestsAfter[0].SpawnSequence, Is.EqualTo(7u));
+
+                Assert.That(TryGetSingleton(em, out SpawnBacklogMetricsComponent metrics), Is.True);
+                Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(0));
+                Assert.That(metrics.PendingCount, Is.GreaterThanOrEqualTo(4));
+                Assert.That(metrics.DeferredByPool, Is.GreaterThan(0));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_NWaySetConsumption_AdvancesSequenceOncePerSet()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnNWaySetSequenceWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 4, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5203,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 1f,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.NWay,
+                    BaseAngleDeg = 45f,
+                    NWayCount = 4,
+                    SpawnSequence = 3u,
+                    Count = 8,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requestsAfter.Length, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].Count, Is.EqualTo(4), "NWay set must consume 4 pending units at once.");
+                Assert.That(requestsAfter[0].SpawnSequence, Is.EqualTo(4u), "SpawnSequence should advance once per NWay set.");
+
+                Assert.That(TryGetSingleton(em, out SpawnBacklogMetricsComponent metrics), Is.True);
+                Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(4));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnRequestBuild_PoissonMeanPositive_AccumulatesPendingRequests()
         {
             try
