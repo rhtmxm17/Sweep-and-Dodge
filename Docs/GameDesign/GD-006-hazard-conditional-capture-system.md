@@ -4,12 +4,13 @@
 - doc_id: `GD-006`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-02-11`
+- last_updated: `2026-02-26`
 - related_adr: [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
 
 ## 0. 전제
 - 본 문서는 [`Source 기반 스폰 & 고갈 시스템`](GD-002-source-based-spawn-and-depletion.md)이 이미 적용된 상태를 전제로 한다.
 - 목표는 Trash(자원) 수거 흐름을 유지하면서도, "집중해야 하는 순간"을 추가해 플레이 밀도를 높이는 것이다.
+- Hazard 피격 패널티 상세는 [`GD-005`](GD-005-hazard-collision-penalty-spec.md)를 단일 기준으로 따른다.
 
 ---
 
@@ -65,7 +66,7 @@
 
 ### 4.2 이동/상호작용
 - Hazard는 기본적으로 Vacuum에 끌려오지 않는다.
-- 플레이어와 접촉하면 페널티가 발생한다.
+- 플레이어와 접촉하면 `GD-005` 규칙으로 피격 페널티가 발생한다.
 - 조건부 수거 성공 시 즉시 제거(또는 수거 상태 전환)되며 보상을 지급한다.
 
 ---
@@ -114,9 +115,15 @@ Hazard 수거의 보상은 "점수 증가"만으로는 부족하다. 아래 중 
 ### 6.2 실패 페널티(Penalty)
 즉사는 금지한다. 페널티는 "욕심의 대가"로 명확해야 한다.
 
-권장 페널티(택 1~2):
-- CarryBin 손실: 현재 적재량의 `carryLossOnHit`%
-- Vacuum 봉인: `vacuumLockTime` 동안 사용 불가
+피격 확정 시 적용(고정):
+- CarryBin 손실:
+  - `loss = clamp(floor(carry * carryLossFrac), carryLossMin, carryLossMax)`
+- Vacuum 봉인: `vacuumLockTime`
+- 무적 프레임: `iFrameTime`
+- 피격한 Hazard 즉시 소멸
+- 동일 프레임 다중 충돌은 `first-hit wins`(최대 1회 처리)
+
+선택 확장:
 - 오염 누적: 일정량 누적 시 이동/시야 페널티(선택)
 
 ▶ 의도: 억울함이 아니라 "내가 무리했다"로 귀결
@@ -162,8 +169,11 @@ Hazard 수거의 보상은 "점수 증가"만으로는 부족하다. 아래 중 
 |---|---:|---|
 | `hazardCarryGain` | Trash 25~50개 분량 | CarryBin 즉시 증가 |
 | `hazardDepletionBonus` | Source 수거량 + 1~3%p | 고갈 가속(선택) |
-| `carryLossOnHit` | 10~20% | 피격 시 Carry 손실 |
-| `vacuumLockTime` | 0.3 ~ 0.6 sec | 피격 시 Vacuum 봉인(선택) |
+| `carryLossFrac` | 0.10 ~ 0.20 | Carry 비율 손실 |
+| `carryLossMin` | 1 ~ 10 | 최소 손실 |
+| `carryLossMax` | 10 ~ 50 | 최대 손실(캡) |
+| `iFrameTime` | 0.5 ~ 0.9 sec | 추가 피격 방지 시간 |
+| `vacuumLockTime` | 0.4 ~ 0.9 sec | 피격 시 Vacuum 봉인 |
 
 ---
 
@@ -200,7 +210,7 @@ Hazard 수거의 보상은 "점수 증가"만으로는 부족하다. 아래 중 
 1) `hazardCarryGain` 증가
 2) `captureRingWidth` 증가
 3) `captureActiveTime` 0.20 → 0.25 sec
-4) `carryLossOnHit` 감소
+4) `carryLossFrac` 감소 (필요 시 `carryLossMin` 하향)
 
 ### 11.2 Hazard가 너무 쉬워서 의미 없음
 1) `captureRingWidth` 감소

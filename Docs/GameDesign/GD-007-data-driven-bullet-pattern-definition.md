@@ -4,7 +4,7 @@
 - doc_id: `GD-007`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-02-25`
+- last_updated: `2026-02-26`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -13,8 +13,8 @@
 
 ## 1. 목적
 - 플레이어 경험 관점에서 Pattern/Wave/Progress의 역할 경계를 확정한다.
-- 15~20분 캠페인 완주를 위한 Stage 스케일 앵커를 제시한다.
-- 본 문서의 15~20분은 전체 캠페인 클리어 시간(재도전 미포함) 기준이다.
+- `OPS-001` 기준(스테이지 2~3분, 캠페인 15~20분)을 스케일 앵커로 사용한다.
+- 본 문서의 캠페인 시간은 무실패 클리어 기준이며 재도전 시간은 포함하지 않는다.
 
 ## 2. 적용 범위
 - 패턴 철학, 감정 곡선, 리스크-보상 의도
@@ -61,7 +61,7 @@
 - Progress 기준: Trash = 1, Hazard = 5
 - Source 상태 전환: 2000 → 약화, 4000 → 고갈
 - Stage 1 목표: 2.5~3분, 필요 Progress 6000~8000
-- 캠페인 목표: 전체 15~20분(재도전 미포함)
+- 캠페인 목표: 전체 15~20분(무실패 클리어, 재도전 미포함)
 
 스폰 밀도 예시:
 
@@ -116,6 +116,7 @@ Stage 권장 Progress 배율:
 - PlayerRelative 피크 Stage에서 공정성(SpawnSkipRate01) 악화를 막는 가드 값 확정 필요
 
 ## 8. 변경 이력
+- 2026-02-26: 캠페인 시간 정의를 `OPS-001` 기준 문구(스테이지 2~3분, 무실패 캠페인 15~20분, 재도전 미포함)로 동기화
 - 2026-02-25: 샘플 시나리오 성립 기준(3구간 전환, `LineEven + Direction` 기반 벽 발사 표현, 공용 예산/Trash 최하 우선순위, EventBurst carry 체감)을 기획 규약으로 추가
 - 2026-02-23: 기존 `보강` 섹션의 SpawnDirective 상세를 `TD-003`으로 분리하고, 기획 원칙만 `5.6`에 흡수
 - 2026-02-23: 기존 `데이터 주도 탄막 패턴 정의` 문서를 `GD-007` 규칙(파일명 + Metadata)으로 정리하고 구조화
