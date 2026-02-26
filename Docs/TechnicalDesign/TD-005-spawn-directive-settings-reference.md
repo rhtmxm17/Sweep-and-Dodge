@@ -12,6 +12,7 @@
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
   - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
   - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
+  - [ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md)
 
 > 목적: `WaveClipSO.Segments[].Entries[]`(SpawnEntry)의 각 설정이 실제 런타임에서 무엇을 의미하는지 빠르게 확인하는 운영 레퍼런스.
 
@@ -39,15 +40,17 @@
 | `Emission.MeanEventsPerSec` | 평균 이벤트율(lambda) | `Poisson`에서 사용, `>= 0` |
 | `Emission.BurstRepeatCount` | 이벤트 반복 횟수 | `EventBurst`: `-1`(무한) 또는 `>=1` |
 | `Emission.BurstIntervalSec` | 이벤트 간격(초) | `EventBurst`: `> 0` |
-| `Emission.BurstShotsPerEvent` | 이벤트 1회 샷 수 | `EventBurst`: `>= 1` |
+| `Emission.BurstShotsPerEvent` | 사건형 이벤트 1회 샷 수 | `Poisson` / `EventBurst`: `>= 1` |
+| `Emission.EventShotSchedule` | 이벤트 내부 샷 스케줄 | `Poisson` / `EventBurst`: `Instant` / `Timed` (합의, 구현 예정) |
+| `Emission.EventShotIntervalSec` | 이벤트 내부 샷 간격(초) | `Poisson` / `EventBurst`에서 `EventShotSchedule=Timed`일 때 `> 0` (합의, 구현 예정) |
 | `Emission.MaxActiveDensityPerArea` | 활성 상한 밀도 | `CapAndMaxDensity`에서 사용 |
 
 ### 3.1 EmissionMode 값 의미
 | 값 | enum 값(byte) | 의미 | 비고 |
 | --- | ---: | --- | --- |
 | `RateField` | 0 | 면적당 초당 비율로 누적 스폰 | `RatePerSecPerArea` 사용 |
-| `Poisson` | 1 | 평균 이벤트율 기반 확률 스폰 | `MeanEventsPerSec` 사용 |
-| `EventBurst` | 2 | 고정 간격 이벤트성 버스트 스폰 | carry 소비 정책 적용 |
+| `Poisson` | 1 | 평균 이벤트율 기반 확률 스폰 | `MeanEventsPerSec` 사용, 이벤트 확정 후 `EventShotSchedule` 적용 가능 |
+| `EventBurst` | 2 | 고정 간격 이벤트성 버스트 스폰 | carry 소비 정책 적용, `EventShotSchedule` 적용 가능 |
 
 ### 3.2 SpawnMode 값 의미
 | 값 | enum 값(byte) | 의미 | 비고 |
@@ -59,6 +62,16 @@
 - 요청 생성은 Request 단계에서 누적된다.
 - 실행은 ExecutionBegin에서 예산 기반으로 소비된다.
 - 프레임에 다 못 쓴 샷은 버리지 않고 다음 프레임으로 이월(carry)된다.
+
+### 3.4 사건형 이벤트 모드 지속 확장 (합의, 구현 예정)
+- 이벤트 내부 타임라인은 `Emission` 책임으로 정의한다.
+- 적용 대상은 `Poisson` / `EventBurst`다.
+- `EventShotSchedule=Instant`:
+  - 기존과 동일하게 이벤트 1회에서 샷을 즉시 소비한다.
+- `EventShotSchedule=Timed`:
+  - 이벤트 1회 내부에서 `EventShotIntervalSec` 간격으로 `BurstShotsPerEvent` 샷을 분할 소비한다.
+- `Poisson`은 이벤트 발생 시점만 확률적으로 결정되고, 발생이 확정된 이후 샷 소비 규약은 `EventBurst`와 동일하다.
+- `BurstShotsPerEvent`는 이벤트 1회 내부 샷 횟수 의미를 유지한다.
 
 ## 4. Sampling 설정
 | 필드 | 의미 | 운영 규칙 |
@@ -101,6 +114,17 @@
   - `localSequence = SpawnSequence / PointCount`
 - `PlayerNoSpawnRadius`로 거부될 경우 다음 포인트로 순환 재시도하며, `SpawnSampleBudget` 한도 내에서만 수행한다.
 
+### 4.5 이벤트 기준점 고정 규약 (합의, 구현 예정)
+- 샘플링 기준점은 이벤트 시작 시 1회 확정하고, 이벤트 종료까지 고정한다.
+- 이벤트 진행 중에는 Source/Player가 이동해도 기준점을 재샘플링하지 않는다(월드 고정).
+- 고정 좌표는 이벤트 범위에만 유효하며, 다음 이벤트는 다시 샘플링한다.
+- Sampling 실패 정책(`PlayerNoSpawnRadius`, `SpawnSampleBudget`)은 기존 규약을 그대로 사용한다.
+  - 스폰 형태(`NWay`, `Spiral`, 지속 사건형)와 무관하게 동일 정책을 적용한다.
+- 기준점 수(기본 규약):
+  - `LineEven`: 라인 샘플링으로 확정된 유효 포인트 전체
+  - `PointSet`: `PointCount` 유효 포인트
+  - `UniformField` / `PollutionTopK`: 이벤트당 1개 포인트
+
 ## 5. Direction 설정
 | 필드 | 의미 | 운영 규칙 |
 | --- | --- | --- |
@@ -114,7 +138,7 @@
 | --- | ---: | --- | --- |
 | `Random` | 0 | 무작위 방향 | 균등 각도 분포 |
 | `NWay` | 1 | 슬롯 수 기반 다방향 분배 | `NWayCount` 사용, `BaseAngleDeg + (360/NWayCount)*slot` |
-| `Spiral` | 2 | 샷 시퀀스마다 각도 누적 회전 | `SpiralStepDeg` 사용 |
+| `Spiral` | 2 | 샷 시퀀스마다 각도 누적 회전 | `SpiralStepDeg` 사용, 이벤트 내부 시간축은 Emission에서 정의 |
 | `RadialBurst` | 3 | 버스트 의도 중심 방사 발사 | 런타임 슬롯 로직은 NWay와 공통 |
 | `Fixed` | 4 | 기준각 고정 발사 | `BaseAngleDeg` 사용 |
 
@@ -132,6 +156,11 @@
 - 예산/풀 부족으로 세트 전체를 소비하지 못하면, 해당 세트는 다음 프레임으로 이월한다.
 - 세트 이월 시 `SpawnSequence`는 증가시키지 않는다.
   - 다음 프레임에서 동일 좌표/동일 슬롯 위상으로 재시도한다.
+
+### 5.4 Direction 책임 경계 (합의)
+- `Direction`은 "각 샷의 방향 계산"만 담당한다.
+- 이벤트 내부 타임라인(샷 간격/샷 회수)과 기준점 고정 정책은 `Emission`에서 담당한다.
+- `Spiral`은 각도 진행 규약이며, 지속 사건형 스폰 자체를 정의하지 않는다.
 
 ## 6. 우선순위/예산 해석
 - 예산(`BudgetPerFrame`)은 요청 전체에서 공유된다.
@@ -202,3 +231,6 @@
 8. Lane 우선순위는 `특수 > Hazard > Trash`를 적용하고, Lane 규칙을 요청 우선순위의 최상위 규칙으로 둔다.
 9. 결정론 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.
 10. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
+
+## 10. 변경 이력
+- 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`)의 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가

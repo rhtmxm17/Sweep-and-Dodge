@@ -11,6 +11,7 @@
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
   - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
   - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
+  - [ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md)
 
 > GD-007의 스폰 개념 보강안을 런타임 데이터 모델 관점으로 분리 정리한 기술 문서.
 
@@ -56,17 +57,31 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 
 ### 5.2 Poisson (완전 무작위형)
 - `MeanEventsPerSec (lambda)`
+- `EventShotSchedule` (`Instant` / `Timed`, 합의, 구현 예정)
+- `EventShotIntervalSec` (`EventShotSchedule=Timed`에서 `>0`, 합의, 구현 예정)
+- `BurstShotsPerEvent` (이벤트 1회 내부 샷 수, 기본 1 이상)
 - 용도: 간헐적/불규칙 체감 형성.
 - 원칙: 완전 무작위 소량 스폰은 초저밀도 `RateField` 대체가 아니라 `Poisson`으로 정의한다.
+  - 확률로 이벤트 발생 시점이 확정된 이후 샷 소비 규약은 사건형 공통 규약(`EventShotSchedule`)을 적용한다.
 
 ### 5.3 EventBurst (정식)
 - 필드:
   - `BurstRepeatCount` (`-1`은 무한 반복, 그 외 `>=1`)
   - `BurstIntervalSec` (`>0`)
   - `BurstShotsPerEvent` (`>=1`)
+  - `EventShotSchedule` (`Instant` / `Timed`, 합의, 구현 예정)
+  - `EventShotIntervalSec` (`EventShotSchedule=Timed`에서 `>0`, 합의, 구현 예정)
 - 소비 정책:
   - `carry`를 기본 정책으로 사용한다.
   - 프레임 예산 부족 시 미소비 샷은 요청 버퍼에 남겨 다음 프레임에서 이어서 소비한다.
+  - `Timed` 모드에서는 이벤트 1회 내부 샷을 시간 간격으로 분할 소비한다.
+  - `EventShotSchedule` 규약 자체는 `Poisson`에도 동일 적용한다(이벤트 발생 시점 규칙만 다름).
+
+### 5.4 이벤트 기준점 고정 (합의, 구현 예정)
+- 샘플링 기준점은 이벤트 시작 시 1회 확정하고 이벤트 종료까지 유지한다.
+- 이벤트 내부에서는 Source/Player 이동에 따른 재샘플링을 하지 않는다(월드 고정).
+- 고정 기준점은 해당 이벤트에만 유효하며, 다음 이벤트는 다시 샘플링한다.
+- 샘플링 실패 처리(`PlayerNoSpawnRadius`, `SpawnSampleBudget`)는 기존 규약을 그대로 사용한다.
 
 ## 6. DirectionProfile (어느 방향으로 쏘는가)
 - 역할: 발사 벡터 분포/리듬 제어.
@@ -84,6 +99,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 런타임은 `NWay`/`RadialBurst`를 공통 슬롯 분배 로직으로 처리한다.
   - 슬롯 각도는 360도 균등 분할(`BaseAngleDeg + (360/N)*slot`)을 기본 규약으로 사용한다.
   - `RadialBurst`는 EventBurst와 결합했을 때의 의도 표현을 위한 별칭 모드로 유지한다.
+  - `Spiral`은 각도 진행 규약만 담당하며, 이벤트 내부 타임라인/기준점 고정은 Emission이 담당한다.
 
 ## 7. PayloadProfile (무엇을 뿌리는가)
 - 역할: 탄 타입과 상호작용 규칙 정의.
@@ -95,13 +111,15 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 ## 8. 조합 규칙
 - 밀도형 스폰: `Sampling + RateField + Payload`
 - 완전 무작위 소량 스폰: `Sampling + Poisson + Payload`
-- 이벤트성 패턴 스폰: `Sampling + EventBurst + Direction + Payload`
+- 이벤트성 패턴 스폰: `Sampling + (Poisson or EventBurst) + Direction + Payload`
+- 지속 사건형 패턴 스폰(확장): `Sampling + (Poisson or EventBurst)(Timed) + Direction + Payload`
 - 스테이지 체감 조정 시, 동일 Sampling에서 Emission만 교체하는 실험 경로를 우선한다.
 
 ## 9. 런타임 적용 규칙 (확정)
 - 요청 집계 키는 `BulletTypeKey` 단독이 아니라 `DirectiveId`를 기본 키로 사용한다.
 - Sampling 최종 평가는 Request가 아니라 `ExecutionBegin` 스폰 소비 시점에서 수행한다.
 - 방향 계산(Direction)도 `ExecutionBegin` 스폰 소비 시점에서 수행한다.
+- 사건형 이벤트 모드 확장(`Poisson/EventBurst`, `Timed`)에서는 이벤트 시작 시 샘플링 기준점을 고정하고, 이벤트 내부 샷은 해당 기준점 집합으로만 소비한다.
 - `WaveClipSO`는 `Segments[].Entries[]` 내부에 `Payload/Emission/Sampling/Direction` 인라인 프로필을 기본 구조로 사용한다.
 - 프레임 예산(`BudgetPerFrame`)은 요청 전체(탄 종류 공용)에서 공유한다.
   - 우선순위 규칙: Lane 우선순위(`특수 > Hazard > Trash`)를 적용한다.
@@ -138,6 +156,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 14. 변경 이력
+- 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가
 - 2026-02-26: NWay 필수값(`NWayCount>=2`)과 360도 균등 슬롯 각도 규약을 명시
 - 2026-02-25: `WaveClipSO` 기반 v3 경로를 반영하고 `WaveTimelineSO` 제거 상태를 문서에 동기화
 - 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, Lane 우선순위, RNG/선택 규칙)으로 초안을 갱신

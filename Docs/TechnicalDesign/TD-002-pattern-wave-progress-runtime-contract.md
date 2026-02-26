@@ -12,6 +12,7 @@
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
   - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
   - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
+  - [ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md)
 
 > GD-007의 기획 의도를 ECS 런타임 데이터 계약으로 변환한 기술 설계 문서.
 > SpawnDirective 분해 모델(Sampling/Emission/Payload) 상세는 `TD-003`을 참조한다.
@@ -46,7 +47,9 @@
 | MeanEventsPerSec | float | Poisson 평균 이벤트율 | >= 0 |
 | BurstRepeatCount | int | EventBurst 반복 수 | -1(무한) 또는 >= 1 |
 | BurstIntervalSec | float | EventBurst 반복 간격 | > 0 |
-| BurstShotsPerEvent | int | EventBurst 1회당 샷 수 | >= 1 |
+| BurstShotsPerEvent | int | 사건형 이벤트 1회당 샷 수 | Poisson / EventBurst에서 >= 1 |
+| EventShotSchedule | enum | 사건형 이벤트 내부 샷 스케줄 | Poisson / EventBurst: Instant / Timed (합의, 구현 예정) |
+| EventShotIntervalSec | float | 사건형 이벤트 내부 샷 간격 | Poisson / EventBurst에서 Timed일 때 > 0 (합의, 구현 예정) |
 | SpawnMode | enum | 활성 캡 정책 | FixedDensity / CapAndMaxDensity |
 | MaxActiveDensityPerArea | float | Cap 모드 상한 | Cap 모드에서 >= 0 |
 | SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK / LineEven / PointSet |
@@ -113,10 +116,12 @@ Hit:
 - 밀도형 발행(`RateField` 중심):
   - 요청은 엔티티 수 예약으로 해석한다.
   - 대량 스폰에서 요청 버퍼 폭주를 방지하기 위해 집계된 수량(`Count`)을 우선 사용한다.
-- 사건형 발행(`EventBurst + Direction` 중심):
+- 사건형 발행(`Poisson/EventBurst + Direction` 중심):
   - 요청은 사건 단위 예약으로 해석한다.
   - ExecutionBegin에서 사건을 샘플/방향 슬롯으로 확장해 실제 엔티티를 소비한다.
   - `NWay`는 샘플 지점별 `NWay 1세트`를 원자 단위로 소비한다.
+  - (확장 합의) `EventShotSchedule=Timed`는 이벤트 1회 내부에서 샷을 시간 간격으로 분할 소비한다.
+  - (확장 합의) 샘플링 기준점은 이벤트 시작 시 1회 확정하고 이벤트 종료까지 고정한다(월드 고정).
 
 ## 4. 업데이트 순서/소유권
 - Request 단계:
@@ -126,6 +131,7 @@ Hit:
 - ExecutionBegin 단계:
 - Owner(`SpawnRequestRoundRobinExecutionSystem`)가 요청을 소비해 실제 스폰을 수행한다.
 - Sampling(중심 계산/샘플링/NoSpawn 반경 검증)과 Direction 계산은 ExecutionBegin에서 최종 평가한다.
+- (확장 합의) `Poisson/EventBurst`의 `Timed` 이벤트는 "이벤트 시작 시 샘플링 고정 -> 이벤트 내부 재샘플링 없이 소비" 순서로 처리한다.
 - `BudgetPerFrame`은 요청 전체(탄 종류 공용)에서 공유한다.
   - 우선순위: Lane 규칙(`특수 > Hazard > Trash`)을 최우선으로 적용한다.
 - `NWay`/`RadialBurst` 방향 슬롯은 360도 균등 분할을 기본 규약으로 사용한다.
@@ -164,7 +170,8 @@ Hit:
 - Wave entry의 `PlayerNoSpawnRadius < 0` (`CV019`).
 - EventBurst에서 `BurstIntervalSec <= 0` (`CV020`).
 - EventBurst에서 `BurstRepeatCount`가 `-1` 또는 `>=1`이 아님 (`CV021`).
-- EventBurst에서 `BurstShotsPerEvent < 1` (`CV022`).
+- Poisson/EventBurst에서 `BurstShotsPerEvent < 1` (`CV022`, 합의 기준. 구현은 EventBurst 우선).
+- Poisson/EventBurst에서 `EventShotSchedule=Timed`인데 `EventShotIntervalSec <= 0` (합의, 구현 예정).
 - NWay에서 `NWayCount < 2` (`CV023`, 필수 제약 위반).
 - RadialBurst에서 `BurstShotsPerEvent < 2` (`CV024`).
 - LineEven에서 선분 길이 0 또는 `SampleSpacing <= 0` (`CV026`).
@@ -187,7 +194,7 @@ Hit:
 - `CV019`: Wave entry의 `PlayerNoSpawnRadius < 0`
 - `CV020`: EventBurst `BurstIntervalSec <= 0`
 - `CV021`: EventBurst `BurstRepeatCount` 범위 오류
-- `CV022`: EventBurst `BurstShotsPerEvent < 1`
+- `CV022`: EventBurst `BurstShotsPerEvent < 1` (현재 구현)
 - `CV023`: NWay `NWayCount < 2`
 - `CV024`: RadialBurst `BurstShotsPerEvent < 2`
 - `CV026`: LineEven 파라미터 오류
@@ -229,6 +236,7 @@ Hit:
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 9. 변경 이력
+- 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 계약을 추가(구현 예정)
 - 2026-02-26: NWay 실행 규약(360도 균등/세트 원자성/이월 시 SpawnSequence 보존)과 발행 단위 계약(밀도형 vs 사건형)을 합의안으로 추가
 - 2026-02-26: PointSet 런타임 샘플러를 활성화하고(`Max=4`, 로컬 오프셋), 검증 규칙을 `CV028`/갱신된 `CVW033` 기준으로 동기화
 - 2026-02-26: `WaveClipSO` 내부 segment 중첩을 전면 허용하도록 정책/검증 문구를 갱신(`CV011` 제거)

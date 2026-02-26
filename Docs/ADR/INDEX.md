@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md): 지속 사건형 스폰의 Emission 책임 확장(Poisson/EventBurst 공통)과 이벤트 기준점 고정 계약
 - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md): NWay 세트 원자성/시퀀스 보존과 밀도형·사건형 발행 단위 분리 계약
 - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md): PointSet 런타임 샘플러 활성화와 `Max=4` 로컬 오프셋 포인트 계약 고정
 - [ADR-20260225-02-wave-clip-slot-channel-contract.md](ADR-20260225-02-wave-clip-slot-channel-contract.md): WaveClipSO 기반 슬롯/채널 계약(하드 프리엠션, sustain 체인, Lane 우선순위, 결정론 RNG) 확정
