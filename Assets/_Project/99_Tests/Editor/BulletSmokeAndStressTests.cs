@@ -813,6 +813,227 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnRequestBuild_PoissonBurstShotsPerEvent_AccumulatesAsShotMultiples()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPoissonShotMultipleWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+
+                EnableV3Source(em, source, stableId: 19u, activeState: SourceStateId.Normal);
+                const int poissonClipId = 1901;
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                var poissonPattern = CreateClipPattern(
+                    directiveId: 7901,
+                    clipId: poissonClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 10f,
+                    ratePerSecPerArea: 0f);
+                poissonPattern.EmissionMode = SourceSpawnEmissionModeId.Poisson;
+                poissonPattern.MeanEventsPerSec = 3600f;
+                poissonPattern.BurstShotsPerEvent = 3;
+                clipPatterns.Add(poissonPattern);
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Normal,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = poissonClipId,
+                    Weight = 1f
+                });
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = poissonClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                int pending = SumPendingRequestCount(em.GetBuffer<SourceSpawnRequestBuffer>(source));
+                Assert.That(pending, Is.GreaterThan(0));
+                Assert.That(pending % 3, Is.EqualTo(0), "Poisson pending shots should follow BurstShotsPerEvent multiples.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_TimedUniformEvent_KeepsFixedWorldPositionAcrossFrames()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnTimedUniformAnchorWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 0f, 0f) });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(2f, 2f),
+                    ComputedArea = 4f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8001,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
+                    BaseAngleDeg = 0f,
+                    Count = 3,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(1));
+                float3 anchoredPosition = snapshots[0].Position;
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(10f, 0f, 0f) });
+
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                snapshots.Clear();
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(1), "Timed interval should defer second shot until interval is reached.");
+
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+                snapshots.Clear();
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(2));
+
+                int anchoredCount = 0;
+                const float tolerance = 0.0001f;
+                float tolSq = tolerance * tolerance;
+                for (int i = 0; i < snapshots.Count; i++)
+                {
+                    float3 delta = snapshots[i].Position - anchoredPosition;
+                    if (math.lengthsq(delta) <= tolSq)
+                        anchoredCount++;
+                }
+
+                Assert.That(anchoredCount, Is.EqualTo(2), "Timed Uniform event should keep a fixed world anchor across shots.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_TimedLineEven_KeepsInitialCenterWhenSourceMoves()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnTimedLineEvenAnchorWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8002,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    LineStart = new float2(-1f, 0f),
+                    LineEnd = new float2(1f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
+                    BaseAngleDeg = 0f,
+                    Count = 2,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(10f, 0f, 0f) });
+
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(2));
+                Assert.That(ContainsPosition(snapshots, new float3(-1f, 0f, 0f), 0.0001f), Is.True);
+                Assert.That(ContainsPosition(snapshots, new float3(1f, 0f, 0f), 0.0001f), Is.True);
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void Smoke_MultiDirectiveSameTypeKey_DoesNotRegressBacklogAgeOrDrop()
         {
             try
@@ -1533,6 +1754,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 BurstRepeatCount = 1,
                 BurstIntervalSec = 1f,
                 BurstShotsPerEvent = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                EventShotIntervalSec = 0f,
                 LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(lane),
                 MaxActiveDensityPerArea = 0f,
                 SpawnAccumulator = 0f,

@@ -15,25 +15,28 @@ MonoBehaviour:
   ClipId: 1201
   Phase: 0
   Lane: 1
-  DurationSec: 1
+  DurationSec: 8
   Segments:
-  - editorOnlyDescription: 
+  - editorOnlyDescription: "Phase \uC804\uD658 \uC644\uB8CC \uD6C4 Hazard: \uBC00\uB3C4
+      \uAE30\uBC18 \uC2ED\uC790\uD615 4\uBC29\uD5A5 \uC2A4\uD3F0 + \uC548\uC804\uAC70\uB9AC"
     StartSec: 0
-    EndSec: 1
+    EndSec: 8
     Entries:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 1
+        EmissionMode: 0
         SpawnMode: 0
-        RatePerSecPerArea: 0
-        MeanEventsPerSec: 4
+        RatePerSecPerArea: 0.03
+        MeanEventsPerSec: 0
         BurstRepeatCount: 1
         BurstIntervalSec: 1
         BurstShotsPerEvent: 1
+        EventShotSchedule: 0
+        EventShotIntervalSec: 0
         MaxActiveDensityPerArea: 0
       Sampling:
-        SamplingMode: 0
+        SamplingMode: 1
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
@@ -52,6 +55,11 @@ MonoBehaviour:
         BaseAngleDeg: 0
         NWayCount: 4
         SpiralStepDeg: 0
+  - editorOnlyDescription: "\uACE0\uC815 \uB77C\uC778 \uBC1C\uC0AC: (-10,-10)~(10,-10),
+      \uAC04\uACA9 4, 4\uCD08 \uAC04\uACA9 Hazard \uBC1C\uC0AC"
+    StartSec: 0
+    EndSec: 8
+    Entries:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
@@ -62,24 +70,26 @@ MonoBehaviour:
         BurstRepeatCount: -1
         BurstIntervalSec: 4
         BurstShotsPerEvent: 6
+        EventShotSchedule: 0
+        EventShotIntervalSec: 0
         MaxActiveDensityPerArea: 0
       Sampling:
         SamplingMode: 2
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
-        LineStart: {x: -8, y: -7.5}
-        LineEnd: {x: -8, y: 7.5}
-        SampleSpacing: 3
+        LineStart: {x: -10, y: -10}
+        LineEnd: {x: 10, y: -10}
+        SampleSpacing: 4
         PointCount: 0
         Point0: {x: 0, y: 0}
         Point1: {x: 0, y: 0}
         Point2: {x: 0, y: 0}
         Point3: {x: 0, y: 0}
-        SpawnSampleBudget: 12
-        PlayerNoSpawnRadius: 1.5
+        SpawnSampleBudget: 16
+        PlayerNoSpawnRadius: 0
       Direction:
         DirectionMode: 4
-        BaseAngleDeg: 0
+        BaseAngleDeg: 90
         NWayCount: 1
         SpiralStepDeg: 0

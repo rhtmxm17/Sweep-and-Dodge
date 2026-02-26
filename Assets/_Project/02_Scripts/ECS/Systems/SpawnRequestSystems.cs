@@ -40,6 +40,7 @@ namespace SweepNDodge.DotsBullets
 
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
+            float deltaTime = math.max(0f, SystemAPI.Time.DeltaTime);
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
 
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
@@ -121,7 +122,7 @@ namespace SweepNDodge.DotsBullets
                 if (!requestLookup.TryGetBuffer(sourceEntity, out var requests))
                     continue;
 
-                PruneExpiredAndCompactRequests(requests, frame, policy.MaxPendingAgeFrames, ref pending, ref expiredByAge);
+                PruneExpiredAndCompactRequests(requests, frame, policy.MaxPendingAgeFrames, deltaTime, ref pending, ref expiredByAge);
             }
 
             if (expiredByAge > 0)
@@ -170,7 +171,7 @@ namespace SweepNDodge.DotsBullets
                     var requestItem = requests[requestIndex];
                     spawned = TrySpawnFromRequest(
                         sourceEntity,
-                        in requestItem,
+                        ref requestItem,
                         ref sourceRuntimeLookup,
                         ref sourceAnchorLookup,
                         ref sourceAreaLookup,
@@ -201,15 +202,18 @@ namespace SweepNDodge.DotsBullets
 
                     if (spawned)
                     {
-                        var item = requests[requestIndex];
-                        item.Count = math.max(0, item.Count - consumedCount);
-                        item.SpawnSequence = item.SpawnSequence + sequenceAdvance;
-                        if (item.Count <= 0)
-                            item.OldestFrame = frame;
-                        requests[requestIndex] = item;
+                        requestItem.Count = math.max(0, requestItem.Count - consumedCount);
+                        requestItem.SpawnSequence = requestItem.SpawnSequence + sequenceAdvance;
+                        if (requestItem.Count <= 0)
+                            requestItem.OldestFrame = frame;
+                        requests[requestIndex] = requestItem;
                         pending = math.max(0, pending - consumedCount);
                         remainingBudget = math.max(0, remainingBudget - consumedCount);
                         budgetUsed = SpawnRequestCommonUtility.SafeAdd(budgetUsed, consumedCount);
+                    }
+                    else
+                    {
+                        requests[requestIndex] = requestItem;
                     }
 
                     chosenSourceIndex = sourceIndex;
@@ -289,6 +293,8 @@ namespace SweepNDodge.DotsBullets
                     var item = requests[i];
                     if (item.Count <= 0)
                         continue;
+                    if (!IsRequestReadyForConsume(in item))
+                        continue;
 
                     int requiredCount = ResolveRequestConsumeUnitCount(in item);
                     if (item.Count < requiredCount)
@@ -312,6 +318,7 @@ namespace SweepNDodge.DotsBullets
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
             uint frame,
             uint maxAge,
+            float deltaTime,
             ref int pending,
             ref int expiredByAge)
         {
@@ -335,6 +342,9 @@ namespace SweepNDodge.DotsBullets
                         continue;
                     }
                 }
+
+                if (item.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
+                    item.EventShotElapsedSec = math.max(0f, item.EventShotElapsedSec + deltaTime);
 
                 pending = SpawnRequestCommonUtility.SafeAdd(pending, item.Count);
                 requests[i] = item;
@@ -367,6 +377,8 @@ namespace SweepNDodge.DotsBullets
                 var item = requests[i];
                 if (item.Count <= 0)
                     continue;
+                if (!IsRequestReadyForConsume(in item))
+                    continue;
 
                 int requiredCount = ResolveRequestConsumeUnitCount(in item);
                 if (item.Count < requiredCount)
@@ -397,6 +409,18 @@ namespace SweepNDodge.DotsBullets
             return bestIndex;
         }
 
+        private static bool IsRequestReadyForConsume(in SourceSpawnRequestBuffer request)
+        {
+            if (request.EventShotSchedule != SourceSpawnEventShotScheduleId.Timed)
+                return true;
+
+            if (request.EventAnchorInitialized == 0)
+                return true;
+
+            float interval = math.max(0.001f, request.EventShotIntervalSec);
+            return request.EventShotElapsedSec >= interval;
+        }
+
         private static int ResolveRequestConsumeUnitCount(in SourceSpawnRequestBuffer request)
         {
             // NWay는 "샘플 1지점의 NWay 1세트"를 원자 단위로 소비한다.
@@ -408,7 +432,7 @@ namespace SweepNDodge.DotsBullets
 
         private static bool TrySpawnFromRequest(
             Entity sourceEntity,
-            in SourceSpawnRequestBuffer request,
+            ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
             ref ComponentLookup<BulletFieldAreaComponent> sourceAreaLookup,
@@ -444,7 +468,7 @@ namespace SweepNDodge.DotsBullets
             {
                 bool singleSpawned = TrySpawnOneFromRequest(
                     sourceEntity,
-                    in request,
+                    ref request,
                     ref sourceRuntimeLookup,
                     ref sourceAnchorLookup,
                     ref sourceAreaLookup,
@@ -475,6 +499,7 @@ namespace SweepNDodge.DotsBullets
 
                 consumedCount = 1;
                 sequenceAdvance = 1u;
+                ConsumeTimedEventSchedule(ref request, consumedCount);
                 return true;
             }
 
@@ -483,7 +508,7 @@ namespace SweepNDodge.DotsBullets
             {
                 bool singleSpawned = TrySpawnOneFromRequest(
                     sourceEntity,
-                    in request,
+                    ref request,
                     ref sourceRuntimeLookup,
                     ref sourceAnchorLookup,
                     ref sourceAreaLookup,
@@ -514,25 +539,20 @@ namespace SweepNDodge.DotsBullets
 
                 consumedCount = 1;
                 sequenceAdvance = 1u;
+                ConsumeTimedEventSchedule(ref request, consumedCount);
                 return true;
             }
 
             var random = CreateSourceRandom(sourceEntity, ref sourceRuntimeLookup);
-            float3 center = ResolveSpawnCenter(
-                sourceEntity,
-                in request,
-                ref sourceAnchorLookup,
-                hasPlayer,
-                playerPosition);
             var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
                 ? sourceAreaLookup[sourceEntity]
                 : default;
 
-            float3 pos = SampleSpawnPosition(
+            float3 pos = ResolveSpawnPositionForRequest(
                 ref random,
                 sourceEntity,
-                in request,
-                center,
+                ref request,
+                ref sourceAnchorLookup,
                 in fieldArea,
                 hasPlayer,
                 playerPosition,
@@ -576,12 +596,13 @@ namespace SweepNDodge.DotsBullets
 
             consumedCount = slotCount;
             sequenceAdvance = 1u;
+            ConsumeTimedEventSchedule(ref request, consumedCount);
             return true;
         }
 
         private static bool TrySpawnOneFromRequest(
             Entity sourceEntity,
-            in SourceSpawnRequestBuffer request,
+            ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
             ref ComponentLookup<BulletFieldAreaComponent> sourceAreaLookup,
@@ -613,21 +634,15 @@ namespace SweepNDodge.DotsBullets
                 return false;
 
             var random = CreateSourceRandom(sourceEntity, ref sourceRuntimeLookup);
-            float3 center = ResolveSpawnCenter(
-                sourceEntity,
-                in request,
-                ref sourceAnchorLookup,
-                hasPlayer,
-                playerPosition);
             var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
                 ? sourceAreaLookup[sourceEntity]
                 : default;
 
-            float3 pos = SampleSpawnPosition(
+            float3 pos = ResolveSpawnPositionForRequest(
                 ref random,
                 sourceEntity,
-                in request,
-                center,
+                ref request,
+                ref sourceAnchorLookup,
                 in fieldArea,
                 hasPlayer,
                 playerPosition,
@@ -783,6 +798,115 @@ namespace SweepNDodge.DotsBullets
                 default:
                     return sourceCenter;
             }
+        }
+
+        private static float3 ResolveSpawnPositionForRequest(
+            ref Unity.Mathematics.Random random,
+            Entity sourceEntity,
+            ref SourceSpawnRequestBuffer request,
+            ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
+            in BulletFieldAreaComponent fieldArea,
+            bool hasPlayer,
+            float3 playerPosition,
+            ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup,
+            out uint sampledSequence)
+        {
+            float3 center = ResolveSpawnCenter(
+                sourceEntity,
+                in request,
+                ref sourceAnchorLookup,
+                hasPlayer,
+                playerPosition);
+
+            if (request.EventShotSchedule != SourceSpawnEventShotScheduleId.Timed)
+            {
+                return SampleSpawnPosition(
+                    ref random,
+                    sourceEntity,
+                    in request,
+                    center,
+                    in fieldArea,
+                    hasPlayer,
+                    playerPosition,
+                    ref pollutionConfigLookup,
+                    ref pollutionGridLookup,
+                    ref pollutionCellsLookup,
+                    ref pollutionValidCellIndicesLookup,
+                    out sampledSequence);
+            }
+
+            if (request.EventAnchorInitialized == 0)
+            {
+                sampledSequence = request.SpawnSequence;
+                if (request.SamplingMode == SourceSpawnSamplingModeId.UniformField
+                    || request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
+                {
+                    float3 anchoredPosition = SampleSpawnPosition(
+                        ref random,
+                        sourceEntity,
+                        in request,
+                        center,
+                        in fieldArea,
+                        hasPlayer,
+                        playerPosition,
+                        ref pollutionConfigLookup,
+                        ref pollutionGridLookup,
+                        ref pollutionCellsLookup,
+                        ref pollutionValidCellIndicesLookup,
+                        out sampledSequence);
+                    request.EventAnchorUseFixedPosition = 1;
+                    request.EventAnchorPosition = anchoredPosition;
+                    request.EventAnchorCenter = center;
+                    request.EventAnchorInitialized = 1;
+                    request.EventShotElapsedSec = 0f;
+                    return anchoredPosition;
+                }
+
+                request.EventAnchorUseFixedPosition = 0;
+                request.EventAnchorCenter = center;
+                request.EventAnchorPosition = float3.zero;
+                request.EventAnchorInitialized = 1;
+                request.EventShotElapsedSec = 0f;
+            }
+
+            if (request.EventAnchorUseFixedPosition != 0)
+            {
+                sampledSequence = request.SpawnSequence;
+                return request.EventAnchorPosition;
+            }
+
+            return SampleSpawnPosition(
+                ref random,
+                sourceEntity,
+                in request,
+                request.EventAnchorCenter,
+                in fieldArea,
+                false,
+                playerPosition,
+                ref pollutionConfigLookup,
+                ref pollutionGridLookup,
+                ref pollutionCellsLookup,
+                ref pollutionValidCellIndicesLookup,
+                out sampledSequence);
+        }
+
+        private static void ConsumeTimedEventSchedule(ref SourceSpawnRequestBuffer request, int consumedCount)
+        {
+            if (request.EventShotSchedule != SourceSpawnEventShotScheduleId.Timed || consumedCount <= 0)
+                return;
+
+            // Timed 모드는 샷 소비를 이벤트 내부 간격으로 진행한다.
+            if (request.EventAnchorInitialized == 0)
+            {
+                request.EventShotElapsedSec = 0f;
+                return;
+            }
+
+            float interval = math.max(0.001f, request.EventShotIntervalSec);
+            request.EventShotElapsedSec = math.max(0f, request.EventShotElapsedSec - interval);
         }
 
         private static Unity.Mathematics.Random CreateSourceRandom(

@@ -27,6 +27,8 @@ namespace SweepNDodge.DotsBullets
             public int BurstRepeatCount;
             public float BurstIntervalSec;
             public int BurstShotsPerEvent;
+            public SourceSpawnEventShotScheduleId EventShotSchedule;
+            public float EventShotIntervalSec;
             public float MaxActiveDensityPerArea;
         }
 
@@ -119,10 +121,28 @@ namespace SweepNDodge.DotsBullets
 
             public int ResolveBurstShotsPerEvent()
             {
-                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst)
+                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst
+                    && Emission.EmissionMode != SourceSpawnEmissionModeId.Poisson)
                     return 1;
 
                 return Emission.BurstShotsPerEvent > 0 ? Emission.BurstShotsPerEvent : 1;
+            }
+
+            public SourceSpawnEventShotScheduleId ResolveEventShotSchedule()
+            {
+                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst
+                    && Emission.EmissionMode != SourceSpawnEmissionModeId.Poisson)
+                    return SourceSpawnEventShotScheduleId.Instant;
+
+                return Emission.EventShotSchedule;
+            }
+
+            public float ResolveEventShotIntervalSec()
+            {
+                if (ResolveEventShotSchedule() != SourceSpawnEventShotScheduleId.Timed)
+                    return 0f;
+
+                return Emission.EventShotIntervalSec > 0f ? Emission.EventShotIntervalSec : 0.1f;
             }
 
             public SourceSpawnSamplingModeId ResolveSamplingMode()

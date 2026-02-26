@@ -41,6 +41,12 @@ namespace SweepNDodge.DotsBullets
         EventBurst = 2,
     }
 
+    public enum SourceSpawnEventShotScheduleId : byte
+    {
+        Instant = 0,
+        Timed = 1,
+    }
+
     public enum SourceSpawnSamplingModeId : byte
     {
         UniformField = 0,
@@ -170,6 +176,8 @@ namespace SweepNDodge.DotsBullets
         public int BurstRepeatCount;
         public float BurstIntervalSec;
         public int BurstShotsPerEvent;
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        public float EventShotIntervalSec;
         public int LanePriority;
         public float MaxActiveDensityPerArea;
         public float SpawnAccumulator;

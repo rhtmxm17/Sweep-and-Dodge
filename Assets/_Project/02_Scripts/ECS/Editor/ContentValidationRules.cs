@@ -329,6 +329,29 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"Clip segment has negative MeanEventsPerSec at segmentIndex={s}, entryIndex={e}."));
                             }
 
+                            if ((emissionMode == SourceSpawnEmissionModeId.Poisson
+                                 || emissionMode == SourceSpawnEmissionModeId.EventBurst)
+                                && entry.Emission.BurstShotsPerEvent < 1)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV022",
+                                    clips[i].Location,
+                                    $"Clip segment has invalid BurstShotsPerEvent at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            if ((emissionMode == SourceSpawnEmissionModeId.Poisson
+                                 || emissionMode == SourceSpawnEmissionModeId.EventBurst)
+                                && entry.ResolveEventShotSchedule() == SourceSpawnEventShotScheduleId.Timed
+                                && entry.Emission.EventShotIntervalSec <= 0f)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV029",
+                                    clips[i].Location,
+                                    $"Clip segment uses Timed EventShotSchedule with non-positive EventShotIntervalSec at segmentIndex={s}, entryIndex={e}."));
+                            }
+
                             if (emissionMode == SourceSpawnEmissionModeId.EventBurst)
                             {
                                 if (entry.Emission.BurstIntervalSec <= 0f)
@@ -348,15 +371,6 @@ namespace SweepNDodge.DotsBullets.Editor
                                         "CV021",
                                         clips[i].Location,
                                         $"Clip segment has invalid BurstRepeatCount at segmentIndex={s}, entryIndex={e}. Use -1 or >= 1."));
-                                }
-
-                                if (entry.Emission.BurstShotsPerEvent < 1)
-                                {
-                                    issues.Add(new ContentValidationIssue(
-                                        ContentValidationSeverity.Error,
-                                        "CV022",
-                                        clips[i].Location,
-                                        $"Clip segment has invalid BurstShotsPerEvent at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
 

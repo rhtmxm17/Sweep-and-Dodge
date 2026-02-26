@@ -48,6 +48,7 @@ namespace SweepNDodge.DotsBullets
             float deltaTime,
             uint deterministicSalt)
         {
+            int shotsPerEvent = math.max(1, burstShotsPerEvent);
             int spawnCount;
             if (emissionMode == SourceSpawnEmissionModeId.Poisson)
             {
@@ -57,12 +58,12 @@ namespace SweepNDodge.DotsBullets
                     return 0;
 
                 var random = CreateDeterministicRandom(sourceEntity, directiveId, frame, deterministicSalt);
-                spawnCount = SamplePoisson(lambda, ref random);
+                int eventCount = SamplePoisson(lambda, ref random);
+                spawnCount = SafeAdd(0, eventCount * shotsPerEvent);
             }
             else if (emissionMode == SourceSpawnEmissionModeId.EventBurst)
             {
                 float interval = math.max(0.001f, burstIntervalSec);
-                int shotsPerEvent = math.max(1, burstShotsPerEvent);
                 spawnAccumulator += math.max(0f, deltaTime);
                 int eventCount = (int)math.floor(spawnAccumulator / interval);
                 if (eventCount <= 0)
@@ -109,6 +110,15 @@ namespace SweepNDodge.DotsBullets
             int pending = GetPendingCount(requests, bulletTypeKey);
             int maxActive = (int)math.floor(math.max(0f, maxActiveDensityPerArea) * area);
             int room = math.max(0, maxActive - active - pending);
+
+            if (emissionMode == SourceSpawnEmissionModeId.Poisson
+                || emissionMode == SourceSpawnEmissionModeId.EventBurst)
+            {
+                int requestedEventCount = spawnCount / shotsPerEvent;
+                int roomEventCount = room / shotsPerEvent;
+                return math.max(0, math.min(requestedEventCount, roomEventCount)) * shotsPerEvent;
+            }
+
             return math.min(spawnCount, room);
         }
 
@@ -137,6 +147,8 @@ namespace SweepNDodge.DotsBullets
             int nWayCount,
             float spiralStepDeg,
             int burstShotsPerEvent,
+            SourceSpawnEventShotScheduleId eventShotSchedule,
+            float eventShotIntervalSec,
             int spawnPriority)
         {
             return new SourceSpawnRequestBuffer
@@ -165,6 +177,13 @@ namespace SweepNDodge.DotsBullets
                 NWayCount = math.max(1, nWayCount),
                 SpiralStepDeg = spiralStepDeg,
                 BurstShotsPerEvent = math.max(1, burstShotsPerEvent),
+                EventShotSchedule = eventShotSchedule,
+                EventShotIntervalSec = math.max(0f, eventShotIntervalSec),
+                EventShotElapsedSec = 0f,
+                EventAnchorInitialized = 0,
+                EventAnchorUseFixedPosition = 0,
+                EventAnchorCenter = float3.zero,
+                EventAnchorPosition = float3.zero,
                 SpawnPriority = spawnPriority,
                 SpawnSequence = 0u,
                 Count = 0,
@@ -180,6 +199,28 @@ namespace SweepNDodge.DotsBullets
         {
             if (count <= 0)
                 return;
+
+            if (requestTemplate.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
+            {
+                int shotsPerEvent = math.max(1, requestTemplate.BurstShotsPerEvent);
+                int remaining = count;
+                while (remaining > 0)
+                {
+                    int eventShotCount = math.min(shotsPerEvent, remaining);
+                    var timedItem = requestTemplate;
+                    timedItem.Count = eventShotCount;
+                    timedItem.OldestFrame = frame;
+                    timedItem.EventShotElapsedSec = 0f;
+                    timedItem.EventAnchorInitialized = 0;
+                    timedItem.EventAnchorUseFixedPosition = 0;
+                    timedItem.EventAnchorCenter = float3.zero;
+                    timedItem.EventAnchorPosition = float3.zero;
+                    requests.Add(timedItem);
+                    remaining -= eventShotCount;
+                }
+
+                return;
+            }
 
             for (int i = 0; i < requests.Length; i++)
             {

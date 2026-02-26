@@ -17,7 +17,9 @@ MonoBehaviour:
   Lane: 0
   DurationSec: 1
   Segments:
-  - StartSec: 0
+  - editorOnlyDescription: "\uCD08\uAE30 \uC0C1\uD0DC Trash: \uBC00\uB3C4 \uAE30\uBC18
+      \uBB34\uC791\uC704 \uC2A4\uD3F0"
+    StartSec: 0
     EndSec: 1
     Entries:
     - Payload:
@@ -30,6 +32,8 @@ MonoBehaviour:
         BurstRepeatCount: 1
         BurstIntervalSec: 1
         BurstShotsPerEvent: 1
+        EventShotSchedule: 0
+        EventShotIntervalSec: 0
         MaxActiveDensityPerArea: 0
       Sampling:
         SamplingMode: 1
@@ -39,6 +43,11 @@ MonoBehaviour:
         LineStart: {x: 0, y: 0}
         LineEnd: {x: 0, y: 0}
         SampleSpacing: 1
+        PointCount: 0
+        Point0: {x: 0, y: 0}
+        Point1: {x: 0, y: 0}
+        Point2: {x: 0, y: 0}
+        Point3: {x: 0, y: 0}
         SpawnSampleBudget: 16
         PlayerNoSpawnRadius: 0
       Direction:

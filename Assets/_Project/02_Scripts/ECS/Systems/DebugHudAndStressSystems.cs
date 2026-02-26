@@ -37,6 +37,8 @@ namespace SweepNDodge.DotsBullets
             public int NWayCount;
             public float SpiralStepDeg;
             public int BurstShotsPerEvent;
+            public SourceSpawnEventShotScheduleId EventShotSchedule;
+            public float EventShotIntervalSec;
         }
 
         public void OnCreate(ref SystemState state)
@@ -148,6 +150,8 @@ namespace SweepNDodge.DotsBullets
                         NWayCount = resolvedV3.NWayCount,
                         SpiralStepDeg = resolvedV3.SpiralStepDeg,
                         BurstShotsPerEvent = resolvedV3.BurstShotsPerEvent,
+                        EventShotSchedule = resolvedV3.EventShotSchedule,
+                        EventShotIntervalSec = resolvedV3.EventShotIntervalSec,
                     });
                 }
             }
@@ -256,6 +260,8 @@ namespace SweepNDodge.DotsBullets
                 target.NWayCount,
                 target.SpiralStepDeg,
                 target.BurstShotsPerEvent,
+                target.EventShotSchedule,
+                target.EventShotIntervalSec,
                 target.LanePriority);
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
         }

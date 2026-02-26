@@ -30,6 +30,13 @@ namespace SweepNDodge.DotsBullets
         public int NWayCount;
         public float SpiralStepDeg;
         public int BurstShotsPerEvent;
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        public float EventShotIntervalSec;
+        public float EventShotElapsedSec;
+        public byte EventAnchorInitialized;
+        public byte EventAnchorUseFixedPosition;
+        public Unity.Mathematics.float3 EventAnchorCenter;
+        public Unity.Mathematics.float3 EventAnchorPosition;
         public int SpawnPriority;
         public uint SpawnSequence;
         public int Count;

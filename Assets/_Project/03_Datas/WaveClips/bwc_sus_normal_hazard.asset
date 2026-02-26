@@ -17,23 +17,25 @@ MonoBehaviour:
   Lane: 1
   DurationSec: 1
   Segments:
-  - editorOnlyDescription: 
+  - editorOnlyDescription: "초기 상태 Hazard: 밀도 기반 무작위 스폰 + 안전거리 규칙"
     StartSec: 0
     EndSec: 1
     Entries:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 1
+        EmissionMode: 0
         SpawnMode: 0
-        RatePerSecPerArea: 0
-        MeanEventsPerSec: 5
+        RatePerSecPerArea: 0.03
+        MeanEventsPerSec: 0
         BurstRepeatCount: 1
         BurstIntervalSec: 1
-        BurstShotsPerEvent: 4
+        BurstShotsPerEvent: 1
+        EventShotSchedule: 0
+        EventShotIntervalSec: 0
         MaxActiveDensityPerArea: 0
       Sampling:
-        SamplingMode: 0
+        SamplingMode: 1
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
@@ -48,7 +50,7 @@ MonoBehaviour:
         SpawnSampleBudget: 24
         PlayerNoSpawnRadius: 2.2
       Direction:
-        DirectionMode: 1
-        BaseAngleDeg: 45
-        NWayCount: 4
-        SpiralStepDeg: 15
+        DirectionMode: 0
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 0

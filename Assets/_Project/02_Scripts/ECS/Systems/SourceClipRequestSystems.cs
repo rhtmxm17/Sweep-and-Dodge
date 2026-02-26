@@ -649,6 +649,8 @@ namespace SweepNDodge.DotsBullets
                 pattern.NWayCount,
                 pattern.SpiralStepDeg,
                 pattern.BurstShotsPerEvent,
+                pattern.EventShotSchedule,
+                pattern.EventShotIntervalSec,
                 pattern.LanePriority);
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
         }

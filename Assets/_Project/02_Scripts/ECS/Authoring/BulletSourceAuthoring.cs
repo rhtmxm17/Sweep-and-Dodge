@@ -337,6 +337,8 @@ namespace SweepNDodge.DotsBullets
                             BurstRepeatCount = entry.ResolveBurstRepeatCount(),
                             BurstIntervalSec = Mathf.Max(0.001f, entry.ResolveBurstIntervalSec()),
                             BurstShotsPerEvent = Mathf.Max(1, entry.ResolveBurstShotsPerEvent()),
+                            EventShotSchedule = entry.ResolveEventShotSchedule(),
+                            EventShotIntervalSec = Mathf.Max(0f, entry.ResolveEventShotIntervalSec()),
                             LanePriority = lanePriority,
                             MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
                             SpawnAccumulator = 0f,
