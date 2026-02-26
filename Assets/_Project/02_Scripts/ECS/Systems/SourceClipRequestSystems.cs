@@ -177,7 +177,7 @@ namespace SweepNDodge.DotsBullets
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
             var metrics = metricsRW.ValueRO;
             metrics.PendingCount = pendingTotal;
-            metrics.LastFrameDroppedByCapacity = SpawnRequestCommonUtility.SafeAdd(metrics.LastFrameDroppedByCapacity, droppedByCapacity);
+            metrics.LastFrameDroppedByCapacity = math.max(0, droppedByCapacity);
             if (droppedByCapacity > 0)
                 metrics.DroppedByCapacity = SpawnRequestCommonUtility.SafeAdd(metrics.DroppedByCapacity, droppedByCapacity);
             metricsRW.ValueRW = metrics;

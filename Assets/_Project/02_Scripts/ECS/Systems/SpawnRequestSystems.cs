@@ -205,7 +205,14 @@ namespace SweepNDodge.DotsBullets
                         requestItem.Count = math.max(0, requestItem.Count - consumedCount);
                         requestItem.SpawnSequence = requestItem.SpawnSequence + sequenceAdvance;
                         if (requestItem.Count <= 0)
+                        {
                             requestItem.OldestFrame = frame;
+                        }
+                        else if (requestItem.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
+                        {
+                            // Timed 이벤트는 정상적인 간격 분할 소비가 진행 중이면 age 기준을 갱신한다.
+                            requestItem.OldestFrame = frame;
+                        }
                         requests[requestIndex] = requestItem;
                         pending = math.max(0, pending - consumedCount);
                         remainingBudget = math.max(0, remainingBudget - consumedCount);
