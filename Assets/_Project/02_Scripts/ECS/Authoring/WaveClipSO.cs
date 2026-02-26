@@ -187,6 +187,10 @@ namespace SweepNDodge.DotsBullets
         [System.Serializable]
         public struct ClipSegment
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            [SerializeField, TextArea(2, 5)]
+            private string editorOnlyDescription;
+            #endif
             public float StartSec;
             public float EndSec;
             public SpawnEntry[] Entries;
@@ -198,7 +202,7 @@ namespace SweepNDodge.DotsBullets
         public SourceSpawnLaneId Lane = SourceSpawnLaneId.Hazard;
         public float DurationSec = 1f;
 
-        [Header("Local Non-overlap Segments")]
+        [Header("Local Segments (Overlap Allowed)")]
         public ClipSegment[] Segments;
     }
 }

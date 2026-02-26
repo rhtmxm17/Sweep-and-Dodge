@@ -54,7 +54,7 @@ MonoBehaviour:
         RatePerSecPerArea: 0
         MeanEventsPerSec: 0
         BurstRepeatCount: -1
-        BurstIntervalSec: 1
+        BurstIntervalSec: 2
         BurstShotsPerEvent: 6
         MaxActiveDensityPerArea: 0
       Sampling:
@@ -80,7 +80,7 @@ MonoBehaviour:
         RatePerSecPerArea: 0
         MeanEventsPerSec: 0
         BurstRepeatCount: -1
-        BurstIntervalSec: 1
+        BurstIntervalSec: 2
         BurstShotsPerEvent: 6
         MaxActiveDensityPerArea: 0
       Sampling:

@@ -15,10 +15,10 @@ MonoBehaviour:
   ClipId: 1101
   Phase: 1
   Lane: 1
-  DurationSec: 0.6
+  DurationSec: 5
   Segments:
   - StartSec: 0
-    EndSec: 0.6
+    EndSec: 5
     Entries:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
@@ -46,6 +46,9 @@ MonoBehaviour:
         BaseAngleDeg: 0
         NWayCount: 1
         SpiralStepDeg: 24
+  - StartSec: 2
+    EndSec: 2.6
+    Entries:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:

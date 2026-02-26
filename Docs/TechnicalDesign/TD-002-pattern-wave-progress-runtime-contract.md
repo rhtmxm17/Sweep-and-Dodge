@@ -98,12 +98,12 @@ Hit:
         Source Remaining 증가 (기존 반환 규칙 유지)
 ```
 
-### 3.4 Wave 중첩 정책 (확정)
-- 대원칙: 두 개 이상의 Wave가 같은 시점에 동시에 지속되도록 구성하지 않는다.
+### 3.4 Clip Segment 중첩 정책 (확정)
+- 동일 `WaveClipSO` 내부에서 segment 시간축 중첩을 허용한다.
 - 운영 규칙:
-  - Wave 시간축은 서로 겹치지 않게 authoring한다.
-  - 경계 프레임은 `종료 후 시작` 순서를 기본으로 본다.
-  - 겹침이 발견되면 데이터 오류로 간주하고 수정 대상에 포함한다.
+  - 각 segment는 `StartSec < EndSec`만 만족하면 된다.
+  - 같은 시점에 활성인 segment가 여러 개면 모두 요청 생성 대상으로 평가한다.
+  - 경계 프레임은 `[StartSec, EndSec)` 반열림 구간으로 해석한다.
 
 ## 4. 업데이트 순서/소유권
 - Request 단계:
@@ -137,7 +137,6 @@ Hit:
 ### 6.1 콘텐츠 검증 규칙 초안
 - Error:
 - Wave segment의 `EndSec <= StartSec` (`CV010`).
-- Wave segment 간 시간 겹침 (`CV011`).
 - Source에 WaveClip 바인딩이 전혀 없음 (`CV006`).
 - Wave clip `Segments` 비어 있음 (`CV008`).
 - `ClipId` 중복 (`CV009`).
@@ -177,7 +176,6 @@ Hit:
 - `CVW032`: Spiral `SpiralStepDeg` 0 근접 (Warning)
 - `CVW033`: PointSet 사용 시 1차 fallback 경고 (Warning)
 - `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
-- `CV011`: Wave segment 중첩
 
 ### 6.2 테스트 루프
 - EditMode: 데이터 무결성/매핑 규칙 검증.
@@ -212,6 +210,7 @@ Hit:
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 9. 변경 이력
+- 2026-02-26: `WaveClipSO` 내부 segment 중첩을 전면 허용하도록 정책/검증 문구를 갱신(`CV011` 제거)
 - 2026-02-25: `WaveClipSO` 기반 v3 단일 경로 반영 상태(규약/검증/CV 코드)로 문서를 동기화
 - 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, 상태전환 즉시중단, Lane 우선순위, RNG 키)으로 초안을 갱신
 - 2026-02-25: v3 클립/슬롯/채널 확장 초안 및 런타임 스키마 초안을 추가

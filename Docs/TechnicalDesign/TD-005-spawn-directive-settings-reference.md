@@ -4,7 +4,7 @@
 - doc_id: `TD-005`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-25`
+- last_updated: `2026-02-26`
 - related_docs:
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
@@ -158,7 +158,7 @@
 | `Phase` | 클립 용도 | `Sustain` / `OnStateEnterOnce` |
 | `Lane` | 클립 Lane | 기본 운영 `Hazard` / `Trash`, `Special` 예약 + enum 확장 허용 |
 | `DurationSec` | 클립 총 길이 | `> 0` |
-| `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, non-overlap |
+| `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, overlap 허용 |
 | `Segments[].Entries[]` | SpawnDirective 인라인 프로필 | 현재 `Payload/Emission/Sampling/Direction` 규약 재사용 |
 
 ### 9.2 BulletSourceAuthoring 직참조 필드(현행)

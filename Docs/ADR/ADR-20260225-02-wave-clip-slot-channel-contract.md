@@ -39,15 +39,20 @@
 - 활성 클립 종료 시 동일 슬롯 후보군에서 "직전 클립 제외 완전 랜덤"으로 다음 클립을 선택한다.
 - 후보가 1개뿐이면 직전 재선택을 허용한다.
 
-7. 결정론 RNG
+7. Clip 내부 segment 중첩 정책
+- 동일 `WaveClipSO` 내부에서 segment 시간축 중첩을 허용한다.
+- 런타임은 해당 로컬 시간 구간에 걸친 segment들을 모두 평가해 요청을 생성한다.
+- 검증은 `EndSec > StartSec`만 강제하고, 중첩 자체는 오류로 취급하지 않는다.
+
+8. 결정론 RNG
 - 선택 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.
 - `Entity.Index` 단독 사용은 재현성 리스크로 지양한다.
 
-8. 채널 우선순위 규약
+9. 채널 우선순위 규약
 - 우선순위는 Lane 규칙이 최우선이며 `특수 > Hazard > Trash` 순으로 고정한다.
 - `SpawnPriority` 중심 정책은 v3 클립 경로에서 사용하지 않는다.
 
-9. 파이프라인/소유권 유지
+10. 파이프라인/소유권 유지
 - Request 단계: 활성 클립 평가 + 요청 집계 생성.
 - ExecutionBegin 단계: Owner가 예산/carry/공정성 규약으로 소비.
 - 프레임 파이프라인(`ExecutionBegin -> Simulation -> Request -> ExecutionEnd`)은 유지한다.
@@ -107,7 +112,6 @@
   - `CV008`: `WaveClipSO.Segments` 비어 있음
   - `CV009`: `ClipId` 중복
   - `CV010`: segment 구간 오류(`EndSec <= StartSec`)
-  - `CV011`: segment 중첩
   - `CV012`: segment 엔트리 비어 있음
   - `CV013`: 엔트리 `Bullet == null`
   - `CV014`: 미등록 `DefinitionId` 참조

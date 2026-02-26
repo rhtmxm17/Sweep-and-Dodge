@@ -253,7 +253,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     continue;
                 }
 
-                var validSegments = new List<(int Index, float Start, float End)>(clip.Segments.Length);
                 for (int s = 0; s < clip.Segments.Length; s++)
                 {
                     var seg = clip.Segments[s];
@@ -440,23 +439,6 @@ namespace SweepNDodge.DotsBullets.Editor
                             }
                         }
                     }
-
-                    validSegments.Add((s, seg.StartSec, seg.EndSec));
-                }
-
-                validSegments.Sort((a, b) => a.Start.CompareTo(b.Start));
-                for (int s = 1; s < validSegments.Count; s++)
-                {
-                    var prev = validSegments[s - 1];
-                    var curr = validSegments[s];
-                    if (curr.Start >= prev.End)
-                        continue;
-
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "CV011",
-                        clips[i].Location,
-                        $"Clip segments overlap: prev(segmentIndex={prev.Index}, [{prev.Start}, {prev.End})) and curr(segmentIndex={curr.Index}, [{curr.Start}, {curr.End}))."));
                 }
             }
         }

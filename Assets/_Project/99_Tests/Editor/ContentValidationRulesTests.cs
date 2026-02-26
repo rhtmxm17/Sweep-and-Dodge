@@ -230,7 +230,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void WaveClip_OverlappingSegments_IsError()
+        public void WaveClip_OverlappingSegments_IsAllowed()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             var clip = ScriptableObject.CreateInstance<WaveClipSO>();
@@ -274,7 +274,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV011").ToArray();
-                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.Length, Is.EqualTo(0));
             }
             finally
             {
