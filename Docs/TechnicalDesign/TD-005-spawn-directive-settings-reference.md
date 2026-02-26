@@ -10,6 +10,8 @@
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
   - [ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md](../ADR/ADR-20260225-01-spawn-directive-v2-contract-and-scenario-readiness.md)
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
+  - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
+  - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
 
 > 목적: `WaveClipSO.Segments[].Entries[]`(SpawnEntry)의 각 설정이 실제 런타임에서 무엇을 의미하는지 빠르게 확인하는 운영 레퍼런스.
 
@@ -68,6 +70,8 @@
 | `Sampling.LineStart` | 선분 시작점(로컬 오프셋) | `LineEven`에서 사용 |
 | `Sampling.LineEnd` | 선분 끝점(로컬 오프셋) | `LineEven`에서 사용 |
 | `Sampling.SampleSpacing` | 등간격 샘플 간격 | `LineEven`에서 `> 0` |
+| `Sampling.PointCount` | PointSet 포인트 개수 | `PointSet`에서 `1..4` |
+| `Sampling.Point0..Point3` | PointSet 로컬 오프셋 포인트 | `Center + Point[i]` |
 | `Sampling.SpawnSampleBudget` | 샘플 재시도 예산 | 플레이어 안전거리 필터 재시도 횟수 |
 | `Sampling.PlayerNoSpawnRadius` | 플레이어 주변 금지 반경 | `>= 0` |
 
@@ -77,7 +81,7 @@
 | `UniformField` | 0 | 필드 내부 균등 무작위 샘플링 | 기본 무작위 분포 |
 | `PollutionTopK` | 1 | Pollution 가중치 상위 후보 중심 샘플링 | 밀도 기반 분포 강화 |
 | `LineEven` | 2 | `LineStart~LineEnd` 선분에서 등간격 샘플링 | 라인/벽 발사 표현에 사용 |
-| `PointSet` | 4 | 사전 정의 포인트셋 기반 샘플링 의도 | 1차에서는 Uniform fallback |
+| `PointSet` | 4 | 사전 정의 포인트셋 기반 샘플링 | 최대 4포인트, round-robin |
 
 ### 4.2 CenterMode
 | 값 | enum 값(byte) | 의미 | 비고 |
@@ -90,19 +94,26 @@
 - 별도 `WallEven`은 사용하지 않는다.
 - 벽 근처에 `LineStart/LineEnd`를 배치하고 `Direction`으로 진행 방향을 지정한다.
 
+### 4.4 PointSet 규약
+- 좌표계는 월드 절대값이 아니라 `CenterMode`로 계산된 중심 기준의 로컬 오프셋이다.
+- 샘플 선택은 `SpawnSequence % PointCount` round-robin을 사용한다.
+- `PointSet + Spiral/NWay/RadialBurst` 조합에서는 방향 시퀀스를 포인트별 로컬 시퀀스로 계산한다.
+  - `localSequence = SpawnSequence / PointCount`
+- `PlayerNoSpawnRadius`로 거부될 경우 다음 포인트로 순환 재시도하며, `SpawnSampleBudget` 한도 내에서만 수행한다.
+
 ## 5. Direction 설정
 | 필드 | 의미 | 운영 규칙 |
 | --- | --- | --- |
 | `Direction.DirectionMode` | 발사 방향 모드 | `Random` / `Fixed` / `NWay` / `Spiral` / `RadialBurst` |
 | `Direction.BaseAngleDeg` | 기준 각도(도) | 모든 모드의 기준값 |
-| `Direction.NWayCount` | 슬롯 수 | `NWay`에서 권장 `>=2` |
+| `Direction.NWayCount` | 슬롯 수 | `NWay`에서 `>=2` (필수) |
 | `Direction.SpiralStepDeg` | 샷당 회전 증분(도) | `Spiral`에서 권장 `!= 0` |
 
 ### 5.1 DirectionMode 값 의미
 | 값 | enum 값(byte) | 의미 | 비고 |
 | --- | ---: | --- | --- |
 | `Random` | 0 | 무작위 방향 | 균등 각도 분포 |
-| `NWay` | 1 | 슬롯 수 기반 다방향 분배 | `NWayCount` 사용 |
+| `NWay` | 1 | 슬롯 수 기반 다방향 분배 | `NWayCount` 사용, `BaseAngleDeg + (360/NWayCount)*slot` |
 | `Spiral` | 2 | 샷 시퀀스마다 각도 누적 회전 | `SpiralStepDeg` 사용 |
 | `RadialBurst` | 3 | 버스트 의도 중심 방사 발사 | 런타임 슬롯 로직은 NWay와 공통 |
 | `Fixed` | 4 | 기준각 고정 발사 | `BaseAngleDeg` 사용 |
@@ -112,6 +123,15 @@
 - 의도 차이:
   - `NWay`: 고정 슬롯 기반 분산 발사
   - `RadialBurst`: 버스트 이벤트와 결합된 방사 의도 표기
+
+### 5.3 NWay 실행 규약 (합의)
+- 각도 규약은 360도 균등 분할을 사용한다.
+- `NWayCount`는 필수로 `>=2`를 만족해야 한다(콘텐츠 검증 Error 대상).
+- 원자성 단위는 "샘플 1지점의 NWay 1세트"다.
+  - 예: `NWayCount=4`이면 4발을 하나의 세트로 소비한다.
+- 예산/풀 부족으로 세트 전체를 소비하지 못하면, 해당 세트는 다음 프레임으로 이월한다.
+- 세트 이월 시 `SpawnSequence`는 증가시키지 않는다.
+  - 다음 프레임에서 동일 좌표/동일 슬롯 위상으로 재시도한다.
 
 ## 6. 우선순위/예산 해석
 - 예산(`BudgetPerFrame`)은 요청 전체에서 공유된다.

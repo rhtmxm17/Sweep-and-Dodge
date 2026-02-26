@@ -431,11 +431,23 @@ namespace SweepNDodge.DotsBullets.Editor
 
                             if (samplingMode == SourceSpawnSamplingModeId.PointSet)
                             {
-                                issues.Add(new ContentValidationIssue(
-                                    ContentValidationSeverity.Warning,
-                                    "CVW033",
-                                    clips[i].Location,
-                                    $"Clip segment uses PointSet at segmentIndex={s}, entryIndex={e}. PointSet runtime sampler is not enabled yet and falls back to UniformField."));
+                                if (entry.Sampling.PointCount <= 0)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Error,
+                                        "CV028",
+                                        clips[i].Location,
+                                        $"Clip segment uses PointSet with PointCount <= 0 at segmentIndex={s}, entryIndex={e}."));
+                                }
+
+                                if (entry.Sampling.PointCount > WaveClipSO.SpawnSamplingProfile.PointSetMaxCount)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Warning,
+                                        "CVW033",
+                                        clips[i].Location,
+                                        $"Clip segment PointSet PointCount exceeds max({WaveClipSO.SpawnSamplingProfile.PointSetMaxCount}) and will be clamped at segmentIndex={s}, entryIndex={e}."));
+                                }
                             }
                         }
                     }

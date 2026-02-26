@@ -451,6 +451,110 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void WaveClip_PointSetWithNonPositivePointCount_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9101);
+                def.Prefab = prefab;
+                var entry = CreateDefaultEntry(def);
+                entry.Sampling.SamplingMode = SourceSpawnSamplingModeId.PointSet;
+                entry.Sampling.PointCount = 0;
+
+                clip.ClipId = 191;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        EndSec = 1f,
+                        Entries = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV028").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_PointSetCountExceedsMax_IsWarning()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9102);
+                def.Prefab = prefab;
+                var entry = CreateDefaultEntry(def);
+                entry.Sampling.SamplingMode = SourceSpawnSamplingModeId.PointSet;
+                entry.Sampling.PointCount = WaveClipSO.SpawnSamplingProfile.PointSetMaxCount + 1;
+
+                clip.ClipId = 192;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        EndSec = 1f,
+                        Entries = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var warnings = issues.Where(i => i.Code == "CVW033").ToArray();
+                Assert.That(warnings.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(warnings.All(i => i.Severity == ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
         private static WaveClipSO.SpawnEntry CreateDefaultEntry(BulletDefinitionSO def)
         {
             return new WaveClipSO.SpawnEntry
@@ -479,6 +583,11 @@ namespace SweepNDodge.DotsBullets.Tests
                     LineStart = Vector2.zero,
                     LineEnd = Vector2.zero,
                     SampleSpacing = 1f,
+                    PointCount = 0,
+                    Point0 = Vector2.zero,
+                    Point1 = Vector2.zero,
+                    Point2 = Vector2.zero,
+                    Point3 = Vector2.zero,
                     SpawnSampleBudget = 16,
                     PlayerNoSpawnRadius = 0f,
                 },

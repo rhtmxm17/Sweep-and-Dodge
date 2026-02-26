@@ -155,6 +155,11 @@ namespace SweepNDodge.DotsBullets
         public float2 LineStart;
         public float2 LineEnd;
         public float SampleSpacing;
+        public int PointSetCount;
+        public float2 Point0;
+        public float2 Point1;
+        public float2 Point2;
+        public float2 Point3;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;

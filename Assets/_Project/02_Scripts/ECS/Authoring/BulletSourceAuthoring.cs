@@ -297,6 +297,11 @@ namespace SweepNDodge.DotsBullets
                         var spawnOffset = entry.ResolveSpawnOffset();
                         var lineStart = entry.ResolveLineStart();
                         var lineEnd = entry.ResolveLineEnd();
+                        int pointSetCount = entry.ResolvePointSetCount();
+                        var point0 = entry.ResolvePointSetPoint(0);
+                        var point1 = entry.ResolvePointSetPoint(1);
+                        var point2 = entry.ResolvePointSetPoint(2);
+                        var point3 = entry.ResolvePointSetPoint(3);
                         clipPatternBuffer.Add(new SourceClipPatternBuffer
                         {
                             DirectiveId = nextDirectiveId++,
@@ -317,6 +322,11 @@ namespace SweepNDodge.DotsBullets
                             LineStart = new float2(lineStart.x, lineStart.y),
                             LineEnd = new float2(lineEnd.x, lineEnd.y),
                             SampleSpacing = Mathf.Max(0.001f, entry.ResolveSampleSpacing()),
+                            PointSetCount = Mathf.Clamp(pointSetCount, 0, WaveClipSO.SpawnSamplingProfile.PointSetMaxCount),
+                            Point0 = new float2(point0.x, point0.y),
+                            Point1 = new float2(point1.x, point1.y),
+                            Point2 = new float2(point2.x, point2.y),
+                            Point3 = new float2(point3.x, point3.y),
                             SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
                             PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
                             BaseAngleDeg = entry.ResolveBaseAngleDeg(),

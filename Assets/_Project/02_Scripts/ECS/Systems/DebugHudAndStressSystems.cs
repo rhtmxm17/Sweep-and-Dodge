@@ -26,6 +26,11 @@ namespace SweepNDodge.DotsBullets
             public float2 LineStart;
             public float2 LineEnd;
             public float SampleSpacing;
+            public int PointSetCount;
+            public float2 Point0;
+            public float2 Point1;
+            public float2 Point2;
+            public float2 Point3;
             public int SpawnSampleBudget;
             public float PlayerNoSpawnRadius;
             public float BaseAngleDeg;
@@ -132,6 +137,11 @@ namespace SweepNDodge.DotsBullets
                         LineStart = resolvedV3.LineStart,
                         LineEnd = resolvedV3.LineEnd,
                         SampleSpacing = resolvedV3.SampleSpacing,
+                        PointSetCount = resolvedV3.PointSetCount,
+                        Point0 = resolvedV3.Point0,
+                        Point1 = resolvedV3.Point1,
+                        Point2 = resolvedV3.Point2,
+                        Point3 = resolvedV3.Point3,
                         SpawnSampleBudget = resolvedV3.SpawnSampleBudget,
                         PlayerNoSpawnRadius = resolvedV3.PlayerNoSpawnRadius,
                         BaseAngleDeg = resolvedV3.BaseAngleDeg,
@@ -235,6 +245,11 @@ namespace SweepNDodge.DotsBullets
                 target.LineStart,
                 target.LineEnd,
                 target.SampleSpacing,
+                target.PointSetCount,
+                target.Point0,
+                target.Point1,
+                target.Point2,
+                target.Point3,
                 target.SpawnSampleBudget,
                 target.PlayerNoSpawnRadius,
                 target.BaseAngleDeg,

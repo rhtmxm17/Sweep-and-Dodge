@@ -387,9 +387,10 @@ namespace SweepNDodge.DotsBullets
                 ref pollutionConfigLookup,
                 ref pollutionGridLookup,
                 ref pollutionCellsLookup,
-                ref pollutionValidCellIndicesLookup);
+                ref pollutionValidCellIndicesLookup,
+                out uint sampledSequence);
 
-            float2 dir = ResolveSpawnDirection(ref random, in request);
+            float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence);
             var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
             float bulletSpeed = speedLookup.HasComponent(bulletEntity)
                 ? math.max(0f, speedLookup[bulletEntity].Value)
@@ -510,9 +511,21 @@ namespace SweepNDodge.DotsBullets
 
         private static float2 ResolveSpawnDirection(
             ref Unity.Mathematics.Random random,
-            in SourceSpawnRequestBuffer request)
+            in SourceSpawnRequestBuffer request,
+            uint spawnSequence)
         {
             float baseRad = math.radians(request.BaseAngleDeg);
+            uint directionSequence = spawnSequence;
+            if (request.SamplingMode == SourceSpawnSamplingModeId.PointSet)
+            {
+                int pointCount = ResolvePointSetCount(in request);
+                if (pointCount > 0)
+                {
+                    // PointSet에서는 포인트별 로컬 시퀀스로 방향(Spiral/NWay)을 계산해 동시 패턴 위상을 맞춘다.
+                    directionSequence = spawnSequence / (uint)pointCount;
+                }
+            }
+
             float angle;
             switch (request.DirectionMode)
             {
@@ -522,14 +535,14 @@ namespace SweepNDodge.DotsBullets
                 case SourceSpawnDirectionModeId.Spiral:
                 {
                     float stepRad = math.radians(request.SpiralStepDeg);
-                    angle = baseRad + stepRad * request.SpawnSequence;
+                    angle = baseRad + stepRad * directionSequence;
                     break;
                 }
                 case SourceSpawnDirectionModeId.NWay:
                 case SourceSpawnDirectionModeId.RadialBurst:
                 {
                     int slotCount = ResolveDirectionalSlotCount(in request);
-                    int slot = slotCount <= 1 ? 0 : (int)(request.SpawnSequence % (uint)slotCount);
+                    int slot = slotCount <= 1 ? 0 : (int)(directionSequence % (uint)slotCount);
                     angle = baseRad + (slotCount <= 1 ? 0f : (math.PI * 2f * slot) / slotCount);
                     break;
                 }
@@ -566,16 +579,19 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
-            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup,
+            out uint sampledSequence)
         {
             int sampleBudget = math.max(1, request.SpawnSampleBudget);
             float noSpawnRadius = math.max(0f, request.PlayerNoSpawnRadius);
             float noSpawnRadiusSq = noSpawnRadius * noSpawnRadius;
             float3 lastSample = center;
+            sampledSequence = request.SpawnSequence;
 
             for (int i = 0; i < sampleBudget; i++)
             {
                 uint sequence = request.SpawnSequence + (uint)i;
+                sampledSequence = sequence;
                 if (request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
                 {
                     if (TrySampleSpawnPositionFromPollution(
@@ -601,8 +617,10 @@ namespace SweepNDodge.DotsBullets
                 }
                 else if (request.SamplingMode == SourceSpawnSamplingModeId.PointSet)
                 {
-                    // PointSet 1차는 계약만 반영한다. 샘플러는 추후 전용 버퍼와 함께 활성화한다.
-                    lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                    if (TrySampleSpawnPositionPointSet(center, in request, sequence, out var pointSetPos))
+                        lastSample = pointSetPos;
+                    else
+                        lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
                 }
                 else
                 {
@@ -618,6 +636,45 @@ namespace SweepNDodge.DotsBullets
             }
 
             return lastSample;
+        }
+
+        private static bool TrySampleSpawnPositionPointSet(
+            float3 center,
+            in SourceSpawnRequestBuffer request,
+            uint sequence,
+            out float3 position)
+        {
+            position = center;
+            int pointCount = ResolvePointSetCount(in request);
+            if (pointCount <= 0)
+                return false;
+
+            int pointIndex = (int)(sequence % (uint)pointCount);
+            float2 local = ResolvePointSetPoint(in request, pointIndex);
+            position = new float3(center.x + local.x, center.y, center.z + local.y);
+            return true;
+        }
+
+        private static int ResolvePointSetCount(in SourceSpawnRequestBuffer request)
+        {
+            return math.clamp(request.PointSetCount, 0, 4);
+        }
+
+        private static float2 ResolvePointSetPoint(in SourceSpawnRequestBuffer request, int index)
+        {
+            switch (index)
+            {
+                case 0:
+                    return request.Point0;
+                case 1:
+                    return request.Point1;
+                case 2:
+                    return request.Point2;
+                case 3:
+                    return request.Point3;
+                default:
+                    return float2.zero;
+            }
         }
 
         private static bool TrySampleSpawnPositionFromPollution(

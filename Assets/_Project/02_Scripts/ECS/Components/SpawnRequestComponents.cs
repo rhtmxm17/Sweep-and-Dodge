@@ -19,6 +19,11 @@ namespace SweepNDodge.DotsBullets
         public Unity.Mathematics.float2 LineStart;
         public Unity.Mathematics.float2 LineEnd;
         public float SampleSpacing;
+        public int PointSetCount;
+        public Unity.Mathematics.float2 Point0;
+        public Unity.Mathematics.float2 Point1;
+        public Unity.Mathematics.float2 Point2;
+        public Unity.Mathematics.float2 Point3;
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;

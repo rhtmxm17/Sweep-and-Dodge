@@ -535,9 +535,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.BulletFieldConfigAuthoring
   PoolSize: 120000
-  MaxActiveTarget: 100000
   CellSize: 1.6
-  BulletLifetime: 4
 --- !u!4 &1246925445
 Transform:
   m_ObjectHideFlags: 0

@@ -33,6 +33,8 @@ namespace SweepNDodge.DotsBullets
         [System.Serializable]
         public struct SpawnSamplingProfile
         {
+            public const int PointSetMaxCount = 4;
+
             public SourceSpawnSamplingModeId SamplingMode;
             public SourceSpawnCenterModeId CenterMode;
             public Vector2 FixedPoint;
@@ -40,6 +42,11 @@ namespace SweepNDodge.DotsBullets
             public Vector2 LineStart;
             public Vector2 LineEnd;
             public float SampleSpacing;
+            public int PointCount;
+            public Vector2 Point0;
+            public Vector2 Point1;
+            public Vector2 Point2;
+            public Vector2 Point3;
             public int SpawnSampleBudget;
             public float PlayerNoSpawnRadius;
         }
@@ -151,6 +158,28 @@ namespace SweepNDodge.DotsBullets
             public float ResolveSampleSpacing()
             {
                 return Sampling.SampleSpacing > 0f ? Sampling.SampleSpacing : 1f;
+            }
+
+            public int ResolvePointSetCount()
+            {
+                return Mathf.Clamp(Sampling.PointCount, 0, SpawnSamplingProfile.PointSetMaxCount);
+            }
+
+            public Vector2 ResolvePointSetPoint(int index)
+            {
+                switch (index)
+                {
+                    case 0:
+                        return Sampling.Point0;
+                    case 1:
+                        return Sampling.Point1;
+                    case 2:
+                        return Sampling.Point2;
+                    case 3:
+                        return Sampling.Point3;
+                    default:
+                        return Vector2.zero;
+                }
             }
 
             public SourceSpawnDirectionModeId ResolveDirectionMode()

@@ -4,12 +4,14 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-25`
+- last_updated: `2026-02-26`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
+  - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
+  - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
 
 > GD-007의 기획 의도를 ECS 런타임 데이터 계약으로 변환한 기술 설계 문서.
 > SpawnDirective 분해 모델(Sampling/Emission/Payload) 상세는 `TD-003`을 참조한다.
@@ -53,9 +55,11 @@
 | SpawnOffset | float2 | 플레이어 상대 오프셋 | CenterMode=PlayerRelative |
 | LineStart / LineEnd | float2 | LineEven 기준 선분 | SamplingMode=LineEven |
 | SampleSpacing | float | LineEven 등간격 간격 | > 0 |
+| PointSetCount | int | PointSet 포인트 개수 | PointSet에서 `1..4` |
+| Point0..Point3 | float2 | PointSet 로컬 오프셋 포인트 | PointSet에서 사용 |
 | DirectionMode | enum | 방향 모드 | Random / Fixed / NWay / Spiral / RadialBurst |
 | BaseAngleDeg | float | 기준 각도 | 자유 범위 |
-| NWayCount | int | NWay 슬롯 수 | NWay에서 >= 2 |
+| NWayCount | int | NWay 슬롯 수 | NWay에서 `>= 2` (필수) |
 | SpiralStepDeg | float | Spiral 각도 증분 | Spiral에서 권장 != 0 |
 | SpawnSampleBudget | int | 샘플링 재시도 예산 | >= 1 (기본 16) |
 | PlayerNoSpawnRadius | float | 플레이어 주변 제외 반경 | >= 0 |
@@ -105,6 +109,15 @@ Hit:
   - 같은 시점에 활성인 segment가 여러 개면 모두 요청 생성 대상으로 평가한다.
   - 경계 프레임은 `[StartSec, EndSec)` 반열림 구간으로 해석한다.
 
+### 3.5 발행 단위 계약 (합의)
+- 밀도형 발행(`RateField` 중심):
+  - 요청은 엔티티 수 예약으로 해석한다.
+  - 대량 스폰에서 요청 버퍼 폭주를 방지하기 위해 집계된 수량(`Count`)을 우선 사용한다.
+- 사건형 발행(`EventBurst + Direction` 중심):
+  - 요청은 사건 단위 예약으로 해석한다.
+  - ExecutionBegin에서 사건을 샘플/방향 슬롯으로 확장해 실제 엔티티를 소비한다.
+  - `NWay`는 샘플 지점별 `NWay 1세트`를 원자 단위로 소비한다.
+
 ## 4. 업데이트 순서/소유권
 - Request 단계:
 - Directive 데이터를 사용해 `SourceSpawnRequestBuffer`를 누적 생성한다.
@@ -115,6 +128,10 @@ Hit:
 - Sampling(중심 계산/샘플링/NoSpawn 반경 검증)과 Direction 계산은 ExecutionBegin에서 최종 평가한다.
 - `BudgetPerFrame`은 요청 전체(탄 종류 공용)에서 공유한다.
   - 우선순위: Lane 규칙(`특수 > Hazard > Trash`)을 최우선으로 적용한다.
+- `NWay`/`RadialBurst` 방향 슬롯은 360도 균등 분할을 기본 규약으로 사용한다.
+- `NWay`는 샘플 지점별 1세트를 원자적으로 소비한다.
+  - 세트를 프레임 내에 완결할 수 없으면 세트 전체를 이월한다.
+  - 세트 이월 시 `SpawnSequence`는 증가시키지 않고 동일 좌표/위상으로 다음 프레임에 재시도한다.
 - ExecutionEnd 단계:
 - 디스폰 owner가 반납과 렌더 토글을 처리한다.
 
@@ -148,15 +165,16 @@ Hit:
 - EventBurst에서 `BurstIntervalSec <= 0` (`CV020`).
 - EventBurst에서 `BurstRepeatCount`가 `-1` 또는 `>=1`이 아님 (`CV021`).
 - EventBurst에서 `BurstShotsPerEvent < 1` (`CV022`).
-- NWay에서 `NWayCount < 2` (`CV023`).
+- NWay에서 `NWayCount < 2` (`CV023`, 필수 제약 위반).
 - RadialBurst에서 `BurstShotsPerEvent < 2` (`CV024`).
 - LineEven에서 선분 길이 0 또는 `SampleSpacing <= 0` (`CV026`).
+- PointSet에서 `PointCount <= 0` (`CV028`).
 - Warning:
 - `SpawnSampleBudget`가 권장 범위 초과.
 - `MaxActiveDensityPerArea`가 Stage 목표 대비 과도함.
 - `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
 - Spiral에서 `SpiralStepDeg`가 0에 근접 (`CVW032`).
-- PointSet 사용(1차에서는 Uniform fallback) (`CVW033`).
+- PointSet `PointCount > 4` 입력(clamp 경고) (`CVW033`).
 
 검증 코드 매핑(현재 구현):
 - `CV012`: Wave segment의 `Entries` 비어 있음
@@ -173,8 +191,9 @@ Hit:
 - `CV023`: NWay `NWayCount < 2`
 - `CV024`: RadialBurst `BurstShotsPerEvent < 2`
 - `CV026`: LineEven 파라미터 오류
+- `CV028`: PointSet `PointCount <= 0`
 - `CVW032`: Spiral `SpiralStepDeg` 0 근접 (Warning)
-- `CVW033`: PointSet 사용 시 1차 fallback 경고 (Warning)
+- `CVW033`: PointSet `PointCount` max 초과 clamp 경고 (Warning)
 - `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
 
 ### 6.2 테스트 루프
@@ -210,6 +229,8 @@ Hit:
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
 ## 9. 변경 이력
+- 2026-02-26: NWay 실행 규약(360도 균등/세트 원자성/이월 시 SpawnSequence 보존)과 발행 단위 계약(밀도형 vs 사건형)을 합의안으로 추가
+- 2026-02-26: PointSet 런타임 샘플러를 활성화하고(`Max=4`, 로컬 오프셋), 검증 규칙을 `CV028`/갱신된 `CVW033` 기준으로 동기화
 - 2026-02-26: `WaveClipSO` 내부 segment 중첩을 전면 허용하도록 정책/검증 문구를 갱신(`CV011` 제거)
 - 2026-02-25: `WaveClipSO` 기반 v3 단일 경로 반영 상태(규약/검증/CV 코드)로 문서를 동기화
 - 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, 상태전환 즉시중단, Lane 우선순위, RNG 키)으로 초안을 갱신

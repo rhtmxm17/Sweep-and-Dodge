@@ -17,7 +17,8 @@ MonoBehaviour:
   Lane: 1
   DurationSec: 1
   Segments:
-  - StartSec: 0
+  - editorOnlyDescription: 
+    StartSec: 0
     EndSec: 1
     Entries:
     - Payload:
@@ -39,10 +40,15 @@ MonoBehaviour:
         LineStart: {x: 0, y: 0}
         LineEnd: {x: 0, y: 0}
         SampleSpacing: 1
+        PointCount: 0
+        Point0: {x: 0, y: 0}
+        Point1: {x: 0, y: 0}
+        Point2: {x: 0, y: 0}
+        Point3: {x: 0, y: 0}
         SpawnSampleBudget: 24
         PlayerNoSpawnRadius: 2.2
       Direction:
-        DirectionMode: 0
+        DirectionMode: 1
         BaseAngleDeg: 0
-        NWayCount: 1
+        NWayCount: 4
         SpiralStepDeg: 0

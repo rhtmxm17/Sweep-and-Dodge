@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Core;
 using Unity.Entities;
@@ -375,6 +376,147 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(TryGetSingleActiveBulletPositionForSource(em, source, out var position), Is.True);
                 float2 delta = new float2(position.x - playerPos.x, position.z - playerPos.z);
                 Assert.That(math.lengthsq(delta), Is.LessThan(25f), "When every sample is rejected, last-sample fallback is expected");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PointSetRoundRobin_SpawnsAcrossConfiguredPoints()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPointSetRoundRobinWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 3, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 6f, 0f) });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5101,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.PointSet,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = new float2(5f, 7f),
+                    PointSetCount = 3,
+                    Point0 = new float2(-1f, 0f),
+                    Point1 = new float2(0f, 2f),
+                    Point2 = new float2(3f, -1f),
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
+                    BaseAngleDeg = 0f,
+                    Count = 3,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(3));
+
+                Assert.That(
+                    ContainsPosition(snapshots, new float3(4f, 6f, 7f), 0.0001f),
+                    Is.True,
+                    "Point0 offset should be used by round-robin sampling.");
+                Assert.That(
+                    ContainsPosition(snapshots, new float3(5f, 6f, 9f), 0.0001f),
+                    Is.True,
+                    "Point1 offset should be used by round-robin sampling.");
+                Assert.That(
+                    ContainsPosition(snapshots, new float3(8f, 6f, 6f), 0.0001f),
+                    Is.True,
+                    "Point2 offset should be used by round-robin sampling.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PointSetSpiral_UsesPerPointLocalSequence()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPointSetSpiralWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 6, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 0f, 0f) });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5102,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.PointSet,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = float2.zero,
+                    PointSetCount = 3,
+                    Point0 = new float2(-2f, 0f),
+                    Point1 = new float2(0f, 0f),
+                    Point2 = new float2(2f, 0f),
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.Spiral,
+                    BaseAngleDeg = 0f,
+                    SpiralStepDeg = 90f,
+                    Count = 6,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(6));
+
+                float3 p0 = new float3(-2f, 0f, 0f);
+                float3 p1 = new float3(0f, 0f, 0f);
+                float3 p2 = new float3(2f, 0f, 0f);
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+
+                Assert.That(CountDirectionAtPoint(snapshots, p0, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p1, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p2, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p0, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p1, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p2, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
             }
             finally
             {
@@ -1171,6 +1313,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 LineStart = float2.zero,
                 LineEnd = float2.zero,
                 SampleSpacing = 1f,
+                PointSetCount = 0,
+                Point0 = float2.zero,
+                Point1 = float2.zero,
+                Point2 = float2.zero,
+                Point3 = float2.zero,
                 SpawnSampleBudget = 16,
                 PlayerNoSpawnRadius = 0f,
                 BaseAngleDeg = 0f,
@@ -1197,6 +1344,84 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return false;
+        }
+
+        private struct ActiveBulletSnapshot
+        {
+            public float3 Position;
+            public quaternion Rotation;
+        }
+
+        private static void CollectActiveBulletSnapshotsForSource(
+            EntityManager em,
+            Entity sourceEntity,
+            List<ActiveBulletSnapshot> snapshots)
+        {
+            snapshots.Clear();
+            var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<BulletActiveTag>(),
+                ComponentType.ReadOnly<BulletSourceRefComponent>(),
+                ComponentType.ReadOnly<LocalTransform>());
+            using var entities = query.ToEntityArray(Allocator.Temp);
+
+            for (int i = 0; i < entities.Length; i++)
+            {
+                var entity = entities[i];
+                var sourceRef = em.GetComponentData<BulletSourceRefComponent>(entity);
+                if (sourceRef.Value != sourceEntity)
+                    continue;
+
+                var tx = em.GetComponentData<LocalTransform>(entity);
+                snapshots.Add(new ActiveBulletSnapshot
+                {
+                    Position = tx.Position,
+                    Rotation = tx.Rotation,
+                });
+            }
+        }
+
+        private static bool ContainsPosition(
+            List<ActiveBulletSnapshot> snapshots,
+            float3 expected,
+            float tolerance)
+        {
+            float tolSq = tolerance * tolerance;
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                float3 delta = snapshots[i].Position - expected;
+                if (math.lengthsq(delta) <= tolSq)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static int CountDirectionAtPoint(
+            List<ActiveBulletSnapshot> snapshots,
+            float3 point,
+            float2 expectedDirection,
+            float positionTolerance,
+            float directionTolerance)
+        {
+            int count = 0;
+            float posTolSq = positionTolerance * positionTolerance;
+            float dirTolSq = directionTolerance * directionTolerance;
+            float2 expected = math.normalizesafe(expectedDirection, new float2(1f, 0f));
+
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                float3 delta = snapshots[i].Position - point;
+                if (math.lengthsq(delta) > posTolSq)
+                    continue;
+
+                float3 forward = math.mul(snapshots[i].Rotation, new float3(0f, 0f, 1f));
+                float2 dir = math.normalizesafe(new float2(forward.x, forward.z), new float2(1f, 0f));
+                float2 diff = dir - expected;
+                if (math.lengthsq(diff) <= dirTolSq)
+                    count++;
+            }
+
+            return count;
         }
 
         private static bool TryGetSingleActiveBulletPositionForSource(EntityManager em, Entity sourceEntity, out float3 position)
