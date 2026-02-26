@@ -142,7 +142,7 @@ Hit:
 - 디스폰 owner가 반납과 렌더 토글을 처리한다.
 
 현행 ECS 매핑 대상:
-- Source 패턴 런타임 버퍼: `SourceSpawnPatternBuffer`
+- Request 빌더 시스템: `SourceClipRequestBuildSystem`
 - Source 클립 런타임 버퍼: `SourceClipPatternBuffer`
 - Source 서스테인/이벤트 런타임: `SourceSustainRuntimeLaneBuffer`, `SourceEventRuntimeComponent`, `SourceEventQueueBuffer`
 - 요청 버퍼: `SourceSpawnRequestBuffer`
@@ -235,7 +235,19 @@ Hit:
 - Stage별 PlayerRelative 허용 비중 상한.
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
-## 9. 변경 이력
+## 9. 런 진행도 디렉터 연동 네이밍 가드 (초안)
+- `SourceState` 용어는 Source 고갈 상태(`Normal/Weakened/Depleted`) 전용으로 유지한다.
+- 런/스테이지 진행 상태 용어는 분리해 `RunProgressState` 또는 `StageFlowState`를 사용한다.
+- `Channel` 용어는 탄 타입과 혼동 가능성이 있어 신규 설계에서도 `Lane` 용어를 유지한다.
+- 디렉터가 발행하는 선택 요청과 스폰 실행 요청을 분리한다.
+  - 디렉터 -> Source 선택 단계: `SourcePatternSelectRequest*` 계열(신규)
+  - Source -> 스폰 실행 단계: `SourceSpawnRequestBuffer`(기존 유지)
+- 역할 분리 기준:
+  - 디렉터: 진행도/상태/이벤트 해석 + 패턴 선택 요청 발행
+  - SourceClipRequestBuildSystem: 선택 결과를 소비해 `SourceSpawnRequestBuffer` 생성
+  - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
+
+## 10. 변경 이력
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 계약을 추가(구현 예정)
 - 2026-02-26: NWay 실행 규약(360도 균등/세트 원자성/이월 시 SpawnSequence 보존)과 발행 단위 계약(밀도형 vs 사건형)을 합의안으로 추가
 - 2026-02-26: PointSet 런타임 샘플러를 활성화하고(`Max=4`, 로컬 오프셋), 검증 규칙을 `CV028`/갱신된 `CVW033` 기준으로 동기화

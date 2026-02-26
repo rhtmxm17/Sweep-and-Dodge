@@ -25,7 +25,7 @@
 - 예산 초과분은 이월하되, `최대 이월량`과 `유효 프레임`으로 상한을 둔다.
 
 4. Build 단계 실행 방식
-- `SourceSpawnRequestBuildSystem`은 `BulletRequestGroup`에서 `단일 스레드`로 고정한다.
+- `SourceClipRequestBuildSystem`은 `BulletRequestGroup`에서 `단일 스레드`로 고정한다.
 - 이유: 현재 스코프는 Source 개수는 적고 Source당 스폰량이 큰 구조라, 전역 cap 적용의 결정성과 단순성이 우선이다.
 
 5. 예산 부족 시 공정성 정책
@@ -74,7 +74,7 @@
 
 ## 진행 메모 (2026-02-20)
 - 반영 완료:
-  - `SourceSpawnRequestBuildSystem`(Request)에서 aggregated 요청 생성 + 전역 pending cap 적용.
+  - `SourceClipRequestBuildSystem`(Request)에서 aggregated 요청 생성 + 전역 pending cap 적용.
   - `SpawnRequestRoundRobinExecutionSystem`(ExecutionBegin)에서 Budget Cap + carry-over + 라운드로빈 커서 소비.
   - `SpawnBacklogWarningSystem` 분리로 관측/경고 책임을 독립.
   - 기존 비활성 `BulletSpawnFromPoolSystem`는 기본 경로에서 제거하고 레거시 파일로 분리.

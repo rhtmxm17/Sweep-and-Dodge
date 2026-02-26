@@ -197,6 +197,8 @@
 - 운영 목표:
   - `WaveClipSO` 기반 단일 경로로 운영한다(`WaveTimelineSO` 제거 완료).
   - Source 바인딩은 1차에서 `BulletSourceAuthoring` 직참조 배열로 운영한다.
+  - `런 진행도 디렉터` 도입 시에도 `WaveClipSO` 스키마(`ClipId/Phase/Lane/DurationSec/Segments`)는 유지한다.
+  - `BulletSource`는 외부 선택 요청을 소비해 `SourceSpawnRequestBuffer`를 출력하는 구조로 확장하되, 슬롯 authoring 필드는 유지한다.
   - `Sustain`은 기본 `Hazard`/`Trash` 2 Lane을 독립 운영하고, Lane enum 확장을 허용한다(`SourceSpawnLaneId`).
   - 특수 Lane 확장 시 Lane 우선순위는 `특수 > Hazard > Trash`를 유지한다.
 
