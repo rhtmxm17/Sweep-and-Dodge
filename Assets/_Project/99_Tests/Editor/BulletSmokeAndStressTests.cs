@@ -1261,6 +1261,180 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void V3_FinishEnter_StartsEventClip_AndDoesNotRequeueWhileMaintained()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("V3FinishEnterEventWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 8192, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+                EnableV3Source(em, source, stableId: 111u, activeState: SourceStateId.Normal);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+
+                var sourceData = em.GetComponentData<SourceSpawnComponent>(source);
+                sourceData.State = SourceStateId.Depleted;
+                sourceData.CollectedCount = math.max(sourceData.CollectedCount, sourceData.ThresholdDepleted);
+                em.SetComponentData(source, sourceData);
+
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 9111,
+                    clipId: 2111,
+                    phase: SourceWavePhaseId.OnStateEnterOnce,
+                    lane: SourceSpawnLaneId.Trash,
+                    triggerState: SourceStateId.Depleted,
+                    startSec: 0f,
+                    endSec: 3f,
+                    ratePerSecPerArea: 2f));
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 9112,
+                    clipId: 2112,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Trash,
+                    triggerState: SourceStateId.Depleted,
+                    startSec: 0f,
+                    endSec: 3f,
+                    ratePerSecPerArea: 1f));
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Depleted,
+                    Lane = SourceSpawnLaneId.Trash,
+                    ClipId = 2112,
+                    Weight = 1f,
+                });
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Trash,
+                    ActiveClipId = 3001,
+                    ElapsedSec = 0.25f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
+                });
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = 3999,
+                    ElapsedSec = 0.25f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
+                });
+
+                var sustainRuntime = em.GetComponentData<SourceSustainRuntimeComponent>(source);
+                sustainRuntime.ActiveState = SourceStateId.Normal;
+                em.SetComponentData(source, sustainRuntime);
+                em.SetComponentData(source, new SourceEventRuntimeComponent
+                {
+                    IsPlaying = 0,
+                    ActiveEventClipId = 0,
+                    TriggerState = SourceStateId.Normal,
+                    ElapsedSec = 0f,
+                    SelectionSequence = 1u,
+                });
+                em.GetBuffer<SourceEventQueueBuffer>(source).Clear();
+
+                world.SetTime(new TimeData(1d, 1f));
+                simGroup.Update();
+
+                var sustainAfter = em.GetComponentData<SourceSustainRuntimeComponent>(source);
+                var eventAfter = em.GetComponentData<SourceEventRuntimeComponent>(source);
+                Assert.That(sustainAfter.ActiveState, Is.EqualTo(SourceStateId.Depleted), "Finish entry must switch active clip-state to depleted");
+                Assert.That(eventAfter.IsPlaying, Is.EqualTo(1), "Finish entry must start depleted event clip when available");
+                Assert.That(eventAfter.TriggerState, Is.EqualTo(SourceStateId.Depleted));
+                Assert.That(em.GetBuffer<SourceEventQueueBuffer>(source).Length, Is.EqualTo(0), "Entry event should be consumed immediately");
+
+                world.SetTime(new TimeData(1.1d, 0.1f));
+                simGroup.Update();
+
+                Assert.That(em.GetBuffer<SourceEventQueueBuffer>(source).Length, Is.EqualTo(0), "Maintained finish state must not requeue duplicate entry events");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void V3_FinishEnter_DoesNotQueueDuplicate_WhenSameStateEventAlreadyPlaying()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("V3FinishDuplicateGuardWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 8192, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+                EnableV3Source(em, source, stableId: 112u, activeState: SourceStateId.Normal);
+
+                var sourceData = em.GetComponentData<SourceSpawnComponent>(source);
+                sourceData.State = SourceStateId.Depleted;
+                sourceData.CollectedCount = math.max(sourceData.CollectedCount, sourceData.ThresholdDepleted);
+                em.SetComponentData(source, sourceData);
+
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 9121,
+                    clipId: 2121,
+                    phase: SourceWavePhaseId.OnStateEnterOnce,
+                    lane: SourceSpawnLaneId.Trash,
+                    triggerState: SourceStateId.Depleted,
+                    startSec: 0f,
+                    endSec: 3f,
+                    ratePerSecPerArea: 1f));
+
+                var sustainRuntime = em.GetComponentData<SourceSustainRuntimeComponent>(source);
+                sustainRuntime.ActiveState = SourceStateId.Normal;
+                em.SetComponentData(source, sustainRuntime);
+                em.SetComponentData(source, new SourceEventRuntimeComponent
+                {
+                    IsPlaying = 1,
+                    ActiveEventClipId = 2121,
+                    TriggerState = SourceStateId.Depleted,
+                    ElapsedSec = 0.2f,
+                    SelectionSequence = 7u,
+                });
+                var eventQueue = em.GetBuffer<SourceEventQueueBuffer>(source);
+                eventQueue.Clear();
+
+                world.SetTime(new TimeData(1d, 0.1f));
+                simGroup.Update();
+
+                var eventAfter = em.GetComponentData<SourceEventRuntimeComponent>(source);
+                Assert.That(eventAfter.IsPlaying, Is.EqualTo(1));
+                Assert.That(eventAfter.TriggerState, Is.EqualTo(SourceStateId.Depleted));
+                Assert.That(em.GetBuffer<SourceEventQueueBuffer>(source).Length, Is.EqualTo(0), "State-enter queue must not duplicate while same-state event is already playing");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void V3_EventQueue_DuplicateTriggers_AreQueuedAndConsumedSequentially()
         {
             try

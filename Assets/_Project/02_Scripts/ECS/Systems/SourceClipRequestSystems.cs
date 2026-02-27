@@ -18,6 +18,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SpawnBacklogMetricsComponent>();
             state.RequireForUpdate<SpawnRunSeedComponent>();
             state.RequireForUpdate<SourceSpawnComponent>();
+            state.RequireForUpdate<SourceRunDirectorStateComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
             state.RequireForUpdate<SourceStableIdComponent>();
             state.RequireForUpdate<SourceClipPatternBuffer>();
@@ -48,7 +49,6 @@ namespace SweepNDodge.DotsBullets
             int remainingCapacity = math.max(0, policy.MaxPendingCount - pendingTotal);
             int droppedByCapacity = 0;
 
-            var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
             var areaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
             var directorStateLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
@@ -61,7 +61,6 @@ namespace SweepNDodge.DotsBullets
             var activeCountLookup = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(false);
             var requestLookup = SystemAPI.GetBufferLookup<SourceSpawnRequestBuffer>(false);
 
-            sourceLookup.Update(ref state);
             stableIdLookup.Update(ref state);
             areaLookup.Update(ref state);
             directorStateLookup.Update(ref state);
@@ -76,6 +75,7 @@ namespace SweepNDodge.DotsBullets
 
             var sourceQuery = SystemAPI.QueryBuilder()
                 .WithAll<SourceSpawnComponent>()
+                .WithAll<SourceRunDirectorStateComponent>()
                 .WithAll<SourceStableIdComponent>()
                 .WithAll<BulletFieldAreaComponent>()
                 .WithAll<SourceSustainRuntimeComponent>()
@@ -92,9 +92,9 @@ namespace SweepNDodge.DotsBullets
             for (int si = 0; si < sourceEntities.Length; si++)
             {
                 var sourceEntity = sourceEntities[si];
-                var source = sourceLookup[sourceEntity];
                 var stableId = stableIdLookup[sourceEntity];
                 var area = areaLookup[sourceEntity];
+                var directorState = directorStateLookup[sourceEntity];
                 var clipPatterns = clipPatternLookup[sourceEntity];
                 var sustainCandidates = sustainCandidateLookup[sourceEntity];
                 var sustainLanes = sustainLaneLookup[sourceEntity];
@@ -108,8 +108,7 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 uint sourceStableId = math.max(1u, stableId.Value);
-                var directorState = ResolveDirectorState(sourceEntity, source.State, ref directorStateLookup);
-                var clipState = ResolveClipSelectionState(source.State, in directorState);
+                var clipState = ResolveClipSelectionState(in directorState);
                 float densityScale = ResolveDensityScale(in directorState);
                 bool restrictFinishToTrashLane = directorState.State == RunDirectorSourceStateId.Finish;
                 var sustainLanesRW = sustainLanes;
@@ -121,7 +120,7 @@ namespace SweepNDodge.DotsBullets
                 {
                     sustainRuntime.ActiveState = clipState;
                     StopAllSustain(ref sustainLanesRW, preserveLastClip: true);
-                    QueueEvent(ref eventQueueRW, clipState, frame);
+                    QueueEventIfNeeded(ref eventQueueRW, in eventRuntime, clipState, frame);
                 }
 
                 TryStartQueuedEvent(
@@ -190,31 +189,9 @@ namespace SweepNDodge.DotsBullets
             metricsRW.ValueRW = metrics;
         }
 
-        private static SourceRunDirectorStateComponent ResolveDirectorState(
-            Entity sourceEntity,
-            SourceStateId sourceState,
-            ref ComponentLookup<SourceRunDirectorStateComponent> directorStateLookup)
+        private static SourceStateId ResolveClipSelectionState(in SourceRunDirectorStateComponent directorState)
         {
-            if (directorStateLookup.HasComponent(sourceEntity))
-                return directorStateLookup[sourceEntity];
-
-            return new SourceRunDirectorStateComponent
-            {
-                State = sourceState == SourceStateId.Depleted
-                    ? RunDirectorSourceStateId.Finish
-                    : RunDirectorSourceStateId.Pressure,
-                SelectedClipState = sourceState,
-                PressureOccupancySec = 0f,
-                DensityScale = 1f,
-                Version = 0u,
-            };
-        }
-
-        private static SourceStateId ResolveClipSelectionState(
-            SourceStateId sourceState,
-            in SourceRunDirectorStateComponent directorState)
-        {
-            if (sourceState == SourceStateId.Depleted || directorState.State == RunDirectorSourceStateId.Finish)
+            if (directorState.State == RunDirectorSourceStateId.Finish)
                 return SourceStateId.Depleted;
 
             var selected = directorState.SelectedClipState;
@@ -223,7 +200,7 @@ namespace SweepNDodge.DotsBullets
                 SourceStateId.Normal => SourceStateId.Normal,
                 SourceStateId.Weakened => SourceStateId.Weakened,
                 SourceStateId.Depleted => SourceStateId.Depleted,
-                _ => sourceState,
+                _ => SourceStateId.Normal,
             };
         }
 
@@ -235,8 +212,21 @@ namespace SweepNDodge.DotsBullets
             return math.max(0f, directorState.DensityScale);
         }
 
-        private static void QueueEvent(ref DynamicBuffer<SourceEventQueueBuffer> queue, SourceStateId triggerState, uint frame)
+        private static void QueueEventIfNeeded(
+            ref DynamicBuffer<SourceEventQueueBuffer> queue,
+            in SourceEventRuntimeComponent eventRuntime,
+            SourceStateId triggerState,
+            uint frame)
         {
+            if (eventRuntime.IsPlaying != 0 && eventRuntime.TriggerState == triggerState)
+                return;
+
+            for (int i = 0; i < queue.Length; i++)
+            {
+                if (queue[i].TriggerState == triggerState)
+                    return;
+            }
+
             queue.Add(new SourceEventQueueBuffer
             {
                 TriggerState = triggerState,

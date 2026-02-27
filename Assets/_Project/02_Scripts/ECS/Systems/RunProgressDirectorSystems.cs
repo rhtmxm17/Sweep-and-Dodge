@@ -2,6 +2,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -14,7 +15,6 @@ namespace SweepNDodge.DotsBullets
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
-            state.RequireForUpdate<PlayerGoSyncComponent>();
             state.RequireForUpdate<SourceSpawnComponent>();
             state.RequireForUpdate<SourceStableIdComponent>();
             state.RequireForUpdate<SourceAnchorComponent>();
@@ -26,7 +26,9 @@ namespace SweepNDodge.DotsBullets
         public void OnUpdate(ref SystemState state)
         {
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
-            if (!SystemAPI.HasComponent<PlayerGoSyncComponent>(playerEntity))
+            bool hasPlayerSync = SystemAPI.HasComponent<PlayerGoSyncComponent>(playerEntity);
+            bool hasPlayerTransform = SystemAPI.HasComponent<LocalTransform>(playerEntity);
+            if (!hasPlayerSync && !hasPlayerTransform)
                 return;
 
             var config = SystemAPI.GetSingleton<RunProgressDirectorConfigComponent>();
@@ -34,7 +36,9 @@ namespace SweepNDodge.DotsBullets
             float baselineScale = math.max(0f, config.BaselineTrashDensityScale);
             float pressureScale = math.max(0f, config.PressureDensityScale);
             float deltaTime = math.max(0f, SystemAPI.Time.DeltaTime);
-            float3 playerPosition = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity).Position;
+            float3 playerPosition = hasPlayerSync
+                ? SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity).Position
+                : SystemAPI.GetComponent<LocalTransform>(playerEntity).Position;
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
