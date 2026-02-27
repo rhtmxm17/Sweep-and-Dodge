@@ -1846,6 +1846,81 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void RunDirector_PressureImmediateInside_AndReturnsBaselineAfterHold()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorImmediateAndReleaseWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var directorConfigEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunProgressDirectorConfigComponent>()).GetSingletonEntity();
+                em.SetComponentData(directorConfigEntity, new RunProgressDirectorConfigComponent
+                {
+                    PressureHoldSec = 0.5f,
+                    BaselineTrashDensityScale = 0.4f,
+                    PressureDensityScale = 1.0f,
+                });
+
+                em.SetComponentData(source, new SourceSpawnComponent
+                {
+                    ThresholdWeakened = 1000,
+                    ThresholdDepleted = 2000,
+                    CollectedCount = 0,
+                    State = SourceStateId.Normal,
+                });
+                em.SetComponentData(source, new SourceAnchorComponent
+                {
+                    Position = float3.zero,
+                });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Circle,
+                    Radius = 3f,
+                    Size = float2.zero,
+                    ComputedArea = math.PI * 9f,
+                });
+                em.SetComponentData(source, new SourceRunDirectorStateComponent
+                {
+                    State = RunDirectorSourceStateId.Baseline,
+                    SelectedClipState = SourceStateId.Normal,
+                    PressureOccupancySec = 0f,
+                    DensityScale = 0.4f,
+                    Version = 1u,
+                });
+
+                SetPlayerPosition(em, float3.zero);
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                var directorAfterEnter = em.GetComponentData<SourceRunDirectorStateComponent>(source);
+                Assert.That(directorAfterEnter.State, Is.EqualTo(RunDirectorSourceStateId.Pressure), "Player entering source area should switch to Pressure immediately");
+
+                SetPlayerPosition(em, new float3(30f, 0f, 0f));
+                world.SetTime(new TimeData(0.3d, 0.2f));
+                simGroup.Update();
+
+                var directorDuringHold = em.GetComponentData<SourceRunDirectorStateComponent>(source);
+                Assert.That(directorDuringHold.State, Is.EqualTo(RunDirectorSourceStateId.Pressure), "After exiting source area, Pressure should remain during hold time");
+
+                world.SetTime(new TimeData(0.7d, 0.4f));
+                simGroup.Update();
+
+                var directorAfterHold = em.GetComponentData<SourceRunDirectorStateComponent>(source);
+                Assert.That(directorAfterHold.State, Is.EqualTo(RunDirectorSourceStateId.Baseline), "Pressure should return to Baseline after hold timer expires");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);
@@ -1972,6 +2047,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 BaselineTrashDensityScale = 0.45f,
                 PressureDensityScale = 1.0f,
             });
+        }
+
+        private static void SetPlayerPosition(EntityManager em, float3 position)
+        {
+            using var playerQuery = em.CreateEntityQuery(ComponentType.ReadOnly<PlayerTag>(), ComponentType.ReadWrite<PlayerGoSyncComponent>());
+            using var players = playerQuery.ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < players.Length; i++)
+            {
+                var player = players[i];
+                var sync = em.GetComponentData<PlayerGoSyncComponent>(player);
+                sync.Position = position;
+                em.SetComponentData(player, sync);
+                if (em.HasComponent<LocalTransform>(player))
+                    em.SetComponentData(player, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            }
         }
 
         private static Entity CreateSource(EntityManager em, int typeKey, float spawnDensityPerSecPerArea)

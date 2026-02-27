@@ -62,6 +62,7 @@ namespace SweepNDodge.DotsBullets
 
             using var sourceEntities = sourceQuery.ToEntityArray(Allocator.Temp);
             Entity pressureEntity = Entity.Null;
+            bool bestPressureOccupied = false;
             float bestPressureScore = float.MinValue;
             uint bestStableId = uint.MaxValue;
 
@@ -82,19 +83,35 @@ namespace SweepNDodge.DotsBullets
                     anchorLookup[sourceEntity].Position,
                     areaLookup[sourceEntity]);
                 director.PressureOccupancySec = isOccupied
-                    ? director.PressureOccupancySec + deltaTime
-                    : 0f;
+                    ? holdSec
+                    : math.max(0f, director.PressureOccupancySec - deltaTime);
                 directorLookup[sourceEntity] = director;
 
-                if (director.PressureOccupancySec < holdSec)
+                bool isPressureCandidate = isOccupied || director.PressureOccupancySec > 0f;
+                if (!isPressureCandidate)
                     continue;
 
                 uint stableId = math.max(1u, stableIdLookup[sourceEntity].Value);
                 float score = director.PressureOccupancySec;
-                bool isBetter = score > bestPressureScore;
-                bool tie = math.abs(score - bestPressureScore) <= 1e-5f;
-                if (isBetter || (tie && stableId < bestStableId))
+                bool pick = false;
+                if (pressureEntity == Entity.Null)
                 {
+                    pick = true;
+                }
+                else if (isOccupied != bestPressureOccupied)
+                {
+                    pick = isOccupied;
+                }
+                else
+                {
+                    bool isBetter = score > bestPressureScore;
+                    bool tie = math.abs(score - bestPressureScore) <= 1e-5f;
+                    pick = isBetter || (tie && stableId < bestStableId);
+                }
+
+                if (pick)
+                {
+                    bestPressureOccupied = isOccupied;
                     bestPressureScore = score;
                     bestStableId = stableId;
                     pressureEntity = sourceEntity;

@@ -153,8 +153,11 @@ MonoBehaviour:
     serializedVersion: 2
     x: 12
     y: 12
-    width: 360
-    height: 260
+    width: 420
+    height: 420
+  ShowSourceDirectorStates: 1
+  MaxSourceRows: 24
+  SourceListHeight: 180
   BurstCount: 100000
   SustainFrames: 300
   SustainPerFrame: 2000
