@@ -205,6 +205,17 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
+            if (!HasSingleton<RunProgressDirectorConfigComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(RunProgressDirectorConfigComponent));
+                em.SetComponentData(e, new RunProgressDirectorConfigComponent
+                {
+                    PressureHoldSec = 0.35f,
+                    BaselineTrashDensityScale = 0.45f,
+                    PressureDensityScale = 1.0f,
+                });
+            }
+
             if (!HasSingleton<DebugHudMetricsComponent>(em))
             {
                 var e = em.CreateEntity(typeof(DebugHudMetricsComponent));

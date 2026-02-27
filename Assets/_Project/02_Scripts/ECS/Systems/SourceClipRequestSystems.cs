@@ -51,6 +51,7 @@ namespace SweepNDodge.DotsBullets
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
             var areaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
+            var directorStateLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
             var sustainRuntimeLookup = SystemAPI.GetComponentLookup<SourceSustainRuntimeComponent>(false);
             var eventRuntimeLookup = SystemAPI.GetComponentLookup<SourceEventRuntimeComponent>(false);
             var clipPatternLookup = SystemAPI.GetBufferLookup<SourceClipPatternBuffer>(false);
@@ -63,6 +64,7 @@ namespace SweepNDodge.DotsBullets
             sourceLookup.Update(ref state);
             stableIdLookup.Update(ref state);
             areaLookup.Update(ref state);
+            directorStateLookup.Update(ref state);
             sustainRuntimeLookup.Update(ref state);
             eventRuntimeLookup.Update(ref state);
             clipPatternLookup.Update(ref state);
@@ -106,22 +108,24 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 uint sourceStableId = math.max(1u, stableId.Value);
-                var sourceState = source.State;
+                var directorState = ResolveDirectorState(sourceEntity, source.State, ref directorStateLookup);
+                var clipState = ResolveClipSelectionState(source.State, in directorState);
+                float densityScale = ResolveDensityScale(in directorState);
+                bool restrictFinishToTrashLane = directorState.State == RunDirectorSourceStateId.Finish;
                 var sustainLanesRW = sustainLanes;
                 var eventQueueRW = eventQueue;
                 var clipPatternsRW = clipPatterns;
                 var requestsRW = requests;
 
-                if (sourceState != sustainRuntime.ActiveState)
+                if (clipState != sustainRuntime.ActiveState)
                 {
-                    sustainRuntime.ActiveState = sourceState;
+                    sustainRuntime.ActiveState = clipState;
                     StopAllSustain(ref sustainLanesRW, preserveLastClip: true);
-                    QueueEvent(ref eventQueueRW, sourceState, frame);
+                    QueueEvent(ref eventQueueRW, clipState, frame);
                 }
 
                 TryStartQueuedEvent(
                     sourceEntity,
-                    sourceState,
                     runSeed,
                     sourceStableId,
                     frame,
@@ -137,10 +141,11 @@ namespace SweepNDodge.DotsBullets
                 {
                     ProcessActiveEventClip(
                         sourceEntity,
-                        sourceState,
+                        clipState,
                         frame,
                         deltaTime,
                         area.ComputedArea,
+                        densityScale,
                         ref clipPatternsRW,
                         ref activeCounts,
                         ref requestsRW,
@@ -153,12 +158,14 @@ namespace SweepNDodge.DotsBullets
                 {
                     ProcessSustainLanes(
                         sourceEntity,
-                        sourceState,
+                        clipState,
                         runSeed,
                         sourceStableId,
                         frame,
                         deltaTime,
                         area.ComputedArea,
+                        densityScale,
+                        restrictFinishToTrashLane,
                         ref clipPatternsRW,
                         ref sustainCandidates,
                         ref sustainLanesRW,
@@ -183,6 +190,51 @@ namespace SweepNDodge.DotsBullets
             metricsRW.ValueRW = metrics;
         }
 
+        private static SourceRunDirectorStateComponent ResolveDirectorState(
+            Entity sourceEntity,
+            SourceStateId sourceState,
+            ref ComponentLookup<SourceRunDirectorStateComponent> directorStateLookup)
+        {
+            if (directorStateLookup.HasComponent(sourceEntity))
+                return directorStateLookup[sourceEntity];
+
+            return new SourceRunDirectorStateComponent
+            {
+                State = sourceState == SourceStateId.Depleted
+                    ? RunDirectorSourceStateId.Finish
+                    : RunDirectorSourceStateId.Pressure,
+                SelectedClipState = sourceState,
+                PressureOccupancySec = 0f,
+                DensityScale = 1f,
+                Version = 0u,
+            };
+        }
+
+        private static SourceStateId ResolveClipSelectionState(
+            SourceStateId sourceState,
+            in SourceRunDirectorStateComponent directorState)
+        {
+            if (sourceState == SourceStateId.Depleted || directorState.State == RunDirectorSourceStateId.Finish)
+                return SourceStateId.Depleted;
+
+            var selected = directorState.SelectedClipState;
+            return selected switch
+            {
+                SourceStateId.Normal => SourceStateId.Normal,
+                SourceStateId.Weakened => SourceStateId.Weakened,
+                SourceStateId.Depleted => SourceStateId.Depleted,
+                _ => sourceState,
+            };
+        }
+
+        private static float ResolveDensityScale(in SourceRunDirectorStateComponent directorState)
+        {
+            if (directorState.State == RunDirectorSourceStateId.Finish)
+                return 1f;
+
+            return math.max(0f, directorState.DensityScale);
+        }
+
         private static void QueueEvent(ref DynamicBuffer<SourceEventQueueBuffer> queue, SourceStateId triggerState, uint frame)
         {
             queue.Add(new SourceEventQueueBuffer
@@ -194,7 +246,6 @@ namespace SweepNDodge.DotsBullets
 
         private static void TryStartQueuedEvent(
             Entity sourceEntity,
-            SourceStateId sourceState,
             uint runSeed,
             uint stableId,
             uint frame,
@@ -292,6 +343,7 @@ namespace SweepNDodge.DotsBullets
             uint frame,
             float deltaTime,
             float area,
+            float densityScale,
             ref DynamicBuffer<SourceClipPatternBuffer> patterns,
             ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
@@ -324,7 +376,7 @@ namespace SweepNDodge.DotsBullets
                     continue;
                 }
 
-                int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requests, area, deltaTime);
+                int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requests, area, deltaTime, densityScale);
                 patterns[i] = pattern;
                 if (requested <= 0)
                     continue;
@@ -359,6 +411,8 @@ namespace SweepNDodge.DotsBullets
             uint frame,
             float deltaTime,
             float area,
+            float densityScale,
+            bool restrictToTrashLane,
             ref DynamicBuffer<SourceClipPatternBuffer> patterns,
             ref DynamicBuffer<SourceSustainSlotCandidateBuffer> sustainCandidates,
             ref DynamicBuffer<SourceSustainRuntimeLaneBuffer> sustainLanes,
@@ -368,9 +422,29 @@ namespace SweepNDodge.DotsBullets
             ref int remainingCapacity,
             ref int droppedByCapacity)
         {
+            if (restrictToTrashLane)
+            {
+                int removed = RemoveSustainPendingRequestsExceptLane(ref requests, SourceSpawnLaneId.Trash);
+                if (removed > 0)
+                {
+                    pendingTotal = math.max(0, pendingTotal - removed);
+                    remainingCapacity = SpawnRequestCommonUtility.SafeAdd(remainingCapacity, removed);
+                }
+            }
+
             for (int i = 0; i < sustainLanes.Length; i++)
             {
                 var laneRuntime = sustainLanes[i];
+                if (restrictToTrashLane && laneRuntime.Lane != SourceSpawnLaneId.Trash)
+                {
+                    if (laneRuntime.ActiveClipId > 0)
+                        laneRuntime.LastClipId = laneRuntime.ActiveClipId;
+                    laneRuntime.ActiveClipId = 0;
+                    laneRuntime.ElapsedSec = 0f;
+                    sustainLanes[i] = laneRuntime;
+                    continue;
+                }
+
                 if (laneRuntime.ActiveClipId <= 0)
                 {
                     if (!TrySelectNextSustainClip(
@@ -381,7 +455,8 @@ namespace SweepNDodge.DotsBullets
                             frame,
                             ref sustainCandidates,
                             ref patterns,
-                            ref laneRuntime))
+                            ref laneRuntime,
+                            suppressMissingLog: restrictToTrashLane))
                     {
                         sustainLanes[i] = laneRuntime;
                         continue;
@@ -412,7 +487,7 @@ namespace SweepNDodge.DotsBullets
                         continue;
                     }
 
-                    int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requests, area, deltaTime);
+                    int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requests, area, deltaTime, densityScale);
                     patterns[p] = pattern;
                     if (requested <= 0)
                         continue;
@@ -450,7 +525,8 @@ namespace SweepNDodge.DotsBullets
             uint frame,
             ref DynamicBuffer<SourceSustainSlotCandidateBuffer> sustainCandidates,
             ref DynamicBuffer<SourceClipPatternBuffer> patterns,
-            ref SourceSustainRuntimeLaneBuffer laneRuntime)
+            ref SourceSustainRuntimeLaneBuffer laneRuntime,
+            bool suppressMissingLog)
         {
             int totalMatching = 0;
             int nonLastMatching = 0;
@@ -467,7 +543,7 @@ namespace SweepNDodge.DotsBullets
 
             if (totalMatching <= 0)
             {
-                if (frame == 0 || frame - laneRuntime.LastMissingLogFrame >= 60u)
+                if (!suppressMissingLog && (frame == 0 || frame - laneRuntime.LastMissingLogFrame >= 60u))
                 {
                     Debug.LogError(
                         $"[WaveClipV3] Sustain lane has no clip candidates. source={sourceEntity.Index}, state={sourceState}, lane={laneRuntime.Lane}");
@@ -542,8 +618,17 @@ namespace SweepNDodge.DotsBullets
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
             float area,
-            float deltaTime)
+            float deltaTime,
+            float densityScale)
         {
+            float spawnDensityPerSecPerArea = pattern.SpawnDensityPerSecPerArea;
+            if (pattern.Phase == SourceWavePhaseId.Sustain
+                && pattern.Lane == SourceSpawnLaneId.Trash
+                && pattern.EmissionMode == SourceSpawnEmissionModeId.RateField)
+            {
+                spawnDensityPerSecPerArea *= math.max(0f, densityScale);
+            }
+
             return SpawnRequestCommonUtility.ResolveSpawnCountCore(
                 ref pattern.SpawnAccumulator,
                 ref pattern.BurstEventsEmitted,
@@ -553,7 +638,7 @@ namespace SweepNDodge.DotsBullets
                 pattern.BurstIntervalSec,
                 pattern.BurstShotsPerEvent,
                 pattern.BurstRepeatCount,
-                pattern.SpawnDensityPerSecPerArea,
+                spawnDensityPerSecPerArea,
                 pattern.MaxActiveDensityPerArea,
                 pattern.BulletTypeKey,
                 sourceEntity,
@@ -573,6 +658,26 @@ namespace SweepNDodge.DotsBullets
             {
                 var item = requests[i];
                 if (item.Count <= 0 || item.Phase != SourceWavePhaseId.Sustain)
+                    continue;
+
+                removed = SpawnRequestCommonUtility.SafeAdd(removed, item.Count);
+                requests.RemoveAtSwapBack(i);
+            }
+
+            return removed;
+        }
+
+        private static int RemoveSustainPendingRequestsExceptLane(
+            ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            SourceSpawnLaneId allowedLane)
+        {
+            int removed = 0;
+            for (int i = requests.Length - 1; i >= 0; i--)
+            {
+                var item = requests[i];
+                if (item.Count <= 0 || item.Phase != SourceWavePhaseId.Sustain)
+                    continue;
+                if (item.Lane == allowedLane)
                     continue;
 
                 removed = SpawnRequestCommonUtility.SafeAdd(removed, item.Count);

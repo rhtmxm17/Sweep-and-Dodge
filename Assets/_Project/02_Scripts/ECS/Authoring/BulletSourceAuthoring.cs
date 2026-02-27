@@ -134,6 +134,17 @@ namespace SweepNDodge.DotsBullets
                     SelectionSequence = 1u,
                 });
 
+                AddComponent(e, new SourceRunDirectorStateComponent
+                {
+                    State = authoring.InitialState == SourceStateId.Depleted
+                        ? RunDirectorSourceStateId.Finish
+                        : RunDirectorSourceStateId.Baseline,
+                    SelectedClipState = authoring.InitialState,
+                    PressureOccupancySec = 0f,
+                    DensityScale = 1f,
+                    Version = 1u,
+                });
+
                 BakeV3ClipBindings(
                     authoring,
                     clipPatternBuffer,

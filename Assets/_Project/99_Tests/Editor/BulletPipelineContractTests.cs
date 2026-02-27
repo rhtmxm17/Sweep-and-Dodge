@@ -46,6 +46,8 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertUpdateBefore(typeof(SourcePollutionUpdateSystem), typeof(PlayerHazardCollisionRequestSystem));
             AssertUpdateAfter(typeof(PlayerHazardCollisionRequestSystem), typeof(BulletVacuumRequestSystem));
             AssertUpdateAfter(typeof(PlayerCarryBinDepositRequestSystem), typeof(PlayerHazardCollisionRequestSystem));
+            AssertUpdateAfter(typeof(RunProgressDirectorSystem), typeof(PlayerCarryBinDepositRequestSystem));
+            AssertUpdateBefore(typeof(RunProgressDirectorSystem), typeof(SourceClipRequestBuildSystem));
             AssertUpdateAfter(typeof(SourceClipRequestBuildSystem), typeof(PlayerCarryBinDepositRequestSystem));
             AssertUpdateBefore(typeof(SourceClipRequestBuildSystem), typeof(BulletRequestFencePublishSystem));
         }

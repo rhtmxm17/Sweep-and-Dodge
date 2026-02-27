@@ -741,6 +741,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
                 CreatePlayer(em);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var playerEntity = em.CreateEntityQuery(ComponentType.ReadOnly<PlayerTag>()).GetSingletonEntity();
+                if (em.HasComponent<PlayerGoSyncComponent>(playerEntity))
+                    em.RemoveComponent<PlayerGoSyncComponent>(playerEntity);
+                var directorConfigEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunProgressDirectorConfigComponent>()).GetSingletonEntity();
+                em.SetComponentData(directorConfigEntity, new RunProgressDirectorConfigComponent
+                {
+                    PressureHoldSec = 999f,
+                    BaselineTrashDensityScale = 0.25f,
+                    PressureDensityScale = 1.0f,
+                });
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
                 em.SetComponentData(source, new BulletFieldAreaComponent
@@ -824,6 +834,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
                 CreatePlayer(em);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var playerEntity = em.CreateEntityQuery(ComponentType.ReadOnly<PlayerTag>()).GetSingletonEntity();
+                if (em.HasComponent<PlayerGoSyncComponent>(playerEntity))
+                    em.RemoveComponent<PlayerGoSyncComponent>(playerEntity);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
                 em.SetComponentData(source, new BulletFieldAreaComponent
@@ -1402,6 +1415,263 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void SourceClipRequestBuild_BaselineScalesOnlyTrashRateField()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorBaselineScaleWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+                em.SetComponentData(source, new SourceSpawnComponent
+                {
+                    ThresholdWeakened = 1000,
+                    ThresholdDepleted = 2000,
+                    CollectedCount = 0,
+                    State = SourceStateId.Normal,
+                });
+                em.SetComponentData(source, new SourceSustainRuntimeComponent
+                {
+                    ActiveState = SourceStateId.Normal,
+                });
+                em.SetComponentData(source, new SourceRunDirectorStateComponent
+                {
+                    State = RunDirectorSourceStateId.Baseline,
+                    SelectedClipState = SourceStateId.Normal,
+                    PressureOccupancySec = 0f,
+                    DensityScale = 0.25f,
+                    Version = 1u,
+                });
+
+                const int trashClipId = 7001;
+                const int hazardClipId = 7002;
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 701,
+                    clipId: trashClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Trash,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 10f,
+                    ratePerSecPerArea: 10f));
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 702,
+                    clipId: hazardClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Normal,
+                    startSec: 0f,
+                    endSec: 10f,
+                    ratePerSecPerArea: 10f));
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Normal,
+                    Lane = SourceSpawnLaneId.Trash,
+                    ClipId = trashClipId,
+                    Weight = 1f,
+                });
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Normal,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = hazardClipId,
+                    Weight = 1f,
+                });
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Trash,
+                    ActiveClipId = trashClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
+                });
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = hazardClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
+                });
+
+                using (var playerSyncQuery = em.CreateEntityQuery(ComponentType.ReadWrite<PlayerGoSyncComponent>()))
+                using (var playerSyncEntities = playerSyncQuery.ToEntityArray(Allocator.Temp))
+                {
+                    for (int i = 0; i < playerSyncEntities.Length; i++)
+                    {
+                        var sync = em.GetComponentData<PlayerGoSyncComponent>(playerSyncEntities[i]);
+                        sync.Position = new float3(1024f, 0f, 1024f);
+                        em.SetComponentData(playerSyncEntities[i], sync);
+                    }
+                }
+
+                world.SetTime(new TimeData(1d, 1f));
+                simGroup.Update();
+
+                var directorAfter = em.GetComponentData<SourceRunDirectorStateComponent>(source);
+                Assert.That(directorAfter.State, Is.EqualTo(RunDirectorSourceStateId.Baseline));
+                int expectedTrash = (int)math.floor(10f * math.max(0f, directorAfter.DensityScale));
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(GetRequestCountByDirective(requests, 701), Is.EqualTo(expectedTrash), "Baseline must scale trash sustain rate-field density");
+                Assert.That(GetRequestCountByDirective(requests, 702), Is.EqualTo(10), "Baseline must not scale hazard/event path");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_FinishKeepsOnlyTrashSustainRequests()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorFinishTrashOnlyWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = new float2(1f, 1f),
+                    ComputedArea = 1f,
+                });
+                em.SetComponentData(source, new SourceSpawnComponent
+                {
+                    ThresholdWeakened = 1000,
+                    ThresholdDepleted = 2000,
+                    CollectedCount = 2000,
+                    State = SourceStateId.Depleted,
+                });
+                em.SetComponentData(source, new SourceSustainRuntimeComponent
+                {
+                    ActiveState = SourceStateId.Depleted,
+                });
+                em.SetComponentData(source, new SourceRunDirectorStateComponent
+                {
+                    State = RunDirectorSourceStateId.Finish,
+                    SelectedClipState = SourceStateId.Depleted,
+                    PressureOccupancySec = 0f,
+                    DensityScale = 1f,
+                    Version = 2u,
+                });
+
+                const int trashClipId = 7101;
+                const int hazardClipId = 7102;
+                var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                clipPatterns.Clear();
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 711,
+                    clipId: trashClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Trash,
+                    triggerState: SourceStateId.Depleted,
+                    startSec: 0f,
+                    endSec: 10f,
+                    ratePerSecPerArea: 4f));
+                clipPatterns.Add(CreateClipPattern(
+                    directiveId: 712,
+                    clipId: hazardClipId,
+                    phase: SourceWavePhaseId.Sustain,
+                    lane: SourceSpawnLaneId.Hazard,
+                    triggerState: SourceStateId.Depleted,
+                    startSec: 0f,
+                    endSec: 10f,
+                    ratePerSecPerArea: 4f));
+
+                var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
+                sustainCandidates.Clear();
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Depleted,
+                    Lane = SourceSpawnLaneId.Trash,
+                    ClipId = trashClipId,
+                    Weight = 1f,
+                });
+                sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
+                {
+                    State = SourceStateId.Depleted,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ClipId = hazardClipId,
+                    Weight = 1f,
+                });
+
+                var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+                sustainLanes.Clear();
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Trash,
+                    ActiveClipId = trashClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
+                });
+                sustainLanes.Add(new SourceSustainRuntimeLaneBuffer
+                {
+                    Lane = SourceSpawnLaneId.Hazard,
+                    ActiveClipId = hazardClipId,
+                    ElapsedSec = 0f,
+                    LastClipId = 0,
+                    SelectionSequence = 1u,
+                    LastMissingLogFrame = 0u,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 7999,
+                    Phase = SourceWavePhaseId.Sustain,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    Count = 3,
+                    OldestFrame = 1u,
+                });
+
+                world.SetTime(new TimeData(1d, 1f));
+                simGroup.Update();
+
+                requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(GetRequestCountByDirective(requests, 711), Is.EqualTo(4), "Finish must keep trash sustain output");
+                Assert.That(GetRequestCountByDirective(requests, 712), Is.EqualTo(0), "Finish must block non-trash sustain output");
+                Assert.That(HasPendingSustainForLane(requests, SourceSpawnLaneId.Hazard), Is.False, "Finish must clear non-trash sustain backlog");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);
@@ -1462,15 +1732,33 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static void CreatePlayer(EntityManager em)
         {
-            var player = em.CreateEntity(typeof(PlayerTag));
+            var player = em.CreateEntity(typeof(PlayerTag), typeof(PlayerGoSyncComponent));
             em.SetName(player, "SmokeStress_Player");
+            em.SetComponentData(player, new PlayerGoSyncComponent
+            {
+                Position = float3.zero,
+                Rotation = quaternion.identity,
+                SyncRotation = 0,
+                VacuumRequested = 0,
+                CleanupActionRequested = 0,
+                RequestedCleanupActionSlot = 0,
+            });
         }
 
         private static void CreatePlayerWithTransform(EntityManager em, float3 position)
         {
-            var player = em.CreateEntity(typeof(PlayerTag), typeof(LocalTransform));
+            var player = em.CreateEntity(typeof(PlayerTag), typeof(LocalTransform), typeof(PlayerGoSyncComponent));
             em.SetName(player, "SmokeStress_Player_WithTransform");
             em.SetComponentData(player, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            em.SetComponentData(player, new PlayerGoSyncComponent
+            {
+                Position = position,
+                Rotation = quaternion.identity,
+                SyncRotation = 0,
+                VacuumRequested = 0,
+                CleanupActionRequested = 0,
+                RequestedCleanupActionSlot = 0,
+            });
         }
 
         private static void CreateConfigSingletons(EntityManager em, int budgetPerFrame, int maxPendingCount, uint maxPendingAgeFrames)
@@ -1502,6 +1790,14 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var runSeedEntity = em.CreateEntity(typeof(SpawnRunSeedComponent));
             em.SetComponentData(runSeedEntity, new SpawnRunSeedComponent { Value = 0x9E3779B9u });
+
+            var runDirectorConfigEntity = em.CreateEntity(typeof(RunProgressDirectorConfigComponent));
+            em.SetComponentData(runDirectorConfigEntity, new RunProgressDirectorConfigComponent
+            {
+                PressureHoldSec = 0.35f,
+                BaselineTrashDensityScale = 0.45f,
+                PressureDensityScale = 1.0f,
+            });
         }
 
         private static Entity CreateSource(EntityManager em, int typeKey, float spawnDensityPerSecPerArea)
@@ -1639,6 +1935,24 @@ namespace SweepNDodge.DotsBullets.Tests
             return false;
         }
 
+        private static bool HasPendingSustainForLane(DynamicBuffer<SourceSpawnRequestBuffer> requests, SourceSpawnLaneId lane)
+        {
+            for (int i = 0; i < requests.Length; i++)
+            {
+                var item = requests[i];
+                if (item.Count <= 0)
+                    continue;
+                if (item.Phase != SourceWavePhaseId.Sustain)
+                    continue;
+                if (item.Lane != lane)
+                    continue;
+
+                return true;
+            }
+
+            return false;
+        }
+
         private static void EnableV3Source(EntityManager em, Entity source, uint stableId, SourceStateId activeState)
         {
             if (!em.HasComponent<SourceStableIdComponent>(source))
@@ -1693,6 +2007,21 @@ namespace SweepNDodge.DotsBullets.Tests
                     SelectionSequence = 1u,
                 });
             }
+
+            var runDirectorState = new SourceRunDirectorStateComponent
+            {
+                State = activeState == SourceStateId.Depleted
+                    ? RunDirectorSourceStateId.Finish
+                    : RunDirectorSourceStateId.Pressure,
+                SelectedClipState = activeState,
+                PressureOccupancySec = 0f,
+                DensityScale = 1f,
+                Version = 1u,
+            };
+            if (!em.HasComponent<SourceRunDirectorStateComponent>(source))
+                em.AddComponentData(source, runDirectorState);
+            else
+                em.SetComponentData(source, runDirectorState);
 
             if (!em.HasBuffer<SourceClipPatternBuffer>(source))
                 em.AddBuffer<SourceClipPatternBuffer>(source);
