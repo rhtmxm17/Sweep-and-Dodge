@@ -9,6 +9,30 @@ namespace SweepNDodge.DotsBullets
         Finish = 2,
     }
 
+    // 디렉터 Pressure 점수 입력 슬롯.
+    public enum RunDirectorPressureInputSlotId : byte
+    {
+        InfluenceOccupancy = 0,
+        InfluenceHoldSec = 1,
+    }
+
+    public struct SourceDirectorPressureInputBuffer : IBufferElementData
+    {
+        public RunDirectorPressureInputSlotId Slot;
+        public float Value;
+    }
+
+    // 런 디렉터 Pressure 입력 가중치 싱글톤 태그.
+    public struct RunDirectorPressureWeightSingletonTag : IComponentData
+    {
+    }
+
+    public struct RunDirectorPressureWeightBuffer : IBufferElementData
+    {
+        public RunDirectorPressureInputSlotId Slot;
+        public float Weight;
+    }
+
     // Source별 런 디렉터 관점 상태.
     // - Clip 선택 주체는 디렉터이며, SourceClipRequestBuildSystem이 이 값을 소비한다.
     public struct SourceRunDirectorStateComponent : IComponentData

@@ -2047,6 +2047,19 @@ namespace SweepNDodge.DotsBullets.Tests
                 BaselineTrashDensityScale = 0.45f,
                 PressureDensityScale = 1.0f,
             });
+
+            var pressureWeightEntity = em.CreateEntity(typeof(RunDirectorPressureWeightSingletonTag));
+            var pressureWeights = em.AddBuffer<RunDirectorPressureWeightBuffer>(pressureWeightEntity);
+            pressureWeights.Add(new RunDirectorPressureWeightBuffer
+            {
+                Slot = RunDirectorPressureInputSlotId.InfluenceOccupancy,
+                Weight = 1.0f,
+            });
+            pressureWeights.Add(new RunDirectorPressureWeightBuffer
+            {
+                Slot = RunDirectorPressureInputSlotId.InfluenceHoldSec,
+                Weight = 1.0f,
+            });
         }
 
         private static void SetPlayerPosition(EntityManager em, float3 position)
@@ -2287,6 +2300,8 @@ namespace SweepNDodge.DotsBullets.Tests
             else
                 em.SetComponentData(source, runDirectorState);
 
+            if (!em.HasBuffer<SourceDirectorPressureInputBuffer>(source))
+                em.AddBuffer<SourceDirectorPressureInputBuffer>(source);
             if (!em.HasBuffer<SourceClipPatternBuffer>(source))
                 em.AddBuffer<SourceClipPatternBuffer>(source);
             if (!em.HasBuffer<SourceSustainSlotCandidateBuffer>(source))
@@ -2296,6 +2311,18 @@ namespace SweepNDodge.DotsBullets.Tests
             if (!em.HasBuffer<SourceEventQueueBuffer>(source))
                 em.AddBuffer<SourceEventQueueBuffer>(source);
 
+            var pressureInputs = em.GetBuffer<SourceDirectorPressureInputBuffer>(source);
+            pressureInputs.Clear();
+            pressureInputs.Add(new SourceDirectorPressureInputBuffer
+            {
+                Slot = RunDirectorPressureInputSlotId.InfluenceOccupancy,
+                Value = 0f,
+            });
+            pressureInputs.Add(new SourceDirectorPressureInputBuffer
+            {
+                Slot = RunDirectorPressureInputSlotId.InfluenceHoldSec,
+                Value = 0f,
+            });
             em.GetBuffer<SourceClipPatternBuffer>(source).Clear();
             em.GetBuffer<SourceSustainSlotCandidateBuffer>(source).Clear();
             em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source).Clear();

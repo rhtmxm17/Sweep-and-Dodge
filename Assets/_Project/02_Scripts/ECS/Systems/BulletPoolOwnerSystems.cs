@@ -216,6 +216,22 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
+            if (!HasSingleton<RunDirectorPressureWeightSingletonTag>(em))
+            {
+                var e = em.CreateEntity(typeof(RunDirectorPressureWeightSingletonTag));
+                var weights = em.AddBuffer<RunDirectorPressureWeightBuffer>(e);
+                weights.Add(new RunDirectorPressureWeightBuffer
+                {
+                    Slot = RunDirectorPressureInputSlotId.InfluenceOccupancy,
+                    Weight = 1.0f,
+                });
+                weights.Add(new RunDirectorPressureWeightBuffer
+                {
+                    Slot = RunDirectorPressureInputSlotId.InfluenceHoldSec,
+                    Weight = 1.0f,
+                });
+            }
+
             if (!HasSingleton<DebugHudMetricsComponent>(em))
             {
                 var e = em.CreateEntity(typeof(DebugHudMetricsComponent));

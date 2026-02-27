@@ -12,6 +12,9 @@ namespace SweepNDodge.DotsBullets
     [UpdateBefore(typeof(SourceClipRequestBuildSystem))]
     public partial struct RunProgressDirectorSystem : ISystem
     {
+        private EntityQuery _directorConfigQuery;
+        private EntityQuery _pressureWeightQuery;
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
@@ -20,7 +23,15 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceAnchorComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
             state.RequireForUpdate<SourceRunDirectorStateComponent>();
-            state.RequireForUpdate<RunProgressDirectorConfigComponent>();
+            _directorConfigQuery = SystemAPI.QueryBuilder()
+                .WithAll<RunProgressDirectorConfigComponent>()
+                .Build();
+            _pressureWeightQuery = SystemAPI.QueryBuilder()
+                .WithAll<RunDirectorPressureWeightSingletonTag>()
+                .WithAll<RunDirectorPressureWeightBuffer>()
+                .Build();
+            state.RequireForUpdate(_directorConfigQuery);
+            state.RequireForUpdate(_pressureWeightQuery);
         }
 
         public void OnUpdate(ref SystemState state)
@@ -31,11 +42,21 @@ namespace SweepNDodge.DotsBullets
             if (!hasPlayerSync && !hasPlayerTransform)
                 return;
 
-            var config = SystemAPI.GetSingleton<RunProgressDirectorConfigComponent>();
+            var configEntity = ResolveFirstEntity(ref _directorConfigQuery);
+            if (configEntity == Entity.Null)
+                return;
+            var config = SystemAPI.GetComponent<RunProgressDirectorConfigComponent>(configEntity);
+
+            var weightEntity = ResolveFirstEntity(ref _pressureWeightQuery);
+            if (weightEntity == Entity.Null)
+                return;
+            var weightBuffer = SystemAPI.GetBuffer<RunDirectorPressureWeightBuffer>(weightEntity);
             float holdSec = math.max(0f, config.PressureHoldSec);
             float baselineScale = math.max(0f, config.BaselineTrashDensityScale);
             float pressureScale = math.max(0f, config.PressureDensityScale);
             float deltaTime = math.max(0f, SystemAPI.Time.DeltaTime);
+            var scoreWeights = PressureScoreWeights.CreateDefault();
+            ApplyWeightOverrides(ref scoreWeights, in weightBuffer);
             float3 playerPosition = hasPlayerSync
                 ? SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity).Position
                 : SystemAPI.GetComponent<LocalTransform>(playerEntity).Position;
@@ -45,12 +66,14 @@ namespace SweepNDodge.DotsBullets
             var anchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(true);
             var areaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
             var directorLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(false);
+            var pressureInputLookup = SystemAPI.GetBufferLookup<SourceDirectorPressureInputBuffer>(false);
 
             sourceLookup.Update(ref state);
             stableIdLookup.Update(ref state);
             anchorLookup.Update(ref state);
             areaLookup.Update(ref state);
             directorLookup.Update(ref state);
+            pressureInputLookup.Update(ref state);
 
             var sourceQuery = SystemAPI.QueryBuilder()
                 .WithAll<SourceSpawnComponent>()
@@ -75,6 +98,12 @@ namespace SweepNDodge.DotsBullets
                 {
                     director.PressureOccupancySec = 0f;
                     directorLookup[sourceEntity] = director;
+                    if (pressureInputLookup.TryGetBuffer(sourceEntity, out var depletedInputs))
+                    {
+                        SetOrAddPressureInput(ref depletedInputs, RunDirectorPressureInputSlotId.InfluenceOccupancy, 0f);
+                        SetOrAddPressureInput(ref depletedInputs, RunDirectorPressureInputSlotId.InfluenceHoldSec, 0f);
+                    }
+
                     continue;
                 }
 
@@ -87,12 +116,24 @@ namespace SweepNDodge.DotsBullets
                     : math.max(0f, director.PressureOccupancySec - deltaTime);
                 directorLookup[sourceEntity] = director;
 
+                float occupancyInput = isOccupied ? 1f : 0f;
+                float holdInput = director.PressureOccupancySec;
+                float score = EvaluatePressureScore(
+                    occupancyInput,
+                    holdInput,
+                    in scoreWeights);
+                if (pressureInputLookup.TryGetBuffer(sourceEntity, out var pressureInputs))
+                {
+                    SetOrAddPressureInput(ref pressureInputs, RunDirectorPressureInputSlotId.InfluenceOccupancy, occupancyInput);
+                    SetOrAddPressureInput(ref pressureInputs, RunDirectorPressureInputSlotId.InfluenceHoldSec, holdInput);
+                    score = EvaluatePressureScoreFromBuffer(ref pressureInputs, in scoreWeights);
+                }
+
                 bool isPressureCandidate = isOccupied || director.PressureOccupancySec > 0f;
                 if (!isPressureCandidate)
                     continue;
 
                 uint stableId = math.max(1u, stableIdLookup[sourceEntity].Value);
-                float score = director.PressureOccupancySec;
                 bool pick = false;
                 if (pressureEntity == Entity.Null)
                 {
@@ -169,6 +210,113 @@ namespace SweepNDodge.DotsBullets
 
             float radius = math.max(0f, area.Radius);
             return dx * dx + dz * dz <= radius * radius;
+        }
+
+        private static Entity ResolveFirstEntity(ref EntityQuery query)
+        {
+            int count = query.CalculateEntityCount();
+            if (count <= 0)
+                return Entity.Null;
+            if (count == 1)
+                return query.GetSingletonEntity();
+
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
+        }
+
+        private static void SetOrAddPressureInput(
+            ref DynamicBuffer<SourceDirectorPressureInputBuffer> inputs,
+            RunDirectorPressureInputSlotId slot,
+            float value)
+        {
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                if (inputs[i].Slot != slot)
+                    continue;
+
+                inputs[i] = new SourceDirectorPressureInputBuffer
+                {
+                    Slot = slot,
+                    Value = value
+                };
+                return;
+            }
+
+            inputs.Add(new SourceDirectorPressureInputBuffer
+            {
+                Slot = slot,
+                Value = value
+            });
+        }
+
+        private static float EvaluatePressureScoreFromBuffer(
+            ref DynamicBuffer<SourceDirectorPressureInputBuffer> inputs,
+            in PressureScoreWeights weights)
+        {
+            float score = 0f;
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                var input = inputs[i];
+                score += input.Value * ResolveSlotWeight(input.Slot, in weights);
+            }
+
+            return score;
+        }
+
+        private static float EvaluatePressureScore(
+            float occupancy,
+            float holdSec,
+            in PressureScoreWeights weights)
+        {
+            return occupancy * weights.Occupancy
+                + holdSec * weights.HoldSec;
+        }
+
+        private static float ResolveSlotWeight(
+            RunDirectorPressureInputSlotId slot,
+            in PressureScoreWeights weights)
+        {
+            return slot switch
+            {
+                RunDirectorPressureInputSlotId.InfluenceOccupancy => weights.Occupancy,
+                RunDirectorPressureInputSlotId.InfluenceHoldSec => weights.HoldSec,
+                _ => 0f,
+            };
+        }
+
+        private static void ApplyWeightOverrides(
+            ref PressureScoreWeights weights,
+            in DynamicBuffer<RunDirectorPressureWeightBuffer> weightBuffer)
+        {
+            for (int i = 0; i < weightBuffer.Length; i++)
+            {
+                var item = weightBuffer[i];
+                float safeWeight = item.Weight;
+                switch (item.Slot)
+                {
+                    case RunDirectorPressureInputSlotId.InfluenceOccupancy:
+                        weights.Occupancy = safeWeight;
+                        break;
+                    case RunDirectorPressureInputSlotId.InfluenceHoldSec:
+                        weights.HoldSec = safeWeight;
+                        break;
+                }
+            }
+        }
+
+        private struct PressureScoreWeights
+        {
+            public float Occupancy;
+            public float HoldSec;
+
+            public static PressureScoreWeights CreateDefault()
+            {
+                return new PressureScoreWeights
+                {
+                    Occupancy = 1.0f,
+                    HoldSec = 1.0f,
+                };
+            }
         }
     }
 }

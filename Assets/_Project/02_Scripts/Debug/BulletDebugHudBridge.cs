@@ -23,9 +23,11 @@ namespace SweepNDodge.DotsBullets
         private EntityQuery _hudQuery;
         private EntityQuery _stressQuery;
         private EntityQuery _sourceDirectorQuery;
+        private EntityQuery _directorWeightQuery;
         private bool _isBound;
         private Vector2 _sourceScroll;
         private readonly List<SourceDirectorHudRow> _sourceRows = new List<SourceDirectorHudRow>(32);
+        private PressureWeightSnapshot _weightSnapshot;
 
         private struct SourceDirectorHudRow
         {
@@ -35,12 +37,24 @@ namespace SweepNDodge.DotsBullets
             public SourceStateId ClipState;
             public SourceStateId SourceState;
             public float DensityScale;
+            public float PressureScore;
+            public float OccupancyInput;
+            public float HoldInputSec;
+        }
+
+        private struct PressureWeightSnapshot
+        {
+            public float Occupancy;
+            public float HoldSec;
         }
 
         private void Update()
         {
             if (TryBind())
+            {
+                RefreshPressureWeightSnapshot();
                 RefreshSourceDirectorSnapshot();
+            }
         }
 
         private void OnGUI()
@@ -66,6 +80,8 @@ namespace SweepNDodge.DotsBullets
             GUILayout.Label($"drop/expire: {hud.DroppedThisFrame} / {hud.ExpiredThisFrame}");
             GUILayout.Space(6f);
             GUILayout.Label($"sustainRemaining: {stress.RemainingFrames}");
+            GUILayout.Label(
+                $"pressureW occ:{_weightSnapshot.Occupancy:0.00} hold:{_weightSnapshot.HoldSec:0.00}");
             DrawSourceDirectorStatesSection();
 
             if (GUILayout.Button($"Stress Burst x{BurstCount}"))
@@ -94,8 +110,42 @@ namespace SweepNDodge.DotsBullets
                 ComponentType.ReadOnly<SourceRunDirectorStateComponent>(),
                 ComponentType.ReadOnly<SourceStableIdComponent>(),
                 ComponentType.ReadOnly<SourceSpawnComponent>());
+            _directorWeightQuery = _em.CreateEntityQuery(
+                ComponentType.ReadOnly<RunDirectorPressureWeightSingletonTag>(),
+                ComponentType.ReadOnly<RunDirectorPressureWeightBuffer>());
             _isBound = true;
             return true;
+        }
+
+        private void RefreshPressureWeightSnapshot()
+        {
+            _weightSnapshot = new PressureWeightSnapshot
+            {
+                Occupancy = 1.0f,
+                HoldSec = 1.0f,
+            };
+
+            if (_directorWeightQuery.IsEmptyIgnoreFilter)
+                return;
+
+            using var entities = _directorWeightQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+            if (entities.Length <= 0)
+                return;
+
+            var weightBuffer = _em.GetBuffer<RunDirectorPressureWeightBuffer>(entities[0]);
+            for (int i = 0; i < weightBuffer.Length; i++)
+            {
+                var item = weightBuffer[i];
+                switch (item.Slot)
+                {
+                    case RunDirectorPressureInputSlotId.InfluenceOccupancy:
+                        _weightSnapshot.Occupancy = item.Weight;
+                        break;
+                    case RunDirectorPressureInputSlotId.InfluenceHoldSec:
+                        _weightSnapshot.HoldSec = item.Weight;
+                        break;
+                }
+            }
         }
 
         private void RefreshSourceDirectorSnapshot()
@@ -113,6 +163,25 @@ namespace SweepNDodge.DotsBullets
                 var stable = _em.GetComponentData<SourceStableIdComponent>(e);
                 var director = _em.GetComponentData<SourceRunDirectorStateComponent>(e);
                 var source = _em.GetComponentData<SourceSpawnComponent>(e);
+                float occupancyInput = 0f;
+                float holdInput = 0f;
+                float pressureScore = 0f;
+                if (_em.HasBuffer<SourceDirectorPressureInputBuffer>(e))
+                {
+                    var inputs = _em.GetBuffer<SourceDirectorPressureInputBuffer>(e);
+                    for (int j = 0; j < inputs.Length; j++)
+                    {
+                        var input = inputs[j];
+                        float weight = ResolvePressureWeight(input.Slot);
+                        pressureScore += input.Value * weight;
+
+                        if (input.Slot == RunDirectorPressureInputSlotId.InfluenceOccupancy)
+                            occupancyInput = input.Value;
+                        else if (input.Slot == RunDirectorPressureInputSlotId.InfluenceHoldSec)
+                            holdInput = input.Value;
+                    }
+                }
+
                 _sourceRows.Add(new SourceDirectorHudRow
                 {
                     StableId = stable.Value,
@@ -121,6 +190,9 @@ namespace SweepNDodge.DotsBullets
                     ClipState = director.SelectedClipState,
                     SourceState = source.State,
                     DensityScale = director.DensityScale,
+                    PressureScore = pressureScore,
+                    OccupancyInput = occupancyInput,
+                    HoldInputSec = holdInput,
                 });
             }
         }
@@ -144,12 +216,23 @@ namespace SweepNDodge.DotsBullets
                 var row = _sourceRows[i];
                 GUILayout.Label(
                     $"#{row.StableId} (E{row.EntityIndex})  dir:{ToDirectorStateLabel(row.DirectorState)}  " +
-                    $"clip:{ToSourceStateLabel(row.ClipState)}  src:{ToSourceStateLabel(row.SourceState)}  x{row.DensityScale:0.00}");
+                    $"clip:{ToSourceStateLabel(row.ClipState)}  src:{ToSourceStateLabel(row.SourceState)}  " +
+                    $"x{row.DensityScale:0.00}  score:{row.PressureScore:0.00}  occ:{row.OccupancyInput:0.00}  hold:{row.HoldInputSec:0.00}");
             }
             int remaining = _sourceDirectorQuery.CalculateEntityCount() - _sourceRows.Count;
             if (remaining > 0)
                 GUILayout.Label($"+{remaining} more...");
             GUILayout.EndScrollView();
+        }
+
+        private float ResolvePressureWeight(RunDirectorPressureInputSlotId slot)
+        {
+            return slot switch
+            {
+                RunDirectorPressureInputSlotId.InfluenceOccupancy => _weightSnapshot.Occupancy,
+                RunDirectorPressureInputSlotId.InfluenceHoldSec => _weightSnapshot.HoldSec,
+                _ => 0f,
+            };
         }
 
         private static string ToDirectorStateLabel(RunDirectorSourceStateId state)

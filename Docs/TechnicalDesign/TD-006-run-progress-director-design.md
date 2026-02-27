@@ -118,6 +118,7 @@
   - 플레이어가 Source 영향권 안에 있으면 해당 Source는 즉시 `Pressure` 후보가 된다.
   - 영향권 이탈 후에는 `유지 시간(PressureHoldSec)`이 만료될 때까지 `Pressure`를 유지할 수 있다.
   - 단순 진입 이벤트 1회가 아니라, 최근 점유/이탈과 유지 시간을 반영해 주도 Source를 결정한다.
+  - Pressure 점수 입력 슬롯은 `InfluenceOccupancy`, `InfluenceHoldSec` 2개만 사용한다.
 - `Finish`는 고갈/정복 완료 이벤트 발생 후 유지 상태로 본다.
   - 연출 잔향 시간에 별도 제한을 두지 않는다.
   - `Finish` 진입 이벤트는 1회성으로 처리하고, 중복 진입은 무시한다.

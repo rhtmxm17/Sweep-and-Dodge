@@ -144,6 +144,18 @@ namespace SweepNDodge.DotsBullets
                     DensityScale = 1f,
                     Version = 1u,
                 });
+                var pressureInputs = AddBuffer<SourceDirectorPressureInputBuffer>(e);
+                pressureInputs.Clear();
+                pressureInputs.Add(new SourceDirectorPressureInputBuffer
+                {
+                    Slot = RunDirectorPressureInputSlotId.InfluenceOccupancy,
+                    Value = 0f,
+                });
+                pressureInputs.Add(new SourceDirectorPressureInputBuffer
+                {
+                    Slot = RunDirectorPressureInputSlotId.InfluenceHoldSec,
+                    Value = 0f,
+                });
 
                 BakeV3ClipBindings(
                     authoring,
