@@ -4,7 +4,7 @@
 - doc_id: `TD-005`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-26`
+- last_updated: `2026-02-27`
 - related_docs:
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
@@ -224,15 +224,18 @@
 
 ### 9.3 실행 규약
 1. 슬롯 키는 `State + Phase + Lane`으로 고정한다.
-2. 같은 `State + Sustain`에서 활성 클립은 Lane별 1개씩 허용한다(기본 최대 2개).
-3. 이벤트 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)을 적용한다.
-4. 이벤트 중복 트리거는 큐잉한다.
-5. 상태 전환 시 기존 sustain 클립은 즉시 중단한다.
-6. sustain 클립 선택 시 로컬 시간은 0으로 리셋한다.
-7. sustain 클립 종료 시 동일 슬롯 후보군에서 "직전 제외 랜덤"으로 다음 클립을 선택한다.
-8. Lane 우선순위는 `특수 > Hazard > Trash`를 적용하고, Lane 규칙을 요청 우선순위의 최상위 규칙으로 둔다.
-9. 결정론 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.
-10. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
+2. Clip 선택 주체는 Source가 아니라 `런 진행도 디렉터`다.
+3. Source는 디렉터가 할당한 `단일 활성 클립`을 재생하고, 전환/재생의 상세 시점 규칙은 기존 Source Clip 선택/전환 규칙 형태를 재사용한다.
+4. `Baseline <-> Pressure` 전환에서는 Clip을 교체하지 않는다.
+5. `Baseline`은 밀도 기반 스폰만 곱셈 배율로 축소하고, `hazard/event`는 디렉터 배율로 조정하지 않는다.
+6. `Pressure` 기본 배율은 `1.0`을 사용한다(추가 요소 미적용 기준).
+7. `Finish`는 `SourceState -> Depleted` 전환과 함께 강제 진입하며, 진입 시 Clip을 `중단` 또는 `고갈 연출용 미량 스폰`으로 교체한다.
+8. `Finish` 지속 Clip은 `Trash Lane`만 허용한다. 지속 Clip이 없으면 `중단` 경로를 사용한다.
+9. `Finish` 전환 시점의 1회성 연출은 추후 결정(TBD)한다.
+10. Lane 우선순위는 `특수 > Hazard > Trash`를 적용하고, Lane 규칙을 요청 우선순위의 최상위 규칙으로 둔다.
+11. 결정론 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.
+12. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
 
 ## 10. 변경 이력
+- 2026-02-27: 런 진행도 디렉터 책임 이관 기준에 맞춰 실행 규약을 갱신했다(Clip 선택 주체 디렉터, `Baseline/Pressure` Clip 유지+배율, `Finish` 강제 교체/Trash Lane 제약).
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`)의 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가

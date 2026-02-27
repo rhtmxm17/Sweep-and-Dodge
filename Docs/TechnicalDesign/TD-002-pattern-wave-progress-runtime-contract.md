@@ -4,7 +4,7 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-26`
+- last_updated: `2026-02-27`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -125,7 +125,12 @@ Hit:
 
 ## 4. 업데이트 순서/소유권
 - Request 단계:
+- 런 진행도 디렉터가 Source별 `단일 활성 클립`을 결정/할당한다.
 - Directive 데이터를 사용해 `SourceSpawnRequestBuffer`를 누적 생성한다.
+- `SourceClipRequestBuildSystem`은 할당된 활성 클립을 기준으로 요청 버퍼를 생성한다.
+- Clip 교체 시점/재생 중단 규칙은 기존 Source Clip 선택/전환 규칙의 형태를 유지한다.
+- `Baseline <-> Pressure` 전환에서는 Clip을 교체하지 않는다(배율만 조정).
+- `Finish`는 `SourceState -> Depleted` 전환 시 강제 진입하며, `중단` 또는 `미량 연출` Clip으로 교체한다.
 - 요청 집계 키는 `BulletTypeKey` 단독이 아니라 `DirectiveId`를 기본 키로 사용한다.
 - EventBurst 소비 정책은 `carry`를 사용한다(미소비 샷은 다음 프레임 이월).
 - ExecutionBegin 단계:
@@ -213,12 +218,17 @@ Hit:
 - 핵심 규약:
   - 슬롯 키: `State + Phase + Lane`
   - Lane enum은 확장 가능 구조로 설계한다(기본 운영: `Hazard`, `Trash`).
+  - Clip 선택 주체는 Source가 아니라 런 진행도 디렉터다.
   - `Sustain`: 상태당 Lane별 활성 클립 1개씩(기본 최대 2개 동시)
   - `OnStateEnterOnce` 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)
   - 이벤트 중복 트리거는 큐잉한다.
   - `Sustain`도 `StartSec/EndSec` 시간축 적용
-  - 클립 선택 시 `Sustain` 로컬 시간은 0으로 리셋
-  - `Sustain` 클립 종료 시 동일 슬롯 후보군에서 "직전 제외 랜덤"으로 다음 클립 선택
+  - 디렉터가 클립을 선택/교체할 때 `Sustain` 로컬 시간은 0으로 리셋한다.
+  - 클립 선택/교체의 상세 시점 규칙은 기존 Source Clip 선택/전환 규칙 형태를 재사용한다.
+  - `Baseline <-> Pressure` 전환에서는 Clip을 교체하지 않는다.
+  - `Baseline`은 밀도 기반 스폰 배율만 축소하고, `hazard/event`는 디렉터 배율로 조정하지 않는다.
+  - `Pressure` 기본 배율은 `1.0`이다(추가 요소 미적용 기준).
+  - `Finish` 진입 시 Clip은 `중단` 또는 `미량 연출` 경로로 교체하며, 지속 Clip은 `Trash Lane`만 허용한다.
   - 상태 전환 시 기존 sustain 클립 즉시 중단
   - Lane 우선순위는 `특수 > Hazard > Trash`이며 Lane 규칙이 최우선
 - 권장 ECS 스키마:
@@ -235,7 +245,7 @@ Hit:
 - Stage별 PlayerRelative 허용 비중 상한.
 - Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
 
-## 9. 런 진행도 디렉터 연동 네이밍 가드 (초안)
+## 9. 런 진행도 디렉터 연동 네이밍 가드
 - `SourceState` 용어는 Source 고갈 상태(`Normal/Weakened/Depleted`) 전용으로 유지한다.
 - 런/스테이지 진행 상태 용어는 분리해 `RunProgressState` 또는 `StageFlowState`를 사용한다.
 - `Channel` 용어는 탄 타입과 혼동 가능성이 있어 신규 설계에서도 `Lane` 용어를 유지한다.
@@ -248,6 +258,7 @@ Hit:
   - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
 
 ## 10. 변경 이력
+- 2026-02-27: `TD-006` active 전환과 함께, Clip 선택 주체(디렉터), `Baseline/Pressure` Clip 유지+배율 규칙, `Finish` 강제 교체 규칙을 반영해 소유권 문구를 갱신했다.
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 계약을 추가(구현 예정)
 - 2026-02-26: NWay 실행 규약(360도 균등/세트 원자성/이월 시 SpawnSequence 보존)과 발행 단위 계약(밀도형 vs 사건형)을 합의안으로 추가
 - 2026-02-26: PointSet 런타임 샘플러를 활성화하고(`Max=4`, 로컬 오프셋), 검증 규칙을 `CV028`/갱신된 `CVW033` 기준으로 동기화
