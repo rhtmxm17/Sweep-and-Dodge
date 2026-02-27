@@ -77,6 +77,35 @@
 - `Completed`
   - 스테이지 종료 상태.
 
+#### 1계층 전이 계약 (이벤트 + 게이트)
+- `Idle -> Running`
+  - 이벤트: `StageStartRequested`
+  - 게이트:
+    - `MinIdleDurationElapsed == true`
+    - `IntroPresentationDone == true`
+  - 전이식: `StageStartRequested && MinIdleDurationElapsed && IntroPresentationDone`
+- `ClearReady -> Completed`
+  - 이벤트: `ConfirmPressed` 또는 `AutoAdvanceTimeoutElapsed`
+  - 게이트:
+    - `ClearPresentationDone == true`
+  - 전이식: `(ConfirmPressed || AutoAdvanceTimeoutElapsed) && ClearPresentationDone`
+
+#### 게이트 갱신 주체 (초안)
+- `StageStartRequested`: 상위 `StageFlow`
+- `MinIdleDurationElapsed`: 런 진행도 디렉터 내부 타이머 시스템
+- `IntroPresentationDone`: 진입 연출/UI 시스템(브리지 통해 ECS 반영)
+- `ConfirmPressed`: 리절트 UI 입력 시스템(브리지 통해 ECS 반영)
+- `AutoAdvanceTimeoutElapsed`: 런 진행도 디렉터 내부 타이머 시스템
+- `ClearPresentationDone`: 클리어 연출/UI 시스템(브리지 통해 ECS 반영)
+
+#### 비고: 상위 StageFlow 가정
+- 본 상태 모델은 상위 `StageFlow`가 씬/맵/Source 초기 준비를 완료한 뒤, 준비 완료 이벤트를 통해 런 진행도 디렉터 상태머신을 시작한다는 전제를 둔다.
+- `StageReady`는 디렉터 전이식의 개별 게이트가 아니라 상위 `StageFlow`의 준비 보장 조건으로 본다.
+  - 내부 체크 예시: `PlayerReady`, `DirectorConfigReady`, `SourceBindReady`
+- 런 진행도 디렉터는 스테이지 내부 상태(`Idle -> Running -> ClearReady -> Completed`)만 책임진다.
+- 씬 전환, 스테이지 출입, 다음 스테이지 로딩과 같은 상위 라이프사이클 처리는 `StageFlow` 책임으로 분리한다.
+- `Completed` 이후 전환은 디렉터가 직접 수행하지 않고, 완료 이벤트를 상위 `StageFlow`에 전달해 후속 흐름을 진행한다.
+
 ### 6.4 2계층: Source별 Director 상태 의미
 - `Baseline`
   - 모든 Source가 작동 중인 기본 운영 상태.
@@ -141,6 +170,7 @@
   - `Finish` 전환 시점의 1회성 연출은 추후 결정(TBD)한다.
 
 ## 9. 변경 이력
+- 2026-02-27: `1계층 Stage 상태` 전이를 `이벤트 + 게이트` 계약으로 구체화하고, `Idle -> Running`, `ClearReady -> Completed` 전이식 및 게이트 갱신 주체 초안을 추가했다.
 - 2026-02-27: 문서 상태를 `active`로 전환하고, 런 디렉터 책임 이관 기준에 맞춰 표현을 정리했다.
 - 2026-02-26: 사용자와 상세 합의되지 않은 구체 타입명/버퍼명/시스템 순서/마이그레이션 세부안을 제거하고, 합의된 범위만 남기도록 문서를 축소했다.
 - 2026-02-26: `1~3개 Source가 항상 작동하거나 그렇게 보이는 스테이지` 전제를 반영해 상태 모델 방향성을 재정리했다.
