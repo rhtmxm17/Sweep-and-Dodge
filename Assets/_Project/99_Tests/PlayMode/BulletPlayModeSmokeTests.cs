@@ -149,6 +149,155 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_DedicatedScene_RunDirectorStageBridge_ConfirmTransitionsToCompleted()
+        {
+            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
+
+            var stageStateEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
+            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.ClearReady,
+                StateElapsedSec = 0f,
+                EnteredFrame = 0u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+            });
+
+            var gateEntity = GetSingletonEntity<RunDirectorStageGateComponent>(em);
+            em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 1,
+                MinIdleDurationElapsed = 0,
+                AutoAdvanceTimeoutElapsed = 0,
+            });
+
+            var requestEntity = GetSingletonEntity<RunDirectorStageRequestComponent>(em);
+            em.SetComponentData(requestEntity, default(RunDirectorStageRequestComponent));
+
+            var bridgeGo = new GameObject("RunDirectorStageBridge_PlayMode");
+            var bridge = bridgeGo.AddComponent<RunDirectorStageBridge>();
+            bridge.LogBindWarnings = false;
+
+            Assert.That(bridge.SetClearPresentationDone(true), Is.True);
+            Assert.That(bridge.RequestConfirm(), Is.True);
+            yield return WaitForCondition(
+                () => GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Completed,
+                120,
+                "RunDirector stage did not reach Completed after bridge confirm request.");
+
+            var stage = GetSingleton<RunDirectorStageStateComponent>(em);
+            Assert.That(stage.State, Is.EqualTo(RunDirectorStageStateId.Completed));
+            Assert.That(stage.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.ConfirmPressed));
+
+            Object.Destroy(bridgeGo);
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_DedicatedScene_TempStageFlowDriver_IntegratedStagePath_ReachesCompleted()
+        {
+            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
+
+            var stageStateEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
+            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.Idle,
+                StateElapsedSec = 0f,
+                EnteredFrame = 0u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+            });
+
+            var gateEntity = GetSingletonEntity<RunDirectorStageGateComponent>(em);
+            em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 0,
+                ClearPresentationDone = 0,
+                MinIdleDurationElapsed = 0,
+                AutoAdvanceTimeoutElapsed = 0,
+            });
+
+            var requestEntity = GetSingletonEntity<RunDirectorStageRequestComponent>(em);
+            em.SetComponentData(requestEntity, default(RunDirectorStageRequestComponent));
+
+            var signalEntity = GetSingletonEntity<RunDirectorStageSignalComponent>(em);
+            em.SetComponentData(signalEntity, default(RunDirectorStageSignalComponent));
+
+            var bridgeGo = new GameObject("RunDirectorStageBridge_TempDriver");
+            var bridge = bridgeGo.AddComponent<RunDirectorStageBridge>();
+            bridge.LogBindWarnings = false;
+
+            int completedEvents = 0;
+            bridge.StageRunCompleted += () => completedEvents++;
+
+            var tempFlow = bridgeGo.AddComponent<RunDirectorStageTempFlowDriver>();
+            tempFlow.StageBridge = bridge;
+            tempFlow.EnableManualHotkeys = false;
+            tempFlow.AutoRequestStartInIdle = true;
+            tempFlow.AutoSetIntroDoneInIdle = true;
+            tempFlow.AutoSetClearDoneInClearReady = true;
+            tempFlow.AutoConfirmInClearReady = true;
+            tempFlow.AutoConfirmDelaySec = 0f;
+
+            yield return WaitForCondition(
+                () => GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                240,
+                "Stage did not transition Idle -> Running by temporary flow driver.");
+
+            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.ClearReady,
+                StateElapsedSec = 0f,
+                EnteredFrame = 0u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.AllSourcesDepleted,
+            });
+
+            yield return WaitForCondition(
+                () => GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.ClearReady,
+                240,
+                "Stage did not reach ClearReady in integration test setup.");
+
+            yield return WaitForCondition(
+                () => GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Completed,
+                240,
+                "Stage did not transition ClearReady -> Completed by temporary flow driver.");
+
+            var completedStage = GetSingleton<RunDirectorStageStateComponent>(em);
+            Assert.That(completedStage.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.ConfirmPressed));
+            Assert.That(completedEvents, Is.EqualTo(1), "Bridge completion event should be raised once.");
+
+            Object.Destroy(bridgeGo);
+        }
+
+        [UnityTest]
         [Category("PeriodicOperationalScene")]
         public IEnumerator PlayMode_OperationalScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
         {
@@ -296,5 +445,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             return Entity.Null;
         }
+
     }
 }

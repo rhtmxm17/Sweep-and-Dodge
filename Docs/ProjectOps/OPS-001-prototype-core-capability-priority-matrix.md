@@ -4,7 +4,7 @@
 - doc_id: `OPS-001`
 - type: `ProjectOps`
 - status: `active`
-- last_updated: `2026-02-26`
+- last_updated: `2026-02-28`
 - related_adr:
   - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
@@ -33,7 +33,7 @@
   - `BLOCK`: 외부 의존/이슈로 진행 차단
 
 ## 3. 진행 현황 스냅샷
-- 전체(10): `DONE 7 | WIP 0 | TODO 3 | BLOCK 0` (완료율 70%)
+- 전체(10): `DONE 7 | WIP 1 | TODO 2 | BLOCK 0` (완료율 70%)
 - `P0`(5): 5/5 완료 (100%)
 - `P1`(4): 2/4 완료 (50%)
 - `P2`(1): 0/1 완료 (0%)
@@ -48,7 +48,7 @@
 | 5 | 스모크 테스트 루틴 (Play 진입, 핵심 루프, 대량 스폰/제거) | P0 | 3 | 8% | DONE | 100% | 전용 씬(작업 완료) + 운영 씬(정기) 2트랙 유지 | 2026-02-23 |
 | 6 | 콘텐츠 검증기 (Authoring Validator) | P1 | 3 | 8% | DONE | 100% | 규칙/게이트 테스트 유지보수 | 2026-02-25 |
 | 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | DONE | 100% | 시나리오 지표 회귀 추적 유지 | 2026-02-25 |
-| 8 | 런 진행도 디렉터 (Source 진행도 기반, 스테이지 2~3분/캠페인 15~20분 가드레일) | P1 | 4 | 14% | TODO | 0% | 착수 전 | 2026-02-20 |
+| 8 | 런 진행도 디렉터 (Source 진행도 기반, 스테이지 2~3분/캠페인 15~20분 가드레일) | P1 | 4 | 14% | WIP | 85% | 임시 호출 주체를 실제 StageFlow/UI 호출 주체로 교체 | 2026-02-28 |
 | 9 | 공통 전투 이벤트 채널 (피격/회피/수집/정리 집계) | P1 | 4 | 8% | TODO | 0% | 착수 전 | 2026-02-20 |
 | 10 | 재현 가능한 시드/리플레이 최소 기반 | P2 | 4 | 18% | TODO | 0% | 착수 전 | 2026-02-20 |
 
@@ -91,6 +91,12 @@
 - 실제 구현에서 순서/소요가 바뀌면 스냅샷/표를 함께 갱신하고 변경 이유를 1~2줄 남긴다.
 
 ## 10. 변경 메모
+### 2026-02-28
+- `#8 런 진행도 디렉터` 상태를 `WIP`로 상향했다.
+  - `RunDirectorStageBridge`를 기준으로 GO↔ECS 브리지 계약(요청/게이트 반영, 완료 신호 발행, 중복 가드)을 반영했다.
+  - 임시 호출 주체(`RunDirectorStageTempFlowDriver`) 기반 Stage 경로 검증(`Idle -> Running -> ClearReady -> Completed`)을 PlayMode에 추가했다.
+  - 남은 축은 임시 호출 주체를 실제 StageFlow/UI 호출 주체로 교체하는 작업이다.
+
 ### 2026-02-26
 - `#8` 명칭을 `런 타임라인 디렉터`에서 `런 진행도 디렉터`로 갱신했다.
   - 진행 기준을 시간축 단독에서 `Source 진행도/상태/이벤트` 해석 중심으로 명확화했다.

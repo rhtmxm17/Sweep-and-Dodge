@@ -32,6 +32,17 @@
 - `Pressure` 입력 슬롯은 `InfluenceOccupancy`, `InfluenceHoldSec` 두 개만 유지한다.
 - 설정 Authoring이 없는 경우 부트스트랩 기본 싱글톤으로 fallback한다.
 
+5. StageFlow/UI 브리지 운영 계약
+- 브리지는 `RunDirectorStageBridge` 단일 타입으로 GO->ECS 요청/게이트 반영과 ECS->GO 완료 신호 발행을 함께 담당한다.
+- 브리지 업데이트 타이밍은 `Update` 단일 루프를 사용한다.
+- 씬당 활성 브리지는 1개만 허용한다.
+  - 중복 브리지는 소유권 획득 실패로 `no-op` 처리한다.
+  - 중복 경고는 1회만 출력한다.
+- ECS 싱글톤 미존재 시 브리지는 `no-op` 처리하고 경고 1회만 출력한다.
+- one-shot 요청은 브리지가 `set only`로 기록하고, 소비/리셋은 ECS 전이 시스템이 담당한다.
+- `StageRunCompleted`는 브리지가 소비 후 즉시 리셋한다.
+- `OnStageRunCompleted` 발행은 프레임당 1회로 제한한다.
+
 ## 대안
 - Source 내부가 계속 클립 선택 주체로 유지:
   - 장점: 초기 변경량이 작음.
@@ -44,6 +55,7 @@
 - 상태 해석/출력 제어 책임이 디렉터로 수렴되어 변경 지점이 명확해졌다.
 - Baseline/Pressure/Finish 정책이 시스템/문서/테스트에서 동일하게 검증 가능해졌다.
 - Debug HUD에서 Source별 디렉터 상태와 Pressure 입력/점수를 직접 확인할 수 있게 됐다.
+- StageFlow/UI 연동 경계가 브리지 단일 계약으로 고정되어, 중복 브리지/미연동/초기화 지연 상황에서의 런타임 동작이 예측 가능해졌다.
 
 ## 검증
 - Unity compile error 0건.

@@ -131,6 +131,7 @@ namespace SweepNDodge.DotsBullets
             if (_stageStateQuery.IsEmptyIgnoreFilter)
                 return;
 
+            GUILayout.Label("[Run Director / Stage State]");
             var stage = _em.GetComponentData<RunDirectorStageStateComponent>(_stageStateQuery.GetSingletonEntity());
             GUILayout.Label(
                 $"stage:{ToStageStateLabel(stage.State)} elapsed:{stage.StateElapsedSec:0.00}s reason:{ToTransitionReasonLabel(stage.LastTransitionReason)}");

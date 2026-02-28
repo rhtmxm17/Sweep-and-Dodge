@@ -583,11 +583,11 @@ MonoBehaviour:
   PressureHoldSec: 0.35
   BaselineTrashDensityScale: 0.45
   PressureDensityScale: 1
+  InitialStageState: 0
+  MinIdleDurationSec: 0
+  ClearAutoAdvanceTimeoutSec: 10
   InfluenceOccupancyWeight: 1
   InfluenceHoldSecWeight: 1
-  CleanupInteractionWeight: 0
-  HazardInteractionWeight: 0
-  CollisionInteractionWeight: 0
 --- !u!4 &1665100580
 Transform:
   m_ObjectHideFlags: 0
