@@ -92,18 +92,22 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 
 ---
 
-## 5. DOTS/ECS 코딩 컨벤션(Conventions)
-### 5.1 네이밍
+## 5. 코딩 컨벤션(Conventions)
+### 5.1 ECS 네이밍
 - `IComponentData`: `*Component` / `*Tag`
 - 굽기(MonoBehaviour): `*Authoring` + 내부 `Baker`
 
-### 5.2 System 작성
+### 5.2 ECS System 작성
 - Entities 권장 패턴 준수
 - 병렬 Job에서 Lookup 기반 **쓰기**는 지양
   - 기본: `EnabledRefRW<T>`(자기 엔티티)로 처리
   - 교차 엔티티 write 필요 시: **ECB.ParallelWriter** 또는 Owner 단일 단계로 이동
 - ReadOnly/Write 의도를 어트리뷰트로 명확히 표기.
 - 항상 실행되어야 하는 Job은 enableable 쿼리 함정을 피하도록 옵션/시그니처를 설계.
+
+### 5.3 주석(summary) 작성
+- 공개 API, 복잡한 로직, 소유권/업데이트 순서처럼 규칙이 중요한 곳에는 `summary` 주석 작성을 권장한다.
+- 자명한 코드에는 주석을 생략한다.
 
 ---
 
@@ -141,6 +145,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
   - **권장(세션 제안)**: 본문 섹션 구성/순서, 예시 템플릿
 - ADR 본문 기본 구성(권장):
   - 문제(왜), 결정(무엇), 대안(비교), 결과(리스크/후속)
+  - 권장 구성을 맞추기 위해, 논의된 적이 없고 기록 가치가 낮은 내용을 임의로 추가하는 것을 금지한다.
 - AGENTS.md는 "현재 합의된 기준"만 유지, 상세 논의는 ADR로 분리
 - ADR 파일 규칙
   - 파일명(필수): `ADR-YYYYMMDD-NN-kebab-case.md`
