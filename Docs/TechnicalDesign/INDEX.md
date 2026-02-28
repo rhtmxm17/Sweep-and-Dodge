@@ -9,3 +9,4 @@
 - [TD-003-spawn-directive-model.md](TD-003-spawn-directive-model.md): SpawnDirective 분해 모델(Sampling/Emission/Payload)과 모드 조합 규칙
 - [TD-005-spawn-directive-settings-reference.md](TD-005-spawn-directive-settings-reference.md): WaveClipSO SpawnEntry 인라인 프로필 설정 의미/운영 규칙 레퍼런스
 - [TD-006-run-progress-director-design.md](TD-006-run-progress-director-design.md): 런 진행도 디렉터 책임 경계/상태 모델/연동 계약
+- [TD-007-common-combat-event-channel.md](TD-007-common-combat-event-channel.md): 공통 전투 이벤트 채널 범위(`Hit/Collect/Cleanup`)와 소유권/집계 계약
