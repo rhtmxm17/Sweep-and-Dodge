@@ -1921,6 +1921,250 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void RunDirectorStage_IdleToRunning_RequiresMinIdleAndIntroDone()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorStageIdleToRunningWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var stageConfigEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageConfigComponent>()).GetSingletonEntity();
+                em.SetComponentData(stageConfigEntity, new RunDirectorStageConfigComponent
+                {
+                    InitialState = RunDirectorStageStateId.Idle,
+                    MinIdleDurationSec = 0.5f,
+                    ClearAutoAdvanceTimeoutSec = 5f,
+                });
+
+                var stageStateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageStateComponent>()).GetSingletonEntity();
+                em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                    StateElapsedSec = 0f,
+                    EnteredFrame = 0u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+                });
+
+                var gateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageGateComponent>()).GetSingletonEntity();
+                em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+                {
+                    IntroPresentationDone = 0,
+                    ClearPresentationDone = 1,
+                    MinIdleDurationElapsed = 0,
+                    AutoAdvanceTimeoutElapsed = 0,
+                });
+
+                var requestEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageRequestComponent>()).GetSingletonEntity();
+                em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
+                {
+                    StageStartRequested = 1,
+                    ConfirmPressed = 0,
+                });
+
+                world.SetTime(new TimeData(0.2d, 0.2f));
+                simGroup.Update();
+                Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.Idle));
+
+                var gate = em.GetComponentData<RunDirectorStageGateComponent>(gateEntity);
+                gate.IntroPresentationDone = 1;
+                em.SetComponentData(gateEntity, gate);
+
+                world.SetTime(new TimeData(0.4d, 0.2f));
+                simGroup.Update();
+                Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.Idle), "MinIdle duration not reached yet");
+
+                world.SetTime(new TimeData(0.6d, 0.2f));
+                simGroup.Update();
+                var stageAfterRun = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
+                Assert.That(stageAfterRun.State, Is.EqualTo(RunDirectorStageStateId.Running));
+                Assert.That(stageAfterRun.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.StartRequested));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void RunDirectorStage_ClearReadyToCompleted_RequiresClearPresentationDone()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorStageClearReadyConfirmWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var stageStateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageStateComponent>()).GetSingletonEntity();
+                em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.ClearReady,
+                    StateElapsedSec = 0f,
+                    EnteredFrame = 0u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+                });
+
+                var gateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageGateComponent>()).GetSingletonEntity();
+                em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+                {
+                    IntroPresentationDone = 1,
+                    ClearPresentationDone = 0,
+                    MinIdleDurationElapsed = 0,
+                    AutoAdvanceTimeoutElapsed = 0,
+                });
+
+                var requestEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageRequestComponent>()).GetSingletonEntity();
+                em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
+                {
+                    StageStartRequested = 0,
+                    ConfirmPressed = 1,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.ClearReady));
+
+                var gate = em.GetComponentData<RunDirectorStageGateComponent>(gateEntity);
+                gate.ClearPresentationDone = 1;
+                em.SetComponentData(gateEntity, gate);
+
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+
+                var completed = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
+                var signal = em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageSignalComponent>()).GetSingleton<RunDirectorStageSignalComponent>();
+                Assert.That(completed.State, Is.EqualTo(RunDirectorStageStateId.Completed));
+                Assert.That(completed.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.ConfirmPressed));
+                Assert.That(signal.StageRunCompleted, Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void RunDirectorStage_ClearReadyToCompleted_AllowsAutoAdvanceTimeout()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorStageClearReadyTimeoutWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var stageConfigEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageConfigComponent>()).GetSingletonEntity();
+                em.SetComponentData(stageConfigEntity, new RunDirectorStageConfigComponent
+                {
+                    InitialState = RunDirectorStageStateId.ClearReady,
+                    MinIdleDurationSec = 0f,
+                    ClearAutoAdvanceTimeoutSec = 0.25f,
+                });
+
+                var stageStateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageStateComponent>()).GetSingletonEntity();
+                em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.ClearReady,
+                    StateElapsedSec = 0f,
+                    EnteredFrame = 0u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+                });
+
+                var gateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageGateComponent>()).GetSingletonEntity();
+                em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+                {
+                    IntroPresentationDone = 1,
+                    ClearPresentationDone = 1,
+                    MinIdleDurationElapsed = 0,
+                    AutoAdvanceTimeoutElapsed = 0,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.ClearReady));
+
+                world.SetTime(new TimeData(0.4d, 0.3f));
+                simGroup.Update();
+
+                var completed = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
+                Assert.That(completed.State, Is.EqualTo(RunDirectorStageStateId.Completed));
+                Assert.That(completed.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.AutoAdvanceTimeout));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void RunDirector_DoesNotSelectPressure_WhenStageIsNotRunning()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorStageGateWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var stageStateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageStateComponent>()).GetSingletonEntity();
+                em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                    StateElapsedSec = 0f,
+                    EnteredFrame = 0u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+                });
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Circle,
+                    Radius = 3f,
+                    Size = float2.zero,
+                    ComputedArea = math.PI * 9f,
+                });
+                em.SetComponentData(source, new SourceRunDirectorStateComponent
+                {
+                    State = RunDirectorSourceStateId.Baseline,
+                    SelectedClipState = SourceStateId.Normal,
+                    PressureOccupancySec = 0f,
+                    DensityScale = 1f,
+                    Version = 1u,
+                });
+
+                SetPlayerPosition(em, float3.zero);
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                var director = em.GetComponentData<SourceRunDirectorStateComponent>(source);
+                Assert.That(director.State, Is.EqualTo(RunDirectorSourceStateId.Baseline));
+                Assert.That(director.PressureOccupancySec, Is.EqualTo(0f).Within(0.0001f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);
@@ -2047,6 +2291,38 @@ namespace SweepNDodge.DotsBullets.Tests
                 BaselineTrashDensityScale = 0.45f,
                 PressureDensityScale = 1.0f,
             });
+
+            var stageConfigEntity = em.CreateEntity(typeof(RunDirectorStageConfigComponent));
+            em.SetComponentData(stageConfigEntity, new RunDirectorStageConfigComponent
+            {
+                InitialState = RunDirectorStageStateId.Running,
+                MinIdleDurationSec = 0f,
+                ClearAutoAdvanceTimeoutSec = 10f,
+            });
+
+            var stageStateEntity = em.CreateEntity(typeof(RunDirectorStageStateComponent));
+            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.Running,
+                StateElapsedSec = 0f,
+                EnteredFrame = 0u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+            });
+
+            var stageGateEntity = em.CreateEntity(typeof(RunDirectorStageGateComponent));
+            em.SetComponentData(stageGateEntity, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 1,
+                MinIdleDurationElapsed = 1,
+                AutoAdvanceTimeoutElapsed = 0,
+            });
+
+            var stageRequestEntity = em.CreateEntity(typeof(RunDirectorStageRequestComponent));
+            em.SetComponentData(stageRequestEntity, default(RunDirectorStageRequestComponent));
+
+            var stageSignalEntity = em.CreateEntity(typeof(RunDirectorStageSignalComponent));
+            em.SetComponentData(stageSignalEntity, default(RunDirectorStageSignalComponent));
 
             var pressureWeightEntity = em.CreateEntity(typeof(RunDirectorPressureWeightSingletonTag));
             var pressureWeights = em.AddBuffer<RunDirectorPressureWeightBuffer>(pressureWeightEntity);

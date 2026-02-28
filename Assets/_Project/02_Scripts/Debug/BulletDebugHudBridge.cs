@@ -24,6 +24,10 @@ namespace SweepNDodge.DotsBullets
         private EntityQuery _stressQuery;
         private EntityQuery _sourceDirectorQuery;
         private EntityQuery _directorWeightQuery;
+        private EntityQuery _stageStateQuery;
+        private EntityQuery _stageGateQuery;
+        private EntityQuery _stageRequestQuery;
+        private EntityQuery _stageSignalQuery;
         private bool _isBound;
         private Vector2 _sourceScroll;
         private readonly List<SourceDirectorHudRow> _sourceRows = new List<SourceDirectorHudRow>(32);
@@ -80,6 +84,7 @@ namespace SweepNDodge.DotsBullets
             GUILayout.Label($"drop/expire: {hud.DroppedThisFrame} / {hud.ExpiredThisFrame}");
             GUILayout.Space(6f);
             GUILayout.Label($"sustainRemaining: {stress.RemainingFrames}");
+            DrawStageStateSection();
             GUILayout.Label(
                 $"pressureW occ:{_weightSnapshot.Occupancy:0.00} hold:{_weightSnapshot.HoldSec:0.00}");
             DrawSourceDirectorStatesSection();
@@ -113,8 +118,42 @@ namespace SweepNDodge.DotsBullets
             _directorWeightQuery = _em.CreateEntityQuery(
                 ComponentType.ReadOnly<RunDirectorPressureWeightSingletonTag>(),
                 ComponentType.ReadOnly<RunDirectorPressureWeightBuffer>());
+            _stageStateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageStateComponent>());
+            _stageGateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageGateComponent>());
+            _stageRequestQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageRequestComponent>());
+            _stageSignalQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageSignalComponent>());
             _isBound = true;
             return true;
+        }
+
+        private void DrawStageStateSection()
+        {
+            if (_stageStateQuery.IsEmptyIgnoreFilter)
+                return;
+
+            var stage = _em.GetComponentData<RunDirectorStageStateComponent>(_stageStateQuery.GetSingletonEntity());
+            GUILayout.Label(
+                $"stage:{ToStageStateLabel(stage.State)} elapsed:{stage.StateElapsedSec:0.00}s reason:{ToTransitionReasonLabel(stage.LastTransitionReason)}");
+
+            if (!_stageGateQuery.IsEmptyIgnoreFilter)
+            {
+                var gate = _em.GetComponentData<RunDirectorStageGateComponent>(_stageGateQuery.GetSingletonEntity());
+                GUILayout.Label(
+                    $"gate intro:{gate.IntroPresentationDone} clear:{gate.ClearPresentationDone} " +
+                    $"minIdle:{gate.MinIdleDurationElapsed} auto:{gate.AutoAdvanceTimeoutElapsed}");
+            }
+
+            if (!_stageRequestQuery.IsEmptyIgnoreFilter)
+            {
+                var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestQuery.GetSingletonEntity());
+                GUILayout.Label($"request start:{request.StageStartRequested} confirm:{request.ConfirmPressed}");
+            }
+
+            if (!_stageSignalQuery.IsEmptyIgnoreFilter)
+            {
+                var signal = _em.GetComponentData<RunDirectorStageSignalComponent>(_stageSignalQuery.GetSingletonEntity());
+                GUILayout.Label($"signal completed:{signal.StageRunCompleted}");
+            }
         }
 
         private void RefreshPressureWeightSnapshot()
@@ -242,6 +281,31 @@ namespace SweepNDodge.DotsBullets
                 RunDirectorSourceStateId.Baseline => "Baseline",
                 RunDirectorSourceStateId.Pressure => "Pressure",
                 RunDirectorSourceStateId.Finish => "Finish",
+                _ => "Unknown",
+            };
+        }
+
+        private static string ToStageStateLabel(RunDirectorStageStateId state)
+        {
+            return state switch
+            {
+                RunDirectorStageStateId.Idle => "Idle",
+                RunDirectorStageStateId.Running => "Running",
+                RunDirectorStageStateId.ClearReady => "ClearReady",
+                RunDirectorStageStateId.Completed => "Completed",
+                _ => "Unknown",
+            };
+        }
+
+        private static string ToTransitionReasonLabel(RunDirectorStageTransitionReasonId reason)
+        {
+            return reason switch
+            {
+                RunDirectorStageTransitionReasonId.None => "None",
+                RunDirectorStageTransitionReasonId.StartRequested => "StartRequested",
+                RunDirectorStageTransitionReasonId.AllSourcesDepleted => "AllSourcesDepleted",
+                RunDirectorStageTransitionReasonId.ConfirmPressed => "ConfirmPressed",
+                RunDirectorStageTransitionReasonId.AutoAdvanceTimeout => "AutoAdvanceTimeout",
                 _ => "Unknown",
             };
         }

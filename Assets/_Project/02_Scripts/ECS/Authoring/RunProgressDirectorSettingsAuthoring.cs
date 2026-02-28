@@ -12,6 +12,11 @@ namespace SweepNDodge.DotsBullets
         [Min(0f)] public float BaselineTrashDensityScale = 0.45f;
         [Min(0f)] public float PressureDensityScale = 1.0f;
 
+        [Header("Stage State Config")]
+        public RunDirectorStageStateId InitialStageState = RunDirectorStageStateId.Running;
+        [Min(0f)] public float MinIdleDurationSec = 0f;
+        [Min(0f)] public float ClearAutoAdvanceTimeoutSec = 10f;
+
         [Header("Pressure Input Weights")]
         public float InfluenceOccupancyWeight = 1.0f;
         public float InfluenceHoldSecWeight = 1.0f;
@@ -26,6 +31,12 @@ namespace SweepNDodge.DotsBullets
                     PressureHoldSec = math.max(0f, authoring.PressureHoldSec),
                     BaselineTrashDensityScale = math.max(0f, authoring.BaselineTrashDensityScale),
                     PressureDensityScale = math.max(0f, authoring.PressureDensityScale),
+                });
+                AddComponent(e, new RunDirectorStageConfigComponent
+                {
+                    InitialState = authoring.InitialStageState,
+                    MinIdleDurationSec = math.max(0f, authoring.MinIdleDurationSec),
+                    ClearAutoAdvanceTimeoutSec = math.max(0f, authoring.ClearAutoAdvanceTimeoutSec),
                 });
                 AddComponent<RunDirectorPressureWeightSingletonTag>(e);
 

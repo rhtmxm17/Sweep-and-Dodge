@@ -9,6 +9,163 @@ namespace SweepNDodge.DotsBullets
     [BurstCompile]
     [UpdateInGroup(typeof(BulletRequestGroup))]
     [UpdateAfter(typeof(PlayerCarryBinDepositRequestSystem))]
+    [UpdateBefore(typeof(RunDirectorStageTransitionSystem))]
+    public partial struct RunDirectorStageGateUpdateSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<RunDirectorStageConfigComponent>();
+            state.RequireForUpdate<RunDirectorStageStateComponent>();
+            state.RequireForUpdate<RunDirectorStageGateComponent>();
+        }
+
+        public void OnUpdate(ref SystemState state)
+        {
+            float dt = math.max(0f, SystemAPI.Time.DeltaTime);
+            var config = SystemAPI.GetSingleton<RunDirectorStageConfigComponent>();
+            var stageRW = SystemAPI.GetSingletonRW<RunDirectorStageStateComponent>();
+            var gateRW = SystemAPI.GetSingletonRW<RunDirectorStageGateComponent>();
+
+            var stageState = stageRW.ValueRO;
+            var stageGate = gateRW.ValueRO;
+            stageState.StateElapsedSec = math.max(0f, stageState.StateElapsedSec + dt);
+
+            switch (stageState.State)
+            {
+                case RunDirectorStageStateId.Idle:
+                    stageGate.MinIdleDurationElapsed = stageState.StateElapsedSec >= math.max(0f, config.MinIdleDurationSec) ? (byte)1 : (byte)0;
+                    stageGate.AutoAdvanceTimeoutElapsed = 0;
+                    break;
+                case RunDirectorStageStateId.ClearReady:
+                    stageGate.MinIdleDurationElapsed = 0;
+                    stageGate.AutoAdvanceTimeoutElapsed = stageState.StateElapsedSec >= math.max(0f, config.ClearAutoAdvanceTimeoutSec) ? (byte)1 : (byte)0;
+                    break;
+                default:
+                    stageGate.MinIdleDurationElapsed = 0;
+                    stageGate.AutoAdvanceTimeoutElapsed = 0;
+                    break;
+            }
+
+            stageRW.ValueRW = stageState;
+            gateRW.ValueRW = stageGate;
+        }
+    }
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletRequestGroup))]
+    [UpdateAfter(typeof(RunDirectorStageGateUpdateSystem))]
+    [UpdateBefore(typeof(RunProgressDirectorSystem))]
+    public partial struct RunDirectorStageTransitionSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<BulletFrameCounterComponent>();
+            state.RequireForUpdate<SourceRunDirectorStateComponent>();
+            state.RequireForUpdate<RunDirectorStageStateComponent>();
+            state.RequireForUpdate<RunDirectorStageGateComponent>();
+            state.RequireForUpdate<RunDirectorStageRequestComponent>();
+            state.RequireForUpdate<RunDirectorStageSignalComponent>();
+        }
+
+        public void OnUpdate(ref SystemState state)
+        {
+            uint frame = FrameSequenceUtility.GetCurrentFrame(SystemAPI.GetSingleton<BulletFrameCounterComponent>());
+            var stageRW = SystemAPI.GetSingletonRW<RunDirectorStageStateComponent>();
+            var gateRW = SystemAPI.GetSingletonRW<RunDirectorStageGateComponent>();
+            var requestRW = SystemAPI.GetSingletonRW<RunDirectorStageRequestComponent>();
+            var signalRW = SystemAPI.GetSingletonRW<RunDirectorStageSignalComponent>();
+
+            var stageState = stageRW.ValueRO;
+            var stageGate = gateRW.ValueRO;
+            var stageRequest = requestRW.ValueRO;
+            var stageSignal = signalRW.ValueRO;
+
+            switch (stageState.State)
+            {
+                case RunDirectorStageStateId.Idle:
+                {
+                    bool canRun = stageRequest.StageStartRequested != 0
+                        && stageGate.MinIdleDurationElapsed != 0
+                        && stageGate.IntroPresentationDone != 0;
+                    if (canRun)
+                    {
+                        TransitionTo(
+                            ref stageState,
+                            RunDirectorStageStateId.Running,
+                            RunDirectorStageTransitionReasonId.StartRequested,
+                            frame);
+                        stageRequest.StageStartRequested = 0;
+                    }
+                    break;
+                }
+                case RunDirectorStageStateId.Running:
+                {
+                    bool anySource = false;
+                    bool allFinish = true;
+                    foreach (var sourceDirector in SystemAPI.Query<RefRO<SourceRunDirectorStateComponent>>())
+                    {
+                        anySource = true;
+                        if (sourceDirector.ValueRO.State == RunDirectorSourceStateId.Finish)
+                            continue;
+
+                        allFinish = false;
+                        break;
+                    }
+
+                    if (anySource && allFinish)
+                    {
+                        TransitionTo(
+                            ref stageState,
+                            RunDirectorStageStateId.ClearReady,
+                            RunDirectorStageTransitionReasonId.AllSourcesDepleted,
+                            frame);
+                        stageRequest.ConfirmPressed = 0;
+                    }
+                    break;
+                }
+                case RunDirectorStageStateId.ClearReady:
+                {
+                    bool confirm = stageRequest.ConfirmPressed != 0;
+                    bool timeout = stageGate.AutoAdvanceTimeoutElapsed != 0;
+                    bool canComplete = (confirm || timeout) && stageGate.ClearPresentationDone != 0;
+                    if (canComplete)
+                    {
+                        TransitionTo(
+                            ref stageState,
+                            RunDirectorStageStateId.Completed,
+                            confirm
+                                ? RunDirectorStageTransitionReasonId.ConfirmPressed
+                                : RunDirectorStageTransitionReasonId.AutoAdvanceTimeout,
+                            frame);
+                        stageRequest.ConfirmPressed = 0;
+                        stageSignal.StageRunCompleted = 1;
+                    }
+                    break;
+                }
+            }
+
+            stageRW.ValueRW = stageState;
+            gateRW.ValueRW = stageGate;
+            requestRW.ValueRW = stageRequest;
+            signalRW.ValueRW = stageSignal;
+        }
+
+        private static void TransitionTo(
+            ref RunDirectorStageStateComponent stageState,
+            RunDirectorStageStateId nextState,
+            RunDirectorStageTransitionReasonId reason,
+            uint frame)
+        {
+            stageState.State = nextState;
+            stageState.StateElapsedSec = 0f;
+            stageState.EnteredFrame = frame;
+            stageState.LastTransitionReason = reason;
+        }
+    }
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletRequestGroup))]
+    [UpdateAfter(typeof(PlayerCarryBinDepositRequestSystem))]
     [UpdateBefore(typeof(SourceClipRequestBuildSystem))]
     public partial struct RunProgressDirectorSystem : ISystem
     {
@@ -23,6 +180,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceAnchorComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
             state.RequireForUpdate<SourceRunDirectorStateComponent>();
+            state.RequireForUpdate<RunDirectorStageStateComponent>();
             _directorConfigQuery = SystemAPI.QueryBuilder()
                 .WithAll<RunProgressDirectorConfigComponent>()
                 .Build();
@@ -36,6 +194,10 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
+            var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
+            if (stageState.State != RunDirectorStageStateId.Running)
+                return;
+
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             bool hasPlayerSync = SystemAPI.HasComponent<PlayerGoSyncComponent>(playerEntity);
             bool hasPlayerTransform = SystemAPI.HasComponent<LocalTransform>(playerEntity);

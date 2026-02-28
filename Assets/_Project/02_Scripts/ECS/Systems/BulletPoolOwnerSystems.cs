@@ -216,6 +216,57 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
+            if (!HasSingleton<RunDirectorStageConfigComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(RunDirectorStageConfigComponent));
+                em.SetComponentData(e, new RunDirectorStageConfigComponent
+                {
+                    // Backward-compatible default: 기존 런타임 흐름을 유지하기 위해 Running에서 시작.
+                    InitialState = RunDirectorStageStateId.Running,
+                    MinIdleDurationSec = 0f,
+                    ClearAutoAdvanceTimeoutSec = 10f,
+                });
+            }
+
+            if (!HasSingleton<RunDirectorStageStateComponent>(em))
+            {
+                var stageConfig = em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageConfigComponent>())
+                    .GetSingleton<RunDirectorStageConfigComponent>();
+                var e = em.CreateEntity(typeof(RunDirectorStageStateComponent));
+                em.SetComponentData(e, new RunDirectorStageStateComponent
+                {
+                    State = stageConfig.InitialState,
+                    StateElapsedSec = 0f,
+                    EnteredFrame = 0u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+                });
+            }
+
+            if (!HasSingleton<RunDirectorStageGateComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(RunDirectorStageGateComponent));
+                em.SetComponentData(e, new RunDirectorStageGateComponent
+                {
+                    // 기본값은 즉시 시작 가능한 호환 모드.
+                    IntroPresentationDone = 1,
+                    ClearPresentationDone = 1,
+                    MinIdleDurationElapsed = 1,
+                    AutoAdvanceTimeoutElapsed = 0,
+                });
+            }
+
+            if (!HasSingleton<RunDirectorStageRequestComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(RunDirectorStageRequestComponent));
+                em.SetComponentData(e, default(RunDirectorStageRequestComponent));
+            }
+
+            if (!HasSingleton<RunDirectorStageSignalComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(RunDirectorStageSignalComponent));
+                em.SetComponentData(e, default(RunDirectorStageSignalComponent));
+            }
+
             if (!HasSingleton<RunDirectorPressureWeightSingletonTag>(em))
             {
                 var e = em.CreateEntity(typeof(RunDirectorPressureWeightSingletonTag));

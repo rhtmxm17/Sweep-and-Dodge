@@ -2,6 +2,59 @@ using Unity.Entities;
 
 namespace SweepNDodge.DotsBullets
 {
+    public enum RunDirectorStageStateId : byte
+    {
+        Idle = 0,
+        Running = 1,
+        ClearReady = 2,
+        Completed = 3,
+    }
+
+    public enum RunDirectorStageTransitionReasonId : byte
+    {
+        None = 0,
+        StartRequested = 1,
+        AllSourcesDepleted = 2,
+        ConfirmPressed = 3,
+        AutoAdvanceTimeout = 4,
+    }
+
+    public struct RunDirectorStageConfigComponent : IComponentData
+    {
+        public RunDirectorStageStateId InitialState;
+        public float MinIdleDurationSec;
+        public float ClearAutoAdvanceTimeoutSec;
+    }
+
+    public struct RunDirectorStageStateComponent : IComponentData
+    {
+        public RunDirectorStageStateId State;
+        public float StateElapsedSec;
+        public uint EnteredFrame;
+        public RunDirectorStageTransitionReasonId LastTransitionReason;
+    }
+
+    public struct RunDirectorStageGateComponent : IComponentData
+    {
+        public byte IntroPresentationDone;
+        public byte ClearPresentationDone;
+        public byte MinIdleDurationElapsed;
+        public byte AutoAdvanceTimeoutElapsed;
+    }
+
+    // 외부(StageFlow/UI)에서 보내는 one-shot 요청.
+    public struct RunDirectorStageRequestComponent : IComponentData
+    {
+        public byte StageStartRequested;
+        public byte ConfirmPressed;
+    }
+
+    // 상위 StageFlow가 소비할 완료 신호(one-shot).
+    public struct RunDirectorStageSignalComponent : IComponentData
+    {
+        public byte StageRunCompleted;
+    }
+
     public enum RunDirectorSourceStateId : byte
     {
         Baseline = 0,
