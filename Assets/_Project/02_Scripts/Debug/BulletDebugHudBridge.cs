@@ -85,38 +85,15 @@ namespace SweepNDodge.DotsBullets
             DrawCategoryToggleSection();
 
             if (_showCoreMetrics)
-            {
-                GUILayout.Label($"frameTime(ms): {hud.FrameTimeMs:0.00}");
-                GUILayout.Label($"active: {hud.ActiveBullets}");
-                GUILayout.Label($"spawn/despawn: {hud.SpawnedThisFrame} / {hud.DespawnedThisFrame}");
-                GUILayout.Label($"pending: {hud.PendingBacklog}");
-                GUILayout.Label($"deferred(budget/pool): {hud.DeferredByBudget} / {hud.DeferredByPool}");
-                GUILayout.Label($"drop/expire: {hud.DroppedThisFrame} / {hud.ExpiredThisFrame}");
-                GUILayout.Space(6f);
-            }
-
-            if (_showStressControl)
-                GUILayout.Label($"sustainRemaining: {stress.RemainingFrames}");
+                DrawCoreMetricsSection(hud);
             if (_showStageState)
                 DrawStageStateSection();
             if (_showCombatEvent)
                 DrawCombatEventSection();
             if (_showSourceDirectorState)
-            {
-                GUILayout.Label(
-                    $"pressureW occ:{_weightSnapshot.Occupancy:0.00} hold:{_weightSnapshot.HoldSec:0.00}");
                 DrawSourceDirectorStatesSection();
-            }
-
             if (_showStressControl)
-            {
-                if (GUILayout.Button($"Stress Burst x{BurstCount}"))
-                    RequestBurst();
-                if (GUILayout.Button($"Stress Sustain {SustainFrames}f x{SustainPerFrame}"))
-                    RequestSustain();
-                if (GUILayout.Button("Stop Sustain"))
-                    RequestStopSustain();
-            }
+                DrawStressControlSection(stress);
 
             GUILayout.EndArea();
         }
@@ -154,6 +131,7 @@ namespace SweepNDodge.DotsBullets
             if (_stageStateQuery.IsEmptyIgnoreFilter)
                 return;
 
+            GUILayout.Space(4f);
             GUILayout.Label("[Run Director / Stage State]");
             var stage = _em.GetComponentData<RunDirectorStageStateComponent>(_stageStateQuery.GetSingletonEntity());
             GUILayout.Label(
@@ -185,6 +163,7 @@ namespace SweepNDodge.DotsBullets
             if (_combatMetricsQuery.IsEmptyIgnoreFilter)
                 return;
 
+            GUILayout.Space(4f);
             var metrics = _em.GetComponentData<CombatEventMetricsComponent>(_combatMetricsQuery.GetSingletonEntity());
             GUILayout.Label("[Combat Event Channel]");
             GUILayout.Label(
@@ -282,8 +261,9 @@ namespace SweepNDodge.DotsBullets
             if (!ShouldDrawSourceDirectorState())
                 return;
 
-            GUILayout.Space(8f);
+            GUILayout.Space(4f);
             GUILayout.Label("[Run Director / Source States]");
+            GUILayout.Label($"pressureW occ:{_weightSnapshot.Occupancy:0.00} hold:{_weightSnapshot.HoldSec:0.00}");
             if (_sourceDirectorQuery.IsEmptyIgnoreFilter)
             {
                 GUILayout.Label("no sources");
@@ -319,6 +299,32 @@ namespace SweepNDodge.DotsBullets
             _showStressControl = GUILayout.Toggle(_showStressControl, "Stress");
             GUILayout.EndHorizontal();
             GUILayout.Space(6f);
+        }
+
+        private void DrawCoreMetricsSection(DebugHudMetricsComponent hud)
+        {
+            GUILayout.Space(4f);
+            GUILayout.Label("[Core Metrics]");
+            GUILayout.Label($"frameTime(ms): {hud.FrameTimeMs:0.00}");
+            GUILayout.Label($"active: {hud.ActiveBullets}");
+            GUILayout.Label($"spawn/despawn: {hud.SpawnedThisFrame} / {hud.DespawnedThisFrame}");
+            GUILayout.Label($"pending: {hud.PendingBacklog}");
+            GUILayout.Label($"deferred(budget/pool): {hud.DeferredByBudget} / {hud.DeferredByPool}");
+            GUILayout.Label($"drop/expire: {hud.DroppedThisFrame} / {hud.ExpiredThisFrame}");
+        }
+
+        private void DrawStressControlSection(StressSwitchStateComponent stress)
+        {
+            GUILayout.Space(4f);
+            GUILayout.Label("[Stress Control]");
+            GUILayout.Label($"sustainRemaining: {stress.RemainingFrames}");
+
+            if (GUILayout.Button($"Stress Burst x{BurstCount}"))
+                RequestBurst();
+            if (GUILayout.Button($"Stress Sustain {SustainFrames}f x{SustainPerFrame}"))
+                RequestSustain();
+            if (GUILayout.Button("Stop Sustain"))
+                RequestStopSustain();
         }
 
         private bool ShouldDrawSourceDirectorState()
