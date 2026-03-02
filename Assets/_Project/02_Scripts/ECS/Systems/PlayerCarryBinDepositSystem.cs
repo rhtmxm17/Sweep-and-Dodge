@@ -131,16 +131,33 @@ namespace SweepNDodge.DotsBullets
     [UpdateBefore(typeof(BulletDespawnExecutionSystem))]
     public partial struct PlayerCarryBinDepositExecutionSystem : ISystem
     {
+        private EntityQuery _combatEventChannelQuery;
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerCarryBinDepositRequestTag>();
             state.RequireForUpdate<PlayerCarryBinDepositContextComponent>();
+            state.RequireForUpdate<BulletFrameCounterComponent>();
+            _combatEventChannelQuery = SystemAPI.QueryBuilder()
+                .WithAll<CombatEventChannelSingletonTag>()
+                .WithAll<CombatEventBufferElement>()
+                .Build();
         }
 
         public void OnUpdate(ref SystemState state)
         {
+            uint frame = FrameSequenceUtility.GetCurrentFrame(SystemAPI.GetSingleton<BulletFrameCounterComponent>());
+            Entity combatChannelEntity = ResolveFirstEntity(ref _combatEventChannelQuery);
+            DynamicBuffer<CombatEventBufferElement> combatBuffer = default;
+            bool hasCombatBuffer = false;
+            if (combatChannelEntity != Entity.Null)
+            {
+                combatBuffer = SystemAPI.GetBuffer<CombatEventBufferElement>(combatChannelEntity);
+                hasCombatBuffer = true;
+            }
+
             foreach (var (depositRequest, carryBin, depositContext) in
                      SystemAPI.Query<
                          EnabledRefRW<PlayerCarryBinDepositRequestTag>,
@@ -154,12 +171,37 @@ namespace SweepNDodge.DotsBullets
                 if (depositedLoad > 0)
                 {
                     carryBin.ValueRW.Load = 0;
+                    if (hasCombatBuffer)
+                    {
+                        combatBuffer.Add(new CombatEventBufferElement
+                        {
+                            Type = CombatEventTypeId.Cleanup,
+                            SourceEntity = Entity.Null,
+                            RelatedEntity = depositContext.ValueRO.DepositEntity,
+                            Count = 1,
+                            Value = depositedLoad,
+                            Frame = frame,
+                            Sequence = (uint)combatBuffer.Length,
+                        });
+                    }
                     Debug.Log($"[CarryBinDeposit] load={depositedLoad}, deposit={depositContext.ValueRO.DepositEntity}");
                 }
 
                 depositContext.ValueRW.DepositEntity = Entity.Null;
                 depositRequest.ValueRW = false;
             }
+        }
+
+        private static Entity ResolveFirstEntity(ref EntityQuery query)
+        {
+            int count = query.CalculateEntityCount();
+            if (count <= 0)
+                return Entity.Null;
+            if (count == 1)
+                return query.GetSingletonEntity();
+
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
         }
     }
 }

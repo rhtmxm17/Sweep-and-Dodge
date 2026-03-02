@@ -137,6 +137,77 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void CombatEventChannel_ConsumesAndAggregatesHitCollectCleanup()
+        {
+            using var world = new World("CombatEventChannelWorld");
+            var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
+            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
+            var simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
+            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+
+            var em = world.EntityManager;
+            CreatePlayer(em);
+            CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+
+            var channelEntity = em.CreateEntity(
+                typeof(CombatEventChannelSingletonTag),
+                typeof(CombatEventMetricsComponent));
+            em.SetComponentData(channelEntity, default(CombatEventMetricsComponent));
+            var combatEvents = em.AddBuffer<CombatEventBufferElement>(channelEntity);
+            combatEvents.Add(new CombatEventBufferElement
+            {
+                Type = CombatEventTypeId.Hit,
+                SourceEntity = Entity.Null,
+                RelatedEntity = Entity.Null,
+                Count = 1,
+                Value = 7,
+                Frame = 41,
+                Sequence = 0,
+            });
+            combatEvents.Add(new CombatEventBufferElement
+            {
+                Type = CombatEventTypeId.Collect,
+                SourceEntity = Entity.Null,
+                RelatedEntity = Entity.Null,
+                Count = 1,
+                Value = 13,
+                Frame = 41,
+                Sequence = 1,
+            });
+            combatEvents.Add(new CombatEventBufferElement
+            {
+                Type = CombatEventTypeId.Cleanup,
+                SourceEntity = Entity.Null,
+                RelatedEntity = Entity.Null,
+                Count = 1,
+                Value = 5,
+                Frame = 42,
+                Sequence = 2,
+            });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            simGroup.Update();
+
+            var metrics = em.GetComponentData<CombatEventMetricsComponent>(channelEntity);
+            Assert.That(metrics.LastConsumedFrame, Is.EqualTo(42));
+            Assert.That(metrics.LastFrameHitCount, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameCollectCount, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameCleanupCount, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameHitValue, Is.EqualTo(7));
+            Assert.That(metrics.LastFrameCollectValue, Is.EqualTo(13));
+            Assert.That(metrics.LastFrameCleanupValue, Is.EqualTo(5));
+            Assert.That(metrics.TotalHitCount, Is.EqualTo(1));
+            Assert.That(metrics.TotalCollectCount, Is.EqualTo(1));
+            Assert.That(metrics.TotalCleanupCount, Is.EqualTo(1));
+            Assert.That(metrics.TotalHitValue, Is.EqualTo(7));
+            Assert.That(metrics.TotalCollectValue, Is.EqualTo(13));
+            Assert.That(metrics.TotalCleanupValue, Is.EqualTo(5));
+            Assert.That(em.GetBuffer<CombatEventBufferElement>(channelEntity).Length, Is.EqualTo(0));
+
+            ForceDisposeSharedContainersIfNeeded();
+        }
+
+        [Test]
         public void SpawnRequestBuild_MergesByDirectiveId_AndSeparatesDifferentDirective()
         {
             try

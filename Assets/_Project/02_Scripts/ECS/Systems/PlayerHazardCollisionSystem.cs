@@ -175,6 +175,8 @@ namespace SweepNDodge.DotsBullets
     [UpdateBefore(typeof(BulletDespawnExecutionSystem))]
     public partial struct PlayerHazardCollisionExecutionSystem : ISystem
     {
+        private EntityQuery _combatEventChannelQuery;
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<PlayerTag>();
@@ -183,18 +185,28 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerHazardHitContextComponent>();
             state.RequireForUpdate<SourceSpawnComponent>();
-            state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
             state.RequireForUpdate<PlayerImpulseEventBufferElement>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
+            _combatEventChannelQuery = SystemAPI.QueryBuilder()
+                .WithAll<CombatEventChannelSingletonTag>()
+                .WithAll<CombatEventBufferElement>()
+                .Build();
         }
 
         public void OnUpdate(ref SystemState state)
         {
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
-            var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
             var impulseBuffer = SystemAPI.GetBuffer<PlayerImpulseEventBufferElement>(playerEntity);
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
+            Entity combatChannelEntity = ResolveFirstEntity(ref _combatEventChannelQuery);
+            DynamicBuffer<CombatEventBufferElement> combatBuffer = default;
+            bool hasCombatBuffer = false;
+            if (combatChannelEntity != Entity.Null)
+            {
+                combatBuffer = SystemAPI.GetBuffer<CombatEventBufferElement>(combatChannelEntity);
+                hasCombatBuffer = true;
+            }
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
             sourceLookup.Update(ref state);
@@ -230,15 +242,19 @@ namespace SweepNDodge.DotsBullets
                     sourceLookup[sourceEntity] = source;
                 }
 
-                uiFeedbackBuffer.Add(new PlayerUiFeedbackEventBufferElement
+                if (hasCombatBuffer)
                 {
-                    Type = PlayerUiFeedbackEventType.PlayerHazardHit,
-                    Reason = (byte)PlayerUiFeedbackReasonId.Default,
-                    Value = loss,
-                    RelatedEntity = sourceEntity,
-                    Frame = frame,
-                    Sequence = (uint)uiFeedbackBuffer.Length,
-                });
+                    combatBuffer.Add(new CombatEventBufferElement
+                    {
+                        Type = CombatEventTypeId.Hit,
+                        SourceEntity = sourceEntity,
+                        RelatedEntity = playerEntity,
+                        Count = 1,
+                        Value = loss,
+                        Frame = frame,
+                        Sequence = (uint)combatBuffer.Length,
+                    });
+                }
 
                 impulseBuffer.Add(new PlayerImpulseEventBufferElement
                 {
@@ -256,6 +272,18 @@ namespace SweepNDodge.DotsBullets
                 Debug.Log($"[HazardCollision] 피격 처리 / loss={loss}, load={carryBin.ValueRO.Load}, contaminationApplied={(contaminationApplied ? 1 : 0)}, iFrame={penaltyState.ValueRO.IFrameTimer:0.00}, vacuumLock={penaltyState.ValueRO.VacuumLockTimer:0.00}");
                 hitReq.ValueRW = false;
             }
+        }
+
+        private static Entity ResolveFirstEntity(ref EntityQuery query)
+        {
+            int count = query.CalculateEntityCount();
+            if (count <= 0)
+                return Entity.Null;
+            if (count == 1)
+                return query.GetSingletonEntity();
+
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
         }
 
     }

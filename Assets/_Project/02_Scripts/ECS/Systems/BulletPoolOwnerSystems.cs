@@ -289,6 +289,20 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, default(DebugHudMetricsComponent));
             }
 
+            using var combatEventChannelQuery = em.CreateEntityQuery(
+                ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
+                ComponentType.ReadOnly<CombatEventMetricsComponent>(),
+                ComponentType.ReadWrite<CombatEventBufferElement>());
+            if (combatEventChannelQuery.IsEmptyIgnoreFilter)
+            {
+                var e = em.CreateEntity(
+                    typeof(CombatEventChannelSingletonTag),
+                    typeof(CombatEventMetricsComponent));
+                em.SetComponentData(e, default(CombatEventMetricsComponent));
+                var channel = em.AddBuffer<CombatEventBufferElement>(e);
+                channel.EnsureCapacity(64);
+            }
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (!HasSingleton<BulletRenderTraceConfigComponent>(em))
             {

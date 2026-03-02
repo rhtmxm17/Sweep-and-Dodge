@@ -28,10 +28,16 @@ namespace SweepNDodge.DotsBullets
         private EntityQuery _stageGateQuery;
         private EntityQuery _stageRequestQuery;
         private EntityQuery _stageSignalQuery;
+        private EntityQuery _combatMetricsQuery;
         private bool _isBound;
         private Vector2 _sourceScroll;
         private readonly List<SourceDirectorHudRow> _sourceRows = new List<SourceDirectorHudRow>(32);
         private PressureWeightSnapshot _weightSnapshot;
+        private bool _showCoreMetrics = true;
+        private bool _showStageState = true;
+        private bool _showCombatEvent = true;
+        private bool _showStressControl = true;
+        private bool _showSourceDirectorState = true;
 
         private struct SourceDirectorHudRow
         {
@@ -76,25 +82,41 @@ namespace SweepNDodge.DotsBullets
 
             GUILayout.BeginArea(HudRect, GUI.skin.box);
             GUILayout.Label("[Bullet Debug HUD]");
-            GUILayout.Label($"frameTime(ms): {hud.FrameTimeMs:0.00}");
-            GUILayout.Label($"active: {hud.ActiveBullets}");
-            GUILayout.Label($"spawn/despawn: {hud.SpawnedThisFrame} / {hud.DespawnedThisFrame}");
-            GUILayout.Label($"pending: {hud.PendingBacklog}");
-            GUILayout.Label($"deferred(budget/pool): {hud.DeferredByBudget} / {hud.DeferredByPool}");
-            GUILayout.Label($"drop/expire: {hud.DroppedThisFrame} / {hud.ExpiredThisFrame}");
-            GUILayout.Space(6f);
-            GUILayout.Label($"sustainRemaining: {stress.RemainingFrames}");
-            DrawStageStateSection();
-            GUILayout.Label(
-                $"pressureW occ:{_weightSnapshot.Occupancy:0.00} hold:{_weightSnapshot.HoldSec:0.00}");
-            DrawSourceDirectorStatesSection();
+            DrawCategoryToggleSection();
 
-            if (GUILayout.Button($"Stress Burst x{BurstCount}"))
-                RequestBurst();
-            if (GUILayout.Button($"Stress Sustain {SustainFrames}f x{SustainPerFrame}"))
-                RequestSustain();
-            if (GUILayout.Button("Stop Sustain"))
-                RequestStopSustain();
+            if (_showCoreMetrics)
+            {
+                GUILayout.Label($"frameTime(ms): {hud.FrameTimeMs:0.00}");
+                GUILayout.Label($"active: {hud.ActiveBullets}");
+                GUILayout.Label($"spawn/despawn: {hud.SpawnedThisFrame} / {hud.DespawnedThisFrame}");
+                GUILayout.Label($"pending: {hud.PendingBacklog}");
+                GUILayout.Label($"deferred(budget/pool): {hud.DeferredByBudget} / {hud.DeferredByPool}");
+                GUILayout.Label($"drop/expire: {hud.DroppedThisFrame} / {hud.ExpiredThisFrame}");
+                GUILayout.Space(6f);
+            }
+
+            if (_showStressControl)
+                GUILayout.Label($"sustainRemaining: {stress.RemainingFrames}");
+            if (_showStageState)
+                DrawStageStateSection();
+            if (_showCombatEvent)
+                DrawCombatEventSection();
+            if (_showSourceDirectorState)
+            {
+                GUILayout.Label(
+                    $"pressureW occ:{_weightSnapshot.Occupancy:0.00} hold:{_weightSnapshot.HoldSec:0.00}");
+                DrawSourceDirectorStatesSection();
+            }
+
+            if (_showStressControl)
+            {
+                if (GUILayout.Button($"Stress Burst x{BurstCount}"))
+                    RequestBurst();
+                if (GUILayout.Button($"Stress Sustain {SustainFrames}f x{SustainPerFrame}"))
+                    RequestSustain();
+                if (GUILayout.Button("Stop Sustain"))
+                    RequestStopSustain();
+            }
 
             GUILayout.EndArea();
         }
@@ -122,6 +144,7 @@ namespace SweepNDodge.DotsBullets
             _stageGateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageGateComponent>());
             _stageRequestQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageRequestComponent>());
             _stageSignalQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageSignalComponent>());
+            _combatMetricsQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>());
             _isBound = true;
             return true;
         }
@@ -155,6 +178,23 @@ namespace SweepNDodge.DotsBullets
                 var signal = _em.GetComponentData<RunDirectorStageSignalComponent>(_stageSignalQuery.GetSingletonEntity());
                 GUILayout.Label($"signal completed:{signal.StageRunCompleted}");
             }
+        }
+
+        private void DrawCombatEventSection()
+        {
+            if (_combatMetricsQuery.IsEmptyIgnoreFilter)
+                return;
+
+            var metrics = _em.GetComponentData<CombatEventMetricsComponent>(_combatMetricsQuery.GetSingletonEntity());
+            GUILayout.Label("[Combat Event Channel]");
+            GUILayout.Label(
+                $"last hit/collect/cleanup: {metrics.LastFrameHitCount}/{metrics.LastFrameCollectCount}/{metrics.LastFrameCleanupCount}");
+            GUILayout.Label(
+                $"last value hit/collect/cleanup: {metrics.LastFrameHitValue}/{metrics.LastFrameCollectValue}/{metrics.LastFrameCleanupValue}");
+            GUILayout.Label(
+                $"total hit/collect/cleanup: {metrics.TotalHitCount}/{metrics.TotalCollectCount}/{metrics.TotalCleanupCount}");
+            GUILayout.Label(
+                $"total value hit/collect/cleanup: {metrics.TotalHitValue}/{metrics.TotalCollectValue}/{metrics.TotalCleanupValue}");
         }
 
         private void RefreshPressureWeightSnapshot()
@@ -191,7 +231,7 @@ namespace SweepNDodge.DotsBullets
         private void RefreshSourceDirectorSnapshot()
         {
             _sourceRows.Clear();
-            if (!ShowSourceDirectorStates || _sourceDirectorQuery.IsEmptyIgnoreFilter)
+            if (!ShouldDrawSourceDirectorState() || _sourceDirectorQuery.IsEmptyIgnoreFilter)
                 return;
 
             int maxRows = Mathf.Max(1, MaxSourceRows);
@@ -239,7 +279,7 @@ namespace SweepNDodge.DotsBullets
 
         private void DrawSourceDirectorStatesSection()
         {
-            if (!ShowSourceDirectorStates)
+            if (!ShouldDrawSourceDirectorState())
                 return;
 
             GUILayout.Space(8f);
@@ -263,6 +303,27 @@ namespace SweepNDodge.DotsBullets
             if (remaining > 0)
                 GUILayout.Label($"+{remaining} more...");
             GUILayout.EndScrollView();
+        }
+
+        private void DrawCategoryToggleSection()
+        {
+            GUILayout.Space(4f);
+            GUILayout.Label("[Category Toggle]");
+            GUILayout.BeginHorizontal();
+            _showCoreMetrics = GUILayout.Toggle(_showCoreMetrics, "Core");
+            _showStageState = GUILayout.Toggle(_showStageState, "Stage");
+            _showCombatEvent = GUILayout.Toggle(_showCombatEvent, "Combat");
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            _showSourceDirectorState = GUILayout.Toggle(_showSourceDirectorState, "Source");
+            _showStressControl = GUILayout.Toggle(_showStressControl, "Stress");
+            GUILayout.EndHorizontal();
+            GUILayout.Space(6f);
+        }
+
+        private bool ShouldDrawSourceDirectorState()
+        {
+            return ShowSourceDirectorStates && _showSourceDirectorState;
         }
 
         private float ResolvePressureWeight(RunDirectorPressureInputSlotId slot)

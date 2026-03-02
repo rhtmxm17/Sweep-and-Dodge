@@ -65,6 +65,16 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ExecutionEndFeedbackSubSequence_StaysInContractOrder()
+        {
+            AssertUpdateAfter(typeof(PlayerCarryBinDepositExecutionSystem), typeof(PlayerHazardCollisionExecutionSystem));
+            AssertUpdateAfter(typeof(CombatEventChannelConsumeSystem), typeof(PlayerCarryBinDepositExecutionSystem));
+            AssertUpdateBefore(typeof(CombatEventChannelConsumeSystem), typeof(PlayerUiFeedbackConsumeSystem));
+            AssertUpdateAfter(typeof(DebugHudMetricsCollectSystem), typeof(PlayerUiFeedbackConsumeSystem));
+            AssertUpdateAfter(typeof(DebugHudMetricsCollectSystem), typeof(PlayerImpulseConsumeSystem));
+        }
+
+        [Test]
         public void FrameSequenceUtility_ExposesCounterBasedAccessor()
         {
             var method = typeof(FrameSequenceUtility).GetMethod(nameof(FrameSequenceUtility.GetCurrentFrame));

@@ -28,6 +28,7 @@ namespace SweepNDodge.DotsBullets
         private const float FallbackForwardTrashHalfAngleDeg = 40f;
         private const float FallbackForwardHazardLineLength = 3.2f;
         private const float FallbackForwardHazardLineHalfWidth = 0.5f;
+        private EntityQuery _combatEventChannelQuery;
 
         public void OnCreate(ref SystemState state)
         {
@@ -42,6 +43,10 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerCleanupActionStateComponent>();
             state.RequireForUpdate<PlayerCleanupActionProfileBufferElement>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
+            _combatEventChannelQuery = SystemAPI.QueryBuilder()
+                .WithAll<CombatEventChannelSingletonTag>()
+                .WithAll<CombatEventBufferElement>()
+                .Build();
         }
 
         [BurstCompile]
@@ -109,6 +114,7 @@ namespace SweepNDodge.DotsBullets
             var sourcePollutionCellLookup = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(isReadOnly: true);
             var sourcePollutionDropRequestLookup = SystemAPI.GetBufferLookup<SourcePollutionDropRequestBuffer>(isReadOnly: false);
             var uiFeedbackLookup = SystemAPI.GetBufferLookup<PlayerUiFeedbackEventBufferElement>(isReadOnly: false);
+            var combatEventLookup = SystemAPI.GetBufferLookup<CombatEventBufferElement>(isReadOnly: false);
 
             txLookup.Update(ref state);
             captureRuleLookup.Update(ref state);
@@ -122,9 +128,11 @@ namespace SweepNDodge.DotsBullets
             sourcePollutionCellLookup.Update(ref state);
             sourcePollutionDropRequestLookup.Update(ref state);
             uiFeedbackLookup.Update(ref state);
+            combatEventLookup.Update(ref state);
 
             var carryLookup = SystemAPI.GetComponentLookup<PlayerCarryBinComponent>(isReadOnly: false);
             carryLookup.Update(ref state);
+            Entity combatChannelEntity = ResolveFirstEntity(ref _combatEventChannelQuery);
 
             var newlyRequested = new NativeReference<int>(Allocator.TempJob);
             newlyRequested.Value = 0;
@@ -171,6 +179,9 @@ namespace SweepNDodge.DotsBullets
                 PlayerEntity = playerEntity,
                 CarryLookup = carryLookup,
                 Add = newlyRequested,
+                CombatChannelEntity = combatChannelEntity,
+                CombatEventLookup = combatEventLookup,
+                Frame = frame,
             }.Schedule(state.Dependency);
 
             state.Dependency = newlyRequested.Dispose(state.Dependency);
@@ -592,17 +603,50 @@ namespace SweepNDodge.DotsBullets
             public Entity PlayerEntity;
             public ComponentLookup<PlayerCarryBinComponent> CarryLookup;
             [ReadOnly] public NativeReference<int> Add;
+            public Entity CombatChannelEntity;
+            public BufferLookup<CombatEventBufferElement> CombatEventLookup;
+            public uint Frame;
 
             public void Execute()
             {
                 int add = Add.Value;
-                if (add <= 0) return;
-                if (!CarryLookup.HasComponent(PlayerEntity)) return;
+                if (add <= 0)
+                    return;
+                if (!CarryLookup.HasComponent(PlayerEntity))
+                    return;
 
                 var carry = CarryLookup[PlayerEntity];
                 carry.Load = CarryBinRules.AddLoadClamped(carry.Load, add, carry.Capacity);
                 CarryLookup[PlayerEntity] = carry;
+
+                if (CombatChannelEntity == Entity.Null)
+                    return;
+                if (!CombatEventLookup.TryGetBuffer(CombatChannelEntity, out var combatBuffer))
+                    return;
+
+                combatBuffer.Add(new CombatEventBufferElement
+                {
+                    Type = CombatEventTypeId.Collect,
+                    SourceEntity = Entity.Null,
+                    RelatedEntity = Entity.Null,
+                    Count = 1,
+                    Value = add,
+                    Frame = Frame,
+                    Sequence = (uint)combatBuffer.Length,
+                });
             }
+        }
+
+        private static Entity ResolveFirstEntity(ref EntityQuery query)
+        {
+            int count = query.CalculateEntityCount();
+            if (count <= 0)
+                return Entity.Null;
+            if (count == 1)
+                return query.GetSingletonEntity();
+
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
         }
     }
 }
