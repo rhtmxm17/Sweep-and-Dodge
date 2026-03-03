@@ -27,11 +27,15 @@ namespace SweepNDodge.DotsBullets
     public struct ReplayInputFrameBufferElement : IBufferElementData
     {
         public uint Frame;
+        public float2 MoveAxis;
+        public float2 AimWorldXZ;
+        public byte HasAimWorldPoint;
         public float3 Position;
         public quaternion Rotation;
         public byte SyncRotation;
         public byte VacuumRequested;
         public byte CleanupActionRequested;
         public byte RequestedCleanupActionSlot;
+        public uint InputSequence;
     }
 }

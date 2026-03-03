@@ -38,6 +38,7 @@ namespace SweepNDodge.DotsBullets
             _playerQuery = SystemAPI.QueryBuilder()
                 .WithAll<PlayerTag>()
                 .WithAll<PlayerGoSyncComponent>()
+                .WithAll<PlayerInputIntentComponent>()
                 .Build();
 
             state.RequireForUpdate(_playerQuery);
@@ -94,15 +95,25 @@ namespace SweepNDodge.DotsBullets
             if (controlRW.ValueRO.Mode == ReplayInputModeId.Record)
             {
                 var sync = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
+                var intent = SystemAPI.GetComponent<PlayerInputIntentComponent>(playerEntity);
+                byte vacuumRequested = intent.VacuumRequested != 0 ? intent.VacuumRequested : sync.VacuumRequested;
+                byte cleanupRequested = intent.CleanupActionRequested != 0 ? intent.CleanupActionRequested : sync.CleanupActionRequested;
+                byte requestedSlot = intent.RequestedCleanupActionSlot != (byte)PlayerCleanupActionSlotId.None
+                    ? intent.RequestedCleanupActionSlot
+                    : sync.RequestedCleanupActionSlot;
                 var snapshot = new ReplayInputFrameBufferElement
                 {
                     Frame = frame,
+                    MoveAxis = intent.MoveAxis,
+                    AimWorldXZ = intent.AimWorldXZ,
+                    HasAimWorldPoint = intent.HasAimWorldPoint,
                     Position = sync.Position,
                     Rotation = sync.Rotation,
                     SyncRotation = sync.SyncRotation,
-                    VacuumRequested = sync.VacuumRequested,
-                    CleanupActionRequested = sync.CleanupActionRequested,
-                    RequestedCleanupActionSlot = sync.RequestedCleanupActionSlot,
+                    VacuumRequested = vacuumRequested,
+                    CleanupActionRequested = cleanupRequested,
+                    RequestedCleanupActionSlot = requestedSlot,
+                    InputSequence = intent.Sequence,
                 };
 
                 int last = frames.Length - 1;
@@ -130,6 +141,16 @@ namespace SweepNDodge.DotsBullets
             if (nextFrameIndex < frames.Length && frames[nextFrameIndex].Frame == frame)
             {
                 var snapshot = frames[nextFrameIndex];
+                SystemAPI.SetComponent(playerEntity, new PlayerInputIntentComponent
+                {
+                    MoveAxis = snapshot.MoveAxis,
+                    AimWorldXZ = snapshot.AimWorldXZ,
+                    HasAimWorldPoint = snapshot.HasAimWorldPoint,
+                    VacuumRequested = snapshot.VacuumRequested,
+                    CleanupActionRequested = snapshot.CleanupActionRequested,
+                    RequestedCleanupActionSlot = snapshot.RequestedCleanupActionSlot,
+                    Sequence = snapshot.InputSequence,
+                });
                 SystemAPI.SetComponent(playerEntity, new PlayerGoSyncComponent
                 {
                     Position = snapshot.Position,

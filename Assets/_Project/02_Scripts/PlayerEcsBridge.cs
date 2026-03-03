@@ -1,5 +1,5 @@
 ﻿using Unity.Entities;
-using Unity.Transforms;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
@@ -22,6 +22,7 @@ namespace SweepNDodge.DotsBullets
 
         [Header("Authority (Transition)")]
         public bool EnableLegacyTransformToEcsSync = true;
+        public Camera AimCamera;
 
         // Vacuum 상태 반영용 Animator (옵션)
         public Animator Animator;
@@ -55,6 +56,7 @@ namespace SweepNDodge.DotsBullets
             if (!suppressLiveInput)
             {
                 var sync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
+                var intent = _em.GetComponentData<PlayerInputIntentComponent>(_playerEntity);
                 if (EnableLegacyTransformToEcsSync)
                 {
                     sync.Position = transform.position;
@@ -62,17 +64,51 @@ namespace SweepNDodge.DotsBullets
                     if (SyncRotation) sync.Rotation = transform.rotation;
                 }
 
+                float moveX = 0f;
+                float moveZ = 0f;
+                if (Input.GetKey(KeyCode.A)) moveX -= 1f;
+                if (Input.GetKey(KeyCode.D)) moveX += 1f;
+                if (Input.GetKey(KeyCode.S)) moveZ -= 1f;
+                if (Input.GetKey(KeyCode.W)) moveZ += 1f;
+                var moveAxis = new float2(moveX, moveZ);
+                if (math.lengthsq(moveAxis) > 1f)
+                    moveAxis = math.normalizesafe(moveAxis, new float2(0f, 1f));
+                intent.MoveAxis = moveAxis;
+
+                var cameraToUse = AimCamera != null ? AimCamera : Camera.main;
+                if (cameraToUse != null)
+                {
+                    var ray = cameraToUse.ScreenPointToRay(Input.mousePosition);
+                    var groundPlane = new Plane(Vector3.up, Vector3.zero);
+                    if (groundPlane.Raycast(ray, out var enter))
+                    {
+                        var hitPoint = ray.GetPoint(enter);
+                        intent.AimWorldXZ = new float2(hitPoint.x, hitPoint.z);
+                        intent.HasAimWorldPoint = 1;
+                    }
+                    else
+                    {
+                        intent.HasAimWorldPoint = 0;
+                    }
+                }
+                else
+                {
+                    intent.HasAimWorldPoint = 0;
+                }
+
                 bool primaryPressed = Input.GetMouseButtonDown(PrimaryVacuumMouseButton);
                 bool secondaryPressed = Input.GetMouseButtonDown(SecondaryVacuumMouseButton);
                 if (primaryPressed || secondaryPressed)
                 {
-                    sync.VacuumRequested = 1;
-                    sync.CleanupActionRequested = 1;
-                    sync.RequestedCleanupActionSlot = (byte)(secondaryPressed ? SecondarySlot : PrimarySlot);
+                    intent.VacuumRequested = 1;
+                    intent.CleanupActionRequested = 1;
+                    intent.RequestedCleanupActionSlot = (byte)(secondaryPressed ? SecondarySlot : PrimarySlot);
+                    intent.Sequence += 1u;
                     _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
                 }
 
                 _em.SetComponentData(_playerEntity, sync);
+                _em.SetComponentData(_playerEntity, intent);
             }
 
             // ECS -> GO : Vacuum 상태를 Animator에 반영(옵션)

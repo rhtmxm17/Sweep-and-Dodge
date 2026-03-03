@@ -16,6 +16,17 @@ namespace SweepNDodge.DotsBullets
         public byte RequestedCleanupActionSlot; // PlayerCleanupActionSlotId(byte) 직렬화 값
     }
 
+    public struct PlayerInputIntentComponent : IComponentData
+    {
+        public float2 MoveAxis;
+        public float2 AimWorldXZ;
+        public byte HasAimWorldPoint;
+        public byte VacuumRequested; // 1이면 이번 프레임 요청
+        public byte CleanupActionRequested; // 1이면 이번 프레임 행동 전환 요청
+        public byte RequestedCleanupActionSlot; // PlayerCleanupActionSlotId(byte) 직렬화 값
+        public uint Sequence;
+    }
+
     public struct PlayerRadiusComponent : IComponentData
     {
         public float Value;

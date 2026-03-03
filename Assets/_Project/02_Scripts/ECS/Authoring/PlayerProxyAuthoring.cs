@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
@@ -71,6 +72,17 @@ namespace SweepNDodge.DotsBullets
                     VacuumRequested = 0,
                     CleanupActionRequested = 0,
                     RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None
+                });
+
+                AddComponent(e, new PlayerInputIntentComponent
+                {
+                    MoveAxis = float2.zero,
+                    AimWorldXZ = float2.zero,
+                    HasAimWorldPoint = 0,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
+                    Sequence = 0u,
                 });
 
                 AddComponent(e, new PlayerCleanupActionStateComponent

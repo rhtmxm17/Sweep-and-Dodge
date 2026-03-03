@@ -9,9 +9,10 @@ namespace SweepNDodge.DotsBullets
     {
         public void OnUpdate(ref SystemState state)
         {
-            foreach (var (sync, tx, vacuum, actionState, slotMap) in
+            foreach (var (sync, intent, tx, vacuum, actionState, slotMap) in
                      SystemAPI.Query<
                          RefRW<PlayerGoSyncComponent>,
+                         RefRW<PlayerInputIntentComponent>,
                          RefRW<LocalTransform>,
                          RefRW<VacuumRuntimeStateComponent>,
                          RefRW<PlayerCleanupActionStateComponent>,
@@ -22,12 +23,19 @@ namespace SweepNDodge.DotsBullets
                 if (sync.ValueRO.SyncRotation != 0)
                     tx.ValueRW.Rotation = sync.ValueRO.Rotation;
 
-                if (sync.ValueRO.VacuumRequested != 0)
+                bool hasVacuumRequest = intent.ValueRO.VacuumRequested != 0 || sync.ValueRO.VacuumRequested != 0;
+                bool hasCleanupRequest = intent.ValueRO.CleanupActionRequested != 0 || sync.ValueRO.CleanupActionRequested != 0;
+                if (hasVacuumRequest)
                     vacuum.ValueRW.ActivateRequested = 1;
-                if (sync.ValueRO.CleanupActionRequested != 0)
+                if (hasCleanupRequest)
+                {
+                    byte requestedSlot = intent.ValueRO.CleanupActionRequested != 0
+                        ? intent.ValueRO.RequestedCleanupActionSlot
+                        : sync.ValueRO.RequestedCleanupActionSlot;
                     actionState.ValueRW.PendingActionId = ResolveActionId(
-                        (PlayerCleanupActionSlotId)sync.ValueRO.RequestedCleanupActionSlot,
+                        (PlayerCleanupActionSlotId)requestedSlot,
                         in slotMap.ValueRO);
+                }
 
                 // 1회성 입력 소비
                 var s = sync.ValueRW;
@@ -35,6 +43,12 @@ namespace SweepNDodge.DotsBullets
                 s.CleanupActionRequested = 0;
                 s.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None;
                 sync.ValueRW = s;
+
+                var i = intent.ValueRW;
+                i.VacuumRequested = 0;
+                i.CleanupActionRequested = 0;
+                i.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None;
+                intent.ValueRW = i;
             }
         }
 
