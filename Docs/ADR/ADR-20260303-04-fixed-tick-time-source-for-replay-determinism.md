@@ -22,6 +22,19 @@
 - 고정 Tick 경로를 기준으로 재생한다.
 - 필요 시 디버그용 `Pause/Step(1 tick)`를 지원한다.
 
+4. Tick 실행 경계는 `FixedTickRootGroup`(신설)로 통합한다.
+- 입력 적용/플레이어 이동/탄환 시뮬레이션/스폰을 고정 Tick 루프 하위에서 실행한다.
+- 기존 `Initialization`/`Simulation` 경계는 표현 계층과 로직 계층 분리에 맞게 재배치한다.
+
+5. 입력 경로는 `InputSystem 이벤트 큐`를 1차 채택하고, 후속으로 `Manual Update` 전환을 검토한다.
+- 1차: 렌더 프레임 입력 이벤트를 tick 소비 큐에 적재한다.
+- 후속: 필요 시 InputSystem 업데이트 타이밍을 tick 경계로 수렴한다.
+
+6. 과부하 정책은 `MaxSubSteps + Accumulator Clamp`를 채택한다.
+- 프레임당 최대 tick 실행 수를 제한한다.
+- 누적기는 상한을 두어 spiral-of-death를 방지한다.
+- 리플레이/결정론 검증 모드에서는 `MaxSubSteps=1`을 기본값으로 사용한다.
+
 ## 대안 비교
 ### 대안 A: 고정 Tick 시간원 도입 (채택)
 - 장점: 결정론/재현성 강화, 리플레이 품질 안정, 1-tick step 디버깅 용이
@@ -50,6 +63,7 @@
 1. TD 발행: 시간원 구조/서브스텝/치환 순서 상세화
 2. 치환 대상 시스템 인벤토리 확정 및 단계별 WU 분해
 3. `SameSeed + SameInput + FixedTick` 동일성 테스트 추가
+4. 고정 Tick 구현 검증 단계에 `DeltaTime 직접 참조 금지` 자동 검사 추가
 
 ## 관련 문서
 - [ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md](ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md)

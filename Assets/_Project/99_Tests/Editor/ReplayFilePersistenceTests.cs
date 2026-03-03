@@ -41,12 +41,12 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             string path = BuildPath("roundtrip.rply");
             uint expectedRunSeed = 0x1234u;
-            var expectedFrames = CreateSampleFrames();
+            var expectedInputs = CreateSampleInputs();
 
             bool saved = ReplayFilePersistence.TrySave(
                 path,
                 expectedRunSeed,
-                expectedFrames,
+                expectedInputs,
                 out var saveError,
                 out var saveMessage);
 
@@ -57,29 +57,29 @@ namespace SweepNDodge.DotsBullets.Tests
             bool loaded = ReplayFilePersistence.TryLoad(
                 path,
                 out uint loadedRunSeed,
-                out List<ReplayInputFrameBufferElement> loadedFrames,
+                out List<ReplayTickInputElement> loadedInputs,
                 out var loadError,
                 out var loadMessage);
 
             Assert.That(loaded, Is.True, loadMessage);
             Assert.That(loadError, Is.EqualTo(ReplayIoError.None));
             Assert.That(loadedRunSeed, Is.EqualTo(expectedRunSeed));
-            Assert.That(loadedFrames.Count, Is.EqualTo(expectedFrames.Count));
+            Assert.That(loadedInputs.Count, Is.EqualTo(expectedInputs.Count));
 
-            for (int i = 0; i < expectedFrames.Count; i++)
-                AssertFrameEqual(expectedFrames[i], loadedFrames[i], i);
+            for (int i = 0; i < expectedInputs.Count; i++)
+                AssertInputEqual(expectedInputs[i], loadedInputs[i], i);
         }
 
         [Test]
         public void Save_EmptyFrames_SucceedsWithZeroCount()
         {
             string path = BuildPath("empty.rply");
-            var emptyFrames = new List<ReplayInputFrameBufferElement>(0);
+            var emptyInputs = new List<ReplayTickInputElement>(0);
 
             bool saved = ReplayFilePersistence.TrySave(
                 path,
                 777u,
-                emptyFrames,
+                emptyInputs,
                 out var saveError,
                 out var saveMessage);
 
@@ -89,14 +89,14 @@ namespace SweepNDodge.DotsBullets.Tests
             bool loaded = ReplayFilePersistence.TryLoad(
                 path,
                 out uint loadedRunSeed,
-                out List<ReplayInputFrameBufferElement> loadedFrames,
+                out List<ReplayTickInputElement> loadedInputs,
                 out var loadError,
                 out var loadMessage);
 
             Assert.That(loaded, Is.True, loadMessage);
             Assert.That(loadError, Is.EqualTo(ReplayIoError.None));
             Assert.That(loadedRunSeed, Is.EqualTo(777u));
-            Assert.That(loadedFrames.Count, Is.EqualTo(0));
+            Assert.That(loadedInputs.Count, Is.EqualTo(0));
         }
 
         [Test]
@@ -109,7 +109,7 @@ namespace SweepNDodge.DotsBullets.Tests
             bool loaded = ReplayFilePersistence.TryLoad(
                 path,
                 out _,
-                out _,
+                out List<ReplayTickInputElement> _,
                 out var reason,
                 out var message);
 
@@ -129,7 +129,7 @@ namespace SweepNDodge.DotsBullets.Tests
             bool loaded = ReplayFilePersistence.TryLoad(
                 path,
                 out _,
-                out _,
+                out List<ReplayTickInputElement> _,
                 out var reason,
                 out _);
 
@@ -147,7 +147,7 @@ namespace SweepNDodge.DotsBullets.Tests
             bool loaded = ReplayFilePersistence.TryLoad(
                 path,
                 out _,
-                out _,
+                out List<ReplayTickInputElement> _,
                 out var reason,
                 out _);
 
@@ -160,33 +160,27 @@ namespace SweepNDodge.DotsBullets.Tests
             return Path.Combine(_tempDirectory, fileName);
         }
 
-        private static List<ReplayInputFrameBufferElement> CreateSampleFrames()
+        private static List<ReplayTickInputElement> CreateSampleInputs()
         {
-            return new List<ReplayInputFrameBufferElement>
+            return new List<ReplayTickInputElement>
             {
-                new ReplayInputFrameBufferElement
+                new ReplayTickInputElement
                 {
-                    Frame = 3u,
+                    Tick = 3u,
                     MoveAxis = new float2(0.25f, -0.5f),
                     AimWorldXZ = new float2(4f, 8f),
                     HasAimWorldPoint = 1,
-                    Position = new float3(1f, 0f, 2f),
-                    Rotation = quaternion.identity,
-                    SyncRotation = 1,
                     VacuumRequested = 1,
                     CleanupActionRequested = 0,
                     RequestedCleanupActionSlot = 0,
                     InputSequence = 10u,
                 },
-                new ReplayInputFrameBufferElement
+                new ReplayTickInputElement
                 {
-                    Frame = 4u,
+                    Tick = 4u,
                     MoveAxis = new float2(-1f, 1f),
                     AimWorldXZ = new float2(-5f, 9f),
                     HasAimWorldPoint = 0,
-                    Position = new float3(3f, 0f, 5f),
-                    Rotation = new quaternion(0f, 0.70710677f, 0f, 0.70710677f),
-                    SyncRotation = 1,
                     VacuumRequested = 0,
                     CleanupActionRequested = 1,
                     RequestedCleanupActionSlot = 2,
@@ -195,22 +189,19 @@ namespace SweepNDodge.DotsBullets.Tests
             };
         }
 
-        private static void AssertFrameEqual(
-            ReplayInputFrameBufferElement expected,
-            ReplayInputFrameBufferElement actual,
+        private static void AssertInputEqual(
+            ReplayTickInputElement expected,
+            ReplayTickInputElement actual,
             int index)
         {
-            Assert.That(actual.Frame, Is.EqualTo(expected.Frame), $"frame[{index}].Frame");
-            Assert.That(actual.MoveAxis, Is.EqualTo(expected.MoveAxis), $"frame[{index}].MoveAxis");
-            Assert.That(actual.AimWorldXZ, Is.EqualTo(expected.AimWorldXZ), $"frame[{index}].AimWorldXZ");
-            Assert.That(actual.HasAimWorldPoint, Is.EqualTo(expected.HasAimWorldPoint), $"frame[{index}].HasAimWorldPoint");
-            Assert.That(actual.Position, Is.EqualTo(expected.Position), $"frame[{index}].Position");
-            Assert.That(actual.Rotation.value, Is.EqualTo(expected.Rotation.value), $"frame[{index}].Rotation");
-            Assert.That(actual.SyncRotation, Is.EqualTo(expected.SyncRotation), $"frame[{index}].SyncRotation");
-            Assert.That(actual.VacuumRequested, Is.EqualTo(expected.VacuumRequested), $"frame[{index}].VacuumRequested");
-            Assert.That(actual.CleanupActionRequested, Is.EqualTo(expected.CleanupActionRequested), $"frame[{index}].CleanupActionRequested");
-            Assert.That(actual.RequestedCleanupActionSlot, Is.EqualTo(expected.RequestedCleanupActionSlot), $"frame[{index}].RequestedCleanupActionSlot");
-            Assert.That(actual.InputSequence, Is.EqualTo(expected.InputSequence), $"frame[{index}].InputSequence");
+            Assert.That(actual.Tick, Is.EqualTo(expected.Tick), $"input[{index}].Tick");
+            Assert.That(actual.MoveAxis, Is.EqualTo(expected.MoveAxis), $"input[{index}].MoveAxis");
+            Assert.That(actual.AimWorldXZ, Is.EqualTo(expected.AimWorldXZ), $"input[{index}].AimWorldXZ");
+            Assert.That(actual.HasAimWorldPoint, Is.EqualTo(expected.HasAimWorldPoint), $"input[{index}].HasAimWorldPoint");
+            Assert.That(actual.VacuumRequested, Is.EqualTo(expected.VacuumRequested), $"input[{index}].VacuumRequested");
+            Assert.That(actual.CleanupActionRequested, Is.EqualTo(expected.CleanupActionRequested), $"input[{index}].CleanupActionRequested");
+            Assert.That(actual.RequestedCleanupActionSlot, Is.EqualTo(expected.RequestedCleanupActionSlot), $"input[{index}].RequestedCleanupActionSlot");
+            Assert.That(actual.InputSequence, Is.EqualTo(expected.InputSequence), $"input[{index}].InputSequence");
         }
 
         private static void SaveFixture(string path)
@@ -218,7 +209,7 @@ namespace SweepNDodge.DotsBullets.Tests
             bool saved = ReplayFilePersistence.TrySave(
                 path,
                 0xABCDu,
-                CreateSampleFrames(),
+                CreateSampleInputs(),
                 out var reason,
                 out var message);
 

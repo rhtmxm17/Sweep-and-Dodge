@@ -15,20 +15,32 @@ namespace SweepNDodge.DotsBullets
         IoFailure = 5,
     }
 
+    public struct ReplayTickInputElement
+    {
+        public uint Tick;
+        public float2 MoveAxis;
+        public float2 AimWorldXZ;
+        public byte HasAimWorldPoint;
+        public byte VacuumRequested;
+        public byte CleanupActionRequested;
+        public byte RequestedCleanupActionSlot;
+        public uint InputSequence;
+    }
+
     public static class ReplayFilePersistence
     {
         public const uint Magic = 0x52504C59u; // "RPLY"
-        public const uint CurrentSchemaVersion = 1u;
+        public const uint CurrentSchemaVersion = 2u;
 
         private const uint Fnv1aOffsetBasis = 2166136261u;
         private const uint Fnv1aPrime = 16777619u;
         private const int HeaderByteSize = 24;
-        private const int FrameByteSize = 57;
+        private const int TickInputByteSize = 28;
 
         public static bool TrySave(
             string path,
             uint runSeed,
-            IReadOnlyList<ReplayInputFrameBufferElement> frames,
+            IReadOnlyList<ReplayTickInputElement> tickInputs,
             out ReplayIoError reason,
             out string message)
         {
@@ -42,10 +54,10 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            if (frames == null)
+            if (tickInputs == null)
             {
                 reason = ReplayIoError.InvalidState;
-                message = "Save failed: replay frames are null.";
+                message = "Save failed: replay tick inputs are null.";
                 return false;
             }
 
@@ -56,8 +68,8 @@ namespace SweepNDodge.DotsBullets
                 if (!string.IsNullOrEmpty(directory))
                     Directory.CreateDirectory(directory);
 
-                var snapshotFrames = CreateFrameSnapshot(frames);
-                byte[] payload = SerializePayload(snapshotFrames);
+                var snapshotInputs = CreateTickInputSnapshot(tickInputs);
+                byte[] payload = SerializePayload(snapshotInputs);
                 uint checksum = ComputeChecksum(payload);
                 uint normalizedRunSeed = runSeed > 0u ? runSeed : 1u;
 
@@ -66,7 +78,7 @@ namespace SweepNDodge.DotsBullets
                 {
                     writer.Write(Magic);
                     writer.Write(CurrentSchemaVersion);
-                    writer.Write((uint)snapshotFrames.Count);
+                    writer.Write((uint)snapshotInputs.Count);
                     writer.Write(normalizedRunSeed);
                     writer.Write((uint)payload.Length);
                     writer.Write(checksum);
@@ -75,13 +87,9 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 if (File.Exists(path))
-                {
                     File.Replace(tempPath, path, null, true);
-                }
                 else
-                {
                     File.Move(tempPath, path);
-                }
 
                 return true;
             }
@@ -102,15 +110,32 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
+        public static bool TrySave(
+            string path,
+            uint runSeed,
+            IReadOnlyList<ReplayInputFrameBufferElement> frames,
+            out ReplayIoError reason,
+            out string message)
+        {
+            if (frames == null)
+            {
+                reason = ReplayIoError.InvalidState;
+                message = "Save failed: replay frames are null.";
+                return false;
+            }
+
+            return TrySave(path, runSeed, CreateTickInputsFromFrameSnapshots(frames), out reason, out message);
+        }
+
         public static bool TryLoad(
             string path,
             out uint runSeed,
-            out List<ReplayInputFrameBufferElement> frames,
+            out List<ReplayTickInputElement> tickInputs,
             out ReplayIoError reason,
             out string message)
         {
             runSeed = 1u;
-            frames = new List<ReplayInputFrameBufferElement>(0);
+            tickInputs = new List<ReplayTickInputElement>(0);
             reason = ReplayIoError.None;
             message = string.Empty;
 
@@ -134,7 +159,7 @@ namespace SweepNDodge.DotsBullets
                 using var reader = new BinaryReader(file);
                 uint magic = reader.ReadUInt32();
                 uint version = reader.ReadUInt32();
-                uint frameCount = reader.ReadUInt32();
+                uint tickCount = reader.ReadUInt32();
                 uint fileRunSeed = reader.ReadUInt32();
                 uint payloadByteLength = reader.ReadUInt32();
                 uint expectedChecksum = reader.ReadUInt32();
@@ -153,7 +178,7 @@ namespace SweepNDodge.DotsBullets
                     return false;
                 }
 
-                long expectedPayloadByteLength = (long)frameCount * FrameByteSize;
+                long expectedPayloadByteLength = (long)tickCount * TickInputByteSize;
                 if (expectedPayloadByteLength != payloadByteLength)
                 {
                     reason = ReplayIoError.CorruptedPayload;
@@ -184,7 +209,7 @@ namespace SweepNDodge.DotsBullets
                     return false;
                 }
 
-                frames = DeserializePayload(payload, frameCount);
+                tickInputs = DeserializePayload(payload, tickCount);
                 runSeed = fileRunSeed > 0u ? fileRunSeed : 1u;
                 return true;
             }
@@ -207,104 +232,138 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        public static bool TryLoadAndStagePlayback(string path, out ReplayIoError reason, out string message)
+        public static bool TryLoad(
+            string path,
+            out uint runSeed,
+            out List<ReplayInputFrameBufferElement> frames,
+            out ReplayIoError reason,
+            out string message)
         {
-            if (!TryLoad(path, out uint runSeed, out List<ReplayInputFrameBufferElement> frames, out reason, out message))
+            if (!TryLoad(path, out runSeed, out List<ReplayTickInputElement> tickInputs, out reason, out message))
+            {
+                frames = new List<ReplayInputFrameBufferElement>(0);
                 return false;
+            }
 
-            ReplaySessionStaging.StagePlayback(frames, runSeed);
+            frames = ConvertToFrameSnapshots(tickInputs);
             return true;
         }
 
-        private static List<ReplayInputFrameBufferElement> CreateFrameSnapshot(IReadOnlyList<ReplayInputFrameBufferElement> source)
+        public static bool TryLoadAndStagePlayback(string path, out ReplayIoError reason, out string message)
+        {
+            reason = ReplayIoError.InvalidState;
+            message = "Load-and-stage is not supported for tick-input replay schema yet. Integrate with FixedTick playback pipeline first.";
+            return false;
+        }
+
+        private static List<ReplayTickInputElement> CreateTickInputSnapshot(IReadOnlyList<ReplayTickInputElement> source)
         {
             int count = source.Count;
-            var snapshot = new List<ReplayInputFrameBufferElement>(count);
+            var snapshot = new List<ReplayTickInputElement>(count);
             for (int i = 0; i < count; i++)
                 snapshot.Add(source[i]);
             return snapshot;
         }
 
-        private static byte[] SerializePayload(IReadOnlyList<ReplayInputFrameBufferElement> frames)
+        private static List<ReplayTickInputElement> CreateTickInputsFromFrameSnapshots(IReadOnlyList<ReplayInputFrameBufferElement> frames)
         {
-            using var payloadStream = new MemoryStream(Math.Max(0, frames.Count) * FrameByteSize);
+            int count = frames.Count;
+            var tickInputs = new List<ReplayTickInputElement>(count);
+            for (int i = 0; i < count; i++)
+            {
+                var frame = frames[i];
+                tickInputs.Add(new ReplayTickInputElement
+                {
+                    Tick = frame.Frame,
+                    MoveAxis = frame.MoveAxis,
+                    AimWorldXZ = frame.AimWorldXZ,
+                    HasAimWorldPoint = frame.HasAimWorldPoint,
+                    VacuumRequested = frame.VacuumRequested,
+                    CleanupActionRequested = frame.CleanupActionRequested,
+                    RequestedCleanupActionSlot = frame.RequestedCleanupActionSlot,
+                    InputSequence = frame.InputSequence,
+                });
+            }
+
+            return tickInputs;
+        }
+
+        private static List<ReplayInputFrameBufferElement> ConvertToFrameSnapshots(IReadOnlyList<ReplayTickInputElement> tickInputs)
+        {
+            int count = tickInputs.Count;
+            var frames = new List<ReplayInputFrameBufferElement>(count);
+            for (int i = 0; i < count; i++)
+            {
+                var tickInput = tickInputs[i];
+                frames.Add(new ReplayInputFrameBufferElement
+                {
+                    Frame = tickInput.Tick,
+                    MoveAxis = tickInput.MoveAxis,
+                    AimWorldXZ = tickInput.AimWorldXZ,
+                    HasAimWorldPoint = tickInput.HasAimWorldPoint,
+                    Position = float3.zero,
+                    Rotation = quaternion.identity,
+                    SyncRotation = 0,
+                    VacuumRequested = tickInput.VacuumRequested,
+                    CleanupActionRequested = tickInput.CleanupActionRequested,
+                    RequestedCleanupActionSlot = tickInput.RequestedCleanupActionSlot,
+                    InputSequence = tickInput.InputSequence,
+                });
+            }
+
+            return frames;
+        }
+
+        private static byte[] SerializePayload(IReadOnlyList<ReplayTickInputElement> tickInputs)
+        {
+            using var payloadStream = new MemoryStream(Math.Max(0, tickInputs.Count) * TickInputByteSize);
             using (var writer = new BinaryWriter(payloadStream, System.Text.Encoding.UTF8, true))
             {
-                for (int i = 0; i < frames.Count; i++)
+                for (int i = 0; i < tickInputs.Count; i++)
                 {
-                    var frame = frames[i];
-                    writer.Write(frame.Frame);
-                    writer.Write(frame.MoveAxis.x);
-                    writer.Write(frame.MoveAxis.y);
-                    writer.Write(frame.AimWorldXZ.x);
-                    writer.Write(frame.AimWorldXZ.y);
-                    writer.Write(frame.HasAimWorldPoint);
-                    writer.Write(frame.Position.x);
-                    writer.Write(frame.Position.y);
-                    writer.Write(frame.Position.z);
-                    writer.Write(frame.Rotation.value.x);
-                    writer.Write(frame.Rotation.value.y);
-                    writer.Write(frame.Rotation.value.z);
-                    writer.Write(frame.Rotation.value.w);
-                    writer.Write(frame.SyncRotation);
-                    writer.Write(frame.VacuumRequested);
-                    writer.Write(frame.CleanupActionRequested);
-                    writer.Write(frame.RequestedCleanupActionSlot);
-                    writer.Write(frame.InputSequence);
+                    var input = tickInputs[i];
+                    writer.Write(input.Tick);
+                    writer.Write(input.MoveAxis.x);
+                    writer.Write(input.MoveAxis.y);
+                    writer.Write(input.AimWorldXZ.x);
+                    writer.Write(input.AimWorldXZ.y);
+                    writer.Write(input.HasAimWorldPoint);
+                    writer.Write(input.VacuumRequested);
+                    writer.Write(input.CleanupActionRequested);
+                    writer.Write(input.RequestedCleanupActionSlot);
+                    writer.Write(input.InputSequence);
                 }
             }
 
             return payloadStream.ToArray();
         }
 
-        private static List<ReplayInputFrameBufferElement> DeserializePayload(byte[] payload, uint frameCount)
+        private static List<ReplayTickInputElement> DeserializePayload(byte[] payload, uint tickCount)
         {
-            int count = frameCount > int.MaxValue ? int.MaxValue : (int)frameCount;
-            var frames = new List<ReplayInputFrameBufferElement>(count);
+            int count = tickCount > int.MaxValue ? int.MaxValue : (int)tickCount;
+            var tickInputs = new List<ReplayTickInputElement>(count);
 
             using var payloadStream = new MemoryStream(payload, false);
             using var reader = new BinaryReader(payloadStream);
             for (int i = 0; i < count; i++)
             {
-                uint frameValue = reader.ReadUInt32();
-                float moveAxisX = reader.ReadSingle();
-                float moveAxisY = reader.ReadSingle();
-                float aimX = reader.ReadSingle();
-                float aimY = reader.ReadSingle();
-                byte hasAim = reader.ReadByte();
-                float positionX = reader.ReadSingle();
-                float positionY = reader.ReadSingle();
-                float positionZ = reader.ReadSingle();
-                float rotationX = reader.ReadSingle();
-                float rotationY = reader.ReadSingle();
-                float rotationZ = reader.ReadSingle();
-                float rotationW = reader.ReadSingle();
-                byte syncRotation = reader.ReadByte();
-                byte vacuumRequested = reader.ReadByte();
-                byte cleanupRequested = reader.ReadByte();
-                byte requestedCleanupSlot = reader.ReadByte();
-                uint inputSequence = reader.ReadUInt32();
-
-                frames.Add(new ReplayInputFrameBufferElement
+                tickInputs.Add(new ReplayTickInputElement
                 {
-                    Frame = frameValue,
-                    MoveAxis = new float2(moveAxisX, moveAxisY),
-                    AimWorldXZ = new float2(aimX, aimY),
-                    HasAimWorldPoint = hasAim,
-                    Position = new float3(positionX, positionY, positionZ),
-                    Rotation = new quaternion(rotationX, rotationY, rotationZ, rotationW),
-                    SyncRotation = syncRotation,
-                    VacuumRequested = vacuumRequested,
-                    CleanupActionRequested = cleanupRequested,
-                    RequestedCleanupActionSlot = requestedCleanupSlot,
-                    InputSequence = inputSequence,
+                    Tick = reader.ReadUInt32(),
+                    MoveAxis = new float2(reader.ReadSingle(), reader.ReadSingle()),
+                    AimWorldXZ = new float2(reader.ReadSingle(), reader.ReadSingle()),
+                    HasAimWorldPoint = reader.ReadByte(),
+                    VacuumRequested = reader.ReadByte(),
+                    CleanupActionRequested = reader.ReadByte(),
+                    RequestedCleanupActionSlot = reader.ReadByte(),
+                    InputSequence = reader.ReadUInt32(),
                 });
             }
 
             if (payloadStream.Position != payloadStream.Length)
                 throw new InvalidDataException("Replay payload has trailing bytes after deserialize.");
 
-            return frames;
+            return tickInputs;
         }
 
         private static uint ComputeChecksum(byte[] payload)

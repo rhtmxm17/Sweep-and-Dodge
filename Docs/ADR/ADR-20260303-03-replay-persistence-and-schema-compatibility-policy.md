@@ -3,6 +3,7 @@
 
 ## 상태
 - 제안됨
+- 다음에서 일부 대체됨: [ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md](ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md)
 
 ## 배경
 - 현재 리플레이는 `ReplaySessionStaging` 기반으로 단일 런타임 세션에서만 다룰 수 있다.

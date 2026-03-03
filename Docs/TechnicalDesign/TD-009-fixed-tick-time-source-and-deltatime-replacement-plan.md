@@ -32,6 +32,21 @@
 - 재생 모드에서 로직 시간은 고정 Tick만 사용한다.
 - 디버그 모드에서 `Pause/Step(1 tick)` 실행을 허용한다.
 
+## 선택 방안(확정)
+1. Tick 실행 경계
+- `FixedTickRootGroup`를 신설한다.
+- 입력 적용, 플레이어 이동, 탄환 시뮬레이션, 스폰/요청 핵심 경로를 이 그룹 하위로 재배치한다.
+- 기존 `Initialization/Simulation` 경계는 표현 계층과 로직 계층 분리에 맞춰 정리한다.
+
+2. 입력 수집/소비
+- 1차: InputSystem 이벤트를 tick 소비 큐에 적재하고 tick 루프에서 순서대로 consume한다.
+- 2차: 필요 시 InputSystem `Manual Update` 전환으로 tick 경계 일치를 강화한다.
+
+3. 과부하(누적기) 처리
+- `MaxSubSteps` 제한 + `Accumulator Clamp` 조합을 사용한다.
+- 리플레이/결정론 검증 모드 기본값은 `MaxSubSteps=1`로 고정한다.
+- 일반 플레이 모드는 성능/체감 기준으로 cap 값을 완화해 운영한다.
+
 ## 치환 우선순위
 1. 1차(결정론 핵심)
 - `PlayerIntentMovementSystem`
@@ -63,11 +78,20 @@
 - Pause/Step(1 tick) 제어 노출
 - 로그/디버그 HUD에 tick 정보 표시
 
+5. Stage-4: 검증 자동화
+- 고정 Tick 구현 검증 단계에 `DeltaTime` 직접 사용 금지 검사를 추가한다.
+- 기본 규칙: 로직 시스템(`Assets/_Project/02_Scripts/ECS/Systems`)에서
+  - `SystemAPI.Time.DeltaTime` 금지
+  - `Time.deltaTime` 금지
+- 예외(화이트리스트): 표현 계층(HUD/카메라 등)만 허용
+- CI 또는 로컬 검증 스크립트에서 정규식 검사로 fail-fast 처리
+
 ## 테스트 계획
 1. `Determinism_FixedTick_SameSeedAndInput_SamePlayerTrack`
 2. `Determinism_FixedTick_SameSeedAndInput_SameBulletSnapshot`
 3. `Replay_PauseAndSingleStep_AdvancesExactlyOneTick`
 4. 기존 EditMode/PlayMode 스모크 회귀
+5. `DeltaTimeBan_NoUsageInLogicSystems`
 
 ## 리스크와 대응
 1. 시간축 혼재(일부 시스템만 치환)
@@ -78,3 +102,7 @@
 
 3. 표현 계층과 로직 체감 불일치
 - 대응: 표현 계층은 보간으로 유지하고 로직 검증은 tick 기준으로 수행
+
+## 관련 문서
+- [ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md](../ADR/ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md)
+- [TD-008-replay-io-persistence-and-version-policy.md](TD-008-replay-io-persistence-and-version-policy.md)
