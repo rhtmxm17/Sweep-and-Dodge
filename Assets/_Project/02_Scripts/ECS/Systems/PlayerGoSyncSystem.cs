@@ -9,6 +9,8 @@ namespace SweepNDodge.DotsBullets
     {
         public void OnUpdate(ref SystemState state)
         {
+            bool isReplayPlayback = SystemAPI.TryGetSingleton<ReplayInputControlComponent>(out var replayControl) &&
+                                    replayControl.Mode == ReplayInputModeId.Playback;
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             txLookup.Update(ref state);
 
@@ -22,7 +24,7 @@ namespace SweepNDodge.DotsBullets
                               .WithAll<PlayerTag>()
                               .WithEntityAccess())
             {
-                if (txLookup.HasComponent(entity))
+                if (!isReplayPlayback && txLookup.HasComponent(entity))
                 {
                     var tx = txLookup[entity];
                     var mirrored = sync.ValueRW;

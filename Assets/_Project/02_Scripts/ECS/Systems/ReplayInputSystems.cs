@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -160,6 +161,14 @@ namespace SweepNDodge.DotsBullets
                     CleanupActionRequested = snapshot.CleanupActionRequested,
                     RequestedCleanupActionSlot = snapshot.RequestedCleanupActionSlot,
                 });
+                if (SystemAPI.HasComponent<LocalTransform>(playerEntity))
+                {
+                    var tx = SystemAPI.GetComponent<LocalTransform>(playerEntity);
+                    SystemAPI.SetComponent(playerEntity, LocalTransform.FromPositionRotationScale(
+                        snapshot.Position,
+                        snapshot.Rotation,
+                        tx.Scale));
+                }
 
                 cursorRW.ValueRW = new ReplayInputCursorComponent
                 {

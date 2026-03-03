@@ -2383,6 +2383,153 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ReplayInput_PlaybackWithLocalTransform_KeepsSnapshotPoseUnderVariableDeltaTime()
+        {
+            using var world = CreateDefaultTestWorld("ReplayPlaybackLocalTransformWorld", out _);
+            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+            var em = world.EntityManager;
+            CreatePlayerWithTransform(em, float3.zero);
+            CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 64, maxPendingAgeFrames: 30);
+
+            var replayEntity = em.CreateEntityQuery(
+                ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+            var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var playerEntity = em.CreateEntityQuery(
+                ComponentType.ReadOnly<PlayerTag>(),
+                ComponentType.ReadWrite<LocalTransform>(),
+                ComponentType.ReadWrite<PlayerGoSyncComponent>(),
+                ComponentType.ReadWrite<PlayerInputIntentComponent>()).GetSingletonEntity();
+
+            var expected = new List<ReplayInputFrameBufferElement>
+            {
+                new ReplayInputFrameBufferElement
+                {
+                    Frame = 0u,
+                    MoveAxis = new float2(1f, 0f),
+                    AimWorldXZ = new float2(5f, 0f),
+                    HasAimWorldPoint = 1,
+                    Position = new float3(0.5f, 0f, 1.5f),
+                    Rotation = quaternion.RotateY(math.radians(15f)),
+                    SyncRotation = 1,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                    InputSequence = 10u,
+                },
+                new ReplayInputFrameBufferElement
+                {
+                    Frame = 1u,
+                    MoveAxis = new float2(0.7f, -0.2f),
+                    AimWorldXZ = new float2(6f, 2f),
+                    HasAimWorldPoint = 1,
+                    Position = new float3(1.2f, 0f, 2.6f),
+                    Rotation = quaternion.RotateY(math.radians(32f)),
+                    SyncRotation = 1,
+                    VacuumRequested = 1,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                    InputSequence = 11u,
+                },
+                new ReplayInputFrameBufferElement
+                {
+                    Frame = 2u,
+                    MoveAxis = new float2(-0.3f, 0.9f),
+                    AimWorldXZ = new float2(2f, 7f),
+                    HasAimWorldPoint = 1,
+                    Position = new float3(2.1f, 0f, 1.8f),
+                    Rotation = quaternion.RotateY(math.radians(78f)),
+                    SyncRotation = 1,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 1,
+                    RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary,
+                    InputSequence = 12u,
+                },
+                new ReplayInputFrameBufferElement
+                {
+                    Frame = 3u,
+                    MoveAxis = new float2(0.4f, 0.4f),
+                    AimWorldXZ = new float2(-1f, 9f),
+                    HasAimWorldPoint = 1,
+                    Position = new float3(2.9f, 0f, 3.3f),
+                    Rotation = quaternion.RotateY(math.radians(121f)),
+                    SyncRotation = 1,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                    InputSequence = 13u,
+                },
+                new ReplayInputFrameBufferElement
+                {
+                    Frame = 4u,
+                    MoveAxis = new float2(-1f, 0.1f),
+                    AimWorldXZ = new float2(-4f, 3f),
+                    HasAimWorldPoint = 1,
+                    Position = new float3(4.2f, 0f, 2.7f),
+                    Rotation = quaternion.RotateY(math.radians(170f)),
+                    SyncRotation = 1,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                    InputSequence = 14u,
+                },
+            };
+
+            var replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            replayFrames.Clear();
+            for (int i = 0; i < expected.Count; i++)
+                replayFrames.Add(expected[i]);
+
+            em.SetComponentData(replayEntity, new ReplayInputCursorComponent { NextFrameIndex = 0 });
+            em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Playback,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+
+            float[] deltas = { 1f / 30f, 1f / 120f, 1f / 24f, 1f / 90f, 1f / 55f };
+            double elapsed = 0d;
+            for (int i = 0; i < expected.Count; i++)
+            {
+                em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = (uint)i });
+                em.SetComponentData(playerEntity, LocalTransform.FromPositionRotationScale(
+                    new float3(-100f - i, 0f, -100f - i),
+                    quaternion.identity,
+                    1f));
+                em.SetComponentData(playerEntity, new PlayerGoSyncComponent
+                {
+                    Position = new float3(999f + i, 0f, 999f + i),
+                    Rotation = quaternion.identity,
+                    SyncRotation = 1,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                });
+                elapsed += deltas[i];
+                world.SetTime(new TimeData(elapsed, deltas[i]));
+                initGroup.Update();
+
+                var sync = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
+                var tx = em.GetComponentData<LocalTransform>(playerEntity);
+                var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+
+                Assert.That(sync.Position, Is.EqualTo(expected[i].Position), $"sync position mismatch at frame={i}");
+                Assert.That(tx.Position, Is.EqualTo(expected[i].Position), $"transform position mismatch at frame={i}");
+                Assert.That(sync.Rotation.value, Is.EqualTo(expected[i].Rotation.value), $"sync rotation mismatch at frame={i}");
+                Assert.That(tx.Rotation.value, Is.EqualTo(expected[i].Rotation.value), $"transform rotation mismatch at frame={i}");
+                Assert.That(intent.Sequence, Is.EqualTo(expected[i].InputSequence), $"intent sequence mismatch at frame={i}");
+            }
+
+            var cursorAfter = em.GetComponentData<ReplayInputCursorComponent>(replayEntity);
+            Assert.That(cursorAfter.NextFrameIndex, Is.EqualTo(expected.Count));
+        }
+
+        [Test]
         public void ReplayInput_StagedPlayback_ResetsFrameAndAppliesSeedAndFrames()
         {
             using var world = CreateDefaultTestWorld("ReplayStagedPlaybackWorld", out _);

@@ -23,6 +23,12 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            if (SystemAPI.TryGetSingleton<ReplayInputControlComponent>(out var replayControl) &&
+                replayControl.Mode == ReplayInputModeId.Playback)
+            {
+                return;
+            }
+
             float dt = math.max(0f, SystemAPI.Time.DeltaTime);
             if (dt <= 0f)
                 return;
