@@ -1,6 +1,10 @@
 # ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume
 > 입력을 행동 ID에 직접 매핑하지 않고 슬롯(Primary/Secondary)을 거쳐 해석하며, 동작 중 들어온 입력은 전환 없이 즉시 소비하도록 고정한 결정이다.
 
+## 상태
+- 반영됨
+- 다음에서 일부 대체됨: [ADR: 플레이어 런타임 권한 ECS 이전 + 표현 브리지 경계 고정](ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md)
+
 ## 배경
 - 입력 계층이 행동 ID를 직접 소유하면 키바인딩/캐릭터 전환 시 결합도가 높아진다.
 - 행동 분기 확장 시 입력 시스템 수정 없이 슬롯 매핑만 바꾸는 구조가 필요하다.

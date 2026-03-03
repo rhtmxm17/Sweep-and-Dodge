@@ -3,6 +3,7 @@
 
 ## 상태
 - 제안됨
+- 다음에서 일부 대체됨: [ADR: 플레이어 런타임 권한 ECS 이전 + 표현 브리지 경계 고정](ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md)
 
 ## 배경
 - `OPS-001 #10`은 "재현 가능한 시드/리플레이 최소 기반"을 목표로 하지만, 현재는 문서상 `TODO` 상태다.
