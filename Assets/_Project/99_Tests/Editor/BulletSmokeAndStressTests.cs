@@ -137,6 +137,28 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void FixedTickSkeleton_BootstrapsRootGroupAndSingleton()
+        {
+            using var world = CreateDefaultTestWorld("FixedTickSkeletonWorld", out var simGroup);
+            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+            var fixedTickRoot = world.GetExistingSystemManaged<FixedTickRootGroup>();
+            Assert.That(fixedTickRoot, Is.Not.Null, "FixedTickRootGroup must exist");
+
+            var em = world.EntityManager;
+            CreatePlayer(em);
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            simGroup.Update();
+
+            Assert.That(TryGetSingleton(em, out FixedTickTimeComponent fixedTick), Is.True);
+            Assert.That(fixedTick.EnableFixedTick, Is.EqualTo(0));
+            Assert.That(fixedTick.PauseRequested, Is.EqualTo(0));
+            Assert.That(fixedTick.StepRequested, Is.EqualTo(0));
+            Assert.That(fixedTick.MaxSubSteps, Is.EqualTo(4));
+            Assert.That(fixedTick.FixedDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
+        }
+
+        [Test]
         public void CombatEventChannel_ConsumesAndAggregatesHitCollectCleanup()
         {
             using var world = new World("CombatEventChannelWorld");
@@ -2380,6 +2402,129 @@ namespace SweepNDodge.DotsBullets.Tests
             var controlAfter = em.GetComponentData<ReplayInputControlComponent>(replayEntity);
             Assert.That(cursorAfter.NextFrameIndex, Is.EqualTo(expected.Count));
             Assert.That(controlAfter.MissingFrameCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ReplayInputQueue_CapturesAndConsumesAtCurrentTick()
+        {
+            using var world = CreateDefaultTestWorld("ReplayInputQueueCaptureConsumeWorld", out _);
+            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+            var em = world.EntityManager;
+            CreatePlayer(em);
+
+            var replayEntity = em.CreateEntityQuery(
+                ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                ComponentType.ReadWrite<ReplayInputFrameBufferElement>(),
+                ComponentType.ReadWrite<ReplayTickInputQueueStateComponent>(),
+                ComponentType.ReadWrite<ReplayTickInputQueueBufferElement>()).GetSingletonEntity();
+            var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var playerEntity = em.CreateEntityQuery(
+                ComponentType.ReadOnly<PlayerTag>(),
+                ComponentType.ReadWrite<PlayerGoSyncComponent>(),
+                ComponentType.ReadWrite<PlayerInputIntentComponent>()).GetSingletonEntity();
+
+            em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Off,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+
+            em.SetComponentData(playerEntity, new PlayerInputIntentComponent
+            {
+                MoveAxis = new float2(0.25f, 0.75f),
+                AimWorldXZ = new float2(9f, 1f),
+                HasAimWorldPoint = 1,
+                VacuumRequested = 1,
+                CleanupActionRequested = 1,
+                RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary,
+                Sequence = 10u,
+            });
+            em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 3u });
+
+            world.SetTime(new TimeData(1d, 1f / 60f));
+            initGroup.Update();
+
+            var queueState = em.GetComponentData<ReplayTickInputQueueStateComponent>(replayEntity);
+            var queue = em.GetBuffer<ReplayTickInputQueueBufferElement>(replayEntity);
+            var intentAfter = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+
+            Assert.That(queueState.LastEnqueuedTick, Is.EqualTo(3u));
+            Assert.That(queueState.LastConsumedTick, Is.EqualTo(3u));
+            Assert.That(queueState.LastEnqueuedSequence, Is.EqualTo(10u));
+            Assert.That(queueState.LastConsumedSequence, Is.EqualTo(10u));
+            Assert.That(queueState.PendingCount, Is.EqualTo(0));
+            Assert.That(queue.Length, Is.EqualTo(0));
+            Assert.That(intentAfter.MoveAxis, Is.EqualTo(new float2(0.25f, 0.75f)));
+            Assert.That(intentAfter.VacuumRequested, Is.EqualTo(1));
+            Assert.That(intentAfter.CleanupActionRequested, Is.EqualTo(1));
+            Assert.That(intentAfter.RequestedCleanupActionSlot, Is.EqualTo((byte)PlayerCleanupActionSlotId.Primary));
+            Assert.That(intentAfter.Sequence, Is.EqualTo(10u));
+        }
+
+        [Test]
+        public void ReplayInputQueue_DeduplicatesOneShot_WhenSameTickAndSequenceReconsumed()
+        {
+            using var world = CreateDefaultTestWorld("ReplayInputQueueDedupWorld", out _);
+            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+            var em = world.EntityManager;
+            CreatePlayer(em);
+
+            var replayEntity = em.CreateEntityQuery(
+                ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                ComponentType.ReadWrite<ReplayInputFrameBufferElement>(),
+                ComponentType.ReadWrite<ReplayTickInputQueueStateComponent>(),
+                ComponentType.ReadWrite<ReplayTickInputQueueBufferElement>()).GetSingletonEntity();
+            var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var playerEntity = em.CreateEntityQuery(
+                ComponentType.ReadOnly<PlayerTag>(),
+                ComponentType.ReadWrite<PlayerGoSyncComponent>(),
+                ComponentType.ReadWrite<PlayerInputIntentComponent>()).GetSingletonEntity();
+
+            em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Off,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+
+            var duplicatedOneShot = new PlayerInputIntentComponent
+            {
+                MoveAxis = new float2(1f, 0f),
+                AimWorldXZ = new float2(4f, 0f),
+                HasAimWorldPoint = 1,
+                VacuumRequested = 1,
+                CleanupActionRequested = 1,
+                RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Secondary,
+                Sequence = 77u,
+            };
+
+            em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 9u });
+            em.SetComponentData(playerEntity, duplicatedOneShot);
+            world.SetTime(new TimeData(1d, 1f / 60f));
+            initGroup.Update();
+
+            em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 9u });
+            em.SetComponentData(playerEntity, duplicatedOneShot);
+            world.SetTime(new TimeData(2d, 1f / 60f));
+            initGroup.Update();
+
+            var intentAfterSecond = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+            var queueState = em.GetComponentData<ReplayTickInputQueueStateComponent>(replayEntity);
+            Assert.That(queueState.LastConsumedTick, Is.EqualTo(9u));
+            Assert.That(queueState.LastConsumedSequence, Is.EqualTo(77u));
+            Assert.That(intentAfterSecond.VacuumRequested, Is.EqualTo(0));
+            Assert.That(intentAfterSecond.CleanupActionRequested, Is.EqualTo(0));
+            Assert.That(intentAfterSecond.RequestedCleanupActionSlot, Is.EqualTo((byte)PlayerCleanupActionSlotId.None));
+            Assert.That(intentAfterSecond.Sequence, Is.EqualTo(77u));
         }
 
         [Test]

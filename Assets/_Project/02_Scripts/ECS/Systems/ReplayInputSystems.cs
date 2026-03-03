@@ -17,9 +17,10 @@ namespace SweepNDodge.DotsBullets
                 .WithAll<ReplayInputCursorComponent>()
                 .WithAll<ReplayInputFrameBufferElement>()
                 .Build();
+            Entity replayEntity;
             if (replayQuery.IsEmptyIgnoreFilter)
             {
-                var replayEntity = em.CreateEntity(
+                replayEntity = em.CreateEntity(
                     typeof(ReplayInputControlComponent),
                     typeof(ReplayInputCursorComponent));
                 em.SetComponentData(replayEntity, new ReplayInputControlComponent
@@ -35,6 +36,24 @@ namespace SweepNDodge.DotsBullets
                 });
                 em.AddBuffer<ReplayInputFrameBufferElement>(replayEntity);
             }
+            else
+            {
+                replayEntity = replayQuery.GetSingletonEntity();
+            }
+
+            if (!em.HasComponent<ReplayTickInputQueueStateComponent>(replayEntity))
+            {
+                em.AddComponentData(replayEntity, new ReplayTickInputQueueStateComponent
+                {
+                    LastEnqueuedTick = 0u,
+                    LastConsumedTick = 0u,
+                    LastEnqueuedSequence = 0u,
+                    LastConsumedSequence = 0u,
+                    PendingCount = 0,
+                });
+            }
+            if (!em.HasBuffer<ReplayTickInputQueueBufferElement>(replayEntity))
+                em.AddBuffer<ReplayTickInputQueueBufferElement>(replayEntity);
 
             _playerQuery = SystemAPI.QueryBuilder()
                 .WithAll<PlayerTag>()
@@ -45,6 +64,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate(_playerQuery);
             state.RequireForUpdate<ReplayInputControlComponent>();
             state.RequireForUpdate<ReplayInputCursorComponent>();
+            state.RequireForUpdate<ReplayTickInputQueueStateComponent>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
         }
 
@@ -59,6 +79,8 @@ namespace SweepNDodge.DotsBullets
             var controlRW = SystemAPI.GetComponentRW<ReplayInputControlComponent>(replayEntity);
             var cursorRW = SystemAPI.GetComponentRW<ReplayInputCursorComponent>(replayEntity);
             var frames = SystemAPI.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            var queueStateRW = SystemAPI.GetComponentRW<ReplayTickInputQueueStateComponent>(replayEntity);
+            var queue = SystemAPI.GetBuffer<ReplayTickInputQueueBufferElement>(replayEntity);
 
             if (ReplaySessionStaging.TryConsumePlayback(frames, out uint stagedRunSeed))
             {
@@ -91,6 +113,21 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 frame = 0u;
+                queue.Clear();
+                queueStateRW.ValueRW = new ReplayTickInputQueueStateComponent
+                {
+                    LastEnqueuedTick = 0u,
+                    LastConsumedTick = 0u,
+                    LastEnqueuedSequence = 0u,
+                    LastConsumedSequence = 0u,
+                    PendingCount = 0,
+                };
+            }
+            else if (controlRW.ValueRO.Mode != ReplayInputModeId.Playback)
+            {
+                var queueState = queueStateRW.ValueRO;
+                CaptureAndConsumeLiveInputQueue(frame, playerEntity, ref queueState, queue, state.EntityManager);
+                queueStateRW.ValueRW = queueState;
             }
 
             if (controlRW.ValueRO.Mode == ReplayInputModeId.Record)
@@ -190,6 +227,84 @@ namespace SweepNDodge.DotsBullets
             if (missingControl.MissingFrameCount < int.MaxValue)
                 missingControl.MissingFrameCount += 1;
             controlRW.ValueRW = missingControl;
+        }
+
+        private static void CaptureAndConsumeLiveInputQueue(
+            uint tick,
+            Entity playerEntity,
+            ref ReplayTickInputQueueStateComponent queueState,
+            DynamicBuffer<ReplayTickInputQueueBufferElement> queue,
+            EntityManager em)
+        {
+            var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+            var input = new ReplayTickInputQueueBufferElement
+            {
+                Tick = tick,
+                MoveAxis = intent.MoveAxis,
+                AimWorldXZ = intent.AimWorldXZ,
+                HasAimWorldPoint = intent.HasAimWorldPoint,
+                VacuumRequested = intent.VacuumRequested,
+                CleanupActionRequested = intent.CleanupActionRequested,
+                RequestedCleanupActionSlot = intent.RequestedCleanupActionSlot,
+                InputSequence = intent.Sequence,
+            };
+
+            EnqueueOrReplaceByTick(input, queue);
+            queueState.LastEnqueuedTick = tick;
+            if (queueState.LastEnqueuedSequence < input.InputSequence)
+                queueState.LastEnqueuedSequence = input.InputSequence;
+
+            int consumeIndex = -1;
+            for (int i = 0; i < queue.Length; i++)
+            {
+                if (queue[i].Tick <= tick)
+                    consumeIndex = i;
+                else
+                    break;
+            }
+
+            if (consumeIndex < 0)
+            {
+                queueState.PendingCount = queue.Length;
+                return;
+            }
+
+            var consumed = queue[consumeIndex];
+            bool duplicateSameTickInput = consumed.Tick == queueState.LastConsumedTick &&
+                                          consumed.InputSequence == queueState.LastConsumedSequence;
+            if (duplicateSameTickInput)
+            {
+                consumed.VacuumRequested = 0;
+                consumed.CleanupActionRequested = 0;
+                consumed.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None;
+            }
+            intent.MoveAxis = consumed.MoveAxis;
+            intent.AimWorldXZ = consumed.AimWorldXZ;
+            intent.HasAimWorldPoint = consumed.HasAimWorldPoint;
+            intent.VacuumRequested = consumed.VacuumRequested;
+            intent.CleanupActionRequested = consumed.CleanupActionRequested;
+            intent.RequestedCleanupActionSlot = consumed.RequestedCleanupActionSlot;
+            intent.Sequence = consumed.InputSequence;
+            em.SetComponentData(playerEntity, intent);
+
+            queue.RemoveRange(0, consumeIndex + 1);
+            queueState.LastConsumedTick = consumed.Tick;
+            queueState.LastConsumedSequence = consumed.InputSequence;
+            queueState.PendingCount = queue.Length;
+        }
+
+        private static void EnqueueOrReplaceByTick(
+            in ReplayTickInputQueueBufferElement input,
+            DynamicBuffer<ReplayTickInputQueueBufferElement> queue)
+        {
+            int last = queue.Length - 1;
+            if (last >= 0 && queue[last].Tick == input.Tick)
+            {
+                queue[last] = input;
+                return;
+            }
+
+            queue.Add(input);
         }
     }
 }

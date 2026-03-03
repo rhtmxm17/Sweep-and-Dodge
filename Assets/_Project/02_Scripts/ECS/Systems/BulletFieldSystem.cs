@@ -26,6 +26,9 @@ namespace SweepNDodge.DotsBullets
     // - 루트 그룹(BulletFramePipelineGroup) 아래에서 순서를 강제한다.
 
     [UpdateInGroup(typeof(SimulationSystemGroup))]
+    public partial class FixedTickRootGroup : ComponentSystemGroup { }
+
+    [UpdateInGroup(typeof(FixedTickRootGroup))]
     public partial class BulletFramePipelineGroup : ComponentSystemGroup { }
 
     [UpdateInGroup(typeof(BulletFramePipelineGroup))]
@@ -48,12 +51,29 @@ namespace SweepNDodge.DotsBullets
     public partial class BulletExecutionEndGroup : ComponentSystemGroup { }
 
     [BurstCompile]
-    [UpdateInGroup(typeof(BulletExecutionBeginGroup), OrderFirst = true)]
-    public partial struct BulletFrameCounterAdvanceSystem : ISystem
+    [UpdateInGroup(typeof(FixedTickRootGroup), OrderFirst = true)]
+    public partial struct FixedTickBootstrapSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
         {
             var em = state.EntityManager;
+            var fixedTickQuery = SystemAPI.QueryBuilder().WithAll<FixedTickTimeComponent>().Build();
+            if (fixedTickQuery.IsEmptyIgnoreFilter)
+            {
+                var e = em.CreateEntity(typeof(FixedTickTimeComponent));
+                em.SetComponentData(e, new FixedTickTimeComponent
+                {
+                    EnableFixedTick = 0,
+                    PauseRequested = 0,
+                    StepRequested = 0,
+                    Reserved = 0,
+                    MaxSubSteps = 4,
+                    FixedDeltaTime = 1f / 60f,
+                    Accumulator = 0f,
+                    Tick = 0u,
+                });
+            }
+
             var frameQuery = SystemAPI.QueryBuilder().WithAll<BulletFrameCounterComponent>().Build();
             if (frameQuery.IsEmptyIgnoreFilter)
             {
@@ -61,6 +81,30 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, new BulletFrameCounterComponent { Value = 0 });
             }
 
+            state.RequireForUpdate<PlayerTag>();
+            state.RequireForUpdate<FixedTickTimeComponent>();
+            state.RequireForUpdate<BulletFrameCounterComponent>();
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            var fixedTick = SystemAPI.GetSingletonRW<FixedTickTimeComponent>();
+            if (SystemAPI.TryGetSingleton<BulletFrameCounterComponent>(out var frameCounter))
+            {
+                var value = fixedTick.ValueRO;
+                value.Tick = frameCounter.Value;
+                fixedTick.ValueRW = value;
+            }
+        }
+    }
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletExecutionBeginGroup), OrderFirst = true)]
+    public partial struct BulletFrameCounterAdvanceSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
         }

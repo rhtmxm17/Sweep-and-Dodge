@@ -94,6 +94,20 @@ namespace SweepNDodge.DotsBullets
         public uint Value;
     }
 
+    // 고정 Tick 시간원 런타임 상태.
+    // C2 단계에서는 골격/토글 저장소로만 사용하고, 실제 고정 tick 루프 적용은 후속 단계에서 진행한다.
+    public struct FixedTickTimeComponent : IComponentData
+    {
+        public byte EnableFixedTick;
+        public byte PauseRequested;
+        public byte StepRequested;
+        public byte Reserved;
+        public int MaxSubSteps;
+        public float FixedDeltaTime;
+        public float Accumulator;
+        public uint Tick;
+    }
+
     // Spawn/Despawn 프레임 추적 스탬프.
     // 렌더-활성 상태 불일치(고스트 표시) 진단 시 근거 데이터로 사용한다.
     public struct BulletLifecycleTraceComponent : IComponentData

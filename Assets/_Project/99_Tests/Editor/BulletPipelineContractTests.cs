@@ -10,7 +10,8 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void PipelineGroups_AreNestedUnderRootInFixedOrder()
         {
-            AssertUpdateInGroup(typeof(BulletFramePipelineGroup), typeof(SimulationSystemGroup));
+            AssertUpdateInGroup(typeof(FixedTickRootGroup), typeof(SimulationSystemGroup));
+            AssertUpdateInGroup(typeof(BulletFramePipelineGroup), typeof(FixedTickRootGroup));
             AssertUpdateInGroup(typeof(BulletExecutionBeginGroup), typeof(BulletFramePipelineGroup));
             AssertUpdateInGroup(typeof(BulletSimulationGroup), typeof(BulletFramePipelineGroup));
             AssertUpdateInGroup(typeof(BulletRequestGroup), typeof(BulletFramePipelineGroup));
@@ -27,6 +28,14 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var attr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(BulletFrameCounterAdvanceSystem));
             Assert.That(attr.GroupType, Is.EqualTo(typeof(BulletExecutionBeginGroup)));
+            Assert.That(attr.OrderFirst, Is.True);
+        }
+
+        [Test]
+        public void FixedTickBootstrapSystem_IsFixedTickRootOrderFirst()
+        {
+            var attr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(FixedTickBootstrapSystem));
+            Assert.That(attr.GroupType, Is.EqualTo(typeof(FixedTickRootGroup)));
             Assert.That(attr.OrderFirst, Is.True);
         }
 
