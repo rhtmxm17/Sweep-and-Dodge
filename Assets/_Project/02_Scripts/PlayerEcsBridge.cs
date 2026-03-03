@@ -18,6 +18,8 @@ namespace SweepNDodge.DotsBullets
 
         [Header("Sync")]
         public bool SyncRotation = true;
+        public bool ApplyEcsPositionToTransform = true;
+        public bool ApplyEcsRotationToTransform = true;
 
         [Header("Authority (Transition)")]
         public bool EnableLegacyTransformToEcsSync = false;
@@ -78,6 +80,12 @@ namespace SweepNDodge.DotsBullets
             }
 
             // ECS -> GO : Vacuum 상태를 Animator에 반영(옵션)
+            var presentSync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
+            if (ApplyEcsPositionToTransform)
+                transform.position = presentSync.Position;
+            if (ApplyEcsRotationToTransform && presentSync.SyncRotation != 0)
+                transform.rotation = presentSync.Rotation;
+
             if (Animator != null)
             {
                 var v = _em.GetComponentData<VacuumRuntimeStateComponent>(_playerEntity);
