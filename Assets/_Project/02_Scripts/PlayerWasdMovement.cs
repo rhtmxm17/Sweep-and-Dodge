@@ -11,6 +11,10 @@ namespace SweepNDodge.DotsBullets
         [Min(0f)]
         public float MoveSpeed = 6f;
         public Camera TargetCamera;
+
+        [Header("Authority (Transition)")]
+        public bool EnableLegacyTransformWrite = true;
+
         private EntityManager _em;
         private EntityQuery _replayQuery;
         private bool _isReplayBound;
@@ -18,6 +22,8 @@ namespace SweepNDodge.DotsBullets
         private void Update()
         {
             if (IsReplayInputSuppressed())
+                return;
+            if (!EnableLegacyTransformWrite)
                 return;
 
             var moveX = 0f;
@@ -50,9 +56,6 @@ namespace SweepNDodge.DotsBullets
 
         private bool IsReplayInputSuppressed()
         {
-            if (ReplaySessionStaging.IsPlaybackStartupPending)
-                return true;
-
             if (!_isReplayBound)
             {
                 var world = World.DefaultGameObjectInjectionWorld;
@@ -64,11 +67,7 @@ namespace SweepNDodge.DotsBullets
                 _isReplayBound = true;
             }
 
-            if (_replayQuery.IsEmptyIgnoreFilter)
-                return false;
-
-            var control = _em.GetComponentData<ReplayInputControlComponent>(_replayQuery.GetSingletonEntity());
-            return control.Mode == ReplayInputModeId.Playback;
+            return ReplayInputSuppressionUtility.IsLiveInputSuppressed(_em, _replayQuery);
         }
     }
 }

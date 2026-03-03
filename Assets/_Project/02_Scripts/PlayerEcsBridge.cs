@@ -20,6 +20,9 @@ namespace SweepNDodge.DotsBullets
         [Header("Sync")]
         public bool SyncRotation = true;
 
+        [Header("Authority (Transition)")]
+        public bool EnableLegacyTransformToEcsSync = true;
+
         // Vacuum 상태 반영용 Animator (옵션)
         public Animator Animator;
         public string VacuumActiveBool = "VacuumActive";
@@ -52,9 +55,12 @@ namespace SweepNDodge.DotsBullets
             if (!suppressLiveInput)
             {
                 var sync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
-                sync.Position = transform.position;
-                sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
-                if (SyncRotation) sync.Rotation = transform.rotation;
+                if (EnableLegacyTransformToEcsSync)
+                {
+                    sync.Position = transform.position;
+                    sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
+                    if (SyncRotation) sync.Rotation = transform.rotation;
+                }
 
                 bool primaryPressed = Input.GetMouseButtonDown(PrimaryVacuumMouseButton);
                 bool secondaryPressed = Input.GetMouseButtonDown(SecondaryVacuumMouseButton);
@@ -120,13 +126,7 @@ namespace SweepNDodge.DotsBullets
 
         private bool IsReplayInputSuppressed()
         {
-            if (ReplaySessionStaging.IsPlaybackStartupPending)
-                return true;
-            if (!_hasPlayerEntity || _replayQuery.IsEmptyIgnoreFilter)
-                return false;
-
-            var control = _em.GetComponentData<ReplayInputControlComponent>(_replayQuery.GetSingletonEntity());
-            return control.Mode == ReplayInputModeId.Playback;
+            return ReplayInputSuppressionUtility.IsLiveInputSuppressed(_em, _replayQuery);
         }
     }
 }

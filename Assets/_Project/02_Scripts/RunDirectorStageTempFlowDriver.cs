@@ -109,13 +109,7 @@ namespace SweepNDodge.DotsBullets
 
         private bool IsReplayInputSuppressed()
         {
-            if (ReplaySessionStaging.IsPlaybackStartupPending)
-                return true;
-            if (_replayQuery.IsEmptyIgnoreFilter)
-                return false;
-
-            var control = _em.GetComponentData<ReplayInputControlComponent>(_replayQuery.GetSingletonEntity());
-            return control.Mode == ReplayInputModeId.Playback;
+            return ReplayInputSuppressionUtility.IsLiveInputSuppressed(_em, _replayQuery);
         }
 
         private void ProcessAutoFlow()
