@@ -156,6 +156,52 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(fixedTick.StepRequested, Is.EqualTo(0));
             Assert.That(fixedTick.MaxSubSteps, Is.EqualTo(4));
             Assert.That(fixedTick.FixedDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
+            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent fixedTickRuntime), Is.True);
+            Assert.That(fixedTickRuntime.UsingFixedTick, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void FixedTickRuntime_UsesFrameDelta_WhenFixedTickDisabled()
+        {
+            using var world = CreateDefaultTestWorld("FixedTickRuntimeFrameDeltaWorld", out var simGroup);
+            var em = world.EntityManager;
+            CreatePlayer(em);
+
+            const float dt = 0.02f;
+            world.SetTime(new TimeData(dt, dt));
+            simGroup.Update();
+
+            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent runtime), Is.True);
+            Assert.That(runtime.HasStep, Is.EqualTo(1));
+            Assert.That(runtime.UsingFixedTick, Is.EqualTo(0));
+            Assert.That(runtime.LogicStepCount, Is.EqualTo(1));
+            Assert.That(runtime.LogicDeltaTime, Is.EqualTo(dt).Within(1e-6f));
+        }
+
+        [Test]
+        public void FixedTickRuntime_ClampsAccumulator_AndPublishesFixedDelta()
+        {
+            using var world = CreateDefaultTestWorld("FixedTickRuntimeClampWorld", out var simGroup);
+            var em = world.EntityManager;
+            CreatePlayer(em);
+
+            Assert.That(TryGetSingleton(em, out FixedTickTimeComponent fixedTick), Is.True);
+            fixedTick.EnableFixedTick = 1;
+            fixedTick.MaxSubSteps = 2;
+            fixedTick.FixedDeltaTime = 0.1f;
+            fixedTick.Accumulator = 0f;
+            em.SetComponentData(em.CreateEntityQuery(ComponentType.ReadWrite<FixedTickTimeComponent>()).GetSingletonEntity(), fixedTick);
+
+            world.SetTime(new TimeData(1d, 1f));
+            simGroup.Update();
+
+            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent runtime), Is.True);
+            Assert.That(runtime.HasStep, Is.EqualTo(1));
+            Assert.That(runtime.UsingFixedTick, Is.EqualTo(1));
+            Assert.That(runtime.LogicDeltaTime, Is.EqualTo(0.1f).Within(1e-6f));
+
+            Assert.That(TryGetSingleton(em, out FixedTickTimeComponent fixedTickAfter), Is.True);
+            Assert.That(fixedTickAfter.Accumulator, Is.EqualTo(0.1f).Within(1e-6f));
         }
 
         [Test]

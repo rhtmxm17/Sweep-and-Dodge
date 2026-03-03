@@ -35,7 +35,13 @@ namespace SweepNDodge.DotsBullets
         {
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
-            float deltaTime = SystemAPI.Time.DeltaTime;
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime,
+                    out float deltaTime))
+                return;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
             uint runSeed = math.max(1u, SystemAPI.GetSingleton<SpawnRunSeedComponent>().Value);
 

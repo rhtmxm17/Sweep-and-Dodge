@@ -27,7 +27,13 @@ namespace SweepNDodge.DotsBullets
             if (!BulletFieldShared.IsInitialized)
                 return;
 
-            float dt = SystemAPI.Time.DeltaTime;
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime,
+                    out float dt))
+                return;
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             var requestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
             requestLookup.Update(ref state);

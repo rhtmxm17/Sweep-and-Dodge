@@ -108,6 +108,16 @@ namespace SweepNDodge.DotsBullets
         public uint Tick;
     }
 
+    // 현재 프레임 로직 실행에 사용할 해석된 시간원.
+    // FixedTickRootGroup OrderFirst에서 프레임당 1회 계산하고, 로직 시스템은 이 값을 읽어 사용한다.
+    public struct FixedTickStepRuntimeComponent : IComponentData
+    {
+        public float LogicDeltaTime;
+        public int LogicStepCount;
+        public byte HasStep;
+        public byte UsingFixedTick;
+    }
+
     // Spawn/Despawn 프레임 추적 스탬프.
     // 렌더-활성 상태 불일치(고스트 표시) 진단 시 근거 데이터로 사용한다.
     public struct BulletLifecycleTraceComponent : IComponentData

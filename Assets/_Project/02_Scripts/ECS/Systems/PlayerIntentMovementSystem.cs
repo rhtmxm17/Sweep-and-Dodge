@@ -29,8 +29,12 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            float dt = math.max(0f, SystemAPI.Time.DeltaTime);
-            if (dt <= 0f)
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime,
+                    out float dt))
                 return;
 
             foreach (var (intent, tx, sync) in
