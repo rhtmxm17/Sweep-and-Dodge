@@ -2,7 +2,7 @@
 > OPS-001 #10의 최소 목표로 "동일 머신/동일 빌드 재현" 범위를 고정하고, 입력 프레임 스냅샷 + run seed 계열 RNG 일원화를 도입한다.
 
 ## 상태
-- 제안됨
+- 반영됨
 - 다음에서 일부 대체됨: [ADR: 플레이어 런타임 권한 ECS 이전 + 표현 브리지 경계 고정](ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md)
 
 ## 배경

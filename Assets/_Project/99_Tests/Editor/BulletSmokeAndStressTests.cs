@@ -2570,6 +2570,109 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void Determinism_SameSeedAndReplayInput_ProducesSamePlayerTrack()
+        {
+            const int frameCount = 32;
+
+            List<PlayerTrackSnapshot> RunScenario(string worldName)
+            {
+                using var world = CreateDefaultTestWorld(worldName, out _);
+                var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+                Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+                var em = world.EntityManager;
+                CreatePlayerWithTransform(em, float3.zero);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+                var runSeedEntity = em.CreateEntityQuery(ComponentType.ReadWrite<SpawnRunSeedComponent>()).GetSingletonEntity();
+                em.SetComponentData(runSeedEntity, new SpawnRunSeedComponent { Value = 0x13579BDFu });
+
+                var replayEntity = em.CreateEntityQuery(
+                    ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                    ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                    ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+                var replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+                replayFrames.Clear();
+
+                for (int i = 0; i < frameCount; i++)
+                {
+                    replayFrames.Add(new ReplayInputFrameBufferElement
+                    {
+                        Frame = (uint)i,
+                        MoveAxis = math.normalizesafe(new float2((i % 3) - 1f, ((i + 1) % 3) - 1f), float2.zero),
+                        AimWorldXZ = new float2((i % 7) - 3f, (i % 5) - 2f),
+                        HasAimWorldPoint = 1,
+                        Position = float3.zero,
+                        Rotation = quaternion.identity,
+                        SyncRotation = 1,
+                        VacuumRequested = (byte)(i % 8 == 0 ? 1 : 0),
+                        CleanupActionRequested = (byte)(i % 10 == 0 ? 1 : 0),
+                        RequestedCleanupActionSlot = (byte)(i % 2 == 0
+                            ? PlayerCleanupActionSlotId.Primary
+                            : PlayerCleanupActionSlotId.Secondary),
+                        InputSequence = (uint)(1000 + i),
+                    });
+                }
+
+                em.SetComponentData(replayEntity, new ReplayInputCursorComponent { NextFrameIndex = 0 });
+                em.SetComponentData(replayEntity, new ReplayInputControlComponent
+                {
+                    Mode = ReplayInputModeId.Playback,
+                    LastRecordedFrame = 0u,
+                    LastPlaybackFrame = 0u,
+                    MissingFrameCount = 0,
+                });
+
+                var playerEntity = em.CreateEntityQuery(
+                    ComponentType.ReadOnly<PlayerTag>(),
+                    ComponentType.ReadWrite<PlayerGoSyncComponent>(),
+                    ComponentType.ReadWrite<PlayerInputIntentComponent>()).GetSingletonEntity();
+
+                var track = new List<PlayerTrackSnapshot>(frameCount);
+                for (int i = 0; i < frameCount; i++)
+                {
+                    em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = (uint)i });
+                    world.SetTime(new TimeData((i + 1d) / 60d, 1f / 60f));
+                    initGroup.Update();
+
+                    var sync = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
+                    var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+                    track.Add(new PlayerTrackSnapshot
+                    {
+                        Position = sync.Position,
+                        Rotation = sync.Rotation,
+                        MoveAxis = intent.MoveAxis,
+                        AimWorldXZ = intent.AimWorldXZ,
+                        Sequence = intent.Sequence,
+                    });
+                }
+
+                ForceDisposeSharedContainersIfNeeded();
+                return track;
+            }
+
+            var first = RunScenario("DeterminismPlayerTrackWorld_A");
+            var second = RunScenario("DeterminismPlayerTrackWorld_B");
+
+            Assert.That(first.Count, Is.EqualTo(second.Count));
+            for (int i = 0; i < first.Count; i++)
+            {
+                float3 positionDelta = first[i].Position - second[i].Position;
+                Assert.That(math.lengthsq(positionDelta), Is.LessThanOrEqualTo(1e-6f), $"player position mismatch at frame={i}");
+
+                float rotationDelta = math.length(first[i].Rotation.value - second[i].Rotation.value);
+                Assert.That(rotationDelta, Is.LessThanOrEqualTo(1e-6f), $"player rotation mismatch at frame={i}");
+
+                float2 moveDelta = first[i].MoveAxis - second[i].MoveAxis;
+                Assert.That(math.lengthsq(moveDelta), Is.LessThanOrEqualTo(1e-6f), $"move axis mismatch at frame={i}");
+
+                float2 aimDelta = first[i].AimWorldXZ - second[i].AimWorldXZ;
+                Assert.That(math.lengthsq(aimDelta), Is.LessThanOrEqualTo(1e-6f), $"aim mismatch at frame={i}");
+                Assert.That(first[i].Sequence, Is.EqualTo(second[i].Sequence), $"input sequence mismatch at frame={i}");
+            }
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);
@@ -3099,6 +3202,15 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             public float3 Position;
             public quaternion Rotation;
+        }
+
+        private struct PlayerTrackSnapshot
+        {
+            public float3 Position;
+            public quaternion Rotation;
+            public float2 MoveAxis;
+            public float2 AimWorldXZ;
+            public uint Sequence;
         }
 
         private static void CollectActiveBulletSnapshotsForSource(

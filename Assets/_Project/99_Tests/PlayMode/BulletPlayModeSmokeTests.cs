@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Entities;
@@ -298,6 +299,112 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_DedicatedScene_Replay_RecordResetPlayback_Smoke()
+        {
+            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    CountByComponentType<PlayerTag>(em) > 0 &&
+                    HasReplaySingleton(em) &&
+                    HasSingleton<SpawnRunSeedComponent>(em),
+                300,
+                "Replay singleton setup was not ready within timeout.");
+
+            var replayEntity = em.CreateEntityQuery(
+                ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+            var playerEntity = GetSingletonEntity<PlayerTag>(em);
+
+            var replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            replayFrames.Clear();
+            em.SetComponentData(replayEntity, new ReplayInputCursorComponent { NextFrameIndex = 0 });
+            em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Record,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+
+            for (int i = 0; i < 24; i++)
+            {
+                if (em.HasComponent<PlayerInputIntentComponent>(playerEntity))
+                {
+                    var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+                    intent.MoveAxis = new Unity.Mathematics.float2(0.7f, 0.2f);
+                    intent.AimWorldXZ = new Unity.Mathematics.float2(4f, -3f);
+                    intent.HasAimWorldPoint = 1;
+                    if (i % 6 == 0)
+                    {
+                        intent.VacuumRequested = 1;
+                        intent.CleanupActionRequested = 1;
+                        intent.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary;
+                        intent.Sequence += 1u;
+                    }
+                    em.SetComponentData(playerEntity, intent);
+                }
+
+                yield return null;
+            }
+
+            replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            Assert.That(replayFrames.Length, Is.GreaterThan(8), "Record mode should accumulate replay frames.");
+
+            var copied = new List<ReplayInputFrameBufferElement>(replayFrames.Length);
+            for (int i = 0; i < replayFrames.Length; i++)
+                copied.Add(replayFrames[i]);
+
+            uint runSeed = GetSingleton<SpawnRunSeedComponent>(em).Value;
+            ReplaySessionStaging.StagePlayback(copied, runSeed);
+            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist after replay scene reset.");
+            em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasReplaySingleton(em) &&
+                    !ReplaySessionStaging.IsPlaybackStartupPending &&
+                    GetSingleton<ReplayInputControlComponent>(em).Mode == ReplayInputModeId.Playback,
+                300,
+                "Playback startup did not complete after scene reset.");
+
+            replayEntity = em.CreateEntityQuery(
+                ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+            replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            var playbackCursor = em.GetComponentData<ReplayInputCursorComponent>(replayEntity);
+            Assert.That(replayFrames.Length, Is.EqualTo(copied.Count), "Staged replay frames must be restored after scene reset.");
+
+            uint maxPlaybackFrame = 0u;
+            int maxCursor = playbackCursor.NextFrameIndex;
+            for (int i = 0; i < 30; i++)
+            {
+                yield return null;
+                var control = em.GetComponentData<ReplayInputControlComponent>(replayEntity);
+                var cursor = em.GetComponentData<ReplayInputCursorComponent>(replayEntity);
+                if (control.LastPlaybackFrame > maxPlaybackFrame)
+                    maxPlaybackFrame = control.LastPlaybackFrame;
+                if (cursor.NextFrameIndex > maxCursor)
+                    maxCursor = cursor.NextFrameIndex;
+            }
+
+            Assert.That(maxCursor, Is.GreaterThan(0), "Playback cursor should advance after scene reset.");
+            Assert.That(maxPlaybackFrame, Is.GreaterThan(0u), "Playback frames should be consumed after scene reset.");
+        }
+
+        [UnityTest]
         [Category("PeriodicOperationalScene")]
         public IEnumerator PlayMode_OperationalScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
         {
@@ -387,6 +494,15 @@ namespace SweepNDodge.DotsBullets.Tests
             return !query.IsEmptyIgnoreFilter;
         }
 
+        private static bool HasReplaySingleton(EntityManager em)
+        {
+            var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<ReplayInputControlComponent>(),
+                ComponentType.ReadOnly<ReplayInputCursorComponent>(),
+                ComponentType.ReadOnly<ReplayInputFrameBufferElement>());
+            return !query.IsEmptyIgnoreFilter;
+        }
+
         private static Entity GetSingletonEntity<T>(EntityManager em) where T : unmanaged, IComponentData
         {
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
@@ -448,3 +564,5 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
+
+

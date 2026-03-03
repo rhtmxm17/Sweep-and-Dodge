@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md](ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md): 리플레이 persistence 도입과 구버전 완전 거부 기반 schema compatibility 정책 고정
 - [ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md](ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md): 플레이어 런타임 권한을 ECS로 이전하고 GameObject를 입력 수집/표현 소비 경계로 고정
 - [ADR-20260303-01-replay-min-foundation-and-seed-unification.md](ADR-20260303-01-replay-min-foundation-and-seed-unification.md): OPS-001 #10 최소 범위(동일 머신/동일 빌드) 고정 + 입력 프레임 스냅샷 + run seed 계열 RNG 일원화 결정
 - [ADR-20260228-02-common-combat-event-channel-hit-collect-cleanup.md](ADR-20260228-02-common-combat-event-channel-hit-collect-cleanup.md): 공통 전투 이벤트 채널 범위를 `Hit/Collect/Cleanup`으로 고정하고 `PlayerHazardHit`를 공통 채널 경유로 이관

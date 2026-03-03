@@ -16,8 +16,13 @@ namespace SweepNDodge.DotsBullets
             StagedFrames.Clear();
             if (frames != null)
             {
+                uint frameBase = frames.Count > 0 ? frames[0].Frame : 0u;
                 for (int i = 0; i < frames.Count; i++)
-                    StagedFrames.Add(frames[i]);
+                {
+                    var item = frames[i];
+                    item.Frame = item.Frame >= frameBase ? item.Frame - frameBase : 0u;
+                    StagedFrames.Add(item);
+                }
             }
 
             _stagedRunSeed = runSeed > 0u ? runSeed : 1u;
