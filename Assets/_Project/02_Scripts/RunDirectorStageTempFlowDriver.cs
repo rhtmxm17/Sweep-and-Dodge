@@ -35,6 +35,7 @@ namespace SweepNDodge.DotsBullets
 
         private EntityManager _em;
         private EntityQuery _stageStateQuery;
+        private EntityQuery _replayQuery;
         private bool _isBound;
         private bool _warnedNoBridge;
 
@@ -67,6 +68,7 @@ namespace SweepNDodge.DotsBullets
 
             _em = world.EntityManager;
             _stageStateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageStateComponent>());
+            _replayQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<ReplayInputControlComponent>());
             _isBound = true;
             return true;
         }
@@ -90,6 +92,8 @@ namespace SweepNDodge.DotsBullets
 
         private void ProcessManualHotkeys()
         {
+            if (IsReplayInputSuppressed())
+                return;
             if (!EnableManualHotkeys || StageBridge == null)
                 return;
 
@@ -101,6 +105,17 @@ namespace SweepNDodge.DotsBullets
                 TryBridgeCall(() => StageBridge.SetClearPresentationDone(true), "SetClearPresentationDone");
             if (Input.GetKeyDown(RequestConfirmKey))
                 TryBridgeCall(StageBridge.RequestConfirm, "RequestConfirm");
+        }
+
+        private bool IsReplayInputSuppressed()
+        {
+            if (ReplaySessionStaging.IsPlaybackStartupPending)
+                return true;
+            if (_replayQuery.IsEmptyIgnoreFilter)
+                return false;
+
+            var control = _em.GetComponentData<ReplayInputControlComponent>(_replayQuery.GetSingletonEntity());
+            return control.Mode == ReplayInputModeId.Playback;
         }
 
         private void ProcessAutoFlow()

@@ -2346,6 +2346,76 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ReplayInput_StagedPlayback_ResetsFrameAndAppliesSeedAndFrames()
+        {
+            using var world = CreateDefaultTestWorld("ReplayStagedPlaybackWorld", out _);
+            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+            var em = world.EntityManager;
+            CreatePlayer(em);
+            CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 64, maxPendingAgeFrames: 30);
+
+            var replayEntity = em.CreateEntityQuery(
+                ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+            var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var runSeedEntity = em.CreateEntityQuery(ComponentType.ReadWrite<SpawnRunSeedComponent>()).GetSingletonEntity();
+
+            em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 99u });
+            em.SetComponentData(runSeedEntity, new SpawnRunSeedComponent { Value = 7u });
+            em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Off,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+
+            var staged = new List<ReplayInputFrameBufferElement>
+            {
+                new ReplayInputFrameBufferElement
+                {
+                    Frame = 0u,
+                    Position = new float3(1f, 0f, 2f),
+                    Rotation = quaternion.identity,
+                    SyncRotation = 1,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                },
+                new ReplayInputFrameBufferElement
+                {
+                    Frame = 1u,
+                    Position = new float3(3f, 0f, 4f),
+                    Rotation = quaternion.identity,
+                    SyncRotation = 1,
+                    VacuumRequested = 1,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                }
+            };
+
+            ReplaySessionStaging.StagePlayback(staged, runSeed: 0x1234u);
+            world.SetTime(new TimeData(1d, 1f));
+            initGroup.Update();
+
+            var controlAfter = em.GetComponentData<ReplayInputControlComponent>(replayEntity);
+            var cursorAfter = em.GetComponentData<ReplayInputCursorComponent>(replayEntity);
+            var framesAfter = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            var frameAfter = em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity);
+            var seedAfter = em.GetComponentData<SpawnRunSeedComponent>(runSeedEntity);
+
+            Assert.That(controlAfter.Mode, Is.EqualTo(ReplayInputModeId.Playback));
+            Assert.That(cursorAfter.NextFrameIndex, Is.EqualTo(1), "Frame 0 should be consumed on first update");
+            Assert.That(framesAfter.Length, Is.EqualTo(2));
+            Assert.That(frameAfter.Value, Is.EqualTo(0u));
+            Assert.That(seedAfter.Value, Is.EqualTo(0x1234u));
+            Assert.That(ReplaySessionStaging.IsPlaybackStartupPending, Is.False);
+        }
+
+        [Test]
         public void Determinism_SameSeedAndReplayInput_ProducesSameSpawnSnapshot()
         {
             const int replayFrameCount = 24;

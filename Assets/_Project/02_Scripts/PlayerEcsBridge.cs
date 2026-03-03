@@ -31,6 +31,7 @@ namespace SweepNDodge.DotsBullets
         private EntityManager _em;
         private Entity _playerEntity;
         private bool _hasPlayerEntity;
+        private EntityQuery _replayQuery;
         private float _vacuumGizmoUntilTime;
 
         private void Awake()
@@ -47,21 +48,26 @@ namespace SweepNDodge.DotsBullets
             }
 
             // GO -> ECS 동기화
-            var sync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
-            sync.Position = transform.position;
-            sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
-            if (SyncRotation) sync.Rotation = transform.rotation;
-
-            bool primaryPressed = Input.GetMouseButtonDown(PrimaryVacuumMouseButton);
-            bool secondaryPressed = Input.GetMouseButtonDown(SecondaryVacuumMouseButton);
-            if (primaryPressed || secondaryPressed)
+            bool suppressLiveInput = IsReplayInputSuppressed();
+            if (!suppressLiveInput)
             {
-                sync.VacuumRequested = 1;
-                sync.CleanupActionRequested = 1;
-                sync.RequestedCleanupActionSlot = (byte)(secondaryPressed ? SecondarySlot : PrimarySlot);
-                _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
+                var sync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
+                sync.Position = transform.position;
+                sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
+                if (SyncRotation) sync.Rotation = transform.rotation;
+
+                bool primaryPressed = Input.GetMouseButtonDown(PrimaryVacuumMouseButton);
+                bool secondaryPressed = Input.GetMouseButtonDown(SecondaryVacuumMouseButton);
+                if (primaryPressed || secondaryPressed)
+                {
+                    sync.VacuumRequested = 1;
+                    sync.CleanupActionRequested = 1;
+                    sync.RequestedCleanupActionSlot = (byte)(secondaryPressed ? SecondarySlot : PrimarySlot);
+                    _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
+                }
+
+                _em.SetComponentData(_playerEntity, sync);
             }
-            _em.SetComponentData(_playerEntity, sync);
 
             // ECS -> GO : Vacuum 상태를 Animator에 반영(옵션)
             if (Animator != null)
@@ -98,6 +104,7 @@ namespace SweepNDodge.DotsBullets
             if (world == null || !world.IsCreated) return;
 
             _em = world.EntityManager;
+            _replayQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<ReplayInputControlComponent>());
 
             // PlayerTag 싱글톤 찾기 (서브씬 로딩 지연 대비)
             using var q = _em.CreateEntityQuery(ComponentType.ReadOnly<PlayerTag>());
@@ -109,6 +116,17 @@ namespace SweepNDodge.DotsBullets
 
             _playerEntity = q.GetSingletonEntity();
             _hasPlayerEntity = _playerEntity != Entity.Null;
+        }
+
+        private bool IsReplayInputSuppressed()
+        {
+            if (ReplaySessionStaging.IsPlaybackStartupPending)
+                return true;
+            if (!_hasPlayerEntity || _replayQuery.IsEmptyIgnoreFilter)
+                return false;
+
+            var control = _em.GetComponentData<ReplayInputControlComponent>(_replayQuery.GetSingletonEntity());
+            return control.Mode == ReplayInputModeId.Playback;
         }
     }
 }

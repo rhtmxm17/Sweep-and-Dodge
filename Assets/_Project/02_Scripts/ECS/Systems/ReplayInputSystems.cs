@@ -58,6 +58,39 @@ namespace SweepNDodge.DotsBullets
             var cursorRW = SystemAPI.GetComponentRW<ReplayInputCursorComponent>(replayEntity);
             var frames = SystemAPI.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
 
+            if (ReplaySessionStaging.TryConsumePlayback(frames, out uint stagedRunSeed))
+            {
+                cursorRW.ValueRW = new ReplayInputCursorComponent
+                {
+                    NextFrameIndex = 0,
+                };
+                controlRW.ValueRW = new ReplayInputControlComponent
+                {
+                    Mode = ReplayInputModeId.Playback,
+                    LastRecordedFrame = 0u,
+                    LastPlaybackFrame = 0u,
+                    MissingFrameCount = 0,
+                };
+
+                if (SystemAPI.TryGetSingletonEntity<SpawnRunSeedComponent>(out var runSeedEntity))
+                {
+                    SystemAPI.SetComponent(runSeedEntity, new SpawnRunSeedComponent
+                    {
+                        Value = stagedRunSeed > 0u ? stagedRunSeed : 1u,
+                    });
+                }
+
+                if (SystemAPI.TryGetSingletonEntity<BulletFrameCounterComponent>(out var frameCounterEntity))
+                {
+                    SystemAPI.SetComponent(frameCounterEntity, new BulletFrameCounterComponent
+                    {
+                        Value = 0u,
+                    });
+                }
+
+                frame = 0u;
+            }
+
             if (controlRW.ValueRO.Mode == ReplayInputModeId.Record)
             {
                 var sync = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);

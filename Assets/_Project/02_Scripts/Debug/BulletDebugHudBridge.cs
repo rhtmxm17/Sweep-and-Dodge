@@ -1,6 +1,7 @@
 using Unity.Entities;
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -29,6 +30,9 @@ namespace SweepNDodge.DotsBullets
         private EntityQuery _stageRequestQuery;
         private EntityQuery _stageSignalQuery;
         private EntityQuery _combatMetricsQuery;
+        private EntityQuery _replayQuery;
+        private EntityQuery _runSeedQuery;
+        private EntityQuery _frameCounterQuery;
         private bool _isBound;
         private Vector2 _sourceScroll;
         private readonly List<SourceDirectorHudRow> _sourceRows = new List<SourceDirectorHudRow>(32);
@@ -38,6 +42,7 @@ namespace SweepNDodge.DotsBullets
         private bool _showCombatEvent = true;
         private bool _showStressControl = true;
         private bool _showSourceDirectorState = true;
+        private bool _showReplayControl = true;
 
         private struct SourceDirectorHudRow
         {
@@ -94,6 +99,8 @@ namespace SweepNDodge.DotsBullets
                 DrawSourceDirectorStatesSection();
             if (_showStressControl)
                 DrawStressControlSection(stress);
+            if (_showReplayControl)
+                DrawReplayControlSection();
 
             GUILayout.EndArea();
         }
@@ -122,6 +129,12 @@ namespace SweepNDodge.DotsBullets
             _stageRequestQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageRequestComponent>());
             _stageSignalQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageSignalComponent>());
             _combatMetricsQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>());
+            _replayQuery = _em.CreateEntityQuery(
+                ComponentType.ReadOnly<ReplayInputControlComponent>(),
+                ComponentType.ReadOnly<ReplayInputCursorComponent>(),
+                ComponentType.ReadOnly<ReplayInputFrameBufferElement>());
+            _runSeedQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<SpawnRunSeedComponent>());
+            _frameCounterQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>());
             _isBound = true;
             return true;
         }
@@ -297,6 +310,7 @@ namespace SweepNDodge.DotsBullets
             GUILayout.BeginHorizontal();
             _showSourceDirectorState = GUILayout.Toggle(_showSourceDirectorState, "Source");
             _showStressControl = GUILayout.Toggle(_showStressControl, "Stress");
+            _showReplayControl = GUILayout.Toggle(_showReplayControl, "Replay");
             GUILayout.EndHorizontal();
             GUILayout.Space(6f);
         }
@@ -325,6 +339,47 @@ namespace SweepNDodge.DotsBullets
                 RequestSustain();
             if (GUILayout.Button("Stop Sustain"))
                 RequestStopSustain();
+        }
+
+        private void DrawReplayControlSection()
+        {
+            if (_replayQuery.IsEmptyIgnoreFilter)
+                return;
+
+            GUILayout.Space(4f);
+            GUILayout.Label("[Replay Control]");
+
+            var replayEntity = _replayQuery.GetSingletonEntity();
+            var control = _em.GetComponentData<ReplayInputControlComponent>(replayEntity);
+            var cursor = _em.GetComponentData<ReplayInputCursorComponent>(replayEntity);
+            var frames = _em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            uint runSeed = _runSeedQuery.IsEmptyIgnoreFilter
+                ? 0u
+                : _em.GetComponentData<SpawnRunSeedComponent>(_runSeedQuery.GetSingletonEntity()).Value;
+            uint frame = _frameCounterQuery.IsEmptyIgnoreFilter
+                ? 0u
+                : _em.GetComponentData<BulletFrameCounterComponent>(_frameCounterQuery.GetSingletonEntity()).Value;
+
+            GUILayout.Label(
+                $"mode:{control.Mode}  runSeed:{runSeed}  frame:{frame}  recorded:{frames.Length}  cursor:{cursor.NextFrameIndex}");
+            GUILayout.Label(
+                $"lastRec:{control.LastRecordedFrame}  lastPlay:{control.LastPlaybackFrame}  missing:{control.MissingFrameCount}");
+            if (ReplaySessionStaging.IsPlaybackStartupPending)
+                GUILayout.Label("playback staging pending...");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Record Start (Clear)"))
+                StartReplayRecording(replayEntity);
+            if (GUILayout.Button("Record Stop"))
+                SetReplayMode(replayEntity, ReplayInputModeId.Off);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Playback (Reset Scene)"))
+                StartReplayPlaybackWithSceneReset(replayEntity);
+            if (GUILayout.Button("Playback Stop"))
+                SetReplayMode(replayEntity, ReplayInputModeId.Off);
+            GUILayout.EndHorizontal();
         }
 
         private bool ShouldDrawSourceDirectorState()
@@ -419,6 +474,70 @@ namespace SweepNDodge.DotsBullets
             state.Mode = (byte)StressSwitchModeId.StopSustain;
             state.RequestExecute = 1;
             _em.SetComponentData(e, state);
+        }
+
+        private void StartReplayRecording(Entity replayEntity)
+        {
+            var frames = _em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            frames.Clear();
+            _em.SetComponentData(replayEntity, new ReplayInputCursorComponent
+            {
+                NextFrameIndex = 0,
+            });
+            _em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Record,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+        }
+
+        private void SetReplayMode(Entity replayEntity, ReplayInputModeId mode)
+        {
+            var control = _em.GetComponentData<ReplayInputControlComponent>(replayEntity);
+            control.Mode = mode;
+            control.MissingFrameCount = 0;
+            _em.SetComponentData(replayEntity, control);
+        }
+
+        private void StartReplayPlaybackWithSceneReset(Entity replayEntity)
+        {
+            var frames = _em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            if (frames.Length <= 0)
+            {
+                Debug.LogWarning("[Replay] Cannot start playback: no recorded frames.");
+                return;
+            }
+
+            uint runSeed = _runSeedQuery.IsEmptyIgnoreFilter
+                ? 1u
+                : _em.GetComponentData<SpawnRunSeedComponent>(_runSeedQuery.GetSingletonEntity()).Value;
+            var copiedFrames = new List<ReplayInputFrameBufferElement>(frames.Length);
+            for (int i = 0; i < frames.Length; i++)
+                copiedFrames.Add(frames[i]);
+            ReplaySessionStaging.StagePlayback(copiedFrames, runSeed);
+
+            var scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid())
+            {
+                Debug.LogWarning("[Replay] Cannot reset scene: active scene is invalid.");
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(scene.path))
+            {
+                SceneManager.LoadScene(scene.path, LoadSceneMode.Single);
+                return;
+            }
+
+            if (scene.buildIndex >= 0)
+            {
+                SceneManager.LoadScene(scene.buildIndex, LoadSceneMode.Single);
+                return;
+            }
+
+            Debug.LogWarning("[Replay] Cannot reset scene: scene path/build index unavailable.");
         }
     }
 }

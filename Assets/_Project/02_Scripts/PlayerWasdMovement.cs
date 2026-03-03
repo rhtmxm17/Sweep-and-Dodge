@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.Entities;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -10,9 +11,15 @@ namespace SweepNDodge.DotsBullets
         [Min(0f)]
         public float MoveSpeed = 6f;
         public Camera TargetCamera;
+        private EntityManager _em;
+        private EntityQuery _replayQuery;
+        private bool _isReplayBound;
 
         private void Update()
         {
+            if (IsReplayInputSuppressed())
+                return;
+
             var moveX = 0f;
             var moveZ = 0f;
 
@@ -39,6 +46,29 @@ namespace SweepNDodge.DotsBullets
             if (lookDirection.sqrMagnitude <= 0.0001f) return;
 
             transform.rotation = Quaternion.LookRotation(lookDirection);
+        }
+
+        private bool IsReplayInputSuppressed()
+        {
+            if (ReplaySessionStaging.IsPlaybackStartupPending)
+                return true;
+
+            if (!_isReplayBound)
+            {
+                var world = World.DefaultGameObjectInjectionWorld;
+                if (world == null || !world.IsCreated)
+                    return false;
+
+                _em = world.EntityManager;
+                _replayQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<ReplayInputControlComponent>());
+                _isReplayBound = true;
+            }
+
+            if (_replayQuery.IsEmptyIgnoreFilter)
+                return false;
+
+            var control = _em.GetComponentData<ReplayInputControlComponent>(_replayQuery.GetSingletonEntity());
+            return control.Mode == ReplayInputModeId.Playback;
         }
     }
 }
