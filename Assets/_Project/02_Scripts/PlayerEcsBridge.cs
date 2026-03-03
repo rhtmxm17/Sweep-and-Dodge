@@ -1,5 +1,4 @@
 ﻿using Unity.Entities;
-using Unity.Mathematics;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
@@ -21,8 +20,7 @@ namespace SweepNDodge.DotsBullets
         public bool SyncRotation = true;
 
         [Header("Authority (Transition)")]
-        public bool EnableLegacyTransformToEcsSync = true;
-        public Camera AimCamera;
+        public bool EnableLegacyTransformToEcsSync = false;
 
         // Vacuum 상태 반영용 Animator (옵션)
         public Animator Animator;
@@ -62,38 +60,6 @@ namespace SweepNDodge.DotsBullets
                     sync.Position = transform.position;
                     sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
                     if (SyncRotation) sync.Rotation = transform.rotation;
-                }
-
-                float moveX = 0f;
-                float moveZ = 0f;
-                if (Input.GetKey(KeyCode.A)) moveX -= 1f;
-                if (Input.GetKey(KeyCode.D)) moveX += 1f;
-                if (Input.GetKey(KeyCode.S)) moveZ -= 1f;
-                if (Input.GetKey(KeyCode.W)) moveZ += 1f;
-                var moveAxis = new float2(moveX, moveZ);
-                if (math.lengthsq(moveAxis) > 1f)
-                    moveAxis = math.normalizesafe(moveAxis, new float2(0f, 1f));
-                intent.MoveAxis = moveAxis;
-
-                var cameraToUse = AimCamera != null ? AimCamera : Camera.main;
-                if (cameraToUse != null)
-                {
-                    var ray = cameraToUse.ScreenPointToRay(Input.mousePosition);
-                    var groundPlane = new Plane(Vector3.up, Vector3.zero);
-                    if (groundPlane.Raycast(ray, out var enter))
-                    {
-                        var hitPoint = ray.GetPoint(enter);
-                        intent.AimWorldXZ = new float2(hitPoint.x, hitPoint.z);
-                        intent.HasAimWorldPoint = 1;
-                    }
-                    else
-                    {
-                        intent.HasAimWorldPoint = 0;
-                    }
-                }
-                else
-                {
-                    intent.HasAimWorldPoint = 0;
                 }
 
                 bool primaryPressed = Input.GetMouseButtonDown(PrimaryVacuumMouseButton);

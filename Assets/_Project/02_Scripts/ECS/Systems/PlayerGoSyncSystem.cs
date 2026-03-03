@@ -9,19 +9,28 @@ namespace SweepNDodge.DotsBullets
     {
         public void OnUpdate(ref SystemState state)
         {
-            foreach (var (sync, intent, tx, vacuum, actionState, slotMap) in
+            var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
+            txLookup.Update(ref state);
+
+            foreach (var (sync, intent, vacuum, actionState, slotMap, entity) in
                      SystemAPI.Query<
                          RefRW<PlayerGoSyncComponent>,
                          RefRW<PlayerInputIntentComponent>,
-                         RefRW<LocalTransform>,
                          RefRW<VacuumRuntimeStateComponent>,
                          RefRW<PlayerCleanupActionStateComponent>,
                          RefRO<PlayerCleanupActionSlotMapComponent>>()
-                              .WithAll<PlayerTag>())
+                              .WithAll<PlayerTag>()
+                              .WithEntityAccess())
             {
-                tx.ValueRW.Position = sync.ValueRO.Position;
-                if (sync.ValueRO.SyncRotation != 0)
-                    tx.ValueRW.Rotation = sync.ValueRO.Rotation;
+                if (txLookup.HasComponent(entity))
+                {
+                    var tx = txLookup[entity];
+                    var mirrored = sync.ValueRW;
+                    mirrored.Position = tx.Position;
+                    if (mirrored.SyncRotation != 0)
+                        mirrored.Rotation = tx.Rotation;
+                    sync.ValueRW = mirrored;
+                }
 
                 bool hasVacuumRequest = intent.ValueRO.VacuumRequested != 0 || sync.ValueRO.VacuumRequested != 0;
                 bool hasCleanupRequest = intent.ValueRO.CleanupActionRequested != 0 || sync.ValueRO.CleanupActionRequested != 0;

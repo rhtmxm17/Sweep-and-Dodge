@@ -14,7 +14,7 @@ namespace SweepNDodge.DotsBullets
         public Camera TargetCamera;
 
         [Header("Authority (Transition)")]
-        public bool EnableLegacyTransformWrite = true;
+        public bool EnableLegacyTransformWrite = false;
 
         private EntityManager _em;
         private EntityQuery _playerQuery;
