@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md](ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md): 리플레이/결정론 품질을 위한 고정 Tick 시간원 전환 결정(가변 DeltaTime 의존 축소)
 - [ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md](ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md): 리플레이 persistence 도입과 구버전 완전 거부 기반 schema compatibility 정책 고정
 - [ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md](ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md): 플레이어 런타임 권한을 ECS로 이전하고 GameObject를 입력 수집/표현 소비 경계로 고정
 - [ADR-20260303-01-replay-min-foundation-and-seed-unification.md](ADR-20260303-01-replay-min-foundation-and-seed-unification.md): OPS-001 #10 최소 범위(동일 머신/동일 빌드) 고정 + 입력 프레임 스냅샷 + run seed 계열 RNG 일원화 결정

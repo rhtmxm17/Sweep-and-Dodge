@@ -11,3 +11,4 @@
 - [TD-006-run-progress-director-design.md](TD-006-run-progress-director-design.md): 런 진행도 디렉터 책임 경계/상태 모델/연동 계약
 - [TD-007-common-combat-event-channel.md](TD-007-common-combat-event-channel.md): 공통 전투 이벤트 채널 범위(`Hit/Collect/Cleanup`)와 소유권/집계 계약
 - [TD-008-replay-io-persistence-and-version-policy.md](TD-008-replay-io-persistence-and-version-policy.md): Replay 파일 입출력 경로와 버전 불일치 즉시 실패 정책(구버전 완전 거부) 설계 초안
+- [TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md](TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md): 고정 Tick 시간원 도입과 DeltaTime 의존 시스템 단계 치환 계획
