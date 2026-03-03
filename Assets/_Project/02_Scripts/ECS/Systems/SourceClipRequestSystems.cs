@@ -141,6 +141,8 @@ namespace SweepNDodge.DotsBullets
                     ProcessActiveEventClip(
                         sourceEntity,
                         clipState,
+                        runSeed,
+                        sourceStableId,
                         frame,
                         deltaTime,
                         area.ComputedArea,
@@ -330,6 +332,8 @@ namespace SweepNDodge.DotsBullets
         private static void ProcessActiveEventClip(
             Entity sourceEntity,
             SourceStateId sourceState,
+            uint runSeed,
+            uint sourceStableId,
             uint frame,
             float deltaTime,
             float area,
@@ -366,7 +370,16 @@ namespace SweepNDodge.DotsBullets
                     continue;
                 }
 
-                int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requests, area, deltaTime, densityScale);
+                int requested = ResolveSpawnCount(
+                    ref pattern,
+                    runSeed,
+                    sourceStableId,
+                    frame,
+                    activeCounts,
+                    requests,
+                    area,
+                    deltaTime,
+                    densityScale);
                 patterns[i] = pattern;
                 if (requested <= 0)
                     continue;
@@ -477,7 +490,16 @@ namespace SweepNDodge.DotsBullets
                         continue;
                     }
 
-                    int requested = ResolveSpawnCount(ref pattern, sourceEntity, frame, activeCounts, requests, area, deltaTime, densityScale);
+                    int requested = ResolveSpawnCount(
+                        ref pattern,
+                        runSeed,
+                        stableId,
+                        frame,
+                        activeCounts,
+                        requests,
+                        area,
+                        deltaTime,
+                        densityScale);
                     patterns[p] = pattern;
                     if (requested <= 0)
                         continue;
@@ -603,7 +625,8 @@ namespace SweepNDodge.DotsBullets
 
         private static int ResolveSpawnCount(
             ref SourceClipPatternBuffer pattern,
-            Entity sourceEntity,
+            uint runSeed,
+            uint sourceStableId,
             uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
@@ -631,7 +654,8 @@ namespace SweepNDodge.DotsBullets
                 spawnDensityPerSecPerArea,
                 pattern.MaxActiveDensityPerArea,
                 pattern.BulletTypeKey,
-                sourceEntity,
+                runSeed,
+                sourceStableId,
                 pattern.DirectiveId,
                 frame,
                 activeCounts,

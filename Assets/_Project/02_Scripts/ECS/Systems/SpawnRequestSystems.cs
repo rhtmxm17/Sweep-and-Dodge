@@ -20,7 +20,9 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SpawnRequestPolicyComponent>();
             state.RequireForUpdate<SpawnBacklogMetricsComponent>();
             state.RequireForUpdate<SpawnBudgetCursorComponent>();
+            state.RequireForUpdate<SpawnRunSeedComponent>();
             state.RequireForUpdate<SourceSpawnComponent>();
+            state.RequireForUpdate<SourceStableIdComponent>();
             state.RequireForUpdate<SourceAnchorComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
             state.RequireForUpdate<SourceSpawnRuntimeComponent>();
@@ -42,6 +44,7 @@ namespace SweepNDodge.DotsBullets
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
             float deltaTime = math.max(0f, SystemAPI.Time.DeltaTime);
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
+            uint runSeed = math.max(1u, SystemAPI.GetSingleton<SpawnRunSeedComponent>().Value);
 
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
             var cursorRW = SystemAPI.GetSingletonRW<SpawnBudgetCursorComponent>();
@@ -69,6 +72,7 @@ namespace SweepNDodge.DotsBullets
             var parentLookup = SystemAPI.GetComponentLookup<Parent>(true);
             var sourceAnchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(true);
             var sourceAreaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
+            var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
             var sourceRuntimeLookup = SystemAPI.GetComponentLookup<SourceSpawnRuntimeComponent>(false);
             var pollutionConfigLookup = SystemAPI.GetComponentLookup<SourcePollutionConfigComponent>(true);
             var pollutionGridLookup = SystemAPI.GetComponentLookup<SourcePollutionGridComponent>(true);
@@ -93,6 +97,7 @@ namespace SweepNDodge.DotsBullets
             parentLookup.Update(ref state);
             sourceAnchorLookup.Update(ref state);
             sourceAreaLookup.Update(ref state);
+            stableIdLookup.Update(ref state);
             sourceRuntimeLookup.Update(ref state);
             pollutionConfigLookup.Update(ref state);
             pollutionGridLookup.Update(ref state);
@@ -101,6 +106,7 @@ namespace SweepNDodge.DotsBullets
 
             using var sourceEntities = new NativeList<Entity>(Allocator.Temp);
             foreach (var (_, entity) in SystemAPI.Query<RefRO<SourceSpawnComponent>>()
+                         .WithAll<SourceStableIdComponent>()
                          .WithAll<SourceSpawnRequestBuffer>()
                          .WithEntityAccess())
             {
@@ -168,9 +174,12 @@ namespace SweepNDodge.DotsBullets
                     if (requestIndex < 0)
                         continue;
 
+                    uint sourceStableId = math.max(1u, stableIdLookup[sourceEntity].Value);
                     var requestItem = requests[requestIndex];
                     spawned = TrySpawnFromRequest(
                         sourceEntity,
+                        runSeed,
+                        sourceStableId,
                         ref requestItem,
                         ref sourceRuntimeLookup,
                         ref sourceAnchorLookup,
@@ -439,6 +448,8 @@ namespace SweepNDodge.DotsBullets
 
         private static bool TrySpawnFromRequest(
             Entity sourceEntity,
+            uint runSeed,
+            uint sourceStableId,
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
@@ -475,6 +486,8 @@ namespace SweepNDodge.DotsBullets
             {
                 bool singleSpawned = TrySpawnOneFromRequest(
                     sourceEntity,
+                    runSeed,
+                    sourceStableId,
                     ref request,
                     ref sourceRuntimeLookup,
                     ref sourceAnchorLookup,
@@ -515,6 +528,8 @@ namespace SweepNDodge.DotsBullets
             {
                 bool singleSpawned = TrySpawnOneFromRequest(
                     sourceEntity,
+                    runSeed,
+                    sourceStableId,
                     ref request,
                     ref sourceRuntimeLookup,
                     ref sourceAnchorLookup,
@@ -550,7 +565,12 @@ namespace SweepNDodge.DotsBullets
                 return true;
             }
 
-            var random = CreateSourceRandom(sourceEntity, ref sourceRuntimeLookup);
+            var random = CreateSourceRandom(
+                runSeed,
+                sourceStableId,
+                request.DirectiveId,
+                sourceEntity,
+                ref sourceRuntimeLookup);
             var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
                 ? sourceAreaLookup[sourceEntity]
                 : default;
@@ -609,6 +629,8 @@ namespace SweepNDodge.DotsBullets
 
         private static bool TrySpawnOneFromRequest(
             Entity sourceEntity,
+            uint runSeed,
+            uint sourceStableId,
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
@@ -640,7 +662,12 @@ namespace SweepNDodge.DotsBullets
             if (!TryDequeueByKey(ref BulletFieldShared.FreeByKey, requestedTypeKey, out var bulletEntity))
                 return false;
 
-            var random = CreateSourceRandom(sourceEntity, ref sourceRuntimeLookup);
+            var random = CreateSourceRandom(
+                runSeed,
+                sourceStableId,
+                request.DirectiveId,
+                sourceEntity,
+                ref sourceRuntimeLookup);
             var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
                 ? sourceAreaLookup[sourceEntity]
                 : default;
@@ -917,19 +944,27 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static Unity.Mathematics.Random CreateSourceRandom(
+            uint runSeed,
+            uint sourceStableId,
+            int directiveId,
             Entity sourceEntity,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup)
         {
-            uint seed = math.max(1u, (uint)(sourceEntity.Index + 1));
+            uint sequence = 1u;
             if (sourceRuntimeLookup.HasComponent(sourceEntity))
             {
                 var runtime = sourceRuntimeLookup[sourceEntity];
-                seed = math.max(1u, runtime.SpawnSequence);
-                runtime.SpawnSequence = seed + 1u;
+                sequence = math.max(1u, runtime.SpawnSequence);
+                runtime.SpawnSequence = sequence + 1u;
                 sourceRuntimeLookup[sourceEntity] = runtime;
             }
 
-            return Unity.Mathematics.Random.CreateFromIndex(seed ^ (uint)sourceEntity.Index);
+            uint seed = math.hash(new uint4(
+                math.max(1u, runSeed),
+                math.max(1u, sourceStableId),
+                sequence,
+                ((uint)math.max(0, directiveId + 1)) ^ 0xA5A5A5A5u));
+            return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
         }
 
         private static float2 ResolveSpawnDirection(

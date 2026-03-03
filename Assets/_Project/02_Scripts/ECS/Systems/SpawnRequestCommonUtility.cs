@@ -39,7 +39,8 @@ namespace SweepNDodge.DotsBullets
             float spawnDensityPerSecPerArea,
             float maxActiveDensityPerArea,
             int bulletTypeKey,
-            Entity sourceEntity,
+            uint runSeed,
+            uint sourceStableId,
             int directiveId,
             uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
@@ -57,7 +58,7 @@ namespace SweepNDodge.DotsBullets
                 if (lambda <= 0f)
                     return 0;
 
-                var random = CreateDeterministicRandom(sourceEntity, directiveId, frame, deterministicSalt);
+                var random = CreateDeterministicRandom(runSeed, sourceStableId, directiveId, frame, deterministicSalt);
                 int eventCount = SamplePoisson(lambda, ref random);
                 spawnCount = SafeAdd(0, eventCount * shotsPerEvent);
             }
@@ -268,13 +269,18 @@ namespace SweepNDodge.DotsBullets
             return pending;
         }
 
-        private static Unity.Mathematics.Random CreateDeterministicRandom(Entity sourceEntity, int directiveId, uint frame, uint salt)
+        private static Unity.Mathematics.Random CreateDeterministicRandom(
+            uint runSeed,
+            uint sourceStableId,
+            int directiveId,
+            uint frame,
+            uint salt)
         {
             uint seed = math.hash(new uint4(
-                frame,
-                (uint)math.max(0, sourceEntity.Index + 1),
+                math.max(1u, runSeed),
+                math.max(1u, sourceStableId),
                 (uint)math.max(0, directiveId + 1),
-                salt));
+                frame ^ salt));
             return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
         }
 

@@ -2236,6 +2236,217 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void ReplayInput_RecordAndPlayback_RoundTripsFrameSnapshots()
+        {
+            using var world = CreateDefaultTestWorld("ReplayRecordPlaybackWorld", out _);
+            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+            var em = world.EntityManager;
+            CreatePlayer(em);
+
+            var replayEntity = em.CreateEntityQuery(
+                ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+            var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var playerEntity = em.CreateEntityQuery(ComponentType.ReadWrite<PlayerGoSyncComponent>(), ComponentType.ReadOnly<PlayerTag>()).GetSingletonEntity();
+
+            var replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            replayFrames.Clear();
+            em.SetComponentData(replayEntity, new ReplayInputCursorComponent { NextFrameIndex = 0 });
+            em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Record,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+
+            var expected = new List<ReplayInputFrameBufferElement>();
+            for (int i = 0; i < 6; i++)
+            {
+                uint frame = (uint)i;
+                var sync = new PlayerGoSyncComponent
+                {
+                    Position = new float3(i, 0f, i * 2f),
+                    Rotation = quaternion.RotateY(math.radians(i * 15f)),
+                    SyncRotation = 1,
+                    VacuumRequested = (byte)(i % 2),
+                    CleanupActionRequested = (byte)((i + 1) % 2),
+                    RequestedCleanupActionSlot = (byte)(i % 3),
+                };
+                expected.Add(new ReplayInputFrameBufferElement
+                {
+                    Frame = frame,
+                    Position = sync.Position,
+                    Rotation = sync.Rotation,
+                    SyncRotation = sync.SyncRotation,
+                    VacuumRequested = sync.VacuumRequested,
+                    CleanupActionRequested = sync.CleanupActionRequested,
+                    RequestedCleanupActionSlot = sync.RequestedCleanupActionSlot,
+                });
+
+                em.SetComponentData(playerEntity, sync);
+                em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = frame });
+                world.SetTime(new TimeData(i + 1d, 1f));
+                initGroup.Update();
+            }
+
+            replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            Assert.That(replayFrames.Length, Is.EqualTo(expected.Count));
+            for (int i = 0; i < expected.Count; i++)
+            {
+                Assert.That(replayFrames[i].Frame, Is.EqualTo(expected[i].Frame));
+                Assert.That(replayFrames[i].Position, Is.EqualTo(expected[i].Position));
+                Assert.That(replayFrames[i].SyncRotation, Is.EqualTo(expected[i].SyncRotation));
+                Assert.That(replayFrames[i].VacuumRequested, Is.EqualTo(expected[i].VacuumRequested));
+                Assert.That(replayFrames[i].CleanupActionRequested, Is.EqualTo(expected[i].CleanupActionRequested));
+                Assert.That(replayFrames[i].RequestedCleanupActionSlot, Is.EqualTo(expected[i].RequestedCleanupActionSlot));
+            }
+
+            em.SetComponentData(replayEntity, new ReplayInputCursorComponent { NextFrameIndex = 0 });
+            em.SetComponentData(replayEntity, new ReplayInputControlComponent
+            {
+                Mode = ReplayInputModeId.Playback,
+                LastRecordedFrame = 0u,
+                LastPlaybackFrame = 0u,
+                MissingFrameCount = 0,
+            });
+
+            for (int i = 0; i < expected.Count; i++)
+            {
+                uint frame = (uint)i;
+                em.SetComponentData(playerEntity, new PlayerGoSyncComponent
+                {
+                    Position = new float3(-99f, 0f, -99f),
+                    Rotation = quaternion.identity,
+                    SyncRotation = 0,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = 0,
+                });
+                em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = frame });
+                world.SetTime(new TimeData(100d + i, 1f));
+                initGroup.Update();
+
+                var replayed = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
+                Assert.That(replayed.Position, Is.EqualTo(expected[i].Position));
+                Assert.That(replayed.SyncRotation, Is.EqualTo(expected[i].SyncRotation));
+                Assert.That(replayed.VacuumRequested, Is.EqualTo(expected[i].VacuumRequested));
+                Assert.That(replayed.CleanupActionRequested, Is.EqualTo(expected[i].CleanupActionRequested));
+                Assert.That(replayed.RequestedCleanupActionSlot, Is.EqualTo(expected[i].RequestedCleanupActionSlot));
+            }
+
+            var cursorAfter = em.GetComponentData<ReplayInputCursorComponent>(replayEntity);
+            var controlAfter = em.GetComponentData<ReplayInputControlComponent>(replayEntity);
+            Assert.That(cursorAfter.NextFrameIndex, Is.EqualTo(expected.Count));
+            Assert.That(controlAfter.MissingFrameCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Determinism_SameSeedAndReplayInput_ProducesSameSpawnSnapshot()
+        {
+            const int replayFrameCount = 24;
+            const int totalFrames = 24;
+
+            List<ActiveBulletSnapshot> RunScenario(string worldName)
+            {
+                using var world = CreateDefaultTestWorld(worldName, out var simGroup);
+                var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+                Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+                var em = world.EntityManager;
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 8f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 256, lifetime: 8f);
+                CreatePlayerWithTransform(em, float3.zero);
+                CreateConfigSingletons(em, budgetPerFrame: 256, maxPendingCount: 4096, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 7101,
+                    Phase = SourceWavePhaseId.Sustain,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    DirectionMode = SourceSpawnDirectionModeId.Random,
+                    SpawnSampleBudget = 8,
+                    NWayCount = 1,
+                    Count = 60,
+                    OldestFrame = 0u,
+                });
+
+                var replayEntity = em.CreateEntityQuery(
+                    ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                    ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                    ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+                var replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+                replayFrames.Clear();
+                for (int i = 0; i < replayFrameCount; i++)
+                {
+                    replayFrames.Add(new ReplayInputFrameBufferElement
+                    {
+                        Frame = (uint)i,
+                        Position = new float3(0f, 0f, 0f),
+                        Rotation = quaternion.identity,
+                        SyncRotation = 0,
+                        VacuumRequested = 0,
+                        CleanupActionRequested = 0,
+                        RequestedCleanupActionSlot = 0,
+                    });
+                }
+
+                em.SetComponentData(replayEntity, new ReplayInputCursorComponent { NextFrameIndex = 0 });
+                em.SetComponentData(replayEntity, new ReplayInputControlComponent
+                {
+                    Mode = ReplayInputModeId.Playback,
+                    LastRecordedFrame = 0u,
+                    LastPlaybackFrame = 0u,
+                    MissingFrameCount = 0,
+                });
+
+                for (int i = 0; i < totalFrames; i++)
+                {
+                    double elapsed = (i + 1d) / 60d;
+                    world.SetTime(new TimeData(elapsed, 1f / 60f));
+                    initGroup.Update();
+                    simGroup.Update();
+                }
+
+                var snapshots = new List<ActiveBulletSnapshot>();
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                snapshots.Sort((a, b) =>
+                {
+                    int cx = a.Position.x.CompareTo(b.Position.x);
+                    if (cx != 0)
+                        return cx;
+                    int cy = a.Position.y.CompareTo(b.Position.y);
+                    if (cy != 0)
+                        return cy;
+                    return a.Position.z.CompareTo(b.Position.z);
+                });
+
+                ForceDisposeSharedContainersIfNeeded();
+                return snapshots;
+            }
+
+            var first = RunScenario("DeterminismReplayWorld_A");
+            var second = RunScenario("DeterminismReplayWorld_B");
+
+            Assert.That(first.Count, Is.EqualTo(second.Count));
+            for (int i = 0; i < first.Count; i++)
+            {
+                float3 delta = first[i].Position - second[i].Position;
+                Assert.That(math.lengthsq(delta), Is.LessThanOrEqualTo(1e-6f), $"spawn position mismatch at index={i}");
+            }
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);

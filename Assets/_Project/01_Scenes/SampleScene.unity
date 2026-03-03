@@ -744,9 +744,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RunDirectorStageTempFlowDriver
   StageBridge: {fileID: 0}
-  AutoRequestStartInIdle: 0
-  AutoSetIntroDoneInIdle: 0
-  AutoSetClearDoneInClearReady: 0
+  AutoRequestStartInIdle: 1
+  AutoSetIntroDoneInIdle: 1
+  AutoSetClearDoneInClearReady: 1
   AutoConfirmInClearReady: 1
   AutoConfirmDelaySec: 0
   EnableManualHotkeys: 1
