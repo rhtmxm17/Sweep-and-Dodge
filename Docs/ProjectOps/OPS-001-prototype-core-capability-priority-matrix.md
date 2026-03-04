@@ -4,11 +4,15 @@
 - doc_id: `OPS-001`
 - type: `ProjectOps`
 - status: `active`
-- last_updated: `2026-03-03`
+- last_updated: `2026-03-04`
 - related_adr:
   - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
   - [ADR-20260228-02-common-combat-event-channel-hit-collect-cleanup.md](../ADR/ADR-20260228-02-common-combat-event-channel-hit-collect-cleanup.md)
+  - [ADR-20260303-01-replay-min-foundation-and-seed-unification.md](../ADR/ADR-20260303-01-replay-min-foundation-and-seed-unification.md)
+  - [ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md](../ADR/ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md)
+  - [ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md](../ADR/ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md)
+  - [ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md](../ADR/ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md)
 
 > 단일 런(1개 스테이지) 2~3분, 캠페인 전체(무실패 클리어) 15~20분을 목표로 하는 1인 플레이 미니게임 프로토타입 코어 기능 우선순위 문서
 
@@ -34,10 +38,10 @@
   - `BLOCK`: 외부 의존/이슈로 진행 차단
 
 ## 3. 진행 현황 스냅샷
-- 전체(10): `DONE 7 | WIP 2 | TODO 1 | BLOCK 0` (완료율 70%)
+- 전체(10): `DONE 8 | WIP 2 | TODO 0 | BLOCK 0` (완료율 80%)
 - `P0`(5): 5/5 완료 (100%)
 - `P1`(4): 2/4 완료 (50%)
-- `P2`(1): 0/1 완료 (0%)
+- `P2`(1): 1/1 완료 (100%)
 
 ## 4. 우선순위 표
 | 순서 | 코어 기능 | 중요도 | 구조 고착 리스크 | 상대 공수 비율 | 상태 | 진행률 | 다음 액션 | 최근 갱신 |
@@ -51,12 +55,12 @@
 | 7 | 데이터 주도 패턴 정의 (패턴/웨이브/보상 분리) | P1 | 4 | 14% | DONE | 100% | 시나리오 지표 회귀 추적 유지 | 2026-02-25 |
 | 8 | 런 진행도 디렉터 (Source 진행도 기반, 스테이지 2~3분/캠페인 15~20분 가드레일) | P1 | 4 | 14% | WIP | 85% | 임시 호출 주체를 실제 StageFlow/UI 호출 주체로 교체 | 2026-02-28 |
 | 9 | 공통 전투 이벤트 채널 (피격/수집/정리 집계) | P1 | 4 | 8% | WIP | 60% | 실제 UI/점수 소비자 연결 + 운영 지표 확정 | 2026-03-03 |
-| 10 | 재현 가능한 시드/리플레이 최소 기반 | P2 | 4 | 18% | TODO | 0% | 착수 전 | 2026-02-20 |
+| 10 | 재현 가능한 시드/리플레이 최소 기반 | P2 | 4 | 18% | DONE | 100% | 리플레이 운영 게이트/CI 연동 유지 | 2026-03-04 |
 
 ## 5. 권장 실행 순서
 1. `P0` 완료로 구조 안정성 확보: 1~5번
 2. `P1`로 콘텐츠 제작/밸런싱 속도 확보: 6~9번
-3. `P2`로 회귀 분석 효율 강화: 10번
+3. `P2` 기반 완료 상태 유지: 10번(리플레이 운영 게이트/회귀 자동화 유지)
 
 ## 6. 일정 감각(비율 기준)
 - 단계별 상대 비중:
@@ -80,18 +84,26 @@
 7. 데이터 주도 패턴 정의: 방향성은 `GD-007`, 런타임 계약은 `TD-002`, 스폰 분해 모델은 `TD-003`, 인라인 authoring 설정 기준은 `TD-005`로 분리해 패턴/웨이브/진행도의 기획-구현 경계를 고정하고 반복 실험 속도를 높인다.
 8. 런 진행도 디렉터: Source별 진행도/상태/이벤트를 해석해 패턴 선택 요청을 일관되게 관리하고, 스테이지(2~3분)·캠페인(무실패 15~20분) 시간은 가드레일로 사용한다.
 9. 공통 전투 이벤트 채널: 피격/수집/정리 이벤트를 단일 집계 경로로 통합해 연출, 점수, 통계가 같은 소스를 보게 한다(단, Source 진행도 증감의 gameplay writer는 기존 Owner 경로를 유지).
-10. 재현 가능한 시드/리플레이 최소 기반: RNG 시드 고정과 입력 기록 최소 구조를 마련해 회귀 버그 추적 비용을 크게 줄인다.
+10. 재현 가능한 시드/리플레이 최소 기반: RNG 시드 고정 + tick 입력 기록/재생 + 고정 Tick 시간원 + DeltaTime 금지 자동화까지 포함해 회귀 버그 추적 비용을 크게 줄인다.
 
 ## 8. 다른 컨텍스트에 이식할 때
 - 장르가 달라도 `1~3번(파이프라인/요청-소비/동시성 규약)`은 거의 그대로 유지한다.
 - 게임 고유성은 `7~9번(데이터/진행도 디렉터/이벤트 채널)`에서 조정한다.
-- `10번(시드/리플레이)`은 우선순위는 낮춰도, 최소한 RNG 시드 고정은 초반에 도입한다.
+- `10번(시드/리플레이)`은 초기엔 최소 기반(시드+tick 입력)으로 시작하고, 고정 Tick/검증 자동화로 확장한다.
 
 ## 9. 문서 사용 규칙
 - 이 문서는 계획 문서이며, 되돌리기 비용이 크거나 파급 영향이 큰 **중요 결정**은 ADR로 기록한다.
 - 실제 구현에서 순서/소요가 바뀌면 스냅샷/표를 함께 갱신하고 변경 이유를 1~2줄 남긴다.
 
 ## 10. 변경 메모
+### 2026-03-04
+- `#10 재현 가능한 시드/리플레이 최소 기반`을 `DONE`으로 전환했다.
+  - replay 저장 계약을 `runSeed + tick 입력` 기준으로 확정했다.
+  - 입력 큐(record/playback)와 재생 경로를 tick 기준으로 일치시켰다.
+  - 고정 Tick 시간원 + `Pause/Step(1 tick)` 디버그 제어를 반영했다.
+  - 로직 시스템 `DeltaTime 직접 참조 금지` 자동 검사(`DeltaTimeBanContractTests`)를 추가했다.
+  - C1~C6 단계 검증(EditMode/PlayMode 스모크)을 통과했다.
+
 ### 2026-03-03
 - `#9 공통 전투 이벤트 채널` 진행률을 상향했다.
   - 이벤트 범위를 `Hit/Collect/Cleanup`으로 고정하고, 채널 Producer/Consumer + 집계 메트릭 경로를 코드에 반영했다.
