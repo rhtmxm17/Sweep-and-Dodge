@@ -5,6 +5,17 @@ namespace SweepNDodge.DotsBullets
 {
     internal static class FixedTickTimeUtility
     {
+        public static bool ShouldRunLogicStep(
+            bool hasRuntime,
+            in FixedTickStepRuntimeComponent runtime,
+            float frameDeltaTime)
+        {
+            if (!hasRuntime || runtime.UsingFixedTick == 0)
+                return math.max(0f, frameDeltaTime) > 0f;
+
+            return runtime.HasStep != 0 && math.max(0f, runtime.LogicDeltaTime) > 0f;
+        }
+
         public static bool TryResolveLogicDeltaTime(
             bool hasRuntime,
             in FixedTickStepRuntimeComponent runtime,
@@ -12,14 +23,10 @@ namespace SweepNDodge.DotsBullets
             out float deltaTime)
         {
             float fallbackDelta = math.max(0f, frameDeltaTime);
-            if (!hasRuntime || runtime.UsingFixedTick == 0)
-            {
-                deltaTime = fallbackDelta;
-                return deltaTime > 0f;
-            }
-
-            deltaTime = math.max(0f, runtime.LogicDeltaTime);
-            return runtime.HasStep != 0 && deltaTime > 0f;
+            deltaTime = (!hasRuntime || runtime.UsingFixedTick == 0)
+                ? fallbackDelta
+                : math.max(0f, runtime.LogicDeltaTime);
+            return ShouldRunLogicStep(hasRuntime, in runtime, frameDeltaTime) && deltaTime > 0f;
         }
     }
 }

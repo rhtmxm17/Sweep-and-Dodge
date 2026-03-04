@@ -205,6 +205,53 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void FixedTick_PauseAndSingleStep_AdvancesExactlyOneTick()
+        {
+            using var world = CreateDefaultTestWorld("FixedTickPauseStepWorld", out var simGroup);
+            var em = world.EntityManager;
+            CreatePlayer(em);
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            simGroup.Update();
+
+            var fixedTickEntity = em.CreateEntityQuery(ComponentType.ReadWrite<FixedTickTimeComponent>()).GetSingletonEntity();
+            var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+            uint baseTick = em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value;
+
+            var fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
+            fixedTick.EnableFixedTick = 1;
+            fixedTick.PauseRequested = 1;
+            fixedTick.StepRequested = 0;
+            fixedTick.MaxSubSteps = 1;
+            fixedTick.FixedDeltaTime = 1f / 60f;
+            fixedTick.Accumulator = 0f;
+            em.SetComponentData(fixedTickEntity, fixedTick);
+
+            world.SetTime(new TimeData(2d / 60d, 0.5f));
+            simGroup.Update();
+            Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick));
+            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pausedRuntime), Is.True);
+            Assert.That(pausedRuntime.HasStep, Is.EqualTo(0));
+
+            fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
+            fixedTick.StepRequested = 1;
+            em.SetComponentData(fixedTickEntity, fixedTick);
+
+            world.SetTime(new TimeData(3d / 60d, 0f));
+            simGroup.Update();
+            Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick + 1u));
+            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent stepRuntime), Is.True);
+            Assert.That(stepRuntime.HasStep, Is.EqualTo(1));
+            Assert.That(stepRuntime.LogicDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
+
+            world.SetTime(new TimeData(4d / 60d, 0.2f));
+            simGroup.Update();
+            Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick + 1u));
+            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pauseRuntimeAfterStep), Is.True);
+            Assert.That(pauseRuntimeAfterStep.HasStep, Is.EqualTo(0));
+        }
+
+        [Test]
         public void CombatEventChannel_ConsumesAndAggregatesHitCollectCleanup()
         {
             using var world = new World("CombatEventChannelWorld");
@@ -2905,6 +2952,135 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 float3 delta = first[i].Position - second[i].Position;
                 Assert.That(math.lengthsq(delta), Is.LessThanOrEqualTo(1e-6f), $"spawn position mismatch at index={i}");
+            }
+        }
+
+        [Test]
+        public void Determinism_FixedTickVariableFrameDelta_SameSeedAndReplayInput_ProducesSameSpawnSnapshot()
+        {
+            const int replayFrameCount = 240;
+            const int totalFrames = 240;
+
+            static float ResolveVariableFrameDelta(int frame)
+            {
+                return frame % 8 switch
+                {
+                    0 => 1f / 120f,
+                    1 => 1f / 45f,
+                    2 => 1f / 90f,
+                    3 => 1f / 30f,
+                    4 => 1f / 75f,
+                    5 => 1f / 50f,
+                    6 => 1f / 110f,
+                    _ => 1f / 40f,
+                };
+            }
+
+            List<ActiveBulletSnapshot> RunScenario(string worldName)
+            {
+                using var world = CreateDefaultTestWorld(worldName, out var simGroup);
+                var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
+                Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
+
+                var em = world.EntityManager;
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 8f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 512, lifetime: 8f);
+                CreatePlayerWithTransform(em, float3.zero);
+                CreateConfigSingletons(em, budgetPerFrame: 512, maxPendingCount: 8192, maxPendingAgeFrames: 240);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var fixedTickEntity = em.CreateEntityQuery(ComponentType.ReadWrite<FixedTickTimeComponent>()).GetSingletonEntity();
+                var fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
+                fixedTick.EnableFixedTick = 1;
+                fixedTick.PauseRequested = 0;
+                fixedTick.StepRequested = 0;
+                fixedTick.MaxSubSteps = 1;
+                fixedTick.FixedDeltaTime = 1f / 60f;
+                fixedTick.Accumulator = 0f;
+                em.SetComponentData(fixedTickEntity, fixedTick);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 7201,
+                    Phase = SourceWavePhaseId.Sustain,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    DirectionMode = SourceSpawnDirectionModeId.Random,
+                    SpawnSampleBudget = 8,
+                    NWayCount = 1,
+                    Count = 100,
+                    OldestFrame = 0u,
+                });
+
+                var replayEntity = em.CreateEntityQuery(
+                    ComponentType.ReadWrite<ReplayInputControlComponent>(),
+                    ComponentType.ReadWrite<ReplayInputCursorComponent>(),
+                    ComponentType.ReadWrite<ReplayInputFrameBufferElement>()).GetSingletonEntity();
+                var replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+                replayFrames.Clear();
+                for (int i = 0; i < replayFrameCount; i++)
+                {
+                    replayFrames.Add(new ReplayInputFrameBufferElement
+                    {
+                        Frame = (uint)i,
+                        Position = float3.zero,
+                        Rotation = quaternion.identity,
+                        SyncRotation = 0,
+                        VacuumRequested = 0,
+                        CleanupActionRequested = 0,
+                        RequestedCleanupActionSlot = 0,
+                    });
+                }
+
+                em.SetComponentData(replayEntity, new ReplayInputCursorComponent { NextFrameIndex = 0 });
+                em.SetComponentData(replayEntity, new ReplayInputControlComponent
+                {
+                    Mode = ReplayInputModeId.Playback,
+                    LastRecordedFrame = 0u,
+                    LastPlaybackFrame = 0u,
+                    MissingFrameCount = 0,
+                });
+
+                double elapsed = 0d;
+                for (int i = 0; i < totalFrames; i++)
+                {
+                    float dt = ResolveVariableFrameDelta(i);
+                    elapsed += dt;
+                    world.SetTime(new TimeData(elapsed, dt));
+                    initGroup.Update();
+                    simGroup.Update();
+                }
+
+                var snapshots = new List<ActiveBulletSnapshot>();
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                snapshots.Sort((a, b) =>
+                {
+                    int cx = a.Position.x.CompareTo(b.Position.x);
+                    if (cx != 0)
+                        return cx;
+                    int cy = a.Position.y.CompareTo(b.Position.y);
+                    if (cy != 0)
+                        return cy;
+                    return a.Position.z.CompareTo(b.Position.z);
+                });
+
+                ForceDisposeSharedContainersIfNeeded();
+                return snapshots;
+            }
+
+            var first = RunScenario("DeterminismFixedTickVariableDeltaWorld_A");
+            var second = RunScenario("DeterminismFixedTickVariableDeltaWorld_B");
+
+            Assert.That(first.Count, Is.EqualTo(second.Count));
+            for (int i = 0; i < first.Count; i++)
+            {
+                float3 delta = first[i].Position - second[i].Position;
+                Assert.That(math.lengthsq(delta), Is.LessThanOrEqualTo(1e-6f), $"fixed tick variable-delta spawn mismatch at index={i}");
             }
         }
 

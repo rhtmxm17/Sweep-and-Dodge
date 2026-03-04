@@ -21,7 +21,13 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
-            float dt = math.max(0f, SystemAPI.Time.DeltaTime);
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime,
+                    out float dt))
+                return;
             var config = SystemAPI.GetSingleton<RunDirectorStageConfigComponent>();
             var stageRW = SystemAPI.GetSingletonRW<RunDirectorStageStateComponent>();
             var gateRW = SystemAPI.GetSingletonRW<RunDirectorStageGateComponent>();
@@ -216,7 +222,13 @@ namespace SweepNDodge.DotsBullets
             float holdSec = math.max(0f, config.PressureHoldSec);
             float baselineScale = math.max(0f, config.BaselineTrashDensityScale);
             float pressureScale = math.max(0f, config.PressureDensityScale);
-            float deltaTime = math.max(0f, SystemAPI.Time.DeltaTime);
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime,
+                    out float deltaTime))
+                return;
             var scoreWeights = PressureScoreWeights.CreateDefault();
             ApplyWeightOverrides(ref scoreWeights, in weightBuffer);
             float3 playerPosition = hasPlayerSync

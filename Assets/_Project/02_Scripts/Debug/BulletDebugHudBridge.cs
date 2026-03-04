@@ -31,6 +31,8 @@ namespace SweepNDodge.DotsBullets
         private EntityQuery _stageSignalQuery;
         private EntityQuery _combatMetricsQuery;
         private EntityQuery _replayQuery;
+        private EntityQuery _fixedTickTimeQuery;
+        private EntityQuery _fixedTickRuntimeQuery;
         private EntityQuery _runSeedQuery;
         private EntityQuery _frameCounterQuery;
         private bool _isBound;
@@ -43,6 +45,7 @@ namespace SweepNDodge.DotsBullets
         private bool _showStressControl = true;
         private bool _showSourceDirectorState = true;
         private bool _showReplayControl = true;
+        private bool _showFixedTickControl = true;
 
         private struct SourceDirectorHudRow
         {
@@ -101,6 +104,8 @@ namespace SweepNDodge.DotsBullets
                 DrawStressControlSection(stress);
             if (_showReplayControl)
                 DrawReplayControlSection();
+            if (_showFixedTickControl)
+                DrawFixedTickControlSection();
 
             GUILayout.EndArea();
         }
@@ -133,6 +138,8 @@ namespace SweepNDodge.DotsBullets
                 ComponentType.ReadOnly<ReplayInputControlComponent>(),
                 ComponentType.ReadOnly<ReplayInputCursorComponent>(),
                 ComponentType.ReadOnly<ReplayInputFrameBufferElement>());
+            _fixedTickTimeQuery = _em.CreateEntityQuery(ComponentType.ReadWrite<FixedTickTimeComponent>());
+            _fixedTickRuntimeQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<FixedTickStepRuntimeComponent>());
             _runSeedQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<SpawnRunSeedComponent>());
             _frameCounterQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>());
             _isBound = true;
@@ -311,6 +318,7 @@ namespace SweepNDodge.DotsBullets
             _showSourceDirectorState = GUILayout.Toggle(_showSourceDirectorState, "Source");
             _showStressControl = GUILayout.Toggle(_showStressControl, "Stress");
             _showReplayControl = GUILayout.Toggle(_showReplayControl, "Replay");
+            _showFixedTickControl = GUILayout.Toggle(_showFixedTickControl, "FixedTick");
             GUILayout.EndHorizontal();
             GUILayout.Space(6f);
         }
@@ -380,6 +388,96 @@ namespace SweepNDodge.DotsBullets
             if (GUILayout.Button("Playback Stop"))
                 SetReplayMode(replayEntity, ReplayInputModeId.Off);
             GUILayout.EndHorizontal();
+        }
+
+        private void DrawFixedTickControlSection()
+        {
+            if (_fixedTickTimeQuery.IsEmptyIgnoreFilter)
+                return;
+
+            GUILayout.Space(4f);
+            GUILayout.Label("[Fixed Tick Control]");
+
+            var timeEntity = _fixedTickTimeQuery.GetSingletonEntity();
+            var fixedTick = _em.GetComponentData<FixedTickTimeComponent>(timeEntity);
+            bool hasRuntime = !_fixedTickRuntimeQuery.IsEmptyIgnoreFilter;
+            var runtime = hasRuntime
+                ? _em.GetComponentData<FixedTickStepRuntimeComponent>(_fixedTickRuntimeQuery.GetSingletonEntity())
+                : default;
+            uint frame = _frameCounterQuery.IsEmptyIgnoreFilter
+                ? 0u
+                : _em.GetComponentData<BulletFrameCounterComponent>(_frameCounterQuery.GetSingletonEntity()).Value;
+
+            GUILayout.Label(
+                $"enable:{fixedTick.EnableFixedTick} pause:{fixedTick.PauseRequested} stepReq:{fixedTick.StepRequested} tick:{fixedTick.Tick} frame:{frame}");
+            GUILayout.Label(
+                $"fixedDt:{fixedTick.FixedDeltaTime:0.######} maxSubSteps:{fixedTick.MaxSubSteps} acc:{fixedTick.Accumulator:0.######}");
+            if (hasRuntime)
+            {
+                GUILayout.Label(
+                    $"runtime usingFixed:{runtime.UsingFixedTick} hasStep:{runtime.HasStep} logicDt:{runtime.LogicDeltaTime:0.######} logicStepCount:{runtime.LogicStepCount}");
+            }
+
+            bool changed = false;
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(fixedTick.EnableFixedTick != 0 ? "Disable FixedTick" : "Enable FixedTick"))
+            {
+                fixedTick.EnableFixedTick = (byte)(fixedTick.EnableFixedTick == 0 ? 1 : 0);
+                if (fixedTick.EnableFixedTick == 0)
+                {
+                    fixedTick.PauseRequested = 0;
+                    fixedTick.StepRequested = 0;
+                }
+                changed = true;
+            }
+
+            if (GUILayout.Button(fixedTick.PauseRequested != 0 ? "Resume" : "Pause"))
+            {
+                fixedTick.PauseRequested = (byte)(fixedTick.PauseRequested == 0 ? 1 : 0);
+                if (fixedTick.PauseRequested == 0)
+                    fixedTick.StepRequested = 0;
+                changed = true;
+            }
+
+            if (GUILayout.Button("Step 1 Tick"))
+            {
+                fixedTick.EnableFixedTick = 1;
+                fixedTick.PauseRequested = 1;
+                fixedTick.StepRequested = 1;
+                changed = true;
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("60Hz + MaxSubSteps=1"))
+            {
+                fixedTick.FixedDeltaTime = 1f / 60f;
+                fixedTick.MaxSubSteps = 1;
+                changed = true;
+            }
+
+            if (GUILayout.Button("60Hz + MaxSubSteps=4"))
+            {
+                fixedTick.FixedDeltaTime = 1f / 60f;
+                fixedTick.MaxSubSteps = 4;
+                changed = true;
+            }
+
+            if (GUILayout.Button("120Hz + MaxSubSteps=1"))
+            {
+                fixedTick.FixedDeltaTime = 1f / 120f;
+                fixedTick.MaxSubSteps = 1;
+                changed = true;
+            }
+            GUILayout.EndHorizontal();
+
+            if (changed)
+            {
+                fixedTick.FixedDeltaTime = Mathf.Max(1e-6f, fixedTick.FixedDeltaTime);
+                fixedTick.MaxSubSteps = Mathf.Max(1, fixedTick.MaxSubSteps);
+                _em.SetComponentData(timeEntity, fixedTick);
+            }
         }
 
         private bool ShouldDrawSourceDirectorState()

@@ -25,9 +25,17 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime,
+                    out float deltaTime))
+                return;
+
             state.Dependency = new SourcePollutionUpdateJob
             {
-                DeltaTime = SystemAPI.Time.DeltaTime,
+                DeltaTime = deltaTime,
             }.ScheduleParallel(state.Dependency);
         }
 

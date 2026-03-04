@@ -112,6 +112,13 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.ShouldRunLogicStep(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime))
+                return;
+
             var counter = SystemAPI.GetSingletonRW<BulletFrameCounterComponent>();
             counter.ValueRW.Value += 1;
         }

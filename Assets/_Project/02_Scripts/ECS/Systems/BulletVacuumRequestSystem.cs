@@ -4,7 +4,6 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -52,7 +51,13 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var dt = SystemAPI.Time.DeltaTime;
+            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
+                    hasRuntime,
+                    in fixedTickRuntime,
+                    SystemAPI.Time.DeltaTime,
+                    out float dt))
+                return;
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
@@ -98,8 +103,6 @@ namespace SweepNDodge.DotsBullets
             var actionProfile = ResolveActionProfile(actionProfiles, actionId);
             float3 playerForward = GetPlayerForward(in goSyncRO);
             float searchRange = ComputeSearchRange(in actionProfile);
-
-            Debug.Log($"[Vacuum System] 흡입 작동 중... / dt: {dt}");
 
             // LocalTransform은 메인 스레드에서 읽지 않는다 (타입 충돌 방지).
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
@@ -422,7 +425,6 @@ namespace SweepNDodge.DotsBullets
                     }
 
                 NewlyRequested.Value += add;
-                Debug.Log($"[Vacuum Job] 이번 프레임 CarryBin 증가량: {add}");
             }
 
             private bool EvaluateCapture(
