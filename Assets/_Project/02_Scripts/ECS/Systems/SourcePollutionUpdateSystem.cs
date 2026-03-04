@@ -20,17 +20,14 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourcePollutionConfigComponent>();
             state.RequireForUpdate<SourcePollutionCellBuffer>();
             state.RequireForUpdate<SourcePollutionDropRequestBuffer>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
-            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
-                    hasRuntime,
-                    in fixedTickRuntime,
-                    SystemAPI.Time.DeltaTime,
-                    out float deltaTime))
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float deltaTime))
                 return;
 
             state.Dependency = new SourcePollutionUpdateJob

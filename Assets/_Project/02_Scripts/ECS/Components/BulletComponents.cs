@@ -112,6 +112,7 @@ namespace SweepNDodge.DotsBullets
     // FixedTickRootGroup OrderFirst에서 프레임당 1회 계산하고, 로직 시스템은 이 값을 읽어 사용한다.
     public struct FixedTickStepRuntimeComponent : IComponentData
     {
+        public float FrameDeltaTime;
         public float LogicDeltaTime;
         public int LogicStepCount;
         public byte HasStep;

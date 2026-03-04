@@ -17,16 +17,13 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<RunDirectorStageConfigComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
             state.RequireForUpdate<RunDirectorStageGateComponent>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
-            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
-            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
-                    hasRuntime,
-                    in fixedTickRuntime,
-                    SystemAPI.Time.DeltaTime,
-                    out float dt))
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float dt))
                 return;
             var config = SystemAPI.GetSingleton<RunDirectorStageConfigComponent>();
             var stageRW = SystemAPI.GetSingletonRW<RunDirectorStageStateComponent>();
@@ -196,6 +193,7 @@ namespace SweepNDodge.DotsBullets
                 .Build();
             state.RequireForUpdate(_directorConfigQuery);
             state.RequireForUpdate(_pressureWeightQuery);
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -222,12 +220,8 @@ namespace SweepNDodge.DotsBullets
             float holdSec = math.max(0f, config.PressureHoldSec);
             float baselineScale = math.max(0f, config.BaselineTrashDensityScale);
             float pressureScale = math.max(0f, config.PressureDensityScale);
-            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
-            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
-                    hasRuntime,
-                    in fixedTickRuntime,
-                    SystemAPI.Time.DeltaTime,
-                    out float deltaTime))
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float deltaTime))
                 return;
             var scoreWeights = PressureScoreWeights.CreateDefault();
             ApplyWeightOverrides(ref scoreWeights, in weightBuffer);

@@ -19,6 +19,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<PlayerTag>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
         [BurstCompile]
@@ -27,12 +28,8 @@ namespace SweepNDodge.DotsBullets
             if (!BulletFieldShared.IsInitialized)
                 return;
 
-            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
-            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
-                    hasRuntime,
-                    in fixedTickRuntime,
-                    SystemAPI.Time.DeltaTime,
-                    out float dt))
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float dt))
                 return;
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             var requestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);

@@ -18,6 +18,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerInputIntentComponent>();
             state.RequireForUpdate<PlayerGoSyncComponent>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
         [BurstCompile]
@@ -29,12 +30,8 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
-            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
-                    hasRuntime,
-                    in fixedTickRuntime,
-                    SystemAPI.Time.DeltaTime,
-                    out float dt))
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float dt))
                 return;
 
             foreach (var (intent, tx, sync) in

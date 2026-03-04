@@ -29,18 +29,15 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceEventQueueBuffer>();
             state.RequireForUpdate<SourceActiveBulletCountBuffer>();
             state.RequireForUpdate<SourceSpawnRequestBuffer>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
-            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
-            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
-                    hasRuntime,
-                    in fixedTickRuntime,
-                    SystemAPI.Time.DeltaTime,
-                    out float deltaTime))
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float deltaTime))
                 return;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
             uint runSeed = math.max(1u, SystemAPI.GetSingleton<SpawnRunSeedComponent>().Value);

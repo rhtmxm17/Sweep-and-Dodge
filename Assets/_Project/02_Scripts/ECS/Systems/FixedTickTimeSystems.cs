@@ -35,6 +35,7 @@ namespace SweepNDodge.DotsBullets
                 var e = em.CreateEntity(typeof(FixedTickStepRuntimeComponent));
                 em.SetComponentData(e, new FixedTickStepRuntimeComponent
                 {
+                    FrameDeltaTime = 0f,
                     LogicDeltaTime = 0f,
                     LogicStepCount = 0,
                     HasStep = 0,
@@ -103,6 +104,7 @@ namespace SweepNDodge.DotsBullets
             var runtimeRW = SystemAPI.GetSingletonRW<FixedTickStepRuntimeComponent>();
             runtimeRW.ValueRW = new FixedTickStepRuntimeComponent
             {
+                FrameDeltaTime = frameDeltaTime,
                 LogicDeltaTime = logicDeltaTime,
                 LogicStepCount = logicStepCount,
                 HasStep = (byte)(hasStep ? 1 : 0),

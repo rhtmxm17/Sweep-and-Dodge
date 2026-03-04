@@ -42,6 +42,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerCleanupActionStateComponent>();
             state.RequireForUpdate<PlayerCleanupActionProfileBufferElement>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
             _combatEventChannelQuery = SystemAPI.QueryBuilder()
                 .WithAll<CombatEventChannelSingletonTag>()
                 .WithAll<CombatEventBufferElement>()
@@ -51,12 +52,8 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            bool hasRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
-            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(
-                    hasRuntime,
-                    in fixedTickRuntime,
-                    SystemAPI.Time.DeltaTime,
-                    out float dt))
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float dt))
                 return;
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
