@@ -8,7 +8,7 @@
 - type: `ProjectOps`
 - status: `draft`
 - last_updated: `YYYY-MM-DD`
-- related_adr: 중요 결정 없음 | [ADR-YYYYMMDD-NN-title.md](../ADR/ADR-YYYYMMDD-NN-title.md)
+- related_docs: 중요 결정 없음 | [ADR-YYYYMMDD-NN-title.md](../ADR/ADR-YYYYMMDD-NN-title.md)
 
 ## 1. 목표
 
