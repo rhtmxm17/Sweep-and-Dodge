@@ -209,9 +209,10 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
-        public IEnumerator PlayMode_DedicatedScene_TempStageFlowDriver_IntegratedStagePath_ReachesCompleted()
+        public IEnumerator PlayMode_OperationalScene_DemoShell_TitleLobbyStageResult_Flow()
         {
-            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
             yield return null;
             yield return null;
 
@@ -228,74 +229,147 @@ namespace SweepNDodge.DotsBullets.Tests
                 300,
                 "RunDirector stage singleton setup was not ready within timeout.");
 
-            var stageStateEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
-            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.Idle,
-                StateElapsedSec = 0f,
-                EnteredFrame = 0u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
-            });
-
-            var gateEntity = GetSingletonEntity<RunDirectorStageGateComponent>(em);
-            em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
-            {
-                IntroPresentationDone = 0,
-                ClearPresentationDone = 0,
-                MinIdleDurationElapsed = 0,
-                AutoAdvanceTimeoutElapsed = 0,
-            });
-
-            var requestEntity = GetSingletonEntity<RunDirectorStageRequestComponent>(em);
-            em.SetComponentData(requestEntity, default(RunDirectorStageRequestComponent));
-
-            var signalEntity = GetSingletonEntity<RunDirectorStageSignalComponent>(em);
-            em.SetComponentData(signalEntity, default(RunDirectorStageSignalComponent));
-
-            var bridgeGo = new GameObject("RunDirectorStageBridge_TempDriver");
-            var bridge = bridgeGo.AddComponent<RunDirectorStageBridge>();
-            bridge.LogBindWarnings = false;
-
-            int completedEvents = 0;
-            bridge.StageRunCompleted += () => completedEvents++;
-
-            var tempFlow = bridgeGo.AddComponent<RunDirectorStageTempFlowDriver>();
-            tempFlow.StageBridge = bridge;
-            tempFlow.EnableManualHotkeys = false;
-            tempFlow.AutoRequestStartInIdle = true;
-            tempFlow.AutoSetIntroDoneInIdle = true;
-            tempFlow.AutoSetClearDoneInClearReady = true;
-            tempFlow.AutoConfirmInClearReady = true;
-            tempFlow.AutoConfirmDelaySec = 0f;
+            yield return WaitForCondition(
+                () => FindDemoShell() != null,
+                240,
+                "DemoShellFlowController was not found in operational scene.");
+            var shell = FindDemoShell();
+            Assert.That(shell.CurrentScreen, Is.EqualTo(DemoShellScreenId.Title));
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
 
             yield return WaitForCondition(
-                () => GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
                 240,
-                "Stage did not transition Idle -> Running by temporary flow driver.");
-
-            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.ClearReady,
-                StateElapsedSec = 0f,
-                EnteredFrame = 0u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.AllSourcesDepleted,
-            });
+                "Demo shell did not transition Title -> Lobby.");
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
 
             yield return WaitForCondition(
-                () => GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.ClearReady,
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                },
                 240,
-                "Stage did not reach ClearReady in integration test setup.");
+                "Demo shell did not enter StagePlay from Lobby.");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StageResult;
+                },
+                240,
+                "Demo shell did not enter StageResult on ClearReady.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_ResultRetry_ReentersSameStage()
+        {
+            ClearDemoShellStaging();
+            DemoShellSessionStaging.StageStagePlay(0);
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1;
+                },
+                360,
+                "Demo shell did not boot into staged StagePlay(Stage1).");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StageResult;
+                },
+                240,
+                "StageResult was not entered before Retry.");
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.Retry), Is.True);
 
             yield return WaitForCondition(
-                () => GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Completed,
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1;
+                },
+                360,
+                "Retry did not re-enter same stage.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_Stage3Next_GoesToDemoComplete_ThenLobby()
+        {
+            ClearDemoShellStaging();
+            DemoShellSessionStaging.StageStagePlay(2);
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+            DemoShellFlowController shell = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 3;
+                },
+                360,
+                "Demo shell did not boot into staged StagePlay(Stage3).");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StageResult;
+                },
                 240,
-                "Stage did not transition ClearReady -> Completed by temporary flow driver.");
+                "StageResult was not entered for Stage3.");
 
-            var completedStage = GetSingleton<RunDirectorStageStateComponent>(em);
-            Assert.That(completedStage.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.ConfirmPressed));
-            Assert.That(completedEvents, Is.EqualTo(1), "Bridge completion event should be raised once.");
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.DemoComplete;
+                },
+                240,
+                "Stage3 NextStage did not transition to DemoComplete.");
 
-            Object.Destroy(bridgeGo);
+            Assert.That(shell.RequestReturnToLobbyFromComplete(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                360,
+                "DemoComplete did not return to Lobby.");
         }
 
         [UnityTest]
@@ -560,6 +634,43 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return Entity.Null;
+        }
+
+        private static void ForceStageStateToClearReady(EntityManager em)
+        {
+            var stageEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
+            var stage = em.GetComponentData<RunDirectorStageStateComponent>(stageEntity);
+            stage.State = RunDirectorStageStateId.ClearReady;
+            stage.StateElapsedSec = 0f;
+            stage.LastTransitionReason = RunDirectorStageTransitionReasonId.AllSourcesDepleted;
+            em.SetComponentData(stageEntity, stage);
+
+            var gateEntity = GetSingletonEntity<RunDirectorStageGateComponent>(em);
+            var gate = em.GetComponentData<RunDirectorStageGateComponent>(gateEntity);
+            gate.ClearPresentationDone = 0;
+            gate.AutoAdvanceTimeoutElapsed = 0;
+            em.SetComponentData(gateEntity, gate);
+
+            var requestEntity = GetSingletonEntity<RunDirectorStageRequestComponent>(em);
+            var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
+            request.ConfirmPressed = 0;
+            em.SetComponentData(requestEntity, request);
+        }
+
+        private static DemoShellFlowController FindDemoShell()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<DemoShellFlowController>();
+#else
+            return Object.FindObjectOfType<DemoShellFlowController>();
+#endif
+        }
+
+        private static void ClearDemoShellStaging()
+        {
+            while (DemoShellSessionStaging.TryConsume(out _))
+            {
+            }
         }
 
     }

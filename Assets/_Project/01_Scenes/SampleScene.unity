@@ -330,6 +330,7 @@ MonoBehaviour:
   Target: {fileID: 352435931}
   TargetCamera: {fileID: 330585545}
   FollowOffset: {x: 0, y: 15, z: -2}
+  PreferEcsPlayerState: 1
   PositionSmoothTime: 0.08
   MaxLookAhead: 2.5
   LookAheadDistanceFactor: 0.35
@@ -468,6 +469,9 @@ MonoBehaviour:
   PrimarySlot: 1
   SecondarySlot: 2
   SyncRotation: 1
+  ApplyEcsPositionToTransform: 1
+  ApplyEcsRotationToTransform: 1
+  EnableLegacyTransformToEcsSync: 0
   Animator: {fileID: 0}
   VacuumActiveBool: VacuumActive
 --- !u!114 &352435933
@@ -484,6 +488,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.PlayerWasdMovement
   MoveSpeed: 6
   TargetCamera: {fileID: 330585545}
+  EnableLegacyTransformWrite: 0
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -723,7 +728,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2015128776}
   - component: {fileID: 2015128775}
-  - component: {fileID: 2015128774}
+  - component: {fileID: 2015128777}
   m_Layer: 0
   m_Name: RunDirectorStageBridge
   m_TagString: Untagged
@@ -731,31 +736,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2015128774
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2015128773}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ba3439da1d4b29849b625d38a21d494d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RunDirectorStageTempFlowDriver
-  StageBridge: {fileID: 0}
-  AutoRequestStartInIdle: 1
-  AutoSetIntroDoneInIdle: 1
-  AutoSetClearDoneInClearReady: 1
-  AutoConfirmInClearReady: 1
-  AutoConfirmDelaySec: 0
-  EnableManualHotkeys: 1
-  RequestStartKey: 286
-  SetIntroDoneKey: 287
-  SetClearDoneKey: 288
-  RequestConfirmKey: 289
-  LogStateChanges: 1
-  LogBridgeCallFailures: 1
 --- !u!114 &2015128775
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -787,6 +767,38 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2015128777
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fdea7ee03e2e4faeb0e214b6acbd0858, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellFlowController
+  StageBridge: {fileID: 2015128775}
+  ShowOverlay: 1
+  OverlayRect:
+    serializedVersion: 2
+    x: 452
+    y: 12
+    width: 420
+    height: 300
+  EnableKeyboardFallback: 1
+  StageProfiles:
+  - StageId: 1
+    DisplayName: Stage 1
+    IsFinalStage: 0
+  - StageId: 2
+    DisplayName: Stage 2
+    IsFinalStage: 0
+  - StageId: 3
+    DisplayName: Stage 3
+    IsFinalStage: 1
+  LogTransitions: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

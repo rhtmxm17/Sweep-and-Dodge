@@ -25,6 +25,7 @@ namespace SweepNDodge.DotsBullets
         public event Action StageRunCompleted;
 
         private EntityManager _em;
+        private Entity _stageStateEntity;
         private Entity _stageRequestEntity;
         private Entity _stageGateEntity;
         private Entity _stageSignalEntity;
@@ -69,6 +70,19 @@ namespace SweepNDodge.DotsBullets
             var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestEntity);
             request.StageStartRequested = 1;
             _em.SetComponentData(_stageRequestEntity, request);
+            return true;
+        }
+
+        public bool TryGetStageState(out RunDirectorStageStateComponent stageState)
+        {
+            stageState = default;
+            if (!TryBind())
+                return false;
+
+            if (_stageStateEntity == Entity.Null || !_em.Exists(_stageStateEntity))
+                return false;
+
+            stageState = _em.GetComponentData<RunDirectorStageStateComponent>(_stageStateEntity);
             return true;
         }
 
@@ -131,6 +145,7 @@ namespace SweepNDodge.DotsBullets
             using var requestQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageRequestComponent>());
             using var gateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageGateComponent>());
             using var signalQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageSignalComponent>());
+            using var stateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageStateComponent>());
             if (requestQuery.IsEmptyIgnoreFilter || gateQuery.IsEmptyIgnoreFilter || signalQuery.IsEmptyIgnoreFilter)
             {
                 WarnBindFailureOnce("RunDirector stage singleton(s) were not found.");
@@ -141,6 +156,9 @@ namespace SweepNDodge.DotsBullets
             _stageRequestEntity = ResolveFirstEntity(requestQuery);
             _stageGateEntity = ResolveFirstEntity(gateQuery);
             _stageSignalEntity = ResolveFirstEntity(signalQuery);
+            _stageStateEntity = stateQuery.IsEmptyIgnoreFilter
+                ? Entity.Null
+                : ResolveFirstEntity(stateQuery);
             _isBound = _stageRequestEntity != Entity.Null && _stageGateEntity != Entity.Null && _stageSignalEntity != Entity.Null;
             if (_isBound)
                 _warnedBindFailure = false;

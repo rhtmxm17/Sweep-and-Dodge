@@ -12,3 +12,4 @@
 - [TD-007-common-combat-event-channel.md](TD-007-common-combat-event-channel.md): 공통 전투 이벤트 채널 범위(`Hit/Collect/Cleanup`)와 소유권/집계 계약
 - [TD-008-replay-io-persistence-and-version-policy.md](TD-008-replay-io-persistence-and-version-policy.md): Replay 파일 입출력과 `runSeed + tick 입력` 저장 계약, 버전 불일치 즉시 실패 정책
 - [TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md](TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md): 고정 Tick 시간원 도입과 DeltaTime 의존 시스템 단계 치환 계획
+- [TD-010-demo-shell-flow-and-bridge-contract.md](TD-010-demo-shell-flow-and-bridge-contract.md): Demo Shell 화면 전이/브리지 단일 접점/씬 재진입(staging) 계약

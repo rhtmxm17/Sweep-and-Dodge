@@ -4,7 +4,7 @@
 - doc_id: `TD-006`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-28`
+- last_updated: `2026-03-04`
 - related_docs:
   - [OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
   - [GD-007-data-driven-bullet-pattern-definition.md](../GameDesign/GD-007-data-driven-bullet-pattern-definition.md)
@@ -120,8 +120,7 @@
 #### 미연동 기본 모드 정책
 - `StageFlow/UI`가 연결되지 않은 테스트/레거시 환경 호환을 위해 기본 `InitialStageState`는 `Running`으로 둔다.
 - 엄격 모드가 필요하면 `InitialStageState = Idle`로 설정하고, 브리지를 통해 `StageStartRequested`를 주입해 전이한다.
-- StageFlow/UI가 아직 없는 동안에는 임시 호출 주체(`RunDirectorStageTempFlowDriver`)를 통해 브리지 호출을 대체할 수 있다.
-  - 목적은 전이 계약 검증이며, 실제 StageFlow/UI 구현 완료 시 제거/교체를 전제로 한다.
+- Demo Shell 연동(S1) 이후 임시 호출 주체는 제거되었고, `Title/Lobby/Result/DemoComplete` 전이는 Shell Owner가 담당한다.
 
 #### GO 브리지 런타임 계약 (`RunDirectorStageBridge`)
 - 브리지 1개가 `GO -> ECS`(요청/게이트 반영)와 `ECS -> GO`(완료 신호 발행)를 모두 담당한다.
@@ -200,6 +199,7 @@
   - `Finish` 전환 시점의 1회성 연출은 추후 결정(TBD)한다.
 
 ## 9. 변경 이력
+- 2026-03-04: Demo Shell S1 연동 완료 기준으로 임시 호출 주체(`RunDirectorStageTempFlowDriver`) 방침을 제거하고, 전이 책임을 Shell Owner 기준으로 갱신했다.
 - 2026-02-28: StageFlow/UI 미구현 구간 검증을 위해 임시 호출 주체(`RunDirectorStageTempFlowDriver`) 사용 방침을 추가했다.
 - 2026-02-28: `RunDirectorStageBridge` 런타임 계약(씬당 1개 소유권, 중복/싱글톤 미존재 시 `no-op + warning 1회`, one-shot set-only/소비 리셋, 완료 이벤트 프레임당 1회 가드, `Update` 단일 루프)을 추가했다.
 - 2026-02-27: StageFlow/UI 브리지 구현 기준을 위해 월드 바인딩 시점 비교(권장: `OnEnable + Update 재시도`)와 미연동 기본 모드(`InitialStageState=Running`) 정책을 추가했다.
