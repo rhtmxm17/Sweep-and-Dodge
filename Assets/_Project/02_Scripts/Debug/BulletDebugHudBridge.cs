@@ -434,9 +434,17 @@ namespace SweepNDodge.DotsBullets
 
             if (GUILayout.Button(fixedTick.PauseRequested != 0 ? "Resume" : "Pause"))
             {
-                fixedTick.PauseRequested = (byte)(fixedTick.PauseRequested == 0 ? 1 : 0);
-                if (fixedTick.PauseRequested == 0)
+                bool nextPause = fixedTick.PauseRequested == 0;
+                fixedTick.PauseRequested = (byte)(nextPause ? 1 : 0);
+                if (nextPause)
+                {
+                    // 편의: Pause는 항상 고정 Tick 컨텍스트에서 동작하도록 자동 활성화한다.
+                    fixedTick.EnableFixedTick = 1;
+                }
+                else
+                {
                     fixedTick.StepRequested = 0;
+                }
                 changed = true;
             }
 
