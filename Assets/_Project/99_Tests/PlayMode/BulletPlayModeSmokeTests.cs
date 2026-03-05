@@ -373,6 +373,121 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_PlayerHud_ReflectsSnapshotAndShellMeta()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<PlayerHudSnapshotComponent>(em) &&
+                    HasSingleton<CombatEventMetricsComponent>(em) &&
+                    HasCombatEventChannel(em) &&
+                    HasSingleton<BulletFrameCounterComponent>(em),
+                300,
+                "HUD snapshot/combat singleton setup was not ready within timeout.");
+
+            yield return WaitForCondition(
+                () => FindDemoShell() != null,
+                240,
+                "DemoShellFlowController was not found in operational scene.");
+
+            var shell = FindDemoShell();
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Demo shell did not transition to Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                },
+                240,
+                "Demo shell did not enter StagePlay.");
+
+            yield return WaitForCondition(
+                () => FindPlayerRuntimeHud() != null,
+                240,
+                "PlayerRuntimeHudBridge was not found in operational scene.");
+
+            var hud = FindPlayerRuntimeHud();
+            Assert.That(hud, Is.Not.Null);
+            yield return WaitForCondition(
+                () => hud.HasSnapshot,
+                240,
+                "PlayerRuntimeHudBridge did not receive snapshot data.");
+
+            Assert.That(hud.LastStageId, Is.EqualTo(1));
+            Assert.That(
+                hud.LastScreen == DemoShellScreenId.StagePlay || hud.LastScreen == DemoShellScreenId.StageResult,
+                Is.True,
+                "HUD stage meta must reflect active run screens.");
+            Assert.That(hud.TryGetLastSnapshot(out var snapshot), Is.True);
+            Assert.That(snapshot.CarryCapacity, Is.GreaterThan(0));
+
+            var playerEntity = GetSingletonEntity<PlayerTag>(em);
+            if (em.HasComponent<PlayerHazardPenaltyStateComponent>(playerEntity))
+            {
+                var penalty = em.GetComponentData<PlayerHazardPenaltyStateComponent>(playerEntity);
+                penalty.IFrameTimer = 10f;
+                penalty.VacuumLockTimer = 0f;
+                em.SetComponentData(playerEntity, penalty);
+            }
+
+            var combatChannelEntity = em.CreateEntityQuery(
+                ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
+                ComponentType.ReadWrite<CombatEventMetricsComponent>(),
+                ComponentType.ReadWrite<CombatEventBufferElement>()).GetSingletonEntity();
+            var combatEvents = em.GetBuffer<CombatEventBufferElement>(combatChannelEntity);
+            uint frame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            combatEvents.Add(new CombatEventBufferElement
+            {
+                Type = CombatEventTypeId.Hit,
+                SourceEntity = Entity.Null,
+                RelatedEntity = playerEntity,
+                Count = 1,
+                Value = 11,
+                Frame = frame,
+                Sequence = (uint)combatEvents.Length,
+            });
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    hud = FindPlayerRuntimeHud();
+                    return hud != null
+                        && hud.TryGetLastSnapshot(out var latest)
+                        && latest.LastHitLossValue == 11
+                        && hud.IsHitFlashVisible;
+                },
+                180,
+                "Player HUD did not expose hit flash/loss from combat event.");
+
+            for (int i = 0; i < 45; i++)
+                yield return null;
+
+            hud = FindPlayerRuntimeHud();
+            Assert.That(hud, Is.Not.Null);
+            Assert.That(hud.TryGetLastSnapshot(out var afterDecay), Is.True);
+            Assert.That(afterDecay.HitFlashRemainingSec, Is.EqualTo(0f).Within(0.05f));
+            Assert.That(hud.IsHitFlashVisible, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_Replay_RecordResetPlayback_Smoke()
         {
             SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
@@ -577,6 +692,15 @@ namespace SweepNDodge.DotsBullets.Tests
             return !query.IsEmptyIgnoreFilter;
         }
 
+        private static bool HasCombatEventChannel(EntityManager em)
+        {
+            var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
+                ComponentType.ReadOnly<CombatEventMetricsComponent>(),
+                ComponentType.ReadWrite<CombatEventBufferElement>());
+            return !query.IsEmptyIgnoreFilter;
+        }
+
         private static Entity GetSingletonEntity<T>(EntityManager em) where T : unmanaged, IComponentData
         {
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
@@ -663,6 +787,15 @@ namespace SweepNDodge.DotsBullets.Tests
             return Object.FindFirstObjectByType<DemoShellFlowController>();
 #else
             return Object.FindObjectOfType<DemoShellFlowController>();
+#endif
+        }
+
+        private static PlayerRuntimeHudBridge FindPlayerRuntimeHud()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<PlayerRuntimeHudBridge>();
+#else
+            return Object.FindObjectOfType<PlayerRuntimeHudBridge>();
 #endif
         }
 

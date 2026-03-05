@@ -77,6 +77,10 @@ namespace SweepNDodge.DotsBullets
 
         private void OnGUI()
         {
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+            return;
+#endif
+
             if (!Application.isPlaying || !ShowHud)
                 return;
 

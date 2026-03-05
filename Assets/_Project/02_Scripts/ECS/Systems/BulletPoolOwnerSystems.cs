@@ -289,6 +289,27 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, default(DebugHudMetricsComponent));
             }
 
+            if (!HasSingleton<PlayerHudSnapshotComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(PlayerHudSnapshotComponent));
+                em.SetComponentData(e, new PlayerHudSnapshotComponent
+                {
+                    CarryLoad = 0,
+                    CarryCapacity = 0,
+                    DepletedSourceCount = 0,
+                    TotalSourceCount = 0,
+                    PressureSourceStableId = 0u,
+                    PressureSourceCollected = 0,
+                    PressureSourceThresholdDepleted = 0,
+                    PressureSourceProgress01 = 0f,
+                    StageState = RunDirectorStageStateId.Idle,
+                    StageStateElapsedSec = 0f,
+                    LastHitLossValue = 0,
+                    HitFlashRemainingSec = 0f,
+                    LastUpdatedFrame = 0u,
+                });
+            }
+
             using var combatEventChannelQuery = em.CreateEntityQuery(
                 ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
                 ComponentType.ReadOnly<CombatEventMetricsComponent>(),

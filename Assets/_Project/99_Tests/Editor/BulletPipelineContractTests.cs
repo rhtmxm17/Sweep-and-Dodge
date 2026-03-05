@@ -78,6 +78,8 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             AssertUpdateAfter(typeof(PlayerCarryBinDepositExecutionSystem), typeof(PlayerHazardCollisionExecutionSystem));
             AssertUpdateAfter(typeof(CombatEventChannelConsumeSystem), typeof(PlayerCarryBinDepositExecutionSystem));
+            AssertUpdateAfter(typeof(PlayerHudSnapshotCollectSystem), typeof(CombatEventChannelConsumeSystem));
+            AssertUpdateBefore(typeof(PlayerHudSnapshotCollectSystem), typeof(PlayerUiFeedbackConsumeSystem));
             AssertUpdateBefore(typeof(CombatEventChannelConsumeSystem), typeof(PlayerUiFeedbackConsumeSystem));
             AssertUpdateAfter(typeof(DebugHudMetricsCollectSystem), typeof(PlayerUiFeedbackConsumeSystem));
             AssertUpdateAfter(typeof(DebugHudMetricsCollectSystem), typeof(PlayerImpulseConsumeSystem));

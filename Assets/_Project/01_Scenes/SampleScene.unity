@@ -154,7 +154,7 @@ MonoBehaviour:
     x: 12
     y: 12
     width: 420
-    height: 420
+    height: 300
   ShowSourceDirectorStates: 1
   MaxSourceRows: 24
   SourceListHeight: 180

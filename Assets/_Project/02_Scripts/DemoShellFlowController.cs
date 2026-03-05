@@ -33,6 +33,7 @@ namespace SweepNDodge.DotsBullets
         public bool LogTransitions;
 
         private RunDirectorStageBridge _subscribedBridge;
+        private PlayerRuntimeHudBridge _runtimeHudBridge;
         private DemoShellScreenId _currentScreen;
         private int _currentStageIndex = -1;
         private bool _stageStartPending;
@@ -53,6 +54,7 @@ namespace SweepNDodge.DotsBullets
         {
             EnsureStageProfiles();
             EnsureBridgeReference();
+            EnsureRuntimeHudBridge();
             EnsureBridgeSubscription();
             BootFromSessionStaging();
         }
@@ -74,6 +76,7 @@ namespace SweepNDodge.DotsBullets
         private void Update()
         {
             EnsureBridgeReference();
+            EnsureRuntimeHudBridge();
             EnsureBridgeSubscription();
             ProcessKeyboardFallback();
             TickStagePlayFlow();
@@ -382,6 +385,16 @@ namespace SweepNDodge.DotsBullets
             _subscribedBridge = StageBridge;
             if (_subscribedBridge != null)
                 _subscribedBridge.StageRunCompleted += OnStageRunCompleted;
+        }
+
+        private void EnsureRuntimeHudBridge()
+        {
+            if (_runtimeHudBridge == null)
+                _runtimeHudBridge = GetComponent<PlayerRuntimeHudBridge>();
+            if (_runtimeHudBridge == null)
+                _runtimeHudBridge = gameObject.AddComponent<PlayerRuntimeHudBridge>();
+            if (_runtimeHudBridge != null && _runtimeHudBridge.DemoShell == null)
+                _runtimeHudBridge.DemoShell = this;
         }
 
         private void TransitionTo(DemoShellScreenId next)

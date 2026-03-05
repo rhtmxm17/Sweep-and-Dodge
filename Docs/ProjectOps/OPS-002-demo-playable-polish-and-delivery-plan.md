@@ -14,6 +14,7 @@
   - [TD-007-common-combat-event-channel.md](../TechnicalDesign/TD-007-common-combat-event-channel.md)
   - [TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md](../TechnicalDesign/TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md)
   - [TD-010-demo-shell-flow-and-bridge-contract.md](../TechnicalDesign/TD-010-demo-shell-flow-and-bridge-contract.md)
+  - [TD-011-runtime-player-hud-contract.md](../TechnicalDesign/TD-011-runtime-player-hud-contract.md)
   - [GD-001-campaign-loop-design.md](../GameDesign/GD-001-campaign-loop-design.md)
   - [GD-004-carrybin-load-and-deposit.md](../GameDesign/GD-004-carrybin-load-and-deposit.md)
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
@@ -53,7 +54,7 @@
 | ID | 스트림 | 목표 | 현재 상태 | 예상 공수(일) | 우선순위 |
 |---|---|---|---|---:|---|
 | S1 | Demo Shell Flow 연동 | 임시 호출자 제거 + `Title/Lobby/Result/Demo Complete` 전이 플로우 확정 | DONE | 2.5 | P0 |
-| S2 | 플레이 HUD | 디버그 HUD와 별개로 플레이어 HUD 최소 세트 확정 | TODO | 1.5 | P0 |
+| S2 | 플레이 HUD | 디버그 HUD와 별개로 플레이어 HUD 최소 세트 확정 | WIP(설계 고정) | 1.5 | P0 |
 | S3 | 결과/실패 UX | Clear/Fail 판정, `Next/Retry/Return`, `Demo Complete` 요약 지표/동선 확정 | TODO | 2.0 | P0 |
 | S4 | 이벤트 피드백 브리지 | `PlayerUiFeedback`/`Impulse`를 실제 UI/Animator/VFX 트리거로 연결 | WIP | 2.0 | P0 |
 | S5 | 사운드 시스템 | BGM/SFX/UI 버스, 이벤트 라우팅, 볼륨 옵션 설계 | TODO | 2.0 | P0 |
@@ -73,6 +74,12 @@
 - 필수 표시: CarryBin Load/Capacity, Source 진행 상태, 위험 피격 피드백, 스테이지 상태
 - 표시 갱신 책임: ECS writer 고정 + GO/HUD는 reader-only
 - 디버그 HUD와 플레이 HUD 공존 정책(빌드 노출 범위 포함)
+- 기술 고정: `OnGUI` 기반 플레이 HUD(`PlayerRuntimeHudBridge`)
+- 데이터 계약: `PlayerHudSnapshotCollectSystem` 단일 writer + `PlayerHudSnapshotComponent` singleton snapshot
+- Source 표시 고정: `Pressure Source progress(Collected/ThresholdDepleted)` + `Depleted/Total`
+- Stage 메타 공급: `DemoShellFlowController.CurrentStageId/CurrentScreen` read-only
+- Hit 피드백 고정: 짧은 플래시 + 손실값(`0.6s`)
+- Debug HUD 노출 고정: `UNITY_EDITOR/DEVELOPMENT_BUILD` 전용
 
 3. `P0` 결과/실패 루프
 - Fail 조건(피격 누적, 타임아웃 등) 확정
@@ -150,10 +157,14 @@
   - 단일 반복 플레이: `Lobby -> StageN -> Result -> Retry(반복) -> Lobby`
   - `Stage3` 결과의 `Next Stage`가 `Demo Complete`로 정확히 연결
   - `Retry` 즉시 재진입
+  - S2 HUD: StagePlay에서 Carry/Source/Hit/Stage 메타가 갱신된다
+  - S2 HUD: Hit 이벤트 입력 시 플래시/손실값 표시 후 시간 경과로 소멸한다
+  - S2 HUD: Debug HUD는 non-development 빌드에서 비노출이다
   - HUD/사운드 옵션 반영 확인
   - 운영 씬 정기 스모크 결과 기록
 
 ## 10. 변경 이력
+- 2026-03-04: S2 설계 고정 반영. `TD-011`을 추가하고 플레이 HUD를 `OnGUI + ECS snapshot(writer 단일)` 계약으로 확정했다. Source/Hit/Stage 표시 규칙과 Debug HUD 노출 정책(Editor/Development 전용)을 문서에 반영했다.
 - 2026-03-04: S1 구현 반영. `RunDirectorStageTempFlowDriver` 제거, Demo Shell 전이 계약(`TD-010`) 추가, 운영/테스트 씬 SubScene 분리 기준을 확정했다.
 - 2026-03-04: GD-008 반영. 범위를 단일 런 중심에서 `Title/Lobby/3스테이지/Demo Complete` 데모 셸 플로우 기준으로 확장했다.
 - 2026-03-04: OPS-002 초안 작성 (데모 플레이 완성 범위: StageFlow/UI, HUD, 결과 UX, 피드백, 사운드, 릴리즈 게이트)

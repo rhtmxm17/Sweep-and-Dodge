@@ -13,3 +13,4 @@
 - [TD-008-replay-io-persistence-and-version-policy.md](TD-008-replay-io-persistence-and-version-policy.md): Replay 파일 입출력과 `runSeed + tick 입력` 저장 계약, 버전 불일치 즉시 실패 정책
 - [TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md](TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md): 고정 Tick 시간원 도입과 DeltaTime 의존 시스템 단계 치환 계획
 - [TD-010-demo-shell-flow-and-bridge-contract.md](TD-010-demo-shell-flow-and-bridge-contract.md): Demo Shell 화면 전이/브리지 단일 접점/씬 재진입(staging) 계약
+- [TD-011-runtime-player-hud-contract.md](TD-011-runtime-player-hud-contract.md): 플레이 HUD 스냅샷 writer/read-only 브리지, Source/Hit/Stage 표시 계약
