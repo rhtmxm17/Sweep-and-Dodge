@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Core;
@@ -320,6 +321,187 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.GetBuffer<CombatEventBufferElement>(channelEntity).Length, Is.EqualTo(0));
 
             ForceDisposeSharedContainersIfNeeded();
+        }
+
+        [Test]
+        public void Vacuum_FullBin_Activation_AllowsActive_AndEmitsCarryBinFullOnce()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("VacuumFullBinActivationWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(em, carryLoad: 10, carryCapacity: 10, out var playerEntity);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                var vacuum = em.GetComponentData<VacuumRuntimeStateComponent>(playerEntity);
+                Assert.That(vacuum.IsActive, Is.EqualTo(1), "FullBin에서도 Vacuum 발동은 허용돼야 한다.");
+
+                var uiBuffer = em.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
+                int blockedCount = CountUiEvents(
+                    uiBuffer,
+                    PlayerUiFeedbackEventType.VacuumStartBlocked,
+                    (byte)PlayerUiFeedbackReasonId.CarryBinFull);
+                Assert.That(blockedCount, Is.EqualTo(1), "CarryBinFull 차단 피드백은 발동 입력 시 1회여야 한다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void Vacuum_FullBin_HazardCapture_RemovesOnly_WithoutCarrySourceCollect()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("VacuumFullBinHazardRemovedWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(em, carryLoad: 10, carryCapacity: 10, out var playerEntity);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                var sourceEntity = CreateVacuumContractSource(em);
+                var hazard = CreateVacuumContractBullet(
+                    em,
+                    position: new float3(2.88f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.RiskTimedResolve,
+                    scoreValue: 5,
+                    sourceEntity: sourceEntity);
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                Assert.That(em.IsComponentEnabled<BulletActiveTag>(hazard), Is.False, "FullBin Hazard 조건부 성공은 제거(디스폰)되어야 한다.");
+
+                var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
+                Assert.That(carry.Load, Is.EqualTo(10), "FullBin 제거는 Carry를 변경하지 않아야 한다.");
+
+                var source = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+                Assert.That(source.CollectedCount, Is.EqualTo(0), "FullBin 제거는 Source 진행에 반영되지 않아야 한다.");
+
+                var metrics = em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>())
+                    .GetSingleton<CombatEventMetricsComponent>();
+                Assert.That(metrics.TotalCollectValue, Is.EqualTo(0), "FullBin 제거는 Collect 집계에 포함되면 안 된다.");
+
+                var uiBuffer = em.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
+                int removedCount = 0;
+                int capturedCount = 0;
+                for (int i = 0; i < uiBuffer.Length; i++)
+                {
+                    var evt = uiBuffer[i];
+                    if (evt.Type == PlayerUiFeedbackEventType.HazardRemoved && evt.RelatedEntity == hazard)
+                        removedCount++;
+                    if (evt.Type == PlayerUiFeedbackEventType.HazardCaptured)
+                        capturedCount++;
+                }
+
+                Assert.That(removedCount, Is.EqualTo(1), "HazardRemoved 이벤트는 탄환별로 발행되어야 한다.");
+                Assert.That(capturedCount, Is.EqualTo(0), "FullBin 제거 경로에서 HazardCaptured는 발행되면 안 된다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void Vacuum_NotFull_HazardCapture_CapturedPath_UpdatesCarrySourceCollect()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("VacuumCapturedPathWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(em, carryLoad: 0, carryCapacity: 10, out var playerEntity);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                var sourceEntity = CreateVacuumContractSource(em);
+                var hazard = CreateVacuumContractBullet(
+                    em,
+                    position: new float3(2.88f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.RiskTimedResolve,
+                    scoreValue: 3,
+                    sourceEntity: sourceEntity);
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                Assert.That(em.IsComponentEnabled<BulletActiveTag>(hazard), Is.False, "HazardCaptured 경로에서는 Hazard가 제거되어야 한다.");
+
+                var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
+                Assert.That(carry.Load, Is.EqualTo(3), "HazardCaptured는 Carry 증가를 반영해야 한다.");
+
+                var source = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+                Assert.That(source.CollectedCount, Is.EqualTo(1), "HazardCaptured는 Source 진행을 반영해야 한다.");
+
+                var metrics = em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>())
+                    .GetSingleton<CombatEventMetricsComponent>();
+                Assert.That(metrics.TotalCollectValue, Is.EqualTo(3), "HazardCaptured는 Collect 집계에 반영되어야 한다.");
+
+                var uiBuffer = em.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
+                int capturedCount = 0;
+                int removedCount = 0;
+                for (int i = 0; i < uiBuffer.Length; i++)
+                {
+                    var evt = uiBuffer[i];
+                    if (evt.Type == PlayerUiFeedbackEventType.HazardCaptured && evt.RelatedEntity == hazard)
+                        capturedCount++;
+                    if (evt.Type == PlayerUiFeedbackEventType.HazardRemoved)
+                        removedCount++;
+                }
+
+                Assert.That(capturedCount, Is.EqualTo(1), "HazardCaptured 이벤트는 탄환별로 발행되어야 한다.");
+                Assert.That(removedCount, Is.EqualTo(0), "비포화 수거 경로에서 HazardRemoved는 발행되면 안 된다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void Vacuum_FullBin_TrashInRange_NotRemoved_NoCollect()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("VacuumFullBinTrashBlockedWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(em, carryLoad: 10, carryCapacity: 10, out var playerEntity);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                var trash = CreateVacuumContractBullet(
+                    em,
+                    position: new float3(1.2f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.StandardCollectible,
+                    scoreValue: 4,
+                    sourceEntity: Entity.Null);
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                Assert.That(em.IsComponentEnabled<BulletActiveTag>(trash), Is.True, "FullBin에서는 Trash가 제거되면 안 된다.");
+                Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(trash), Is.False, "FullBin Trash는 despawn request가 생기면 안 된다.");
+
+                var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
+                Assert.That(carry.Load, Is.EqualTo(10), "FullBin Trash 제한에서 Carry 변화가 없어야 한다.");
+
+                var metrics = em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>())
+                    .GetSingleton<CombatEventMetricsComponent>();
+                Assert.That(metrics.TotalCollectValue, Is.EqualTo(0), "FullBin Trash 제한은 Collect 집계가 증가하면 안 된다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
         }
 
         [Test]
@@ -3195,6 +3377,237 @@ namespace SweepNDodge.DotsBullets.Tests
             simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
             Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
             return world;
+        }
+
+        private static World CreateDefaultTestWorldWithoutFeedbackConsumers(string worldName, out SimulationSystemGroup simGroup)
+        {
+            var world = new World(worldName);
+            var allSystems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
+            var systems = new List<Type>(allSystems);
+            systems.RemoveAll(t =>
+                t == typeof(PlayerUiFeedbackConsumeSystem) ||
+                t == typeof(PlayerImpulseConsumeSystem));
+            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
+            simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
+            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+            return world;
+        }
+
+        private static void SetupVacuumContractEnvironment(
+            EntityManager em,
+            int carryLoad,
+            int carryCapacity,
+            out Entity playerEntity)
+        {
+            var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 8f);
+            CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 256, lifetime: 8f);
+            CreateConfigSingletons(em, budgetPerFrame: 256, maxPendingCount: 4096, maxPendingAgeFrames: 120);
+            playerEntity = CreateVacuumContractPlayer(em, carryLoad, carryCapacity);
+        }
+
+        private static Entity CreateVacuumContractPlayer(EntityManager em, int carryLoad, int carryCapacity)
+        {
+            var player = em.CreateEntity(
+                typeof(PlayerTag),
+                typeof(LocalTransform),
+                typeof(PlayerGoSyncComponent),
+                typeof(PlayerInputIntentComponent),
+                typeof(PlayerRadiusComponent),
+                typeof(VacuumActivationConfigComponent),
+                typeof(VacuumRuntimeStateComponent),
+                typeof(PlayerCarryBinComponent),
+                typeof(PlayerHazardPenaltyConfigComponent),
+                typeof(PlayerHazardPenaltyStateComponent),
+                typeof(PlayerCleanupActionStateComponent),
+                typeof(PlayerCleanupActionSlotMapComponent),
+                typeof(PlayerCarryBinDepositRequestTag),
+                typeof(PlayerCarryBinDepositContextComponent),
+                typeof(PlayerHazardHitRequestTag),
+                typeof(PlayerHazardHitContextComponent));
+
+            em.SetName(player, "VacuumContract_Player");
+            em.SetComponentData(player, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
+            em.SetComponentData(player, new PlayerGoSyncComponent
+            {
+                Position = float3.zero,
+                Rotation = quaternion.identity,
+                SyncRotation = 0,
+                VacuumRequested = 0,
+                CleanupActionRequested = 0,
+                RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
+            });
+            em.SetComponentData(player, new PlayerInputIntentComponent
+            {
+                MoveAxis = float2.zero,
+                AimWorldXZ = float2.zero,
+                HasAimWorldPoint = 0,
+                VacuumRequested = 0,
+                CleanupActionRequested = 0,
+                RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
+                Sequence = 0u,
+            });
+            em.SetComponentData(player, new PlayerRadiusComponent { Value = 0.35f });
+            em.SetComponentData(player, new VacuumActivationConfigComponent
+            {
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
+            });
+            em.SetComponentData(player, new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 0f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 0f,
+                CooldownTimer = 0f,
+                IsActive = 0,
+                ActivateRequested = 0,
+            });
+            em.SetComponentData(player, new PlayerCarryBinComponent
+            {
+                Load = math.max(0, carryLoad),
+                Capacity = math.max(0, carryCapacity),
+            });
+            em.SetComponentData(player, new PlayerHazardPenaltyConfigComponent
+            {
+                CarryLossFrac = 0.15f,
+                CarryLossMin = 1,
+                CarryLossMax = 5,
+                IFrameTime = 0.7f,
+                VacuumLockTime = 0.7f,
+                HitImpulseMagnitude = 1f,
+            });
+            em.SetComponentData(player, new PlayerHazardPenaltyStateComponent
+            {
+                IFrameTimer = 0f,
+                VacuumLockTimer = 0f,
+            });
+            em.SetComponentData(player, new PlayerCleanupActionStateComponent
+            {
+                SelectedActionId = PlayerCleanupActionId.RadialRing,
+                PendingActionId = PlayerCleanupActionId.None,
+                Version = 0,
+            });
+            em.SetComponentData(player, new PlayerCleanupActionSlotMapComponent
+            {
+                PrimaryActionId = PlayerCleanupActionId.RadialRing,
+                SecondaryActionId = PlayerCleanupActionId.ForwardFanLine,
+            });
+            em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
+            em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
+            {
+                DepositEntity = Entity.Null,
+            });
+            em.SetComponentEnabled<PlayerHazardHitRequestTag>(player, false);
+            em.SetComponentData(player, new PlayerHazardHitContextComponent
+            {
+                SourceEntity = Entity.Null,
+                HitDirX = 0f,
+                HitDirZ = 0f,
+            });
+
+            var actionProfiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
+            actionProfiles.Add(new PlayerCleanupActionProfileBufferElement
+            {
+                ActionId = PlayerCleanupActionId.RadialRing,
+                TrashRange = 3.2f,
+                TrashFanHalfAngleDeg = 180f,
+                HazardRingRadius = 2.88f,
+                HazardRingWidth = 0.8f,
+                HazardLineLength = 0f,
+                HazardLineHalfWidth = 0f,
+            });
+
+            var uiBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
+            uiBuffer.EnsureCapacity(64);
+            var impulseBuffer = em.AddBuffer<PlayerImpulseEventBufferElement>(player);
+            impulseBuffer.EnsureCapacity(16);
+
+            return player;
+        }
+
+        private static Entity CreateVacuumContractSource(EntityManager em)
+        {
+            var source = em.CreateEntity(typeof(SourceSpawnComponent));
+            em.SetComponentData(source, new SourceSpawnComponent
+            {
+                ThresholdWeakened = 100,
+                ThresholdDepleted = 200,
+                CollectedCount = 0,
+                State = SourceStateId.Normal,
+            });
+            return source;
+        }
+
+        private static Entity CreateVacuumContractBullet(
+            EntityManager em,
+            float3 position,
+            BulletCaptureRuleId captureRule,
+            int scoreValue,
+            Entity sourceEntity)
+        {
+            var bullet = em.CreateEntity(
+                typeof(LocalTransform),
+                typeof(BulletVelocityComponent),
+                typeof(BulletLifetimeComponent),
+                typeof(BulletTypeKeyComponent),
+                typeof(BulletSourceRefComponent),
+                typeof(BulletRadiusComponent),
+                typeof(BulletScoreValueComponent),
+                typeof(BulletCaptureRuleComponent),
+                typeof(BulletActiveTag),
+                typeof(BulletDespawnRequestTag));
+
+            em.SetComponentData(bullet, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            em.SetComponentData(bullet, new BulletVelocityComponent { Value = float2.zero });
+            em.SetComponentData(bullet, new BulletLifetimeComponent { Value = 8f });
+            em.SetComponentData(bullet, new BulletTypeKeyComponent { Value = 1 });
+            em.SetComponentData(bullet, new BulletSourceRefComponent { Value = sourceEntity });
+            em.SetComponentData(bullet, new BulletRadiusComponent { Value = 0.2f });
+            em.SetComponentData(bullet, new BulletScoreValueComponent { Value = math.max(0, scoreValue) });
+            em.SetComponentData(bullet, new BulletCaptureRuleComponent { Value = captureRule });
+            em.SetComponentEnabled<BulletActiveTag>(bullet, true);
+            em.SetComponentEnabled<BulletDespawnRequestTag>(bullet, false);
+            return bullet;
+        }
+
+        private static void RequestVacuum(EntityManager em, Entity playerEntity)
+        {
+            var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+            intent.VacuumRequested = 1;
+            intent.Sequence += 1u;
+            em.SetComponentData(playerEntity, intent);
+
+            var vacuum = em.GetComponentData<VacuumRuntimeStateComponent>(playerEntity);
+            vacuum.ActivateRequested = 1;
+            em.SetComponentData(playerEntity, vacuum);
+        }
+
+        private static void StepSimulationFrame(World world, SimulationSystemGroup simGroup, ref double elapsed)
+        {
+            const float dt = 1f / 60f;
+            elapsed += dt;
+            world.SetTime(new TimeData(elapsed, dt));
+            simGroup.Update();
+        }
+
+        private static int CountUiEvents(
+            DynamicBuffer<PlayerUiFeedbackEventBufferElement> buffer,
+            PlayerUiFeedbackEventType type,
+            byte reason)
+        {
+            int count = 0;
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                var evt = buffer[i];
+                if (evt.Type != type)
+                    continue;
+                if (evt.Reason != reason)
+                    continue;
+                count++;
+            }
+
+            return count;
         }
 
         private static Entity CreateBulletPrefab(EntityManager em, int typeKey, float lifetime)

@@ -101,6 +101,8 @@ namespace SweepNDodge.DotsBullets
         VacuumStartBlocked = 1,
         SourceStateChanged = 2,
         PlayerHazardHit = 3,
+        HazardCaptured = 4,
+        HazardRemoved = 5,
     }
 
     public enum PlayerUiFeedbackReasonId : byte

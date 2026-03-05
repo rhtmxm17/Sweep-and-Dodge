@@ -69,6 +69,7 @@ namespace SweepNDodge.DotsBullets
             var actionStateRO = SystemAPI.GetComponent<PlayerCleanupActionStateComponent>(playerEntity);
             var actionProfiles = SystemAPI.GetBuffer<PlayerCleanupActionProfileBufferElement>(playerEntity);
             var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
+            byte isCarryFull = CarryBinRules.IsFull(in carryBinRO) ? (byte)1 : (byte)0;
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
             byte blockReason = UpdateVacuumState(
                 in vacuumConfigRO,
@@ -147,6 +148,7 @@ namespace SweepNDodge.DotsBullets
                 InvCellSize = cfg.InvCellSize,
                 SearchRange = searchRange,
                 IsHazardCaptureActive = vacuumStateRW.ValueRO.CaptureActiveTimer > 0f ? (byte)1 : (byte)0,
+                IsCarryFull = isCarryFull,
                 ActionId = actionId,
                 PlayerForward = playerForward,
                 RadialTrashRange = actionProfile.TrashRange,
@@ -232,17 +234,13 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 state.ActivateRequested = 0;
-
-                if (CarryBinRules.IsFull(in carry))
-                {
-                    return (byte)PlayerUiFeedbackReasonId.CarryBinFull;
-                }
-
                 state.IsActive = 1;
                 state.ActiveTimer = config.ActiveTime;
                 state.CaptureActiveTimer = config.CaptureActiveTime;
                 state.CaptureCooldownTimer = config.CaptureCooldown;
-                return (byte)PlayerUiFeedbackReasonId.None;
+                return CarryBinRules.IsFull(in carry)
+                    ? (byte)PlayerUiFeedbackReasonId.CarryBinFull
+                    : (byte)PlayerUiFeedbackReasonId.None;
             }
 
             return (byte)PlayerUiFeedbackReasonId.None;
@@ -338,6 +336,7 @@ namespace SweepNDodge.DotsBullets
             public float InvCellSize;
             public float SearchRange;
             public byte IsHazardCaptureActive;
+            public byte IsCarryFull;
             public PlayerCleanupActionId ActionId;
             public float3 PlayerForward;
             public float RadialTrashRange;
@@ -411,12 +410,32 @@ namespace SweepNDodge.DotsBullets
 
                             if (!canCapture) continue;
 
-                            RequestLookup.SetComponentEnabled(bullet, true);
-                            TryAccumulateDepletionAndPollution(bullet, p);
-                            int scoreValue = 1;
-                            if (ScoreValueLookup.HasComponent(bullet))
-                                scoreValue = math.max(0, ScoreValueLookup[bullet].Value);
-                            add += scoreValue;
+                            bool isFull = IsCarryFull != 0;
+                            if (captureRule == BulletCaptureRuleId.StandardCollectible)
+                            {
+                                if (isFull)
+                                    continue;
+
+                                RequestLookup.SetComponentEnabled(bullet, true);
+                                TryAccumulateDepletionAndPollution(bullet, p);
+                                add += ResolveScoreValue(bullet);
+                                continue;
+                            }
+
+                            if (captureRule == BulletCaptureRuleId.RiskTimedResolve)
+                            {
+                                RequestLookup.SetComponentEnabled(bullet, true);
+                                if (isFull)
+                                {
+                                    EmitHazardCaptureResult(bullet, captured: false);
+                                    continue;
+                                }
+
+                                TryAccumulateDepletionAndPollution(bullet, p);
+                                add += ResolveScoreValue(bullet);
+                                EmitHazardCaptureResult(bullet, captured: true);
+                                continue;
+                            }
                         }
                         while (CellMap.TryGetNextValue(out bullet, ref it));
                     }
@@ -434,10 +453,17 @@ namespace SweepNDodge.DotsBullets
                 if (captureRule == BulletCaptureRuleId.StandardCollectible)
                     return EvaluateTrashCapture(distSq, dxp, dzp, bulletRadius);
 
-                if (captureRule == BulletCaptureRuleId.RiskTimedResolve && IsHazardCaptureActive != 0)
-                    return EvaluateHazardCapture(distSq, dxp, dzp, bulletRadius);
+                if (captureRule == BulletCaptureRuleId.RiskTimedResolve)
+                    return IsHazardCaptureActive != 0 && EvaluateHazardCapture(distSq, dxp, dzp, bulletRadius);
 
                 return false;
+            }
+
+            private int ResolveScoreValue(Entity bullet)
+            {
+                if (ScoreValueLookup.HasComponent(bullet))
+                    return math.max(0, ScoreValueLookup[bullet].Value);
+                return 1;
             }
 
             private bool EvaluateTrashCapture(float distSq, float dxp, float dzp, float bulletRadius)
@@ -594,6 +620,26 @@ namespace SweepNDodge.DotsBullets
                     Sequence = (uint)uiFeedbackBuffer.Length,
                 });
             }
+
+            private void EmitHazardCaptureResult(Entity bullet, bool captured)
+            {
+                if (!UiFeedbackLookup.TryGetBuffer(PlayerEntity, out var uiFeedbackBuffer))
+                    return;
+
+                uiFeedbackBuffer.Add(new PlayerUiFeedbackEventBufferElement
+                {
+                    Type = captured
+                        ? PlayerUiFeedbackEventType.HazardCaptured
+                        : PlayerUiFeedbackEventType.HazardRemoved,
+                    Reason = captured
+                        ? (byte)PlayerUiFeedbackReasonId.Default
+                        : (byte)PlayerUiFeedbackReasonId.CarryBinFull,
+                    Value = 0,
+                    RelatedEntity = bullet,
+                    Frame = Frame,
+                    Sequence = (uint)uiFeedbackBuffer.Length,
+                });
+            }
         }
 
         [BurstCompile]
@@ -615,8 +661,14 @@ namespace SweepNDodge.DotsBullets
                     return;
 
                 var carry = CarryLookup[PlayerEntity];
-                carry.Load = CarryBinRules.AddLoadClamped(carry.Load, add, carry.Capacity);
+                int beforeLoad = math.clamp(carry.Load, 0, math.max(0, carry.Capacity));
+                int afterLoad = CarryBinRules.AddLoadClamped(carry.Load, add, carry.Capacity);
+                int appliedAdd = math.max(0, afterLoad - beforeLoad);
+                carry.Load = afterLoad;
                 CarryLookup[PlayerEntity] = carry;
+
+                if (appliedAdd <= 0)
+                    return;
 
                 if (CombatChannelEntity == Entity.Null)
                     return;
@@ -629,7 +681,7 @@ namespace SweepNDodge.DotsBullets
                     SourceEntity = Entity.Null,
                     RelatedEntity = Entity.Null,
                     Count = 1,
-                    Value = add,
+                    Value = appliedAdd,
                     Frame = Frame,
                     Sequence = (uint)combatBuffer.Length,
                 });
