@@ -5,7 +5,7 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// <br/>Player GameObject가 "표현/입력/애니"를 담당
-    /// <br/>ECS PlayerTag 엔티티(Proxy)에 Transform/입력을 밀어넣어 판정은 DOTS에서 처리
+    /// <br/>ECS PlayerTag 엔티티(Proxy)에 입력 의도만 전달하고, 판정/상태 writer는 DOTS에서 단일 소유한다.
     /// <br/>단일 플레이어 전제: PlayerTag 싱글톤을 찾음(서브씬 로딩 타이밍 고려해 재시도 로직 포함)
     /// </summary>
     public sealed class PlayerEcsBridge : MonoBehaviour
@@ -16,13 +16,9 @@ namespace SweepNDodge.DotsBullets
         public PlayerCleanupActionSlotId PrimarySlot = PlayerCleanupActionSlotId.Primary;
         public PlayerCleanupActionSlotId SecondarySlot = PlayerCleanupActionSlotId.Secondary;
 
-        [Header("Sync")]
-        public bool SyncRotation = true;
+        [Header("Presentation Sync")]
         public bool ApplyEcsPositionToTransform = true;
         public bool ApplyEcsRotationToTransform = true;
-
-        [Header("Authority (Transition)")]
-        public bool EnableLegacyTransformToEcsSync = false;
 
         // Vacuum 상태 반영용 Animator (옵션)
         public Animator Animator;
@@ -69,19 +65,11 @@ namespace SweepNDodge.DotsBullets
                 if (!_hasPlayerEntity) return;
             }
 
-            // GO -> ECS 동기화
+            // GO -> ECS : 입력 의도만 전달
             bool suppressLiveInput = IsReplayInputSuppressed();
             if (!suppressLiveInput)
             {
-                var sync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
                 var intent = _em.GetComponentData<PlayerInputIntentComponent>(_playerEntity);
-                if (EnableLegacyTransformToEcsSync)
-                {
-                    // 표현용 impulse 오프셋이 ECS 권한 위치에 역주입되지 않도록 분리한다.
-                    sync.Position = (Vector3)transform.position - _visualImpulseOffset;
-                    sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
-                    if (SyncRotation) sync.Rotation = transform.rotation;
-                }
 
                 bool primaryPressed = Input.GetMouseButtonDown(PrimaryVacuumMouseButton);
                 bool secondaryPressed = Input.GetMouseButtonDown(SecondaryVacuumMouseButton);
@@ -94,7 +82,6 @@ namespace SweepNDodge.DotsBullets
                     _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
                 }
 
-                _em.SetComponentData(_playerEntity, sync);
                 _em.SetComponentData(_playerEntity, intent);
             }
 

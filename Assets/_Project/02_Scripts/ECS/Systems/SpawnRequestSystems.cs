@@ -388,7 +388,6 @@ namespace SweepNDodge.DotsBullets
         {
             int bestIndex = -1;
             int bestLanePriority = int.MinValue;
-            int bestPriority = int.MinValue;
             uint bestOldest = uint.MaxValue;
 
             for (int i = 0; i < requests.Length; i++)
@@ -414,13 +413,10 @@ namespace SweepNDodge.DotsBullets
 
                 if (bestIndex < 0
                     || item.LanePriority > bestLanePriority
-                    || (item.LanePriority == bestLanePriority
-                        && (item.SpawnPriority > bestPriority
-                            || (item.SpawnPriority == bestPriority && item.OldestFrame < bestOldest))))
+                    || (item.LanePriority == bestLanePriority && item.OldestFrame < bestOldest))
                 {
                     bestIndex = i;
                     bestLanePriority = item.LanePriority;
-                    bestPriority = item.SpawnPriority;
                     bestOldest = item.OldestFrame;
                 }
             }

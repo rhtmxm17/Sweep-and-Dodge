@@ -5,16 +5,11 @@ using Unity.Mathematics;
 namespace SweepNDodge.DotsBullets
 {
     /// <summary>
-    /// 프로토타입 플레이용 간단한 WASD 이동 컴포넌트.
+    /// 플레이어 입력을 읽어 ECS 입력 의도 컴포넌트로 전달한다.
     /// </summary>
     public sealed class PlayerWasdMovement : MonoBehaviour
     {
-        [Min(0f)]
-        public float MoveSpeed = 6f;
         public Camera TargetCamera;
-
-        [Header("Authority (Transition)")]
-        public bool EnableLegacyTransformWrite = false;
 
         private EntityManager _em;
         private EntityQuery _playerQuery;
@@ -52,20 +47,6 @@ namespace SweepNDodge.DotsBullets
             }
 
             PublishInputIntent(new float2(move.x, move.z), hasAimPoint, new float2(aimPoint.x, aimPoint.z));
-
-            if (!EnableLegacyTransformWrite)
-                return;
-
-            transform.position += move * (MoveSpeed * Time.deltaTime);
-
-            if (!hasAimPoint)
-                return;
-
-            var lookDirection = aimPoint - transform.position;
-            lookDirection.y = 0f;
-            if (lookDirection.sqrMagnitude <= 0.0001f) return;
-
-            transform.rotation = Quaternion.LookRotation(lookDirection);
         }
 
         private bool IsReplayInputSuppressed()

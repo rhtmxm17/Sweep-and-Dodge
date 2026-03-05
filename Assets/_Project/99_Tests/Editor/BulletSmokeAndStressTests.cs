@@ -801,6 +801,78 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnExecution_SameLanePriority_OlderRequestConsumesFirst()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnOldestTieBreakWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 8, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 7f, 0f) });
+                em.SetComponentData(source, new BulletFieldAreaComponent
+                {
+                    Shape = BulletFieldShapeId.Rectangle,
+                    Radius = 0f,
+                    Size = float2.zero,
+                    ComputedArea = 0f,
+                });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5004,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = new float2(1f, 4f),
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 1,
+                    OldestFrame = 1u,
+                });
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5005,
+                    Lane = SourceSpawnLaneId.Hazard,
+                    LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    FixedPoint = new float2(9f, 10f),
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 1,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                Assert.That(TryGetSingleActiveBulletPositionForSource(em, source, out var position), Is.True);
+                Assert.That(position.x, Is.EqualTo(9f).Within(0.0001f));
+                Assert.That(position.y, Is.EqualTo(7f).Within(0.0001f));
+                Assert.That(position.z, Is.EqualTo(10f).Within(0.0001f));
+
+                requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(GetRequestCountByDirective(requests, 5004), Is.EqualTo(1), "Newer request must remain pending.");
+                Assert.That(GetRequestCountByDirective(requests, 5005), Is.EqualTo(0), "When lane priority ties, older request must be consumed first.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnExecution_PointSetRoundRobin_SpawnsAcrossConfiguredPoints()
         {
             try
@@ -1651,7 +1723,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     NWayCount = 1,
                     SpiralStepDeg = 0f,
                     BurstShotsPerEvent = 1,
-                    SpawnPriority = 1,
                     SpawnSequence = 0u,
                     Count = 5,
                     OldestFrame = 0u,

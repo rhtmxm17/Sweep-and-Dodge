@@ -177,10 +177,11 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 이벤트 중복 트리거는 큐잉한다.
   - `Sustain` 시간축은 클립 선택 시 로컬 시간 리셋 기준으로 동작한다.
   - 클립 종료 시 동일 슬롯 후보군에서 "직전 클립 제외 완전 랜덤"으로 다음 클립을 선택한다.
-  - 우선순위는 Lane 규칙 `특수 > Hazard > Trash`를 우선하며, v3에서는 레거시 `SpawnPriority` 제거를 기본안으로 둔다.
+  - 우선순위는 Lane 규칙 `특수 > Hazard > Trash`를 우선하며, 레거시 `SpawnPriority` 경로는 코드에서 제거 완료 상태다.
   - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 14. 변경 이력
+- 2026-03-05: 요청 소비 우선순위를 `LanePriority + OldestFrame` 단일 규칙으로 확정하고, 레거시 `SpawnPriority` 제거 완료 상태를 반영했다.
 - 2026-03-05: `PollutionTopK` 운영 계약, 오염도 갱신 흐름(요청 누적 -> 단일 writer 소비), 원형 Source valid 셀 마스크 규약을 추가해 GD-003 기술 상세 이관을 반영했다.
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가
 - 2026-02-26: NWay 필수값(`NWayCount>=2`)과 360도 균등 슬롯 각도 규약을 명시

@@ -149,8 +149,7 @@ namespace SweepNDodge.DotsBullets
             float spiralStepDeg,
             int burstShotsPerEvent,
             SourceSpawnEventShotScheduleId eventShotSchedule,
-            float eventShotIntervalSec,
-            int spawnPriority)
+            float eventShotIntervalSec)
         {
             return new SourceSpawnRequestBuffer
             {
@@ -185,7 +184,6 @@ namespace SweepNDodge.DotsBullets
                 EventAnchorUseFixedPosition = 0,
                 EventAnchorCenter = float3.zero,
                 EventAnchorPosition = float3.zero,
-                SpawnPriority = spawnPriority,
                 SpawnSequence = 0u,
                 Count = 0,
                 OldestFrame = 0u,

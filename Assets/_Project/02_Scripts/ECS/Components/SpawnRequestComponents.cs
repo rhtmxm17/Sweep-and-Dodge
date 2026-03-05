@@ -37,7 +37,6 @@ namespace SweepNDodge.DotsBullets
         public byte EventAnchorUseFixedPosition;
         public Unity.Mathematics.float3 EventAnchorCenter;
         public Unity.Mathematics.float3 EventAnchorPosition;
-        public int SpawnPriority;
         public uint SpawnSequence;
         public int Count;
         public uint OldestFrame;

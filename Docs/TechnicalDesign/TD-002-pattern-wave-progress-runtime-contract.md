@@ -4,7 +4,7 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-27`
+- last_updated: `2026-03-05`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -66,7 +66,7 @@
 | SpiralStepDeg | float | Spiral 각도 증분 | Spiral에서 권장 != 0 |
 | SpawnSampleBudget | int | 샘플링 재시도 예산 | >= 1 (기본 16) |
 | PlayerNoSpawnRadius | float | 플레이어 주변 제외 반경 | >= 0 |
-| SpawnPriority | int | 요청 소비 우선순위(legacy) | v3 클립 경로에서는 `LanePriority` 사용 |
+| LanePriority | int | 요청 소비 우선순위 | `특수 > Hazard > Trash`, 동률은 `OldestFrame` 우선 |
 
 `PatternDefinitionSlim`은 밀도 기반 구버전 용어이며, 스폰 모델은 `TD-003`의 SpawnDirective 용어를 기준으로 유지한다.
 

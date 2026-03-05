@@ -261,8 +261,7 @@ namespace SweepNDodge.DotsBullets
                 target.SpiralStepDeg,
                 target.BurstShotsPerEvent,
                 target.EventShotSchedule,
-                target.EventShotIntervalSec,
-                target.LanePriority);
+                target.EventShotIntervalSec);
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
         }
     }
