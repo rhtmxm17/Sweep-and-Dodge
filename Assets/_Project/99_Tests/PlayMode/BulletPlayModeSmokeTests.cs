@@ -13,10 +13,6 @@ namespace SweepNDodge.DotsBullets.Tests
     {
         private const string DedicatedScenePath = "Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity";
         private const string OperationalScenePath = "Assets/_Project/01_Scenes/SampleScene.unity";
-        private const string MasterVolumePrefKey = "demo.audio.master";
-        private const string BgmVolumePrefKey = "demo.audio.bgm";
-        private const string SfxVolumePrefKey = "demo.audio.sfx";
-        private const string UiVolumePrefKey = "demo.audio.ui";
 
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
@@ -1307,10 +1303,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static void ClearAudioVolumePrefs()
         {
-            PlayerPrefs.DeleteKey(MasterVolumePrefKey);
-            PlayerPrefs.DeleteKey(BgmVolumePrefKey);
-            PlayerPrefs.DeleteKey(SfxVolumePrefKey);
-            PlayerPrefs.DeleteKey(UiVolumePrefKey);
+            for (int i = 0; i < DemoAudioPrefsKeys.AllVolumeKeys.Length; i++)
+                PlayerPrefs.DeleteKey(DemoAudioPrefsKeys.AllVolumeKeys[i]);
             PlayerPrefs.Save();
         }
 

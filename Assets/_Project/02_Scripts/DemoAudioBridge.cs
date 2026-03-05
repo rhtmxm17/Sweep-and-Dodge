@@ -12,11 +12,6 @@ namespace SweepNDodge.DotsBullets
     [DisallowMultipleComponent]
     public sealed class DemoAudioBridge : MonoBehaviour
     {
-        private const string MasterVolumePrefKey = "demo.audio.master";
-        private const string BgmVolumePrefKey = "demo.audio.bgm";
-        private const string SfxVolumePrefKey = "demo.audio.sfx";
-        private const string UiVolumePrefKey = "demo.audio.ui";
-
         [Header("References (Read-only)")]
         public DemoShellFlowController DemoShell;
 
@@ -451,18 +446,18 @@ namespace SweepNDodge.DotsBullets
 
         private void LoadVolumePrefs()
         {
-            MasterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MasterVolumePrefKey, MasterVolume));
-            BgmVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(BgmVolumePrefKey, BgmVolume));
-            SfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(SfxVolumePrefKey, SfxVolume));
-            UiVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(UiVolumePrefKey, UiVolume));
+            MasterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(DemoAudioPrefsKeys.MasterVolume, MasterVolume));
+            BgmVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(DemoAudioPrefsKeys.BgmVolume, BgmVolume));
+            SfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(DemoAudioPrefsKeys.SfxVolume, SfxVolume));
+            UiVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(DemoAudioPrefsKeys.UiVolume, UiVolume));
         }
 
         private void SaveVolumePrefs()
         {
-            PlayerPrefs.SetFloat(MasterVolumePrefKey, Mathf.Clamp01(MasterVolume));
-            PlayerPrefs.SetFloat(BgmVolumePrefKey, Mathf.Clamp01(BgmVolume));
-            PlayerPrefs.SetFloat(SfxVolumePrefKey, Mathf.Clamp01(SfxVolume));
-            PlayerPrefs.SetFloat(UiVolumePrefKey, Mathf.Clamp01(UiVolume));
+            PlayerPrefs.SetFloat(DemoAudioPrefsKeys.MasterVolume, Mathf.Clamp01(MasterVolume));
+            PlayerPrefs.SetFloat(DemoAudioPrefsKeys.BgmVolume, Mathf.Clamp01(BgmVolume));
+            PlayerPrefs.SetFloat(DemoAudioPrefsKeys.SfxVolume, Mathf.Clamp01(SfxVolume));
+            PlayerPrefs.SetFloat(DemoAudioPrefsKeys.UiVolume, Mathf.Clamp01(UiVolume));
             PlayerPrefs.Save();
         }
 

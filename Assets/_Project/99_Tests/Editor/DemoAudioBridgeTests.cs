@@ -6,11 +6,6 @@ namespace SweepNDodge.DotsBullets.Tests
 {
     public class DemoAudioBridgeTests
     {
-        private const string MasterVolumePrefKey = "demo.audio.master";
-        private const string BgmVolumePrefKey = "demo.audio.bgm";
-        private const string SfxVolumePrefKey = "demo.audio.sfx";
-        private const string UiVolumePrefKey = "demo.audio.ui";
-
         [SetUp]
         public void SetUp()
         {
@@ -214,10 +209,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static void ClearVolumePrefs()
         {
-            PlayerPrefs.DeleteKey(MasterVolumePrefKey);
-            PlayerPrefs.DeleteKey(BgmVolumePrefKey);
-            PlayerPrefs.DeleteKey(SfxVolumePrefKey);
-            PlayerPrefs.DeleteKey(UiVolumePrefKey);
+            for (int i = 0; i < DemoAudioPrefsKeys.AllVolumeKeys.Length; i++)
+                PlayerPrefs.DeleteKey(DemoAudioPrefsKeys.AllVolumeKeys[i]);
             PlayerPrefs.Save();
         }
     }
