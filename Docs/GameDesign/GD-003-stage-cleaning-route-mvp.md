@@ -4,7 +4,7 @@
 - doc_id: `GD-003`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-02-19`
+- last_updated: `2026-03-05`
 - related_adr: [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](../ADR/ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md)
 
 > 적용 범위: 스테이지 공통 규칙 중 **동선/스폰 분포(체감)** 파트
@@ -27,7 +27,7 @@
 ## 1. 최소 루프(동선 관점)
 ### 1.1 루프 정의
 - Source 영역 진입 → 수거(청소)로 Load 증가 + Source 진행(남은 청소 필요량 감소)
-- Capacity 도달 시 수거/제거 불가 → Deposit으로 이동하여 Load 비움
+- Capacity 도달 시 Trash 수거 불가 + Hazard 조건부 제거만 가능 → Deposit으로 이동하여 Load 비움
 - 재진입하여 남은 구역을 계속 청소, Source를 Weakened/Depleted로 전환
 
 ### 1.2 동선이 유도해야 하는 선택
@@ -92,11 +92,11 @@ Source 영역을 셀/섹터 단위로 분할하고, 각 단위는 "오염도(스
   - Source 경계 왕복(핑퐁)이 기본 해법이 되면 안 된다.
 
 ### 3.6 MVP 구현 결정 (2026-02-19)
-- Owner 위치: `BulletRequestGroup` 내 **단일 writer 시스템**으로 오염도 갱신을 고정한다.
-  - 수거 시스템은 오염도 직접 변경 대신 셀 단위 요청만 남긴다.
-- 스폰 샘플링: 성능 우선으로 **상위 K 샘플(Top-K 후보 중 최대 오염도 선택)** 방식을 채택한다.
-- 원형 Source 처리: **사각 격자 + Valid 마스크**를 사용한다.
-  - 스폰/드롭 모두 valid 셀만 사용해 반경 외곽 오차를 줄인다.
+- 구현의 핵심 의도는 아래 3가지로 고정한다.
+  - 오염도 변화는 플레이어가 체감 가능한 단일 규칙으로 유지한다.
+  - 스폰 분포는 "방금 청소한 자리보다 다음 더러운 자리"를 우선적으로 보여준다.
+  - 원형 Source에서도 "경계 밖에서 뜬금없이 나오는 느낌"이 최소화되어야 한다.
+- 기술 계약(요청 누적/소비, 샘플링 방식, valid 셀 처리)은 [TD-003](../TechnicalDesign/TD-003-spawn-directive-model.md)에서 관리한다.
 
 ---
 
@@ -105,7 +105,7 @@ Source 영역을 셀/섹터 단위로 분할하고, 각 단위는 "오염도(스
 2) 가까운 고오염 셀에서 수거가 잘 되고 Load가 상승
 3) 동일 좌표에서 수거가 진행되면 주변 `CellPollution`이 감소 → 밀도 하락 체감
 4) 플레이어는 Source 내부의 다른 고오염 구역으로 이동
-5) Load가 Capacity에 접근하면 더 이상 제거 효율이 떨어지고(또는 제거 불가)
+5) Load가 Capacity에 접근하면 Trash 수거는 멈추고, Hazard는 조건부 성공 시 제거만 가능(진행도 미반영)
 6) Source 경계 밖으로 이탈 → 3~6초 이동 → Deposit에서 Load 비움
 7) 다시 Source로 진입하여 남은 고오염 구역을 청소
 8) Source가 Weakened/Depleted로 진행되며 "여긴 다 치웠다"가 성립 → 다음 Source로 이동

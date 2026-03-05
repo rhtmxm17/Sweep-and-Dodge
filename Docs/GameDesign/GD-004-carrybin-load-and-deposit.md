@@ -4,28 +4,28 @@
 - doc_id: `GD-004`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-02-26`
+- last_updated: `2026-03-05`
 - related_adr: [ADR-20260212-04-carrybin-replaces-score-placeholder.md](../ADR/ADR-20260212-04-carrybin-replaces-score-placeholder.md), [ADR-20260219-05-carrybin-deposit-touch-request-execution.md](../ADR/ADR-20260219-05-carrybin-deposit-touch-request-execution.md)
 
 ## 0. 목적
 CarryBin은 "수거량"을 런 내 규칙으로 승격시켜,
 - Source 기반 고갈/이동 동기를 강화하고
 - Hazard의 조건부 수거(기회/욕심) 보상을 "흐름 변화"로 만들며
-- `RiskMultiplier`를 통해 고위험 유지 플레이의 효율 상승을 설계 가능한 형태로 고정하고
+- 고위험 유지 플레이가 "빨리 밀 수 있지만 더 아픈" 구간으로 체감되게 만들고
 - DOTS 대량 탄막(대량 수거/처리량)이 플레이 규칙상 의미를 갖도록 한다.
 
 ---
 
-## 1. 용어 / 데이터 모델
+## 1. 용어 / 경험 변수
 
 ### 1.1 런 내 자원: CarryBinLoad
 - 의미: 플레이어가 현재 들고 있는 "적치량(Load)"
 - 범위: `0 ~ Capacity`
 - 증가: 쓰레기(일반 탄) 수거, Hazard 수거 성공 보상(스파이크)
 
-### 1.2 런 내 위험 누적치: HazardStack
+### 1.2 런 내 위험 누적치: HazardStack (경험 변수)
 - 의미: 고위험 플레이 구간에서 누적되는 위험 스택
-- 역할: `RiskMultiplier`의 추가 계수
+- 역할: "욕심 구간" 강도를 높이는 상태 변수
 - 상한: `HazardStackMax` (상한 도달 후 증가 정지)
 
 ### 1.3 Deposit(배출 지점)
@@ -64,14 +64,12 @@ CarryBin은 "수거량"을 런 내 규칙으로 승격시켜,
   - `CarryBinLoad`는 `Capacity`를 초과할 수 없다.
 
 ### 3.2 위험-효율 연동 (RiskMultiplier)
-- 런타임 기본식(계약 기준):
-  - `RiskMultiplier = 1 + (Load / Capacity) * RiskFactor + (HazardStack * HazardBonusRate)`
-- 진행도 반영:
-  - `TrashProgressDelta = BaseTrashValue * RiskMultiplier`
-  - `HazardProgressDelta = BaseHazardValue * RiskMultiplier`
 - 의도:
   - 더 오래 욕심을 유지할수록 진행 효율은 올라간다.
   - 동시에 피격/과밀 리스크도 함께 증가한다.
+- 플레이어 체감:
+  - "지금 더 밀면 빨라진다"와 "지금 맞으면 크게 잃는다"가 동시에 성립해야 한다.
+- 계산식/집계 계약은 [TD-002](../TechnicalDesign/TD-002-pattern-wave-progress-runtime-contract.md)에서 관리한다.
 
 ### 3.3 Deposit 리셋
 - Deposit은 점수/메타 정산 장치가 아니다.
@@ -88,9 +86,13 @@ Hazard 보상은 점수보다 "흐름을 바꾸는 보상"이어야 한다.
 따라서 CarryBin과 직접 결합한다.
 
 ### 4.2 보상 방식(권장)
-- Hazard 조건부 수거 성공 시:
+- `HazardCaptured` (`Load < Capacity`) 성공 시:
   - `CarryBinLoad += SpikeAmount`
   - SpikeAmount는 "일반 쓰레기 다수 분량"으로 체감되게 설정
+- `HazardRemovedWhenCarryFull` (`Load == Capacity`) 성공 시:
+  - Hazard는 `제거`로만 처리한다.
+  - `SpikeAmount`는 적용하지 않는다.
+  - CarryBin/Source 진행/HazardStack/`Collect` 집계는 갱신하지 않는다.
 
 ---
 
@@ -136,11 +138,10 @@ CarryBinLoad가 높을수록:
 - `SpikeAmount`
 
 ### 7.2 Progress / RiskMultiplier
-- `BaseTrashValue`
-- `BaseHazardValue`
-- `RiskFactor`
-- `HazardBonusRate`
-- `HazardStackMax`
+- Progress 기본 가치(Trash/Hazard 상대 가치)
+- 욕심 구간 효율 기울기(Load 연동)
+- 위험 누적 보너스 강도(HazardStack 연동)
+- 위험 누적 상한(HazardStack cap)
 
 ### 7.3 리스크(Load 연동)
 - `ActiveCapBonusByLoad`
@@ -150,11 +151,12 @@ CarryBinLoad가 높을수록:
 ---
 
 ## 8. 오픈 이슈(결정 필요)
-1) Deposit 트리거 방식:
-   - 접촉 즉시 vs 접촉+인터랙션
-2) SpikeAmount의 체감 기준:
+1) SpikeAmount의 체감 기준:
    - "일반 쓰레기 몇 개 분량"을 기준으로 초기 목표치를 고정할지
-3) Load 연동 리스크 레버의 우선순위:
+2) Load 연동 리스크 레버의 우선순위:
    - `active cap` 우선 vs `packet 빈도` 우선
+
+현행 기준(구현 반영):
+- Deposit은 **접촉 즉시 비우기**를 사용한다.
 
 ---

@@ -4,29 +4,31 @@
 - doc_id: `TD-001`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-19`
+- last_updated: `2026-03-05`
 - related_adr: [ADR-20260219-01-player-feedback-event-channels-by-consumer-boundary.md](../ADR/ADR-20260219-01-player-feedback-event-channels-by-consumer-boundary.md)
 
 본 문서는 다음 채팅에서 설계/구현 논의를 빠르게 이어가기 위한 설계 정리다.
-대상 이벤트는 아래 4가지다.
-- 흡입 시작 차단(Vacuum blocked)
+대상 이벤트는 아래 5가지다.
+- 흡입 시작 제한(Vacuum blocked, Trash 수거 제한)
+- Hazard 처리 결과(Hazard captured/removed)
 - 스폰 소스 고갈(Source depleted 전이)
 - 피격(Hazard hit)
 - 피격 넉백(Impulse)
 
 ---
 
-## 0. 현재 코드 상태 (2026-02-19 기준)
+## 0. 현재 코드 상태 (2026-03-05 기준)
 
-### 0.1 흡입 시작 차단
+### 0.1 흡입 시작 제한(FullBin 예외 포함)
 - 구현됨.
 - 위치:
   - `Assets/_Project/02_Scripts/ECS/Systems/BulletVacuumRequestSystem.cs`
   - `Assets/_Project/02_Scripts/ECS/Components/PlayerComponents.cs`
 - 요약:
-  - `CarryBin`이 full이면 흡입 시작을 거부.
+  - `CarryBin`이 full이어도 흡입 시작 자체는 거부하지 않는다.
+  - `Load == Capacity`에서는 Trash 수거만 제한하고, Hazard 조건부 판정 경로는 동작한다.
   - `PlayerVacuumStartBlockFeedbackComponent`에 프레임 이벤트로 기록.
-  - 사유 enum: `VacuumStartBlockReasonId.CarryBinFull`.
+  - 사유 enum `VacuumStartBlockReasonId.CarryBinFull`은 "Trash 수거 제한" 의미로 유지한다.
 
 ### 0.2 스폰 소스 고갈
 - 상태 전이는 이미 존재.
@@ -51,6 +53,7 @@
 
 현재 피드백 데이터가 "이벤트별 산개" 상태다.
 - 흡입 차단은 별도 컴포넌트에 기록됨.
+- Hazard 조건부 성공의 결과(`수거`/`제거`) 구분이 이벤트 계약에서 고정되어 있지 않음.
 - 피격은 request tag consume 패턴으로 처리되나, UI 소비 전용 payload가 없음.
 - 소스 상태 전이는 내부 상태 변경만 있고, 전이 사실을 외부가 안정적으로 구독하기 어려움.
 
@@ -87,13 +90,19 @@
 
 ### 2.2 UI 이벤트 타입(1차 확정)
 - `VacuumStartBlocked`
+- `HazardCaptured`
+- `HazardRemoved`
 - `SourceStateChanged`
 - `PlayerHazardHit`
 
 ### 2.3 Reason 코드(초안)
 - `VacuumStartBlocked`:
-  - `CarryBinFull`
+  - `CarryBinFull` (의미: Trash 수거 제한)
   - (확장 예약) `VacuumLocked`, `CooldownActive` 등
+- `HazardCaptured`:
+  - `Default`
+- `HazardRemoved`:
+  - `CarryBinFull`
 - `SourceStateChanged`:
   - `ToWeakened`, `ToDepleted`
 - `PlayerHazardHit`:
@@ -116,7 +125,10 @@
 
 이벤트별 권장 발행 지점:
 - `VacuumStartBlocked`:
-  - `BulletVacuumRequestSystem` 내부 시작 게이트에서 append.
+  - `BulletVacuumRequestSystem`에서 `Load == Capacity` 상태의 Trash 수거 제한 시 append.
+- `HazardCaptured` / `HazardRemoved`:
+  - `BulletVacuumRequestSystem`에서 Hazard 조건부 성공 결과 확정 시 append.
+  - `HazardRemoved`는 FullBin 예외 경로이며 `Collect` 집계에 포함하지 않는다(`TD-007` 유지).
 - `SourceStateChanged`:
   - `TryAccumulateDepletion`에서 state 전이 확정 시 append.
   - 전이 직전/직후 상태를 비교하여 전이 발생 프레임에만 발행.
@@ -157,7 +169,7 @@
 
 1. `PlayerUiFeedbackEventBufferElement`, `PlayerImpulseEventBufferElement` 및 enum 정의
 2. Player Baker에서 두 버퍼 부착
-3. `BulletVacuumRequestSystem`에서 UI 버퍼로 `VacuumStartBlocked` 발행
+3. `BulletVacuumRequestSystem`에서 UI 버퍼로 `VacuumStartBlocked`, `HazardCaptured`, `HazardRemoved` 발행
 4. `PlayerHazardCollisionExecutionSystem`에서
    - UI 버퍼로 `PlayerHazardHit` 발행(loss 포함)
    - Impulse 버퍼로 `PlayerImpulse` 발행(고정 강도)
@@ -218,12 +230,14 @@
 
 ---
 
-## 7. 결정 사항 (2026-02-19)
+## 7. 결정 사항 (2026-03-05)
 
 - 단일 공통 버퍼 대신 타입별 버퍼 분리(A안) 채택
 - Impulse는 UI 버퍼와 분리된 전용 버퍼로 발행/소비
 - Impulse 강도 정책: 고정값
 - `loss` 반영 정책: Impulse 강도에는 미반영, VFX 강도/길이에 반영
 - clear 소유권/중복 억제 최소 규칙/처리 순서 규칙 확정
+- `TD-007`의 공통 전투 채널(`Hit/Collect/Cleanup`) 범위는 유지하고, FullBin 제거 구분은 UI 이벤트(`HazardRemoved`)로 분리
+- 이벤트 명칭 고정: `HazardCaptured`, `HazardRemoved`
 
 

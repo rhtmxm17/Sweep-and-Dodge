@@ -4,7 +4,7 @@
 - doc_id: `GD-001`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-02-26`
+- last_updated: `2026-03-05`
 - related_adr: [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
 
 본 문서는 "단일 스테이지 내 플레이(수거/Deposit/위험탄/Source 고갈)"를
@@ -55,9 +55,11 @@
 
 ### 2.3 CarryBin / 수거 제한
 - 수거/캡처 성공 시 CarryBin.Load가 증가한다.
-- **Capacity 도달 시 수거가 멈춰야 Deposit이 필수 행동이 된다.**
+- **Capacity 도달 시 Trash 수거가 멈춰야 Deposit이 필수 행동이 된다.**
   - `Load == Capacity`이면:
-    - Vacuum/캡처로 탄을 "제거(디스폰)"할 수 없다(= 못 담으면 못 없앤다).
+    - Trash는 Vacuum/캡처로 수거할 수 없다(= Load 증가 없음).
+    - Hazard는 조건부 성공 시 `수거` 대신 `제거`로 처리할 수 있다.
+    - `HazardRemovedWhenCarryFull`는 디스폰만 수행하며 CarryBin/Source 진행/HazardStack/`Collect` 집계에는 반영하지 않는다.
     - 플레이어는 Deposit으로 돌아가 Load를 비운 뒤 다시 수거해야 한다.
 
 ### 2.4 Deposit 동작(MVP)
@@ -71,6 +73,13 @@
 
 ### 2.5 Hazard(위험탄) 규칙(공통 개념)
 - Hazard는 기본 수거로 즉시 처리되지 않으며, 별도의 조건부 제거 룰을 가진다.
+- Hazard 조건부 성공 결과는 2가지로 고정한다.
+  - `HazardCaptured`:
+    - 조건: `Load < Capacity`
+    - 처리: 수거 + 보상 적용(Carry/Source 진행/HazardStack/`Collect` 반영)
+  - `HazardRemovedWhenCarryFull`:
+    - 조건: `Load == Capacity`
+    - 처리: 제거 전용(디스폰 + 전용 피드백), Carry/Source 진행/HazardStack/`Collect` 미반영
 - 피격 처리:
   - 피격 시 iFrame/VacuumLock 등 제약이 발생(상세 수치는 밸런싱 문서 범위)
 

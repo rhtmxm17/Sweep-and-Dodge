@@ -4,9 +4,10 @@
 - doc_id: `TD-003`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-26`
+- last_updated: `2026-03-05`
 - related_adr:
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
+  - [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](../ADR/ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
   - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
@@ -45,6 +46,30 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 원칙:
   - 공간 무작위성은 Sampling 단에서만 조정한다.
   - 밀도형/무작위형 여부와 관계없이 공정성 가드는 공통 적용한다.
+
+### 4.1 PollutionTopK 운영 계약
+- `SamplingMode=PollutionTopK`의 목적은 "방금 청소한 자리보다 아직 더러운 자리"를 우선 선택하는 체감 유지다.
+- 기본 처리 순서:
+  - 후보 셀을 예산 내에서 샘플한다.
+  - 후보 중 오염도 상위 셀을 우선 선택한다.
+  - 선택된 셀 내부에서 최종 스폰 좌표를 결정한다.
+- Top-K의 목표는 확률 정확도 최대화가 아니라, 대량 엔티티에서도 동선 유도 체감을 안정적으로 유지하는 것이다.
+
+### 4.2 오염도 갱신 흐름 (요청 누적 -> 단일 writer 소비)
+- 오염도 값(`SourcePollutionCellBuffer`)은 Request 단계 단일 writer가 최종 갱신한다.
+- 흐름:
+  - 수거 판정 시스템은 셀별 drop 요청만 누적한다.
+  - `SourcePollutionUpdateSystem`이 regen/drop/clamp를 일괄 반영하고 요청을 clear한다.
+- 소유권 규칙:
+  - 수거 쪽은 오염도 값을 직접 수정하지 않는다.
+  - 오염도 실제 값 수정은 단일 writer 책임으로 고정한다.
+
+### 4.3 원형 Source valid 셀 마스크 규약
+- 원형 Source는 사각 격자 기반 계산을 유지하되 `valid` 셀 마스크로 경계 오차를 줄인다.
+- 스폰/오염도 드롭 요청은 valid 셀에만 적용한다.
+- 목적:
+  - 반경 외곽에서 "의도 밖 스폰/드롭" 체감을 줄이고,
+  - 원형 필드에서도 일관된 분포를 유지한다.
 
 ## 5. EmissionProfile (언제/얼마나 뿌리는가)
 - 역할: 시간 분포와 방출 리듬 제어.
@@ -156,6 +181,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 14. 변경 이력
+- 2026-03-05: `PollutionTopK` 운영 계약, 오염도 갱신 흐름(요청 누적 -> 단일 writer 소비), 원형 Source valid 셀 마스크 규약을 추가해 GD-003 기술 상세 이관을 반영했다.
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가
 - 2026-02-26: NWay 필수값(`NWayCount>=2`)과 360도 균등 슬롯 각도 규약을 명시
 - 2026-02-25: `WaveClipSO` 기반 v3 경로를 반영하고 `WaveTimelineSO` 제거 상태를 문서에 동기화

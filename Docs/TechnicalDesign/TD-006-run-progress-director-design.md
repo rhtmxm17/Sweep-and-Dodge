@@ -4,7 +4,7 @@
 - doc_id: `TD-006`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-04`
+- last_updated: `2026-03-05`
 - related_docs:
   - [OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
   - [GD-007-data-driven-bullet-pattern-definition.md](../GameDesign/GD-007-data-driven-bullet-pattern-definition.md)
@@ -154,6 +154,12 @@
   - 진입 시 Clip은 `스폰 중단` 또는 `고갈 연출용 미량 스폰 Clip`으로 교체한다.
   - `Finish` 상태에서 지속 재생되는 Clip은 `Trash Lane`만 사용한다.
 
+### 6.4.1 플레이 체감 목적 연결
+- `Baseline`은 정리 루프를 안정적으로 굴리게 만드는 "기본 압력" 구간을 의도한다.
+- `Pressure`는 특정 Source를 전면으로 끌어올려 "지금 여기가 핵심 전장"이라는 집중 체감을 만든다.
+- `Finish`는 완료 구역을 명확히 구분해 다음 목표 전환을 부드럽게 만드는 마무리 구간을 의도한다.
+- 위 체감 정의는 `GD-007`의 경험 규칙과 동기화하며, 본 문서는 해당 체감을 만드는 전이/가중치/클립 계약만 책임진다.
+
 ### 6.5 해석 예시
 - A, B, C 세 Source가 있는 스테이지 진입 직후:
   - A: `Baseline`
@@ -199,6 +205,7 @@
   - `Finish` 전환 시점의 1회성 연출은 추후 결정(TBD)한다.
 
 ## 9. 변경 이력
+- 2026-03-05: `Baseline/Pressure/Finish`의 기술 상태 정의에 대응하는 플레이 체감 목적 연결 문단(`6.4.1`)을 추가해 GD-007과 경계를 명확히 했다.
 - 2026-03-04: Demo Shell S1 연동 완료 기준으로 임시 호출 주체(`RunDirectorStageTempFlowDriver`) 방침을 제거하고, 전이 책임을 Shell Owner 기준으로 갱신했다.
 - 2026-02-28: StageFlow/UI 미구현 구간 검증을 위해 임시 호출 주체(`RunDirectorStageTempFlowDriver`) 사용 방침을 추가했다.
 - 2026-02-28: `RunDirectorStageBridge` 런타임 계약(씬당 1개 소유권, 중복/싱글톤 미존재 시 `no-op + warning 1회`, one-shot set-only/소비 리셋, 완료 이벤트 프레임당 1회 가드, `Update` 단일 루프)을 추가했다.

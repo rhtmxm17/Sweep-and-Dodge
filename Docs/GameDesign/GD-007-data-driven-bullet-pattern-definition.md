@@ -4,7 +4,7 @@
 - doc_id: `GD-007`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-02-26`
+- last_updated: `2026-03-05`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -96,19 +96,22 @@ Stage 권장 Progress 배율:
 - 동일한 Sampling을 유지한 상태에서 Emission만 교체해 스테이지 리듬을 바꿀 수 있어야 한다.
 - MVP 구간에서는 데이터 과잉을 피하기 위해 Emission 모드를 최소 집합으로 유지한다.
 
-### 5.7 샘플 시나리오 성립 규약 (기획)
-- 샘플 시나리오는 아래 3구간 체감 전환을 목표로 한다.
-  - 초기: Hazard 밀도 기반 무작위 + 안전거리, Trash 밀도 기반 무작위
-  - Phase 전환: Hazard 나선형 + `0.2s` 간격 `3회` 원형 방사
-  - 전환 후: Hazard 밀도 기반 4방향 + 안전거리, 라인 등간격 Hazard 발사, Trash 스폰율 감소
-- “벽에서 발사” 연출은 별도 Wall 전용 모드 없이 `LineEven + Direction` 조합으로 표현한다.
-  - 벽에 평행/밀착한 스폰 라인을 배치하고, 방향(`Fixed` 또는 `NWay`)을 지정한다.
-- 프레임 예산은 탄종 공용으로 소비하며, Trash는 최하 우선순위로 처리한다.
-- EventBurst는 프레임 미소비 샷을 다음 프레임으로 이월(carry)하는 체감을 기본으로 한다.
+### 5.7 Source 강조 상태 체감 규칙
+- `Baseline`:
+  - 스테이지 기본 압력을 유지하는 상태다.
+  - 플레이어가 "지금은 정리 리듬을 유지하는 구간"으로 해석할 수 있어야 한다.
+- `Pressure`:
+  - 특정 Source가 전면으로 올라오는 상태다.
+  - 플레이어가 "지금은 이 Source를 우선 처리해야 한다"는 압박을 체감해야 한다.
+- `Finish`:
+  - Source 정리 완료 이후의 마무리 상태다.
+  - 플레이어가 "이 구역은 끝났고 다음 구역으로 넘어간다"는 전환 감각을 가져야 한다.
+- 상태 선정 알고리즘/가중치/타이브레이크/클립 전환 계약은 [TD-006](../TechnicalDesign/TD-006-run-progress-director-design.md)에서 관리한다.
 
 ## 6. 문서 경계
-- 필드 단위 스키마, 계산식, 검증 규칙, 런타임 반영 절차는 `TD-002`에서 관리한다.
-- SpawnDirective 분해 모델(Sampling/Emission/Payload)과 조합 규칙 상세는 `TD-003`에서 관리한다.
+- 필드 단위 스키마, 계산식, 검증 규칙, 런타임 반영 절차는 [TD-002](../TechnicalDesign/TD-002-pattern-wave-progress-runtime-contract.md)에서 관리한다.
+- SpawnDirective 분해 모델(Sampling/Emission/Payload)과 조합 규칙 상세는 [TD-003](../TechnicalDesign/TD-003-spawn-directive-model.md)에서 관리한다.
+- Source 강조 상태(`Baseline/Pressure/Finish`)의 전환 계약과 선정 규칙은 [TD-006](../TechnicalDesign/TD-006-run-progress-director-design.md)에서 관리한다.
 - 본 문서는 밸런싱 방향과 플레이 경험 의도를 고정하는 기준 문서로 유지한다.
 
 ## 7. 오픈 이슈
@@ -116,6 +119,7 @@ Stage 권장 Progress 배율:
 - PlayerRelative 피크 Stage에서 공정성(SpawnSkipRate01) 악화를 막는 가드 값 확정 필요
 
 ## 8. 변경 이력
+- 2026-03-05: 샘플 시나리오의 구현 계약(소비 정책/우선순위/연출 구현 방식) 문구를 축소하고, Source 강조 상태 체감 규칙(`Baseline/Pressure/Finish`)을 경험 언어로 보강했다.
 - 2026-02-26: 캠페인 시간 정의를 `OPS-001` 기준 문구(스테이지 2~3분, 무실패 캠페인 15~20분, 재도전 미포함)로 동기화
 - 2026-02-25: 샘플 시나리오 성립 기준(3구간 전환, `LineEven + Direction` 기반 벽 발사 표현, 공용 예산/Trash 최하 우선순위, EventBurst carry 체감)을 기획 규약으로 추가
 - 2026-02-23: 기존 `보강` 섹션의 SpawnDirective 상세를 `TD-003`으로 분리하고, 기획 원칙만 `5.6`에 흡수

@@ -4,8 +4,11 @@
 - doc_id: `GD-006`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-02-26`
-- related_adr: [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
+- last_updated: `2026-03-05`
+- related_adr:
+  - [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
+  - [ADR-20260219-03-player-cleanup-action-profile-so-externalization.md](../ADR/ADR-20260219-03-player-cleanup-action-profile-so-externalization.md)
+  - [ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md](../ADR/ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md)
 
 ## 0. 전제
 - 본 문서는 [`Source 기반 스폰 & 고갈 시스템`](GD-002-source-based-spawn-and-depletion.md)이 이미 적용된 상태를 전제로 한다.
@@ -67,7 +70,12 @@
 ### 4.2 이동/상호작용
 - Hazard는 기본적으로 Vacuum에 끌려오지 않는다.
 - 플레이어와 접촉하면 `GD-005` 규칙으로 피격 페널티가 발생한다.
-- 조건부 수거 성공 시 즉시 제거(또는 수거 상태 전환)되며 보상을 지급한다.
+- 조건부 수거 성공 결과는 CarryBin 상태에 따라 분기한다.
+  - `HazardCaptured` (`Load < Capacity`):
+    - 수거 + 보상 적용
+  - `HazardRemovedWhenCarryFull` (`Load == Capacity`):
+    - 제거 전용 처리(디스폰)
+    - Carry/Source 진행/HazardStack/`Collect` 미반영
 
 ---
 
@@ -99,14 +107,36 @@
 
 ---
 
+### 5.4 청소 액션 분기(경험 규칙)
+Hazard 조건부 수거는 단일 조작이 아니라, 상황에 맞는 "행동 선택" 경험을 포함한다.
+
+- 기본 액션 2종:
+  - `RadialRing`: 주변 안정 정리에 유리한 기본형
+  - `ForwardFanLine`: 전방 돌파/정밀 정리에 유리한 지향형
+- 슬롯 전환:
+  - 플레이어는 `Primary/Secondary` 슬롯을 통해 액션을 빠르게 전환한다.
+  - 의도는 "같은 위험 상황에서도 내 선택으로 대응 방식이 달라진다"는 체감을 주는 것이다.
+- 입력 소비 체감 규칙:
+  - 이미 Vacuum 동작이 진행 중일 때 들어온 전환 입력은 즉시 다음 행동으로 바뀌지 않는다.
+  - 즉, "한 번 켠 동작은 끝까지 수행하고 다음 선택은 다음 타이밍에 반영"되는 예측 가능한 리듬을 유지한다.
+- 기술 계약(슬롯 해석, Pending 적용 타이밍, 활성 중 입력 소비)은 [TD-012](../TechnicalDesign/TD-012-player-cleanup-action-runtime-contract.md)에서 관리한다.
+
+---
+
 ## 6. 보상/페널티 설계
 
 ### 6.1 보상(Reward)
-Hazard 수거의 보상은 "점수 증가"만으로는 부족하다. 아래 중 1~2개를 MVP에서 사용한다.
+Hazard 성공 결과는 `수거`와 `제거`를 분리한다.
 
-- CarryBin 즉시 증가: `hazardCarryGain` (Trash 다수 분량)
-- Source 고갈 진행 가속: `hazardDepletionBonus` (마무리 단축)
-- 짧은 버프: 일정 시간 Vacuum 효율 증가(선택)
+- `HazardCaptured` 보상형:
+  - 보상은 "점수 증가"만으로는 부족하며, 아래 중 1~2개를 MVP에서 사용한다.
+  - CarryBin 즉시 증가: `hazardCarryGain` (Trash 다수 분량)
+  - Source 고갈 진행 가속: `hazardDepletionBonus` (마무리 단축)
+  - 짧은 버프: 일정 시간 Vacuum 효율 증가(선택)
+
+- `HazardRemovedWhenCarryFull` 제거형:
+  - CarryBin/Source 진행/HazardStack/`Collect` 집계 보상은 없다.
+  - 목적은 Full 상태의 불쾌한 무효 행동을 줄이고, 위험탄 정리 체감만 제공하는 것이다.
 
 ▶ 의도: "지금 먹으면 흐름이 바뀐다"를 체감시키기
 
@@ -188,7 +218,9 @@ Hazard 수거의 보상은 "점수 증가"만으로는 부족하다. 아래 중 
 ### 9.2 Capture 타이밍 피드백
 - Vacuum ON 순간, 링 밴드가 짧게 표시되거나(약한 FX)
 - 짧은 "띵" 또는 "찰칵" 같은 입력 피드백 제공
-- 성공 시: 묵직한 흡수/정리 사운드 + 보상 UI 반응
+- 성공 시 결과별로 분리된 피드백을 사용한다.
+  - `HazardCaptured`: 묵직한 흡수/정리 사운드 + 보상 UI 반응
+  - `HazardRemovedWhenCarryFull`: 제거 전용 VFX/사운드 + 비보상 UI 반응
 
 ▶ 의도: "지금이 타이밍"을 즉시 알린다
 

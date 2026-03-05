@@ -11,3 +11,4 @@
 - [GD-002-source-based-spawn-and-depletion.md](GD-002-source-based-spawn-and-depletion.md): Source 기반 스폰/고갈
 - [GD-003-stage-cleaning-route-mvp.md](GD-003-stage-cleaning-route-mvp.md): 청소 동선/스폰 분포 MVP
 - [GD-007-data-driven-bullet-pattern-definition.md](GD-007-data-driven-bullet-pattern-definition.md): 데이터 주도 탄막 패턴 방향성 (의도/리듬/리스크-보상)
+- [GD-008-demo-flow-design.md](GD-008-demo-flow-design.md): 데모 외부 플레이 흐름(Title/Lobby/Stage/Result/Demo Complete)
