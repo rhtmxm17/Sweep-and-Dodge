@@ -147,6 +147,34 @@ namespace SweepNDodge.DotsBullets
 
                 var impulseBuffer = AddBuffer<PlayerImpulseEventBufferElement>(e);
                 impulseBuffer.EnsureCapacity(8);
+
+                AddComponent(e, new PlayerUiFeedbackPresentationSnapshotComponent
+                {
+                    Version = 0u,
+                    Type = PlayerUiFeedbackEventType.None,
+                    Reason = (byte)PlayerUiFeedbackReasonId.None,
+                    Value = 0,
+                    RelatedEntity = Entity.Null,
+                    Frame = 0u,
+                    RemainingSec = 0f,
+                    ClockSec = 0f,
+                    NextAllowedVacuumBlockedSec = 0f,
+                    NextAllowedSourceStateChangedSec = 0f,
+                    NextAllowedHazardCapturedSec = 0f,
+                    NextAllowedHazardRemovedSec = 0f,
+                    NextAllowedHitSec = 0f,
+                });
+
+                AddComponent(e, new PlayerImpulsePresentationSnapshotComponent
+                {
+                    Version = 0u,
+                    Reason = (byte)PlayerImpulseReasonId.None,
+                    DirX = 0f,
+                    DirZ = 0f,
+                    Magnitude = 0f,
+                    Frame = 0u,
+                    MergedEventCount = 0,
+                });
             }
 
             private static void BakeCleanupActionProfiles(

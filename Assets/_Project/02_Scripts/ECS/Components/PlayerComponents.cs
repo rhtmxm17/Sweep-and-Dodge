@@ -143,4 +143,32 @@ namespace SweepNDodge.DotsBullets
         public uint Frame;
         public uint Sequence;
     }
+
+    public struct PlayerUiFeedbackPresentationSnapshotComponent : IComponentData
+    {
+        public uint Version;
+        public PlayerUiFeedbackEventType Type;
+        public byte Reason;
+        public int Value;
+        public Entity RelatedEntity;
+        public uint Frame;
+        public float RemainingSec;
+        public float ClockSec;
+        public float NextAllowedVacuumBlockedSec;
+        public float NextAllowedSourceStateChangedSec;
+        public float NextAllowedHazardCapturedSec;
+        public float NextAllowedHazardRemovedSec;
+        public float NextAllowedHitSec;
+    }
+
+    public struct PlayerImpulsePresentationSnapshotComponent : IComponentData
+    {
+        public uint Version;
+        public byte Reason;
+        public float DirX;
+        public float DirZ;
+        public float Magnitude;
+        public uint Frame;
+        public int MergedEventCount;
+    }
 }

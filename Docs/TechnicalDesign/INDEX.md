@@ -15,3 +15,4 @@
 - [TD-010-demo-shell-flow-and-bridge-contract.md](TD-010-demo-shell-flow-and-bridge-contract.md): Demo Shell 화면 전이/브리지 단일 접점/씬 재진입(staging) 계약
 - [TD-011-runtime-player-hud-contract.md](TD-011-runtime-player-hud-contract.md): 플레이 HUD 스냅샷 writer/read-only 브리지, Source/Hit/Stage 표시 계약
 - [TD-012-player-cleanup-action-runtime-contract.md](TD-012-player-cleanup-action-runtime-contract.md): 플레이어 청소 액션 분기/슬롯 매핑/활성 중 입력 소비 계약
+- [TD-013-player-feedback-presentation-bridge-contract.md](TD-013-player-feedback-presentation-bridge-contract.md): S4 피드백 소비자 브리지(Animator/HUD feed/Impulse offset)와 dedupe/cooldown 계약

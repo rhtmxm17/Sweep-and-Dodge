@@ -27,6 +27,19 @@ namespace SweepNDodge.DotsBullets
         // Vacuum 상태 반영용 Animator (옵션)
         public Animator Animator;
         public string VacuumActiveBool = "VacuumActive";
+        public string HitReactTrigger = "HitReact";
+        public string VacuumBlockedTrigger = "VacuumBlocked";
+        public string HazardCapturedTrigger = "HazardCaptured";
+        public string HazardRemovedTrigger = "HazardRemoved";
+        public string SourceStateChangedTrigger = "SourceStateChanged";
+
+        [Header("Visual Impulse")]
+        public float ImpulseSpringFrequency = 18f;
+        [Range(0f, 2f)] public float ImpulseDampingRatio = 1f;
+        public float ImpulseVisualBase = 0.08f;
+        public float ImpulseVisualLossScale = 0.03f;
+        public float ImpulseVisualPerFrameMax = 0.20f;
+        public float ImpulseMaxOffset = 0.35f;
 
         private const float VacuumGizmoDuration = 0.2f;
         private const float VacuumGizmoRadius = 2.88f;
@@ -37,6 +50,11 @@ namespace SweepNDodge.DotsBullets
         private bool _hasPlayerEntity;
         private EntityQuery _replayQuery;
         private float _vacuumGizmoUntilTime;
+        private Vector3 _visualImpulseOffset;
+        private Vector3 _visualImpulseVelocity;
+        private uint _lastUiFeedbackVersion;
+        private uint _lastImpulseVersion;
+        private static bool _warnedAnimatorMissingGlobal;
 
         private void Awake()
         {
@@ -59,7 +77,8 @@ namespace SweepNDodge.DotsBullets
                 var intent = _em.GetComponentData<PlayerInputIntentComponent>(_playerEntity);
                 if (EnableLegacyTransformToEcsSync)
                 {
-                    sync.Position = transform.position;
+                    // 표현용 impulse 오프셋이 ECS 권한 위치에 역주입되지 않도록 분리한다.
+                    sync.Position = (Vector3)transform.position - _visualImpulseOffset;
                     sync.SyncRotation = (byte)(SyncRotation ? 1 : 0);
                     if (SyncRotation) sync.Rotation = transform.rotation;
                 }
@@ -79,10 +98,13 @@ namespace SweepNDodge.DotsBullets
                 _em.SetComponentData(_playerEntity, intent);
             }
 
+            // ECS -> GO : Impulse 시각 오프셋(표현 전용, ECS 소유권 미변경)
+            UpdateVisualImpulseOffset();
+
             // ECS -> GO : Vacuum 상태를 Animator에 반영(옵션)
             var presentSync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
             if (ApplyEcsPositionToTransform)
-                transform.position = presentSync.Position;
+                transform.position = (Vector3)presentSync.Position + _visualImpulseOffset;
             if (ApplyEcsRotationToTransform && presentSync.SyncRotation != 0)
                 transform.rotation = presentSync.Rotation;
 
@@ -90,6 +112,11 @@ namespace SweepNDodge.DotsBullets
             {
                 var v = _em.GetComponentData<VacuumRuntimeStateComponent>(_playerEntity);
                 Animator.SetBool(VacuumActiveBool, v.IsActive != 0);
+                ApplyAnimatorFeedbackTrigger();
+            }
+            else
+            {
+                WarnMissingAnimatorOnce();
             }
         }
 
@@ -137,6 +164,131 @@ namespace SweepNDodge.DotsBullets
         private bool IsReplayInputSuppressed()
         {
             return ReplayInputSuppressionUtility.IsLiveInputSuppressed(_em, _replayQuery);
+        }
+
+        private void UpdateVisualImpulseOffset()
+        {
+            if (!_em.HasComponent<PlayerImpulsePresentationSnapshotComponent>(_playerEntity))
+                return;
+
+            var snapshot = _em.GetComponentData<PlayerImpulsePresentationSnapshotComponent>(_playerEntity);
+            if (snapshot.Version != 0u && snapshot.Version != _lastImpulseVersion)
+            {
+                _lastImpulseVersion = snapshot.Version;
+                var dir = new Vector3(snapshot.DirX, 0f, snapshot.DirZ);
+                if (dir.sqrMagnitude > 1e-6f)
+                {
+                    dir.Normalize();
+                    int hitLoss = ResolveRecentHitLoss();
+                    float magnitude = ComputeVisualImpulseMagnitude(snapshot.Magnitude, hitLoss);
+                    _visualImpulseOffset += dir * magnitude;
+                    _visualImpulseOffset = Vector3.ClampMagnitude(_visualImpulseOffset, Mathf.Max(0.01f, ImpulseMaxOffset));
+                }
+            }
+
+            StepVisualImpulseSpring();
+        }
+
+        private void ApplyAnimatorFeedbackTrigger()
+        {
+            if (!_em.HasComponent<PlayerUiFeedbackPresentationSnapshotComponent>(_playerEntity))
+                return;
+
+            var snapshot = _em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(_playerEntity);
+            if (snapshot.Version == 0u || snapshot.Version == _lastUiFeedbackVersion)
+                return;
+
+            _lastUiFeedbackVersion = snapshot.Version;
+            string triggerName = ResolveTriggerName(snapshot.Type);
+            if (string.IsNullOrEmpty(triggerName))
+                return;
+
+            Animator.SetTrigger(triggerName);
+        }
+
+        private string ResolveTriggerName(PlayerUiFeedbackEventType eventType)
+        {
+            return eventType switch
+            {
+                PlayerUiFeedbackEventType.PlayerHazardHit => HitReactTrigger,
+                PlayerUiFeedbackEventType.VacuumStartBlocked => VacuumBlockedTrigger,
+                PlayerUiFeedbackEventType.HazardCaptured => HazardCapturedTrigger,
+                PlayerUiFeedbackEventType.HazardRemoved => HazardRemovedTrigger,
+                PlayerUiFeedbackEventType.SourceStateChanged => SourceStateChangedTrigger,
+                _ => null,
+            };
+        }
+
+        private void WarnMissingAnimatorOnce()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_warnedAnimatorMissingGlobal)
+                return;
+            _warnedAnimatorMissingGlobal = true;
+            Debug.LogWarning("[PlayerEcsBridge] Animator reference is missing. Animator feedback is skipped.");
+#endif
+        }
+
+        private int ResolveRecentHitLoss()
+        {
+            if (!_em.HasComponent<PlayerUiFeedbackPresentationSnapshotComponent>(_playerEntity))
+                return 0;
+
+            var uiSnapshot = _em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(_playerEntity);
+            if (uiSnapshot.Type != PlayerUiFeedbackEventType.PlayerHazardHit)
+                return 0;
+            if (uiSnapshot.RemainingSec <= 0f)
+                return 0;
+
+            return Mathf.Max(0, uiSnapshot.Value);
+        }
+
+        private float ComputeVisualImpulseMagnitude(float gameplayMagnitude, int hitLoss)
+        {
+            float safeGameplayMagnitude = Mathf.Max(0f, gameplayMagnitude);
+            float safeHitLoss = Mathf.Max(0f, hitLoss);
+            float gain = Mathf.Max(0f, ImpulseVisualBase + ImpulseVisualLossScale * Mathf.Log(1f + safeHitLoss));
+            float magnitude = safeGameplayMagnitude * gain;
+            return Mathf.Min(magnitude, Mathf.Max(0f, ImpulseVisualPerFrameMax));
+        }
+
+        private void StepVisualImpulseSpring()
+        {
+            float dt = Mathf.Max(0f, Time.deltaTime);
+            if (dt <= 0f)
+                return;
+
+            // 고주파 스프링 + 가변 frame dt에서의 수치 발산을 막기 위해 sub-step 적분한다.
+            int subSteps = Mathf.Clamp(Mathf.CeilToInt(dt / (1f / 120f)), 1, 8);
+            float subDt = dt / subSteps;
+
+            float angularFrequency = Mathf.Max(0.01f, ImpulseSpringFrequency);
+            float dampingRatio = Mathf.Clamp(ImpulseDampingRatio, 0f, 4f);
+            float spring = angularFrequency * angularFrequency;
+            float damping = 2f * dampingRatio * angularFrequency;
+
+            for (int i = 0; i < subSteps; i++)
+            {
+                Vector3 accel = (-spring * _visualImpulseOffset) - (damping * _visualImpulseVelocity);
+                _visualImpulseVelocity += accel * subDt;
+                _visualImpulseOffset += _visualImpulseVelocity * subDt;
+            }
+
+            float maxOffset = Mathf.Max(0.01f, ImpulseMaxOffset);
+            if (_visualImpulseOffset.sqrMagnitude > maxOffset * maxOffset)
+            {
+                Vector3 normal = _visualImpulseOffset.normalized;
+                _visualImpulseOffset = normal * maxOffset;
+                float outwardVelocity = Vector3.Dot(_visualImpulseVelocity, normal);
+                if (outwardVelocity > 0f)
+                    _visualImpulseVelocity -= normal * outwardVelocity;
+            }
+
+            if (_visualImpulseOffset.sqrMagnitude <= 1e-5f && _visualImpulseVelocity.sqrMagnitude <= 1e-4f)
+            {
+                _visualImpulseOffset = Vector3.zero;
+                _visualImpulseVelocity = Vector3.zero;
+            }
         }
     }
 }

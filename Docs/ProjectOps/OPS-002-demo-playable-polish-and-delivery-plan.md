@@ -15,6 +15,7 @@
   - [TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md](../TechnicalDesign/TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md)
   - [TD-010-demo-shell-flow-and-bridge-contract.md](../TechnicalDesign/TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-011-runtime-player-hud-contract.md](../TechnicalDesign/TD-011-runtime-player-hud-contract.md)
+  - [TD-013-player-feedback-presentation-bridge-contract.md](../TechnicalDesign/TD-013-player-feedback-presentation-bridge-contract.md)
   - [GD-001-campaign-loop-design.md](../GameDesign/GD-001-campaign-loop-design.md)
   - [GD-004-carrybin-load-and-deposit.md](../GameDesign/GD-004-carrybin-load-and-deposit.md)
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
@@ -56,7 +57,7 @@
 | S1 | Demo Shell Flow 연동 | 임시 호출자 제거 + `Title/Lobby/Result/Demo Complete` 전이 플로우 확정 | DONE | 2.5 | P0 |
 | S2 | 플레이 HUD | 디버그 HUD와 별개로 플레이어 HUD 최소 세트 확정 | DONE | 1.5 | P0 |
 | S3 | 결과/실패 UX | Clear/Fail 판정, `Next/Retry/Return`, `Demo Complete` 요약 지표/동선 확정 | DONE | 2.0 | P0 |
-| S4 | 이벤트 피드백 브리지 | `PlayerUiFeedback`/`Impulse`를 실제 UI/Animator/VFX 트리거로 연결 | WIP | 2.0 | P0 |
+| S4 | 이벤트 피드백 브리지 | `PlayerUiFeedback`/`Impulse`를 실제 UI/Animator/Impulse 표현으로 연결 | DONE | 2.0 | P0 |
 | S5 | 사운드 시스템 | BGM/SFX/UI 버스, 이벤트 라우팅, 볼륨 옵션 설계 | TODO | 2.0 | P0 |
 | S6 | 온보딩/가이드 | 첫 진입 30~60초 조작/목표 안내 설계 | TODO | 1.0 | P1 |
 | S7 | 데모 운영/릴리즈 게이트 | 빌드 체크리스트, 시연 모드, QA 체크리스트 확정 | TODO | 1.0 | P0 |
@@ -92,7 +93,7 @@
 4. `P0` 피드백 소비자 연결
 - `PlayerUiFeedbackConsumeSystem`, `PlayerImpulseConsumeSystem`을 로그 소비에서 표현 소비로 전환
 - Animator 파라미터 계약(예: `VacuumActive`, `HitReact`) 확정
-- 파티클 트리거 규칙(중복 억제/쿨다운) 확정
+- HUD feed/Impulse 오프셋 표현 규칙(중복 억제/쿨다운) 확정
 
 5. `P0` 사운드 계약
 - 버스 구조: `Master/BGM/SFX/UI`
@@ -127,7 +128,7 @@
 - TD 후속(권장):
   - `TD-010`: Demo Shell Flow/Presentation Contract
   - `TD-011`: Runtime Player HUD Contract
-  - `TD-012`: Audio Event Routing And Mixer Policy
+  - `TD-013`: Player Feedback Presentation Bridge Contract
 - GD 후속(권장):
   - `GD-008`: 데모 화면/전이 흐름 기준 문서로 유지
   - `GD-009`: Demo Onboarding And Result Copy/UX(필요 시 분리)
@@ -165,10 +166,15 @@
   - S2 HUD: StagePlay에서 Carry/Source/Hit/Stage 메타가 갱신된다
   - S2 HUD: Hit 이벤트 입력 시 플래시/손실값 표시 후 시간 경과로 소멸한다
   - S2 HUD: Debug HUD는 non-development 빌드에서 비노출이다
+  - S4 Feedback: UI 버퍼 소비 후 스냅샷 version 증가 + buffer clear
+  - S4 Feedback: 동일 `Frame+Type+RelatedEntity` dedupe, cooldown(`0.15s`, Hit `0.10s`)이 반영된다
+  - S4 Feedback: Impulse 다건 입력 시 단일 합산 snapshot 반영 + buffer clear
+  - S4 Feedback: Animator null-safe skip(개발 빌드 경고 1회)로 런타임이 유지된다
   - HUD/사운드 옵션 반영 확인
   - 운영 씬 정기 스모크 결과 기록
 
 ## 10. 변경 이력
+- 2026-03-05: S4 구현 반영. `TD-013`을 추가하고 피드백 소비를 snapshot writer로 전환했다. `PlayerEcsBridge` Animator trigger/impulse offset, `PlayerRuntimeHudBridge` feedback feed, dedupe/cooldown 규칙과 EditMode 테스트를 반영해 S4 상태를 `DONE`으로 갱신했다.
 - 2026-03-05: S3 완료 반영. Fail 트리거(`Timeout/GiveUp`), 단일 Result 분기(클리어 전용 Next), Demo Complete 코어 총합/clear 시도 누적 규칙을 코드/테스트 기준으로 고정했다.
 - 2026-03-05: S2 문서 마감. S2 상태를 `DONE`으로 전환하고 HUD 계약/검증 항목을 기준선으로 고정했다.
 - 2026-03-04: S2 설계 고정 반영. `TD-011`을 추가하고 플레이 HUD를 `OnGUI + ECS snapshot(writer 단일)` 계약으로 확정했다. Source/Hit/Stage 표시 규칙과 Debug HUD 노출 정책(Editor/Development 전용)을 문서에 반영했다.

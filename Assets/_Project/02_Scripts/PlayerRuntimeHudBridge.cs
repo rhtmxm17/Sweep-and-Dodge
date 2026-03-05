@@ -14,12 +14,14 @@ namespace SweepNDodge.DotsBullets
         [Header("HUD")]
         public bool ShowHud = true;
         public Rect HudRect = new Rect(12f, 332f, 420f, 188f);
+        public bool ShowFeedbackFeed = true;
 
         [Header("Stage Meta (Read-only)")]
         public DemoShellFlowController DemoShell;
 
         private EntityManager _em;
         private EntityQuery _snapshotQuery;
+        private EntityQuery _feedbackQuery;
         private bool _isBound;
         private bool _warnedBindFailure;
 
@@ -27,6 +29,9 @@ namespace SweepNDodge.DotsBullets
         private bool _hasSnapshot;
         private int _lastStageId;
         private DemoShellScreenId _lastScreen;
+        private PlayerUiFeedbackPresentationSnapshotComponent _lastFeedbackSnapshot;
+        private uint _lastFeedbackVersion;
+        private string _feedbackLine;
 
         public bool HasSnapshot => _hasSnapshot;
         public int LastStageId => _lastStageId;
@@ -58,6 +63,7 @@ namespace SweepNDodge.DotsBullets
 
             _lastSnapshot = _em.GetComponentData<PlayerHudSnapshotComponent>(snapshotEntity);
             _hasSnapshot = true;
+            UpdateFeedbackState();
 
             if (DemoShell != null)
             {
@@ -108,6 +114,14 @@ namespace SweepNDodge.DotsBullets
                 GUI.color = prevColor;
             }
 
+            if (ShowFeedbackFeed
+                && _lastFeedbackSnapshot.RemainingSec > 0f
+                && !string.IsNullOrEmpty(_feedbackLine))
+            {
+                GUILayout.Space(4f);
+                GUILayout.Label($"Feedback: {_feedbackLine}");
+            }
+
             GUILayout.EndArea();
         }
 
@@ -122,6 +136,9 @@ namespace SweepNDodge.DotsBullets
 
             _em = world.EntityManager;
             _snapshotQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<PlayerHudSnapshotComponent>());
+            _feedbackQuery = _em.CreateEntityQuery(
+                ComponentType.ReadOnly<PlayerTag>(),
+                ComponentType.ReadOnly<PlayerUiFeedbackPresentationSnapshotComponent>());
             _isBound = true;
             _warnedBindFailure = false;
             return true;
@@ -159,6 +176,46 @@ namespace SweepNDodge.DotsBullets
 
             using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
             return entities.Length > 0 ? entities[0] : Entity.Null;
+        }
+
+        private void UpdateFeedbackState()
+        {
+            var feedbackEntity = ResolveFirstEntity(_feedbackQuery);
+            if (feedbackEntity == Entity.Null)
+                return;
+            if (!_em.HasComponent<PlayerUiFeedbackPresentationSnapshotComponent>(feedbackEntity))
+                return;
+
+            _lastFeedbackSnapshot = _em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(feedbackEntity);
+            if (_lastFeedbackSnapshot.Version == 0u || _lastFeedbackSnapshot.Version == _lastFeedbackVersion)
+                return;
+
+            _lastFeedbackVersion = _lastFeedbackSnapshot.Version;
+            _feedbackLine = BuildFeedbackLine(_lastFeedbackSnapshot);
+        }
+
+        private static string BuildFeedbackLine(in PlayerUiFeedbackPresentationSnapshotComponent snapshot)
+        {
+            return snapshot.Type switch
+            {
+                PlayerUiFeedbackEventType.PlayerHazardHit => $"Hit -{Mathf.Max(0, snapshot.Value)}",
+                PlayerUiFeedbackEventType.HazardCaptured => "Hazard Captured",
+                PlayerUiFeedbackEventType.HazardRemoved => "Hazard Removed (Carry Full)",
+                PlayerUiFeedbackEventType.SourceStateChanged => snapshot.Reason switch
+                {
+                    (byte)PlayerUiFeedbackReasonId.SourceToWeakened => "Source State: Weakened",
+                    (byte)PlayerUiFeedbackReasonId.SourceToDepleted => "Source State: Depleted",
+                    _ => "Source State Changed",
+                },
+                PlayerUiFeedbackEventType.VacuumStartBlocked => snapshot.Reason switch
+                {
+                    (byte)PlayerUiFeedbackReasonId.CarryBinFull => "Vacuum: CarryBin Full",
+                    (byte)PlayerUiFeedbackReasonId.VacuumLocked => "Vacuum: Locked",
+                    (byte)PlayerUiFeedbackReasonId.CooldownActive => "Vacuum: Cooldown",
+                    _ => "Vacuum Start Blocked",
+                },
+                _ => string.Empty,
+            };
         }
 
         private static string ToStageStateLabel(RunDirectorStageStateId state)

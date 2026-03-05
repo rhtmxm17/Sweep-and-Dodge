@@ -505,6 +505,55 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardCollision_IFrame_BlocksAdditionalHit_AndKeepsSingleHitPerFrame()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("HazardCollisionIFrameWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(em, carryLoad: 20, carryCapacity: 100, out var playerEntity);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                var sourceEntity = CreateVacuumContractSource(em);
+                var hazardA = CreateHazardCollisionBullet(em, new float3(0.15f, 0f, 0f), sourceEntity);
+                var hazardB = CreateHazardCollisionBullet(em, new float3(-0.15f, 0f, 0f), sourceEntity);
+
+                StepSimulationFrame(world, simGroup, ref elapsed); // first hit
+
+                var firstMetrics = em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>())
+                    .GetSingleton<CombatEventMetricsComponent>();
+                Assert.That(firstMetrics.TotalHitCount, Is.EqualTo(1), "동일 프레임 다건 겹침에서도 hit는 1회만 확정되어야 한다.");
+                Assert.That(firstMetrics.LastFrameHitCount, Is.EqualTo(1));
+
+                var impulseBuffer = em.GetBuffer<PlayerImpulseEventBufferElement>(playerEntity);
+                Assert.That(impulseBuffer.Length, Is.EqualTo(1), "동일 프레임 다건 충돌 입력에서도 impulse 이벤트는 1건이어야 한다.");
+                int activeAfterFirstHit = (em.IsComponentEnabled<BulletActiveTag>(hazardA) ? 1 : 0)
+                    + (em.IsComponentEnabled<BulletActiveTag>(hazardB) ? 1 : 0);
+                Assert.That(activeAfterFirstHit, Is.EqualTo(1), "첫 hit 프레임에서는 두 hazard 중 1개만 비활성화되어야 한다.");
+
+                var penaltyState = em.GetComponentData<PlayerHazardPenaltyStateComponent>(playerEntity);
+                Assert.That(penaltyState.IFrameTimer, Is.GreaterThan(0f), "첫 hit 이후 iFrame이 시작되어야 한다.");
+
+                StepSimulationFrame(world, simGroup, ref elapsed); // iFrame frame
+
+                var secondMetrics = em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>())
+                    .GetSingleton<CombatEventMetricsComponent>();
+                Assert.That(secondMetrics.TotalHitCount, Is.EqualTo(1), "iFrame 동안 추가 hit 누적은 제외되어야 한다.");
+                Assert.That(secondMetrics.LastFrameHitCount, Is.EqualTo(0), "iFrame frame에는 신규 hit가 없어야 한다.");
+                Assert.That(impulseBuffer.Length, Is.EqualTo(1), "iFrame 동안 impulse 추가 누적이 발생하면 안 된다.");
+                int activeAfterIFrame = (em.IsComponentEnabled<BulletActiveTag>(hazardA) ? 1 : 0)
+                    + (em.IsComponentEnabled<BulletActiveTag>(hazardB) ? 1 : 0);
+                Assert.That(activeAfterIFrame, Is.EqualTo(1), "iFrame frame에서 남은 hazard가 추가로 제거되면 안 된다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnRequestBuild_MergesByDirectiveId_AndSeparatesDifferentDirective()
         {
             try
@@ -3522,6 +3571,32 @@ namespace SweepNDodge.DotsBullets.Tests
             uiBuffer.EnsureCapacity(64);
             var impulseBuffer = em.AddBuffer<PlayerImpulseEventBufferElement>(player);
             impulseBuffer.EnsureCapacity(16);
+            em.AddComponentData(player, new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 0u,
+                Type = PlayerUiFeedbackEventType.None,
+                Reason = (byte)PlayerUiFeedbackReasonId.None,
+                Value = 0,
+                RelatedEntity = Entity.Null,
+                Frame = 0u,
+                RemainingSec = 0f,
+                ClockSec = 0f,
+                NextAllowedVacuumBlockedSec = 0f,
+                NextAllowedSourceStateChangedSec = 0f,
+                NextAllowedHazardCapturedSec = 0f,
+                NextAllowedHazardRemovedSec = 0f,
+                NextAllowedHitSec = 0f,
+            });
+            em.AddComponentData(player, new PlayerImpulsePresentationSnapshotComponent
+            {
+                Version = 0u,
+                Reason = (byte)PlayerImpulseReasonId.None,
+                DirX = 0f,
+                DirZ = 0f,
+                Magnitude = 0f,
+                Frame = 0u,
+                MergedEventCount = 0,
+            });
 
             return player;
         }
@@ -3568,6 +3643,21 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(bullet, new BulletCaptureRuleComponent { Value = captureRule });
             em.SetComponentEnabled<BulletActiveTag>(bullet, true);
             em.SetComponentEnabled<BulletDespawnRequestTag>(bullet, false);
+            return bullet;
+        }
+
+        private static Entity CreateHazardCollisionBullet(EntityManager em, float3 position, Entity sourceEntity)
+        {
+            var bullet = CreateVacuumContractBullet(
+                em,
+                position: position,
+                captureRule: BulletCaptureRuleId.RiskTimedResolve,
+                scoreValue: 1,
+                sourceEntity: sourceEntity);
+
+            if (!em.HasComponent<BulletHazardTag>(bullet))
+                em.AddComponent<BulletHazardTag>(bullet);
+            em.SetComponentEnabled<BulletHazardTag>(bullet, true);
             return bullet;
         }
 
