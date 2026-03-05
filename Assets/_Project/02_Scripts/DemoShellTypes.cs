@@ -19,11 +19,39 @@ namespace SweepNDodge.DotsBullets
         ReturnToLobby = 2,
     }
 
+    public enum DemoShellStageOutcomeId : byte
+    {
+        Clear = 0,
+        Fail = 1,
+    }
+
     [Serializable]
     public struct DemoShellStageProfile
     {
         [Min(1)] public int StageId;
         public string DisplayName;
         public bool IsFinalStage;
+        [Min(0f)] public float StageTimeLimitSec;
+    }
+
+    [Serializable]
+    public struct DemoShellStageResultMetrics
+    {
+        [Min(1)] public int StageId;
+        public DemoShellStageOutcomeId Outcome;
+        [Min(0f)] public float ElapsedSec;
+        public int CollectValue;
+        public int CleanupValue;
+        public int HitValue;
+    }
+
+    [Serializable]
+    public struct DemoShellSessionMetrics
+    {
+        [Min(0f)] public float TotalElapsedSec;
+        public int TotalCollectValue;
+        public int TotalCleanupValue;
+        public int TotalHitValue;
+        public int ClearedStageCount;
     }
 }

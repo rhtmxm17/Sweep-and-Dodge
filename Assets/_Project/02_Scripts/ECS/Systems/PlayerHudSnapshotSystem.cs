@@ -94,6 +94,9 @@ namespace SweepNDodge.DotsBullets
 
             snapshot.StageState = stage.State;
             snapshot.StageStateElapsedSec = math.max(0f, stage.StateElapsedSec);
+            snapshot.TotalCollectValue = SaturateToNonNegativeInt(combat.TotalCollectValue);
+            snapshot.TotalCleanupValue = SaturateToNonNegativeInt(combat.TotalCleanupValue);
+            snapshot.TotalHitValue = SaturateToNonNegativeInt(combat.TotalHitValue);
 
             if (combat.LastFrameHitCount > 0)
             {
@@ -107,6 +110,15 @@ namespace SweepNDodge.DotsBullets
 
             snapshot.LastUpdatedFrame = frame;
             snapshotRW.ValueRW = snapshot;
+        }
+
+        private static int SaturateToNonNegativeInt(long value)
+        {
+            if (value <= 0)
+                return 0;
+            if (value >= int.MaxValue)
+                return int.MaxValue;
+            return (int)value;
         }
     }
 }

@@ -4,7 +4,7 @@
 - doc_id: `GD-008`
 - type: `GameDesign`
 - status: `draft`
-- last_updated: `2026-03-04`
+- last_updated: `2026-03-05`
 - related_docs:
   - [GD-001-campaign-loop-design.md](./GD-001-campaign-loop-design.md)
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -38,8 +38,8 @@
 | --- | --- | --- |
 | Title | 시작 진입점 | 아무 키 입력으로 로비 진입 |
 | Simple Lobby | 스테이지 선택 허브 | Stage 1~3 선택, Quit |
-| Stage Play | 실제 플레이 구간 | 클리어/실패 발생 |
-| Stage Result | 결과 확인 및 다음 선택 | Next Stage, Retry, Return to Lobby |
+| Stage Play | 실제 플레이 구간 | 클리어/실패 발생, Give Up |
+| Stage Result | 결과 확인 및 다음 선택 | Clear: Next/Retry/Return, Fail: Retry/Return |
 | Demo Complete | 데모 종료 경험 | Restart Demo, Return to Lobby, Quit |
 
 ## 6. 기본 흐름
@@ -64,13 +64,21 @@ Stage3 Result (Next Stage)
 ### 7.1 Stage Result 선택지
 | 선택 | 전이 |
 | --- | --- |
-| Next Stage | 다음 번호 스테이지 진입 (`Stage1 -> Stage2 -> Stage3`) |
+| Next Stage | 클리어 결과에서만 다음 번호 스테이지 진입 (`Stage1 -> Stage2 -> Stage3`) |
 | Retry | 동일 스테이지 즉시 재시작 |
 | Return to Lobby | `Simple Lobby` 복귀 |
 
 ### 7.2 마지막 스테이지 처리
 - `Stage3`에서 `Next Stage`를 선택하면 `Demo Complete`로 전이한다.
 - `Demo Complete`의 `Restart Demo`와 `Return to Lobby`는 모두 `Simple Lobby`로 이동한다.
+
+### 7.3 실패 진입 규칙
+- `Stage Play`에서 `Timeout` 또는 `Give Up`으로 `Stage Result(Fail)`에 진입한다.
+- `Stage Result(Fail)`에서는 `Next Stage`를 제공하지 않는다.
+
+### 7.4 Demo Complete 요약 지표
+- 요약 지표는 코어 총합(`시간/수집/정리/피격`)만 표시한다.
+- 집계 범위는 데모 세션 내 **클리어 시도만** 누적한다.
 
 ## 8. 대표 플레이 시나리오
 ### 8.1 순차 플레이
@@ -97,9 +105,9 @@ Title -> Lobby -> Stage2 -> Result -> Retry (반복) -> Lobby
 - 구현 세부가 바뀌어도 `화면 역할`과 `전이 규칙`은 본 문서를 기준으로 유지한다.
 
 ## 11. 오픈 이슈
-- `Next Stage` 버튼 노출 조건(클리어 전용 여부) 최종 확정 필요
-- `Demo Complete`에서 노출할 요약 지표(클리어 시간, 피격 수) 범위 결정 필요
+- 없음 (2026-03-05 기준 S3 결정 반영 완료)
 
 ## 12. 변경 이력
+- 2026-03-05: S3 결정 반영. Fail 진입(`Timeout/GiveUp`), Result 버튼 분기(클리어 전용 Next), Demo Complete 코어 총합/클리어 시도 누적 규칙을 확정했다.
 - 2026-03-04: 템플릿 기준으로 섹션/헤더/표현을 재정렬
 - 2026-03-04: 기술 구현 상세를 축소하고 경험 설계 중심으로 재작성

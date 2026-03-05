@@ -6,7 +6,7 @@
 - doc_id: `OPS-002`
 - type: `ProjectOps`
 - status: `draft`
-- last_updated: `2026-03-04`
+- last_updated: `2026-03-05`
 - related_docs:
   - [OPS-001-prototype-core-capability-priority-matrix.md](./OPS-001-prototype-core-capability-priority-matrix.md)
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
@@ -54,8 +54,8 @@
 | ID | 스트림 | 목표 | 현재 상태 | 예상 공수(일) | 우선순위 |
 |---|---|---|---|---:|---|
 | S1 | Demo Shell Flow 연동 | 임시 호출자 제거 + `Title/Lobby/Result/Demo Complete` 전이 플로우 확정 | DONE | 2.5 | P0 |
-| S2 | 플레이 HUD | 디버그 HUD와 별개로 플레이어 HUD 최소 세트 확정 | WIP(설계 고정) | 1.5 | P0 |
-| S3 | 결과/실패 UX | Clear/Fail 판정, `Next/Retry/Return`, `Demo Complete` 요약 지표/동선 확정 | TODO | 2.0 | P0 |
+| S2 | 플레이 HUD | 디버그 HUD와 별개로 플레이어 HUD 최소 세트 확정 | DONE | 1.5 | P0 |
+| S3 | 결과/실패 UX | Clear/Fail 판정, `Next/Retry/Return`, `Demo Complete` 요약 지표/동선 확정 | DONE | 2.0 | P0 |
 | S4 | 이벤트 피드백 브리지 | `PlayerUiFeedback`/`Impulse`를 실제 UI/Animator/VFX 트리거로 연결 | WIP | 2.0 | P0 |
 | S5 | 사운드 시스템 | BGM/SFX/UI 버스, 이벤트 라우팅, 볼륨 옵션 설계 | TODO | 2.0 | P0 |
 | S6 | 온보딩/가이드 | 첫 진입 30~60초 조작/목표 안내 설계 | TODO | 1.0 | P1 |
@@ -82,10 +82,12 @@
 - Debug HUD 노출 고정: `UNITY_EDITOR/DEVELOPMENT_BUILD` 전용
 
 3. `P0` 결과/실패 루프
-- Fail 조건(피격 누적, 타임아웃 등) 확정
-- Result 지표 세트(시간, 수집, 정리, 피격, 등급) 확정
-- `Next Stage`, `Retry`, `Return to Lobby` 선택지 동작 고정
-- `Demo Complete` 요약 지표 범위와 버튼 노출 조건 확정
+- Fail 트리거: `Timeout + StagePlay GiveUp`으로 고정
+- Timeout 설정: `StageProfile` per-stage(`Stage1=150s`, `Stage2=180s`, `Stage3=210s`)
+- Result UX: 단일 `StageResult` 화면 유지, `Fail`에서는 `Retry/Return`만 허용(`Next` 비노출/거부)
+- Result 지표: `시간/수집/정리/피격` 코어 세트로 고정
+- Demo Complete 요약: 코어 총합(`시간/수집/정리/피격`)만 노출
+- Demo Complete 집계: **성공(clear) 시도만 누적**, fail/retry 실패 시도 제외
 
 4. `P0` 피드백 소비자 연결
 - `PlayerUiFeedbackConsumeSystem`, `PlayerImpulseConsumeSystem`을 로그 소비에서 표현 소비로 전환
@@ -157,6 +159,9 @@
   - 단일 반복 플레이: `Lobby -> StageN -> Result -> Retry(반복) -> Lobby`
   - `Stage3` 결과의 `Next Stage`가 `Demo Complete`로 정확히 연결
   - `Retry` 즉시 재진입
+  - S3 Result: `Timeout`/`GiveUp`으로 `StageResult(Fail)` 진입
+  - S3 Result: Fail에서 `Retry/Return` 동작, `Next` 거부
+  - S3 Result: `Stage1->2->3` 클리어 후 Demo Complete 총합이 clear 시도만 누적됨
   - S2 HUD: StagePlay에서 Carry/Source/Hit/Stage 메타가 갱신된다
   - S2 HUD: Hit 이벤트 입력 시 플래시/손실값 표시 후 시간 경과로 소멸한다
   - S2 HUD: Debug HUD는 non-development 빌드에서 비노출이다
@@ -164,6 +169,8 @@
   - 운영 씬 정기 스모크 결과 기록
 
 ## 10. 변경 이력
+- 2026-03-05: S3 완료 반영. Fail 트리거(`Timeout/GiveUp`), 단일 Result 분기(클리어 전용 Next), Demo Complete 코어 총합/clear 시도 누적 규칙을 코드/테스트 기준으로 고정했다.
+- 2026-03-05: S2 문서 마감. S2 상태를 `DONE`으로 전환하고 HUD 계약/검증 항목을 기준선으로 고정했다.
 - 2026-03-04: S2 설계 고정 반영. `TD-011`을 추가하고 플레이 HUD를 `OnGUI + ECS snapshot(writer 단일)` 계약으로 확정했다. Source/Hit/Stage 표시 규칙과 Debug HUD 노출 정책(Editor/Development 전용)을 문서에 반영했다.
 - 2026-03-04: S1 구현 반영. `RunDirectorStageTempFlowDriver` 제거, Demo Shell 전이 계약(`TD-010`) 추가, 운영/테스트 씬 SubScene 분리 기준을 확정했다.
 - 2026-03-04: GD-008 반영. 범위를 단일 런 중심에서 `Title/Lobby/3스테이지/Demo Complete` 데모 셸 플로우 기준으로 확장했다.

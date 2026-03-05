@@ -306,6 +306,9 @@ namespace SweepNDodge.DotsBullets
                     StageStateElapsedSec = 0f,
                     LastHitLossValue = 0,
                     HitFlashRemainingSec = 0f,
+                    TotalCollectValue = 0,
+                    TotalCleanupValue = 0,
+                    TotalHitValue = 0,
                     LastUpdatedFrame = 0u,
                 });
             }

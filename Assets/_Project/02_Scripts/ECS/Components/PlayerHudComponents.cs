@@ -22,6 +22,10 @@ namespace SweepNDodge.DotsBullets
         public int LastHitLossValue;
         public float HitFlashRemainingSec;
 
+        public int TotalCollectValue;
+        public int TotalCleanupValue;
+        public int TotalHitValue;
+
         public uint LastUpdatedFrame;
     }
 }

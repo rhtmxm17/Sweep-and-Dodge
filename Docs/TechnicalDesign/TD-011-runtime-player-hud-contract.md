@@ -4,7 +4,7 @@
 - doc_id: `TD-011`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-04`
+- last_updated: `2026-03-05`
 - related_docs:
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
@@ -119,4 +119,5 @@
 - 따라서 ADR 신규 작성은 생략한다.
 
 ## 9. 변경 이력
+- 2026-03-05: OPS-002 S2 문서 마감 반영. 진행 상태/검증 기준과 일치하도록 최신화했다.
 - 2026-03-04: 문서 신규 작성. S2 플레이 HUD 계약(`OnGUI + ECS snapshot`), Stage 메타 read-only 공급, Debug HUD 빌드 노출 정책을 고정했다.

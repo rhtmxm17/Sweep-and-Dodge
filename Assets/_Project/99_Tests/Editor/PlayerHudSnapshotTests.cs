@@ -15,7 +15,13 @@ namespace SweepNDodge.DotsBullets.Tests
             CreatePlayer(em, load: 47, capacity: 300);
             CreateSnapshotSingleton(em);
             CreateStageStateSingleton(em, RunDirectorStageStateId.Running, 3.5f);
-            CreateCombatMetricsSingleton(em, hitCount: 1, hitValue: 12);
+            CreateCombatMetricsSingleton(
+                em,
+                hitCount: 1,
+                hitValue: 12,
+                totalCollectValue: 101,
+                totalCleanupValue: 34,
+                totalHitValue: 19);
 
             CreateSource(em, stableId: 9u, state: SourceStateId.Normal, directorState: RunDirectorSourceStateId.Pressure, collected: 4, thresholdDepleted: 80);
             CreateSource(em, stableId: 3u, state: SourceStateId.Normal, directorState: RunDirectorSourceStateId.Pressure, collected: 9, thresholdDepleted: 0);
@@ -35,6 +41,9 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(snapshot.StageState, Is.EqualTo(RunDirectorStageStateId.Running));
             Assert.That(snapshot.LastHitLossValue, Is.EqualTo(12));
             Assert.That(snapshot.HitFlashRemainingSec, Is.EqualTo(0.6f).Within(1e-6f));
+            Assert.That(snapshot.TotalCollectValue, Is.EqualTo(101));
+            Assert.That(snapshot.TotalCleanupValue, Is.EqualTo(34));
+            Assert.That(snapshot.TotalHitValue, Is.EqualTo(19));
             Assert.That(snapshot.LastUpdatedFrame, Is.GreaterThan(0u));
         }
 
@@ -47,19 +56,31 @@ namespace SweepNDodge.DotsBullets.Tests
             CreatePlayer(em, load: 10, capacity: 100);
             CreateSnapshotSingleton(em);
             CreateStageStateSingleton(em, RunDirectorStageStateId.Running, 0f);
-            CreateCombatMetricsSingleton(em, hitCount: 1, hitValue: 7);
+            CreateCombatMetricsSingleton(
+                em,
+                hitCount: 1,
+                hitValue: 7,
+                totalCollectValue: 5,
+                totalCleanupValue: 6,
+                totalHitValue: 7);
             CreateSource(em, stableId: 1u, state: SourceStateId.Normal, directorState: RunDirectorSourceStateId.Pressure, collected: 1, thresholdDepleted: 10);
 
             TickWorld(world, simGroup, 1f / 60f);
             var snapshotAfterHit = GetSingleton<PlayerHudSnapshotComponent>(em);
             Assert.That(snapshotAfterHit.HitFlashRemainingSec, Is.EqualTo(0.6f).Within(1e-6f));
             Assert.That(snapshotAfterHit.LastHitLossValue, Is.EqualTo(7));
+            Assert.That(snapshotAfterHit.TotalCollectValue, Is.EqualTo(5));
+            Assert.That(snapshotAfterHit.TotalCleanupValue, Is.EqualTo(6));
+            Assert.That(snapshotAfterHit.TotalHitValue, Is.EqualTo(7));
 
             var metricsEntity = GetSingletonEntity<CombatEventMetricsComponent>(em);
             em.SetComponentData(metricsEntity, new CombatEventMetricsComponent
             {
                 LastFrameHitCount = 0,
                 LastFrameHitValue = 0,
+                TotalCollectValue = 5,
+                TotalCleanupValue = 6,
+                TotalHitValue = 7,
             });
 
             for (int i = 0; i < 45; i++)
@@ -68,6 +89,9 @@ namespace SweepNDodge.DotsBullets.Tests
             var snapshotAfterDecay = GetSingleton<PlayerHudSnapshotComponent>(em);
             Assert.That(snapshotAfterDecay.HitFlashRemainingSec, Is.EqualTo(0f).Within(1e-4f));
             Assert.That(snapshotAfterDecay.LastHitLossValue, Is.EqualTo(7));
+            Assert.That(snapshotAfterDecay.TotalCollectValue, Is.EqualTo(5));
+            Assert.That(snapshotAfterDecay.TotalCleanupValue, Is.EqualTo(6));
+            Assert.That(snapshotAfterDecay.TotalHitValue, Is.EqualTo(7));
         }
 
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
@@ -115,13 +139,22 @@ namespace SweepNDodge.DotsBullets.Tests
             });
         }
 
-        private static void CreateCombatMetricsSingleton(EntityManager em, int hitCount, int hitValue)
+        private static void CreateCombatMetricsSingleton(
+            EntityManager em,
+            int hitCount,
+            int hitValue,
+            long totalCollectValue,
+            long totalCleanupValue,
+            long totalHitValue)
         {
             var entity = em.CreateEntity(typeof(CombatEventMetricsComponent));
             em.SetComponentData(entity, new CombatEventMetricsComponent
             {
                 LastFrameHitCount = hitCount,
                 LastFrameHitValue = hitValue,
+                TotalCollectValue = totalCollectValue,
+                TotalCleanupValue = totalCleanupValue,
+                TotalHitValue = totalHitValue,
             });
         }
 

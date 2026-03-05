@@ -373,6 +373,318 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_Timeout_EntersFailResult_AndRetryReenters()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
+
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Demo shell did not transition to Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                },
+                240,
+                "Demo shell did not enter StagePlay.");
+
+            var profiles = shell.StageProfiles;
+            profiles[0].StageTimeLimitSec = 0.05f;
+            shell.StageProfiles = profiles;
+            ForceStageStateToRunning(em, elapsedSec: 0.06f);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Fail;
+                },
+                240,
+                "Stage timeout did not transition to Fail result.");
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.False, "Fail result must reject NextStage.");
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.Retry), Is.True);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1;
+                },
+                360,
+                "Fail Retry did not re-enter same stage.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_GiveUp_EntersFailResult_AndReturnLobby()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Demo shell did not transition to Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                },
+                240,
+                "Demo shell did not enter StagePlay.");
+
+            Assert.That(shell.RequestGiveUp(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Fail;
+                },
+                240,
+                "Give Up did not transition to Fail result.");
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.ReturnToLobby), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                360,
+                "Fail ReturnToLobby did not transition to Lobby.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_DemoCompleteSessionMetrics_AccumulatesClearOnly()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Demo shell did not transition to Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                },
+                240,
+                "Demo shell did not enter StagePlay.");
+
+            // 실패 시도 1회는 세션 합계에서 제외되어야 한다.
+            Assert.That(shell.RequestGiveUp(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Fail;
+                },
+                240,
+                "Give Up did not transition to Fail result.");
+
+            Assert.That(DemoShellSessionStaging.TryGetSessionMetrics(out var metricsAfterFail), Is.True);
+            Assert.That(metricsAfterFail.ClearedStageCount, Is.EqualTo(0), "Fail attempt must not be accumulated.");
+            Assert.That(metricsAfterFail.TotalCollectValue, Is.EqualTo(0));
+            Assert.That(metricsAfterFail.TotalCleanupValue, Is.EqualTo(0));
+            Assert.That(metricsAfterFail.TotalHitValue, Is.EqualTo(0));
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.Retry), Is.True);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1;
+                },
+                360,
+                "Retry after fail did not re-enter Stage1.");
+
+            // Stage1 clear
+            SetCombatTotals(em, totalCollect: 10, totalCleanup: 5, totalHit: 1);
+            yield return null;
+            yield return null;
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Clear;
+                },
+                240,
+                "Stage1 did not enter Clear result.");
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 2;
+                },
+                360,
+                "Did not enter Stage2 after Stage1 Next.");
+            world = World.DefaultGameObjectInjectionWorld;
+            em = world.EntityManager;
+
+            // Stage2 clear
+            SetCombatTotals(em, totalCollect: 20, totalCleanup: 8, totalHit: 2);
+            yield return null;
+            yield return null;
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Clear;
+                },
+                240,
+                "Stage2 did not enter Clear result.");
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 3;
+                },
+                360,
+                "Did not enter Stage3 after Stage2 Next.");
+            world = World.DefaultGameObjectInjectionWorld;
+            em = world.EntityManager;
+
+            // Stage3 clear -> DemoComplete
+            SetCombatTotals(em, totalCollect: 30, totalCleanup: 12, totalHit: 3);
+            yield return null;
+            yield return null;
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Clear;
+                },
+                240,
+                "Stage3 did not enter Clear result.");
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.DemoComplete;
+                },
+                360,
+                "Stage3 NextStage did not transition to DemoComplete.");
+
+            Assert.That(DemoShellSessionStaging.TryGetSessionMetrics(out var metrics), Is.True);
+            Assert.That(metrics.ClearedStageCount, Is.EqualTo(3));
+            Assert.That(metrics.TotalCollectValue, Is.GreaterThanOrEqualTo(0));
+            Assert.That(metrics.TotalCleanupValue, Is.GreaterThanOrEqualTo(0));
+            Assert.That(metrics.TotalHitValue, Is.GreaterThanOrEqualTo(0));
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_PlayerHud_ReflectsSnapshotAndShellMeta()
         {
             ClearDemoShellStaging();
@@ -781,6 +1093,30 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(requestEntity, request);
         }
 
+        private static void ForceStageStateToRunning(EntityManager em, float elapsedSec)
+        {
+            var stageEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
+            var stage = em.GetComponentData<RunDirectorStageStateComponent>(stageEntity);
+            stage.State = RunDirectorStageStateId.Running;
+            stage.StateElapsedSec = Mathf.Max(0f, elapsedSec);
+            stage.LastTransitionReason = RunDirectorStageTransitionReasonId.StartRequested;
+            em.SetComponentData(stageEntity, stage);
+        }
+
+        private static void SetCombatTotals(EntityManager em, long totalCollect, long totalCleanup, long totalHit)
+        {
+            using var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
+                ComponentType.ReadWrite<CombatEventMetricsComponent>(),
+                ComponentType.ReadWrite<CombatEventBufferElement>());
+            var channelEntity = query.GetSingletonEntity();
+            var metrics = em.GetComponentData<CombatEventMetricsComponent>(channelEntity);
+            metrics.TotalCollectValue = totalCollect;
+            metrics.TotalCleanupValue = totalCleanup;
+            metrics.TotalHitValue = totalHit;
+            em.SetComponentData(channelEntity, metrics);
+        }
+
         private static DemoShellFlowController FindDemoShell()
         {
 #if UNITY_2023_1_OR_NEWER
@@ -804,6 +1140,8 @@ namespace SweepNDodge.DotsBullets.Tests
             while (DemoShellSessionStaging.TryConsume(out _))
             {
             }
+
+            DemoShellSessionStaging.ResetSessionMetrics();
         }
 
     }

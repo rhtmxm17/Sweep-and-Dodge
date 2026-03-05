@@ -11,6 +11,10 @@ namespace SweepNDodge.DotsBullets
     [RequireComponent(typeof(RunDirectorStageBridge))]
     public sealed class DemoShellFlowController : MonoBehaviour
     {
+        private const float DefaultStage1TimeLimitSec = 150f;
+        private const float DefaultStage2TimeLimitSec = 180f;
+        private const float DefaultStage3TimeLimitSec = 210f;
+
         [Header("References")]
         public RunDirectorStageBridge StageBridge;
 
@@ -24,9 +28,9 @@ namespace SweepNDodge.DotsBullets
         [Header("Stage Profiles")]
         public DemoShellStageProfile[] StageProfiles =
         {
-            new DemoShellStageProfile { StageId = 1, DisplayName = "Stage 1", IsFinalStage = false },
-            new DemoShellStageProfile { StageId = 2, DisplayName = "Stage 2", IsFinalStage = false },
-            new DemoShellStageProfile { StageId = 3, DisplayName = "Stage 3", IsFinalStage = true },
+            new DemoShellStageProfile { StageId = 1, DisplayName = "Stage 1", IsFinalStage = false, StageTimeLimitSec = DefaultStage1TimeLimitSec },
+            new DemoShellStageProfile { StageId = 2, DisplayName = "Stage 2", IsFinalStage = false, StageTimeLimitSec = DefaultStage2TimeLimitSec },
+            new DemoShellStageProfile { StageId = 3, DisplayName = "Stage 3", IsFinalStage = true, StageTimeLimitSec = DefaultStage3TimeLimitSec },
         };
 
         [Header("Debug")]
@@ -40,10 +44,20 @@ namespace SweepNDodge.DotsBullets
         private bool _awaitingCompletedSignal;
         private DemoShellResultActionId _pendingResultAction;
         private bool _warnedNoBridge;
+        private float _stagePlayElapsedSec;
+        private int _stageStartTotalCollectValue;
+        private int _stageStartTotalCleanupValue;
+        private int _stageStartTotalHitValue;
+        private DemoShellStageOutcomeId _currentStageOutcome;
+        private DemoShellStageResultMetrics _currentStageResult;
+        private bool _hasCurrentStageResult;
+        private DemoShellSessionMetrics _sessionMetrics;
+        private bool _hasSessionMetrics;
 
         public DemoShellScreenId CurrentScreen => _currentScreen;
         public int CurrentStageIndex => _currentStageIndex;
         public int CurrentStageId => TryGetStageProfile(_currentStageIndex, out var profile) ? profile.StageId : 0;
+        public DemoShellStageOutcomeId CurrentStageOutcome => _currentStageOutcome;
 
         private void Reset()
         {
@@ -118,12 +132,27 @@ namespace SweepNDodge.DotsBullets
                     GUILayout.Space(8f);
                     GUILayout.Label("Playing...");
                     GUILayout.Label("Wait for Result trigger on ClearReady.");
+                    if (TryGetStageProfile(_currentStageIndex, out var activeProfile))
+                    {
+                        float limit = Mathf.Max(0f, activeProfile.StageTimeLimitSec);
+                        if (limit > 0f)
+                            GUILayout.Label($"Time: {_stagePlayElapsedSec:0.0}s / {limit:0.0}s");
+                    }
+                    if (GUILayout.Button("Give Up"))
+                        RequestGiveUp();
                     break;
 
                 case DemoShellScreenId.StageResult:
                     GUILayout.Space(8f);
-                    GUILayout.Label("Stage Result");
-                    if (GUILayout.Button("Next Stage"))
+                    GUILayout.Label($"Stage Result ({_currentStageOutcome})");
+                    if (_hasCurrentStageResult)
+                    {
+                        GUILayout.Label($"Time: {_currentStageResult.ElapsedSec:0.0}s");
+                        GUILayout.Label(
+                            $"Collect/Cleanup/Hit: {_currentStageResult.CollectValue}/{_currentStageResult.CleanupValue}/{_currentStageResult.HitValue}");
+                    }
+
+                    if (_currentStageOutcome == DemoShellStageOutcomeId.Clear && GUILayout.Button("Next Stage"))
                         RequestResultAction(DemoShellResultActionId.NextStage);
                     if (GUILayout.Button("Retry"))
                         RequestResultAction(DemoShellResultActionId.Retry);
@@ -134,6 +163,13 @@ namespace SweepNDodge.DotsBullets
                 case DemoShellScreenId.DemoComplete:
                     GUILayout.Space(8f);
                     GUILayout.Label("Demo Complete");
+                    if (_hasSessionMetrics)
+                    {
+                        GUILayout.Label($"Cleared Stages: {_sessionMetrics.ClearedStageCount}");
+                        GUILayout.Label($"Total Time: {_sessionMetrics.TotalElapsedSec:0.0}s");
+                        GUILayout.Label(
+                            $"Total Collect/Cleanup/Hit: {_sessionMetrics.TotalCollectValue}/{_sessionMetrics.TotalCleanupValue}/{_sessionMetrics.TotalHitValue}");
+                    }
                     if (GUILayout.Button("Restart Demo"))
                         RequestRestartDemo();
                     if (GUILayout.Button("Return to Lobby"))
@@ -164,16 +200,41 @@ namespace SweepNDodge.DotsBullets
             if (stageIndex < 0)
                 return false;
 
+            DemoShellSessionStaging.ResetSessionMetrics();
+            RefreshSessionMetrics();
             EnterStagePlay(stageIndex);
             return true;
         }
 
         public bool RequestResultAction(DemoShellResultActionId action)
         {
-            if (_currentScreen != DemoShellScreenId.StageResult || _awaitingCompletedSignal || StageBridge == null)
+            if (_currentScreen != DemoShellScreenId.StageResult || _awaitingCompletedSignal)
                 return false;
 
             if (!TryGetStageProfile(_currentStageIndex, out _))
+                return false;
+
+            if (_currentStageOutcome == DemoShellStageOutcomeId.Fail)
+            {
+                switch (action)
+                {
+                    case DemoShellResultActionId.NextStage:
+                        return false;
+                    case DemoShellResultActionId.Retry:
+                        DemoShellSessionStaging.StageStagePlay(_currentStageIndex);
+                        ReloadActiveScene();
+                        return true;
+                    case DemoShellResultActionId.ReturnToLobby:
+                        DemoShellSessionStaging.ResetSessionMetrics();
+                        DemoShellSessionStaging.StageLobby();
+                        ReloadActiveScene();
+                        return true;
+                }
+
+                return false;
+            }
+
+            if (StageBridge == null)
                 return false;
 
             bool clearOk = StageBridge.SetClearPresentationDone(true);
@@ -191,6 +252,7 @@ namespace SweepNDodge.DotsBullets
             if (_currentScreen != DemoShellScreenId.DemoComplete)
                 return false;
 
+            DemoShellSessionStaging.ResetSessionMetrics();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
             return true;
@@ -201,8 +263,18 @@ namespace SweepNDodge.DotsBullets
             if (_currentScreen != DemoShellScreenId.DemoComplete)
                 return false;
 
+            DemoShellSessionStaging.ResetSessionMetrics();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
+            return true;
+        }
+
+        public bool RequestGiveUp()
+        {
+            if (_currentScreen != DemoShellScreenId.StagePlay)
+                return false;
+
+            EnterStageResult(DemoShellStageOutcomeId.Fail);
             return true;
         }
 
@@ -235,7 +307,12 @@ namespace SweepNDodge.DotsBullets
 
         private void TickStagePlayFlow()
         {
-            if (_currentScreen != DemoShellScreenId.StagePlay || StageBridge == null)
+            if (_currentScreen != DemoShellScreenId.StagePlay)
+                return;
+
+            _stagePlayElapsedSec = Mathf.Max(0f, _stagePlayElapsedSec + Time.deltaTime);
+
+            if (StageBridge == null)
                 return;
 
             if (_stageStartPending)
@@ -247,11 +324,24 @@ namespace SweepNDodge.DotsBullets
                     _stageStartPending = false;
             }
 
-            if (StageBridge.TryGetStageState(out var stageState)
-                && stageState.State == RunDirectorStageStateId.ClearReady)
+            if (!StageBridge.TryGetStageState(out var stageState))
+                return;
+
+            if (stageState.State == RunDirectorStageStateId.ClearReady)
             {
-                TransitionTo(DemoShellScreenId.StageResult);
-                _awaitingCompletedSignal = false;
+                EnterStageResult(DemoShellStageOutcomeId.Clear);
+                return;
+            }
+
+            if (TryGetStageProfile(_currentStageIndex, out var profile))
+            {
+                float limit = Mathf.Max(0f, profile.StageTimeLimitSec);
+                if (limit > 0f
+                    && stageState.State == RunDirectorStageStateId.Running
+                    && stageState.StateElapsedSec >= limit)
+                {
+                    EnterStageResult(DemoShellStageOutcomeId.Fail);
+                }
             }
         }
 
@@ -276,6 +366,11 @@ namespace SweepNDodge.DotsBullets
                         RequestSelectStageById(3);
                     break;
 
+                case DemoShellScreenId.StagePlay:
+                    if (Input.GetKeyDown(KeyCode.G))
+                        RequestGiveUp();
+                    break;
+
                 case DemoShellScreenId.StageResult:
                     if (Input.GetKeyDown(KeyCode.N))
                         RequestResultAction(DemoShellResultActionId.NextStage);
@@ -298,7 +393,9 @@ namespace SweepNDodge.DotsBullets
 
         private void OnStageRunCompleted()
         {
-            if (_currentScreen != DemoShellScreenId.StageResult || !_awaitingCompletedSignal)
+            if (_currentScreen != DemoShellScreenId.StageResult
+                || !_awaitingCompletedSignal
+                || _currentStageOutcome != DemoShellStageOutcomeId.Clear)
                 return;
 
             _awaitingCompletedSignal = false;
@@ -311,6 +408,7 @@ namespace SweepNDodge.DotsBullets
 
                     if (profile.IsFinalStage)
                     {
+                        RefreshSessionMetrics();
                         TransitionTo(DemoShellScreenId.DemoComplete);
                         return;
                     }
@@ -318,6 +416,7 @@ namespace SweepNDodge.DotsBullets
                     int nextStageIndex = _currentStageIndex + 1;
                     if (!TryGetStageProfile(nextStageIndex, out _))
                     {
+                        RefreshSessionMetrics();
                         TransitionTo(DemoShellScreenId.DemoComplete);
                         return;
                     }
@@ -331,6 +430,7 @@ namespace SweepNDodge.DotsBullets
                     ReloadActiveScene();
                     return;
                 case DemoShellResultActionId.ReturnToLobby:
+                    DemoShellSessionStaging.ResetSessionMetrics();
                     DemoShellSessionStaging.StageLobby();
                     ReloadActiveScene();
                     return;
@@ -346,6 +446,10 @@ namespace SweepNDodge.DotsBullets
             _stageStartPending = true;
             _awaitingCompletedSignal = false;
             _pendingResultAction = DemoShellResultActionId.NextStage;
+            _stagePlayElapsedSec = 0f;
+            _currentStageOutcome = DemoShellStageOutcomeId.Clear;
+            _hasCurrentStageResult = false;
+            CaptureStageStartTotals();
             TransitionTo(DemoShellScreenId.StagePlay);
 
             if (LogTransitions)
@@ -450,14 +554,124 @@ namespace SweepNDodge.DotsBullets
 
         private void EnsureStageProfiles()
         {
-            if (StageProfiles != null && StageProfiles.Length > 0)
+            if (StageProfiles == null || StageProfiles.Length == 0)
+            {
+                StageProfiles = new[]
+                {
+                    new DemoShellStageProfile { StageId = 1, DisplayName = "Stage 1", IsFinalStage = false, StageTimeLimitSec = DefaultStage1TimeLimitSec },
+                    new DemoShellStageProfile { StageId = 2, DisplayName = "Stage 2", IsFinalStage = false, StageTimeLimitSec = DefaultStage2TimeLimitSec },
+                    new DemoShellStageProfile { StageId = 3, DisplayName = "Stage 3", IsFinalStage = true, StageTimeLimitSec = DefaultStage3TimeLimitSec },
+                };
+                return;
+            }
+
+            for (int i = 0; i < StageProfiles.Length; i++)
+            {
+                var entry = StageProfiles[i];
+                int fallbackStageId = i + 1;
+                if (entry.StageId <= 0)
+                    entry.StageId = fallbackStageId;
+                if (string.IsNullOrWhiteSpace(entry.DisplayName))
+                    entry.DisplayName = $"Stage {entry.StageId}";
+                if (entry.StageTimeLimitSec <= 0f)
+                    entry.StageTimeLimitSec = ResolveDefaultStageTimeLimitSec(entry.StageId, i);
+                StageProfiles[i] = entry;
+            }
+        }
+
+        private void EnterStageResult(DemoShellStageOutcomeId outcome)
+        {
+            if (_currentScreen != DemoShellScreenId.StagePlay)
                 return;
 
-            StageProfiles = new[]
+            _currentStageOutcome = outcome;
+            _currentStageResult = BuildCurrentStageResult(outcome);
+            _hasCurrentStageResult = true;
+            _awaitingCompletedSignal = false;
+            TransitionTo(DemoShellScreenId.StageResult);
+
+            if (outcome == DemoShellStageOutcomeId.Clear)
+                DemoShellSessionStaging.AccumulateSuccessfulStage(in _currentStageResult);
+
+            RefreshSessionMetrics();
+        }
+
+        private DemoShellStageResultMetrics BuildCurrentStageResult(DemoShellStageOutcomeId outcome)
+        {
+            int stageId = TryGetStageProfile(_currentStageIndex, out var stageProfile)
+                ? stageProfile.StageId
+                : Mathf.Max(1, _currentStageIndex + 1);
+
+            int totalCollect = _stageStartTotalCollectValue;
+            int totalCleanup = _stageStartTotalCleanupValue;
+            int totalHit = _stageStartTotalHitValue;
+            if (TryGetSnapshotTotals(out var snapCollect, out var snapCleanup, out var snapHit))
             {
-                new DemoShellStageProfile { StageId = 1, DisplayName = "Stage 1", IsFinalStage = false },
-                new DemoShellStageProfile { StageId = 2, DisplayName = "Stage 2", IsFinalStage = false },
-                new DemoShellStageProfile { StageId = 3, DisplayName = "Stage 3", IsFinalStage = true },
+                totalCollect = snapCollect;
+                totalCleanup = snapCleanup;
+                totalHit = snapHit;
+            }
+
+            return new DemoShellStageResultMetrics
+            {
+                StageId = stageId,
+                Outcome = outcome,
+                ElapsedSec = Mathf.Max(0f, _stagePlayElapsedSec),
+                CollectValue = Mathf.Max(0, totalCollect - _stageStartTotalCollectValue),
+                CleanupValue = Mathf.Max(0, totalCleanup - _stageStartTotalCleanupValue),
+                HitValue = Mathf.Max(0, totalHit - _stageStartTotalHitValue),
+            };
+        }
+
+        private void CaptureStageStartTotals()
+        {
+            if (TryGetSnapshotTotals(out var collect, out var cleanup, out var hit))
+            {
+                _stageStartTotalCollectValue = collect;
+                _stageStartTotalCleanupValue = cleanup;
+                _stageStartTotalHitValue = hit;
+                return;
+            }
+
+            _stageStartTotalCollectValue = 0;
+            _stageStartTotalCleanupValue = 0;
+            _stageStartTotalHitValue = 0;
+        }
+
+        private bool TryGetSnapshotTotals(out int collect, out int cleanup, out int hit)
+        {
+            collect = 0;
+            cleanup = 0;
+            hit = 0;
+
+            if (_runtimeHudBridge == null || !_runtimeHudBridge.TryGetLastSnapshot(out var snapshot))
+                return false;
+
+            collect = Mathf.Max(0, snapshot.TotalCollectValue);
+            cleanup = Mathf.Max(0, snapshot.TotalCleanupValue);
+            hit = Mathf.Max(0, snapshot.TotalHitValue);
+            return true;
+        }
+
+        private void RefreshSessionMetrics()
+        {
+            _hasSessionMetrics = DemoShellSessionStaging.TryGetSessionMetrics(out _sessionMetrics);
+        }
+
+        private static float ResolveDefaultStageTimeLimitSec(int stageId, int stageIndex)
+        {
+            return stageId switch
+            {
+                1 => DefaultStage1TimeLimitSec,
+                2 => DefaultStage2TimeLimitSec,
+                3 => DefaultStage3TimeLimitSec,
+                _ => stageIndex switch
+                {
+                    0 => DefaultStage1TimeLimitSec,
+                    1 => DefaultStage2TimeLimitSec,
+                    2 => DefaultStage3TimeLimitSec,
+                    _ => DefaultStage2TimeLimitSec,
+                },
             };
         }
     }
