@@ -82,8 +82,8 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 
 ### 5.2 Poisson (완전 무작위형)
 - `MeanEventsPerSec (lambda)`
-- `EventShotSchedule` (`Instant` / `Timed`, 합의, 구현 예정)
-- `EventShotIntervalSec` (`EventShotSchedule=Timed`에서 `>0`, 합의, 구현 예정)
+- `EventShotSchedule` (`Instant` / `Timed`)
+- `EventShotIntervalSec` (`EventShotSchedule=Timed`에서 `>0`)
 - `BurstShotsPerEvent` (이벤트 1회 내부 샷 수, 기본 1 이상)
 - 용도: 간헐적/불규칙 체감 형성.
 - 원칙: 완전 무작위 소량 스폰은 초저밀도 `RateField` 대체가 아니라 `Poisson`으로 정의한다.
@@ -94,15 +94,15 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - `BurstRepeatCount` (`-1`은 무한 반복, 그 외 `>=1`)
   - `BurstIntervalSec` (`>0`)
   - `BurstShotsPerEvent` (`>=1`)
-  - `EventShotSchedule` (`Instant` / `Timed`, 합의, 구현 예정)
-  - `EventShotIntervalSec` (`EventShotSchedule=Timed`에서 `>0`, 합의, 구현 예정)
+  - `EventShotSchedule` (`Instant` / `Timed`)
+  - `EventShotIntervalSec` (`EventShotSchedule=Timed`에서 `>0`)
 - 소비 정책:
   - `carry`를 기본 정책으로 사용한다.
   - 프레임 예산 부족 시 미소비 샷은 요청 버퍼에 남겨 다음 프레임에서 이어서 소비한다.
   - `Timed` 모드에서는 이벤트 1회 내부 샷을 시간 간격으로 분할 소비한다.
   - `EventShotSchedule` 규약 자체는 `Poisson`에도 동일 적용한다(이벤트 발생 시점 규칙만 다름).
 
-### 5.4 이벤트 기준점 고정 (합의, 구현 예정)
+### 5.4 이벤트 기준점 고정
 - 샘플링 기준점은 이벤트 시작 시 1회 확정하고 이벤트 종료까지 유지한다.
 - 이벤트 내부에서는 Source/Player 이동에 따른 재샘플링을 하지 않는다(월드 고정).
 - 고정 기준점은 해당 이벤트에만 유효하며, 다음 이벤트는 다시 샘플링한다.
@@ -181,6 +181,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 14. 변경 이력
+- 2026-03-05: `Poisson/EventBurst Timed`와 이벤트 기준점 고정 항목을 구현 반영 상태로 동기화했다.
 - 2026-03-05: 요청 소비 우선순위를 `LanePriority + OldestFrame` 단일 규칙으로 확정하고, 레거시 `SpawnPriority` 제거 완료 상태를 반영했다.
 - 2026-03-05: `PollutionTopK` 운영 계약, 오염도 갱신 흐름(요청 누적 -> 단일 writer 소비), 원형 Source valid 셀 마스크 규약을 추가해 GD-003 기술 상세 이관을 반영했다.
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가

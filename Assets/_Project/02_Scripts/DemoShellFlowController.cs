@@ -38,6 +38,7 @@ namespace SweepNDodge.DotsBullets
 
         private RunDirectorStageBridge _subscribedBridge;
         private PlayerRuntimeHudBridge _runtimeHudBridge;
+        private DemoAudioBridge _demoAudioBridge;
         private DemoShellScreenId _currentScreen;
         private int _currentStageIndex = -1;
         private bool _stageStartPending;
@@ -69,6 +70,7 @@ namespace SweepNDodge.DotsBullets
             EnsureStageProfiles();
             EnsureBridgeReference();
             EnsureRuntimeHudBridge();
+            EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
             BootFromSessionStaging();
         }
@@ -91,6 +93,7 @@ namespace SweepNDodge.DotsBullets
         {
             EnsureBridgeReference();
             EnsureRuntimeHudBridge();
+            EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
             ProcessKeyboardFallback();
             TickStagePlayFlow();
@@ -179,6 +182,7 @@ namespace SweepNDodge.DotsBullets
                     break;
             }
 
+            DrawAudioOptionsSection();
             GUILayout.EndArea();
         }
 
@@ -499,6 +503,45 @@ namespace SweepNDodge.DotsBullets
                 _runtimeHudBridge = gameObject.AddComponent<PlayerRuntimeHudBridge>();
             if (_runtimeHudBridge != null && _runtimeHudBridge.DemoShell == null)
                 _runtimeHudBridge.DemoShell = this;
+        }
+
+        private void EnsureDemoAudioBridge()
+        {
+            if (_demoAudioBridge == null)
+                _demoAudioBridge = GetComponent<DemoAudioBridge>();
+            if (_demoAudioBridge == null)
+                _demoAudioBridge = gameObject.AddComponent<DemoAudioBridge>();
+            if (_demoAudioBridge != null && _demoAudioBridge.DemoShell == null)
+                _demoAudioBridge.DemoShell = this;
+        }
+
+        private void DrawAudioOptionsSection()
+        {
+            GUILayout.Space(10f);
+            GUILayout.Label("Audio");
+
+            if (_demoAudioBridge == null)
+            {
+                GUILayout.Label("Audio bridge unavailable");
+                return;
+            }
+
+            DrawVolumeSlider("Master", DemoAudioBusId.Master);
+            DrawVolumeSlider("BGM", DemoAudioBusId.Bgm);
+            DrawVolumeSlider("SFX", DemoAudioBusId.Sfx);
+            DrawVolumeSlider("UI", DemoAudioBusId.Ui);
+        }
+
+        private void DrawVolumeSlider(string label, DemoAudioBusId bus)
+        {
+            float current = Mathf.Clamp01(_demoAudioBridge.GetBusVolume(bus));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{label} {current:0.00}", GUILayout.Width(120f));
+            float next = GUILayout.HorizontalSlider(current, 0f, 1f, GUILayout.Width(170f));
+            GUILayout.EndHorizontal();
+
+            if (Mathf.Abs(next - current) > 0.001f)
+                _demoAudioBridge.SetBusVolume(bus, next);
         }
 
         private void TransitionTo(DemoShellScreenId next)

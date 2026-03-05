@@ -267,8 +267,6 @@ namespace SweepNDodge.DotsBullets
     }
 
     [UpdateInGroup(typeof(BulletExecutionEndGroup), OrderLast = true)]
-    [UpdateAfter(typeof(PlayerUiFeedbackConsumeSystem))]
-    [UpdateAfter(typeof(PlayerImpulseConsumeSystem))]
     public partial struct DebugHudMetricsCollectSystem : ISystem
     {
         private EntityQuery _activeBulletQuery;

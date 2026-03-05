@@ -48,8 +48,8 @@
 | BurstRepeatCount | int | EventBurst 반복 수 | -1(무한) 또는 >= 1 |
 | BurstIntervalSec | float | EventBurst 반복 간격 | > 0 |
 | BurstShotsPerEvent | int | 사건형 이벤트 1회당 샷 수 | Poisson / EventBurst에서 >= 1 |
-| EventShotSchedule | enum | 사건형 이벤트 내부 샷 스케줄 | Poisson / EventBurst: Instant / Timed (합의, 구현 예정) |
-| EventShotIntervalSec | float | 사건형 이벤트 내부 샷 간격 | Poisson / EventBurst에서 Timed일 때 > 0 (합의, 구현 예정) |
+| EventShotSchedule | enum | 사건형 이벤트 내부 샷 스케줄 | Poisson / EventBurst: Instant / Timed |
+| EventShotIntervalSec | float | 사건형 이벤트 내부 샷 간격 | Poisson / EventBurst에서 Timed일 때 > 0 |
 | SpawnMode | enum | 활성 캡 정책 | FixedDensity / CapAndMaxDensity |
 | MaxActiveDensityPerArea | float | Cap 모드 상한 | Cap 모드에서 >= 0 |
 | SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK / LineEven / PointSet |
@@ -176,7 +176,7 @@ Hit:
 - EventBurst에서 `BurstIntervalSec <= 0` (`CV020`).
 - EventBurst에서 `BurstRepeatCount`가 `-1` 또는 `>=1`이 아님 (`CV021`).
 - Poisson/EventBurst에서 `BurstShotsPerEvent < 1` (`CV022`, 합의 기준. 구현은 EventBurst 우선).
-- Poisson/EventBurst에서 `EventShotSchedule=Timed`인데 `EventShotIntervalSec <= 0` (합의, 구현 예정).
+- Poisson/EventBurst에서 `EventShotSchedule=Timed`인데 `EventShotIntervalSec <= 0`.
 - NWay에서 `NWayCount < 2` (`CV023`, 필수 제약 위반).
 - RadialBurst에서 `BurstShotsPerEvent < 2` (`CV024`).
 - LineEven에서 선분 길이 0 또는 `SampleSpacing <= 0` (`CV026`).
@@ -258,8 +258,9 @@ Hit:
   - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
 
 ## 10. 변경 이력
+- 2026-03-05: `EventShotSchedule/Interval` 및 관련 검증 문구를 구현 반영 상태로 동기화했다.
 - 2026-02-27: `TD-006` active 전환과 함께, Clip 선택 주체(디렉터), `Baseline/Pressure` Clip 유지+배율 규칙, `Finish` 강제 교체 규칙을 반영해 소유권 문구를 갱신했다.
-- 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 계약을 추가(구현 예정)
+- 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 계약을 추가
 - 2026-02-26: NWay 실행 규약(360도 균등/세트 원자성/이월 시 SpawnSequence 보존)과 발행 단위 계약(밀도형 vs 사건형)을 합의안으로 추가
 - 2026-02-26: PointSet 런타임 샘플러를 활성화하고(`Max=4`, 로컬 오프셋), 검증 규칙을 `CV028`/갱신된 `CVW033` 기준으로 동기화
 - 2026-02-26: `WaveClipSO` 내부 segment 중첩을 전면 허용하도록 정책/검증 문구를 갱신(`CV011` 제거)

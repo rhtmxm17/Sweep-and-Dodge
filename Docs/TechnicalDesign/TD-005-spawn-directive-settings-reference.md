@@ -4,7 +4,7 @@
 - doc_id: `TD-005`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-02-27`
+- last_updated: `2026-03-05`
 - related_docs:
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
@@ -41,8 +41,8 @@
 | `Emission.BurstRepeatCount` | 이벤트 반복 횟수 | `EventBurst`: `-1`(무한) 또는 `>=1` |
 | `Emission.BurstIntervalSec` | 이벤트 간격(초) | `EventBurst`: `> 0` |
 | `Emission.BurstShotsPerEvent` | 사건형 이벤트 1회 샷 수 | `Poisson` / `EventBurst`: `>= 1` |
-| `Emission.EventShotSchedule` | 이벤트 내부 샷 스케줄 | `Poisson` / `EventBurst`: `Instant` / `Timed` (합의, 구현 예정) |
-| `Emission.EventShotIntervalSec` | 이벤트 내부 샷 간격(초) | `Poisson` / `EventBurst`에서 `EventShotSchedule=Timed`일 때 `> 0` (합의, 구현 예정) |
+| `Emission.EventShotSchedule` | 이벤트 내부 샷 스케줄 | `Poisson` / `EventBurst`: `Instant` / `Timed` |
+| `Emission.EventShotIntervalSec` | 이벤트 내부 샷 간격(초) | `Poisson` / `EventBurst`에서 `EventShotSchedule=Timed`일 때 `> 0` |
 | `Emission.MaxActiveDensityPerArea` | 활성 상한 밀도 | `CapAndMaxDensity`에서 사용 |
 
 ### 3.1 EmissionMode 값 의미
@@ -63,7 +63,7 @@
 - 실행은 ExecutionBegin에서 예산 기반으로 소비된다.
 - 프레임에 다 못 쓴 샷은 버리지 않고 다음 프레임으로 이월(carry)된다.
 
-### 3.4 사건형 이벤트 모드 지속 확장 (합의, 구현 예정)
+### 3.4 사건형 이벤트 모드 지속 확장
 - 이벤트 내부 타임라인은 `Emission` 책임으로 정의한다.
 - 적용 대상은 `Poisson` / `EventBurst`다.
 - `EventShotSchedule=Instant`:
@@ -114,7 +114,7 @@
   - `localSequence = SpawnSequence / PointCount`
 - `PlayerNoSpawnRadius`로 거부될 경우 다음 포인트로 순환 재시도하며, `SpawnSampleBudget` 한도 내에서만 수행한다.
 
-### 4.5 이벤트 기준점 고정 규약 (합의, 구현 예정)
+### 4.5 이벤트 기준점 고정 규약
 - 샘플링 기준점은 이벤트 시작 시 1회 확정하고, 이벤트 종료까지 고정한다.
 - 이벤트 진행 중에는 Source/Player가 이동해도 기준점을 재샘플링하지 않는다(월드 고정).
 - 고정 좌표는 이벤트 범위에만 유효하며, 다음 이벤트는 다시 샘플링한다.
@@ -237,5 +237,6 @@
 12. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
 
 ## 10. 변경 이력
+- 2026-03-05: `EventShotSchedule/Interval`, 이벤트 기준점 고정 규약을 구현 반영 상태로 동기화했다.
 - 2026-02-27: 런 진행도 디렉터 책임 이관 기준에 맞춰 실행 규약을 갱신했다(Clip 선택 주체 디렉터, `Baseline/Pressure` Clip 유지+배율, `Finish` 강제 교체/Trash Lane 제약).
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`)의 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가

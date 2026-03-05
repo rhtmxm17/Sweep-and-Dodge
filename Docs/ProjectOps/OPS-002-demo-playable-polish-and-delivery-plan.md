@@ -16,6 +16,7 @@
   - [TD-010-demo-shell-flow-and-bridge-contract.md](../TechnicalDesign/TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-011-runtime-player-hud-contract.md](../TechnicalDesign/TD-011-runtime-player-hud-contract.md)
   - [TD-013-player-feedback-presentation-bridge-contract.md](../TechnicalDesign/TD-013-player-feedback-presentation-bridge-contract.md)
+  - [TD-014-demo-audio-runtime-contract.md](../TechnicalDesign/TD-014-demo-audio-runtime-contract.md)
   - [GD-001-campaign-loop-design.md](../GameDesign/GD-001-campaign-loop-design.md)
   - [GD-004-carrybin-load-and-deposit.md](../GameDesign/GD-004-carrybin-load-and-deposit.md)
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
@@ -58,7 +59,7 @@
 | S2 | 플레이 HUD | 디버그 HUD와 별개로 플레이어 HUD 최소 세트 확정 | DONE | 1.5 | P0 |
 | S3 | 결과/실패 UX | Clear/Fail 판정, `Next/Retry/Return`, `Demo Complete` 요약 지표/동선 확정 | DONE | 2.0 | P0 |
 | S4 | 이벤트 피드백 브리지 | `PlayerUiFeedback`/`Impulse`를 실제 UI/Animator/Impulse 표현으로 연결 | DONE | 2.0 | P0 |
-| S5 | 사운드 시스템 | BGM/SFX/UI 버스, 이벤트 라우팅, 볼륨 옵션 설계 | TODO | 2.0 | P0 |
+| S5 | 사운드 시스템 | BGM/SFX/UI 버스, 이벤트 라우팅, 볼륨 옵션 설계 | DONE | 2.0 | P0 |
 | S6 | 온보딩/가이드 | 첫 진입 30~60초 조작/목표 안내 설계 | TODO | 1.0 | P1 |
 | S7 | 데모 운영/릴리즈 게이트 | 빌드 체크리스트, 시연 모드, QA 체크리스트 확정 | TODO | 1.0 | P0 |
 
@@ -99,6 +100,7 @@
 - 버스 구조: `Master/BGM/SFX/UI`
 - 이벤트 매핑: `Hit/Collect/Cleanup/StageState` -> SFX/BGM cue
 - 중복 재생 방지와 믹스 정책(쿨다운/보이스 제한/ducking) 확정
+- 운영 기본 세팅: Source 하이브리드(프리와이어 + 누락 자동 생성), fallback clip(누락 슬롯만), DemoShell OnGUI 볼륨 슬라이더 확정
 
 6. `P1` 온보딩/가이드
 - 첫 시도 실패를 줄이는 최소 가이드 문구/타이밍
@@ -170,10 +172,19 @@
   - S4 Feedback: 동일 `Frame+Type+RelatedEntity` dedupe, cooldown(`0.15s`, Hit `0.10s`)이 반영된다
   - S4 Feedback: Impulse 다건 입력 시 단일 합산 snapshot 반영 + buffer clear
   - S4 Feedback: Animator null-safe skip(개발 빌드 경고 1회)로 런타임이 유지된다
+  - S5 Audio: `Master/BGM/SFX/UI` 버스 볼륨 `0..1` clamp 및 즉시 반영이 동작한다
+  - S5 Audio: 운영 씬에서 소스/클립 누락 시 자동 보정으로 재생 경로가 유지된다(실클립 할당 슬롯은 비파괴 유지)
+  - S5 Audio: `Title->Lobby`, `Lobby->StagePlay`, `StagePlay->StageResult`, `Stage3->DemoComplete` 전이 cue가 1회씩 발행된다
+  - S5 Audio: `Hit`는 snapshot version 기준 1회 소비되고, `Collect/Cleanup`은 total delta + cooldown(`0.05s`) 기준으로 소비된다
+  - S5 Audio: 볼륨 옵션이 씬 재진입/재시작 후 복원된다
+  - S5 Audio: DemoShell Overlay에서 `Master/BGM/SFX/UI` 볼륨을 조작하면 즉시 반영된다
+  - S7 Gate: 완료 보고 전 `EditMode 전체`, `PlayMode BulletPlayModeSmokeTests 전체(13개 이상)`, `console error 0`를 모두 통과한다
   - HUD/사운드 옵션 반영 확인
   - 운영 씬 정기 스모크 결과 기록
 
 ## 10. 변경 이력
+- 2026-03-05: S5 잔여 작업 완료. `DemoAudioBridge`에 Source 하이브리드 자동 보정, fallback tone clip 자동 할당/정리, missing cue warn-once 정책을 추가하고 `DemoShellFlowController` Overlay에 4버스 볼륨 슬라이더를 연결했다. EditMode/PlayMode 테스트를 확장해 전이 cue, 자동 세팅, 볼륨 복원을 검증하고 S5 상태를 `DONE`으로 갱신했다.
+- 2026-03-05: S5 1차 구현 반영. `DemoAudioBridge`와 `TD-014`를 추가해 reader-only 오디오 소비 계약(버스/큐/dedupe/cooldown/볼륨 복원)을 고정하고, OPS 합격 기준을 테스트 가능 문장으로 갱신했다.
 - 2026-03-05: S4 구현 반영. `TD-013`을 추가하고 피드백 소비를 snapshot writer로 전환했다. `PlayerEcsBridge` Animator trigger/impulse offset, `PlayerRuntimeHudBridge` feedback feed, dedupe/cooldown 규칙과 EditMode 테스트를 반영해 S4 상태를 `DONE`으로 갱신했다.
 - 2026-03-05: S3 완료 반영. Fail 트리거(`Timeout/GiveUp`), 단일 Result 분기(클리어 전용 Next), Demo Complete 코어 총합/clear 시도 누적 규칙을 코드/테스트 기준으로 고정했다.
 - 2026-03-05: S2 문서 마감. S2 상태를 `DONE`으로 전환하고 HUD 계약/검증 항목을 기준선으로 고정했다.

@@ -13,6 +13,10 @@ namespace SweepNDodge.DotsBullets.Tests
     {
         private const string DedicatedScenePath = "Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity";
         private const string OperationalScenePath = "Assets/_Project/01_Scenes/SampleScene.unity";
+        private const string MasterVolumePrefKey = "demo.audio.master";
+        private const string BgmVolumePrefKey = "demo.audio.bgm";
+        private const string SfxVolumePrefKey = "demo.audio.sfx";
+        private const string UiVolumePrefKey = "demo.audio.ui";
 
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
@@ -279,6 +283,14 @@ namespace SweepNDodge.DotsBullets.Tests
             var world = World.DefaultGameObjectInjectionWorld;
             Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
             var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
 
             DemoShellFlowController shell = null;
             yield return WaitForCondition(
@@ -328,6 +340,14 @@ namespace SweepNDodge.DotsBullets.Tests
             var world = World.DefaultGameObjectInjectionWorld;
             Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
             var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
             DemoShellFlowController shell = null;
 
             yield return WaitForCondition(
@@ -800,6 +820,138 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoAudioBridge_AutoSetupAndTransitionCues_Work()
+        {
+            ClearAudioVolumePrefs();
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
+
+            DemoShellFlowController shell = null;
+            DemoAudioBridge bridge = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    bridge = FindDemoAudioBridge();
+                    return shell != null && bridge != null;
+                },
+                240,
+                "DemoShellFlowController/DemoAudioBridge was not found in operational scene.");
+
+            Assert.That(bridge.BgmSource, Is.Not.Null, "BGM source must be available via prewire or auto-create.");
+            Assert.That(bridge.SfxSource, Is.Not.Null, "SFX source must be available via prewire or auto-create.");
+            Assert.That(bridge.UiSource, Is.Not.Null, "UI source must be available via prewire or auto-create.");
+
+            int baselineCueCount = bridge.PlayedCueCount;
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    bridge = FindDemoAudioBridge();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.Lobby
+                        && bridge != null
+                        && bridge.PlayedCueCount >= baselineCueCount + 1;
+                },
+                240,
+                "Title->Lobby transition cue was not observed.");
+
+            int lobbyCueCount = bridge.PlayedCueCount;
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    bridge = FindDemoAudioBridge();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && bridge != null
+                        && bridge.PlayedCueCount >= lobbyCueCount + 2;
+                },
+                240,
+                "Lobby->StagePlay transition cues were not observed.");
+
+            int stagePlayCueCount = bridge.PlayedCueCount;
+            Assert.That(shell.RequestGiveUp(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    bridge = FindDemoAudioBridge();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && bridge != null
+                        && bridge.PlayedCueCount >= stagePlayCueCount + 2;
+                },
+                240,
+                "StagePlay->StageResult transition cues were not observed.");
+
+            ClearAudioVolumePrefs();
+            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoAudioBridge_VolumePersistsAcrossReload()
+        {
+            ClearAudioVolumePrefs();
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            DemoShellFlowController shell = null;
+            DemoAudioBridge bridge = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    bridge = FindDemoAudioBridge();
+                    return shell != null && bridge != null;
+                },
+                240,
+                "DemoShellFlowController/DemoAudioBridge was not found in operational scene.");
+
+            bridge.SetBusVolume(DemoAudioBusId.Master, 0.77f);
+            bridge.SetBusVolume(DemoAudioBusId.Bgm, 0.22f);
+            bridge.SetBusVolume(DemoAudioBusId.Sfx, 0.33f);
+            bridge.SetBusVolume(DemoAudioBusId.Ui, 0.44f);
+
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            yield return WaitForCondition(
+                () => FindDemoAudioBridge() != null,
+                240,
+                "DemoAudioBridge was not found after scene reload.");
+
+            bridge = FindDemoAudioBridge();
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Master), Is.EqualTo(0.77f).Within(0.01f));
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Bgm), Is.EqualTo(0.22f).Within(0.01f));
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Sfx), Is.EqualTo(0.33f).Within(0.01f));
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Ui), Is.EqualTo(0.44f).Within(0.01f));
+
+            ClearAudioVolumePrefs();
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_Replay_RecordResetPlayback_Smoke()
         {
             SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
@@ -1135,6 +1287,15 @@ namespace SweepNDodge.DotsBullets.Tests
 #endif
         }
 
+        private static DemoAudioBridge FindDemoAudioBridge()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<DemoAudioBridge>();
+#else
+            return Object.FindObjectOfType<DemoAudioBridge>();
+#endif
+        }
+
         private static void ClearDemoShellStaging()
         {
             while (DemoShellSessionStaging.TryConsume(out _))
@@ -1142,6 +1303,15 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             DemoShellSessionStaging.ResetSessionMetrics();
+        }
+
+        private static void ClearAudioVolumePrefs()
+        {
+            PlayerPrefs.DeleteKey(MasterVolumePrefKey);
+            PlayerPrefs.DeleteKey(BgmVolumePrefKey);
+            PlayerPrefs.DeleteKey(SfxVolumePrefKey);
+            PlayerPrefs.DeleteKey(UiVolumePrefKey);
+            PlayerPrefs.Save();
         }
 
     }
