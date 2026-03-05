@@ -23,6 +23,7 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             var definitions = CollectScriptableObjects<BulletDefinitionSO>();
             var waveClips = CollectScriptableObjects<WaveClipSO>();
+            var stageMapCatalogs = CollectScriptableObjects<StageMapCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<BulletSourceAuthoring>>();
             var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
@@ -32,12 +33,14 @@ namespace SweepNDodge.DotsBullets.Editor
 
             SortRecordsByLocation(definitions);
             SortRecordsByLocation(waveClips);
+            SortRecordsByLocation(stageMapCatalogs);
             SortRecordsByLocation(visuals);
             SortRecordsByLocation(sources);
             SortRecordsByLocation(bullets);
 
             var input = new ContentValidationInput(definitions, waveClips, visuals, sources, bullets);
             var issues = ContentValidationRules.Validate(input);
+            StageLayoutValidationRules.ValidateCatalogRecords(stageMapCatalogs, issues);
             SortIssuesInPlace(issues);
             return issues;
         }
