@@ -22,6 +22,9 @@ namespace SweepNDodge.DotsBullets
         [Header("Stage Map")]
         public StageMapCatalogSO StageMapCatalog;
 
+        [Header("Stage Catalog")]
+        public StageCatalogSO StageCatalog;
+
         [Header("Events")]
         public UnityEvent OnStageRunCompleted;
 
@@ -35,8 +38,10 @@ namespace SweepNDodge.DotsBullets
         private bool _isBound;
         private bool _warnedBindFailure;
         private bool _warnedStageMapBindingFailure;
+        private bool _warnedStageCatalogBindingFailure;
         private int _lastCompletedNotifiedFrame = -1;
         private bool _isSceneOwner;
+        private StageMapCatalogSO _composedStageMapCatalog;
 
         private void OnEnable()
         {
@@ -50,6 +55,19 @@ namespace SweepNDodge.DotsBullets
         private void OnDisable()
         {
             ReleaseSceneOwnership();
+        }
+
+        private void OnDestroy()
+        {
+            if (_composedStageMapCatalog == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(_composedStageMapCatalog);
+            else
+                DestroyImmediate(_composedStageMapCatalog);
+
+            _composedStageMapCatalog = null;
         }
 
         private void Update()
@@ -109,6 +127,7 @@ namespace SweepNDodge.DotsBullets
                 return false;
             if (!EnsureStageMapCatalogRuntimeSingleton())
                 return false;
+            EnsureStageCatalogRuntimeSingleton();
 
             var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestEntity);
             request.RequestedStageId = stageId;
@@ -188,9 +207,10 @@ namespace SweepNDodge.DotsBullets
 
         private bool EnsureStageMapCatalogRuntimeSingleton()
         {
-            if (StageMapCatalog == null)
+            var effectiveCatalog = ResolveEffectiveStageMapCatalog();
+            if (effectiveCatalog == null)
             {
-                WarnStageMapFailureOnce("StageMapCatalog is not assigned.");
+                WarnStageMapFailureOnce("StageMapCatalog is not assigned and no compatible layout entries were resolved from StageCatalog.");
                 return false;
             }
 
@@ -200,7 +220,7 @@ namespace SweepNDodge.DotsBullets
                 var created = _em.CreateEntity();
                 _em.AddComponentObject(created, new StageMapCatalogRuntimeComponent
                 {
-                    Catalog = StageMapCatalog,
+                    Catalog = effectiveCatalog,
                 });
                 _warnedStageMapBindingFailure = false;
                 return true;
@@ -218,11 +238,87 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            var runtime = _em.GetComponentObject<StageMapCatalogRuntimeComponent>(catalogEntity) ?? new StageMapCatalogRuntimeComponent();
-            runtime.Catalog = StageMapCatalog;
-            _em.SetComponentData(catalogEntity, runtime);
+            var runtime = _em.GetComponentObject<StageMapCatalogRuntimeComponent>(catalogEntity);
+            runtime.Catalog = effectiveCatalog;
             _warnedStageMapBindingFailure = false;
             return true;
+        }
+
+        private bool EnsureStageCatalogRuntimeSingleton()
+        {
+            if (StageCatalog == null)
+            {
+                WarnStageCatalogFailureOnce("StageCatalog is not assigned. StageDefinition apply will be skipped.");
+                return false;
+            }
+
+            using var query = _em.CreateEntityQuery(ComponentType.ReadWrite<StageCatalogRuntimeComponent>());
+            if (query.IsEmptyIgnoreFilter)
+            {
+                var created = _em.CreateEntity();
+                _em.AddComponentObject(created, new StageCatalogRuntimeComponent
+                {
+                    Catalog = StageCatalog,
+                });
+                _warnedStageCatalogBindingFailure = false;
+                return true;
+            }
+
+            if (query.CalculateEntityCount() > 1)
+            {
+                WarnStageCatalogFailureOnce("Multiple StageCatalogRuntimeComponent singletons detected. The first entity will be used.");
+            }
+
+            var catalogEntity = ResolveFirstEntity(query);
+            if (catalogEntity == Entity.Null || !_em.Exists(catalogEntity))
+            {
+                WarnStageCatalogFailureOnce("StageCatalogRuntimeComponent singleton resolve failed.");
+                return false;
+            }
+
+            var runtime = _em.GetComponentObject<StageCatalogRuntimeComponent>(catalogEntity);
+            runtime.Catalog = StageCatalog;
+            _warnedStageCatalogBindingFailure = false;
+            return true;
+        }
+
+        private StageMapCatalogSO ResolveEffectiveStageMapCatalog()
+        {
+            if (StageMapCatalog != null)
+                return StageMapCatalog;
+            if (StageCatalog == null || StageCatalog.Entries == null || StageCatalog.Entries.Length <= 0)
+                return null;
+
+            if (_composedStageMapCatalog == null)
+            {
+                _composedStageMapCatalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
+                _composedStageMapCatalog.hideFlags = HideFlags.HideAndDontSave;
+                _composedStageMapCatalog.name = "RuntimeComposedStageMapCatalog";
+            }
+
+            var entries = StageCatalog.Entries;
+            var stages = new List<StageMapDefinition>(entries.Length);
+            for (int i = 0; i < entries.Length; i++)
+            {
+                var entry = entries[i];
+                if (!entry.Enabled || entry.Layout == null || entry.Layout.StageId <= 0)
+                    continue;
+
+                stages.Add(new StageMapDefinition
+                {
+                    StageId = entry.Layout.StageId,
+                    Sources = entry.Layout.Sources,
+                    Deposits = entry.Layout.Deposits,
+                    Obstacles = entry.Layout.Obstacles,
+                    Visuals = entry.Layout.Visuals,
+                });
+            }
+
+            if (stages.Count <= 0)
+                return null;
+
+            _composedStageMapCatalog.Stages = stages.ToArray();
+            return _composedStageMapCatalog;
         }
 
         private void PublishStageCompletedEventIfNeeded()
@@ -259,6 +355,15 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             _warnedStageMapBindingFailure = true;
+            Debug.LogWarning($"[RunDirectorStageBridge] {message}");
+        }
+
+        private void WarnStageCatalogFailureOnce(string message)
+        {
+            if (!LogBindWarnings || _warnedStageCatalogBindingFailure)
+                return;
+
+            _warnedStageCatalogBindingFailure = true;
             Debug.LogWarning($"[RunDirectorStageBridge] {message}");
         }
 

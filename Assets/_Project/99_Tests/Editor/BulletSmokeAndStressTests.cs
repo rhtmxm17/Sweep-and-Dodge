@@ -2090,6 +2090,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreatePlayer(em);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+                var keepRunningSource = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
                 em.SetComponentData(source, new BulletFieldAreaComponent
                 {
@@ -2220,6 +2221,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreatePlayer(em);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+                var keepRunningSource = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
                 em.SetComponentData(source, new BulletFieldAreaComponent
                 {
@@ -2319,6 +2321,20 @@ namespace SweepNDodge.DotsBullets.Tests
                     Count = 3,
                     OldestFrame = 1u,
                 });
+
+                em.SetComponentData(keepRunningSource, new SourceRunDirectorStateComponent
+                {
+                    State = RunDirectorSourceStateId.Baseline,
+                    SelectedClipState = SourceStateId.Normal,
+                    PressureOccupancySec = 0f,
+                    DensityScale = 1f,
+                    Version = 1u,
+                });
+                em.GetBuffer<SourceClipPatternBuffer>(keepRunningSource).Clear();
+                em.GetBuffer<SourceSustainSlotCandidateBuffer>(keepRunningSource).Clear();
+                em.GetBuffer<SourceSustainRuntimeLaneBuffer>(keepRunningSource).Clear();
+                em.GetBuffer<SourceEventQueueBuffer>(keepRunningSource).Clear();
+                em.GetBuffer<SourceSpawnRequestBuffer>(keepRunningSource).Clear();
 
                 world.SetTime(new TimeData(1d, 1f));
                 simGroup.Update();

@@ -63,6 +63,12 @@ namespace SweepNDodge.DotsBullets
         public StageMapCatalogSO Catalog;
     }
 
+    // 런타임 StageCatalog 참조(Managed Singleton).
+    public class StageCatalogRuntimeComponent : IComponentData
+    {
+        public StageCatalogSO Catalog;
+    }
+
     public enum RunDirectorSourceStateId : byte
     {
         Baseline = 0,

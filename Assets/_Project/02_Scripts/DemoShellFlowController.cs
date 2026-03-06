@@ -74,6 +74,7 @@ namespace SweepNDodge.DotsBullets
         {
             EnsureStageProfiles();
             EnsureBridgeReference();
+            SyncBridgeStageCatalogReference();
             EnsureRuntimeHudBridge();
             EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
@@ -97,6 +98,7 @@ namespace SweepNDodge.DotsBullets
         private void Update()
         {
             EnsureBridgeReference();
+            SyncBridgeStageCatalogReference();
             EnsureRuntimeHudBridge();
             EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
@@ -498,6 +500,15 @@ namespace SweepNDodge.DotsBullets
                 _warnedNoBridge = true;
                 Debug.LogWarning("[DemoShellFlowController] RunDirectorStageBridge was not found in scene.");
             }
+        }
+
+        private void SyncBridgeStageCatalogReference()
+        {
+            if (StageBridge == null || StageCatalog == null)
+                return;
+
+            if (StageBridge.StageCatalog != StageCatalog)
+                StageBridge.StageCatalog = StageCatalog;
         }
 
         private void EnsureBridgeSubscription()

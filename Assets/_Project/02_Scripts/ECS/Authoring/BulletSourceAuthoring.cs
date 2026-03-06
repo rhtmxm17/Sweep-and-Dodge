@@ -78,43 +78,40 @@ namespace SweepNDodge.DotsBullets
                     Value = stableId,
                 });
 
-                AddComponent(e, new BulletFieldAreaComponent
+                var fieldArea = new BulletFieldAreaComponent
                 {
                     Shape = authoring.FieldShape,
                     Radius = Mathf.Max(0f, authoring.FieldRadius),
                     Size = new float2(Mathf.Max(0f, authoring.FieldSize.x), Mathf.Max(0f, authoring.FieldSize.y)),
-                    ComputedArea = ComputeArea(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize)
-                });
+                    ComputedArea = SourceRuntimeApplyUtility.ComputeArea(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize)
+                };
+                AddComponent(e, fieldArea);
 
                 AddComponent(e, new SourceSpawnRuntimeComponent
                 {
                     SpawnSequence = 1u
                 });
 
-                var halfExtents = ComputeHalfExtents(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize);
+                var halfExtents = SourceRuntimeApplyUtility.ComputeHalfExtents(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize);
                 float cellSize = Mathf.Max(0.1f, authoring.PollutionCellSize);
-                int cols = Mathf.Max(1, Mathf.CeilToInt((halfExtents.x * 2f) / cellSize));
-                int rows = Mathf.Max(1, Mathf.CeilToInt((halfExtents.y * 2f) / cellSize));
                 float minValue = Mathf.Max(0f, authoring.PollutionMin);
                 float maxValue = Mathf.Max(minValue, authoring.PollutionMax);
 
-                AddComponent(e, new SourcePollutionConfigComponent
+                var pollutionConfig = new SourcePollutionConfigComponent
                 {
                     MinValue = minValue,
                     MaxValue = maxValue,
                     RegenPerSec = Mathf.Max(0f, authoring.PollutionRegenPerSec),
                     DropPerCollect = Mathf.Max(0f, authoring.PollutionDropPerCollect),
                     TopKSampleCount = Mathf.Max(1, authoring.PollutionTopKSampleCount),
-                });
+                };
+                AddComponent(e, pollutionConfig);
 
-                AddComponent(e, new SourcePollutionGridComponent
+                var pollutionGrid = new SourcePollutionGridComponent
                 {
-                    Cols = cols,
-                    Rows = rows,
                     CellSize = cellSize,
-                    InvCellSize = 1f / cellSize,
                     HalfExtents = halfExtents,
-                });
+                };
 
                 var activeCountBuffer = AddBuffer<SourceActiveBulletCountBuffer>(e);
                 var spawnRequestBuffer = AddBuffer<SourceSpawnRequestBuffer>(e);
@@ -151,41 +148,27 @@ namespace SweepNDodge.DotsBullets
                     Version = 1u,
                 });
                 var pressureInputs = AddBuffer<SourceDirectorPressureInputBuffer>(e);
-                pressureInputs.Clear();
-                pressureInputs.Add(new SourceDirectorPressureInputBuffer
-                {
-                    Slot = RunDirectorPressureInputSlotId.InfluenceOccupancy,
-                    Value = 0f,
-                });
-                pressureInputs.Add(new SourceDirectorPressureInputBuffer
-                {
-                    Slot = RunDirectorPressureInputSlotId.InfluenceHoldSec,
-                    Value = 0f,
-                });
+                SourceRuntimeApplyUtility.ResetPressureInputs(pressureInputs);
 
-                BakeV3ClipBindings(
+                SourceRuntimeApplyUtility.RebuildClipBindingsFromAuthoring(
                     authoring,
                     clipPatternBuffer,
                     sustainSlotCandidateBuffer,
                     sustainRuntimeLaneBuffer,
                     eventQueueBuffer,
-                    activeCountBuffer,
-                    ref nextDirectiveId);
+                    activeCountBuffer);
 
                 var pollutionCells = AddBuffer<SourcePollutionCellBuffer>(e);
                 var pollutionDrops = AddBuffer<SourcePollutionDropRequestBuffer>(e);
                 var pollutionValidCellIndices = AddBuffer<SourcePollutionValidCellIndexBuffer>(e);
-                BakePollutionGrid(
+                SourceRuntimeApplyUtility.RebuildPollutionGrid(
+                    in fieldArea,
+                    in pollutionConfig,
+                    ref pollutionGrid,
                     pollutionCells,
                     pollutionDrops,
-                    pollutionValidCellIndices,
-                    cols,
-                    rows,
-                    cellSize,
-                    halfExtents,
-                    authoring.FieldShape,
-                    authoring.FieldRadius,
-                    maxValue);
+                    pollutionValidCellIndices);
+                AddComponent(e, pollutionGrid);
 
                 AddComponent(e, new SourceAnchorComponent
                 {

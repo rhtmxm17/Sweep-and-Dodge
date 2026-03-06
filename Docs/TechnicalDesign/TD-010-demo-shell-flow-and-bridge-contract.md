@@ -12,7 +12,7 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. Stage 선택 데이터는 `StageCatalogSO` 우선 로딩 + 기존 `StageProfiles` fallback 계약을 가진다.
+> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. Bridge는 `RequestStageMapApply(stageId)` 시 `StageMapCatalogRuntimeComponent`와 `StageCatalogRuntimeComponent`를 함께 publish하며, legacy `StageMapCatalogSO`가 비어 있으면 `StageCatalog.Entry.Layout`로 runtime 호환 카탈로그를 합성할 수 있다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -35,7 +35,7 @@
   - `RequestStageMapApply(int stageId)`
   - `RequestStageStart()`, `RequestConfirm()`
   - `SetIntroPresentationDone(bool)`, `SetClearPresentationDone(bool)`
-- ECS StageMap 적용 Owner: `StageMapApplyExecutionBeginSystem`
+- ECS StageMap/Definition 적용 Owner: `StageMapApplyExecutionBeginSystem`
 - ECS Stage 상태/전이 Owner: 기존 시스템 유지 (`RunDirectorStageTransitionSystem` 등)
 
 ## 3. 업데이트 순서 / 전이 계약
@@ -57,6 +57,10 @@
   - `StageCatalog` 할당 시: `Entries` 순서대로 `Enabled=true` 엔트리만 런타임 프로필 구성
   - `StageCatalog` 미할당/유효 엔트리 없음 시: 직렬화된 `StageProfiles` 사용
   - 로딩 중 불일치(예: null Definition/Layout, StageId 중복/불일치)는 경고 후 skip
+- Bridge runtime publish 계약
+  - `StageMapCatalog`가 있으면 이를 runtime singleton에 publish
+  - `StageMapCatalog`가 없고 `StageCatalog.Entry.Layout`가 있으면 runtime 호환 `StageMapCatalogSO`를 합성해 publish
+  - `StageCatalog`가 있으면 `StageCatalogRuntimeComponent`도 함께 publish
 
 ## 5. StageId 경로
 - 로비 선택 -> `EnterStagePlay(stageIndex)`

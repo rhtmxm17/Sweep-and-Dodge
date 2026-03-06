@@ -1071,6 +1071,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static IEnumerator RunSceneSmoke(string scenePath, string sceneLabel, int frameCount)
         {
+            if (scenePath == OperationalScenePath)
+                ClearDemoShellStaging();
+
             SceneManager.LoadScene(scenePath, LoadSceneMode.Single);
             yield return null;
             yield return null;
@@ -1086,6 +1089,46 @@ namespace SweepNDodge.DotsBullets.Tests
                     CountByComponentType<BulletFrameCounterComponent>(em) > 0,
                 300,
                 $"ECS setup was not ready within timeout. scene={sceneLabel}");
+
+            if (scenePath == OperationalScenePath)
+            {
+                DemoShellFlowController shell = null;
+                yield return WaitForCondition(
+                    () =>
+                    {
+                        shell = FindDemoShell();
+                        return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                    },
+                    240,
+                    "Operational scene DemoShell was not ready for smoke bootstrap.");
+
+                Assert.That(shell.RequestStartFromTitle(), Is.True, "Operational smoke must enter Lobby before StagePlay.");
+                yield return WaitForCondition(
+                    () =>
+                    {
+                        shell = FindDemoShell();
+                        return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                    },
+                    240,
+                    "Operational scene smoke did not reach Lobby.");
+
+                Assert.That(shell.RequestSelectStageById(1), Is.True, "Operational smoke must start Stage1.");
+                yield return WaitForCondition(
+                    () =>
+                    {
+                        shell = FindDemoShell();
+                        return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                    },
+                    360,
+                    "Operational scene smoke did not enter StagePlay.");
+
+                yield return WaitForCondition(
+                    () => IsStageMapAppliedForStage1(em),
+                    240,
+                    "Operational scene smoke did not apply Stage1 layout before core loop observation.");
+
+                ForceStageStateToRunning(em, 0f);
+            }
 
             var pipeline = world.GetExistingSystemManaged<BulletFramePipelineGroup>();
             Assert.That(pipeline, Is.Not.Null, "BulletFramePipelineGroup must exist in default world");

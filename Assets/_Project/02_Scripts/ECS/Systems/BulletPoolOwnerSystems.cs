@@ -279,6 +279,18 @@ namespace SweepNDodge.DotsBullets
                     });
                 }
             }
+
+            using (var stageCatalogRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>()))
+            {
+                if (stageCatalogRuntimeQuery.IsEmptyIgnoreFilter)
+                {
+                    var e = em.CreateEntity();
+                    em.AddComponentObject(e, new StageCatalogRuntimeComponent
+                    {
+                        Catalog = null,
+                    });
+                }
+            }
             if (!HasSingleton<RunDirectorPressureWeightSingletonTag>(em))
             {
                 var e = em.CreateEntity(typeof(RunDirectorPressureWeightSingletonTag));

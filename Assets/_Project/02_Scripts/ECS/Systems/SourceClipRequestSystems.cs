@@ -30,10 +30,15 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceActiveBulletCountBuffer>();
             state.RequireForUpdate<SourceSpawnRequestBuffer>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
+            state.RequireForUpdate<RunDirectorStageStateComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
         {
+            var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
+            if (stageState.State != RunDirectorStageStateId.Running)
+                return;
+
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
             var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();

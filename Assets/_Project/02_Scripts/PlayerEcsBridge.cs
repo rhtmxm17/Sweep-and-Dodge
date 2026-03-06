@@ -59,8 +59,11 @@ namespace SweepNDodge.DotsBullets
 
         private void Update()
         {
-            if (!_hasPlayerEntity)
+            if (!_hasPlayerEntity
+                || !_em.World.IsCreated
+                || !_em.Exists(_playerEntity))
             {
+                _hasPlayerEntity = false;
                 TryBind();
                 if (!_hasPlayerEntity) return;
             }
