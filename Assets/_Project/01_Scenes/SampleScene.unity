@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -760,7 +760,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RunDirectorStageBridge
   LogBindWarnings: 1
-  StageMapCatalog: {fileID: 11400000, guid: fef86e0a2b2fee84693f27f62f03d255, type: 2}
+  StageMapCatalog: {fileID: 0}
   OnStageRunCompleted:
     m_PersistentCalls:
       m_Calls: []

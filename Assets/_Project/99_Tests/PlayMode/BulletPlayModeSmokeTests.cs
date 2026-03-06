@@ -331,6 +331,65 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_Stage2_AppliesDifferentLayoutAndPattern()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
+
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Demo shell did not transition Title -> Lobby for Stage2 test.");
+
+            Assert.That(shell.RequestSelectStageById(2), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 2;
+                },
+                360,
+                "Demo shell did not enter StagePlay(Stage2).");
+
+            yield return WaitForCondition(
+                () => IsStageMapAppliedForStage2(em),
+                240,
+                "Stage2 layout/pattern was not applied within timeout.");
+            AssertStageMapAppliedForStage2(em);
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_DemoShell_Stage3Next_GoesToDemoComplete_ThenLobby()
         {
             ClearDemoShellStaging();
@@ -1296,6 +1355,43 @@ namespace SweepNDodge.DotsBullets.Tests
                 && Mathf.Abs(deposit1.Radius - 5f) <= 0.01f;
         }
 
+        private static bool IsStageMapAppliedForStage2(EntityManager em)
+        {
+            if (!TryFindSourceByStableId(em, 1001u, out var source1001))
+                return false;
+            if (!TryFindSourceByStableId(em, 1002u, out var source1002))
+                return false;
+            if (!TryFindSourceByStableId(em, 1003u, out var source1003))
+                return false;
+            if (!TryFindDepositByStableId(em, 2001u, out var deposit2001))
+                return false;
+
+            var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
+            var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
+            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
+            var area2 = em.GetComponentData<BulletFieldAreaComponent>(source1002);
+            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+            var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
+
+            bool hazardOnly = clipPatterns2.Length > 0;
+            for (int i = 0; i < clipPatterns2.Length; i++)
+            {
+                if (clipPatterns2[i].Lane != SourceSpawnLaneId.Hazard)
+                {
+                    hazardOnly = false;
+                    break;
+                }
+            }
+
+            return sourceState1.State == SourceStateId.Depleted
+                && sourceState2.State == SourceStateId.Normal
+                && sourceState3.State == SourceStateId.Depleted
+                && area2.Shape == BulletFieldShapeId.Circle
+                && Mathf.Abs(area2.Radius - 6f) <= 0.01f
+                && Mathf.Abs(deposit1.Radius - 4f) <= 0.01f
+                && hazardOnly;
+        }
+
         private static void AssertStageMapAppliedForStage1(EntityManager em)
         {
             Assert.That(TryFindSourceByStableId(em, 1001u, out var source1001), Is.True);
@@ -1316,6 +1412,31 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(area1.Size.x, Is.EqualTo(12f).Within(0.01f));
             Assert.That(area1.Size.y, Is.EqualTo(8f).Within(0.01f));
             Assert.That(deposit1.Radius, Is.EqualTo(5f).Within(0.01f));
+        }
+
+        private static void AssertStageMapAppliedForStage2(EntityManager em)
+        {
+            Assert.That(TryFindSourceByStableId(em, 1001u, out var source1001), Is.True);
+            Assert.That(TryFindSourceByStableId(em, 1002u, out var source1002), Is.True);
+            Assert.That(TryFindSourceByStableId(em, 1003u, out var source1003), Is.True);
+            Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
+
+            var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
+            var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
+            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
+            var area2 = em.GetComponentData<BulletFieldAreaComponent>(source1002);
+            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+            var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
+
+            Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Depleted));
+            Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Normal));
+            Assert.That(sourceState3.State, Is.EqualTo(SourceStateId.Depleted));
+            Assert.That(area2.Shape, Is.EqualTo(BulletFieldShapeId.Circle));
+            Assert.That(area2.Radius, Is.EqualTo(6f).Within(0.01f));
+            Assert.That(deposit1.Radius, Is.EqualTo(4f).Within(0.01f));
+            Assert.That(clipPatterns2.Length, Is.GreaterThan(0));
+            for (int i = 0; i < clipPatterns2.Length; i++)
+                Assert.That(clipPatterns2[i].Lane, Is.EqualTo(SourceSpawnLaneId.Hazard));
         }
 
         private static bool TryFindSourceByStableId(EntityManager em, uint stableId, out Entity sourceEntity)

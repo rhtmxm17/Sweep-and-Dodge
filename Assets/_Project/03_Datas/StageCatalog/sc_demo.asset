@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -13,4 +13,16 @@ MonoBehaviour:
   m_Name: sc_demo
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageCatalogSO
   SchemaVersion: 1
-  Entries: []
+  Entries:
+  - Enabled: 1
+    EntryKey: stage_01
+    Definition: {fileID: 11400000, guid: 3160656c95e13a84b821425457327c39, type: 2}
+    Layout: {fileID: 11400000, guid: 2f4ee260d250cc947849ca730c9333c5, type: 2}
+  - Enabled: 1
+    EntryKey: stage_02
+    Definition: {fileID: 11400000, guid: 3a118228ad254bf1a86d8d9a99323df1, type: 2}
+    Layout: {fileID: 11400000, guid: a9c7ae4a264348f5be8a34ea7160f1fd, type: 2}
+  - Enabled: 1
+    EntryKey: stage_03
+    Definition: {fileID: 11400000, guid: 2f3d121991554812ae4a9eaa5ae57667, type: 2}
+    Layout: {fileID: 11400000, guid: 6aefe56c6ec34820bdc8024f6240ab67, type: 2}

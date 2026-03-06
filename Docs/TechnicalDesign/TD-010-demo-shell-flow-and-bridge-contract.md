@@ -12,7 +12,7 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. Bridge는 `RequestStageMapApply(stageId)` 시 `StageMapCatalogRuntimeComponent`와 `StageCatalogRuntimeComponent`를 함께 publish하며, legacy `StageMapCatalogSO`가 비어 있으면 `StageCatalog.Entry.Layout`로 runtime 호환 카탈로그를 합성할 수 있다.
+> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. Phase A 기준 `SampleScene`은 `StageCatalogSO`를 주 경로로 사용하며, Bridge는 `RequestStageMapApply(stageId)` 시 `StageMapCatalogRuntimeComponent`와 `StageCatalogRuntimeComponent`를 함께 publish한다. `StageMapCatalogSO`는 deprecated fallback으로만 남고, 비어 있으면 `StageCatalog.Entry.Layout`로 runtime 호환 카탈로그를 합성한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -57,7 +57,9 @@
   - `StageCatalog` 할당 시: `Entries` 순서대로 `Enabled=true` 엔트리만 런타임 프로필 구성
   - `StageCatalog` 미할당/유효 엔트리 없음 시: 직렬화된 `StageProfiles` 사용
   - 로딩 중 불일치(예: null Definition/Layout, StageId 중복/불일치)는 경고 후 skip
+  - `sc_demo`는 수작업 운영 자산이 아니라 편집 씬 + generator/composer가 만든 생성물로 취급한다
 - Bridge runtime publish 계약
+  - `SampleScene` 주 경로는 `StageMapCatalog = null` 상태의 runtime compose 경로다
   - `StageMapCatalog`가 있으면 이를 runtime singleton에 publish
   - `StageMapCatalog`가 없고 `StageCatalog.Entry.Layout`가 있으면 runtime 호환 `StageMapCatalogSO`를 합성해 publish
   - `StageCatalog`가 있으면 `StageCatalogRuntimeComponent`도 함께 publish
@@ -70,8 +72,11 @@
 
 ## 6. 씬/운영 기준
 - `SampleScene`
-  - `DemoShellFlowController.StageCatalog` 연결 시 카탈로그 기반 로비 목록 사용
+  - `DemoShellFlowController.StageCatalog = sc_demo`
+  - `RunDirectorStageBridge.StageMapCatalog = null`
+  - `StageCatalog.Entry.Layout -> runtime compose` 경로를 주 경로로 사용
   - 미연결 시 기존 `StageProfiles` fallback 동작
+  - `sc_demo` 갱신은 `StageLayoutEditingSampleV1.unity` 수정 후 generator/composer 실행으로 수행한다
 - `PlayModeSmoke_Dedicated`
   - 기존 스모크 목적 유지
 
@@ -86,8 +91,11 @@
     - Entries 순서 반영
     - Enabled 필터
     - fallback 동작
+  - `StageCatalogSampleAssetsTests`
+    - `sc_demo` / `sd_demo_1~3` / `sl_demo_1~3` 자산 유효성
 - PlayMode 회귀
   - `Title -> Lobby -> Stage -> Result -> Retry/Next -> DemoComplete`
+  - `Stage2` layout/pattern 차이 반영
 
 ## 8. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)

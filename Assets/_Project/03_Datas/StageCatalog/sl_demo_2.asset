@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -10,27 +10,27 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ded24860c6a0ae844a3e661c60e40647, type: 3}
-  m_Name: sl_demo_1
+  m_Name: sl_demo_2
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutSO
-  StageId: 1
+  StageId: 2
   Sources:
-  - StableId: 1001
+  - StableId: 1002
     Active: 1
-    Position: {x: 0, y: 0, z: 0}
+    Position: {x: -12, y: 0, z: 6}
     YawDeg: 0
-    FieldShape: 1
-    FieldRadius: 8
-    FieldSize: {x: 12, y: 8}
+    FieldShape: 0
+    FieldRadius: 6
+    FieldSize: {x: 10, y: 10}
   Deposits:
   - StableId: 2001
     Active: 1
-    Position: {x: 0, y: 0, z: 10}
-    Radius: 5
+    Position: {x: -8, y: 0, z: -9}
+    Radius: 4
   Obstacles: []
   Visuals:
-  - StableId: 9001
+  - StableId: 9002
     Active: 1
-    Position: {x: 0, y: 0, z: 0}
-    Euler: {x: 0, y: 0, z: 0}
+    Position: {x: -12, y: 0, z: 6}
+    Euler: {x: 0, y: 15, z: 0}
     Scale: {x: 1, y: 1, z: 1}
-    VisualKey: preview_visual_01
+    VisualKey: preview_visual_02

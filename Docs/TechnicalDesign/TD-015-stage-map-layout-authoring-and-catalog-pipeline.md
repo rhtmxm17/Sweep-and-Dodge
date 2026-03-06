@@ -11,7 +11,7 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> v1.5는 `정의/레이아웃 분리(Dual Catalog)`를 유지하면서, `StageDefinitionSO`의 Source 정의/패턴을 `StageMapApplyExecutionBeginSystem`이 런타임에서 함께 소비한다. `Obstacle/Visual`, stage-level override, 운영 fail-fast는 다음 페이즈 이월이다.
+> v1.5는 `정의/레이아웃 분리(Dual Catalog)`를 유지하면서, `StageDefinitionSO`의 Source 정의/패턴을 `StageMapApplyExecutionBeginSystem`이 런타임에서 함께 소비한다. Phase A에서는 샘플 `StageCatalogSO`를 `Stage1~3`로 실제 authoring하고, `SampleScene`의 주 경로를 `StageCatalog` 기반 runtime compose 경로로 전환한다. `Obstacle/Visual`, stage-level override, 운영 fail-fast는 다음 페이즈 이월이다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -20,6 +20,7 @@
 - `RunDirectorStageBridge -> RequestStageMapApply(stageId)` 단일 입력 경로를 유지한다.
 - `StageDefinitionSO.SourceBindings`를 런타임 Source에 적용한다.
 - `SourceClipRequestBuildSystem`은 `RunDirectorStageState == Running`에서만 요청을 생성한다.
+- 샘플 운영 씬은 `StageCatalogSO`를 주 경로로 사용하고, `StageMapCatalogSO`는 deprecated fallback으로만 유지한다.
 
 ### 1.2 비목표 (다음 페이즈 이월)
 - `RunDirectorStageConfig/RunProgressDirectorConfig/SpawnRequestPolicy` stage-level override 런타임 적용
@@ -31,6 +32,8 @@
 - `DemoShellFlowController`는 `StageCatalogSO`가 있으면 카탈로그에서 `StageProfiles`를 구성하고, 없으면 기존 직렬화 `StageProfiles`를 fallback으로 사용한다.
 - `RunDirectorStageBridge`는 `RequestStageMapApply(stageId)` 호출 시 `StageMapCatalogRuntimeComponent`와 `StageCatalogRuntimeComponent`를 함께 최신화한다.
 - `SourceClipRequestBuildSystem`은 stage state gate를 가져 `Running` 전에는 clip request를 만들지 않는다.
+- 샘플 자산은 `sc_demo -> Stage1~3 enabled entries`, `sd_demo_1~3`, `sl_demo_1~3`로 채우고, `smc_demo`는 deprecated compatibility artifact로만 유지한다.
+- 샘플 자산의 SSOT는 `StageLayoutEditingSampleV1.unity`의 marker 구성이다. `sc_demo`, `sd_demo_*`, `sl_demo_*`, `smc_demo`는 생성물로 취급한다.
 
 ## 3. 소유권 (Owner / Writer)
 - Definition 생성/동기화 Owner: `StageDefinitionGenerator`
@@ -98,7 +101,7 @@
   - 정의-레이아웃 stage/source 누락은 경고 기록
   - 일치 항목만 적용
 - 런타임 Source 조인 규칙
-  - 조인 키: `StageId + SourceStableId`
+  - 조인 키: `SourceStableId`
   - layout active=false 또는 layout 미매핑: safe-disable
   - definition binding 미매핑: safe-disable
   - definition stage 미존재: layout-only apply + baked clip pattern 유지
@@ -113,11 +116,27 @@
   - `Definition/Layout`를 명시적 페어 엔트리로 조립
 - `ContentValidationRunner`
   - `StageCatalogSO` 수집/검증 체인 추가
+- 샘플 갱신 루틴(정식)
+  1. `StageLayoutEditingSampleV1.unity`에서 `StageLayoutStageMarker`, `StageSourceMarker`, `StageDepositMarker`, `StageVisualMarker`를 수정한다.
+  2. `StageDefinitionGenerator`로 `sd_demo_*`를 갱신한다.
+  3. `StageLayoutCatalogGenerator`로 `sl_demo_*`와 deprecated `smc_demo`를 갱신한다.
+  4. `StageCatalogComposer`로 `sc_demo`를 갱신한다.
+  5. 생성된 asset을 검증/커밋한다.
+- 운영 규칙
+  - `sc_demo`, `sd_demo_*`, `sl_demo_*`, `smc_demo` 직접 수정은 원칙적으로 금지한다.
+  - 예외적으로 직접 수정한 경우에는 편집 씬 marker 기준과 다시 일치시켜야 한다.
 
 ## 7. 런타임 반영(v1.5)
 - `DemoShellFlowController`
   - 시작 시 `StageCatalogSO`를 읽어 런타임 `StageProfiles` 구성
   - 미할당/유효 엔트리 없음 시 기존 `StageProfiles` fallback
+- `SampleScene`
+  - `DemoShellFlowController.StageCatalog = sc_demo`
+  - `RunDirectorStageBridge.StageMapCatalog = null`
+  - Stage apply는 `StageCatalog.Entry.Layout -> runtime compose` 경로를 주 경로로 사용
+- 샘플 asset 관리
+  - `SampleScene`은 생성된 `sc_demo`를 소비만 한다.
+  - 샘플 자산 변경은 씬 직접 소비 경로가 아니라 편집 씬 + generator/composer 경로로 갱신한다.
 - `EnterStagePlay`
   - 선택 엔트리의 `Definition.StageId`를 사용해 `RequestStageMapApply(stageId)` 호출
 - `StageMapApplyExecutionBeginSystem`
@@ -139,7 +158,8 @@
 3. ContentValidationRunner 체인 추가 (`완료`)
 4. DemoShell StageCatalog 로딩 + fallback 경로 반영 (`완료`)
 5. StageDefinition Source runtime apply (`완료`)
-6. stage-level override / Deposit/Obstacle/Visual 런타임 소비 (`다음 페이즈`)
+6. 샘플 StageCatalog authoring + SampleScene StageCatalog 주 경로 전환 (`완료`)
+7. stage-level override / Deposit/Obstacle/Visual 런타임 소비 (`다음 페이즈`)
 
 ## 9. 검증 계획 / 합격 기준
 - 공통
@@ -160,8 +180,13 @@
     - Entries 순서 반영
     - Enabled 필터
     - fallback 동작
+  - `StageCatalogSampleAssetsTests`:
+    - `sc_demo`가 비어 있지 않음
+    - `sd_demo_1/2/3`의 `SourceBindings`가 비어 있지 않음
+    - `sl_demo_1/2/3`가 모두 존재함
 - PlayMode
   - DemoShell 회귀 스모크(`Title -> Lobby -> Stage -> Result -> Retry/Next`)
+  - `Stage2` layout/pattern 차이 반영 확인
 
 ## 10. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)

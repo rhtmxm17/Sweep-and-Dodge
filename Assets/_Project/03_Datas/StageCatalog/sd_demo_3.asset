@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -10,24 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d9212538da431464da940fb210a3d92b, type: 3}
-  m_Name: sd_demo_1
+  m_Name: sd_demo_3
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDefinitionSO
-  StageId: 1
-  DisplayName: Stage 1 - Baseline
-  IsFinalStage: 0
-  StageTimeLimitSec: 150
+  StageId: 3
+  DisplayName: Stage 3 - Final Sweep
+  IsFinalStage: 1
+  StageTimeLimitSec: 210
   SourceBindings:
-  - SourceStableId: 1001
+  - SourceStableId: 1003
     InitialSourceState: 0
-    ThresholdWeakened: 2000
-    ThresholdDepleted: 4000
+    ThresholdWeakened: 1800
+    ThresholdDepleted: 3600
     SustainSlots:
-    - State: 0
-      Lane: 0
-      Clips:
-      - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
-      Weights:
-      - 1
     - State: 0
       Lane: 1
       Clips:
@@ -35,15 +29,9 @@ MonoBehaviour:
       Weights:
       - 1
     - State: 1
-      Lane: 0
-      Clips:
-      - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
-      Weights:
-      - 1
-    - State: 1
       Lane: 1
       Clips:
-      - {fileID: 11400000, guid: 13955e787a1b4edfa70b980acec4da95, type: 2}
+      - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
       Weights:
       - 1
     EventSlots:
