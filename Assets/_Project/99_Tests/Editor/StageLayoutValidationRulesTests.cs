@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
@@ -9,111 +9,97 @@ namespace SweepNDodge.DotsBullets.Tests
     public class StageLayoutValidationRulesTests
     {
         [Test]
-        public void DuplicateStageId_IsReportedAsError()
+        public void InvalidStageId_IsReportedAsError()
         {
-            var catalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
             try
             {
-                catalog.Stages = new[]
-                {
-                    new StageMapDefinition { StageId = 1, Sources = System.Array.Empty<StageSourceLayoutData>(), Deposits = System.Array.Empty<StageDepositLayoutData>() },
-                    new StageMapDefinition { StageId = 1, Sources = System.Array.Empty<StageSourceLayoutData>(), Deposits = System.Array.Empty<StageDepositLayoutData>() },
-                };
+                layout.StageId = 0;
+                layout.Sources = System.Array.Empty<StageSourceLayoutData>();
+                layout.Deposits = System.Array.Empty<StageDepositLayoutData>();
 
                 var issues = new List<ContentValidationIssue>();
-                StageLayoutValidationRules.ValidateCatalogRecords(
-                    new List<ContentValidationRecord<StageMapCatalogSO>>
+                StageLayoutValidationRules.ValidateLayoutRecords(
+                    new List<ContentValidationRecord<StageLayoutSO>>
                     {
-                        new ContentValidationRecord<StageMapCatalogSO>(catalog, "catalog")
+                        new ContentValidationRecord<StageLayoutSO>(layout, "layout")
                     },
                     issues);
 
-                Assert.That(issues.Any(x => x.Code == "STG002" && x.Severity == ContentValidationSeverity.Error), Is.True);
+                Assert.That(issues.Any(x => x.Code == "STL001" && x.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
-                Object.DestroyImmediate(catalog);
+                Object.DestroyImmediate(layout);
             }
         }
 
         [Test]
-        public void DuplicateSourceStableIdInSameStage_IsReportedAsError()
+        public void DuplicateSourceStableIdInSameLayout_IsReportedAsError()
         {
-            var catalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
             try
             {
-                catalog.Stages = new[]
+                layout.StageId = 3;
+                layout.Sources = new[]
                 {
-                    new StageMapDefinition
-                    {
-                        StageId = 3,
-                        Sources = new[]
-                        {
-                            new StageSourceLayoutData { StableId = 100, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 4f },
-                            new StageSourceLayoutData { StableId = 100, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 5f },
-                        },
-                        Deposits = new[]
-                        {
-                            new StageDepositLayoutData { StableId = 200, Active = true, Radius = 1f },
-                        },
-                    },
+                    new StageSourceLayoutData { StableId = 100, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 4f },
+                    new StageSourceLayoutData { StableId = 100, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 5f },
+                };
+                layout.Deposits = new[]
+                {
+                    new StageDepositLayoutData { StableId = 200, Active = true, Radius = 1f },
                 };
 
                 var issues = new List<ContentValidationIssue>();
-                StageLayoutValidationRules.ValidateCatalogRecords(
-                    new List<ContentValidationRecord<StageMapCatalogSO>>
+                StageLayoutValidationRules.ValidateLayoutRecords(
+                    new List<ContentValidationRecord<StageLayoutSO>>
                     {
-                        new ContentValidationRecord<StageMapCatalogSO>(catalog, "catalog")
+                        new ContentValidationRecord<StageLayoutSO>(layout, "layout")
                     },
                     issues);
 
-                Assert.That(issues.Any(x => x.Code == "STG003" && x.Severity == ContentValidationSeverity.Error), Is.True);
+                Assert.That(issues.Any(x => x.Code == "STL003" && x.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
-                Object.DestroyImmediate(catalog);
+                Object.DestroyImmediate(layout);
             }
         }
 
         [Test]
         public void EmptyVisualKey_IsReportedAsWarning()
         {
-            var catalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
             try
             {
-                catalog.Stages = new[]
+                layout.StageId = 5;
+                layout.Sources = new[]
                 {
-                    new StageMapDefinition
-                    {
-                        StageId = 5,
-                        Sources = new[]
-                        {
-                            new StageSourceLayoutData { StableId = 10, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
-                        },
-                        Deposits = new[]
-                        {
-                            new StageDepositLayoutData { StableId = 20, Active = true, Radius = 1f },
-                        },
-                        Visuals = new[]
-                        {
-                            new StageVisualLayoutData { StableId = 30, Active = true, VisualKey = "" },
-                        },
-                    },
+                    new StageSourceLayoutData { StableId = 10, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
+                };
+                layout.Deposits = new[]
+                {
+                    new StageDepositLayoutData { StableId = 20, Active = true, Radius = 1f },
+                };
+                layout.Visuals = new[]
+                {
+                    new StageVisualLayoutData { StableId = 30, Active = true, VisualKey = "" },
                 };
 
                 var issues = new List<ContentValidationIssue>();
-                StageLayoutValidationRules.ValidateCatalogRecords(
-                    new List<ContentValidationRecord<StageMapCatalogSO>>
+                StageLayoutValidationRules.ValidateLayoutRecords(
+                    new List<ContentValidationRecord<StageLayoutSO>>
                     {
-                        new ContentValidationRecord<StageMapCatalogSO>(catalog, "catalog")
+                        new ContentValidationRecord<StageLayoutSO>(layout, "layout")
                     },
                     issues);
 
-                Assert.That(issues.Any(x => x.Code == "STG007" && x.Severity == ContentValidationSeverity.Warning), Is.True);
+                Assert.That(issues.Any(x => x.Code == "STL007" && x.Severity == ContentValidationSeverity.Warning), Is.True);
             }
             finally
             {
-                Object.DestroyImmediate(catalog);
+                Object.DestroyImmediate(layout);
             }
         }
     }

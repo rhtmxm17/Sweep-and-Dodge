@@ -149,7 +149,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutRootMarker
   TargetStageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
-  TargetCatalog: {fileID: 11400000, guid: fef86e0a2b2fee84693f27f62f03d255, type: 2}
   SortByStageId: 1
 --- !u!4 &1200092716
 Transform:

@@ -28,7 +28,7 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 bool synced = StageDefinitionGenerator.TrySyncDefinitionsForRoot(root, out var issues, saveAssets: true);
                 if (synced)
-                    Debug.Log($"[StageDefinition] StageDefinitionSO assets synced for {root.name}");
+                    Debug.Log($"[StageDefinition] Missing StageDefinitionSO bindings ensured for {root.name}");
 
                 ReportIssues(issues);
             }
@@ -38,16 +38,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 bool composed = StageCatalogComposer.TryComposeForRoot(root, out var issues, saveAssets: true);
                 if (composed)
                     Debug.Log($"[StageCatalog] StageCatalogSO composed for {root.name}");
-
-                ReportIssues(issues);
-            }
-
-            EditorGUILayout.Space(6f);
-            if (GUILayout.Button("Generate Legacy StageMapCatalog (Deprecated)"))
-            {
-                bool generated = StageLayoutCatalogGenerator.TryGenerateForRoot(root, out var issues, saveAssets: true);
-                if (generated)
-                    Debug.Log($"[StageLayout] Legacy StageMapCatalog generated for {root.name}");
 
                 ReportIssues(issues);
             }

@@ -333,7 +333,7 @@ namespace SweepNDodge.DotsBullets
 
                 if (_stageMapApplyPending)
                 {
-                    bool applyOk = StageBridge.RequestStageMapApply(startProfile.StageId);
+                    bool applyOk = StageBridge.RequestStageApply(startProfile.StageId);
                     if (!applyOk)
                         return;
 

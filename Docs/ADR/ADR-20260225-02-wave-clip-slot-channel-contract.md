@@ -3,6 +3,7 @@
 
 ## 상태
 - 반영됨(구현 완료)
+- 현행 운영 보충: Source 정의 SSOT는 이후 `StageDefinitionSO`로 이동했고, `BulletSourceAuthoring` 직참조 슬롯은 legacy migration data로 축소됐다.
 
 ## 배경
 - 기존 `WaveTimelineSO`는 Source 단위 전체 흐름을 함께 담고 있어, 이벤트 기반 웨이브 재생/재사용 확장 시 결합도가 높았다.
@@ -16,8 +17,8 @@
 - 데이터 경로를 `Assets/_Project/03_Datas/WaveTimelines`에서 `Assets/_Project/03_Datas/WaveClips`로 전환했다.
 
 2. Source 바인딩 방식
-- 별도 바인딩 SO 없이 `BulletSourceAuthoring` 직참조 배열로 운영한다.
-- 필드명은 `SustainClipSlots[]`, `EventClipSlots[]`로 고정했다.
+- 당시 결정은 별도 바인딩 SO 없이 `BulletSourceAuthoring` 직참조 배열로 운영하는 것이었다.
+- 현재 운영 경로는 `StageDefinitionSO.SourceBindings`가 SSOT이며, `BulletSourceAuthoring` 슬롯 필드는 migration/seed 용도로만 남아 있다.
 
 3. 슬롯/채널 규약
 - 슬롯 키는 `State + Phase + Lane`이다.

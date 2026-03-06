@@ -65,19 +65,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Radius = -0.5f;
                 def.ScoreValue = -7;
 
-                sourceAuthoring.SustainClipSlots = new[]
-                {
-                    new BulletSourceAuthoring.SustainClipSlotAuthoring
-                    {
-                        State = SourceStateId.Normal,
-                        Lane = SourceSpawnLaneId.Hazard,
-                        Clips = new[] { clip },
-                        Weights = new[] { 1f },
-                    }
-                };
-                sourceAuthoring.ThresholdWeakened = -1;
-                sourceAuthoring.ThresholdDepleted = -2;
-                sourceAuthoring.InitialCollectedCount = -3;
                 sourceAuthoring.FieldRadius = -4f;
                 sourceAuthoring.FieldSize = new Vector2(-5f, -6f);
                 sourceAuthoring.PollutionCellSize = 0.01f;
@@ -118,7 +105,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SourceAuthoring_WithoutAnyWaveClipBinding_IsError()
+        public void SourceAuthoring_WithoutAnyWaveClipBinding_IsNotAnError()
         {
             var sourceRoot = new GameObject("source_root");
             var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
@@ -139,8 +126,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV006").ToArray();
-                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
-                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+                Assert.That(errors.Length, Is.EqualTo(0));
             }
             finally
             {

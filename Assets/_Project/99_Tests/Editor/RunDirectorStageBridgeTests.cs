@@ -53,16 +53,15 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Bridge_RequestStageMapApply_WritesRequestAndCatalogSingleton()
+        public void Bridge_RequestStageApply_WritesRequestAndCatalogSingleton()
         {
             var oldDefault = World.DefaultGameObjectInjectionWorld;
             World world = null;
             GameObject go = null;
-            StageMapCatalogSO stageMapCatalog = null;
             StageCatalogSO stageCatalog = null;
             try
             {
-                world = new World("RunDirectorStageBridgeEditWorld_StageMap");
+                world = new World("RunDirectorStageBridgeEditWorld_StageApply");
                 World.DefaultGameObjectInjectionWorld = world;
                 var em = world.EntityManager;
 
@@ -71,27 +70,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 em.CreateEntity(typeof(RunDirectorStageGateComponent));
                 em.CreateEntity(typeof(RunDirectorStageSignalComponent));
 
-                stageMapCatalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
                 stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
 
-                go = new GameObject("RunDirectorStageBridge_Edit_StageMap");
+                go = new GameObject("RunDirectorStageBridge_Edit_StageApply");
                 var bridge = go.AddComponent<RunDirectorStageBridge>();
                 bridge.LogBindWarnings = false;
-                bridge.StageMapCatalog = stageMapCatalog;
                 bridge.StageCatalog = stageCatalog;
 
-                Assert.That(bridge.RequestStageMapApply(7), Is.True);
+                Assert.That(bridge.RequestStageApply(7), Is.True);
 
                 var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
                 Assert.That(request.RequestedStageId, Is.EqualTo(7));
-                Assert.That(request.StageMapApplyRequested, Is.EqualTo(1));
-
-                using var stageMapRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageMapCatalogRuntimeComponent>());
-                Assert.That(stageMapRuntimeQuery.IsEmptyIgnoreFilter, Is.False);
-                var runtimeEntity = stageMapRuntimeQuery.GetSingletonEntity();
-                var runtime = em.GetComponentObject<StageMapCatalogRuntimeComponent>(runtimeEntity);
-                Assert.That(runtime, Is.Not.Null);
-                Assert.That(runtime.Catalog, Is.SameAs(stageMapCatalog));
+                Assert.That(request.StageApplyRequested, Is.EqualTo(1));
 
                 using var stageCatalogRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>());
                 Assert.That(stageCatalogRuntimeQuery.IsEmptyIgnoreFilter, Is.False);
@@ -104,8 +94,6 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 if (go != null)
                     Object.DestroyImmediate(go);
-                if (stageMapCatalog != null)
-                    Object.DestroyImmediate(stageMapCatalog);
                 if (stageCatalog != null)
                     Object.DestroyImmediate(stageCatalog);
                 world?.Dispose();
@@ -114,17 +102,15 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Bridge_RequestStageMapApply_ComposesLegacyStageMapCatalogFromStageCatalog()
+        public void Bridge_RequestStageMapApply_ForwardsToRequestStageApply()
         {
             var oldDefault = World.DefaultGameObjectInjectionWorld;
             World world = null;
             GameObject go = null;
             StageCatalogSO stageCatalog = null;
-            StageDefinitionSO definition = null;
-            StageLayoutSO layout = null;
             try
             {
-                world = new World("RunDirectorStageBridgeEditWorld_ComposeStageMap");
+                world = new World("RunDirectorStageBridgeEditWorld_ObsoleteForward");
                 World.DefaultGameObjectInjectionWorld = world;
                 var em = world.EntityManager;
 
@@ -133,56 +119,20 @@ namespace SweepNDodge.DotsBullets.Tests
                 em.CreateEntity(typeof(RunDirectorStageGateComponent));
                 em.CreateEntity(typeof(RunDirectorStageSignalComponent));
 
-                definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
-                definition.StageId = 3;
-                definition.DisplayName = "Stage 3";
-                definition.StageTimeLimitSec = 120f;
-
-                layout = ScriptableObject.CreateInstance<StageLayoutSO>();
-                layout.StageId = 3;
-                layout.Sources = new[]
-                {
-                    new StageSourceLayoutData
-                    {
-                        StableId = 1001u,
-                        Active = true,
-                    },
-                };
-
                 stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                stageCatalog.Entries = new[]
-                {
-                    new StageCatalogEntry
-                    {
-                        Enabled = true,
-                        EntryKey = "stage_03",
-                        Definition = definition,
-                        Layout = layout,
-                    },
-                };
 
-                go = new GameObject("RunDirectorStageBridge_Edit_ComposeStageMap");
+                go = new GameObject("RunDirectorStageBridge_Edit_ObsoleteForward");
                 var bridge = go.AddComponent<RunDirectorStageBridge>();
                 bridge.LogBindWarnings = false;
                 bridge.StageCatalog = stageCatalog;
 
+#pragma warning disable CS0618
                 Assert.That(bridge.RequestStageMapApply(3), Is.True);
+#pragma warning restore CS0618
 
                 var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
                 Assert.That(request.RequestedStageId, Is.EqualTo(3));
-                Assert.That(request.StageMapApplyRequested, Is.EqualTo(1));
-
-                using var runtimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageMapCatalogRuntimeComponent>());
-                Assert.That(runtimeQuery.IsEmptyIgnoreFilter, Is.False);
-                var runtimeEntity = runtimeQuery.GetSingletonEntity();
-                var runtime = em.GetComponentObject<StageMapCatalogRuntimeComponent>(runtimeEntity);
-                Assert.That(runtime, Is.Not.Null);
-                Assert.That(runtime.Catalog, Is.Not.Null);
-                Assert.That(runtime.Catalog, Is.Not.SameAs(layout));
-                Assert.That(runtime.Catalog.Stages, Has.Length.EqualTo(1));
-                Assert.That(runtime.Catalog.Stages[0].StageId, Is.EqualTo(3));
-                Assert.That(runtime.Catalog.Stages[0].Sources, Has.Length.EqualTo(1));
-                Assert.That(runtime.Catalog.Stages[0].Sources[0].StableId, Is.EqualTo(1001u));
+                Assert.That(request.StageApplyRequested, Is.EqualTo(1));
             }
             finally
             {
@@ -190,10 +140,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     Object.DestroyImmediate(go);
                 if (stageCatalog != null)
                     Object.DestroyImmediate(stageCatalog);
-                if (definition != null)
-                    Object.DestroyImmediate(definition);
-                if (layout != null)
-                    Object.DestroyImmediate(layout);
                 world?.Dispose();
                 World.DefaultGameObjectInjectionWorld = oldDefault;
             }

@@ -8,14 +8,14 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class StageMapApplyExecutionBeginSystemTests
+    public class StageCatalogApplyExecutionBeginSystemTests
     {
         [Test]
-        public void StageMapApply_RequestApplied_RebuildsDefinitionAndDisablesInvalidSources()
+        public void StageCatalogApply_RequestApplied_RebuildsDefinitionAndDisablesInvalidSources()
         {
-            using var world = CreateDefaultTestWorld("StageMapApplyWorld_A", out _);
+            using var world = CreateDefaultTestWorld("StageCatalogApplyWorld_A", out _);
             var em = world.EntityManager;
-            var applySystem = world.GetOrCreateSystem<StageMapApplyExecutionBeginSystem>();
+            var applySystem = world.GetOrCreateSystem<StageCatalogApplyExecutionBeginSystem>();
             var createdAssets = new List<ScriptableObject>();
 
             var sourceMatched = CreateSource(em, 1001u, new float3(-4f, 0f, -2f), state: SourceStateId.Normal, version: 7u);
@@ -28,9 +28,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var depositMapped = CreateDeposit(em, 2001u, new float3(-8f, 0f, 0f), radius: 10f);
             var depositUnmapped = CreateDeposit(em, 9002u, new float3(7f, 0f, 7f), radius: 3f);
 
-            var stageMapCatalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
             var stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-            createdAssets.Add(stageMapCatalog);
             createdAssets.Add(stageCatalog);
 
             try
@@ -105,6 +103,63 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                 };
 
+                var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+                createdAssets.Add(layout);
+                layout.StageId = 1;
+                layout.Sources = new[]
+                {
+                    new StageSourceLayoutData
+                    {
+                        StableId = 1001u,
+                        Active = true,
+                        Position = new Vector3(1f, 0f, 2f),
+                        YawDeg = 90f,
+                        FieldShape = BulletFieldShapeId.Rectangle,
+                        FieldRadius = 0f,
+                        FieldSize = new Vector2(12f, 8f),
+                    },
+                    new StageSourceLayoutData
+                    {
+                        StableId = 1002u,
+                        Active = true,
+                        Position = new Vector3(3f, 0f, 4f),
+                        YawDeg = 0f,
+                        FieldShape = BulletFieldShapeId.Circle,
+                        FieldRadius = 6f,
+                        FieldSize = Vector2.zero,
+                    },
+                    new StageSourceLayoutData
+                    {
+                        StableId = 1003u,
+                        Active = false,
+                        Position = new Vector3(5f, 0f, 6f),
+                        YawDeg = 0f,
+                        FieldShape = BulletFieldShapeId.Circle,
+                        FieldRadius = 3f,
+                        FieldSize = Vector2.zero,
+                    },
+                    new StageSourceLayoutData
+                    {
+                        StableId = 1004u,
+                        Active = true,
+                        Position = new Vector3(7f, 0f, 8f),
+                        YawDeg = 0f,
+                        FieldShape = BulletFieldShapeId.Circle,
+                        FieldRadius = 2f,
+                        FieldSize = Vector2.zero,
+                    },
+                };
+                layout.Deposits = new[]
+                {
+                    new StageDepositLayoutData
+                    {
+                        StableId = 2001u,
+                        Active = true,
+                        Position = new Vector3(0f, 0f, 10f),
+                        Radius = 5f,
+                    },
+                };
+
                 stageCatalog.Entries = new[]
                 {
                     new StageCatalogEntry
@@ -112,73 +167,9 @@ namespace SweepNDodge.DotsBullets.Tests
                         Enabled = true,
                         EntryKey = "stage_01",
                         Definition = definition,
-                        Layout = null,
+                        Layout = layout,
                     },
                 };
-
-                stageMapCatalog.Stages = new[]
-                {
-                    new StageMapDefinition
-                    {
-                        StageId = 1,
-                        Sources = new[]
-                        {
-                            new StageSourceLayoutData
-                            {
-                                StableId = 1001u,
-                                Active = true,
-                                Position = new Vector3(1f, 0f, 2f),
-                                YawDeg = 90f,
-                                FieldShape = BulletFieldShapeId.Rectangle,
-                                FieldRadius = 0f,
-                                FieldSize = new Vector2(12f, 8f),
-                            },
-                            new StageSourceLayoutData
-                            {
-                                StableId = 1002u,
-                                Active = true,
-                                Position = new Vector3(3f, 0f, 4f),
-                                YawDeg = 0f,
-                                FieldShape = BulletFieldShapeId.Circle,
-                                FieldRadius = 6f,
-                                FieldSize = Vector2.zero,
-                            },
-                            new StageSourceLayoutData
-                            {
-                                StableId = 1003u,
-                                Active = false,
-                                Position = new Vector3(5f, 0f, 6f),
-                                YawDeg = 0f,
-                                FieldShape = BulletFieldShapeId.Circle,
-                                FieldRadius = 3f,
-                                FieldSize = Vector2.zero,
-                            },
-                            new StageSourceLayoutData
-                            {
-                                StableId = 1004u,
-                                Active = true,
-                                Position = new Vector3(7f, 0f, 8f),
-                                YawDeg = 0f,
-                                FieldShape = BulletFieldShapeId.Circle,
-                                FieldRadius = 2f,
-                                FieldSize = Vector2.zero,
-                            },
-                        },
-                        Deposits = new[]
-                        {
-                            new StageDepositLayoutData
-                            {
-                                StableId = 2001u,
-                                Active = true,
-                                Position = new Vector3(0f, 0f, 10f),
-                                Radius = 5f,
-                            },
-                        },
-                    },
-                };
-
-                var stageMapRuntimeEntity = GetOrCreateManagedSingletonEntity<StageMapCatalogRuntimeComponent>(em);
-                em.GetComponentObject<StageMapCatalogRuntimeComponent>(stageMapRuntimeEntity).Catalog = stageMapCatalog;
 
                 var stageCatalogRuntimeEntity = GetOrCreateManagedSingletonEntity<StageCatalogRuntimeComponent>(em);
                 em.GetComponentObject<StageCatalogRuntimeComponent>(stageCatalogRuntimeEntity).Catalog = stageCatalog;
@@ -187,14 +178,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
                 {
                     RequestedStageId = 1,
-                    StageMapApplyRequested = 1,
+                    StageApplyRequested = 1,
                 });
 
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
                 applySystem.Update(world.Unmanaged);
 
                 var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
-                Assert.That(request.StageMapApplyRequested, Is.EqualTo(0));
+                Assert.That(request.StageApplyRequested, Is.EqualTo(0));
                 Assert.That(request.RequestedStageId, Is.EqualTo(1));
 
                 var matchedSource = em.GetComponentData<SourceSpawnComponent>(sourceMatched);
@@ -258,25 +249,23 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void StageMapApply_MissingDefinitionStage_AppliesLayoutOnly_AndPreservesClipBuffers()
+        public void StageCatalogApply_MissingDefinitionStage_AppliesLayoutOnly_AndPreservesClipBuffers()
         {
-            using var world = CreateDefaultTestWorld("StageMapApplyWorld_B", out _);
+            using var world = CreateDefaultTestWorld("StageCatalogApplyWorld_B", out _);
             var em = world.EntityManager;
-            var applySystem = world.GetOrCreateSystem<StageMapApplyExecutionBeginSystem>();
+            var applySystem = world.GetOrCreateSystem<StageCatalogApplyExecutionBeginSystem>();
             var createdAssets = new List<ScriptableObject>();
 
             var source = CreateSource(em, 1001u, new float3(7f, 0f, 8f), state: SourceStateId.Weakened, version: 2u);
-            var stageMapCatalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
-            createdAssets.Add(stageMapCatalog);
+            var stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            createdAssets.Add(stageCatalog);
+            createdAssets.Add(layout);
 
             try
             {
-                stageMapCatalog.Stages = new[]
-                {
-                    new StageMapDefinition
-                    {
-                        StageId = 1,
-                        Sources = new[]
+                layout.StageId = 1;
+                layout.Sources = new[]
                         {
                             new StageSourceLayoutData
                             {
@@ -288,18 +277,26 @@ namespace SweepNDodge.DotsBullets.Tests
                                 FieldRadius = 0f,
                                 FieldSize = new Vector2(5f, 4f),
                             },
-                        },
+                        };
+                stageCatalog.Entries = new[]
+                {
+                    new StageCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "stage_01",
+                        Definition = null,
+                        Layout = layout,
                     },
                 };
 
-                var runtimeEntity = GetOrCreateManagedSingletonEntity<StageMapCatalogRuntimeComponent>(em);
-                em.GetComponentObject<StageMapCatalogRuntimeComponent>(runtimeEntity).Catalog = stageMapCatalog;
+                var runtimeEntity = GetOrCreateManagedSingletonEntity<StageCatalogRuntimeComponent>(em);
+                em.GetComponentObject<StageCatalogRuntimeComponent>(runtimeEntity).Catalog = stageCatalog;
 
                 var requestEntity = GetOrCreateSingletonEntity<RunDirectorStageRequestComponent>(em);
                 em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
                 {
                     RequestedStageId = 1,
-                    StageMapApplyRequested = 1,
+                    StageApplyRequested = 1,
                 });
 
                 var beforeClipPatternCount = em.GetBuffer<SourceClipPatternBuffer>(source).Length;

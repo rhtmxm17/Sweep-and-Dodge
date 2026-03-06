@@ -760,7 +760,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RunDirectorStageBridge
   LogBindWarnings: 1
-  StageMapCatalog: {fileID: 0}
   OnStageRunCompleted:
     m_PersistentCalls:
       m_Calls: []

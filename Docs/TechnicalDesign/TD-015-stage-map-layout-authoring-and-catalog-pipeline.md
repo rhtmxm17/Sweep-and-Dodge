@@ -11,16 +11,15 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> v1.5는 `정의/레이아웃 분리(Dual Catalog)`를 유지하면서, `StageDefinitionSO`의 Source 정의/패턴을 `StageMapApplyExecutionBeginSystem`이 런타임에서 함께 소비한다. Phase A에서는 샘플 `StageCatalogSO`를 `Stage1~3`로 실제 authoring하고, `SampleScene`의 주 경로를 `StageCatalog` 기반 runtime compose 경로로 전환한다. `Obstacle/Visual`, stage-level override, 운영 fail-fast는 다음 페이즈 이월이다.
+> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageCatalogApplyExecutionBeginSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve해 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
 - 스테이지 메타/패턴 정의와 물리 레이아웃 데이터를 분리한다.
 - 로비/진행 순서를 `StageCatalogSO.Entries` 순서로 고정한다.
-- `RunDirectorStageBridge -> RequestStageMapApply(stageId)` 단일 입력 경로를 유지한다.
+- `RunDirectorStageBridge -> RequestStageApply(stageId)` 단일 입력 경로를 유지한다.
 - `StageDefinitionSO.SourceBindings`를 런타임 Source에 적용한다.
-- `SourceClipRequestBuildSystem`은 `RunDirectorStageState == Running`에서만 요청을 생성한다.
-- 샘플 운영 씬은 `StageCatalogSO`를 주 경로로 사용하고, `StageMapCatalogSO`는 deprecated fallback으로만 유지한다.
+- 샘플 운영 씬과 에디터 파이프라인을 `StageCatalogSO` 중심으로 닫는다.
 
 ### 1.2 비목표 (다음 페이즈 이월)
 - `RunDirectorStageConfig/RunProgressDirectorConfig/SpawnRequestPolicy` stage-level override 런타임 적용
@@ -28,31 +27,32 @@
 - 운영 빌드 fail-fast 정책 전환
 
 ## 2. 현재 상태(코드 기준)
-- 런타임 적용은 `StageMapApplyExecutionBeginSystem`이 `StageMapCatalogSO` + `StageCatalogSO`를 `StageId`로 조회해 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+- 런타임 적용은 `StageCatalogApplyExecutionBeginSystem`이 `StageCatalogSO`를 `StageId`로 조회해 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+- `RunDirectorStageBridge`는 `StageCatalogRuntimeComponent`만 publish한다.
 - `DemoShellFlowController`는 `StageCatalogSO`가 있으면 카탈로그에서 `StageProfiles`를 구성하고, 없으면 기존 직렬화 `StageProfiles`를 fallback으로 사용한다.
-- `RunDirectorStageBridge`는 `RequestStageMapApply(stageId)` 호출 시 `StageMapCatalogRuntimeComponent`와 `StageCatalogRuntimeComponent`를 함께 최신화한다.
 - `SourceClipRequestBuildSystem`은 stage state gate를 가져 `Running` 전에는 clip request를 만들지 않는다.
-- 샘플 자산은 `sc_demo -> Stage1~3 enabled entries`, `sd_demo_1~3`, `sl_demo_1~3`로 채우고, `smc_demo`는 deprecated compatibility artifact로만 유지한다.
-- 샘플 자산의 SSOT는 `StageLayoutEditingSampleV1.unity`의 marker 구성이다. `sc_demo`, `sd_demo_*`, `sl_demo_*`, `smc_demo`는 생성물로 취급한다.
+- 샘플 자산은 `sc_demo -> Stage1~3 enabled entries`, `sd_demo_1~3`, `sl_demo_1~3`로 구성되며, `StageMapCatalogSO` 경로는 제거됐다.
+- 샘플 자산의 SSOT는 `StageLayoutEditingSampleV1.unity`의 marker 구성이다. `sc_demo`, `sd_demo_*`, `sl_demo_*`는 생성물로 취급한다.
 
 ## 3. 소유권 (Owner / Writer)
-- Definition 생성/동기화 Owner: `StageDefinitionGenerator`
-- Layout 생성 Owner: `StageLayoutCatalogGenerator` (`StageLayoutSO` 대상)
+- Definition 생성/보강 Owner: `StageDefinitionGenerator`
+- Layout 생성 Owner: `StageLayoutCatalogGenerator`
 - Catalog 조립 Owner: `StageCatalogComposer`
 - StageCatalog 검증 Owner: `StageCatalogValidationRules`
-- 런타임 StageMap/Definition 적용 Owner: `StageMapApplyExecutionBeginSystem` (ExecutionBegin)
+- StageLayout 검증 Owner: `StageLayoutValidationRules`
+- 런타임 Stage apply Owner: `StageCatalogApplyExecutionBeginSystem` (ExecutionBegin)
 - GO -> ECS 요청 Writer: `RunDirectorStageBridge` 단일 Writer
 
 ## 4. 업데이트 순서
 - 파이프라인 계약 유지:
   - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
-- StageMap 적용 순서:
+- Stage apply 순서:
   - `BulletPoolOwnerBootstrapSystem`
-  - `StageMapApplyExecutionBeginSystem`
+  - `StageCatalogApplyExecutionBeginSystem`
   - `BulletFieldAreaUpdateSystem`
 
 ## 5. 데이터 구조 / 제약
-### 5.1 신규 SO
+### 5.1 SO 계약
 - `StageCatalogSO`
   - `int SchemaVersion`
   - `StageCatalogEntry[] Entries`
@@ -74,120 +74,86 @@
   - `StageObstacleLayoutData[] Obstacles`
   - `StageVisualLayoutData[] Visuals`
 
-### 5.2 StageDefinition Source 패턴
+### 5.2 Source 정의 계약
 - `StageSourceBinding`
   - `SourceStableId`
   - `InitialSourceState`
   - `ThresholdWeakened`, `ThresholdDepleted`
   - `SustainSlotBinding[]`, `EventSlotBinding[]`
-- `SustainSlotBinding`
-  - `State`, `Lane`, `WaveClipSO[] Clips`, `float[] Weights`
-- `EventSlotBinding`
-  - `TriggerState`, `WaveClipSO[] EventClips`
-
-### 5.3 규칙
-- 로비/진행 순서: `StageCatalogSO.Entries` 배열 순서
-- 로비/진행 대상: `Enabled == true` 엔트리만
-- `EntryKey`는 카탈로그 내 유니크
-- `Definition.StageId == Layout.StageId` 필수
-- Source 조인 키: `StageId + SourceStableId`
-- `StageTimeLimitSec > 0`
+- 런타임 Source 조인 키는 `SourceStableId`다.
 - `ThresholdDepleted >= ThresholdWeakened >= 0`
 - sustain/event slot clip null 금지
 - clip phase 검증:
   - sustain slot: `SourceWavePhaseId.Sustain`
   - event slot: `SourceWavePhaseId.OnStateEnterOnce`
 - 불일치 정책: `Warn + partial apply`
-  - 정의-레이아웃 stage/source 누락은 경고 기록
-  - 일치 항목만 적용
-- 런타임 Source 조인 규칙
-  - 조인 키: `SourceStableId`
-  - layout active=false 또는 layout 미매핑: safe-disable
+  - layout 미매핑 또는 active=false: safe-disable
   - definition binding 미매핑: safe-disable
-  - definition stage 미존재: layout-only apply + baked clip pattern 유지
+  - definition stage 미존재: layout-only apply
+
+### 5.3 `BulletSourceAuthoring` 축소 책임
+- 운영 authoring으로 남는 필드
+  - `StableIdOverride`
+  - field shape/radius/size
+  - pollution grid/config
+  - gizmo/debug
+- deprecated migration data로만 남는 필드
+  - `SustainClipSlots[]`, `EventClipSlots[]`
+  - `ThresholdWeakened`, `ThresholdDepleted`, `InitialCollectedCount`, `InitialState`
+- baker는 deprecated 필드로 runtime clip/threshold/state를 bake하지 않는다. neutral 기본값만 bake하고, 실제 정의는 `StageDefinitionSO` apply가 책임진다.
 
 ## 6. 에디터 파이프라인
 - `StageLayoutCatalogGenerator`
-  - 단일 스테이지 `StageLayoutSO` 생성
-  - 기존 `StageMapCatalogSO` 생성 경로는 v1 호환 유지(deprecated)
+  - 단일 스테이지 `StageLayoutSO` 생성만 담당한다.
 - `StageDefinitionGenerator`
-  - Stage별 Source binding 템플릿 동기화
+  - `sync/overwrite`가 아니라 `additive/reconcile` 도구다.
+  - layout에 있는 stable id 중 `StageDefinitionSO`에 없는 binding만 생성한다.
+  - 기존 binding의 clip/threshold/state 값은 덮어쓰지 않는다.
+  - orphan binding은 제거하지 않고 warning만 남긴다.
 - `StageCatalogComposer`
-  - `Definition/Layout`를 명시적 페어 엔트리로 조립
+  - `Definition/Layout`를 명시적 페어 엔트리로 조립한다.
 - `ContentValidationRunner`
-  - `StageCatalogSO` 수집/검증 체인 추가
+  - `StageCatalogSO`, `StageLayoutSO`, `StageDefinitionSO` 기준으로 검증한다.
 - 샘플 갱신 루틴(정식)
-  1. `StageLayoutEditingSampleV1.unity`에서 `StageLayoutStageMarker`, `StageSourceMarker`, `StageDepositMarker`, `StageVisualMarker`를 수정한다.
-  2. `StageDefinitionGenerator`로 `sd_demo_*`를 갱신한다.
-  3. `StageLayoutCatalogGenerator`로 `sl_demo_*`와 deprecated `smc_demo`를 갱신한다.
+  1. `StageLayoutEditingSampleV1.unity`에서 marker를 수정한다.
+  2. `StageDefinitionGenerator`로 누락 binding을 보강한다.
+  3. `StageLayoutCatalogGenerator`로 `sl_demo_*`를 갱신한다.
   4. `StageCatalogComposer`로 `sc_demo`를 갱신한다.
   5. 생성된 asset을 검증/커밋한다.
-- 운영 규칙
-  - `sc_demo`, `sd_demo_*`, `sl_demo_*`, `smc_demo` 직접 수정은 원칙적으로 금지한다.
-  - 예외적으로 직접 수정한 경우에는 편집 씬 marker 기준과 다시 일치시켜야 한다.
 
-## 7. 런타임 반영(v1.5)
+## 7. 런타임 반영
 - `DemoShellFlowController`
   - 시작 시 `StageCatalogSO`를 읽어 런타임 `StageProfiles` 구성
   - 미할당/유효 엔트리 없음 시 기존 `StageProfiles` fallback
 - `SampleScene`
   - `DemoShellFlowController.StageCatalog = sc_demo`
-  - `RunDirectorStageBridge.StageMapCatalog = null`
-  - Stage apply는 `StageCatalog.Entry.Layout -> runtime compose` 경로를 주 경로로 사용
-- 샘플 asset 관리
-  - `SampleScene`은 생성된 `sc_demo`를 소비만 한다.
-  - 샘플 자산 변경은 씬 직접 소비 경로가 아니라 편집 씬 + generator/composer 경로로 갱신한다.
+  - `RunDirectorStageBridge`는 `StageCatalog`만 참조한다.
 - `EnterStagePlay`
-  - 선택 엔트리의 `Definition.StageId`를 사용해 `RequestStageMapApply(stageId)` 호출
-- `StageMapApplyExecutionBeginSystem`
-  - `RequestedStageId`로 layout stage와 definition stage를 각각 resolve
+  - 선택 엔트리의 `Definition.StageId`를 사용해 `RequestStageApply(stageId)` 호출
+- `StageCatalogApplyExecutionBeginSystem`
+  - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 layout+definition 결합 적용
-  - definition stage 누락 시 layout-only apply
-  - `Deposit`은 기존 layout 경로 유지
-- `StageDefinitionSO.SourceBindings`
-  - threshold / initial state / clip pattern / runtime buffer / pollution init 재구성에 사용
+  - `Deposit`은 layout 적용
   - `OnStateEnterOnce`는 initial apply 직후 자동 발화하지 않음
-  - stage-level override, Deposit/Obstacle/Visual 소비는 이월
-- `RunDirectorStageBridge`
-  - `StageCatalogRuntimeComponent`를 함께 publish
-  - legacy `StageMapCatalogSO` 미할당 시 `StageCatalog.Entry.Layout`로 runtime 호환 `StageMapCatalogSO`를 합성 가능
 
-## 8. 진행 상태
-1. Dual Catalog 타입(`StageCatalogSO`, `StageDefinitionSO`, `StageLayoutSO`) 추가 (`완료`)
-2. Generator/Composer/ValidationRules 추가 (`완료`)
-3. ContentValidationRunner 체인 추가 (`완료`)
-4. DemoShell StageCatalog 로딩 + fallback 경로 반영 (`완료`)
-5. StageDefinition Source runtime apply (`완료`)
-6. 샘플 StageCatalog authoring + SampleScene StageCatalog 주 경로 전환 (`완료`)
-7. stage-level override / Deposit/Obstacle/Visual 런타임 소비 (`다음 페이즈`)
-
-## 9. 검증 계획 / 합격 기준
+## 8. 검증 계획 / 합격 기준
 - 공통
   - compile error 0
   - console error 0
   - EditMode pass
   - PlayMode smoke pass
 - EditMode
-  - `StageCatalogValidationRulesTests`:
-    - null ref
-    - StageId mismatch
-    - EntryKey duplicate
-    - enabled StageId duplicate
-    - threshold 순서 오류
-    - clip phase 오류
-    - source stableId 불일치 경고
-  - `DemoShellFlowControllerStageCatalogTests`:
-    - Entries 순서 반영
-    - Enabled 필터
-    - fallback 동작
-  - `StageCatalogSampleAssetsTests`:
-    - `sc_demo`가 비어 있지 않음
-    - `sd_demo_1/2/3`의 `SourceBindings`가 비어 있지 않음
-    - `sl_demo_1/2/3`가 모두 존재함
+  - `StageCatalogValidationRulesTests`
+  - `StageLayoutValidationRulesTests`
+  - `StageDefinitionGeneratorTests`
+  - `DemoShellFlowControllerStageCatalogTests`
+  - `StageCatalogSampleAssetsTests`
+  - `RunDirectorStageBridgeTests`
+  - `StageCatalogApplyExecutionBeginSystemTests`
 - PlayMode
   - DemoShell 회귀 스모크(`Title -> Lobby -> Stage -> Result -> Retry/Next`)
   - `Stage2` layout/pattern 차이 반영 확인
 
-## 10. 관련 ADR
+## 9. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)

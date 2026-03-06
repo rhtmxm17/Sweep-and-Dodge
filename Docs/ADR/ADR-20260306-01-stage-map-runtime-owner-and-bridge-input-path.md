@@ -1,5 +1,5 @@
 ﻿# ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path
-> StageMap 런타임 적용 Owner를 ExecutionBegin 단일 시스템으로 고정하고, DemoShell StageId 입력 경로를 RunDirectorStageBridge 단일화한 결정
+> Stage 런타임 적용 Owner를 ExecutionBegin 단일 시스템으로 고정하고, DemoShell StageId 입력 경로를 RunDirectorStageBridge 단일화한 결정
 
 ## 배경
 - `TD-015` 1차 구현은 StageMap 데이터/에디터 생성/검증 파이프라인만 완료된 상태였다.
@@ -7,11 +7,11 @@
 - AGENTS.md 원칙상 소유권/업데이트 순서는 명시적으로 단일 책임을 가져야 하며, 중복 writer를 허용하지 않는다.
 
 ## 결정
-- StageMap 런타임 적용 Owner를 `StageMapApplyExecutionBeginSystem`으로 고정한다.
+- Stage 런타임 적용 Owner를 `StageCatalogApplyExecutionBeginSystem`으로 고정한다.
   - 위치: `BulletExecutionBeginGroup`
   - 순서: `BulletPoolOwnerBootstrapSystem` 이후, `BulletFieldAreaUpdateSystem` 이전
 - 입력 경로를 `RunDirectorStageBridge` 단일화한다.
-  - `RequestStageMapApply(int stageId)`가 `RunDirectorStageRequestComponent`에 one-shot 요청을 기록한다.
+  - `RequestStageApply(int stageId)`가 `RunDirectorStageRequestComponent`에 one-shot 요청을 기록한다.
   - DemoShell은 ECS 직접 쓰기를 하지 않고 Bridge API만 호출한다.
 - 매핑 정책은 `StableId` 엄격 1:1을 채택한다.
   - 런타임 duplicate stable id는 경고 후 해당 키 skip
@@ -34,7 +34,7 @@
 
 ## 결과
 - 긍정 효과
-  - StageMap 적용 write 경로가 ExecutionBegin 단일 시스템으로 고정되어 파이프라인 해석이 단순해졌다.
+  - Stage apply write 경로가 ExecutionBegin 단일 시스템으로 고정되어 파이프라인 해석이 단순해졌다.
   - DemoShell StageId 입력 경로가 Bridge 단일화되어 중복/경합 쓰기 리스크가 줄었다.
   - StageId 누락/duplicate stable id 상황에서 fail-safe(경고 + 안전 스킵/비활성화) 동작을 확보했다.
 - 트레이드오프

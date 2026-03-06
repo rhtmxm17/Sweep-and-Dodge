@@ -212,15 +212,15 @@
 | `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, overlap 허용 |
 | `Segments[].Entries[]` | SpawnDirective 인라인 프로필 | 현재 `Payload/Emission/Sampling/Direction` 규약 재사용 |
 
-### 9.2 BulletSourceAuthoring 직참조 필드(현행)
+### 9.2 BulletSourceAuthoring 직참조 필드(legacy authoring)
 | 필드 | 의미 | 운영 규칙 |
 | --- | --- | --- |
-| `SustainClipSlots[].State` | Source 상태 슬롯 | `Normal` / `Weakened` / `Depleted` |
-| `SustainClipSlots[].Lane` | 슬롯 Lane | Lane enum 값 |
-| `SustainClipSlots[].Clips[]` | 해당 Lane 후보군 | 비어 있으면 런타임 skip + Error 로그 |
-| `SustainClipSlots[].Weights[]` | 선택 가중치(옵션) | 길이 불일치/0 이하는 1.0 fallback |
-| `EventClipSlots[].TriggerState` | 이벤트 트리거 상태 | 상태 전환 감지 시 발동 |
-| `EventClipSlots[].EventClips[]` | 이벤트 클립 참조 | 중복 트리거는 큐잉 |
+| `SustainClipSlots[].State` | Source 상태 슬롯 | deprecated. 신규 운영 수정은 `StageDefinitionSO.SourceBindings[].SustainSlots` 기준 |
+| `SustainClipSlots[].Lane` | 슬롯 Lane | deprecated. generator seed 데이터로만 사용 |
+| `SustainClipSlots[].Clips[]` | 해당 Lane 후보군 | deprecated. runtime SSOT 아님 |
+| `SustainClipSlots[].Weights[]` | 선택 가중치(옵션) | deprecated. runtime SSOT 아님 |
+| `EventClipSlots[].TriggerState` | 이벤트 트리거 상태 | deprecated. 신규 운영 수정은 `StageDefinitionSO.SourceBindings[].EventSlots` 기준 |
+| `EventClipSlots[].EventClips[]` | 이벤트 클립 참조 | deprecated. runtime SSOT 아님 |
 
 ### 9.3 실행 규약
 1. 슬롯 키는 `State + Phase + Lane`으로 고정한다.

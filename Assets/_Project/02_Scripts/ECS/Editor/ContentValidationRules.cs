@@ -71,7 +71,6 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateWaveClipContracts(input.Definitions, input.WaveClips, issues);
-            ValidateSourceAuthoringContracts(input.SourceAuthorings, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
             ValidateAutoCorrectionWarnings(input.Definitions, input.VisualAuthorings, input.SourceAuthorings, issues);
 
@@ -516,9 +515,6 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 string location = sourceAuthorings[i].Location;
 
-                WarnIf(authoring.ThresholdWeakened < 0, "CVW021", location, "ThresholdWeakened < 0 will be clamped to 0.", issues);
-                WarnIf(authoring.ThresholdDepleted < authoring.ThresholdWeakened, "CVW022", location, "ThresholdDepleted < ThresholdWeakened will be clamped up to ThresholdWeakened.", issues);
-                WarnIf(authoring.InitialCollectedCount < 0, "CVW023", location, "InitialCollectedCount < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.FieldRadius < 0f, "CVW024", location, "FieldRadius < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.FieldSize.x < 0f || authoring.FieldSize.y < 0f, "CVW025", location, "FieldSize contains negative values and will be clamped to >= 0.", issues);
                 WarnIf(authoring.PollutionCellSize < 0.1f, "CVW026", location, "PollutionCellSize < 0.1 will be clamped to 0.1.", issues);
@@ -536,67 +532,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
 
             issues.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, code, location, message));
-        }
-
-        private static void ValidateSourceAuthoringContracts(
-            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
-            List<ContentValidationIssue> issues)
-        {
-            for (int i = 0; i < sourceAuthorings.Count; i++)
-            {
-                var source = sourceAuthorings[i].Value;
-                if (source == null)
-                    continue;
-
-                if (!HasAnyWaveClipBinding(source))
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "CV006",
-                        sourceAuthorings[i].Location,
-                        "BulletSourceAuthoring has no WaveClip bindings. Configure SustainClipSlots or EventClipSlots."));
-                }
-            }
-        }
-
-        private static bool HasAnyWaveClipBinding(BulletSourceAuthoring source)
-        {
-            if (source == null)
-                return false;
-
-            if (source.SustainClipSlots != null)
-            {
-                for (int i = 0; i < source.SustainClipSlots.Length; i++)
-                {
-                    var slot = source.SustainClipSlots[i];
-                    if (slot.Clips == null)
-                        continue;
-
-                    for (int c = 0; c < slot.Clips.Length; c++)
-                    {
-                        if (slot.Clips[c] != null)
-                            return true;
-                    }
-                }
-            }
-
-            if (source.EventClipSlots != null)
-            {
-                for (int i = 0; i < source.EventClipSlots.Length; i++)
-                {
-                    var slot = source.EventClipSlots[i];
-                    if (slot.EventClips == null)
-                        continue;
-
-                    for (int c = 0; c < slot.EventClips.Length; c++)
-                    {
-                        if (slot.EventClips[c] != null)
-                            return true;
-                    }
-                }
-            }
-
-            return false;
         }
 
         private static void ValidateBulletAuthoringRenderContracts(

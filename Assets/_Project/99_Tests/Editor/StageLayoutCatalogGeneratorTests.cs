@@ -8,7 +8,7 @@ namespace SweepNDodge.DotsBullets.Tests
     public class StageLayoutCatalogGeneratorTests
     {
         [Test]
-        public void GenerateForRoot_SortsByStageIdAndStableId()
+        public void GenerateLayoutsForRoot_SortsByStageIdAndStableId()
         {
             var rootGo = new GameObject("root");
             var stage2Go = new GameObject("stage2");
@@ -17,7 +17,8 @@ namespace SweepNDodge.DotsBullets.Tests
             var srcB = new GameObject("srcB");
             var dep1 = new GameObject("dep1");
             var dep2 = new GameObject("dep2");
-            var catalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
+            var layout1 = ScriptableObject.CreateInstance<StageLayoutSO>();
+            var layout2 = ScriptableObject.CreateInstance<StageLayoutSO>();
 
             try
             {
@@ -29,13 +30,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 dep2.transform.SetParent(stage2Go.transform);
 
                 var root = rootGo.AddComponent<StageLayoutRootMarker>();
-                root.TargetCatalog = catalog;
                 root.SortByStageId = true;
 
                 var stage2 = stage2Go.AddComponent<StageLayoutStageMarker>();
                 stage2.StageId = 2;
+                stage2.TargetLayout = layout2;
                 var stage1 = stage1Go.AddComponent<StageLayoutStageMarker>();
                 stage1.StageId = 1;
+                stage1.TargetLayout = layout1;
 
                 var sourceA = srcA.AddComponent<StageSourceMarker>();
                 sourceA.StableId = 20;
@@ -54,34 +56,39 @@ namespace SweepNDodge.DotsBullets.Tests
                 deposit2.StableId = 40;
                 deposit2.Radius = 1f;
 
-                bool ok = StageLayoutCatalogGenerator.TryGenerateForRoot(root, out var issues, saveAssets: false);
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(root, out var issues, saveAssets: false);
 
                 Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
-                Assert.That(catalog.Stages, Is.Not.Null);
-                Assert.That(catalog.Stages.Length, Is.EqualTo(2));
-                Assert.That(catalog.Stages[0].StageId, Is.EqualTo(1));
-                Assert.That(catalog.Stages[1].StageId, Is.EqualTo(2));
-                Assert.That(catalog.Stages[0].Sources[0].StableId, Is.EqualTo(10u));
-                Assert.That(catalog.Stages[0].Sources[1].StableId, Is.EqualTo(20u));
+                Assert.That(layout1.StageId, Is.EqualTo(1));
+                Assert.That(layout2.StageId, Is.EqualTo(2));
+                Assert.That(layout1.Sources[0].StableId, Is.EqualTo(10u));
+                Assert.That(layout1.Sources[1].StableId, Is.EqualTo(20u));
+                Assert.That(layout2.Deposits[0].StableId, Is.EqualTo(40u));
             }
             finally
             {
-                Object.DestroyImmediate(catalog);
+                Object.DestroyImmediate(layout1);
+                Object.DestroyImmediate(layout2);
                 Object.DestroyImmediate(rootGo);
             }
         }
 
         [Test]
-        public void GenerateForRoot_WithoutTargetCatalog_FailsWithError()
+        public void GenerateLayoutsForRoot_WithoutTargetLayout_FailsWithError()
         {
             var rootGo = new GameObject("root");
+            var stageGo = new GameObject("stage");
             try
             {
-                var root = rootGo.AddComponent<StageLayoutRootMarker>();
-                bool ok = StageLayoutCatalogGenerator.TryGenerateForRoot(root, out var issues, saveAssets: false);
+                stageGo.transform.SetParent(rootGo.transform);
+                rootGo.AddComponent<StageLayoutRootMarker>();
+                var stage = stageGo.AddComponent<StageLayoutStageMarker>();
+                stage.StageId = 1;
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(rootGo.GetComponent<StageLayoutRootMarker>(), out var issues, saveAssets: false);
 
                 Assert.That(ok, Is.False);
-                Assert.That(issues.Any(x => x.Code == "STG901"), Is.True);
+                Assert.That(issues.Any(x => x.Code == "STL901"), Is.True);
             }
             finally
             {
@@ -90,4 +97,3 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
-

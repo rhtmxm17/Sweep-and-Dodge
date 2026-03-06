@@ -1,0 +1,88 @@
+﻿using System.Linq;
+using NUnit.Framework;
+using SweepNDodge.DotsBullets.Editor;
+using UnityEngine;
+
+namespace SweepNDodge.DotsBullets.Tests
+{
+    public class StageDefinitionGeneratorTests
+    {
+        [Test]
+        public void SyncDefinitionsForRoot_PreservesExistingBindings_SeedsMissing_AndWarnsOnOrphan()
+        {
+            var rootGo = new GameObject("root");
+            var stageGo = new GameObject("stage");
+            var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            var authoringGo = new GameObject("source_authoring");
+
+            try
+            {
+                stageGo.transform.SetParent(rootGo.transform);
+
+                var root = rootGo.AddComponent<StageLayoutRootMarker>();
+                var stage = stageGo.AddComponent<StageLayoutStageMarker>();
+                stage.StageId = 1;
+                stage.TargetDefinition = definition;
+                stage.TargetLayout = layout;
+
+                layout.StageId = 1;
+                layout.Sources = new[]
+                {
+                    new StageSourceLayoutData { StableId = 1001u, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
+                    new StageSourceLayoutData { StableId = 1002u, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 3f },
+                };
+
+                definition.StageId = 1;
+                definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1001u,
+                        InitialSourceState = SourceStateId.Depleted,
+                        ThresholdWeakened = 77,
+                        ThresholdDepleted = 88,
+                        SustainSlots = System.Array.Empty<SustainSlotBinding>(),
+                        EventSlots = System.Array.Empty<EventSlotBinding>(),
+                    },
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 9001u,
+                        InitialSourceState = SourceStateId.Normal,
+                        ThresholdWeakened = 5,
+                        ThresholdDepleted = 10,
+                        SustainSlots = System.Array.Empty<SustainSlotBinding>(),
+                        EventSlots = System.Array.Empty<EventSlotBinding>(),
+                    },
+                };
+
+                var authoring = authoringGo.AddComponent<BulletSourceAuthoring>();
+                authoring.StableIdOverride = 1002u;
+                authoring.InitialState = SourceStateId.Weakened;
+                authoring.ThresholdWeakened = 11;
+                authoring.ThresholdDepleted = 22;
+                authoring.SustainClipSlots = System.Array.Empty<BulletSourceAuthoring.SustainClipSlotAuthoring>();
+                authoring.EventClipSlots = System.Array.Empty<BulletSourceAuthoring.EventClipSlotAuthoring>();
+
+                bool ok = StageDefinitionGenerator.TrySyncDefinitionsForRoot(root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True);
+                Assert.That(definition.SourceBindings.Select(x => x.SourceStableId), Is.EqualTo(new uint[] { 1001u, 1002u, 9001u }));
+                Assert.That(definition.SourceBindings[0].ThresholdWeakened, Is.EqualTo(77));
+                Assert.That(definition.SourceBindings[0].ThresholdDepleted, Is.EqualTo(88));
+                Assert.That(definition.SourceBindings[0].InitialSourceState, Is.EqualTo(SourceStateId.Depleted));
+                Assert.That(definition.SourceBindings[1].ThresholdWeakened, Is.EqualTo(11));
+                Assert.That(definition.SourceBindings[1].ThresholdDepleted, Is.EqualTo(22));
+                Assert.That(definition.SourceBindings[1].InitialSourceState, Is.EqualTo(SourceStateId.Weakened));
+                Assert.That(issues.Any(x => x.Code == "SDF905"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(authoringGo);
+                Object.DestroyImmediate(definition);
+                Object.DestroyImmediate(layout);
+                Object.DestroyImmediate(rootGo);
+            }
+        }
+    }
+}

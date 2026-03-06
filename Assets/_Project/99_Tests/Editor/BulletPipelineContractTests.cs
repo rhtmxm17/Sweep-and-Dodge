@@ -68,8 +68,8 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ExecutionBeginSpawnSubSequence_StaysInContractOrder()
         {
-            AssertUpdateAfter(typeof(StageMapApplyExecutionBeginSystem), typeof(BulletPoolOwnerBootstrapSystem));
-            AssertUpdateBefore(typeof(StageMapApplyExecutionBeginSystem), typeof(BulletFieldAreaUpdateSystem));
+            AssertUpdateAfter(typeof(StageCatalogApplyExecutionBeginSystem), typeof(BulletPoolOwnerBootstrapSystem));
+            AssertUpdateBefore(typeof(StageCatalogApplyExecutionBeginSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
             AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateAfter(typeof(SpawnBacklogWarningSystem), typeof(SpawnRequestRoundRobinExecutionSystem));

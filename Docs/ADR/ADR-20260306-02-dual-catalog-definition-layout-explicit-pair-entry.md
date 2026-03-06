@@ -46,4 +46,4 @@
 ## 후속
 - v2에서 `StageDefinitionSO.SourceBindings`를 ECS `SourceClipPatternBuffer`로 재구성 적용한다.
 - stage-level override(`RunDirectorStageConfig/RunProgressDirectorConfig/SpawnRequestPolicy`) 적용 범위를 확정한다.
-- `StageMapCatalogSO` legacy 경로 제거 시점과 migration 절차를 확정한다.
+- 후속으로 남아 있던 `StageMapCatalogSO` legacy 경로는 2026-03-06 cleanup에서 제거되었고, 현재 런타임은 `StageCatalogSO` direct consume 경로를 사용한다.

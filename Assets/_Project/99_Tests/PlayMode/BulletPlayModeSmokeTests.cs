@@ -18,15 +18,16 @@ namespace SweepNDodge.DotsBullets.Tests
         public IEnumerator PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
         {
             yield return RunSceneSmoke(
-                scenePath: DedicatedScenePath,
-                sceneLabel: "PlayModeSmoke_Dedicated",
+                scenePath: OperationalScenePath,
+                sceneLabel: "SampleScene_StageCatalog",
                 frameCount: 120);
         }
 
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_StressSwitch_BurstRequest_ImpactsBacklogAndHud()
         {
-            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
             yield return null;
             yield return null;
 
@@ -34,16 +35,41 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
 
             var em = world.EntityManager;
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene for stress test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Operational stress test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
             yield return WaitForCondition(
                 () =>
                     CountByComponentType<PlayerTag>(em) > 0 &&
                     CountByComponentType<SourceSpawnComponent>(em) > 0 &&
                     CountByComponentType<BulletFrameCounterComponent>(em) > 0 &&
-                    HasSingleton<StressSwitchStateComponent>(em) &&
+                    (shell = FindDemoShell()) != null &&
+                    shell.CurrentScreen == DemoShellScreenId.StagePlay &&
+                    shell.CurrentStageId == 1 &&
+                    IsStageMapAppliedForStage1(em) &&
                     HasSingleton<SpawnBacklogMetricsComponent>(em) &&
                     HasSingleton<DebugHudMetricsComponent>(em),
-                300,
+                480,
                 "ECS singleton setup for stress/HUD was not ready within timeout.");
+            ForceStageStateToRunning(em, 0f);
 
             int baselineMaxPending = 0;
             for (int i = 0; i < 20; i++)
@@ -53,13 +79,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 baselineMaxPending = Mathf.Max(baselineMaxPending, baselineMetrics.PendingCount);
             }
 
-            var stressEntity = GetSingletonEntity<StressSwitchStateComponent>(em);
-            var stress = em.GetComponentData<StressSwitchStateComponent>(stressEntity);
-            stress.Mode = (byte)StressSwitchModeId.BurstOnce;
-            stress.BurstCount = 20000;
-            stress.PreferredBulletTypeKey = -1;
-            stress.RequestExecute = 1;
-            em.SetComponentData(stressEntity, stress);
+            EnqueueBurstRequestsFromFirstPattern(em, requestCount: 20000);
 
             int postMaxPending = 0;
             int postMaxHudSpawned = 0;
@@ -72,9 +92,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 postMaxHudSpawned = Mathf.Max(postMaxHudSpawned, hud.SpawnedThisFrame);
             }
 
-            var stressAfter = GetSingleton<StressSwitchStateComponent>(em);
-            Assert.That(stressAfter.RequestExecute, Is.EqualTo(0), "Stress request flag must be consumed");
-            Assert.That(stressAfter.Mode, Is.EqualTo((byte)StressSwitchModeId.None), "Burst mode must finish as one-shot request");
             Assert.That(postMaxPending, Is.GreaterThan(baselineMaxPending + 1000), "Burst request should noticeably increase pending backlog");
             Assert.That(postMaxHudSpawned, Is.GreaterThan(0), "HUD spawned metric should be updated during burst run");
         }
@@ -82,7 +99,9 @@ namespace SweepNDodge.DotsBullets.Tests
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_DataDrivenPatternScenario_BaselineMetricsAreRecorded()
         {
-            SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
+            ClearDemoShellStaging();
+            DemoShellSessionStaging.StageStagePlay(0);
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
             yield return null;
             yield return null;
 
@@ -93,6 +112,7 @@ namespace SweepNDodge.DotsBullets.Tests
             yield return WaitForCondition(
                 () =>
                     CountByComponentType<SourceSpawnComponent>(em) > 0 &&
+                    IsStageMapAppliedForStage1(em) &&
                     HasSingleton<SpawnBacklogMetricsComponent>(em) &&
                     HasSingleton<BulletFrameCounterComponent>(em),
                 300,
@@ -1546,6 +1566,68 @@ namespace SweepNDodge.DotsBullets.Tests
 #else
             return Object.FindObjectOfType<DemoAudioBridge>();
 #endif
+        }
+
+        private static void EnqueueBurstRequestsFromFirstPattern(EntityManager em, int requestCount)
+        {
+            using var sourceQuery = em.CreateEntityQuery(
+                ComponentType.ReadOnly<SourceSpawnComponent>(),
+                ComponentType.ReadOnly<SourceClipPatternBuffer>(),
+                ComponentType.ReadWrite<SourceSpawnRequestBuffer>());
+            using var sources = sourceQuery.ToEntityArray(Allocator.Temp);
+            Assert.That(sources.Length, Is.GreaterThan(0), "At least one source must exist for burst request test.");
+
+            uint frame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            for (int i = 0; i < sources.Length; i++)
+            {
+                var source = sources[i];
+                var patterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+                if (patterns.Length <= 0)
+                    continue;
+
+                var pattern = patterns[0];
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = pattern.DirectiveId,
+                    Phase = pattern.Phase,
+                    Lane = pattern.Lane,
+                    LanePriority = pattern.LanePriority,
+                    BulletTypeKey = pattern.BulletTypeKey,
+                    SamplingMode = pattern.SamplingMode,
+                    CenterMode = pattern.CenterMode,
+                    DirectionMode = pattern.DirectionMode,
+                    FixedPoint = pattern.FixedPoint,
+                    SpawnOffset = pattern.SpawnOffset,
+                    LineStart = pattern.LineStart,
+                    LineEnd = pattern.LineEnd,
+                    SampleSpacing = pattern.SampleSpacing,
+                    PointSetCount = pattern.PointSetCount,
+                    Point0 = pattern.Point0,
+                    Point1 = pattern.Point1,
+                    Point2 = pattern.Point2,
+                    Point3 = pattern.Point3,
+                    SpawnSampleBudget = pattern.SpawnSampleBudget,
+                    PlayerNoSpawnRadius = pattern.PlayerNoSpawnRadius,
+                    BaseAngleDeg = pattern.BaseAngleDeg,
+                    NWayCount = pattern.NWayCount,
+                    SpiralStepDeg = pattern.SpiralStepDeg,
+                    BurstShotsPerEvent = pattern.BurstShotsPerEvent,
+                    EventShotSchedule = pattern.EventShotSchedule,
+                    EventShotIntervalSec = pattern.EventShotIntervalSec,
+                    EventShotElapsedSec = 0f,
+                    EventAnchorInitialized = 0,
+                    EventAnchorUseFixedPosition = 0,
+                    EventAnchorCenter = default,
+                    EventAnchorPosition = default,
+                    SpawnSequence = 1u,
+                    Count = requestCount,
+                    OldestFrame = frame,
+                });
+                return;
+            }
+
+            Assert.Fail("No source with clip pattern was found for burst request test.");
         }
 
         private static void ClearDemoShellStaging()

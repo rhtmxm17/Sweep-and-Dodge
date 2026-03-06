@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -10,13 +10,12 @@ namespace SweepNDodge.DotsBullets
     /// <summary>
     /// Stage runtime apply owner.
     /// - ExecutionBegin에서 stage apply one-shot 요청을 소비한다.
-    /// - Source layout + definition apply를 단일 consumer로 처리한다.
-    /// - Deposit layout write도 이 시스템이 단일 소유한다.
+    /// - StageCatalog에서 layout + definition을 직접 조회해 Source/Deposit 적용을 수행한다.
     /// </summary>
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
     [UpdateBefore(typeof(BulletFieldAreaUpdateSystem))]
-    public partial struct StageMapApplyExecutionBeginSystem : ISystem
+    public partial struct StageCatalogApplyExecutionBeginSystem : ISystem
     {
         private static readonly float3 DepositSinkPosition = new float3(0f, -10000f, 0f);
 
@@ -29,73 +28,81 @@ namespace SweepNDodge.DotsBullets
         {
             var requestRW = SystemAPI.GetSingletonRW<RunDirectorStageRequestComponent>();
             var request = requestRW.ValueRO;
-            if (request.StageMapApplyRequested == 0)
+            if (request.StageApplyRequested == 0)
                 return;
 
-            request.StageMapApplyRequested = 0;
+            request.StageApplyRequested = 0;
             requestRW.ValueRW = request;
 
             int requestedStageId = request.RequestedStageId;
             if (requestedStageId <= 0)
             {
-                Debug.LogWarning("[StageMapApply] Ignored request with invalid stageId.");
+                Debug.LogWarning("[StageCatalogApply] Ignored request with invalid stageId.");
                 return;
             }
 
-            StageMapDefinition layoutStage = default;
-            bool hasLayoutStage = TryResolveLayoutStage(ref state, requestedStageId, out layoutStage);
+            StageLayoutSO layout = null;
+            bool hasLayout = TryResolveLayout(ref state, requestedStageId, out layout);
             StageDefinitionSO definition = null;
-            bool hasDefinitionStage = TryResolveDefinitionStage(ref state, requestedStageId, out definition);
+            bool hasDefinition = TryResolveDefinition(ref state, requestedStageId, out definition);
 
-            if (hasLayoutStage)
+            if (hasLayout)
             {
-                ApplySourceStage(ref state, requestedStageId, in layoutStage, definition, hasDefinitionStage);
-                ApplyDepositLayout(ref state, requestedStageId, in layoutStage);
+                ApplySourceStage(ref state, requestedStageId, layout, definition, hasDefinition);
+                ApplyDepositLayout(ref state, requestedStageId, layout);
             }
-            else if (hasDefinitionStage)
+            else if (hasDefinition)
             {
-                Debug.LogWarning($"[StageMapApply] Layout stage is missing but definition exists. stageId={requestedStageId}, definition={definition.name}");
+                Debug.LogWarning($"[StageCatalogApply] Layout is missing but definition exists. stageId={requestedStageId}, definition={definition.name}");
             }
         }
 
-        private static bool TryResolveLayoutStage(ref SystemState state, int stageId, out StageMapDefinition stage)
+        private static bool TryResolveLayout(ref SystemState state, int stageId, out StageLayoutSO layout)
         {
-            stage = default;
-            var catalogRuntime = TryGetStageMapCatalogRuntime(ref state);
-            if (catalogRuntime == null || catalogRuntime.Catalog == null)
+            layout = null;
+            var runtime = TryGetStageCatalogRuntime(ref state);
+            if (runtime == null || runtime.Catalog == null)
             {
-                Debug.LogWarning($"[StageMapApply] StageMap catalog is missing. stageId={stageId}");
+                Debug.LogWarning($"[StageCatalogApply] StageCatalog is missing. stageId={stageId}");
                 return false;
             }
 
-            if (!TryFindStage(catalogRuntime.Catalog, stageId, out stage))
+            if (!TryFindEnabledStageLayout(runtime.Catalog, stageId, out layout, out bool duplicateMatch))
             {
-                Debug.LogWarning($"[StageMapApply] StageId not found in StageMap catalog. stageId={stageId}, catalog={catalogRuntime.Catalog.name}");
+                if (duplicateMatch)
+                {
+                    Debug.LogWarning($"[StageCatalogApply] Duplicate enabled StageLayout match detected. Layout apply will be skipped. stageId={stageId}, catalog={runtime.Catalog.name}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[StageCatalogApply] StageLayout not found in StageCatalog. stageId={stageId}, catalog={runtime.Catalog.name}");
+                }
+
                 return false;
             }
 
             return true;
         }
 
-        private static bool TryResolveDefinitionStage(ref SystemState state, int stageId, out StageDefinitionSO definition)
+        private static bool TryResolveDefinition(ref SystemState state, int stageId, out StageDefinitionSO definition)
         {
             definition = null;
-            var catalogRuntime = TryGetStageCatalogRuntime(ref state);
-            if (catalogRuntime == null || catalogRuntime.Catalog == null)
+            var runtime = TryGetStageCatalogRuntime(ref state);
+            if (runtime == null || runtime.Catalog == null)
             {
-                Debug.LogWarning($"[StageMapApply] StageCatalog is missing. Definition apply will be skipped. stageId={stageId}");
+                Debug.LogWarning($"[StageCatalogApply] StageCatalog is missing. Definition apply will be skipped. stageId={stageId}");
                 return false;
             }
 
-            if (!TryFindEnabledStageDefinition(catalogRuntime.Catalog, stageId, out definition, out bool duplicateMatch))
+            if (!TryFindEnabledStageDefinition(runtime.Catalog, stageId, out definition, out bool duplicateMatch))
             {
                 if (duplicateMatch)
                 {
-                    Debug.LogWarning($"[StageMapApply] Duplicate enabled StageDefinition match detected. Definition apply will be skipped. stageId={stageId}, catalog={catalogRuntime.Catalog.name}");
+                    Debug.LogWarning($"[StageCatalogApply] Duplicate enabled StageDefinition match detected. Definition apply will be skipped. stageId={stageId}, catalog={runtime.Catalog.name}");
                 }
                 else
                 {
-                    Debug.LogWarning($"[StageMapApply] StageDefinition not found in StageCatalog. Definition apply will be skipped. stageId={stageId}, catalog={catalogRuntime.Catalog.name}");
+                    Debug.LogWarning($"[StageCatalogApply] StageDefinition not found in StageCatalog. Definition apply will be skipped. stageId={stageId}, catalog={runtime.Catalog.name}");
                 }
 
                 return false;
@@ -107,7 +114,7 @@ namespace SweepNDodge.DotsBullets
         private static void ApplySourceStage(
             ref SystemState state,
             int stageId,
-            in StageMapDefinition layoutStage,
+            StageLayoutSO layout,
             StageDefinitionSO definition,
             bool hasDefinitionStage)
         {
@@ -126,28 +133,28 @@ namespace SweepNDodge.DotsBullets
                 ComponentType.ReadWrite<LocalTransform>());
             using var sourceEntities = sourceQuery.ToEntityArray(Allocator.Temp);
 
-            var layoutById = BuildStageSourceMap(layoutStage.Sources, out int layoutDuplicateCount);
-            var runtimeById = BuildRuntimeSourceMap(em, sourceEntities, out int runtimeDuplicateCount, out var runtimeDuplicateIds);
+            var layoutById = BuildStageSourceMap(layout != null ? layout.Sources : null, out int layoutDuplicateCount);
+            BuildRuntimeSourceMap(em, sourceEntities, out int runtimeDuplicateCount, out var runtimeDuplicateIds);
             var definitionById = hasDefinitionStage
                 ? BuildDefinitionSourceMap(definition.SourceBindings, out int _, out _)
                 : new Dictionary<uint, StageSourceBinding>();
             var definitionDuplicateIds = hasDefinitionStage
-                ? BuildDefinitionDuplicateIdSet(definition.SourceBindings, out int definitionDuplicateCount)
+                ? BuildDefinitionDuplicateIdSet(definition.SourceBindings, out int _)
                 : new HashSet<uint>();
 
             if (layoutDuplicateCount > 0)
             {
-                Debug.LogWarning($"[StageMapApply] Duplicate source stableId in layout stage. stageId={stageId}, duplicateCount={layoutDuplicateCount}");
+                Debug.LogWarning($"[StageCatalogApply] Duplicate source stableId in layout. stageId={stageId}, duplicateCount={layoutDuplicateCount}");
             }
 
             if (runtimeDuplicateCount > 0)
             {
-                Debug.LogWarning($"[StageMapApply] Duplicate runtime source stableId detected. stageId={stageId}, duplicateCount={runtimeDuplicateCount}");
+                Debug.LogWarning($"[StageCatalogApply] Duplicate runtime source stableId detected. stageId={stageId}, duplicateCount={runtimeDuplicateCount}");
             }
 
             if (hasDefinitionStage && definitionDuplicateIds.Count > 0)
             {
-                Debug.LogWarning($"[StageMapApply] Duplicate source stableId in StageDefinition. stageId={stageId}, duplicateCount={definitionDuplicateIds.Count}, definition={definition.name}");
+                Debug.LogWarning($"[StageCatalogApply] Duplicate source stableId in StageDefinition. stageId={stageId}, duplicateCount={definitionDuplicateIds.Count}, definition={definition.name}");
             }
 
             for (int i = 0; i < sourceEntities.Length; i++)
@@ -189,7 +196,7 @@ namespace SweepNDodge.DotsBullets
 
                 if (!definitionById.TryGetValue(stableId, out var binding))
                 {
-                    Debug.LogWarning($"[StageMapApply] Source binding is missing in StageDefinition. stageId={stageId}, stableId={stableId}, definition={definition.name}");
+                    Debug.LogWarning($"[StageCatalogApply] Source binding is missing in StageDefinition. stageId={stageId}, stableId={stableId}, definition={definition.name}");
                     DisableSource(em, sourceEntity);
                     continue;
                 }
@@ -198,7 +205,7 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static void ApplyDepositLayout(ref SystemState state, int stageId, in StageMapDefinition stage)
+        private static void ApplyDepositLayout(ref SystemState state, int stageId, StageLayoutSO layout)
         {
             var em = state.EntityManager;
             using var depositQuery = em.CreateEntityQuery(
@@ -207,18 +214,18 @@ namespace SweepNDodge.DotsBullets
                 ComponentType.ReadWrite<LocalTransform>());
             using var depositEntities = depositQuery.ToEntityArray(Allocator.Temp);
 
-            var stageById = BuildStageDepositMap(stage.Deposits, out int stageDuplicateCount);
+            var stageById = BuildStageDepositMap(layout != null ? layout.Deposits : null, out int stageDuplicateCount);
             var runtimeById = BuildRuntimeDepositMap(em, depositEntities, out int runtimeDuplicateCount, out var runtimeDuplicateIds);
             var mappedIds = new HashSet<uint>();
 
             if (stageDuplicateCount > 0)
             {
-                Debug.LogWarning($"[StageMapApply] Duplicate deposit stableId in layout stage. stageId={stageId}, duplicateCount={stageDuplicateCount}");
+                Debug.LogWarning($"[StageCatalogApply] Duplicate deposit stableId in layout. stageId={stageId}, duplicateCount={stageDuplicateCount}");
             }
 
             if (runtimeDuplicateCount > 0)
             {
-                Debug.LogWarning($"[StageMapApply] Duplicate runtime deposit stableId detected. stageId={stageId}, duplicateCount={runtimeDuplicateCount}");
+                Debug.LogWarning($"[StageCatalogApply] Duplicate runtime deposit stableId detected. stageId={stageId}, duplicateCount={runtimeDuplicateCount}");
             }
 
             foreach (var pair in stageById)
@@ -243,21 +250,6 @@ namespace SweepNDodge.DotsBullets
                 DisableDeposit(em, depositEntity);
             }
         }
-
-        private static StageMapCatalogRuntimeComponent TryGetStageMapCatalogRuntime(ref SystemState state)
-        {
-            var em = state.EntityManager;
-            using var query = em.CreateEntityQuery(ComponentType.ReadWrite<StageMapCatalogRuntimeComponent>());
-            if (query.IsEmptyIgnoreFilter)
-                return null;
-
-            var runtimeEntity = ResolveFirstEntity(query);
-            if (runtimeEntity == Entity.Null || !em.Exists(runtimeEntity))
-                return null;
-
-            return em.GetComponentObject<StageMapCatalogRuntimeComponent>(runtimeEntity);
-        }
-
         private static StageCatalogRuntimeComponent TryGetStageCatalogRuntime(ref SystemState state)
         {
             var em = state.EntityManager;
@@ -272,29 +264,35 @@ namespace SweepNDodge.DotsBullets
             return em.GetComponentObject<StageCatalogRuntimeComponent>(runtimeEntity);
         }
 
-        private static bool TryFindStage(StageMapCatalogSO catalog, int stageId, out StageMapDefinition stage)
+        private static bool TryFindEnabledStageLayout(StageCatalogSO catalog, int stageId, out StageLayoutSO layout, out bool duplicateMatch)
         {
-            stage = default;
-            if (catalog == null || catalog.Stages == null)
+            layout = null;
+            duplicateMatch = false;
+            if (catalog == null || catalog.Entries == null)
                 return false;
 
-            for (int i = 0; i < catalog.Stages.Length; i++)
+            for (int i = 0; i < catalog.Entries.Length; i++)
             {
-                if (catalog.Stages[i].StageId != stageId)
+                var entry = catalog.Entries[i];
+                if (!entry.Enabled || entry.Layout == null)
+                    continue;
+                if (entry.Layout.StageId != stageId)
                     continue;
 
-                stage = catalog.Stages[i];
-                return true;
+                if (layout != null)
+                {
+                    duplicateMatch = true;
+                    layout = null;
+                    return false;
+                }
+
+                layout = entry.Layout;
             }
 
-            return false;
+            return layout != null;
         }
 
-        private static bool TryFindEnabledStageDefinition(
-            StageCatalogSO catalog,
-            int stageId,
-            out StageDefinitionSO definition,
-            out bool duplicateMatch)
+        private static bool TryFindEnabledStageDefinition(StageCatalogSO catalog, int stageId, out StageDefinitionSO definition, out bool duplicateMatch)
         {
             definition = null;
             duplicateMatch = false;
@@ -322,9 +320,7 @@ namespace SweepNDodge.DotsBullets
             return definition != null;
         }
 
-        private static Dictionary<uint, StageSourceLayoutData> BuildStageSourceMap(
-            StageSourceLayoutData[] sources,
-            out int duplicateCount)
+        private static Dictionary<uint, StageSourceLayoutData> BuildStageSourceMap(StageSourceLayoutData[] sources, out int duplicateCount)
         {
             duplicateCount = 0;
             var map = new Dictionary<uint, StageSourceLayoutData>();
@@ -353,10 +349,7 @@ namespace SweepNDodge.DotsBullets
             return map;
         }
 
-        private static Dictionary<uint, StageSourceBinding> BuildDefinitionSourceMap(
-            StageSourceBinding[] bindings,
-            out int duplicateCount,
-            out HashSet<uint> duplicateIds)
+        private static Dictionary<uint, StageSourceBinding> BuildDefinitionSourceMap(StageSourceBinding[] bindings, out int duplicateCount, out HashSet<uint> duplicateIds)
         {
             duplicateCount = 0;
             duplicateIds = new HashSet<uint>();
@@ -391,9 +384,7 @@ namespace SweepNDodge.DotsBullets
             return duplicateIds;
         }
 
-        private static Dictionary<uint, StageDepositLayoutData> BuildStageDepositMap(
-            StageDepositLayoutData[] deposits,
-            out int duplicateCount)
+        private static Dictionary<uint, StageDepositLayoutData> BuildStageDepositMap(StageDepositLayoutData[] deposits, out int duplicateCount)
         {
             duplicateCount = 0;
             var map = new Dictionary<uint, StageDepositLayoutData>();
@@ -422,11 +413,7 @@ namespace SweepNDodge.DotsBullets
             return map;
         }
 
-        private static Dictionary<uint, Entity> BuildRuntimeSourceMap(
-            EntityManager em,
-            NativeArray<Entity> entities,
-            out int duplicateCount,
-            out HashSet<uint> duplicateIds)
+        private static void BuildRuntimeSourceMap(EntityManager em, NativeArray<Entity> entities, out int duplicateCount, out HashSet<uint> duplicateIds)
         {
             duplicateCount = 0;
             duplicateIds = new HashSet<uint>();
@@ -448,15 +435,9 @@ namespace SweepNDodge.DotsBullets
 
                 map.Add(stableId, entities[i]);
             }
-
-            return map;
         }
 
-        private static Dictionary<uint, Entity> BuildRuntimeDepositMap(
-            EntityManager em,
-            NativeArray<Entity> entities,
-            out int duplicateCount,
-            out HashSet<uint> duplicateIds)
+        private static Dictionary<uint, Entity> BuildRuntimeDepositMap(EntityManager em, NativeArray<Entity> entities, out int duplicateCount, out HashSet<uint> duplicateIds)
         {
             duplicateCount = 0;
             duplicateIds = new HashSet<uint>();
@@ -498,102 +479,20 @@ namespace SweepNDodge.DotsBullets
             area.Shape = sourceData.FieldShape;
             area.Radius = math.max(0f, sourceData.FieldRadius);
             area.Size = math.max(float2.zero, new float2(sourceData.FieldSize.x, sourceData.FieldSize.y));
-            area.ComputedArea = SourceRuntimeApplyUtility.ComputeArea(
-                area.Shape,
-                area.Radius,
-                new Vector2(area.Size.x, area.Size.y));
+            area.ComputedArea = SourceRuntimeApplyUtility.ComputeArea(area.Shape, area.Radius, new Vector2(area.Size.x, area.Size.y));
 
-            RebuildPollutionGridRuntime(
-                em,
-                entity,
+            SourceRuntimeApplyUtility.RebuildPollutionGrid(
                 in area,
                 in pollutionConfig,
-                ref pollutionGrid);
+                ref pollutionGrid,
+                em.GetBuffer<SourcePollutionCellBuffer>(entity),
+                em.GetBuffer<SourcePollutionDropRequestBuffer>(entity),
+                em.GetBuffer<SourcePollutionValidCellIndexBuffer>(entity));
 
             em.SetComponentData(entity, anchor);
             em.SetComponentData(entity, area);
             em.SetComponentData(entity, tx);
             em.SetComponentData(entity, pollutionGrid);
-        }
-
-        private static void RebuildPollutionGridRuntime(
-            EntityManager em,
-            Entity entity,
-            in BulletFieldAreaComponent area,
-            in SourcePollutionConfigComponent config,
-            ref SourcePollutionGridComponent grid)
-        {
-            float cellSize = math.max(0.1f, grid.CellSize);
-            float2 halfExtents = SourceRuntimeApplyUtility.ComputeHalfExtents(area.Shape, area.Radius, area.Size);
-            int cols = math.max(1, Mathf.CeilToInt((halfExtents.x * 2f) / cellSize));
-            int rows = math.max(1, Mathf.CeilToInt((halfExtents.y * 2f) / cellSize));
-            int cellCount = math.max(1, cols * rows);
-
-            grid.Cols = cols;
-            grid.Rows = rows;
-            grid.CellSize = cellSize;
-            grid.InvCellSize = 1f / cellSize;
-            grid.HalfExtents = halfExtents;
-
-            float safeCellSize = math.max(0.001f, cellSize);
-            float safeRadius = math.max(0f, area.Radius);
-            float radiusSq = safeRadius * safeRadius;
-            float maxValue = math.max(config.MinValue, config.MaxValue);
-
-            var cellsData = new List<SourcePollutionCellBuffer>(cellCount);
-            var validIndicesData = new List<int>(cellCount);
-
-            for (int y = 0; y < rows; y++)
-            {
-                for (int x = 0; x < cols; x++)
-                {
-                    int index = y * cols + x;
-                    float centerX = -halfExtents.x + (x + 0.5f) * safeCellSize;
-                    float centerZ = -halfExtents.y + (y + 0.5f) * safeCellSize;
-                    bool isValid = area.Shape == BulletFieldShapeId.Rectangle
-                        || (centerX * centerX + centerZ * centerZ) <= radiusSq;
-
-                    cellsData.Add(new SourcePollutionCellBuffer
-                    {
-                        Value = maxValue,
-                        IsValid = isValid ? (byte)1 : (byte)0,
-                    });
-
-                    if (isValid)
-                        validIndicesData.Add(index);
-                }
-            }
-
-            if (validIndicesData.Count <= 0)
-            {
-                int centerIndex = math.clamp((rows / 2) * cols + (cols / 2), 0, cellCount - 1);
-                var centerCell = cellsData[centerIndex];
-                centerCell.IsValid = 1;
-                cellsData[centerIndex] = centerCell;
-                validIndicesData.Add(centerIndex);
-            }
-
-            var pollutionDrops = em.GetBuffer<SourcePollutionDropRequestBuffer>(entity);
-            pollutionDrops.Clear();
-
-            var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(entity);
-            pollutionCells.Clear();
-            if (pollutionCells.Capacity < cellsData.Count)
-                pollutionCells.Capacity = cellsData.Count;
-            for (int i = 0; i < cellsData.Count; i++)
-                pollutionCells.Add(cellsData[i]);
-
-            var pollutionValidCellIndices = em.GetBuffer<SourcePollutionValidCellIndexBuffer>(entity);
-            pollutionValidCellIndices.Clear();
-            if (pollutionValidCellIndices.Capacity < validIndicesData.Count)
-                pollutionValidCellIndices.Capacity = validIndicesData.Count;
-            for (int i = 0; i < validIndicesData.Count; i++)
-            {
-                pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
-                {
-                    Value = validIndicesData[i],
-                });
-            }
         }
 
         private static void ApplySourceLayoutOnly(EntityManager em, Entity entity)
@@ -656,7 +555,6 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
         }
-
         private static void ApplySourceDefinition(EntityManager em, Entity entity, in StageSourceBinding binding)
         {
             int thresholdWeakened = math.max(0, binding.ThresholdWeakened);
@@ -691,9 +589,7 @@ namespace SweepNDodge.DotsBullets
             eventRuntime.ElapsedSec = 0f;
             eventRuntime.SelectionSequence = 1u;
 
-            directorState.State = initialState == SourceStateId.Depleted
-                ? RunDirectorSourceStateId.Finish
-                : RunDirectorSourceStateId.Baseline;
+            directorState.State = initialState == SourceStateId.Depleted ? RunDirectorSourceStateId.Finish : RunDirectorSourceStateId.Baseline;
             directorState.SelectedClipState = initialState;
             directorState.PressureOccupancySec = 0f;
             directorState.DensityScale = 1f;
@@ -702,13 +598,7 @@ namespace SweepNDodge.DotsBullets
             spawnRequests.Clear();
             pollutionDrops.Clear();
             SourceRuntimeApplyUtility.ResetPressureInputs(pressureInputs);
-            SourceRuntimeApplyUtility.RebuildClipBindingsFromStageDefinition(
-                in binding,
-                clipPatterns,
-                sustainCandidates,
-                sustainRuntimeLanes,
-                eventQueue,
-                activeCounts);
+            SourceRuntimeApplyUtility.RebuildClipBindingsFromStageDefinition(in binding, clipPatterns, sustainCandidates, sustainRuntimeLanes, eventQueue, activeCounts);
 
             em.SetComponentData(entity, source);
             em.SetComponentData(entity, sourceRuntime);
@@ -735,7 +625,6 @@ namespace SweepNDodge.DotsBullets
 
             source.CollectedCount = math.max(math.max(0, source.ThresholdWeakened), source.ThresholdDepleted);
             source.State = SourceStateId.Depleted;
-
             sourceRuntime.SpawnSequence = 1u;
             sustainRuntime.ActiveState = SourceStateId.Depleted;
 

@@ -12,19 +12,18 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. Phase A 기준 `SampleScene`은 `StageCatalogSO`를 주 경로로 사용하며, Bridge는 `RequestStageMapApply(stageId)` 시 `StageMapCatalogRuntimeComponent`와 `StageCatalogRuntimeComponent`를 함께 publish한다. `StageMapCatalogSO`는 deprecated fallback으로만 남고, 비어 있으면 `StageCatalog.Entry.Layout`로 runtime 호환 카탈로그를 합성한다.
+> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. 현재 런타임은 `StageCatalogSO`만 publish하며, `RequestStageApply(stageId)`가 stage apply one-shot의 정식 API다. `RequestStageMapApply(stageId)`는 한 페이즈 동안 obsolete forwarder로만 남는다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
 - DemoShell 화면 전이를 단일 소유한다.
 - GO->ECS 쓰기 경로를 `RunDirectorStageBridge` 단일 접점으로 유지한다.
-- Stage 시작 전에 `RequestStageMapApply(stageId)`를 선행해 맵 적용을 보장한다.
+- Stage 시작 전에 `RequestStageApply(stageId)`를 선행해 layout + definition 적용을 보장한다.
 - 로비/진행 순서를 `StageCatalogSO.Entries` 기반으로 데이터 주도화한다.
 
 ### 1.2 비목표
-- StageMapApply Owner 변경
-- StageDefinition의 Source 패턴 ECS 재구성 적용 (v1 비범위)
-- Obstacle/Visual 런타임 적용
+- Source 외 Deposit/Obstacle/Visual 확장 소비
+- StageDefinition의 stage-level override 적용
 
 ## 2. 소유권 (Owner / Writer)
 - DemoShell Owner: `DemoShellFlowController`
@@ -32,17 +31,17 @@
   - 로비 선택/결과 선택 후속 처리
   - StageCatalog 로딩과 fallback 결정
 - GO->ECS Writer: `RunDirectorStageBridge`
-  - `RequestStageMapApply(int stageId)`
+  - `RequestStageApply(int stageId)`
   - `RequestStageStart()`, `RequestConfirm()`
   - `SetIntroPresentationDone(bool)`, `SetClearPresentationDone(bool)`
-- ECS StageMap/Definition 적용 Owner: `StageMapApplyExecutionBeginSystem`
+- ECS stage apply Owner: `StageCatalogApplyExecutionBeginSystem`
 - ECS Stage 상태/전이 Owner: 기존 시스템 유지 (`RunDirectorStageTransitionSystem` 등)
 
 ## 3. 업데이트 순서 / 전이 계약
 - 파이프라인 순서:
   - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
 - StagePlay 시작 루프:
-  1. `RequestStageMapApply(stageId)` 성공
+  1. `RequestStageApply(stageId)` 성공
   2. `SetIntroPresentationDone(true)` + `SetClearPresentationDone(false)`
   3. `RequestStageStart()`
 - `DemoShellFlowController`는 ECS 직접 write 금지
@@ -51,7 +50,7 @@
 - `DemoShellStageProfile`
   - `StageId`, `DisplayName`, `IsFinalStage`, `StageTimeLimitSec`
 - `DemoShellFlowController`
-  - `StageCatalogSO StageCatalog` (신규)
+  - `StageCatalogSO StageCatalog`
   - `DemoShellStageProfile[] StageProfiles` (fallback)
 - StageCatalog 로딩 계약
   - `StageCatalog` 할당 시: `Entries` 순서대로 `Enabled=true` 엔트리만 런타임 프로필 구성
@@ -59,22 +58,20 @@
   - 로딩 중 불일치(예: null Definition/Layout, StageId 중복/불일치)는 경고 후 skip
   - `sc_demo`는 수작업 운영 자산이 아니라 편집 씬 + generator/composer가 만든 생성물로 취급한다
 - Bridge runtime publish 계약
-  - `SampleScene` 주 경로는 `StageMapCatalog = null` 상태의 runtime compose 경로다
-  - `StageMapCatalog`가 있으면 이를 runtime singleton에 publish
-  - `StageMapCatalog`가 없고 `StageCatalog.Entry.Layout`가 있으면 runtime 호환 `StageMapCatalogSO`를 합성해 publish
-  - `StageCatalog`가 있으면 `StageCatalogRuntimeComponent`도 함께 publish
+  - `StageCatalog`가 있으면 `StageCatalogRuntimeComponent`를 최신화한다
+  - `StageMapCatalogSO` publish/compose 경로는 제거됐다
+  - `RequestStageMapApply(int)`는 obsolete forwarder이며 내부적으로 `RequestStageApply(int)`만 호출한다
 
 ## 5. StageId 경로
 - 로비 선택 -> `EnterStagePlay(stageIndex)`
 - `stageIndex`에 대응하는 런타임 프로필의 `StageId` 결정
-- `RequestStageMapApply(StageId)` 호출
+- `RequestStageApply(StageId)` 호출
 - 이후 기존 Stage start/confirm 경로 유지
 
 ## 6. 씬/운영 기준
 - `SampleScene`
   - `DemoShellFlowController.StageCatalog = sc_demo`
-  - `RunDirectorStageBridge.StageMapCatalog = null`
-  - `StageCatalog.Entry.Layout -> runtime compose` 경로를 주 경로로 사용
+  - `RunDirectorStageBridge`는 `StageCatalog`만 참조한다
   - 미연결 시 기존 `StageProfiles` fallback 동작
   - `sc_demo` 갱신은 `StageLayoutEditingSampleV1.unity` 수정 후 generator/composer 실행으로 수행한다
 - `PlayModeSmoke_Dedicated`
@@ -91,6 +88,9 @@
     - Entries 순서 반영
     - Enabled 필터
     - fallback 동작
+  - `RunDirectorStageBridgeTests`
+    - `RequestStageApply`
+    - obsolete forwarder
   - `StageCatalogSampleAssetsTests`
     - `sc_demo` / `sd_demo_1~3` / `sl_demo_1~3` 자산 유효성
 - PlayMode 회귀

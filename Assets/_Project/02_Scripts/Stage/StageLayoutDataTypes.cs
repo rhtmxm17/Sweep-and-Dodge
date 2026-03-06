@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
@@ -12,60 +12,44 @@ namespace SweepNDodge.DotsBullets
     [Serializable]
     public struct StageSourceLayoutData
     {
-        public uint StableId;
+        [Min(1)] public uint StableId;
         public bool Active;
         public Vector3 Position;
         public float YawDeg;
         public BulletFieldShapeId FieldShape;
-        public float FieldRadius;
+        [Min(0f)] public float FieldRadius;
         public Vector2 FieldSize;
     }
 
     [Serializable]
     public struct StageDepositLayoutData
     {
-        public uint StableId;
+        [Min(1)] public uint StableId;
         public bool Active;
         public Vector3 Position;
-        public float Radius;
+        [Min(0f)] public float Radius;
     }
 
     [Serializable]
     public struct StageObstacleLayoutData
     {
-        public uint StableId;
+        [Min(1)] public uint StableId;
         public bool Active;
         public Vector3 Position;
         public float YawDeg;
         public StageMapElementShape Shape;
-        public float Radius;
+        [Min(0f)] public float Radius;
         public Vector2 Size;
     }
 
     [Serializable]
     public struct StageVisualLayoutData
     {
-        public uint StableId;
+        [Min(1)] public uint StableId;
         public bool Active;
         public Vector3 Position;
-        public Vector3 Euler;
-        public Vector3 Scale;
+        public float YawDeg;
         public string VisualKey;
-    }
-
-    [Serializable]
-    public struct StageMapDefinition
-    {
-        [Min(1)] public int StageId;
-        public StageSourceLayoutData[] Sources;
-        public StageDepositLayoutData[] Deposits;
-        public StageObstacleLayoutData[] Obstacles;
-        public StageVisualLayoutData[] Visuals;
-    }
-
-    [CreateAssetMenu(menuName = "SweepNDodge/Stage/Map Catalog", fileName = "smc_")]
-    public class StageMapCatalogSO : ScriptableObject
-    {
-        public StageMapDefinition[] Stages;
+        public Vector3 Scale;
     }
 }

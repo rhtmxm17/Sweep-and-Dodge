@@ -1,7 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Unity.Entities;
-using UnityEngine.SceneManagement;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -9,7 +8,7 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// StageFlow/UI(GameObject) <-> Run Director Stage 상태(ECS) 브리지.
-    /// - GO -> ECS: Start/Confirm 요청, Intro/Clear 연출 완료 게이트 반영
+    /// - GO -> ECS: Start/Confirm/StageApply 요청, Intro/Clear 연출 완료 게이트 반영
     /// - ECS -> GO: StageRunCompleted 신호를 이벤트로 전달
     /// </summary>
     public sealed class RunDirectorStageBridge : MonoBehaviour
@@ -18,9 +17,6 @@ namespace SweepNDodge.DotsBullets
 
         [Header("Bridge")]
         public bool LogBindWarnings = true;
-
-        [Header("Stage Map")]
-        public StageMapCatalogSO StageMapCatalog;
 
         [Header("Stage Catalog")]
         public StageCatalogSO StageCatalog;
@@ -37,18 +33,13 @@ namespace SweepNDodge.DotsBullets
         private Entity _stageSignalEntity;
         private bool _isBound;
         private bool _warnedBindFailure;
-        private bool _warnedStageMapBindingFailure;
         private bool _warnedStageCatalogBindingFailure;
         private int _lastCompletedNotifiedFrame = -1;
         private bool _isSceneOwner;
-        private StageMapCatalogSO _composedStageMapCatalog;
 
         private void OnEnable()
         {
             TryAcquireSceneOwnership();
-
-            // 권장 바인딩 시점: OnEnable에서 1차 시도, Update에서 재시도.
-            // Awake/Start 고정 바인딩은 SubScene/DefaultWorld 초기화 타이밍 레이스에 취약하다.
             TryBind();
         }
 
@@ -57,25 +48,11 @@ namespace SweepNDodge.DotsBullets
             ReleaseSceneOwnership();
         }
 
-        private void OnDestroy()
-        {
-            if (_composedStageMapCatalog == null)
-                return;
-
-            if (Application.isPlaying)
-                Destroy(_composedStageMapCatalog);
-            else
-                DestroyImmediate(_composedStageMapCatalog);
-
-            _composedStageMapCatalog = null;
-        }
-
         private void Update()
         {
             Tick();
         }
 
-        // 테스트/외부 호출용 수동 틱.
         public void Tick()
         {
             if (!TryBind())
@@ -119,21 +96,26 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        public bool RequestStageMapApply(int stageId)
+        public bool RequestStageApply(int stageId)
         {
             if (stageId <= 0)
                 return false;
             if (!TryBind())
                 return false;
-            if (!EnsureStageMapCatalogRuntimeSingleton())
+            if (!EnsureStageCatalogRuntimeSingleton())
                 return false;
-            EnsureStageCatalogRuntimeSingleton();
 
             var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestEntity);
             request.RequestedStageId = stageId;
-            request.StageMapApplyRequested = 1;
+            request.StageApplyRequested = 1;
             _em.SetComponentData(_stageRequestEntity, request);
             return true;
+        }
+
+        [Obsolete("Use RequestStageApply(int stageId).")]
+        public bool RequestStageMapApply(int stageId)
+        {
+            return RequestStageApply(stageId);
         }
 
         public bool SetIntroPresentationDone(bool done)
@@ -195,9 +177,7 @@ namespace SweepNDodge.DotsBullets
             _stageRequestEntity = ResolveFirstEntity(requestQuery);
             _stageGateEntity = ResolveFirstEntity(gateQuery);
             _stageSignalEntity = ResolveFirstEntity(signalQuery);
-            _stageStateEntity = stateQuery.IsEmptyIgnoreFilter
-                ? Entity.Null
-                : ResolveFirstEntity(stateQuery);
+            _stageStateEntity = stateQuery.IsEmptyIgnoreFilter ? Entity.Null : ResolveFirstEntity(stateQuery);
             _isBound = _stageRequestEntity != Entity.Null && _stageGateEntity != Entity.Null && _stageSignalEntity != Entity.Null;
             if (_isBound)
                 _warnedBindFailure = false;
@@ -205,50 +185,11 @@ namespace SweepNDodge.DotsBullets
             return _isBound;
         }
 
-        private bool EnsureStageMapCatalogRuntimeSingleton()
-        {
-            var effectiveCatalog = ResolveEffectiveStageMapCatalog();
-            if (effectiveCatalog == null)
-            {
-                WarnStageMapFailureOnce("StageMapCatalog is not assigned and no compatible layout entries were resolved from StageCatalog.");
-                return false;
-            }
-
-            using var query = _em.CreateEntityQuery(ComponentType.ReadWrite<StageMapCatalogRuntimeComponent>());
-            if (query.IsEmptyIgnoreFilter)
-            {
-                var created = _em.CreateEntity();
-                _em.AddComponentObject(created, new StageMapCatalogRuntimeComponent
-                {
-                    Catalog = effectiveCatalog,
-                });
-                _warnedStageMapBindingFailure = false;
-                return true;
-            }
-
-            if (query.CalculateEntityCount() > 1)
-            {
-                WarnStageMapFailureOnce("Multiple StageMapCatalogRuntimeComponent singletons detected. The first entity will be used.");
-            }
-
-            var catalogEntity = ResolveFirstEntity(query);
-            if (catalogEntity == Entity.Null || !_em.Exists(catalogEntity))
-            {
-                WarnStageMapFailureOnce("StageMapCatalogRuntimeComponent singleton resolve failed.");
-                return false;
-            }
-
-            var runtime = _em.GetComponentObject<StageMapCatalogRuntimeComponent>(catalogEntity);
-            runtime.Catalog = effectiveCatalog;
-            _warnedStageMapBindingFailure = false;
-            return true;
-        }
-
         private bool EnsureStageCatalogRuntimeSingleton()
         {
             if (StageCatalog == null)
             {
-                WarnStageCatalogFailureOnce("StageCatalog is not assigned. StageDefinition apply will be skipped.");
+                WarnStageCatalogFailureOnce("StageCatalog is not assigned.");
                 return false;
             }
 
@@ -282,45 +223,6 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        private StageMapCatalogSO ResolveEffectiveStageMapCatalog()
-        {
-            if (StageMapCatalog != null)
-                return StageMapCatalog;
-            if (StageCatalog == null || StageCatalog.Entries == null || StageCatalog.Entries.Length <= 0)
-                return null;
-
-            if (_composedStageMapCatalog == null)
-            {
-                _composedStageMapCatalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
-                _composedStageMapCatalog.hideFlags = HideFlags.HideAndDontSave;
-                _composedStageMapCatalog.name = "RuntimeComposedStageMapCatalog";
-            }
-
-            var entries = StageCatalog.Entries;
-            var stages = new List<StageMapDefinition>(entries.Length);
-            for (int i = 0; i < entries.Length; i++)
-            {
-                var entry = entries[i];
-                if (!entry.Enabled || entry.Layout == null || entry.Layout.StageId <= 0)
-                    continue;
-
-                stages.Add(new StageMapDefinition
-                {
-                    StageId = entry.Layout.StageId,
-                    Sources = entry.Layout.Sources,
-                    Deposits = entry.Layout.Deposits,
-                    Obstacles = entry.Layout.Obstacles,
-                    Visuals = entry.Layout.Visuals,
-                });
-            }
-
-            if (stages.Count <= 0)
-                return null;
-
-            _composedStageMapCatalog.Stages = stages.ToArray();
-            return _composedStageMapCatalog;
-        }
-
         private void PublishStageCompletedEventIfNeeded()
         {
             var signal = _em.GetComponentData<RunDirectorStageSignalComponent>(_stageSignalEntity);
@@ -335,7 +237,6 @@ namespace SweepNDodge.DotsBullets
             StageRunCompleted?.Invoke();
             OnStageRunCompleted?.Invoke();
 
-            // one-shot 소비: 브리지가 이벤트 발행 후 신호를 리셋한다.
             signal.StageRunCompleted = 0;
             _em.SetComponentData(_stageSignalEntity, signal);
         }
@@ -346,15 +247,6 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             _warnedBindFailure = true;
-            Debug.LogWarning($"[RunDirectorStageBridge] {message}");
-        }
-
-        private void WarnStageMapFailureOnce(string message)
-        {
-            if (!LogBindWarnings || _warnedStageMapBindingFailure)
-                return;
-
-            _warnedStageMapBindingFailure = true;
             Debug.LogWarning($"[RunDirectorStageBridge] {message}");
         }
 
@@ -424,6 +316,3 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
-
-
-

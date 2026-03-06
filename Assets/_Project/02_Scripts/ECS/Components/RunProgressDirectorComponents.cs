@@ -47,7 +47,7 @@ namespace SweepNDodge.DotsBullets
     {
         public byte StageStartRequested;
         public byte ConfirmPressed;
-        public byte StageMapApplyRequested;
+        public byte StageApplyRequested;
         public int RequestedStageId;
     }
 
@@ -55,12 +55,6 @@ namespace SweepNDodge.DotsBullets
     public struct RunDirectorStageSignalComponent : IComponentData
     {
         public byte StageRunCompleted;
-    }
-
-    // 런타임 StageMap 카탈로그 참조(Managed Singleton).
-    public class StageMapCatalogRuntimeComponent : IComponentData
-    {
-        public StageMapCatalogSO Catalog;
     }
 
     // 런타임 StageCatalog 참조(Managed Singleton).

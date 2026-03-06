@@ -8,11 +8,11 @@ namespace SweepNDodge.DotsBullets.Editor
 {
     public static class StageDefinitionGenerator
     {
-        [MenuItem("Tools/Project/Stage Layout/Sync Stage Definitions From Open Scenes")]
-        private static void SyncDefinitionsFromOpenScenesMenu()
+        [MenuItem("Tools/Project/Stage Layout/Ensure Missing Stage Definition Bindings From Open Scenes")]
+        private static void EnsureMissingDefinitionsFromOpenScenesMenu()
         {
-            int synced = SyncDefinitionsFromOpenScenes(saveAssets: true);
-            Debug.Log($"[StageDefinition] Sync complete. definitions={synced}");
+            int seeded = SyncDefinitionsFromOpenScenes(saveAssets: true);
+            Debug.Log($"[StageDefinition] Ensure missing bindings complete. definitions={seeded}");
         }
 
         public static int SyncDefinitionsFromOpenScenes(bool saveAssets)
@@ -92,17 +92,32 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             var stableIds = CollectSourceStableIds(stageNode);
-            var sourceBindings = new List<StageSourceBinding>(stableIds.Count);
+            var existingBindings = stageNode.TargetDefinition.SourceBindings ?? Array.Empty<StageSourceBinding>();
+            var bindingByStableId = new Dictionary<uint, StageSourceBinding>();
+            for (int i = 0; i < existingBindings.Length; i++)
+            {
+                uint stableId = Math.Max(1u, existingBindings[i].SourceStableId);
+                if (!bindingByStableId.ContainsKey(stableId))
+                    bindingByStableId.Add(stableId, existingBindings[i]);
+            }
+
+            var sourceBindings = new List<StageSourceBinding>(Math.Max(stableIds.Count, existingBindings.Length));
             for (int i = 0; i < stableIds.Count; i++)
             {
                 uint stableId = stableIds[i];
+                if (bindingByStableId.TryGetValue(stableId, out var existing))
+                {
+                    sourceBindings.Add(existing);
+                    continue;
+                }
+
                 if (!authoringByStableId.TryGetValue(stableId, out var authoring) || authoring == null)
                 {
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Warning,
                         "SDF903",
                         location,
-                        $"No BulletSourceAuthoring with StableIdOverride={stableId} was found. Default binding will be generated."));
+                        $"No BulletSourceAuthoring with StableIdOverride={stableId} was found. Default binding template will be generated."));
                     sourceBindings.Add(CreateDefaultBinding(stableId));
                     continue;
                 }
@@ -110,7 +125,21 @@ namespace SweepNDodge.DotsBullets.Editor
                 sourceBindings.Add(BuildBindingFromAuthoring(stableId, authoring));
             }
 
-            Undo.RecordObject(stageNode.TargetDefinition, "Sync Stage Definition");
+            for (int i = 0; i < existingBindings.Length; i++)
+            {
+                uint stableId = Math.Max(1u, existingBindings[i].SourceStableId);
+                if (stableIds.Contains(stableId))
+                    continue;
+
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Warning,
+                    "SDF905",
+                    location,
+                    $"StageDefinition contains orphan binding not present in layout. stableId={stableId}"));
+                sourceBindings.Add(existingBindings[i]);
+            }
+
+            Undo.RecordObject(stageNode.TargetDefinition, "Ensure Stage Definition Bindings");
             stageNode.TargetDefinition.StageId = Math.Max(1, stageNode.StageId);
             if (string.IsNullOrWhiteSpace(stageNode.TargetDefinition.DisplayName))
                 stageNode.TargetDefinition.DisplayName = $"Stage {stageNode.TargetDefinition.StageId}";

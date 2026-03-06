@@ -267,19 +267,6 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, default(RunDirectorStageSignalComponent));
             }
 
-
-            using (var stageMapRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageMapCatalogRuntimeComponent>()))
-            {
-                if (stageMapRuntimeQuery.IsEmptyIgnoreFilter)
-                {
-                    var e = em.CreateEntity();
-                    em.AddComponentObject(e, new StageMapCatalogRuntimeComponent
-                    {
-                        Catalog = null,
-                    });
-                }
-            }
-
             using (var stageCatalogRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>()))
             {
                 if (stageCatalogRuntimeQuery.IsEmptyIgnoreFilter)

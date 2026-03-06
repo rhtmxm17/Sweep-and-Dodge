@@ -11,11 +11,12 @@
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
   - [TD-005-spawn-directive-settings-reference.md](./TD-005-spawn-directive-settings-reference.md)
 
-> 본 문서는 `WaveTimelineSO` 기반 authoring/runtime 경로를 `WaveClipSO` 기반 경로로 전환한 결과를 기록한 히스토리 문서다.
+> 본 문서는 `WaveTimelineSO` 기반 authoring/runtime 경로를 `WaveClipSO` 기반 경로로 전환한 결과를 기록한 히스토리 문서다. 현재 Source 정의의 운영 SSOT는 `StageDefinitionSO`이며, 여기서 언급되는 `BulletSourceAuthoring` clip 슬롯은 legacy authoring 기록으로만 취급한다.
 
 ## 1. 전환 결과 요약
 - `WaveClipSO` 도입: 완료.
 - `BulletSourceAuthoring` 바인딩 전환(`SustainClipSlots[]`, `EventClipSlots[]`): 완료.
+  - 단, 현재 운영 경로에서는 `StageDefinitionSO`가 clip binding SSOT이며 `BulletSourceAuthoring` 슬롯 필드는 deprecated migration data다.
 - `WaveTimelineSO` 타입 제거: 완료.
 - `Assets/_Project/03_Datas/WaveTimelines` 데이터 제거 및 `WaveClips` 경로 사용: 완료.
 - v3 단일 경로(클립/슬롯/채널) 전환: 완료.
