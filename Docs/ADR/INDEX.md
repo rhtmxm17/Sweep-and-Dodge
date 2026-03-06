@@ -1,4 +1,4 @@
-# ADR Index
+﻿# ADR Index
 
 ## Scope
 - 중요한 아키텍처/설계 결정과 그 근거(배경, 대안, 결과)를 기록한다.
@@ -6,6 +6,8 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md): 스테이지 정의/레이아웃 분리와 StageCatalog 명시적 페어 엔트리 채택
+- [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md): StageMap 런타임 적용 Owner를 ExecutionBegin 단일 시스템으로 고정하고 DemoShell StageId 입력 경로를 RunDirectorStageBridge로 단일화
 - [ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md](ADR-20260303-04-fixed-tick-time-source-for-replay-determinism.md): 리플레이/결정론 품질을 위한 고정 Tick 시간원 전환 결정(가변 DeltaTime 의존 축소)
 - [ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md](ADR-20260303-03-replay-persistence-and-schema-compatibility-policy.md): 리플레이 persistence 도입과 구버전 완전 거부 기반 schema compatibility 정책 고정
 - [ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md](ADR-20260303-02-player-ecs-authority-and-presentation-bridge-for-replay.md): 플레이어 런타임 권한을 ECS로 이전하고 GameObject를 입력 수집/표현 소비 경계로 고정
@@ -35,3 +37,4 @@
 - [ADR-20260210-01-bullet-active-filtering-and-despawn-request.md](ADR-20260210-01-bullet-active-filtering-and-despawn-request.md): 비활성 탄환 시뮬레이션 필터링 + 디스폰 요청 파이프라인 결정
 - [ADR-20260209-01-bullet-render-parts-buffe.md](ADR-20260209-01-bullet-render-parts-buffe.md): 다중 렌더 파츠 버퍼 기반 토글 구조 결정
 - [ADR-20260206-01-bullet-pipeline-ownership.md](ADR-20260206-01-bullet-pipeline-ownership.md): 탄환 파이프라인 소유권/업데이트 순서 기준 결정
+

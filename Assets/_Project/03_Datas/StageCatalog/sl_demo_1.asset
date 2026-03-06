@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ded24860c6a0ae844a3e661c60e40647, type: 3}
+  m_Name: sl_demo_1
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutSO
+  StageId: 1
+  Sources:
+  - StableId: 1001
+    Active: 1
+    Position: {x: 0, y: 0, z: 0}
+    YawDeg: 0
+    FieldShape: 1
+    FieldRadius: 8
+    FieldSize: {x: 12, y: 8}
+  Deposits:
+  - StableId: 2001
+    Active: 1
+    Position: {x: 0, y: 0, z: 10}
+    Radius: 5
+  Obstacles: []
+  Visuals:
+  - StableId: 9001
+    Active: 1
+    Position: {x: 0, y: 0, z: 0}
+    Euler: {x: -0, y: 0, z: 0}
+    Scale: {x: 1, y: 1, z: 1}
+    VisualKey: preview_visual_01

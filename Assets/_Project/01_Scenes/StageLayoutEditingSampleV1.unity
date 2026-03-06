@@ -167,6 +167,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutStageMarker
   StageId: 1
+  IncludeInCatalog: 1
+  EnabledInCatalog: 1
+  EntryKey: 
+  TargetDefinition: {fileID: 11400000, guid: 3160656c95e13a84b821425457327c39, type: 2}
+  TargetLayout: {fileID: 11400000, guid: 2f4ee260d250cc947849ca730c9333c5, type: 2}
 --- !u!1 &694074687
 GameObject:
   m_ObjectHideFlags: 0
@@ -294,6 +299,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f03d4623266dd624a8b8d721331b26d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutRootMarker
+  TargetStageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
   TargetCatalog: {fileID: 11400000, guid: fef86e0a2b2fee84693f27f62f03d255, type: 2}
   SortByStageId: 1
 --- !u!4 &1200092716

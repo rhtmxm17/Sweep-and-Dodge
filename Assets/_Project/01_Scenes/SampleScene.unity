@@ -760,6 +760,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RunDirectorStageBridge
   LogBindWarnings: 1
+  StageMapCatalog: {fileID: 11400000, guid: fef86e0a2b2fee84693f27f62f03d255, type: 2}
   OnStageRunCompleted:
     m_PersistentCalls:
       m_Calls: []
@@ -791,6 +792,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellFlowController
   StageBridge: {fileID: 2015128775}
+  StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
   ShowOverlay: 1
   OverlayRect:
     serializedVersion: 2

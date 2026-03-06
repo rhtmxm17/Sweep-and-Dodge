@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using NUnit.Framework;
 using Unity.Entities;
@@ -68,6 +68,8 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ExecutionBeginSpawnSubSequence_StaysInContractOrder()
         {
+            AssertUpdateAfter(typeof(StageMapApplyExecutionBeginSystem), typeof(BulletPoolOwnerBootstrapSystem));
+            AssertUpdateBefore(typeof(StageMapApplyExecutionBeginSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
             AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateAfter(typeof(SpawnBacklogWarningSystem), typeof(SpawnRequestRoundRobinExecutionSystem));

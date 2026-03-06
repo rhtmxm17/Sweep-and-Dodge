@@ -256,6 +256,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 240,
                 "Demo shell did not enter StagePlay from Lobby.");
 
+            yield return WaitForCondition(
+                () => IsStageMapAppliedForStage1(em),
+                240,
+                "StageMap layout was not applied for Stage1 within timeout.");
+            AssertStageMapAppliedForStage1(em);
+
             ForceStageStateToClearReady(em);
             yield return WaitForCondition(
                 () =>
@@ -1220,6 +1226,92 @@ namespace SweepNDodge.DotsBullets.Tests
             return Entity.Null;
         }
 
+
+        private static bool IsStageMapAppliedForStage1(EntityManager em)
+        {
+            if (!TryFindSourceByStableId(em, 1001u, out var source1001))
+                return false;
+            if (!TryFindSourceByStableId(em, 1002u, out var source1002))
+                return false;
+            if (!TryFindSourceByStableId(em, 1003u, out var source1003))
+                return false;
+            if (!TryFindDepositByStableId(em, 2001u, out var deposit2001))
+                return false;
+
+            var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
+            var area1 = em.GetComponentData<BulletFieldAreaComponent>(source1001);
+            var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
+            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
+            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+
+            return sourceState1.State == SourceStateId.Normal
+                && area1.Shape == BulletFieldShapeId.Rectangle
+                && Mathf.Abs(area1.Size.x - 12f) <= 0.01f
+                && Mathf.Abs(area1.Size.y - 8f) <= 0.01f
+                && sourceState2.State == SourceStateId.Depleted
+                && sourceState3.State == SourceStateId.Depleted
+                && Mathf.Abs(deposit1.Radius - 5f) <= 0.01f;
+        }
+
+        private static void AssertStageMapAppliedForStage1(EntityManager em)
+        {
+            Assert.That(TryFindSourceByStableId(em, 1001u, out var source1001), Is.True);
+            Assert.That(TryFindSourceByStableId(em, 1002u, out var source1002), Is.True);
+            Assert.That(TryFindSourceByStableId(em, 1003u, out var source1003), Is.True);
+            Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
+
+            var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
+            var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
+            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
+            var area1 = em.GetComponentData<BulletFieldAreaComponent>(source1001);
+            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+
+            Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Normal));
+            Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Depleted));
+            Assert.That(sourceState3.State, Is.EqualTo(SourceStateId.Depleted));
+            Assert.That(area1.Shape, Is.EqualTo(BulletFieldShapeId.Rectangle));
+            Assert.That(area1.Size.x, Is.EqualTo(12f).Within(0.01f));
+            Assert.That(area1.Size.y, Is.EqualTo(8f).Within(0.01f));
+            Assert.That(deposit1.Radius, Is.EqualTo(5f).Within(0.01f));
+        }
+
+        private static bool TryFindSourceByStableId(EntityManager em, uint stableId, out Entity sourceEntity)
+        {
+            sourceEntity = Entity.Null;
+            using var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<SourceStableIdComponent>(),
+                ComponentType.ReadOnly<SourceSpawnComponent>());
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                if (em.GetComponentData<SourceStableIdComponent>(entities[i]).Value != stableId)
+                    continue;
+
+                sourceEntity = entities[i];
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryFindDepositByStableId(EntityManager em, uint stableId, out Entity depositEntity)
+        {
+            depositEntity = Entity.Null;
+            using var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<DepositStableIdComponent>(),
+                ComponentType.ReadOnly<DepositPointComponent>());
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                if (em.GetComponentData<DepositStableIdComponent>(entities[i]).Value != stableId)
+                    continue;
+
+                depositEntity = entities[i];
+                return true;
+            }
+
+            return false;
+        }
         private static void ForceStageStateToClearReady(EntityManager em)
         {
             var stageEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
@@ -1310,5 +1402,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
+
+
+
 
 

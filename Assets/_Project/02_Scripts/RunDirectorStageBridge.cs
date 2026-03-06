@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Unity.Entities;
 using UnityEngine.SceneManagement;
@@ -19,6 +19,9 @@ namespace SweepNDodge.DotsBullets
         [Header("Bridge")]
         public bool LogBindWarnings = true;
 
+        [Header("Stage Map")]
+        public StageMapCatalogSO StageMapCatalog;
+
         [Header("Events")]
         public UnityEvent OnStageRunCompleted;
 
@@ -31,6 +34,7 @@ namespace SweepNDodge.DotsBullets
         private Entity _stageSignalEntity;
         private bool _isBound;
         private bool _warnedBindFailure;
+        private bool _warnedStageMapBindingFailure;
         private int _lastCompletedNotifiedFrame = -1;
         private bool _isSceneOwner;
 
@@ -93,6 +97,22 @@ namespace SweepNDodge.DotsBullets
 
             var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestEntity);
             request.ConfirmPressed = 1;
+            _em.SetComponentData(_stageRequestEntity, request);
+            return true;
+        }
+
+        public bool RequestStageMapApply(int stageId)
+        {
+            if (stageId <= 0)
+                return false;
+            if (!TryBind())
+                return false;
+            if (!EnsureStageMapCatalogRuntimeSingleton())
+                return false;
+
+            var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestEntity);
+            request.RequestedStageId = stageId;
+            request.StageMapApplyRequested = 1;
             _em.SetComponentData(_stageRequestEntity, request);
             return true;
         }
@@ -166,6 +186,45 @@ namespace SweepNDodge.DotsBullets
             return _isBound;
         }
 
+        private bool EnsureStageMapCatalogRuntimeSingleton()
+        {
+            if (StageMapCatalog == null)
+            {
+                WarnStageMapFailureOnce("StageMapCatalog is not assigned.");
+                return false;
+            }
+
+            using var query = _em.CreateEntityQuery(ComponentType.ReadWrite<StageMapCatalogRuntimeComponent>());
+            if (query.IsEmptyIgnoreFilter)
+            {
+                var created = _em.CreateEntity();
+                _em.AddComponentObject(created, new StageMapCatalogRuntimeComponent
+                {
+                    Catalog = StageMapCatalog,
+                });
+                _warnedStageMapBindingFailure = false;
+                return true;
+            }
+
+            if (query.CalculateEntityCount() > 1)
+            {
+                WarnStageMapFailureOnce("Multiple StageMapCatalogRuntimeComponent singletons detected. The first entity will be used.");
+            }
+
+            var catalogEntity = ResolveFirstEntity(query);
+            if (catalogEntity == Entity.Null || !_em.Exists(catalogEntity))
+            {
+                WarnStageMapFailureOnce("StageMapCatalogRuntimeComponent singleton resolve failed.");
+                return false;
+            }
+
+            var runtime = _em.GetComponentObject<StageMapCatalogRuntimeComponent>(catalogEntity) ?? new StageMapCatalogRuntimeComponent();
+            runtime.Catalog = StageMapCatalog;
+            _em.SetComponentData(catalogEntity, runtime);
+            _warnedStageMapBindingFailure = false;
+            return true;
+        }
+
         private void PublishStageCompletedEventIfNeeded()
         {
             var signal = _em.GetComponentData<RunDirectorStageSignalComponent>(_stageSignalEntity);
@@ -191,6 +250,15 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             _warnedBindFailure = true;
+            Debug.LogWarning($"[RunDirectorStageBridge] {message}");
+        }
+
+        private void WarnStageMapFailureOnce(string message)
+        {
+            if (!LogBindWarnings || _warnedStageMapBindingFailure)
+                return;
+
+            _warnedStageMapBindingFailure = true;
             Debug.LogWarning($"[RunDirectorStageBridge] {message}");
         }
 
@@ -251,3 +319,6 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+
+
+

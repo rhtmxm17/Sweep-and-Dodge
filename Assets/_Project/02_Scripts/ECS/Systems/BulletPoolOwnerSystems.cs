@@ -1,4 +1,4 @@
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -267,6 +267,18 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, default(RunDirectorStageSignalComponent));
             }
 
+
+            using (var stageMapRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageMapCatalogRuntimeComponent>()))
+            {
+                if (stageMapRuntimeQuery.IsEmptyIgnoreFilter)
+                {
+                    var e = em.CreateEntity();
+                    em.AddComponentObject(e, new StageMapCatalogRuntimeComponent
+                    {
+                        Catalog = null,
+                    });
+                }
+            }
             if (!HasSingleton<RunDirectorPressureWeightSingletonTag>(em))
             {
                 var e = em.CreateEntity(typeof(RunDirectorPressureWeightSingletonTag));

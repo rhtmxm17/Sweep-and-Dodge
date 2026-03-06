@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -24,6 +24,7 @@ namespace SweepNDodge.DotsBullets.Editor
             var definitions = CollectScriptableObjects<BulletDefinitionSO>();
             var waveClips = CollectScriptableObjects<WaveClipSO>();
             var stageMapCatalogs = CollectScriptableObjects<StageMapCatalogSO>();
+            var stageCatalogs = CollectScriptableObjects<StageCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<BulletSourceAuthoring>>();
             var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
@@ -34,6 +35,7 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(definitions);
             SortRecordsByLocation(waveClips);
             SortRecordsByLocation(stageMapCatalogs);
+            SortRecordsByLocation(stageCatalogs);
             SortRecordsByLocation(visuals);
             SortRecordsByLocation(sources);
             SortRecordsByLocation(bullets);
@@ -41,6 +43,7 @@ namespace SweepNDodge.DotsBullets.Editor
             var input = new ContentValidationInput(definitions, waveClips, visuals, sources, bullets);
             var issues = ContentValidationRules.Validate(input);
             StageLayoutValidationRules.ValidateCatalogRecords(stageMapCatalogs, issues);
+            StageCatalogValidationRules.ValidateCatalogRecords(stageCatalogs, issues);
             SortIssuesInPlace(issues);
             return issues;
         }
@@ -282,3 +285,6 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 }
+
+
+

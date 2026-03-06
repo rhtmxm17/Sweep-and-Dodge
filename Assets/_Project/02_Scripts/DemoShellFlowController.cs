@@ -1,3 +1,4 @@
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -17,6 +18,8 @@ namespace SweepNDodge.DotsBullets
 
         [Header("References")]
         public RunDirectorStageBridge StageBridge;
+        [Header("Stage Data")]
+        public StageCatalogSO StageCatalog;
 
         [Header("Overlay")]
         public bool ShowOverlay = true;
@@ -42,9 +45,11 @@ namespace SweepNDodge.DotsBullets
         private DemoShellScreenId _currentScreen;
         private int _currentStageIndex = -1;
         private bool _stageStartPending;
+        private bool _stageMapApplyPending;
         private bool _awaitingCompletedSignal;
         private DemoShellResultActionId _pendingResultAction;
         private bool _warnedNoBridge;
+        private bool _warnedStageCatalogIssue;
         private float _stagePlayElapsedSec;
         private int _stageStartTotalCollectValue;
         private int _stageStartTotalCleanupValue;
@@ -321,6 +326,18 @@ namespace SweepNDodge.DotsBullets
 
             if (_stageStartPending)
             {
+                if (!TryGetStageProfile(_currentStageIndex, out var startProfile))
+                    return;
+
+                if (_stageMapApplyPending)
+                {
+                    bool applyOk = StageBridge.RequestStageMapApply(startProfile.StageId);
+                    if (!applyOk)
+                        return;
+
+                    _stageMapApplyPending = false;
+                }
+
                 bool introOk = StageBridge.SetIntroPresentationDone(true);
                 bool clearGateOk = StageBridge.SetClearPresentationDone(false);
                 bool startOk = StageBridge.RequestStageStart();
@@ -448,6 +465,7 @@ namespace SweepNDodge.DotsBullets
 
             _currentStageIndex = stageIndex;
             _stageStartPending = true;
+            _stageMapApplyPending = true;
             _awaitingCompletedSignal = false;
             _pendingResultAction = DemoShellResultActionId.NextStage;
             _stagePlayElapsedSec = 0f;
@@ -597,6 +615,9 @@ namespace SweepNDodge.DotsBullets
 
         private void EnsureStageProfiles()
         {
+            if (TryLoadStageProfilesFromCatalog())
+                return;
+
             if (StageProfiles == null || StageProfiles.Length == 0)
             {
                 StageProfiles = new[]
@@ -620,6 +641,83 @@ namespace SweepNDodge.DotsBullets
                     entry.StageTimeLimitSec = ResolveDefaultStageTimeLimitSec(entry.StageId, i);
                 StageProfiles[i] = entry;
             }
+        }
+
+        private bool TryLoadStageProfilesFromCatalog()
+        {
+            if (StageCatalog == null)
+                return false;
+
+            var entries = StageCatalog.Entries;
+            if (entries == null || entries.Length <= 0)
+                return false;
+
+            var profiles = new List<DemoShellStageProfile>(entries.Length);
+            var stageIds = new HashSet<int>();
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                var entry = entries[i];
+                if (!entry.Enabled)
+                    continue;
+
+                var definition = entry.Definition;
+                if (definition == null)
+                {
+                    WarnStageCatalogIssueOnce($"Entry has null Definition. index={i}");
+                    continue;
+                }
+
+                int stageId = definition.StageId;
+                if (stageId <= 0)
+                {
+                    WarnStageCatalogIssueOnce($"Definition.StageId must be >= 1. index={i}");
+                    continue;
+                }
+
+                if (!stageIds.Add(stageId))
+                {
+                    WarnStageCatalogIssueOnce($"Duplicate enabled StageId detected in StageCatalog. stageId={stageId}");
+                    continue;
+                }
+
+                if (entry.Layout == null)
+                {
+                    WarnStageCatalogIssueOnce($"Entry has null Layout. stageId={stageId}");
+                }
+                else if (entry.Layout.StageId != stageId)
+                {
+                    WarnStageCatalogIssueOnce($"Definition/Layout StageId mismatch. definition={stageId}, layout={entry.Layout.StageId}");
+                }
+
+                profiles.Add(new DemoShellStageProfile
+                {
+                    StageId = stageId,
+                    DisplayName = string.IsNullOrWhiteSpace(definition.DisplayName)
+                        ? $"Stage {stageId}"
+                        : definition.DisplayName,
+                    IsFinalStage = definition.IsFinalStage,
+                    StageTimeLimitSec = definition.StageTimeLimitSec > 0f
+                        ? definition.StageTimeLimitSec
+                        : ResolveDefaultStageTimeLimitSec(stageId, profiles.Count),
+                });
+            }
+
+            if (profiles.Count <= 0)
+                return false;
+
+            StageProfiles = profiles.ToArray();
+            _warnedStageCatalogIssue = false;
+            return true;
+        }
+
+        private void WarnStageCatalogIssueOnce(string message)
+        {
+            if (_warnedStageCatalogIssue)
+                return;
+
+            _warnedStageCatalogIssue = true;
+            Debug.LogWarning($"[DemoShellFlowController] StageCatalog issue: {message}");
         }
 
         private void EnterStageResult(DemoShellStageOutcomeId outcome)
@@ -719,3 +817,13 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+
+
+
+
+
+
+
+
+
+

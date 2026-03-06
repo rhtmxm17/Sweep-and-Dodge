@@ -1,4 +1,4 @@
-using Unity.Entities;
+﻿using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 using System.Text;
@@ -22,6 +22,9 @@ namespace SweepNDodge.DotsBullets
             public SourceStateId TriggerState;
             public WaveClipSO[] EventClips;
         }
+
+        [Header("Identity")]
+        [Min(0)] public uint StableIdOverride = 0;
 
         [Header("Source Field")]
         public BulletFieldShapeId FieldShape = BulletFieldShapeId.Circle;
@@ -67,9 +70,12 @@ namespace SweepNDodge.DotsBullets
                     State = authoring.InitialState
                 });
 
+                uint stableId = authoring.StableIdOverride > 0
+                    ? authoring.StableIdOverride
+                    : ComputeStableSourceId(authoring.transform, authoring.transform.position);
                 AddComponent(e, new SourceStableIdComponent
                 {
-                    Value = ComputeStableSourceId(authoring.transform, authoring.transform.position),
+                    Value = stableId,
                 });
 
                 AddComponent(e, new BulletFieldAreaComponent
@@ -587,3 +593,4 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+

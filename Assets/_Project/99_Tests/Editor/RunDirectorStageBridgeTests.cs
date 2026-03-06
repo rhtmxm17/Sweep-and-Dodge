@@ -1,4 +1,4 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using Unity.Entities;
 using UnityEngine;
 
@@ -47,6 +47,55 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 if (go != null)
                     Object.DestroyImmediate(go);
+                world?.Dispose();
+                World.DefaultGameObjectInjectionWorld = oldDefault;
+            }
+        }
+
+        [Test]
+        public void Bridge_RequestStageMapApply_WritesRequestAndCatalogSingleton()
+        {
+            var oldDefault = World.DefaultGameObjectInjectionWorld;
+            World world = null;
+            GameObject go = null;
+            StageMapCatalogSO catalog = null;
+            try
+            {
+                world = new World("RunDirectorStageBridgeEditWorld_StageMap");
+                World.DefaultGameObjectInjectionWorld = world;
+                var em = world.EntityManager;
+
+                var requestEntity = em.CreateEntity(typeof(RunDirectorStageRequestComponent));
+                em.SetComponentData(requestEntity, default(RunDirectorStageRequestComponent));
+                em.CreateEntity(typeof(RunDirectorStageGateComponent));
+                em.CreateEntity(typeof(RunDirectorStageSignalComponent));
+
+                catalog = ScriptableObject.CreateInstance<StageMapCatalogSO>();
+
+                go = new GameObject("RunDirectorStageBridge_Edit_StageMap");
+                var bridge = go.AddComponent<RunDirectorStageBridge>();
+                bridge.LogBindWarnings = false;
+                bridge.StageMapCatalog = catalog;
+
+                Assert.That(bridge.RequestStageMapApply(7), Is.True);
+
+                var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
+                Assert.That(request.RequestedStageId, Is.EqualTo(7));
+                Assert.That(request.StageMapApplyRequested, Is.EqualTo(1));
+
+                using var stageMapRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageMapCatalogRuntimeComponent>());
+                Assert.That(stageMapRuntimeQuery.IsEmptyIgnoreFilter, Is.False);
+                var runtimeEntity = stageMapRuntimeQuery.GetSingletonEntity();
+                var runtime = em.GetComponentObject<StageMapCatalogRuntimeComponent>(runtimeEntity);
+                Assert.That(runtime, Is.Not.Null);
+                Assert.That(runtime.Catalog, Is.SameAs(catalog));
+            }
+            finally
+            {
+                if (go != null)
+                    Object.DestroyImmediate(go);
+                if (catalog != null)
+                    Object.DestroyImmediate(catalog);
                 world?.Dispose();
                 World.DefaultGameObjectInjectionWorld = oldDefault;
             }

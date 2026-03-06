@@ -1,4 +1,4 @@
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -268,8 +268,11 @@ namespace SweepNDodge.DotsBullets
                         ref eventRuntime,
                         out int selectedClipId))
                 {
-                    Debug.LogError(
-                        $"[WaveClipV3] Event trigger has no clip. source={sourceEntity.Index}, state={queued.TriggerState}");
+                    if (queued.TriggerState != SourceStateId.Depleted)
+                    {
+                        Debug.LogWarning(
+                            $"[WaveClipV3] Event trigger has no clip. source={sourceEntity.Index}, state={queued.TriggerState}");
+                    }
                     continue;
                 }
 
@@ -799,3 +802,4 @@ namespace SweepNDodge.DotsBullets
 
     }
 }
+

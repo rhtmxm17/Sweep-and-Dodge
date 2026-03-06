@@ -1,4 +1,4 @@
-using Unity.Entities;
+﻿using Unity.Entities;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -47,12 +47,20 @@ namespace SweepNDodge.DotsBullets
     {
         public byte StageStartRequested;
         public byte ConfirmPressed;
+        public byte StageMapApplyRequested;
+        public int RequestedStageId;
     }
 
     // 상위 StageFlow가 소비할 완료 신호(one-shot).
     public struct RunDirectorStageSignalComponent : IComponentData
     {
         public byte StageRunCompleted;
+    }
+
+    // 런타임 StageMap 카탈로그 참조(Managed Singleton).
+    public class StageMapCatalogRuntimeComponent : IComponentData
+    {
+        public StageMapCatalogSO Catalog;
     }
 
     public enum RunDirectorSourceStateId : byte
@@ -105,3 +113,4 @@ namespace SweepNDodge.DotsBullets
         public float PressureDensityScale;
     }
 }
+

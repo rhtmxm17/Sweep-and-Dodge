@@ -9,11 +9,125 @@ namespace SweepNDodge.DotsBullets.Editor
 {
     public static class StageLayoutCatalogGenerator
     {
+        [MenuItem("Tools/Project/Stage Layout/Generate Stage Layout Assets From Open Scenes")]
+        private static void GenerateStageLayoutsFromOpenScenesMenu()
+        {
+            int generated = GenerateStageLayoutsFromOpenScenes(saveAssets: true);
+            Debug.Log($"[StageLayout] StageLayoutSO generation complete. layouts={generated}");
+        }
+
+        public static int GenerateStageLayoutsFromOpenScenes(bool saveAssets)
+        {
+            var roots = UnityEngine.Object.FindObjectsByType<StageLayoutRootMarker>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Array.Sort(roots, CompareRoots);
+
+            int generatedCount = 0;
+            for (int i = 0; i < roots.Length; i++)
+            {
+                var root = roots[i];
+                if (root == null)
+                    continue;
+
+                if (TryGenerateLayoutsForRoot(root, out var issues, saveAssets))
+                {
+                    generatedCount += CountGeneratedLayoutTargets(root);
+                }
+
+                ReportIssues(root, issues);
+            }
+
+            return generatedCount;
+        }
+
+        public static bool TryGenerateLayoutsForRoot(
+            StageLayoutRootMarker root,
+            out List<ContentValidationIssue> issues,
+            bool saveAssets = false)
+        {
+            issues = new List<ContentValidationIssue>(16);
+            if (root == null)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "STL900",
+                    "(null)",
+                    "StageLayoutRootMarker is null."));
+                return false;
+            }
+
+            var stageNodes = root.GetComponentsInChildren<StageLayoutStageMarker>(includeInactive: true);
+            if (stageNodes == null || stageNodes.Length <= 0)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Warning,
+                    "STL902",
+                    BuildHierarchyPath(root.transform),
+                    "No StageLayoutStageMarker was found under root."));
+                return true;
+            }
+
+            Array.Sort(stageNodes, (a, b) =>
+            {
+                int stageOrder = a.StageId.CompareTo(b.StageId);
+                if (stageOrder != 0)
+                    return stageOrder;
+
+                return string.CompareOrdinal(BuildHierarchyPath(a.transform), BuildHierarchyPath(b.transform));
+            });
+
+            for (int i = 0; i < stageNodes.Length; i++)
+            {
+                TryGenerateLayoutForStage(stageNodes[i], issues, saveAssets);
+            }
+
+            return !HasError(issues);
+        }
+
+        private static bool TryGenerateLayoutForStage(
+            StageLayoutStageMarker stageNode,
+            List<ContentValidationIssue> issues,
+            bool saveAssets)
+        {
+            if (stageNode == null)
+                return false;
+
+            string location = BuildHierarchyPath(stageNode.transform);
+            if (stageNode.TargetLayout == null)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "STL901",
+                    location,
+                    "TargetLayout is not assigned."));
+                return false;
+            }
+
+            var definition = BuildLegacyStageDefinition(stageNode);
+            var validation = new List<ContentValidationIssue>(8);
+            StageLayoutValidationRules.ValidateDefinitions(new[] { definition }, location, validation);
+            for (int i = 0; i < validation.Count; i++)
+                issues.Add(validation[i]);
+            if (HasError(validation))
+                return false;
+
+            Undo.RecordObject(stageNode.TargetLayout, "Generate Stage Layout");
+            stageNode.TargetLayout.StageId = definition.StageId;
+            stageNode.TargetLayout.Sources = definition.Sources;
+            stageNode.TargetLayout.Deposits = definition.Deposits;
+            stageNode.TargetLayout.Obstacles = definition.Obstacles;
+            stageNode.TargetLayout.Visuals = definition.Visuals;
+            EditorUtility.SetDirty(stageNode.TargetLayout);
+            if (saveAssets)
+                AssetDatabase.SaveAssets();
+            return true;
+        }
+
         [MenuItem("Tools/Project/Stage Layout/Generate Catalogs From Open Scenes")]
         private static void GenerateCatalogsFromOpenScenesMenu()
         {
+            Debug.LogWarning("[StageLayout] GenerateCatalogsFromOpenScenes is deprecated in Dual Catalog mode. Use StageLayoutSO + StageCatalog composer.");
             int generated = GenerateCatalogsFromOpenScenes(saveAssets: true);
-            Debug.Log($"[StageLayout] Generation complete. catalogs={generated}");
+            Debug.Log($"[StageLayout] Legacy StageMapCatalog generation complete. catalogs={generated}");
         }
 
         public static int GenerateCatalogsFromOpenScenes(bool saveAssets)
@@ -81,6 +195,22 @@ namespace SweepNDodge.DotsBullets.Editor
             return true;
         }
 
+        private static int CountGeneratedLayoutTargets(StageLayoutRootMarker root)
+        {
+            if (root == null)
+                return 0;
+
+            int count = 0;
+            var nodes = root.GetComponentsInChildren<StageLayoutStageMarker>(includeInactive: true);
+            for (int i = 0; i < nodes.Length; i++)
+            {
+                if (nodes[i] != null && nodes[i].TargetLayout != null)
+                    count++;
+            }
+
+            return count;
+        }
+
         private static List<StageMapDefinition> BuildDefinitions(StageLayoutRootMarker root)
         {
             var definitions = new List<StageMapDefinition>(8);
@@ -106,35 +236,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (stageNode == null)
                     continue;
 
-                var sources = stageNode.GetComponentsInChildren<StageSourceMarker>(includeInactive: true)
-                    .OrderBy(x => x.StableId)
-                    .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                    .Select(ToSourceData)
-                    .ToArray();
-                var deposits = stageNode.GetComponentsInChildren<StageDepositMarker>(includeInactive: true)
-                    .OrderBy(x => x.StableId)
-                    .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                    .Select(ToDepositData)
-                    .ToArray();
-                var obstacles = stageNode.GetComponentsInChildren<StageObstacleMarker>(includeInactive: true)
-                    .OrderBy(x => x.StableId)
-                    .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                    .Select(ToObstacleData)
-                    .ToArray();
-                var visuals = stageNode.GetComponentsInChildren<StageVisualMarker>(includeInactive: true)
-                    .OrderBy(x => x.StableId)
-                    .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                    .Select(ToVisualData)
-                    .ToArray();
-
-                definitions.Add(new StageMapDefinition
-                {
-                    StageId = stageNode.StageId,
-                    Sources = sources,
-                    Deposits = deposits,
-                    Obstacles = obstacles,
-                    Visuals = visuals,
-                });
+                definitions.Add(BuildLegacyStageDefinition(stageNode));
             }
 
             if (root.SortByStageId)
@@ -143,6 +245,39 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             return definitions;
+        }
+
+        private static StageMapDefinition BuildLegacyStageDefinition(StageLayoutStageMarker stageNode)
+        {
+            var sources = stageNode.GetComponentsInChildren<StageSourceMarker>(includeInactive: true)
+                .OrderBy(x => x.StableId)
+                .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
+                .Select(ToSourceData)
+                .ToArray();
+            var deposits = stageNode.GetComponentsInChildren<StageDepositMarker>(includeInactive: true)
+                .OrderBy(x => x.StableId)
+                .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
+                .Select(ToDepositData)
+                .ToArray();
+            var obstacles = stageNode.GetComponentsInChildren<StageObstacleMarker>(includeInactive: true)
+                .OrderBy(x => x.StableId)
+                .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
+                .Select(ToObstacleData)
+                .ToArray();
+            var visuals = stageNode.GetComponentsInChildren<StageVisualMarker>(includeInactive: true)
+                .OrderBy(x => x.StableId)
+                .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
+                .Select(ToVisualData)
+                .ToArray();
+
+            return new StageMapDefinition
+            {
+                StageId = stageNode.StageId,
+                Sources = sources,
+                Deposits = deposits,
+                Obstacles = obstacles,
+                Visuals = visuals,
+            };
         }
 
         private static StageSourceLayoutData ToSourceData(StageSourceMarker marker)
@@ -263,4 +398,3 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 }
-
