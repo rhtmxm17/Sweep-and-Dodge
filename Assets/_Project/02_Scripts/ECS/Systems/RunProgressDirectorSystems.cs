@@ -65,6 +65,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<BulletFrameCounterComponent>();
             state.RequireForUpdate<SourceRunDirectorStateComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
+            state.RequireForUpdate<StageTopologyStateComponent>();
             state.RequireForUpdate<RunDirectorStageGateComponent>();
             state.RequireForUpdate<RunDirectorStageRequestComponent>();
             state.RequireForUpdate<RunDirectorStageSignalComponent>();
@@ -74,6 +75,7 @@ namespace SweepNDodge.DotsBullets
         {
             uint frame = FrameSequenceUtility.GetCurrentFrame(SystemAPI.GetSingleton<BulletFrameCounterComponent>());
             var stageRW = SystemAPI.GetSingletonRW<RunDirectorStageStateComponent>();
+            var topologyState = SystemAPI.GetSingleton<StageTopologyStateComponent>();
             var gateRW = SystemAPI.GetSingletonRW<RunDirectorStageGateComponent>();
             var requestRW = SystemAPI.GetSingletonRW<RunDirectorStageRequestComponent>();
             var signalRW = SystemAPI.GetSingletonRW<RunDirectorStageSignalComponent>();
@@ -88,6 +90,9 @@ namespace SweepNDodge.DotsBullets
                 case RunDirectorStageStateId.Idle:
                 {
                     bool canRun = stageRequest.StageStartRequested != 0
+                        && topologyState.Ready != 0
+                        && topologyState.SelectedStageId > 0
+                        && topologyState.AppliedStageId == topologyState.SelectedStageId
                         && stageGate.MinIdleDurationElapsed != 0
                         && stageGate.IntroPresentationDone != 0;
                     if (canRun)
@@ -198,6 +203,8 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
+            state.CompleteDependency();
+
             var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
             if (stageState.State != RunDirectorStageStateId.Running)
                 return;

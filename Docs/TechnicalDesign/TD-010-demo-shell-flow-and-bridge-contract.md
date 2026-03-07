@@ -12,13 +12,13 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. 현재 런타임은 `StageCatalogSO`만 publish하며, `RequestStageApply(stageId)`가 stage apply one-shot의 정식 API다. `RequestStageMapApply(stageId)`는 한 페이즈 동안 obsolete forwarder로만 남는다.
+> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. 현재 런타임은 `StageCatalogSO + StageTopologyPrefabCatalog`를 publish하며, `RequestStageTopologyApply(stageId)`가 topology apply one-shot의 정식 API다. `RequestStageApply(stageId)` / `RequestStageMapApply(stageId)`는 obsolete forwarder로만 남는다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
 - DemoShell 화면 전이를 단일 소유한다.
 - GO->ECS 쓰기 경로를 `RunDirectorStageBridge` 단일 접점으로 유지한다.
-- Stage 시작 전에 `RequestStageApply(stageId)`를 선행해 layout + definition 적용을 보장한다.
+- Stage 시작 전에 `RequestStageTopologyApply(stageId)`를 선행해 topology + layout + definition 적용을 보장한다.
 - 로비/진행 순서를 `StageCatalogSO.Entries` 기반으로 데이터 주도화한다.
 
 ### 1.2 비목표
@@ -31,17 +31,17 @@
   - 로비 선택/결과 선택 후속 처리
   - StageCatalog 로딩과 fallback 결정
 - GO->ECS Writer: `RunDirectorStageBridge`
-  - `RequestStageApply(int stageId)`
+  - `RequestStageTopologyApply(int stageId)`
   - `RequestStageStart()`, `RequestConfirm()`
   - `SetIntroPresentationDone(bool)`, `SetClearPresentationDone(bool)`
-- ECS stage apply Owner: `StageCatalogApplyExecutionBeginSystem`
+- ECS stage topology/apply Owner: `StageTopologyApplyExecutionBeginSystem`
 - ECS Stage 상태/전이 Owner: 기존 시스템 유지 (`RunDirectorStageTransitionSystem` 등)
 
 ## 3. 업데이트 순서 / 전이 계약
 - 파이프라인 순서:
   - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
 - StagePlay 시작 루프:
-  1. `RequestStageApply(stageId)` 성공
+  1. `RequestStageTopologyApply(stageId)` 성공
   2. `SetIntroPresentationDone(true)` + `SetClearPresentationDone(false)`
   3. `RequestStageStart()`
 - `DemoShellFlowController`는 ECS 직접 write 금지
@@ -60,12 +60,12 @@
 - Bridge runtime publish 계약
   - `StageCatalog`가 있으면 `StageCatalogRuntimeComponent`를 최신화한다
   - `StageMapCatalogSO` publish/compose 경로는 제거됐다
-  - `RequestStageMapApply(int)`는 obsolete forwarder이며 내부적으로 `RequestStageApply(int)`만 호출한다
+  - `RequestStageApply(int)` / `RequestStageMapApply(int)`는 obsolete forwarder이며 내부적으로 `RequestStageTopologyApply(int)`만 호출한다
 
 ## 5. StageId 경로
 - 로비 선택 -> `EnterStagePlay(stageIndex)`
 - `stageIndex`에 대응하는 런타임 프로필의 `StageId` 결정
-- `RequestStageApply(StageId)` 호출
+- `RequestStageTopologyApply(StageId)` 호출
 - 이후 기존 Stage start/confirm 경로 유지
 
 ## 6. 씬/운영 기준
@@ -89,7 +89,7 @@
     - Enabled 필터
     - fallback 동작
   - `RunDirectorStageBridgeTests`
-    - `RequestStageApply`
+    - `RequestStageTopologyApply`
     - obsolete forwarder
   - `StageCatalogSampleAssetsTests`
     - `sc_demo` / `sd_demo_1~3` / `sl_demo_1~3` 자산 유효성

@@ -11,13 +11,13 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageCatalogApplyExecutionBeginSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve해 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyApplyExecutionBeginSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve하고, `Source/Deposit` topology를 runtime template reconcile로 생성/재사용한 뒤 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
 - 스테이지 메타/패턴 정의와 물리 레이아웃 데이터를 분리한다.
 - 로비/진행 순서를 `StageCatalogSO.Entries` 순서로 고정한다.
-- `RunDirectorStageBridge -> RequestStageApply(stageId)` 단일 입력 경로를 유지한다.
+- `RunDirectorStageBridge -> RequestStageTopologyApply(stageId)` 단일 topology 입력 경로를 사용한다.
 - `StageDefinitionSO.SourceBindings`를 런타임 Source에 적용한다.
 - 샘플 운영 씬과 에디터 파이프라인을 `StageCatalogSO` 중심으로 닫는다.
 
@@ -27,7 +27,7 @@
 - 운영 빌드 fail-fast 정책 전환
 
 ## 2. 현재 상태(코드 기준)
-- 런타임 적용은 `StageCatalogApplyExecutionBeginSystem`이 `StageCatalogSO`를 `StageId`로 조회해 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+- 런타임 적용은 `StageTopologyApplyExecutionBeginSystem`이 `StageCatalogSO`를 `StageId`로 조회해 `Source/Deposit` runtime topology를 reconcile하고, `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
 - `RunDirectorStageBridge`는 `StageCatalogRuntimeComponent`만 publish한다.
 - `DemoShellFlowController`는 `StageCatalogSO`가 있으면 카탈로그에서 `StageProfiles`를 구성하고, 없으면 기존 직렬화 `StageProfiles`를 fallback으로 사용한다.
 - `SourceClipRequestBuildSystem`은 stage state gate를 가져 `Running` 전에는 clip request를 만들지 않는다.
@@ -40,7 +40,7 @@
 - Catalog 조립 Owner: `StageCatalogComposer`
 - StageCatalog 검증 Owner: `StageCatalogValidationRules`
 - StageLayout 검증 Owner: `StageLayoutValidationRules`
-- 런타임 Stage apply Owner: `StageCatalogApplyExecutionBeginSystem` (ExecutionBegin)
+- 런타임 Stage topology/apply Owner: `StageTopologyApplyExecutionBeginSystem` (ExecutionBegin)
 - GO -> ECS 요청 Writer: `RunDirectorStageBridge` 단일 Writer
 
 ## 4. 업데이트 순서
@@ -48,7 +48,7 @@
   - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
 - Stage apply 순서:
   - `BulletPoolOwnerBootstrapSystem`
-  - `StageCatalogApplyExecutionBeginSystem`
+  - `StageTopologyApplyExecutionBeginSystem`
   - `BulletFieldAreaUpdateSystem`
 
 ## 5. 데이터 구조 / 제약
@@ -129,8 +129,8 @@
   - `DemoShellFlowController.StageCatalog = sc_demo`
   - `RunDirectorStageBridge`는 `StageCatalog`만 참조한다.
 - `EnterStagePlay`
-  - 선택 엔트리의 `Definition.StageId`를 사용해 `RequestStageApply(stageId)` 호출
-- `StageCatalogApplyExecutionBeginSystem`
+  - 선택 엔트리의 `Definition.StageId`를 사용해 `RequestStageTopologyApply(stageId)` 호출
+- `StageTopologyApplyExecutionBeginSystem`
   - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 layout+definition 결합 적용
   - `Deposit`은 layout 적용
@@ -149,7 +149,7 @@
   - `DemoShellFlowControllerStageCatalogTests`
   - `StageCatalogSampleAssetsTests`
   - `RunDirectorStageBridgeTests`
-  - `StageCatalogApplyExecutionBeginSystemTests`
+  - `StageTopologyApplyExecutionBeginSystemTests`
 - PlayMode
   - DemoShell 회귀 스모크(`Title -> Lobby -> Stage -> Result -> Retry/Next`)
   - `Stage2` layout/pattern 차이 반영 확인

@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -760,6 +760,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RunDirectorStageBridge
   LogBindWarnings: 1
+  StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
+  TopologyPrefabCatalog: {fileID: 11400000, guid: 3023896e72d43dd4fbbdf17556c9259c, type: 2}
   OnStageRunCompleted:
     m_PersistentCalls:
       m_Calls: []
@@ -802,15 +804,15 @@ MonoBehaviour:
   EnableKeyboardFallback: 1
   StageProfiles:
   - StageId: 1
-    DisplayName: Stage 1
+    DisplayName: Stage 1 - Baseline
     IsFinalStage: 0
     StageTimeLimitSec: 150
   - StageId: 2
-    DisplayName: Stage 2
+    DisplayName: Stage 2 - Shifted Pressure
     IsFinalStage: 0
     StageTimeLimitSec: 180
   - StageId: 3
-    DisplayName: Stage 3
+    DisplayName: Stage 3 - Final Sweep
     IsFinalStage: 1
     StageTimeLimitSec: 210
   LogTransitions: 0

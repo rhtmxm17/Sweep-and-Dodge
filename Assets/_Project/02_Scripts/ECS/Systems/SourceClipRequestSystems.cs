@@ -35,6 +35,8 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
+            state.CompleteDependency();
+
             var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
             if (stageState.State != RunDirectorStageStateId.Running)
                 return;

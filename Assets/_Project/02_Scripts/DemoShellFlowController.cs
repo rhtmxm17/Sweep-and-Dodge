@@ -45,7 +45,7 @@ namespace SweepNDodge.DotsBullets
         private DemoShellScreenId _currentScreen;
         private int _currentStageIndex = -1;
         private bool _stageStartPending;
-        private bool _stageMapApplyPending;
+        private bool _stageTopologyApplyPending;
         private bool _awaitingCompletedSignal;
         private DemoShellResultActionId _pendingResultAction;
         private bool _warnedNoBridge;
@@ -331,13 +331,13 @@ namespace SweepNDodge.DotsBullets
                 if (!TryGetStageProfile(_currentStageIndex, out var startProfile))
                     return;
 
-                if (_stageMapApplyPending)
+                if (_stageTopologyApplyPending)
                 {
-                    bool applyOk = StageBridge.RequestStageApply(startProfile.StageId);
+                    bool applyOk = StageBridge.RequestStageTopologyApply(startProfile.StageId);
                     if (!applyOk)
                         return;
 
-                    _stageMapApplyPending = false;
+                    _stageTopologyApplyPending = false;
                 }
 
                 bool introOk = StageBridge.SetIntroPresentationDone(true);
@@ -467,7 +467,7 @@ namespace SweepNDodge.DotsBullets
 
             _currentStageIndex = stageIndex;
             _stageStartPending = true;
-            _stageMapApplyPending = true;
+            _stageTopologyApplyPending = true;
             _awaitingCompletedSignal = false;
             _pendingResultAction = DemoShellResultActionId.NextStage;
             _stagePlayElapsedSec = 0f;

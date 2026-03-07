@@ -261,6 +261,18 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, default(RunDirectorStageRequestComponent));
             }
 
+            if (!HasSingleton<StageTopologyRequestComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(StageTopologyRequestComponent));
+                em.SetComponentData(e, default(StageTopologyRequestComponent));
+            }
+
+            if (!HasSingleton<StageTopologyStateComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(StageTopologyStateComponent));
+                em.SetComponentData(e, default(StageTopologyStateComponent));
+            }
+
             if (!HasSingleton<RunDirectorStageSignalComponent>(em))
             {
                 var e = em.CreateEntity(typeof(RunDirectorStageSignalComponent));
@@ -278,6 +290,17 @@ namespace SweepNDodge.DotsBullets
                     });
                 }
             }
+
+            if (!HasSingleton<StageTopologyPrefabCatalogComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(StageTopologyPrefabCatalogComponent));
+                em.SetComponentData(e, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = Entity.Null,
+                    DepositTemplate = Entity.Null,
+                });
+            }
+
             if (!HasSingleton<RunDirectorPressureWeightSingletonTag>(em))
             {
                 var e = em.CreateEntity(typeof(RunDirectorPressureWeightSingletonTag));

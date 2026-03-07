@@ -8,159 +8,137 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class StageCatalogApplyExecutionBeginSystemTests
+    public class StageTopologyApplyExecutionBeginSystemTests
     {
         [Test]
-        public void StageCatalogApply_RequestApplied_RebuildsDefinitionAndDisablesInvalidSources()
+        public void StageTopologyApply_InstantiatesOwnedSourceAndDeposit_WhenNoPrebakedEntitiesExist()
         {
-            using var world = CreateDefaultTestWorld("StageCatalogApplyWorld_A", out _);
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_A");
             var em = world.EntityManager;
-            var applySystem = world.GetOrCreateSystem<StageCatalogApplyExecutionBeginSystem>();
             var createdAssets = new List<ScriptableObject>();
-
-            var sourceMatched = CreateSource(em, 1001u, new float3(-4f, 0f, -2f), state: SourceStateId.Normal, version: 7u);
-            var sourceMissingBinding = CreateSource(em, 1002u, new float3(6f, 0f, -2f), state: SourceStateId.Normal, version: 3u);
-            var sourceLayoutInactive = CreateSource(em, 1003u, new float3(8f, 0f, -2f), state: SourceStateId.Normal, version: 4u);
-            var sourceDuplicateA = CreateSource(em, 1004u, new float3(10f, 0f, -2f), state: SourceStateId.Normal, version: 5u);
-            var sourceDuplicateB = CreateSource(em, 1004u, new float3(12f, 0f, -2f), state: SourceStateId.Normal, version: 6u);
-            var sourceUnmapped = CreateSource(em, 9001u, new float3(14f, 0f, -2f), state: SourceStateId.Normal, version: 2u);
-
-            var depositMapped = CreateDeposit(em, 2001u, new float3(-8f, 0f, 0f), radius: 10f);
-            var depositUnmapped = CreateDeposit(em, 9002u, new float3(7f, 0f, 7f), radius: 3f);
-
-            var stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-            createdAssets.Add(stageCatalog);
 
             try
             {
-                var definition = CreateDefinition(createdAssets, 1);
-                var bullet = CreateBulletDefinition(createdAssets, 101);
-                var sustainClip = CreateSustainClip(createdAssets, bullet, clipId: 501);
-                var eventClip = CreateEventClip(createdAssets, bullet, clipId: 601);
-
-                definition.SourceBindings = new[]
+                var catalog = CreateStageCatalog(createdAssets, stageId: 1, sourceStableIds: new uint[] { 1001u, 1002u }, depositStableIds: new uint[] { 2001u });
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
                 {
-                    new StageSourceBinding
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+                SetSingleton(em, new StageTopologyRequestComponent
+                {
+                    RequestedStageId = 1,
+                    ApplyRequested = 1,
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+
+                using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
+                {
+                    All = new[]
                     {
-                        SourceStableId = 1001u,
-                        InitialSourceState = SourceStateId.Weakened,
-                        ThresholdWeakened = 50,
-                        ThresholdDepleted = 90,
-                        SustainSlots = new[]
-                        {
-                            new SustainSlotBinding
-                            {
-                                State = SourceStateId.Weakened,
-                                Lane = SourceSpawnLaneId.Hazard,
-                                Clips = new[] { sustainClip },
-                                Weights = new[] { 1f },
-                            },
-                        },
-                        EventSlots = new[]
-                        {
-                            new EventSlotBinding
-                            {
-                                TriggerState = SourceStateId.Weakened,
-                                EventClips = new[] { eventClip },
-                            },
-                        },
+                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                        ComponentType.ReadOnly<StageTopologySourceTag>(),
+                        ComponentType.ReadOnly<SourceStableIdComponent>(),
                     },
-                    new StageSourceBinding
+                    Options = EntityQueryOptions.IncludeDisabledEntities,
+                });
+                using var depositQuery = em.CreateEntityQuery(new EntityQueryDesc
+                {
+                    All = new[]
                     {
-                        SourceStableId = 1003u,
-                        InitialSourceState = SourceStateId.Normal,
-                        ThresholdWeakened = 10,
-                        ThresholdDepleted = 20,
-                        SustainSlots = new[]
-                        {
-                            new SustainSlotBinding
-                            {
-                                State = SourceStateId.Normal,
-                                Lane = SourceSpawnLaneId.Trash,
-                                Clips = new[] { sustainClip },
-                                Weights = new[] { 1f },
-                            },
-                        },
-                        EventSlots = new EventSlotBinding[0],
+                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                        ComponentType.ReadOnly<StageTopologyDepositTag>(),
+                        ComponentType.ReadOnly<DepositStableIdComponent>(),
                     },
-                    new StageSourceBinding
-                    {
-                        SourceStableId = 1004u,
-                        InitialSourceState = SourceStateId.Normal,
-                        ThresholdWeakened = 12,
-                        ThresholdDepleted = 24,
-                        SustainSlots = new[]
-                        {
-                            new SustainSlotBinding
-                            {
-                                State = SourceStateId.Normal,
-                                Lane = SourceSpawnLaneId.Hazard,
-                                Clips = new[] { sustainClip },
-                                Weights = new[] { 1f },
-                            },
-                        },
-                        EventSlots = new EventSlotBinding[0],
-                    },
+                    Options = EntityQueryOptions.IncludeDisabledEntities,
+                });
+                using var sourceEntities = sourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+                using var depositEntities = depositQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+
+                Assert.That(sourceEntities.Length, Is.EqualTo(2));
+                Assert.That(depositEntities.Length, Is.EqualTo(1));
+
+                var sourceA = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1001u, c => c.Value);
+                var sourceB = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1002u, c => c.Value);
+                var deposit = FindByStableId<DepositStableIdComponent>(em, depositEntities, 2001u, c => c.Value);
+
+                Assert.That(em.IsEnabled(sourceA), Is.True);
+                Assert.That(em.IsEnabled(sourceB), Is.True);
+                Assert.That(em.IsEnabled(deposit), Is.True);
+                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceA).Length, Is.GreaterThan(0));
+                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceB).Length, Is.GreaterThan(0));
+                Assert.That(em.GetComponentData<DepositPointComponent>(deposit).Radius, Is.GreaterThan(0f));
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_ReusesDisabledOwnedEntities_AcrossStageSwitches()
+        {
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_B");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+                createdAssets.Add(catalog);
+                catalog.Entries = new[]
+                {
+                    CreateEntry(createdAssets, 1, new uint[] { 1001u, 1002u }, new uint[] { 2001u }),
+                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }),
                 };
 
-                var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
-                createdAssets.Add(layout);
-                layout.StageId = 1;
-                layout.Sources = new[]
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
                 {
-                    new StageSourceLayoutData
-                    {
-                        StableId = 1001u,
-                        Active = true,
-                        Position = new Vector3(1f, 0f, 2f),
-                        YawDeg = 90f,
-                        FieldShape = BulletFieldShapeId.Rectangle,
-                        FieldRadius = 0f,
-                        FieldSize = new Vector2(12f, 8f),
-                    },
-                    new StageSourceLayoutData
-                    {
-                        StableId = 1002u,
-                        Active = true,
-                        Position = new Vector3(3f, 0f, 4f),
-                        YawDeg = 0f,
-                        FieldShape = BulletFieldShapeId.Circle,
-                        FieldRadius = 6f,
-                        FieldSize = Vector2.zero,
-                    },
-                    new StageSourceLayoutData
-                    {
-                        StableId = 1003u,
-                        Active = false,
-                        Position = new Vector3(5f, 0f, 6f),
-                        YawDeg = 0f,
-                        FieldShape = BulletFieldShapeId.Circle,
-                        FieldRadius = 3f,
-                        FieldSize = Vector2.zero,
-                    },
-                    new StageSourceLayoutData
-                    {
-                        StableId = 1004u,
-                        Active = true,
-                        Position = new Vector3(7f, 0f, 8f),
-                        YawDeg = 0f,
-                        FieldShape = BulletFieldShapeId.Circle,
-                        FieldRadius = 2f,
-                        FieldSize = Vector2.zero,
-                    },
-                };
-                layout.Deposits = new[]
-                {
-                    new StageDepositLayoutData
-                    {
-                        StableId = 2001u,
-                        Active = true,
-                        Position = new Vector3(0f, 0f, 10f),
-                        Radius = 5f,
-                    },
-                };
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, default(StageTopologyRequestComponent));
 
-                stageCatalog.Entries = new[]
+                ApplyStage(world, 1);
+                AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 2, expectedDepositTotal: 1, expectedDepositEnabled: 1);
+
+                ApplyStage(world, 2);
+                AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 1, expectedDepositTotal: 1, expectedDepositEnabled: 1);
+
+                ApplyStage(world, 1);
+                AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 2, expectedDepositTotal: 1, expectedDepositEnabled: 1);
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_MissingDefinitionBinding_DisablesOnlyMissingSource_AndKeepsReady()
+        {
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_C");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var definition = CreateDefinition(createdAssets, 1, new uint[] { 1001u });
+                var layout = CreateLayout(createdAssets, 1, new uint[] { 1001u, 1002u }, new uint[] { 2001u });
+                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+                createdAssets.Add(catalog);
+                catalog.Entries = new[]
                 {
                     new StageCatalogEntry
                     {
@@ -171,76 +149,43 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                 };
 
-                var stageCatalogRuntimeEntity = GetOrCreateManagedSingletonEntity<StageCatalogRuntimeComponent>(em);
-                em.GetComponentObject<StageCatalogRuntimeComponent>(stageCatalogRuntimeEntity).Catalog = stageCatalog;
-
-                var requestEntity = GetOrCreateSingletonEntity<RunDirectorStageRequestComponent>(em);
-                em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+                SetSingleton(em, new StageTopologyRequestComponent
                 {
                     RequestedStageId = 1,
-                    StageApplyRequested = 1,
+                    ApplyRequested = 1,
                 });
+                SetSingleton(em, default(StageTopologyStateComponent));
 
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                applySystem.Update(world.Unmanaged);
+                world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
 
-                var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
-                Assert.That(request.StageApplyRequested, Is.EqualTo(0));
-                Assert.That(request.RequestedStageId, Is.EqualTo(1));
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
 
-                var matchedSource = em.GetComponentData<SourceSpawnComponent>(sourceMatched);
-                var matchedRuntime = em.GetComponentData<SourceSpawnRuntimeComponent>(sourceMatched);
-                var matchedAnchor = em.GetComponentData<SourceAnchorComponent>(sourceMatched);
-                var matchedArea = em.GetComponentData<BulletFieldAreaComponent>(sourceMatched);
-                var matchedTransform = em.GetComponentData<LocalTransform>(sourceMatched);
-                var matchedDirector = em.GetComponentData<SourceRunDirectorStateComponent>(sourceMatched);
-                var matchedEventRuntime = em.GetComponentData<SourceEventRuntimeComponent>(sourceMatched);
-                var matchedGrid = em.GetComponentData<SourcePollutionGridComponent>(sourceMatched);
-                Assert.That(matchedSource.ThresholdWeakened, Is.EqualTo(50));
-                Assert.That(matchedSource.ThresholdDepleted, Is.EqualTo(90));
-                Assert.That(matchedSource.CollectedCount, Is.EqualTo(50));
-                Assert.That(matchedSource.State, Is.EqualTo(SourceStateId.Weakened));
-                Assert.That(matchedRuntime.SpawnSequence, Is.EqualTo(1u));
-                Assert.That(matchedAnchor.Position.x, Is.EqualTo(1f).Within(1e-4f));
-                Assert.That(matchedAnchor.Position.z, Is.EqualTo(2f).Within(1e-4f));
-                Assert.That(matchedTransform.Position.x, Is.EqualTo(1f).Within(1e-4f));
-                Assert.That(matchedTransform.Position.z, Is.EqualTo(2f).Within(1e-4f));
-                Assert.That(matchedArea.Shape, Is.EqualTo(BulletFieldShapeId.Rectangle));
-                Assert.That(matchedArea.Size.x, Is.EqualTo(12f).Within(1e-4f));
-                Assert.That(matchedArea.Size.y, Is.EqualTo(8f).Within(1e-4f));
-                Assert.That(matchedDirector.State, Is.EqualTo(RunDirectorSourceStateId.Baseline));
-                Assert.That(matchedDirector.SelectedClipState, Is.EqualTo(SourceStateId.Weakened));
-                Assert.That(matchedDirector.PressureOccupancySec, Is.EqualTo(0f).Within(1e-4f));
-                Assert.That(matchedDirector.DensityScale, Is.EqualTo(1f).Within(1e-4f));
-                Assert.That(matchedDirector.Version, Is.EqualTo(8u));
-                Assert.That(matchedEventRuntime.IsPlaying, Is.EqualTo(0));
-                Assert.That(matchedEventRuntime.TriggerState, Is.EqualTo(SourceStateId.Weakened));
-                Assert.That(matchedEventRuntime.SelectionSequence, Is.EqualTo(1u));
-                Assert.That(matchedGrid.Cols, Is.EqualTo(12));
-                Assert.That(matchedGrid.Rows, Is.EqualTo(8));
-                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceMatched).Length, Is.GreaterThan(0));
-                Assert.That(em.GetBuffer<SourceSustainSlotCandidateBuffer>(sourceMatched).Length, Is.EqualTo(1));
-                Assert.That(em.GetBuffer<SourceEventQueueBuffer>(sourceMatched).Length, Is.EqualTo(0));
-                Assert.That(em.GetBuffer<SourceSpawnRequestBuffer>(sourceMatched).Length, Is.EqualTo(0));
-                Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(sourceMatched).Length, Is.EqualTo(1));
-                Assert.That(em.GetBuffer<SourceDirectorPressureInputBuffer>(sourceMatched).Length, Is.EqualTo(2));
-                Assert.That(em.GetBuffer<SourcePollutionValidCellIndexBuffer>(sourceMatched).Length, Is.GreaterThan(0));
+                using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
+                {
+                    All = new[]
+                    {
+                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                        ComponentType.ReadOnly<StageTopologySourceTag>(),
+                        ComponentType.ReadOnly<SourceStableIdComponent>(),
+                    },
+                    Options = EntityQueryOptions.IncludeDisabledEntities,
+                });
+                using var sourceEntities = sourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+                Assert.That(sourceEntities.Length, Is.EqualTo(2));
 
-                AssertDisabledSource(em, sourceMissingBinding, expectedVersion: 4u);
-                AssertDisabledSource(em, sourceLayoutInactive, expectedVersion: 5u);
-                AssertDisabledSource(em, sourceDuplicateA, expectedVersion: 6u);
-                AssertDisabledSource(em, sourceDuplicateB, expectedVersion: 7u);
-                AssertDisabledSource(em, sourceUnmapped, expectedVersion: 3u);
-
-                var mappedDeposit = em.GetComponentData<DepositPointComponent>(depositMapped);
-                var mappedDepositTx = em.GetComponentData<LocalTransform>(depositMapped);
-                Assert.That(mappedDeposit.Radius, Is.EqualTo(5f).Within(1e-4f));
-                Assert.That(mappedDepositTx.Position.z, Is.EqualTo(10f).Within(1e-4f));
-
-                var unmappedDeposit = em.GetComponentData<DepositPointComponent>(depositUnmapped);
-                var unmappedDepositTx = em.GetComponentData<LocalTransform>(depositUnmapped);
-                Assert.That(unmappedDeposit.Radius, Is.EqualTo(0f).Within(1e-4f));
-                Assert.That(unmappedDepositTx.Position.y, Is.LessThan(-9999f));
+                var bound = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1001u, c => c.Value);
+                var missing = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1002u, c => c.Value);
+                Assert.That(em.IsEnabled(bound), Is.True);
+                Assert.That(em.IsEnabled(missing), Is.False);
+                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(missing).Length, Is.EqualTo(0));
             }
             finally
             {
@@ -249,112 +194,128 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void StageCatalogApply_MissingDefinitionStage_AppliesLayoutOnly_AndPreservesClipBuffers()
+        public void RunDirectorStageTransition_IdleStart_IsBlockedUntilTopologyReady()
         {
-            using var world = CreateDefaultTestWorld("StageCatalogApplyWorld_B", out _);
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_D");
             var em = world.EntityManager;
-            var applySystem = world.GetOrCreateSystem<StageCatalogApplyExecutionBeginSystem>();
-            var createdAssets = new List<ScriptableObject>();
+            var transitionSystem = world.GetOrCreateSystem<RunDirectorStageTransitionSystem>();
 
-            var source = CreateSource(em, 1001u, new float3(7f, 0f, 8f), state: SourceStateId.Weakened, version: 2u);
-            var stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
-            createdAssets.Add(stageCatalog);
-            createdAssets.Add(layout);
-
-            try
+            var stageStateEntity = GetOrCreateSingletonEntity<RunDirectorStageStateComponent>(em);
+            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
             {
-                layout.StageId = 1;
-                layout.Sources = new[]
-                        {
-                            new StageSourceLayoutData
-                            {
-                                StableId = 1001,
-                                Active = true,
-                                Position = new Vector3(1f, 0f, 1f),
-                                YawDeg = 0f,
-                                FieldShape = BulletFieldShapeId.Rectangle,
-                                FieldRadius = 0f,
-                                FieldSize = new Vector2(5f, 4f),
-                            },
-                        };
-                stageCatalog.Entries = new[]
-                {
-                    new StageCatalogEntry
-                    {
-                        Enabled = true,
-                        EntryKey = "stage_01",
-                        Definition = null,
-                        Layout = layout,
-                    },
-                };
+                State = RunDirectorStageStateId.Idle,
+                StateElapsedSec = 0f,
+                EnteredFrame = 0u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+            });
 
-                var runtimeEntity = GetOrCreateManagedSingletonEntity<StageCatalogRuntimeComponent>(em);
-                em.GetComponentObject<StageCatalogRuntimeComponent>(runtimeEntity).Catalog = stageCatalog;
-
-                var requestEntity = GetOrCreateSingletonEntity<RunDirectorStageRequestComponent>(em);
-                em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
-                {
-                    RequestedStageId = 1,
-                    StageApplyRequested = 1,
-                });
-
-                var beforeClipPatternCount = em.GetBuffer<SourceClipPatternBuffer>(source).Length;
-                var beforeThresholdWeakened = em.GetComponentData<SourceSpawnComponent>(source).ThresholdWeakened;
-                var beforeThresholdDepleted = em.GetComponentData<SourceSpawnComponent>(source).ThresholdDepleted;
-
-                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                applySystem.Update(world.Unmanaged);
-
-                var appliedSource = em.GetComponentData<SourceSpawnComponent>(source);
-                var appliedAnchor = em.GetComponentData<SourceAnchorComponent>(source);
-                var appliedArea = em.GetComponentData<BulletFieldAreaComponent>(source);
-                Assert.That(appliedSource.State, Is.EqualTo(SourceStateId.Normal));
-                Assert.That(appliedSource.CollectedCount, Is.EqualTo(0));
-                Assert.That(appliedSource.ThresholdWeakened, Is.EqualTo(beforeThresholdWeakened));
-                Assert.That(appliedSource.ThresholdDepleted, Is.EqualTo(beforeThresholdDepleted));
-                Assert.That(appliedAnchor.Position.x, Is.EqualTo(1f).Within(1e-4f));
-                Assert.That(appliedAnchor.Position.z, Is.EqualTo(1f).Within(1e-4f));
-                Assert.That(appliedArea.Shape, Is.EqualTo(BulletFieldShapeId.Rectangle));
-                Assert.That(appliedArea.Size.x, Is.EqualTo(5f).Within(1e-4f));
-                Assert.That(appliedArea.Size.y, Is.EqualTo(4f).Within(1e-4f));
-                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(source).Length, Is.EqualTo(beforeClipPatternCount));
-            }
-            finally
+            var topologyStateEntity = GetOrCreateSingletonEntity<StageTopologyStateComponent>(em);
+            em.SetComponentData(topologyStateEntity, new StageTopologyStateComponent
             {
-                DestroyAll(createdAssets);
-            }
+                SelectedStageId = 1,
+                AppliedStageId = 0,
+                Ready = 0,
+            });
+
+            var gateEntity = GetOrCreateSingletonEntity<RunDirectorStageGateComponent>(em);
+            em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 1,
+                MinIdleDurationElapsed = 1,
+                AutoAdvanceTimeoutElapsed = 0,
+            });
+
+            var requestEntity = GetOrCreateSingletonEntity<RunDirectorStageRequestComponent>(em);
+            em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
+            {
+                StageStartRequested = 1,
+                ConfirmPressed = 0,
+            });
+
+            GetOrCreateSingletonEntity<RunDirectorStageSignalComponent>(em);
+            GetOrCreateSingletonEntity<BulletFrameCounterComponent>(em);
+            em.CreateEntity(typeof(SourceRunDirectorStateComponent));
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            transitionSystem.Update(world.Unmanaged);
+            Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.Idle));
+
+            em.SetComponentData(topologyStateEntity, new StageTopologyStateComponent
+            {
+                SelectedStageId = 1,
+                AppliedStageId = 1,
+                Ready = 1,
+            });
+            transitionSystem.Update(world.Unmanaged);
+
+            var stageState = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
+            var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
+            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Running));
+            Assert.That(request.StageStartRequested, Is.EqualTo(0));
         }
 
-        private static void AssertDisabledSource(EntityManager em, Entity entity, uint expectedVersion)
+        private static void ApplyStage(World world, int stageId)
         {
-            var source = em.GetComponentData<SourceSpawnComponent>(entity);
-            var runtime = em.GetComponentData<SourceSpawnRuntimeComponent>(entity);
-            var eventRuntime = em.GetComponentData<SourceEventRuntimeComponent>(entity);
-            var director = em.GetComponentData<SourceRunDirectorStateComponent>(entity);
-
-            Assert.That(source.State, Is.EqualTo(SourceStateId.Depleted));
-            Assert.That(runtime.SpawnSequence, Is.EqualTo(1u));
-            Assert.That(eventRuntime.IsPlaying, Is.EqualTo(0));
-            Assert.That(eventRuntime.TriggerState, Is.EqualTo(SourceStateId.Depleted));
-            Assert.That(director.State, Is.EqualTo(RunDirectorSourceStateId.Finish));
-            Assert.That(director.SelectedClipState, Is.EqualTo(SourceStateId.Depleted));
-            Assert.That(director.Version, Is.EqualTo(expectedVersion));
-            Assert.That(em.GetBuffer<SourceClipPatternBuffer>(entity).Length, Is.EqualTo(0));
-            Assert.That(em.GetBuffer<SourceSustainSlotCandidateBuffer>(entity).Length, Is.EqualTo(0));
-            Assert.That(em.GetBuffer<SourceSustainRuntimeLaneBuffer>(entity).Length, Is.EqualTo(0));
-            Assert.That(em.GetBuffer<SourceEventQueueBuffer>(entity).Length, Is.EqualTo(0));
-            Assert.That(em.GetBuffer<SourceSpawnRequestBuffer>(entity).Length, Is.EqualTo(0));
-            Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(entity).Length, Is.EqualTo(0));
+            var em = world.EntityManager;
+            var requestEntity = GetOrCreateSingletonEntity<StageTopologyRequestComponent>(em);
+            em.SetComponentData(requestEntity, new StageTopologyRequestComponent
+            {
+                RequestedStageId = stageId,
+                ApplyRequested = 1,
+            });
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
         }
 
-        private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
+        private static void AssertOwnedCounts(EntityManager em, int expectedSourceTotal, int expectedSourceEnabled, int expectedDepositTotal, int expectedDepositEnabled)
+        {
+            using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologySourceTag>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var depositQuery = em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologyDepositTag>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var sourceEntities = sourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+            using var depositEntities = depositQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+
+            int sourceEnabled = 0;
+            for (int i = 0; i < sourceEntities.Length; i++)
+            {
+                if (em.IsEnabled(sourceEntities[i]))
+                    sourceEnabled++;
+            }
+
+            int depositEnabled = 0;
+            for (int i = 0; i < depositEntities.Length; i++)
+            {
+                if (em.IsEnabled(depositEntities[i]))
+                    depositEnabled++;
+            }
+
+            Assert.That(sourceEntities.Length, Is.EqualTo(expectedSourceTotal));
+            Assert.That(sourceEnabled, Is.EqualTo(expectedSourceEnabled));
+            Assert.That(depositEntities.Length, Is.EqualTo(expectedDepositTotal));
+            Assert.That(depositEnabled, Is.EqualTo(expectedDepositEnabled));
+        }
+
+        private static World CreateDefaultTestWorld(string worldName)
         {
             var world = new World(worldName);
             var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
             DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
-            simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
-            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
             return world;
         }
 
@@ -366,30 +327,37 @@ namespace SweepNDodge.DotsBullets.Tests
                 return em.CreateEntity(typeof(T));
             if (query.CalculateEntityCount() == 1)
                 return query.GetSingletonEntity();
-
             using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
             return entities[0];
         }
 
-        private static Entity GetOrCreateManagedSingletonEntity<T>(EntityManager em)
+        private static void SetSingleton<T>(EntityManager em, T value)
+            where T : unmanaged, IComponentData
+        {
+            var entity = GetOrCreateSingletonEntity<T>(em);
+            em.SetComponentData(entity, value);
+        }
+
+        private static void SetManagedSingleton<T>(EntityManager em, T value)
             where T : class
         {
             using var query = em.CreateEntityQuery(ComponentType.ReadWrite<T>());
+            Entity entity;
             if (query.IsEmptyIgnoreFilter)
             {
-                var entity = em.CreateEntity();
-                em.AddComponentObject(entity, (T)System.Activator.CreateInstance(typeof(T)));
-                return entity;
+                entity = em.CreateEntity();
+                em.AddComponentObject(entity, value);
+                return;
             }
 
-            if (query.CalculateEntityCount() == 1)
-                return query.GetSingletonEntity();
-
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
-            return entities[0];
+            entity = query.CalculateEntityCount() == 1
+                ? query.GetSingletonEntity()
+                : query.ToEntityArray(Unity.Collections.Allocator.Temp)[0];
+            em.RemoveComponent<T>(entity);
+            em.AddComponentObject(entity, value);
         }
 
-        private static Entity CreateSource(EntityManager em, uint stableId, float3 position, SourceStateId state, uint version)
+        private static Entity CreateSourceTemplate(EntityManager em)
         {
             var entity = em.CreateEntity(
                 typeof(SourceStableIdComponent),
@@ -404,270 +372,123 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(SourceRunDirectorStateComponent),
                 typeof(LocalTransform));
 
-            em.SetComponentData(entity, new SourceStableIdComponent { Value = stableId });
+            em.SetComponentData(entity, new SourceStableIdComponent { Value = 1u });
             em.SetComponentData(entity, new SourceSpawnComponent
             {
-                ThresholdWeakened = 10,
-                ThresholdDepleted = 20,
-                CollectedCount = 42,
-                State = state,
+                ThresholdWeakened = 2000,
+                ThresholdDepleted = 4000,
+                CollectedCount = 0,
+                State = SourceStateId.Normal,
             });
-            em.SetComponentData(entity, new SourceSpawnRuntimeComponent
-            {
-                SpawnSequence = 33u,
-            });
-            em.SetComponentData(entity, new SourceAnchorComponent
-            {
-                Position = position,
-            });
+            em.SetComponentData(entity, new SourceSpawnRuntimeComponent { SpawnSequence = 1u });
+            em.SetComponentData(entity, new SourceAnchorComponent { Position = float3.zero });
             em.SetComponentData(entity, new BulletFieldAreaComponent
             {
                 Shape = BulletFieldShapeId.Circle,
-                Radius = 2f,
-                Size = new float2(2f, 2f),
-                ComputedArea = 0f,
+                Radius = 8f,
+                Size = new float2(12f, 8f),
+                ComputedArea = SourceRuntimeApplyUtility.ComputeArea(BulletFieldShapeId.Circle, 8f, new Vector2(12f, 8f)),
             });
             em.SetComponentData(entity, new SourcePollutionConfigComponent
             {
                 MinValue = 0f,
                 MaxValue = 1f,
-                RegenPerSec = 0.1f,
-                DropPerCollect = 0.1f,
-                TopKSampleCount = 4,
+                RegenPerSec = 0.08f,
+                DropPerCollect = 0.12f,
+                TopKSampleCount = 6,
             });
             em.SetComponentData(entity, new SourcePollutionGridComponent
             {
-                CellSize = 1f,
-                InvCellSize = 1f,
-                HalfExtents = new float2(2f, 2f),
-                Cols = 4,
-                Rows = 4,
+                CellSize = 2f,
+                InvCellSize = 0.5f,
+                HalfExtents = new float2(8f, 8f),
+                Cols = 1,
+                Rows = 1,
             });
-            em.SetComponentData(entity, new SourceSustainRuntimeComponent
-            {
-                ActiveState = state,
-            });
+            em.SetComponentData(entity, new SourceSustainRuntimeComponent { ActiveState = SourceStateId.Normal });
             em.SetComponentData(entity, new SourceEventRuntimeComponent
             {
-                IsPlaying = 1,
-                ActiveEventClipId = 99,
-                TriggerState = state,
-                ElapsedSec = 2f,
-                SelectionSequence = 8u,
+                IsPlaying = 0,
+                ActiveEventClipId = 0,
+                TriggerState = SourceStateId.Normal,
+                ElapsedSec = 0f,
+                SelectionSequence = 1u,
             });
             em.SetComponentData(entity, new SourceRunDirectorStateComponent
             {
-                State = RunDirectorSourceStateId.Pressure,
-                SelectedClipState = state,
-                PressureOccupancySec = 1.5f,
-                DensityScale = 2f,
-                Version = version,
+                State = RunDirectorSourceStateId.Baseline,
+                SelectedClipState = SourceStateId.Normal,
+                PressureOccupancySec = 0f,
+                DensityScale = 1f,
+                Version = 1u,
             });
-            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
 
-            var requests = em.AddBuffer<SourceSpawnRequestBuffer>(entity);
-            requests.Add(new SourceSpawnRequestBuffer
-            {
-                Count = 3,
-                OldestFrame = 4u,
-            });
-
-            var clipPatterns = em.AddBuffer<SourceClipPatternBuffer>(entity);
-            clipPatterns.Add(new SourceClipPatternBuffer
-            {
-                DirectiveId = 77,
-                ClipId = 88,
-                Phase = SourceWavePhaseId.Sustain,
-                Lane = SourceSpawnLaneId.Hazard,
-                TriggerState = state,
-                BulletTypeKey = 999,
-            });
-
-            var sustainCandidates = em.AddBuffer<SourceSustainSlotCandidateBuffer>(entity);
-            sustainCandidates.Add(new SourceSustainSlotCandidateBuffer
-            {
-                State = state,
-                Lane = SourceSpawnLaneId.Hazard,
-                ClipId = 88,
-                Weight = 1f,
-            });
-
-            var sustainRuntimeLanes = em.AddBuffer<SourceSustainRuntimeLaneBuffer>(entity);
-            sustainRuntimeLanes.Add(new SourceSustainRuntimeLaneBuffer
-            {
-                Lane = SourceSpawnLaneId.Hazard,
-                ActiveClipId = 88,
-                ElapsedSec = 1f,
-                LastClipId = 77,
-                SelectionSequence = 4u,
-                LastMissingLogFrame = 5u,
-            });
-
-            var eventQueue = em.AddBuffer<SourceEventQueueBuffer>(entity);
-            eventQueue.Add(new SourceEventQueueBuffer
-            {
-                TriggerState = state,
-                QueuedFrame = 2u,
-            });
-
-            var activeCounts = em.AddBuffer<SourceActiveBulletCountBuffer>(entity);
-            activeCounts.Add(new SourceActiveBulletCountBuffer
-            {
-                BulletTypeKey = 999,
-                ActiveCount = 5,
-            });
-
+            em.AddBuffer<SourceSpawnRequestBuffer>(entity).Clear();
+            em.AddBuffer<SourceClipPatternBuffer>(entity).Clear();
+            em.AddBuffer<SourceSustainSlotCandidateBuffer>(entity).Clear();
+            em.AddBuffer<SourceSustainRuntimeLaneBuffer>(entity).Clear();
+            em.AddBuffer<SourceEventQueueBuffer>(entity).Clear();
+            em.AddBuffer<SourceActiveBulletCountBuffer>(entity).Clear();
             var pressureInputs = em.AddBuffer<SourceDirectorPressureInputBuffer>(entity);
-            pressureInputs.Add(new SourceDirectorPressureInputBuffer
-            {
-                Slot = RunDirectorPressureInputSlotId.InfluenceOccupancy,
-                Value = 1f,
-            });
-            pressureInputs.Add(new SourceDirectorPressureInputBuffer
-            {
-                Slot = RunDirectorPressureInputSlotId.InfluenceHoldSec,
-                Value = 0.5f,
-            });
-
-            em.AddBuffer<SourcePollutionCellBuffer>(entity);
-            em.AddBuffer<SourcePollutionDropRequestBuffer>(entity);
-            em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
-            InitializePollutionGrid(em, entity);
-            var pollutionDrops = em.GetBuffer<SourcePollutionDropRequestBuffer>(entity);
-            pollutionDrops.Add(new SourcePollutionDropRequestBuffer
-            {
-                CellIndex = 0,
-                Count = 1,
-            });
-
+            SourceRuntimeApplyUtility.ResetPressureInputs(pressureInputs);
+            em.AddBuffer<SourcePollutionCellBuffer>(entity).Clear();
+            em.AddBuffer<SourcePollutionDropRequestBuffer>(entity).Clear();
+            em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity).Clear();
             return entity;
         }
 
-        private static void InitializePollutionGrid(EntityManager em, Entity entity)
-        {
-            var area = em.GetComponentData<BulletFieldAreaComponent>(entity);
-            var config = em.GetComponentData<SourcePollutionConfigComponent>(entity);
-            var grid = em.GetComponentData<SourcePollutionGridComponent>(entity);
-
-            float cellSize = math.max(0.1f, grid.CellSize);
-            float2 halfExtents = SourceRuntimeApplyUtility.ComputeHalfExtents(area.Shape, area.Radius, area.Size);
-            int cols = math.max(1, Mathf.CeilToInt((halfExtents.x * 2f) / cellSize));
-            int rows = math.max(1, Mathf.CeilToInt((halfExtents.y * 2f) / cellSize));
-            int cellCount = math.max(1, cols * rows);
-
-            grid.Cols = cols;
-            grid.Rows = rows;
-            grid.CellSize = cellSize;
-            grid.InvCellSize = 1f / cellSize;
-            grid.HalfExtents = halfExtents;
-            em.SetComponentData(entity, grid);
-
-            float safeCellSize = math.max(0.001f, cellSize);
-            float safeRadius = math.max(0f, area.Radius);
-            float radiusSq = safeRadius * safeRadius;
-            float maxValue = math.max(config.MinValue, config.MaxValue);
-
-            var cellsData = new List<SourcePollutionCellBuffer>(cellCount);
-            var validIndicesData = new List<int>(cellCount);
-            for (int y = 0; y < rows; y++)
-            {
-                for (int x = 0; x < cols; x++)
-                {
-                    int index = y * cols + x;
-                    float centerX = -halfExtents.x + (x + 0.5f) * safeCellSize;
-                    float centerZ = -halfExtents.y + (y + 0.5f) * safeCellSize;
-                    bool isValid = area.Shape == BulletFieldShapeId.Rectangle
-                        || (centerX * centerX + centerZ * centerZ) <= radiusSq;
-
-                    cellsData.Add(new SourcePollutionCellBuffer
-                    {
-                        Value = maxValue,
-                        IsValid = isValid ? (byte)1 : (byte)0,
-                    });
-
-                    if (isValid)
-                        validIndicesData.Add(index);
-                }
-            }
-
-            if (validIndicesData.Count <= 0)
-            {
-                int centerIndex = math.clamp((rows / 2) * cols + (cols / 2), 0, cellCount - 1);
-                var cell = cellsData[centerIndex];
-                cell.IsValid = 1;
-                cellsData[centerIndex] = cell;
-                validIndicesData.Add(centerIndex);
-            }
-
-            var pollutionDrops = em.GetBuffer<SourcePollutionDropRequestBuffer>(entity);
-            pollutionDrops.Clear();
-
-            var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(entity);
-            pollutionCells.Clear();
-            if (pollutionCells.Capacity < cellsData.Count)
-                pollutionCells.Capacity = cellsData.Count;
-            for (int i = 0; i < cellsData.Count; i++)
-                pollutionCells.Add(cellsData[i]);
-
-            var pollutionValidIndices = em.GetBuffer<SourcePollutionValidCellIndexBuffer>(entity);
-            pollutionValidIndices.Clear();
-            if (pollutionValidIndices.Capacity < validIndicesData.Count)
-                pollutionValidIndices.Capacity = validIndicesData.Count;
-            for (int i = 0; i < validIndicesData.Count; i++)
-            {
-                pollutionValidIndices.Add(new SourcePollutionValidCellIndexBuffer
-                {
-                    Value = validIndicesData[i],
-                });
-            }
-        }
-
-        private static Entity CreateDeposit(EntityManager em, uint stableId, float3 position, float radius)
+        private static Entity CreateDepositTemplate(EntityManager em)
         {
             var entity = em.CreateEntity(
                 typeof(DepositStableIdComponent),
                 typeof(DepositPointComponent),
                 typeof(LocalTransform));
-            em.SetComponentData(entity, new DepositStableIdComponent
-            {
-                Value = stableId,
-            });
-            em.SetComponentData(entity, new DepositPointComponent
-            {
-                Radius = radius,
-            });
-            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            em.SetComponentData(entity, new DepositStableIdComponent { Value = 1u });
+            em.SetComponentData(entity, new DepositPointComponent { Radius = 1.2f });
+            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
             return entity;
         }
 
-        private static StageDefinitionSO CreateDefinition(List<ScriptableObject> created, int stageId)
+        private static StageCatalogSO CreateStageCatalog(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds)
+        {
+            var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+            createdAssets.Add(catalog);
+            catalog.Entries = new[] { CreateEntry(createdAssets, stageId, sourceStableIds, depositStableIds) };
+            return catalog;
+        }
+
+        private static StageCatalogEntry CreateEntry(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds)
+        {
+            return new StageCatalogEntry
+            {
+                Enabled = true,
+                EntryKey = $"stage_{stageId:00}",
+                Definition = CreateDefinition(createdAssets, stageId, sourceStableIds),
+                Layout = CreateLayout(createdAssets, stageId, sourceStableIds, depositStableIds),
+            };
+        }
+
+        private static StageDefinitionSO CreateDefinition(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds)
         {
             var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
             definition.StageId = stageId;
             definition.DisplayName = $"Stage {stageId}";
             definition.StageTimeLimitSec = 90f;
-            created.Add(definition);
-            return definition;
-        }
+            createdAssets.Add(definition);
 
-        private static BulletDefinitionSO CreateBulletDefinition(List<ScriptableObject> created, int definitionId)
-        {
-            var definition = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
 #if UNITY_EDITOR
-            definition.Editor_SetDefinitionId(definitionId);
+            bullet.Editor_SetDefinitionId(stageId * 100 + 1);
 #endif
-            created.Add(definition);
-            return definition;
-        }
+            createdAssets.Add(bullet);
 
-        private static WaveClipSO CreateSustainClip(List<ScriptableObject> created, BulletDefinitionSO bullet, int clipId)
-        {
-            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
-            clip.ClipId = clipId;
-            clip.Phase = SourceWavePhaseId.Sustain;
-            clip.Lane = SourceSpawnLaneId.Hazard;
-            clip.DurationSec = 1f;
-            clip.Segments = new[]
+            var sustain = ScriptableObject.CreateInstance<WaveClipSO>();
+            sustain.ClipId = stageId * 1000 + 1;
+            sustain.Phase = SourceWavePhaseId.Sustain;
+            sustain.Lane = SourceSpawnLaneId.Hazard;
+            sustain.DurationSec = 1f;
+            sustain.Segments = new[]
             {
                 new WaveClipSO.ClipSegment
                 {
@@ -685,14 +506,14 @@ namespace SweepNDodge.DotsBullets.Tests
                             {
                                 EmissionMode = SourceSpawnEmissionModeId.RateField,
                                 SpawnMode = SourceSpawnModeId.FixedDensity,
-                                RatePerSecPerArea = 60f,
+                                RatePerSecPerArea = 20f,
                                 BurstShotsPerEvent = 1,
                             },
                             Sampling = new WaveClipSO.SpawnSamplingProfile
                             {
                                 SamplingMode = SourceSpawnSamplingModeId.UniformField,
                                 CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                SpawnSampleBudget = 16,
+                                SpawnSampleBudget = 8,
                             },
                             Direction = new WaveClipSO.SpawnDirectionProfile
                             {
@@ -704,26 +525,92 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                 },
             };
-            created.Add(clip);
-            return clip;
-        }
+            createdAssets.Add(sustain);
 
-        private static WaveClipSO CreateEventClip(List<ScriptableObject> created, BulletDefinitionSO bullet, int clipId)
-        {
-            var clip = CreateSustainClip(created, bullet, clipId);
-            clip.Phase = SourceWavePhaseId.OnStateEnterOnce;
-            return clip;
-        }
-
-        private static void DestroyAll(List<ScriptableObject> created)
-        {
-            for (int i = created.Count - 1; i >= 0; i--)
+            definition.SourceBindings = new StageSourceBinding[sourceStableIds.Length];
+            for (int i = 0; i < sourceStableIds.Length; i++)
             {
-                if (created[i] != null)
-                    Object.DestroyImmediate(created[i]);
+                definition.SourceBindings[i] = new StageSourceBinding
+                {
+                    SourceStableId = sourceStableIds[i],
+                    InitialSourceState = SourceStateId.Normal,
+                    ThresholdWeakened = 10,
+                    ThresholdDepleted = 20,
+                    SustainSlots = new[]
+                    {
+                        new SustainSlotBinding
+                        {
+                            State = SourceStateId.Normal,
+                            Lane = SourceSpawnLaneId.Hazard,
+                            Clips = new[] { sustain },
+                            Weights = new[] { 1f },
+                        },
+                    },
+                    EventSlots = new EventSlotBinding[0],
+                };
             }
 
-            created.Clear();
+            return definition;
+        }
+
+        private static StageLayoutSO CreateLayout(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds)
+        {
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.StageId = stageId;
+            createdAssets.Add(layout);
+
+            layout.Sources = new StageSourceLayoutData[sourceStableIds.Length];
+            for (int i = 0; i < sourceStableIds.Length; i++)
+            {
+                layout.Sources[i] = new StageSourceLayoutData
+                {
+                    StableId = sourceStableIds[i],
+                    Active = true,
+                    Position = new Vector3(i * 3f, 0f, stageId * 2f),
+                    YawDeg = i * 30f,
+                    FieldShape = i % 2 == 0 ? BulletFieldShapeId.Circle : BulletFieldShapeId.Rectangle,
+                    FieldRadius = 6f + i,
+                    FieldSize = new Vector2(8f + i, 6f + i),
+                };
+            }
+
+            layout.Deposits = new StageDepositLayoutData[depositStableIds.Length];
+            for (int i = 0; i < depositStableIds.Length; i++)
+            {
+                layout.Deposits[i] = new StageDepositLayoutData
+                {
+                    StableId = depositStableIds[i],
+                    Active = true,
+                    Position = new Vector3(stageId * 5f, 0f, i * 4f),
+                    Radius = 3f + i,
+                };
+            }
+
+            return layout;
+        }
+
+        private static Entity FindByStableId<T>(EntityManager em, Unity.Collections.NativeArray<Entity> entities, uint stableId, System.Func<T, uint> accessor)
+            where T : unmanaged, IComponentData
+        {
+            for (int i = 0; i < entities.Length; i++)
+            {
+                if (accessor(em.GetComponentData<T>(entities[i])) == stableId)
+                    return entities[i];
+            }
+
+            Assert.Fail($"StableId {stableId} not found.");
+            return Entity.Null;
+        }
+
+        private static void DestroyAll(List<ScriptableObject> createdAssets)
+        {
+            for (int i = createdAssets.Count - 1; i >= 0; i--)
+            {
+                if (createdAssets[i] != null)
+                    Object.DestroyImmediate(createdAssets[i]);
+            }
+
+            createdAssets.Clear();
         }
     }
 }

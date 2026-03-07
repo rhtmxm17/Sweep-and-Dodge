@@ -39,6 +39,7 @@ namespace SweepNDodge.DotsBullets
 
             var poolDeps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);
             poolDeps.Complete();
+            state.CompleteDependency();
             state.Dependency = default;
 
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
