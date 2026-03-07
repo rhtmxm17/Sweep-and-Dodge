@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!1 &100000
 GameObject:
@@ -41,10 +41,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 100000}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4f7f4a34732e4e4fb6ef4db516cd5e68, type: 3}
+  m_Script: {fileID: 11500000, guid: a88eb03052f2da7448766790feb9211e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.DepositPointAuthoring
+  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.DepositRuntimeTemplateAuthoring
   StableIdOverride: 0
   Radius: 1.2
   DrawGizmo: 0
   DrawGizmoWhenNotSelected: 0
+

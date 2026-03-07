@@ -20,8 +20,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var requestEntity = em.CreateEntity(typeof(RunDirectorStageRequestComponent));
                 em.SetComponentData(requestEntity, default(RunDirectorStageRequestComponent));
-                em.CreateEntity(typeof(StageTopologyRequestComponent));
-                em.CreateEntity(typeof(StageTopologyStateComponent));
 
                 var gateEntity = em.CreateEntity(typeof(RunDirectorStageGateComponent));
                 em.SetComponentData(gateEntity, default(RunDirectorStageGateComponent));
@@ -55,114 +53,32 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Bridge_RequestStageTopologyApply_WritesTopologyRequestAndCatalogSingleton()
+        public void Bridge_BindsWithoutTopologySingletons()
         {
             var oldDefault = World.DefaultGameObjectInjectionWorld;
             World world = null;
             GameObject go = null;
-            StageCatalogSO stageCatalog = null;
-            StageTopologyPrefabCatalogSO topologyCatalog = null;
             try
             {
-                world = new World("RunDirectorStageBridgeEditWorld_StageTopologyApply");
+                world = new World("RunDirectorStageBridgeEditWorld_NoTopology");
                 World.DefaultGameObjectInjectionWorld = world;
                 var em = world.EntityManager;
 
                 em.CreateEntity(typeof(RunDirectorStageRequestComponent));
-                var topologyRequestEntity = em.CreateEntity(typeof(StageTopologyRequestComponent));
-                em.SetComponentData(topologyRequestEntity, default(StageTopologyRequestComponent));
-                var topologyStateEntity = em.CreateEntity(typeof(StageTopologyStateComponent));
-                em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
-                em.CreateEntity(typeof(StageTopologyPrefabCatalogComponent));
                 em.CreateEntity(typeof(RunDirectorStageGateComponent));
                 em.CreateEntity(typeof(RunDirectorStageSignalComponent));
 
-                stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                topologyCatalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
-
-                go = new GameObject("RunDirectorStageBridge_Edit_StageTopologyApply");
+                go = new GameObject("RunDirectorStageBridge_Edit_NoTopology");
                 var bridge = go.AddComponent<RunDirectorStageBridge>();
                 bridge.LogBindWarnings = false;
-                bridge.StageCatalog = stageCatalog;
-                bridge.TopologyPrefabCatalog = topologyCatalog;
 
-                Assert.That(bridge.RequestStageTopologyApply(7), Is.True);
-
-                var request = em.GetComponentData<StageTopologyRequestComponent>(topologyRequestEntity);
-                Assert.That(request.RequestedStageId, Is.EqualTo(7));
-                Assert.That(request.ApplyRequested, Is.EqualTo(1));
-
-                var state = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
-                Assert.That(state.SelectedStageId, Is.EqualTo(7));
-                Assert.That(state.Ready, Is.EqualTo(0));
-
-                using var stageCatalogRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>());
-                Assert.That(stageCatalogRuntimeQuery.IsEmptyIgnoreFilter, Is.False);
-                var stageCatalogRuntimeEntity = stageCatalogRuntimeQuery.GetSingletonEntity();
-                var stageCatalogRuntime = em.GetComponentObject<StageCatalogRuntimeComponent>(stageCatalogRuntimeEntity);
-                Assert.That(stageCatalogRuntime, Is.Not.Null);
-                Assert.That(stageCatalogRuntime.Catalog, Is.SameAs(stageCatalog));
+                Assert.That(bridge.RequestStageStart(), Is.True);
+                Assert.That(bridge.SetIntroPresentationDone(true), Is.True);
             }
             finally
             {
                 if (go != null)
                     Object.DestroyImmediate(go);
-                if (stageCatalog != null)
-                    Object.DestroyImmediate(stageCatalog);
-                if (topologyCatalog != null)
-                    Object.DestroyImmediate(topologyCatalog);
-                world?.Dispose();
-                World.DefaultGameObjectInjectionWorld = oldDefault;
-            }
-        }
-
-        [Test]
-        public void Bridge_RequestStageMapApply_ForwardsToRequestStageTopologyApply()
-        {
-            var oldDefault = World.DefaultGameObjectInjectionWorld;
-            World world = null;
-            GameObject go = null;
-            StageCatalogSO stageCatalog = null;
-            StageTopologyPrefabCatalogSO topologyCatalog = null;
-            try
-            {
-                world = new World("RunDirectorStageBridgeEditWorld_ObsoleteForward");
-                World.DefaultGameObjectInjectionWorld = world;
-                var em = world.EntityManager;
-
-                em.CreateEntity(typeof(RunDirectorStageRequestComponent));
-                var topologyRequestEntity = em.CreateEntity(typeof(StageTopologyRequestComponent));
-                em.SetComponentData(topologyRequestEntity, default(StageTopologyRequestComponent));
-                em.CreateEntity(typeof(StageTopologyStateComponent));
-                em.CreateEntity(typeof(StageTopologyPrefabCatalogComponent));
-                em.CreateEntity(typeof(RunDirectorStageGateComponent));
-                em.CreateEntity(typeof(RunDirectorStageSignalComponent));
-
-                stageCatalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                topologyCatalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
-
-                go = new GameObject("RunDirectorStageBridge_Edit_ObsoleteForward");
-                var bridge = go.AddComponent<RunDirectorStageBridge>();
-                bridge.LogBindWarnings = false;
-                bridge.StageCatalog = stageCatalog;
-                bridge.TopologyPrefabCatalog = topologyCatalog;
-
-#pragma warning disable CS0618
-                Assert.That(bridge.RequestStageMapApply(3), Is.True);
-#pragma warning restore CS0618
-
-                var request = em.GetComponentData<StageTopologyRequestComponent>(topologyRequestEntity);
-                Assert.That(request.RequestedStageId, Is.EqualTo(3));
-                Assert.That(request.ApplyRequested, Is.EqualTo(1));
-            }
-            finally
-            {
-                if (go != null)
-                    Object.DestroyImmediate(go);
-                if (stageCatalog != null)
-                    Object.DestroyImmediate(stageCatalog);
-                if (topologyCatalog != null)
-                    Object.DestroyImmediate(topologyCatalog);
                 world?.Dispose();
                 World.DefaultGameObjectInjectionWorld = oldDefault;
             }
@@ -181,8 +97,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 var em = world.EntityManager;
 
                 em.CreateEntity(typeof(RunDirectorStageRequestComponent));
-                em.CreateEntity(typeof(StageTopologyRequestComponent));
-                em.CreateEntity(typeof(StageTopologyStateComponent));
                 em.CreateEntity(typeof(RunDirectorStageGateComponent));
                 var signalEntity = em.CreateEntity(typeof(RunDirectorStageSignalComponent));
                 em.SetComponentData(signalEntity, new RunDirectorStageSignalComponent
@@ -201,7 +115,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(fired, Is.EqualTo(1));
                 Assert.That(em.GetComponentData<RunDirectorStageSignalComponent>(signalEntity).StageRunCompleted, Is.EqualTo(0));
 
-                // 같은 프레임에 신호가 다시 올라와도 중복 발행 방지.
                 em.SetComponentData(signalEntity, new RunDirectorStageSignalComponent
                 {
                     StageRunCompleted = 1
@@ -231,8 +144,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 var em = world.EntityManager;
 
                 em.CreateEntity(typeof(RunDirectorStageRequestComponent));
-                em.CreateEntity(typeof(StageTopologyRequestComponent));
-                em.CreateEntity(typeof(StageTopologyStateComponent));
                 em.CreateEntity(typeof(RunDirectorStageGateComponent));
                 em.CreateEntity(typeof(RunDirectorStageSignalComponent));
                 var stateEntity = em.CreateEntity(typeof(RunDirectorStageStateComponent));
@@ -277,8 +188,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 var em = world.EntityManager;
 
                 em.CreateEntity(typeof(RunDirectorStageRequestComponent));
-                em.CreateEntity(typeof(StageTopologyRequestComponent));
-                em.CreateEntity(typeof(StageTopologyStateComponent));
                 em.CreateEntity(typeof(RunDirectorStageGateComponent));
                 em.CreateEntity(typeof(RunDirectorStageSignalComponent));
 

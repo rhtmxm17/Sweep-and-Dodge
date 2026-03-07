@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
@@ -9,7 +9,7 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// StageFlow/UI(GameObject) <-> Run Director Stage 상태(ECS) 브리지.
-    /// - GO -> ECS: Start/Confirm/StageApply 요청, Intro/Clear 연출 완료 게이트 반영
+    /// - GO -> ECS: Start/Confirm 요청, Intro/Clear 연출 완료 게이트 반영
     /// - ECS -> GO: StageRunCompleted 신호를 이벤트로 전달
     /// </summary>
     public sealed class RunDirectorStageBridge : MonoBehaviour
@@ -18,10 +18,6 @@ namespace SweepNDodge.DotsBullets
 
         [Header("Bridge")]
         public bool LogBindWarnings = true;
-
-        [Header("Stage Catalog")]
-        public StageCatalogSO StageCatalog;
-        public StageTopologyPrefabCatalogSO TopologyPrefabCatalog;
 
         [Header("Events")]
         public UnityEvent OnStageRunCompleted;
@@ -35,7 +31,6 @@ namespace SweepNDodge.DotsBullets
         private Entity _stageSignalEntity;
         private bool _isBound;
         private bool _warnedBindFailure;
-        private bool _warnedStageCatalogBindingFailure;
         private int _lastCompletedNotifiedFrame = -1;
         private bool _isSceneOwner;
 
@@ -74,27 +69,6 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        public bool RequestStageTopologyApply(int stageId)
-        {
-            if (stageId <= 0)
-                return false;
-            if (!TryBind())
-                return false;
-            if (!EnsureStageCatalogRuntimeSingleton())
-                return false;
-
-            var topologyState = _em.GetComponentData<StageTopologyStateComponent>(EnsureTopologyStateEntity());
-            topologyState.SelectedStageId = stageId;
-            topologyState.Ready = 0;
-            _em.SetComponentData(EnsureTopologyStateEntity(), topologyState);
-
-            var request = _em.GetComponentData<StageTopologyRequestComponent>(EnsureTopologyRequestEntity());
-            request.RequestedStageId = stageId;
-            request.ApplyRequested = 1;
-            _em.SetComponentData(EnsureTopologyRequestEntity(), request);
-            return true;
-        }
-
         public bool TryGetStageState(out RunDirectorStageStateComponent stageState)
         {
             stageState = default;
@@ -117,18 +91,6 @@ namespace SweepNDodge.DotsBullets
             request.ConfirmPressed = 1;
             _em.SetComponentData(_stageRequestEntity, request);
             return true;
-        }
-
-        [Obsolete("Use RequestStageTopologyApply(int stageId).")]
-        public bool RequestStageApply(int stageId)
-        {
-            return RequestStageTopologyApply(stageId);
-        }
-
-        [Obsolete("Use RequestStageTopologyApply(int stageId).")]
-        public bool RequestStageMapApply(int stageId)
-        {
-            return RequestStageTopologyApply(stageId);
         }
 
         public bool SetIntroPresentationDone(bool done)
@@ -177,14 +139,10 @@ namespace SweepNDodge.DotsBullets
 
             _em = world.EntityManager;
             using var requestQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageRequestComponent>());
-            using var topologyRequestQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>());
-            using var topologyStateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyStateComponent>());
             using var gateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageGateComponent>());
             using var signalQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageSignalComponent>());
             using var stateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageStateComponent>());
             if (requestQuery.IsEmptyIgnoreFilter
-                || topologyRequestQuery.IsEmptyIgnoreFilter
-                || topologyStateQuery.IsEmptyIgnoreFilter
                 || gateQuery.IsEmptyIgnoreFilter
                 || signalQuery.IsEmptyIgnoreFilter)
             {
@@ -202,123 +160,6 @@ namespace SweepNDodge.DotsBullets
                 _warnedBindFailure = false;
 
             return _isBound;
-        }
-
-        private bool EnsureStageCatalogRuntimeSingleton()
-        {
-            if (StageCatalog == null)
-            {
-                WarnStageCatalogFailureOnce("StageCatalog is not assigned.");
-                return false;
-            }
-
-            if (TopologyPrefabCatalog == null)
-            {
-                WarnStageCatalogFailureOnce("TopologyPrefabCatalog is not assigned.");
-                return false;
-            }
-
-            using var query = _em.CreateEntityQuery(ComponentType.ReadWrite<StageCatalogRuntimeComponent>());
-            if (query.IsEmptyIgnoreFilter)
-            {
-                var created = _em.CreateEntity();
-                _em.AddComponentObject(created, new StageCatalogRuntimeComponent
-                {
-                    Catalog = StageCatalog,
-                });
-                _warnedStageCatalogBindingFailure = false;
-                return true;
-            }
-
-            if (query.CalculateEntityCount() > 1)
-            {
-                WarnStageCatalogFailureOnce("Multiple StageCatalogRuntimeComponent singletons detected. The first entity will be used.");
-            }
-
-            var catalogEntity = ResolveFirstEntity(query);
-            if (catalogEntity == Entity.Null || !_em.Exists(catalogEntity))
-            {
-                WarnStageCatalogFailureOnce("StageCatalogRuntimeComponent singleton resolve failed.");
-                return false;
-            }
-
-            var runtime = _em.GetComponentObject<StageCatalogRuntimeComponent>(catalogEntity);
-            runtime.Catalog = StageCatalog;
-
-            using var topologyCatalogQuery = _em.CreateEntityQuery(ComponentType.ReadWrite<StageTopologyPrefabCatalogComponent>());
-            var topologyCatalogEntity = EnsureTopologyPrefabCatalogEntity(topologyCatalogQuery);
-            if (topologyCatalogEntity == Entity.Null || !_em.Exists(topologyCatalogEntity))
-                return false;
-
-            var topologyPrefabs = _em.GetComponentData<StageTopologyPrefabCatalogComponent>(topologyCatalogEntity);
-            if (topologyPrefabs.SourceTemplate == Entity.Null || !_em.Exists(topologyPrefabs.SourceTemplate))
-                topologyPrefabs.SourceTemplate = StageTopologyTemplateFactory.CreateSourceTemplate(_em);
-            if (topologyPrefabs.DepositTemplate == Entity.Null || !_em.Exists(topologyPrefabs.DepositTemplate))
-                topologyPrefabs.DepositTemplate = StageTopologyTemplateFactory.CreateDepositTemplate(_em);
-            _em.SetComponentData(topologyCatalogEntity, topologyPrefabs);
-
-            _warnedStageCatalogBindingFailure = false;
-            return true;
-        }
-
-        private Entity EnsureTopologyPrefabCatalogEntity(EntityQuery topologyCatalogQuery)
-        {
-            if (topologyCatalogQuery.IsEmptyIgnoreFilter)
-                return _em.CreateEntity(typeof(StageTopologyPrefabCatalogComponent));
-
-            using var entities = topologyCatalogQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-            Entity keeper = Entity.Null;
-            StageTopologyPrefabCatalogComponent keeperValue = default;
-
-            for (int i = 0; i < entities.Length; i++)
-            {
-                var entity = entities[i];
-                if (!_em.Exists(entity))
-                    continue;
-
-                var candidate = _em.GetComponentData<StageTopologyPrefabCatalogComponent>(entity);
-                bool hasAnyPrefab = candidate.SourceTemplate != Entity.Null || candidate.DepositTemplate != Entity.Null;
-                if (keeper == Entity.Null || hasAnyPrefab)
-                {
-                    keeper = entity;
-                    keeperValue = candidate;
-                    if (hasAnyPrefab)
-                        break;
-                }
-            }
-
-            if (keeper == Entity.Null)
-                keeper = entities[0];
-
-            for (int i = 0; i < entities.Length; i++)
-            {
-                var entity = entities[i];
-                if (entity == keeper || !_em.Exists(entity))
-                    continue;
-
-                var extra = _em.GetComponentData<StageTopologyPrefabCatalogComponent>(entity);
-                if (keeperValue.SourceTemplate == Entity.Null && extra.SourceTemplate != Entity.Null)
-                    keeperValue.SourceTemplate = extra.SourceTemplate;
-                if (keeperValue.DepositTemplate == Entity.Null && extra.DepositTemplate != Entity.Null)
-                    keeperValue.DepositTemplate = extra.DepositTemplate;
-
-                _em.RemoveComponent<StageTopologyPrefabCatalogComponent>(entity);
-            }
-
-            _em.SetComponentData(keeper, keeperValue);
-            return keeper;
-        }
-
-        private Entity EnsureTopologyRequestEntity()
-        {
-            using var query = _em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>());
-            return ResolveFirstEntity(query);
-        }
-
-        private Entity EnsureTopologyStateEntity()
-        {
-            using var query = _em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyStateComponent>());
-            return ResolveFirstEntity(query);
         }
 
         private void PublishStageCompletedEventIfNeeded()
@@ -348,15 +189,6 @@ namespace SweepNDodge.DotsBullets
             Debug.LogWarning($"[RunDirectorStageBridge] {message}");
         }
 
-        private void WarnStageCatalogFailureOnce(string message)
-        {
-            if (!LogBindWarnings || _warnedStageCatalogBindingFailure)
-                return;
-
-            _warnedStageCatalogBindingFailure = true;
-            Debug.LogWarning($"[RunDirectorStageBridge] {message}");
-        }
-
         private static Entity ResolveFirstEntity(EntityQuery query)
         {
             int count = query.CalculateEntityCount();
@@ -365,7 +197,7 @@ namespace SweepNDodge.DotsBullets
             if (count == 1)
                 return query.GetSingletonEntity();
 
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
+            using var entities = query.ToEntityArray(Allocator.Temp);
             return entities.Length > 0 ? entities[0] : Entity.Null;
         }
 

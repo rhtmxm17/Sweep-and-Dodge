@@ -4,7 +4,7 @@
 - doc_id: `TD-010`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-06`
+- last_updated: `2026-03-07`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -12,12 +12,12 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 
-> DemoShell은 화면 전이 Owner를 유지하고, Stage 입력은 `RunDirectorStageBridge` 단일 경로로 ECS에 전달한다. 현재 런타임은 `StageCatalogSO + StageTopologyPrefabCatalog`를 publish하며, `RequestStageTopologyApply(stageId)`가 topology apply one-shot의 정식 API다. `RequestStageApply(stageId)` / `RequestStageMapApply(stageId)`는 obsolete forwarder로만 남는다.
+> DemoShell은 화면 전이 Owner를 유지하고, topology 입력은 `StageTopologyBridge`, stage state 입력은 `RunDirectorStageBridge`를 통해 ECS에 전달한다. 현재 런타임은 `StageCatalogSO + StageTopologyPrefabCatalog`를 publish하며, topology apply one-shot의 정식 API는 `StageTopologyBridge.RequestTopologyApply(stageId)`다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
 - DemoShell 화면 전이를 단일 소유한다.
-- GO->ECS 쓰기 경로를 `RunDirectorStageBridge` 단일 접점으로 유지한다.
+- GO->ECS 쓰기 경로를 `StageTopologyBridge`와 `RunDirectorStageBridge`의 이원 경계로 분리한다.
 - Stage 시작 전에 `RequestStageTopologyApply(stageId)`를 선행해 topology + layout + definition 적용을 보장한다.
 - 로비/진행 순서를 `StageCatalogSO.Entries` 기반으로 데이터 주도화한다.
 
@@ -30,8 +30,10 @@
   - 화면 상태 전이
   - 로비 선택/결과 선택 후속 처리
   - StageCatalog 로딩과 fallback 결정
-- GO->ECS Writer: `RunDirectorStageBridge`
-  - `RequestStageTopologyApply(int stageId)`
+- GO->ECS Topology Writer: `StageTopologyBridge`
+  - `RequestTopologyApply(int stageId)`
+  - `StageCatalogRuntimeComponent` publish/bind
+- GO->ECS StageState Writer: `RunDirectorStageBridge`
   - `RequestStageStart()`, `RequestConfirm()`
   - `SetIntroPresentationDone(bool)`, `SetClearPresentationDone(bool)`
 - ECS stage topology/apply Owner: `StageTopologyApplyExecutionBeginSystem`
@@ -41,7 +43,7 @@
 - 파이프라인 순서:
   - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
 - StagePlay 시작 루프:
-  1. `RequestStageTopologyApply(stageId)` 성공
+  1. `StageTopologyBridge.RequestTopologyApply(stageId)` 성공
   2. `SetIntroPresentationDone(true)` + `SetClearPresentationDone(false)`
   3. `RequestStageStart()`
 - `DemoShellFlowController`는 ECS 직접 write 금지
@@ -58,20 +60,21 @@
   - 로딩 중 불일치(예: null Definition/Layout, StageId 중복/불일치)는 경고 후 skip
   - `sc_demo`는 수작업 운영 자산이 아니라 편집 씬 + generator/composer가 만든 생성물로 취급한다
 - Bridge runtime publish 계약
-  - `StageCatalog`가 있으면 `StageCatalogRuntimeComponent`를 최신화한다
-  - `StageMapCatalogSO` publish/compose 경로는 제거됐다
-  - `RequestStageApply(int)` / `RequestStageMapApply(int)`는 obsolete forwarder이며 내부적으로 `RequestStageTopologyApply(int)`만 호출한다
+  - `StageTopologyBridge`가 `StageCatalogRuntimeComponent`를 최신화한다
+  - topology prefab singleton은 `StageTopologyBridge`가 bind/보강한다
+  - `RunDirectorStageBridge`는 topology singleton이 없어도 run-director singleton만으로 bind된다
 
 ## 5. StageId 경로
 - 로비 선택 -> `EnterStagePlay(stageIndex)`
 - `stageIndex`에 대응하는 런타임 프로필의 `StageId` 결정
-- `RequestStageTopologyApply(StageId)` 호출
+- `StageTopologyBridge.RequestTopologyApply(StageId)` 호출
 - 이후 기존 Stage start/confirm 경로 유지
 
 ## 6. 씬/운영 기준
 - `SampleScene`
   - `DemoShellFlowController.StageCatalog = sc_demo`
-  - `RunDirectorStageBridge`는 `StageCatalog`만 참조한다
+  - `StageTopologyBridge`는 `StageCatalog`를 참조한다
+  - `RunDirectorStageBridge`는 stage state/gate/signal만 다룬다
   - 미연결 시 기존 `StageProfiles` fallback 동작
   - `sc_demo` 갱신은 `StageLayoutEditingSampleV1.unity` 수정 후 generator/composer 실행으로 수행한다
 - `PlayModeSmoke_Dedicated`
@@ -88,9 +91,11 @@
     - Entries 순서 반영
     - Enabled 필터
     - fallback 동작
+  - `StageTopologyBridgeTests`
+    - `RequestTopologyApply`
+    - topology state read helper
   - `RunDirectorStageBridgeTests`
-    - `RequestStageTopologyApply`
-    - obsolete forwarder
+    - topology singleton 없이 독립 bind
   - `StageCatalogSampleAssetsTests`
     - `sc_demo` / `sd_demo_1~3` / `sl_demo_1~3` 자산 유효성
 - PlayMode 회귀
@@ -100,3 +105,5 @@
 ## 8. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
+
+

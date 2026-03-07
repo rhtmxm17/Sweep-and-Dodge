@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -43,20 +43,20 @@ namespace SweepNDodge.DotsBullets.Editor
         public readonly IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> Definitions;
         public readonly IReadOnlyList<ContentValidationRecord<WaveClipSO>> WaveClips;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
-        public readonly IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> SourceAuthorings;
+        public readonly IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> SourceAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletAuthoring>> BulletAuthorings;
 
         public ContentValidationInput(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
-            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
         {
             Definitions = definitions ?? Array.Empty<ContentValidationRecord<BulletDefinitionSO>>();
             WaveClips = waveClips ?? Array.Empty<ContentValidationRecord<WaveClipSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
-            SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<BulletSourceAuthoring>>();
+            SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
             BulletAuthorings = bulletAuthorings ?? Array.Empty<ContentValidationRecord<BulletAuthoring>>();
         }
     }
@@ -471,7 +471,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private static void ValidateAutoCorrectionWarnings(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
-            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
             List<ContentValidationIssue> issues)
         {
             for (int i = 0; i < definitions.Count; i++)
@@ -561,3 +561,4 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 }
+

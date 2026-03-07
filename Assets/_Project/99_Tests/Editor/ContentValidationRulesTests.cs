@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
@@ -53,7 +53,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var sourceRoot = new GameObject("source_root");
-            var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
+            var sourceAuthoring = sourceRoot.AddComponent<SourceRuntimeTemplateAuthoring>();
 
             try
             {
@@ -81,9 +81,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                     null,
                     null,
-                    new List<ContentValidationRecord<BulletSourceAuthoring>>
+                    new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>
                     {
-                        new ContentValidationRecord<BulletSourceAuthoring>(sourceAuthoring, "source"),
+                        new ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>(sourceAuthoring, "source"),
                     },
                     null);
 
@@ -108,19 +108,19 @@ namespace SweepNDodge.DotsBullets.Tests
         public void SourceAuthoring_WithoutAnyWaveClipBinding_IsNotAnError()
         {
             var sourceRoot = new GameObject("source_root");
-            var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
+            var sourceAuthoring = sourceRoot.AddComponent<SourceRuntimeTemplateAuthoring>();
 
             try
             {
-                sourceAuthoring.SustainClipSlots = System.Array.Empty<BulletSourceAuthoring.SustainClipSlotAuthoring>();
-                sourceAuthoring.EventClipSlots = System.Array.Empty<BulletSourceAuthoring.EventClipSlotAuthoring>();
+                sourceAuthoring.SustainClipSlots = System.Array.Empty<SourceRuntimeTemplateAuthoringBase.SustainClipSlotAuthoring>();
+                sourceAuthoring.EventClipSlots = System.Array.Empty<SourceRuntimeTemplateAuthoringBase.EventClipSlotAuthoring>();
                 var input = new ContentValidationInput(
                     null,
                     null,
                     null,
-                    new List<ContentValidationRecord<BulletSourceAuthoring>>
+                    new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>
                     {
-                        new ContentValidationRecord<BulletSourceAuthoring>(sourceAuthoring, "source"),
+                        new ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>(sourceAuthoring, "source"),
                     },
                     null);
 
@@ -588,3 +588,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
+
+
+

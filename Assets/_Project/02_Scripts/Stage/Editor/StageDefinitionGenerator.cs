@@ -8,11 +8,11 @@ namespace SweepNDodge.DotsBullets.Editor
 {
     public static class StageDefinitionGenerator
     {
-        [MenuItem("Tools/Project/Stage Layout/Ensure Missing Stage Definition Bindings From Open Scenes")]
+        [MenuItem("Tools/Project/Stage Layout/Ensure Missing Stage Definition Bindings From Runtime Template Sources")]
         private static void EnsureMissingDefinitionsFromOpenScenesMenu()
         {
             int seeded = SyncDefinitionsFromOpenScenes(saveAssets: true);
-            Debug.Log($"[StageDefinition] Ensure missing bindings complete. definitions={seeded}");
+            Debug.Log($"[StageDefinition] Ensure missing runtime template bindings complete. definitions={seeded}");
         }
 
         public static int SyncDefinitionsFromOpenScenes(bool saveAssets)
@@ -55,7 +55,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 return true;
             }
 
-            var authorings = UnityEngine.Object.FindObjectsByType<BulletSourceAuthoring>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var authorings = UnityEngine.Object.FindObjectsByType<SourceRuntimeTemplateAuthoringBase>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             var authoringByStableId = BuildAuthoringIndex(authorings, issues);
 
             Array.Sort(stageNodes, (a, b) =>
@@ -80,7 +80,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static void SyncDefinitionForStage(
             StageLayoutStageMarker stageNode,
-            Dictionary<uint, BulletSourceAuthoring> authoringByStableId,
+            Dictionary<uint, SourceRuntimeTemplateAuthoringBase> authoringByStableId,
             List<ContentValidationIssue> issues,
             bool saveAssets)
         {
@@ -117,7 +117,7 @@ namespace SweepNDodge.DotsBullets.Editor
                         ContentValidationSeverity.Warning,
                         "SDF903",
                         location,
-                        $"No BulletSourceAuthoring with StableIdOverride={stableId} was found. Default binding template will be generated."));
+                        $"No source runtime template authoring with StableIdOverride={stableId} was found. Default binding template will be generated."));
                     sourceBindings.Add(CreateDefaultBinding(stableId));
                     continue;
                 }
@@ -151,11 +151,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 AssetDatabase.SaveAssets();
         }
 
-        private static Dictionary<uint, BulletSourceAuthoring> BuildAuthoringIndex(
-            BulletSourceAuthoring[] authorings,
+        private static Dictionary<uint, SourceRuntimeTemplateAuthoringBase> BuildAuthoringIndex(
+            SourceRuntimeTemplateAuthoringBase[] authorings,
             List<ContentValidationIssue> issues)
         {
-            var result = new Dictionary<uint, BulletSourceAuthoring>();
+            var result = new Dictionary<uint, SourceRuntimeTemplateAuthoringBase>();
             if (authorings == null)
                 return result;
 
@@ -175,7 +175,7 @@ namespace SweepNDodge.DotsBullets.Editor
                         ContentValidationSeverity.Warning,
                         "SDF904",
                         BuildHierarchyPath(authoring.transform),
-                        $"Duplicate BulletSourceAuthoring StableIdOverride detected: {stableId}. First instance will be used."));
+                        $"Duplicate source runtime template StableIdOverride detected: {stableId}. First instance will be used."));
                     continue;
                 }
 
@@ -227,7 +227,7 @@ namespace SweepNDodge.DotsBullets.Editor
             };
         }
 
-        private static StageSourceBinding BuildBindingFromAuthoring(uint stableId, BulletSourceAuthoring authoring)
+        private static StageSourceBinding BuildBindingFromAuthoring(uint stableId, SourceRuntimeTemplateAuthoringBase authoring)
         {
             return new StageSourceBinding
             {
@@ -240,7 +240,7 @@ namespace SweepNDodge.DotsBullets.Editor
             };
         }
 
-        private static SustainSlotBinding[] BuildSustainSlots(BulletSourceAuthoring.SustainClipSlotAuthoring[] slots)
+        private static SustainSlotBinding[] BuildSustainSlots(SourceRuntimeTemplateAuthoringBase.SustainClipSlotAuthoring[] slots)
         {
             if (slots == null || slots.Length <= 0)
                 return Array.Empty<SustainSlotBinding>();
@@ -263,7 +263,7 @@ namespace SweepNDodge.DotsBullets.Editor
             return result;
         }
 
-        private static EventSlotBinding[] BuildEventSlots(BulletSourceAuthoring.EventClipSlotAuthoring[] slots)
+        private static EventSlotBinding[] BuildEventSlots(SourceRuntimeTemplateAuthoringBase.EventClipSlotAuthoring[] slots)
         {
             if (slots == null || slots.Length <= 0)
                 return Array.Empty<EventSlotBinding>();
@@ -357,3 +357,5 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 }
+
+
