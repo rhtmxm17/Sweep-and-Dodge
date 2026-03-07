@@ -1,4 +1,4 @@
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -63,7 +63,6 @@ namespace SweepNDodge.DotsBullets
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<BulletFrameCounterComponent>();
-            state.RequireForUpdate<SourceRunDirectorStateComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
             state.RequireForUpdate<StageTopologyStateComponent>();
             state.RequireForUpdate<RunDirectorStageGateComponent>();
@@ -495,3 +494,5 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+
+

@@ -1,4 +1,4 @@
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -195,6 +195,8 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
+            state.CompleteDependency();
+
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var impulseBuffer = SystemAPI.GetBuffer<PlayerImpulseEventBufferElement>(playerEntity);
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
@@ -288,3 +290,4 @@ namespace SweepNDodge.DotsBullets
 
     }
 }
+

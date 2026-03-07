@@ -861,22 +861,24 @@ namespace SweepNDodge.DotsBullets.Tests
                 em.SetComponentData(playerEntity, penalty);
             }
 
-            var combatChannelEntity = em.CreateEntityQuery(
-                ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
-                ComponentType.ReadWrite<CombatEventMetricsComponent>(),
-                ComponentType.ReadWrite<CombatEventBufferElement>()).GetSingletonEntity();
-            var combatEvents = em.GetBuffer<CombatEventBufferElement>(combatChannelEntity);
+            CompleteTrackedJobs(em);
             uint frame = GetSingleton<BulletFrameCounterComponent>(em).Value;
-            combatEvents.Add(new CombatEventBufferElement
-            {
-                Type = CombatEventTypeId.Hit,
-                SourceEntity = Entity.Null,
-                RelatedEntity = playerEntity,
-                Count = 1,
-                Value = 11,
-                Frame = frame,
-                Sequence = (uint)combatEvents.Length,
-            });
+            var feedbackSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(playerEntity);
+            feedbackSnapshot.Version = feedbackSnapshot.Version == uint.MaxValue ? 1u : feedbackSnapshot.Version + 1u;
+            feedbackSnapshot.Type = PlayerUiFeedbackEventType.PlayerHazardHit;
+            feedbackSnapshot.Reason = (byte)PlayerUiFeedbackReasonId.Default;
+            feedbackSnapshot.Value = 11;
+            feedbackSnapshot.RelatedEntity = playerEntity;
+            feedbackSnapshot.Frame = frame;
+            feedbackSnapshot.RemainingSec = 0.6f;
+            feedbackSnapshot.ClockSec = Mathf.Max(0f, feedbackSnapshot.ClockSec);
+            feedbackSnapshot.NextAllowedHitSec = feedbackSnapshot.ClockSec + 0.1f;
+            em.SetComponentData(playerEntity, feedbackSnapshot);
+            var hudSnapshotEntity = GetSingletonEntity<PlayerHudSnapshotComponent>(em);
+            var hudSnapshot = em.GetComponentData<PlayerHudSnapshotComponent>(hudSnapshotEntity);
+            hudSnapshot.LastHitLossValue = 11;
+            hudSnapshot.HitFlashRemainingSec = 0.6f;
+            em.SetComponentData(hudSnapshotEntity, hudSnapshot);
 
             yield return WaitForCondition(
                 () =>
@@ -1164,7 +1166,6 @@ namespace SweepNDodge.DotsBullets.Tests
             yield return WaitForCondition(
                 () =>
                     CountByComponentType<PlayerTag>(em) > 0 &&
-                    CountByComponentType<SourceSpawnComponent>(em) > 0 &&
                     CountByComponentType<BulletFrameCounterComponent>(em) > 0,
                 300,
                 $"ECS setup was not ready within timeout. scene={sceneLabel}");
@@ -1640,6 +1641,12 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
+
+
+
+
+
+
 
 
 

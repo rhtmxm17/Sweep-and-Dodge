@@ -1,4 +1,4 @@
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -148,6 +148,8 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
+            state.CompleteDependency();
+
             uint frame = FrameSequenceUtility.GetCurrentFrame(SystemAPI.GetSingleton<BulletFrameCounterComponent>());
             Entity combatChannelEntity = ResolveFirstEntity(ref _combatEventChannelQuery);
             DynamicBuffer<CombatEventBufferElement> combatBuffer = default;
@@ -205,3 +207,4 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+

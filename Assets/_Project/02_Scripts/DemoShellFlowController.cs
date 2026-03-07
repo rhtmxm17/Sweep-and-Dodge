@@ -78,7 +78,8 @@ namespace SweepNDodge.DotsBullets
             EnsureRuntimeHudBridge();
             EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
-            BootFromSessionStaging();
+            if (!TryBootFromSessionStaging())
+                TransitionTo(DemoShellScreenId.Title);
         }
 
         private void OnDisable()
@@ -102,6 +103,7 @@ namespace SweepNDodge.DotsBullets
             EnsureRuntimeHudBridge();
             EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
+            TryBootFromSessionStagingIfPending();
             ProcessKeyboardFallback();
             TickStagePlayFlow();
         }
@@ -295,7 +297,18 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        private void BootFromSessionStaging()
+        private void TryBootFromSessionStagingIfPending()
+        {
+            if (!DemoShellSessionStaging.IsStartupPending)
+                return;
+
+            if (_currentScreen != DemoShellScreenId.Title && _currentScreen != DemoShellScreenId.Lobby)
+                return;
+
+            TryBootFromSessionStaging();
+        }
+
+        private bool TryBootFromSessionStaging()
         {
             if (DemoShellSessionStaging.TryConsume(out var request))
             {
@@ -303,17 +316,17 @@ namespace SweepNDodge.DotsBullets
                 {
                     int clamped = Mathf.Clamp(request.StageIndex, 0, StageProfiles.Length - 1);
                     EnterStagePlay(clamped);
-                    return;
+                    return true;
                 }
 
                 if (request.Screen == DemoShellScreenId.Lobby)
                 {
                     TransitionTo(DemoShellScreenId.Lobby);
-                    return;
+                    return true;
                 }
             }
 
-            TransitionTo(DemoShellScreenId.Title);
+            return false;
         }
 
         private void TickStagePlayFlow()
@@ -828,6 +841,8 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+
+
 
 
 
