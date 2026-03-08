@@ -18,7 +18,7 @@
 ### 1.1 목표
 - DemoShell 화면 전이를 단일 소유한다.
 - GO->ECS 쓰기 경로를 `StageTopologyBridge`와 `RunDirectorStageBridge`의 이원 경계로 분리한다.
-- Stage 시작 전에 `RequestStageTopologyApply(stageId)`를 선행해 topology + layout + definition 적용을 보장한다.
+- Stage 시작 전에 `StageTopologyBridge.RequestTopologyApply(stageId)`를 선행해 topology + layout + definition 적용을 보장한다.
 - 로비/진행 순서를 `StageCatalogSO.Entries` 기반으로 데이터 주도화한다.
 
 ### 1.2 비목표
@@ -68,13 +68,26 @@
   - topology prefab singleton은 `StageTopologyBridge`가 bind/보강한다
   - `RunDirectorStageBridge`는 topology singleton이 없어도 run-director singleton만으로 bind된다
 
-## 5. StageId 경로
+## 5. Topology Boundary
+- `StageTopologyBridge`
+  - topology 입력 전용 GO->ECS writer
+  - `StageCatalogRuntimeComponent` publish
+  - `StageTopologyRequestComponent` one-shot write
+  - `StageTopologyStateComponent`는 read-only 조회만 허용
+- `RunDirectorStageBridge`
+  - stage state/gate/signal 입력 전용 GO->ECS writer
+  - topology singleton이 없어도 독립 bind
+- same-frame 계약
+  - `RequestTopologyApply(stageId)`와 `RequestStageStart()`는 같은 프레임에 연속 호출 가능
+  - `RunDirectorStageTransitionSystem`은 `StageTopologyState.Ready == 1` 및 `AppliedStageId == SelectedStageId`일 때만 `Idle -> Running`을 허용한다
+
+## 6. StageId 경로
 - 로비 선택 -> `EnterStagePlay(stageIndex)`
 - `stageIndex`에 대응하는 런타임 프로필의 `StageId` 결정
 - `StageTopologyBridge.RequestTopologyApply(StageId)` 호출
 - 이후 기존 Stage start/confirm 경로 유지
 
-## 6. 씬/운영 기준
+## 7. 씬/운영 기준
 - `SampleScene`
   - `DemoShellFlowController.StageCatalog = sc_demo`
   - `StageTopologyBridge`는 `StageCatalog`를 참조한다
@@ -84,7 +97,7 @@
 - `PlayModeSmoke_Dedicated`
   - 기존 스모크 목적 유지
 
-## 7. 검증 계획 / 합격 기준
+## 8. 검증 계획 / 합격 기준
 - 공통
   1. compile
   2. console error 0
@@ -98,15 +111,20 @@
   - `StageTopologyBridgeTests`
     - `RequestTopologyApply`
     - topology state read helper
+    - topology singleton publish/bind
   - `RunDirectorStageBridgeTests`
     - topology singleton 없이 독립 bind
+  - `StageTopologyApplyExecutionBeginSystemTests`
+    - boundary-only apply
+    - lifecycle stamp/versioning
+    - failure keep-current-stage policy
   - `StageCatalogSampleAssetsTests`
     - `sc_demo` / `sd_demo_1~3` / `sl_demo_1~3` 자산 유효성
 - PlayMode 회귀
   - `Title -> Lobby -> Stage -> Result -> Retry/Next -> DemoComplete`
   - `Stage2` layout/pattern 차이 반영
 
-## 8. 관련 ADR
+## 9. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)

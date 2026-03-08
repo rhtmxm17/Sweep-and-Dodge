@@ -128,6 +128,21 @@
   5. 생성된 asset을 검증/커밋한다.
 
 ## 7. 런타임 반영
+### 7.1 Topology Layer
+- topology owner
+  - `StageTopologyApplyExecutionBeginSystem`
+  - `ExecutionBegin` 단일 writer
+- topology input
+  - `StageTopologyBridge`
+  - `StageCatalogRuntimeComponent` publish
+  - `StageTopologyRequestComponent` one-shot write
+- stage state input
+  - `RunDirectorStageBridge`
+  - `RunDirectorStageRequestComponent`, gate/signal write
+- topology ready gate
+  - `RunDirectorStageTransitionSystem`은 `StageTopologyState.Ready == 1` 및 `AppliedStageId == SelectedStageId`일 때만 `Idle -> Running`을 허용한다
+
+### 7.2 DemoShell / Runtime Flow
 - `DemoShellFlowController`
   - 시작 시 `StageCatalogSO`를 읽어 런타임 `StageProfiles` 구성
   - 미할당/유효 엔트리 없음 시 기존 `StageProfiles` fallback
@@ -153,6 +168,17 @@
   - `OnStateEnterOnce`는 initial apply 직후 자동 발화하지 않음
   - 현재 지원 topology kind는 `Source`, `Deposit`뿐이며, `StageTopologyPrefabCatalogSO`도 동일하게 `SourceTemplatePrefab`, `DepositTemplatePrefab`만 필수 필드로 가진다.
 
+### 7.3 Template Catalog / Validation Boundary
+- `StageTopologyPrefabCatalogSO`
+  - shape는 v1에서 고정
+    - `SourceTemplatePrefab`
+    - `DepositTemplatePrefab`
+  - entry-list 구조로 일반화하지 않는다
+- `ContentValidationRunner` / `ContentValidationRules`
+  - `StageTopologyPrefabCatalogSO.SourceTemplatePrefab` null은 오류
+  - `StageTopologyPrefabCatalogSO.DepositTemplatePrefab` null은 오류
+  - unsupported kind / optional kind 정책은 아직 도입하지 않는다
+
 ## 8. 검증 계획 / 합격 기준
 - 공통
   - compile error 0
@@ -168,6 +194,8 @@
   - `StageTopologyBridgeTests`
   - `RunDirectorStageBridgeTests`
   - `StageTopologyApplyExecutionBeginSystemTests`
+  - `ContentValidationRulesTests`
+    - topology prefab catalog required template 검증
 - PlayMode
   - DemoShell 회귀 스모크(`Title -> Lobby -> Stage -> Result -> Retry/Next`)
   - `Stage2` layout/pattern 차이 반영 확인
