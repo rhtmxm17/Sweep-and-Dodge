@@ -26,6 +26,10 @@ namespace SweepNDodge.DotsBullets
     // - 루트 그룹(BulletFramePipelineGroup) 아래에서 순서를 강제한다.
 
     [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateBefore(typeof(FixedTickRootGroup))]
+    public partial class StageTopologyPrepareGroup : ComponentSystemGroup { }
+
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
     public partial class FixedTickRootGroup : ComponentSystemGroup { }
 
     [UpdateInGroup(typeof(FixedTickRootGroup))]

@@ -735,6 +735,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2015128776}
   - component: {fileID: 2015128775}
+  - component: {fileID: 2015128782}
   - component: {fileID: 2015128777}
   - component: {fileID: 2015128781}
   - component: {fileID: 2015128780}
@@ -778,6 +779,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2015128782
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 324550874272c21458d505f96b15da9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageTopologyBridge
+  LogBindWarnings: 1
+  StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
+  TopologyPrefabCatalog: {fileID: 11400000, guid: 3023896e72d43dd4fbbdf17556c9259c, type: 2}
 --- !u!114 &2015128777
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -791,6 +807,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellFlowController
   StageBridge: {fileID: 2015128775}
+  TopologyBridge: {fileID: 2015128782}
   StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
   ShowOverlay: 1
   OverlayRect:
@@ -802,15 +819,15 @@ MonoBehaviour:
   EnableKeyboardFallback: 1
   StageProfiles:
   - StageId: 1
-    DisplayName: Stage 1
+    DisplayName: Stage 1 - Baseline
     IsFinalStage: 0
     StageTimeLimitSec: 150
   - StageId: 2
-    DisplayName: Stage 2
+    DisplayName: Stage 2 - Shifted Pressure
     IsFinalStage: 0
     StageTimeLimitSec: 180
   - StageId: 3
-    DisplayName: Stage 3
+    DisplayName: Stage 3 - Final Sweep
     IsFinalStage: 1
     StageTimeLimitSec: 210
   LogTransitions: 0
@@ -1159,3 +1176,6 @@ SceneRoots:
   - {fileID: 352435931}
   - {fileID: 2015128776}
   - {fileID: 219259909}
+
+
+

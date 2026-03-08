@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 using UnityEngine.Events;
@@ -8,7 +9,7 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// StageFlow/UI(GameObject) <-> Run Director Stage 상태(ECS) 브리지.
-    /// - GO -> ECS: Start/Confirm/StageApply 요청, Intro/Clear 연출 완료 게이트 반영
+    /// - GO -> ECS: Start/Confirm 요청, Intro/Clear 연출 완료 게이트 반영
     /// - ECS -> GO: StageRunCompleted 신호를 이벤트로 전달
     /// </summary>
     public sealed class RunDirectorStageBridge : MonoBehaviour
@@ -17,9 +18,6 @@ namespace SweepNDodge.DotsBullets
 
         [Header("Bridge")]
         public bool LogBindWarnings = true;
-
-        [Header("Stage Catalog")]
-        public StageCatalogSO StageCatalog;
 
         [Header("Events")]
         public UnityEvent OnStageRunCompleted;
@@ -33,7 +31,6 @@ namespace SweepNDodge.DotsBullets
         private Entity _stageSignalEntity;
         private bool _isBound;
         private bool _warnedBindFailure;
-        private bool _warnedStageCatalogBindingFailure;
         private int _lastCompletedNotifiedFrame = -1;
         private bool _isSceneOwner;
 
@@ -96,28 +93,6 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        public bool RequestStageApply(int stageId)
-        {
-            if (stageId <= 0)
-                return false;
-            if (!TryBind())
-                return false;
-            if (!EnsureStageCatalogRuntimeSingleton())
-                return false;
-
-            var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestEntity);
-            request.RequestedStageId = stageId;
-            request.StageApplyRequested = 1;
-            _em.SetComponentData(_stageRequestEntity, request);
-            return true;
-        }
-
-        [Obsolete("Use RequestStageApply(int stageId).")]
-        public bool RequestStageMapApply(int stageId)
-        {
-            return RequestStageApply(stageId);
-        }
-
         public bool SetIntroPresentationDone(bool done)
         {
             if (!TryBind())
@@ -167,7 +142,9 @@ namespace SweepNDodge.DotsBullets
             using var gateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageGateComponent>());
             using var signalQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageSignalComponent>());
             using var stateQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageStateComponent>());
-            if (requestQuery.IsEmptyIgnoreFilter || gateQuery.IsEmptyIgnoreFilter || signalQuery.IsEmptyIgnoreFilter)
+            if (requestQuery.IsEmptyIgnoreFilter
+                || gateQuery.IsEmptyIgnoreFilter
+                || signalQuery.IsEmptyIgnoreFilter)
             {
                 WarnBindFailureOnce("RunDirector stage singleton(s) were not found.");
                 _isBound = false;
@@ -183,44 +160,6 @@ namespace SweepNDodge.DotsBullets
                 _warnedBindFailure = false;
 
             return _isBound;
-        }
-
-        private bool EnsureStageCatalogRuntimeSingleton()
-        {
-            if (StageCatalog == null)
-            {
-                WarnStageCatalogFailureOnce("StageCatalog is not assigned.");
-                return false;
-            }
-
-            using var query = _em.CreateEntityQuery(ComponentType.ReadWrite<StageCatalogRuntimeComponent>());
-            if (query.IsEmptyIgnoreFilter)
-            {
-                var created = _em.CreateEntity();
-                _em.AddComponentObject(created, new StageCatalogRuntimeComponent
-                {
-                    Catalog = StageCatalog,
-                });
-                _warnedStageCatalogBindingFailure = false;
-                return true;
-            }
-
-            if (query.CalculateEntityCount() > 1)
-            {
-                WarnStageCatalogFailureOnce("Multiple StageCatalogRuntimeComponent singletons detected. The first entity will be used.");
-            }
-
-            var catalogEntity = ResolveFirstEntity(query);
-            if (catalogEntity == Entity.Null || !_em.Exists(catalogEntity))
-            {
-                WarnStageCatalogFailureOnce("StageCatalogRuntimeComponent singleton resolve failed.");
-                return false;
-            }
-
-            var runtime = _em.GetComponentObject<StageCatalogRuntimeComponent>(catalogEntity);
-            runtime.Catalog = StageCatalog;
-            _warnedStageCatalogBindingFailure = false;
-            return true;
         }
 
         private void PublishStageCompletedEventIfNeeded()
@@ -250,15 +189,6 @@ namespace SweepNDodge.DotsBullets
             Debug.LogWarning($"[RunDirectorStageBridge] {message}");
         }
 
-        private void WarnStageCatalogFailureOnce(string message)
-        {
-            if (!LogBindWarnings || _warnedStageCatalogBindingFailure)
-                return;
-
-            _warnedStageCatalogBindingFailure = true;
-            Debug.LogWarning($"[RunDirectorStageBridge] {message}");
-        }
-
         private static Entity ResolveFirstEntity(EntityQuery query)
         {
             int count = query.CalculateEntityCount();
@@ -267,7 +197,7 @@ namespace SweepNDodge.DotsBullets
             if (count == 1)
                 return query.GetSingletonEntity();
 
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
+            using var entities = query.ToEntityArray(Allocator.Temp);
             return entities.Length > 0 ? entities[0] : Entity.Null;
         }
 

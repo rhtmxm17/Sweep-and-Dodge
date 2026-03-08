@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -42,22 +42,35 @@ namespace SweepNDodge.DotsBullets.Editor
     {
         public readonly IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> Definitions;
         public readonly IReadOnlyList<ContentValidationRecord<WaveClipSO>> WaveClips;
+        public readonly IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> TopologyPrefabCatalogs;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
-        public readonly IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> SourceAuthorings;
+        public readonly IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> SourceAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletAuthoring>> BulletAuthorings;
 
         public ContentValidationInput(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
+            IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> topologyPrefabCatalogs,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
-            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
         {
             Definitions = definitions ?? Array.Empty<ContentValidationRecord<BulletDefinitionSO>>();
             WaveClips = waveClips ?? Array.Empty<ContentValidationRecord<WaveClipSO>>();
+            TopologyPrefabCatalogs = topologyPrefabCatalogs ?? Array.Empty<ContentValidationRecord<StageTopologyPrefabCatalogSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
-            SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<BulletSourceAuthoring>>();
+            SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
             BulletAuthorings = bulletAuthorings ?? Array.Empty<ContentValidationRecord<BulletAuthoring>>();
+        }
+
+        public ContentValidationInput(
+            IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
+            IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
+            IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
+            : this(definitions, waveClips, null, visualAuthorings, sourceAuthorings, bulletAuthorings)
+        {
         }
     }
 
@@ -69,6 +82,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             ValidateDefinitionUniqueness(input.Definitions, issues);
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
+            ValidateStageTopologyPrefabCatalogContracts(input.TopologyPrefabCatalogs, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateWaveClipContracts(input.Definitions, input.WaveClips, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
@@ -471,7 +485,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private static void ValidateAutoCorrectionWarnings(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
-            IReadOnlyList<ContentValidationRecord<BulletSourceAuthoring>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
             List<ContentValidationIssue> issues)
         {
             for (int i = 0; i < definitions.Count; i++)
@@ -526,6 +540,36 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
+        private static void ValidateStageTopologyPrefabCatalogContracts(
+            IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> catalogs,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < catalogs.Count; i++)
+            {
+                var catalog = catalogs[i].Value;
+                if (catalog == null)
+                    continue;
+
+                if (catalog.SourceTemplatePrefab == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV030",
+                        catalogs[i].Location,
+                        "StageTopologyPrefabCatalogSO.SourceTemplatePrefab is null."));
+                }
+
+                if (catalog.DepositTemplatePrefab == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV031",
+                        catalogs[i].Location,
+                        "StageTopologyPrefabCatalogSO.DepositTemplatePrefab is null."));
+                }
+            }
+        }
+
         private static void WarnIf(bool condition, string code, string location, string message, List<ContentValidationIssue> issues)
         {
             if (!condition)
@@ -561,3 +605,4 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 }
+

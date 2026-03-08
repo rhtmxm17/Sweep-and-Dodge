@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
@@ -48,12 +48,74 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageTopologyPrefabCatalog_WithMissingSourceTemplate_IsError()
+        {
+            var catalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
+            catalog.DepositTemplatePrefab = new GameObject("deposit_template");
+
+            try
+            {
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    new List<ContentValidationRecord<StageTopologyPrefabCatalogSO>>
+                    {
+                        new ContentValidationRecord<StageTopologyPrefabCatalogSO>(catalog, "topology_catalog"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV030").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(catalog.DepositTemplatePrefab);
+                Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyPrefabCatalog_WithMissingDepositTemplate_IsError()
+        {
+            var catalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
+            catalog.SourceTemplatePrefab = new GameObject("source_template");
+
+            try
+            {
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    new List<ContentValidationRecord<StageTopologyPrefabCatalogSO>>
+                    {
+                        new ContentValidationRecord<StageTopologyPrefabCatalogSO>(catalog, "topology_catalog"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV031").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(catalog.SourceTemplatePrefab);
+                Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
         public void AutoCorrectionInputs_AreReportedAsWarningsOnly()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var sourceRoot = new GameObject("source_root");
-            var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
+            var sourceAuthoring = sourceRoot.AddComponent<SourceRuntimeTemplateAuthoring>();
 
             try
             {
@@ -81,9 +143,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                     null,
                     null,
-                    new List<ContentValidationRecord<BulletSourceAuthoring>>
+                    new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>
                     {
-                        new ContentValidationRecord<BulletSourceAuthoring>(sourceAuthoring, "source"),
+                        new ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>(sourceAuthoring, "source"),
                     },
                     null);
 
@@ -108,19 +170,19 @@ namespace SweepNDodge.DotsBullets.Tests
         public void SourceAuthoring_WithoutAnyWaveClipBinding_IsNotAnError()
         {
             var sourceRoot = new GameObject("source_root");
-            var sourceAuthoring = sourceRoot.AddComponent<BulletSourceAuthoring>();
+            var sourceAuthoring = sourceRoot.AddComponent<SourceRuntimeTemplateAuthoring>();
 
             try
             {
-                sourceAuthoring.SustainClipSlots = System.Array.Empty<BulletSourceAuthoring.SustainClipSlotAuthoring>();
-                sourceAuthoring.EventClipSlots = System.Array.Empty<BulletSourceAuthoring.EventClipSlotAuthoring>();
+                sourceAuthoring.SustainClipSlots = System.Array.Empty<SourceRuntimeTemplateAuthoringBase.SustainClipSlotAuthoring>();
+                sourceAuthoring.EventClipSlots = System.Array.Empty<SourceRuntimeTemplateAuthoringBase.EventClipSlotAuthoring>();
                 var input = new ContentValidationInput(
                     null,
                     null,
                     null,
-                    new List<ContentValidationRecord<BulletSourceAuthoring>>
+                    new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>
                     {
-                        new ContentValidationRecord<BulletSourceAuthoring>(sourceAuthoring, "source"),
+                        new ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>(sourceAuthoring, "source"),
                     },
                     null);
 
@@ -588,3 +650,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
+
+
+

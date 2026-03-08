@@ -47,8 +47,19 @@ namespace SweepNDodge.DotsBullets
     {
         public byte StageStartRequested;
         public byte ConfirmPressed;
-        public byte StageApplyRequested;
+    }
+
+    public struct StageTopologyRequestComponent : IComponentData
+    {
+        public byte ApplyRequested;
         public int RequestedStageId;
+    }
+
+    public struct StageTopologyStateComponent : IComponentData
+    {
+        public int SelectedStageId;
+        public int AppliedStageId;
+        public byte Ready;
     }
 
     // 상위 StageFlow가 소비할 완료 신호(one-shot).
@@ -61,6 +72,43 @@ namespace SweepNDodge.DotsBullets
     public class StageCatalogRuntimeComponent : IComponentData
     {
         public StageCatalogSO Catalog;
+    }
+
+    public struct StageTopologyPrefabCatalogComponent : IComponentData
+    {
+        public Entity SourceTemplate;
+        public Entity DepositTemplate;
+    }
+
+    public enum StageTopologyKind : byte
+    {
+        Source = 0,
+        Deposit = 1,
+        Obstacle = 2,
+        Visual = 3,
+    }
+
+    public struct StageTopologyLifecycleStateComponent : IComponentData
+    {
+        public uint CurrentAppliedVersion;
+    }
+
+    public struct StageTopologyOwnedTag : IComponentData
+    {
+    }
+
+    public struct StageTopologyOwnedComponent : IComponentData
+    {
+        public StageTopologyKind Kind;
+        public uint LastAppliedVersion;
+    }
+
+    public struct StageTopologySourceTag : IComponentData
+    {
+    }
+
+    public struct StageTopologyDepositTag : IComponentData
+    {
     }
 
     public enum RunDirectorSourceStateId : byte

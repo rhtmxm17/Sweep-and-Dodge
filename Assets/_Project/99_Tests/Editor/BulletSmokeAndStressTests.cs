@@ -542,6 +542,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     .GetSingleton<CombatEventMetricsComponent>();
                 Assert.That(secondMetrics.TotalHitCount, Is.EqualTo(1), "iFrame 동안 추가 hit 누적은 제외되어야 한다.");
                 Assert.That(secondMetrics.LastFrameHitCount, Is.EqualTo(0), "iFrame frame에는 신규 hit가 없어야 한다.");
+                impulseBuffer = em.GetBuffer<PlayerImpulseEventBufferElement>(playerEntity);
                 Assert.That(impulseBuffer.Length, Is.EqualTo(1), "iFrame 동안 impulse 추가 누적이 발생하면 안 된다.");
                 int activeAfterIFrame = (em.IsComponentEnabled<BulletActiveTag>(hazardA) ? 1 : 0)
                     + (em.IsComponentEnabled<BulletActiveTag>(hazardB) ? 1 : 0);
@@ -2470,6 +2471,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     StageStartRequested = 1,
                     ConfirmPressed = 0,
+                });
+
+                var topologyStateQuery = em.CreateEntityQuery(ComponentType.ReadWrite<StageTopologyStateComponent>());
+                var topologyStateEntity = topologyStateQuery.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(StageTopologyStateComponent))
+                    : topologyStateQuery.GetSingletonEntity();
+                em.SetComponentData(topologyStateEntity, new StageTopologyStateComponent
+                {
+                    SelectedStageId = 1,
+                    AppliedStageId = 1,
+                    Ready = 1,
                 });
 
                 world.SetTime(new TimeData(0.2d, 0.2f));

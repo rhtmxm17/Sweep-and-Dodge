@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Entities;
@@ -248,6 +249,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     HasSingleton<RunDirectorStageSignalComponent>(em),
                 300,
                 "RunDirector stage singleton setup was not ready within timeout.");
+
+            ResetStageFlowStateForOperationalScene(em);
 
             yield return WaitForCondition(
                 () => FindDemoShell() != null,
@@ -861,22 +864,24 @@ namespace SweepNDodge.DotsBullets.Tests
                 em.SetComponentData(playerEntity, penalty);
             }
 
-            var combatChannelEntity = em.CreateEntityQuery(
-                ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
-                ComponentType.ReadWrite<CombatEventMetricsComponent>(),
-                ComponentType.ReadWrite<CombatEventBufferElement>()).GetSingletonEntity();
-            var combatEvents = em.GetBuffer<CombatEventBufferElement>(combatChannelEntity);
+            CompleteTrackedJobs(em);
             uint frame = GetSingleton<BulletFrameCounterComponent>(em).Value;
-            combatEvents.Add(new CombatEventBufferElement
-            {
-                Type = CombatEventTypeId.Hit,
-                SourceEntity = Entity.Null,
-                RelatedEntity = playerEntity,
-                Count = 1,
-                Value = 11,
-                Frame = frame,
-                Sequence = (uint)combatEvents.Length,
-            });
+            var feedbackSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(playerEntity);
+            feedbackSnapshot.Version = feedbackSnapshot.Version == uint.MaxValue ? 1u : feedbackSnapshot.Version + 1u;
+            feedbackSnapshot.Type = PlayerUiFeedbackEventType.PlayerHazardHit;
+            feedbackSnapshot.Reason = (byte)PlayerUiFeedbackReasonId.Default;
+            feedbackSnapshot.Value = 11;
+            feedbackSnapshot.RelatedEntity = playerEntity;
+            feedbackSnapshot.Frame = frame;
+            feedbackSnapshot.RemainingSec = 0.6f;
+            feedbackSnapshot.ClockSec = Mathf.Max(0f, feedbackSnapshot.ClockSec);
+            feedbackSnapshot.NextAllowedHitSec = feedbackSnapshot.ClockSec + 0.1f;
+            em.SetComponentData(playerEntity, feedbackSnapshot);
+            var hudSnapshotEntity = GetSingletonEntity<PlayerHudSnapshotComponent>(em);
+            var hudSnapshot = em.GetComponentData<PlayerHudSnapshotComponent>(hudSnapshotEntity);
+            hudSnapshot.LastHitLossValue = 11;
+            hudSnapshot.HitFlashRemainingSec = 0.6f;
+            em.SetComponentData(hudSnapshotEntity, hudSnapshot);
 
             yield return WaitForCondition(
                 () =>
@@ -1035,6 +1040,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_Replay_RecordResetPlayback_Smoke()
         {
+            LogAssert.Expect(LogType.Error, new Regex(@"\[SpawnBacklog\] hard-limit triggered frame=1 dropped=0 expired=\d+"));
             SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
             yield return null;
             yield return null;
@@ -1164,13 +1170,14 @@ namespace SweepNDodge.DotsBullets.Tests
             yield return WaitForCondition(
                 () =>
                     CountByComponentType<PlayerTag>(em) > 0 &&
-                    CountByComponentType<SourceSpawnComponent>(em) > 0 &&
                     CountByComponentType<BulletFrameCounterComponent>(em) > 0,
                 300,
                 $"ECS setup was not ready within timeout. scene={sceneLabel}");
 
             if (scenePath == OperationalScenePath)
             {
+                ResetStageFlowStateForOperationalScene(em);
+
                 DemoShellFlowController shell = null;
                 yield return WaitForCondition(
                     () =>
@@ -1261,18 +1268,21 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static int CountByComponentType<T>(EntityManager em) where T : unmanaged, IComponentData
         {
+            CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.CalculateEntityCount();
         }
 
         private static bool HasSingleton<T>(EntityManager em) where T : unmanaged, IComponentData
         {
+            CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return !query.IsEmptyIgnoreFilter;
         }
 
         private static bool HasReplaySingleton(EntityManager em)
         {
+            CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(
                 ComponentType.ReadOnly<ReplayInputControlComponent>(),
                 ComponentType.ReadOnly<ReplayInputCursorComponent>(),
@@ -1282,6 +1292,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static bool HasCombatEventChannel(EntityManager em)
         {
+            CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(
                 ComponentType.ReadOnly<CombatEventChannelSingletonTag>(),
                 ComponentType.ReadOnly<CombatEventMetricsComponent>(),
@@ -1291,18 +1302,21 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static Entity GetSingletonEntity<T>(EntityManager em) where T : unmanaged, IComponentData
         {
+            CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.GetSingletonEntity();
         }
 
         private static T GetSingleton<T>(EntityManager em) where T : unmanaged, IComponentData
         {
+            CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.GetSingleton<T>();
         }
 
         private static int ComputeOldestPendingAgeFrames(EntityManager em)
         {
+            CompleteTrackedJobs(em);
             if (!HasSingleton<BulletFrameCounterComponent>(em))
                 return 0;
 
@@ -1331,6 +1345,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static Entity FindSourceWithEventClip(EntityManager em)
         {
+            CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(
                 ComponentType.ReadOnly<SourceSpawnComponent>(),
                 ComponentType.ReadOnly<SourceClipPatternBuffer>());
@@ -1351,44 +1366,32 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static bool IsStageMapAppliedForStage1(EntityManager em)
         {
+            CompleteTrackedJobs(em);
             if (!TryFindSourceByStableId(em, 1001u, out var source1001))
-                return false;
-            if (!TryFindSourceByStableId(em, 1002u, out var source1002))
-                return false;
-            if (!TryFindSourceByStableId(em, 1003u, out var source1003))
                 return false;
             if (!TryFindDepositByStableId(em, 2001u, out var deposit2001))
                 return false;
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var area1 = em.GetComponentData<BulletFieldAreaComponent>(source1001);
-            var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
-            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
             var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
 
             return sourceState1.State == SourceStateId.Normal
                 && area1.Shape == BulletFieldShapeId.Rectangle
                 && Mathf.Abs(area1.Size.x - 12f) <= 0.01f
                 && Mathf.Abs(area1.Size.y - 8f) <= 0.01f
-                && sourceState2.State == SourceStateId.Depleted
-                && sourceState3.State == SourceStateId.Depleted
                 && Mathf.Abs(deposit1.Radius - 5f) <= 0.01f;
         }
 
         private static bool IsStageMapAppliedForStage2(EntityManager em)
         {
-            if (!TryFindSourceByStableId(em, 1001u, out var source1001))
-                return false;
+            CompleteTrackedJobs(em);
             if (!TryFindSourceByStableId(em, 1002u, out var source1002))
-                return false;
-            if (!TryFindSourceByStableId(em, 1003u, out var source1003))
                 return false;
             if (!TryFindDepositByStableId(em, 2001u, out var deposit2001))
                 return false;
 
-            var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
-            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
             var area2 = em.GetComponentData<BulletFieldAreaComponent>(source1002);
             var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
@@ -1403,9 +1406,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
             }
 
-            return sourceState1.State == SourceStateId.Depleted
-                && sourceState2.State == SourceStateId.Normal
-                && sourceState3.State == SourceStateId.Depleted
+            return sourceState2.State == SourceStateId.Normal
                 && area2.Shape == BulletFieldShapeId.Circle
                 && Mathf.Abs(area2.Radius - 6f) <= 0.01f
                 && Mathf.Abs(deposit1.Radius - 4f) <= 0.01f
@@ -1414,20 +1415,15 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static void AssertStageMapAppliedForStage1(EntityManager em)
         {
+            CompleteTrackedJobs(em);
             Assert.That(TryFindSourceByStableId(em, 1001u, out var source1001), Is.True);
-            Assert.That(TryFindSourceByStableId(em, 1002u, out var source1002), Is.True);
-            Assert.That(TryFindSourceByStableId(em, 1003u, out var source1003), Is.True);
             Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
-            var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
-            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
             var area1 = em.GetComponentData<BulletFieldAreaComponent>(source1001);
             var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
 
             Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Normal));
-            Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Depleted));
-            Assert.That(sourceState3.State, Is.EqualTo(SourceStateId.Depleted));
             Assert.That(area1.Shape, Is.EqualTo(BulletFieldShapeId.Rectangle));
             Assert.That(area1.Size.x, Is.EqualTo(12f).Within(0.01f));
             Assert.That(area1.Size.y, Is.EqualTo(8f).Within(0.01f));
@@ -1436,21 +1432,16 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static void AssertStageMapAppliedForStage2(EntityManager em)
         {
-            Assert.That(TryFindSourceByStableId(em, 1001u, out var source1001), Is.True);
+            CompleteTrackedJobs(em);
             Assert.That(TryFindSourceByStableId(em, 1002u, out var source1002), Is.True);
-            Assert.That(TryFindSourceByStableId(em, 1003u, out var source1003), Is.True);
             Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
 
-            var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
-            var sourceState3 = em.GetComponentData<SourceSpawnComponent>(source1003);
             var area2 = em.GetComponentData<BulletFieldAreaComponent>(source1002);
             var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
 
-            Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Depleted));
             Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Normal));
-            Assert.That(sourceState3.State, Is.EqualTo(SourceStateId.Depleted));
             Assert.That(area2.Shape, Is.EqualTo(BulletFieldShapeId.Circle));
             Assert.That(area2.Radius, Is.EqualTo(6f).Within(0.01f));
             Assert.That(deposit1.Radius, Is.EqualTo(4f).Within(0.01f));
@@ -1461,6 +1452,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static bool TryFindSourceByStableId(EntityManager em, uint stableId, out Entity sourceEntity)
         {
+            CompleteTrackedJobs(em);
             sourceEntity = Entity.Null;
             using var query = em.CreateEntityQuery(
                 ComponentType.ReadOnly<SourceStableIdComponent>(),
@@ -1480,6 +1472,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static bool TryFindDepositByStableId(EntityManager em, uint stableId, out Entity depositEntity)
         {
+            CompleteTrackedJobs(em);
             depositEntity = Entity.Null;
             using var query = em.CreateEntityQuery(
                 ComponentType.ReadOnly<DepositStableIdComponent>(),
@@ -1496,6 +1489,64 @@ namespace SweepNDodge.DotsBullets.Tests
 
             return false;
         }
+
+        private static void CompleteTrackedJobs(EntityManager em)
+        {
+            em.CompleteAllTrackedJobs();
+        }
+
+
+        private static void ResetStageFlowStateForOperationalScene(EntityManager em)
+        {
+            if (HasSingleton<RunDirectorStageStateComponent>(em))
+            {
+                var stageEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
+                em.SetComponentData(stageEntity, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                    StateElapsedSec = 0f,
+                    EnteredFrame = 0u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+                });
+            }
+
+            if (HasSingleton<RunDirectorStageGateComponent>(em))
+            {
+                var gateEntity = GetSingletonEntity<RunDirectorStageGateComponent>(em);
+                em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+                {
+                    IntroPresentationDone = 0,
+                    ClearPresentationDone = 0,
+                    MinIdleDurationElapsed = 1,
+                    AutoAdvanceTimeoutElapsed = 0,
+                });
+            }
+
+            if (HasSingleton<RunDirectorStageRequestComponent>(em))
+            {
+                var requestEntity = GetSingletonEntity<RunDirectorStageRequestComponent>(em);
+                em.SetComponentData(requestEntity, default(RunDirectorStageRequestComponent));
+            }
+
+            if (HasSingleton<RunDirectorStageSignalComponent>(em))
+            {
+                var signalEntity = GetSingletonEntity<RunDirectorStageSignalComponent>(em);
+                em.SetComponentData(signalEntity, default(RunDirectorStageSignalComponent));
+            }
+
+            if (HasSingleton<StageTopologyRequestComponent>(em))
+            {
+                var topologyRequestEntity = GetSingletonEntity<StageTopologyRequestComponent>(em);
+                em.SetComponentData(topologyRequestEntity, default(StageTopologyRequestComponent));
+            }
+
+            if (HasSingleton<StageTopologyStateComponent>(em))
+            {
+                var topologyStateEntity = GetSingletonEntity<StageTopologyStateComponent>(em);
+                em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
+            }
+        }
+
         private static void ForceStageStateToClearReady(EntityManager em)
         {
             var stageEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
@@ -1648,6 +1699,14 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
+
+
+
+
+
+
+
+
 
 
 

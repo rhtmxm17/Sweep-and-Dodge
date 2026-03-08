@@ -13,8 +13,8 @@ namespace SweepNDodge.DotsBullets
         [Min(0f)] public float PressureDensityScale = 1.0f;
 
         [Header("Stage State Config")]
-        // 기본 모드: StageFlow/UI 미연동 환경에서도 기존 플레이 루프를 유지하기 위해 Running 시작을 기본값으로 둔다.
-        public RunDirectorStageStateId InitialStageState = RunDirectorStageStateId.Running;
+        // 기본 모드: topology prepare 이후 RequestStageStart()로 Running에 진입한다.
+        public RunDirectorStageStateId InitialStageState = RunDirectorStageStateId.Idle;
         [Min(0f)] public float MinIdleDurationSec = 0f;
         [Min(0f)] public float ClearAutoAdvanceTimeoutSec = 10f;
 

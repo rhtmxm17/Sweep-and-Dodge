@@ -1,4 +1,4 @@
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -30,6 +30,12 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            bool hasTopologyState = SystemAPI.TryGetSingleton<StageTopologyStateComponent>(out var topologyState);
+            bool hasStageState = SystemAPI.TryGetSingleton<RunDirectorStageStateComponent>(out var stageState);
+            if (hasTopologyState
+                && (!hasStageState || !StageTopologyRuntimeGateUtility.ShouldRunGameplay(in topologyState, in stageState)))
+                return;
+
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var carryBin = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
             if (math.max(0, carryBin.Load) <= 0)
@@ -148,6 +154,8 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
+            state.CompleteDependency();
+
             uint frame = FrameSequenceUtility.GetCurrentFrame(SystemAPI.GetSingleton<BulletFrameCounterComponent>());
             Entity combatChannelEntity = ResolveFirstEntity(ref _combatEventChannelQuery);
             DynamicBuffer<CombatEventBufferElement> combatBuffer = default;
@@ -205,3 +213,4 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+

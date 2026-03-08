@@ -6,10 +6,10 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// Demo Shell 화면 전이를 소유한다.
-    /// ECS Stage 상태 읽기/요청 쓰기는 RunDirectorStageBridge를 통해서만 수행한다.
+    /// ECS RunDirector 상태 읽기/요청 쓰기는 RunDirectorStageBridge를 통해 수행하고, topology 요청은 StageTopologyBridge를 통해 수행한다.
     /// </summary>
     [DisallowMultipleComponent]
-    [RequireComponent(typeof(RunDirectorStageBridge))]
+    [RequireComponent(typeof(RunDirectorStageBridge), typeof(StageTopologyBridge))]
     public sealed class DemoShellFlowController : MonoBehaviour
     {
         private const float DefaultStage1TimeLimitSec = 150f;
@@ -18,6 +18,7 @@ namespace SweepNDodge.DotsBullets
 
         [Header("References")]
         public RunDirectorStageBridge StageBridge;
+        public StageTopologyBridge TopologyBridge;
         [Header("Stage Data")]
         public StageCatalogSO StageCatalog;
 
@@ -45,10 +46,11 @@ namespace SweepNDodge.DotsBullets
         private DemoShellScreenId _currentScreen;
         private int _currentStageIndex = -1;
         private bool _stageStartPending;
-        private bool _stageMapApplyPending;
+        private bool _stageTopologyApplyPending;
         private bool _awaitingCompletedSignal;
         private DemoShellResultActionId _pendingResultAction;
         private bool _warnedNoBridge;
+        private bool _warnedNoTopologyBridge;
         private bool _warnedStageCatalogIssue;
         private float _stagePlayElapsedSec;
         private int _stageStartTotalCollectValue;
@@ -68,17 +70,20 @@ namespace SweepNDodge.DotsBullets
         private void Reset()
         {
             StageBridge = GetComponent<RunDirectorStageBridge>();
+            TopologyBridge = GetComponent<StageTopologyBridge>();
         }
 
         private void OnEnable()
         {
             EnsureStageProfiles();
             EnsureBridgeReference();
-            SyncBridgeStageCatalogReference();
+            EnsureTopologyBridgeReference();
+            SyncTopologyBridgeStageCatalogReference();
             EnsureRuntimeHudBridge();
             EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
-            BootFromSessionStaging();
+            if (!TryBootFromSessionStaging())
+                TransitionTo(DemoShellScreenId.Title);
         }
 
         private void OnDisable()
@@ -98,10 +103,12 @@ namespace SweepNDodge.DotsBullets
         private void Update()
         {
             EnsureBridgeReference();
-            SyncBridgeStageCatalogReference();
+            EnsureTopologyBridgeReference();
+            SyncTopologyBridgeStageCatalogReference();
             EnsureRuntimeHudBridge();
             EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
+            TryBootFromSessionStagingIfPending();
             ProcessKeyboardFallback();
             TickStagePlayFlow();
         }
@@ -295,7 +302,18 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        private void BootFromSessionStaging()
+        private void TryBootFromSessionStagingIfPending()
+        {
+            if (!DemoShellSessionStaging.IsStartupPending)
+                return;
+
+            if (_currentScreen != DemoShellScreenId.Title && _currentScreen != DemoShellScreenId.Lobby)
+                return;
+
+            TryBootFromSessionStaging();
+        }
+
+        private bool TryBootFromSessionStaging()
         {
             if (DemoShellSessionStaging.TryConsume(out var request))
             {
@@ -303,17 +321,17 @@ namespace SweepNDodge.DotsBullets
                 {
                     int clamped = Mathf.Clamp(request.StageIndex, 0, StageProfiles.Length - 1);
                     EnterStagePlay(clamped);
-                    return;
+                    return true;
                 }
 
                 if (request.Screen == DemoShellScreenId.Lobby)
                 {
                     TransitionTo(DemoShellScreenId.Lobby);
-                    return;
+                    return true;
                 }
             }
 
-            TransitionTo(DemoShellScreenId.Title);
+            return false;
         }
 
         private void TickStagePlayFlow()
@@ -331,13 +349,13 @@ namespace SweepNDodge.DotsBullets
                 if (!TryGetStageProfile(_currentStageIndex, out var startProfile))
                     return;
 
-                if (_stageMapApplyPending)
+                if (_stageTopologyApplyPending)
                 {
-                    bool applyOk = StageBridge.RequestStageApply(startProfile.StageId);
+                    bool applyOk = TopologyBridge != null && TopologyBridge.RequestTopologyApply(startProfile.StageId);
                     if (!applyOk)
                         return;
 
-                    _stageMapApplyPending = false;
+                    _stageTopologyApplyPending = false;
                 }
 
                 bool introOk = StageBridge.SetIntroPresentationDone(true);
@@ -467,7 +485,7 @@ namespace SweepNDodge.DotsBullets
 
             _currentStageIndex = stageIndex;
             _stageStartPending = true;
-            _stageMapApplyPending = true;
+            _stageTopologyApplyPending = true;
             _awaitingCompletedSignal = false;
             _pendingResultAction = DemoShellResultActionId.NextStage;
             _stagePlayElapsedSec = 0f;
@@ -502,13 +520,37 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private void SyncBridgeStageCatalogReference()
+        private void EnsureTopologyBridgeReference()
         {
-            if (StageBridge == null || StageCatalog == null)
+            if (TopologyBridge != null)
                 return;
 
-            if (StageBridge.StageCatalog != StageCatalog)
-                StageBridge.StageCatalog = StageCatalog;
+            TopologyBridge = GetComponent<StageTopologyBridge>();
+            if (TopologyBridge == null)
+                TopologyBridge = gameObject.AddComponent<StageTopologyBridge>();
+
+#if UNITY_2023_1_OR_NEWER
+            if (TopologyBridge == null)
+                TopologyBridge = FindFirstObjectByType<StageTopologyBridge>();
+#else
+            if (TopologyBridge == null)
+                TopologyBridge = FindObjectOfType<StageTopologyBridge>();
+#endif
+
+            if (TopologyBridge == null && !_warnedNoTopologyBridge)
+            {
+                _warnedNoTopologyBridge = true;
+                Debug.LogWarning("[DemoShellFlowController] StageTopologyBridge was not found in scene.");
+            }
+        }
+
+        private void SyncTopologyBridgeStageCatalogReference()
+        {
+            if (TopologyBridge == null || StageCatalog == null)
+                return;
+
+            if (TopologyBridge.StageCatalog != StageCatalog)
+                TopologyBridge.StageCatalog = StageCatalog;
         }
 
         private void EnsureBridgeSubscription()
@@ -828,6 +870,11 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+
+
+
+
+
 
 
 

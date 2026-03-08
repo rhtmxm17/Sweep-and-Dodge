@@ -25,8 +25,9 @@ namespace SweepNDodge.DotsBullets.Editor
             var waveClips = CollectScriptableObjects<WaveClipSO>();
             var stageCatalogs = CollectScriptableObjects<StageCatalogSO>();
             var stageLayouts = CollectScriptableObjects<StageLayoutSO>();
+            var topologyPrefabCatalogs = CollectScriptableObjects<StageTopologyPrefabCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
-            var sources = new List<ContentValidationRecord<BulletSourceAuthoring>>();
+            var sources = new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
             var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
 
             CollectAuthoringsFromPrefabs(visuals, sources, bullets);
@@ -36,11 +37,12 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(waveClips);
             SortRecordsByLocation(stageCatalogs);
             SortRecordsByLocation(stageLayouts);
+            SortRecordsByLocation(topologyPrefabCatalogs);
             SortRecordsByLocation(visuals);
             SortRecordsByLocation(sources);
             SortRecordsByLocation(bullets);
 
-            var input = new ContentValidationInput(definitions, waveClips, visuals, sources, bullets);
+            var input = new ContentValidationInput(definitions, waveClips, topologyPrefabCatalogs, visuals, sources, bullets);
             var issues = ContentValidationRules.Validate(input);
             StageLayoutValidationRules.ValidateLayoutRecords(stageLayouts, issues);
             StageCatalogValidationRules.ValidateCatalogRecords(stageCatalogs, issues);
@@ -127,7 +129,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static void CollectAuthoringsFromPrefabs(
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
-            List<ContentValidationRecord<BulletSourceAuthoring>> sources,
+            List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sources,
             List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             string[] guids = AssetDatabase.FindAssets("t:Prefab", SearchRoots);
@@ -145,7 +147,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static void CollectAuthoringsFromScenes(
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
-            List<ContentValidationRecord<BulletSourceAuthoring>> sources,
+            List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sources,
             List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             string[] guids = AssetDatabase.FindAssets("t:Scene", SearchRoots);
@@ -187,7 +189,7 @@ namespace SweepNDodge.DotsBullets.Editor
             string assetPath,
             GameObject root,
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
-            List<ContentValidationRecord<BulletSourceAuthoring>> sources,
+            List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sources,
             List<ContentValidationRecord<BulletAuthoring>> bullets)
         {
             var visualComponents = root.GetComponentsInChildren<BulletVisualPrefabAuthoring>(includeInactive: true);
@@ -197,11 +199,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 visuals.Add(new ContentValidationRecord<BulletVisualPrefabAuthoring>(visualComponents[i], location));
             }
 
-            var sourceComponents = root.GetComponentsInChildren<BulletSourceAuthoring>(includeInactive: true);
+            var sourceComponents = root.GetComponentsInChildren<SourceRuntimeTemplateAuthoringBase>(includeInactive: true);
             for (int i = 0; i < sourceComponents.Length; i++)
             {
                 string location = $"{assetPath}::{BuildHierarchyPath(sourceComponents[i].transform)}";
-                sources.Add(new ContentValidationRecord<BulletSourceAuthoring>(sourceComponents[i], location));
+                sources.Add(new ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>(sourceComponents[i], location));
             }
 
             var bulletComponents = root.GetComponentsInChildren<BulletAuthoring>(includeInactive: true);
@@ -285,6 +287,7 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 }
+
 
 
 

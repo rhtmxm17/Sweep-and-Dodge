@@ -56,13 +56,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                 };
 
-                var authoring = authoringGo.AddComponent<BulletSourceAuthoring>();
+                var authoring = authoringGo.AddComponent<SourceRuntimeTemplateAuthoring>();
                 authoring.StableIdOverride = 1002u;
                 authoring.InitialState = SourceStateId.Weakened;
                 authoring.ThresholdWeakened = 11;
                 authoring.ThresholdDepleted = 22;
-                authoring.SustainClipSlots = System.Array.Empty<BulletSourceAuthoring.SustainClipSlotAuthoring>();
-                authoring.EventClipSlots = System.Array.Empty<BulletSourceAuthoring.EventClipSlotAuthoring>();
+                authoring.SustainClipSlots = System.Array.Empty<SourceRuntimeTemplateAuthoringBase.SustainClipSlotAuthoring>();
+                authoring.EventClipSlots = System.Array.Empty<SourceRuntimeTemplateAuthoringBase.EventClipSlotAuthoring>();
 
                 bool ok = StageDefinitionGenerator.TrySyncDefinitionsForRoot(root, out var issues, saveAssets: false);
 
@@ -86,3 +86,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
+
+
+

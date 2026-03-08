@@ -1,4 +1,4 @@
-using Unity.Entities;
+﻿using Unity.Entities;
 using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
@@ -32,6 +32,8 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
+            state.CompleteDependency();
+
             Entity channelEntity = ResolveFirstEntity(ref _combatEventChannelQuery);
             if (channelEntity == Entity.Null)
                 return;
@@ -371,3 +373,4 @@ namespace SweepNDodge.DotsBullets
     }
 
 }
+
