@@ -75,10 +75,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 var sourceA = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1001u, c => c.Value);
                 var sourceB = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1002u, c => c.Value);
                 var deposit = FindByStableId<DepositStableIdComponent>(em, depositEntities, 2001u, c => c.Value);
+                var lifecycle = em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em));
 
                 Assert.That(em.IsEnabled(sourceA), Is.True);
                 Assert.That(em.IsEnabled(sourceB), Is.True);
                 Assert.That(em.IsEnabled(deposit), Is.True);
+                Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(1u));
+                AssertTopologyOwned(em, sourceA, StageTopologyKind.Source, 1u);
+                AssertTopologyOwned(em, sourceB, StageTopologyKind.Source, 1u);
+                AssertTopologyOwned(em, deposit, StageTopologyKind.Deposit, 1u);
                 Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceA).Length, Is.GreaterThan(0));
                 Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceB).Length, Is.GreaterThan(0));
                 Assert.That(em.GetComponentData<DepositPointComponent>(deposit).Radius, Is.GreaterThan(0f));
@@ -120,13 +125,45 @@ namespace SweepNDodge.DotsBullets.Tests
                 SetSingleton(em, default(StageTopologyRequestComponent));
 
                 ApplyStage(world, 1);
+                using var initialSourceQuery = em.CreateEntityQuery(new EntityQueryDesc
+                {
+                    All = new[]
+                    {
+                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                        ComponentType.ReadOnly<StageTopologySourceTag>(),
+                    },
+                    Options = EntityQueryOptions.IncludeDisabledEntities,
+                });
+                using var initialSources = initialSourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+                using var initialDepositQuery = em.CreateEntityQuery(new EntityQueryDesc
+                {
+                    All = new[]
+                    {
+                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                        ComponentType.ReadOnly<StageTopologyDepositTag>(),
+                    },
+                    Options = EntityQueryOptions.IncludeDisabledEntities,
+                });
+                using var initialDeposits = initialDepositQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+                var sourceEntityA = initialSources[0];
+                var sourceEntityB = initialSources[1];
+                var depositEntity = initialDeposits[0];
                 AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 2, expectedDepositTotal: 1, expectedDepositEnabled: 1);
+                Assert.That(em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em)).CurrentAppliedVersion, Is.EqualTo(1u));
 
                 ApplyStage(world, 2);
                 AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 1, expectedDepositTotal: 1, expectedDepositEnabled: 1);
+                Assert.That(em.Exists(sourceEntityA), Is.True);
+                Assert.That(em.Exists(sourceEntityB), Is.True);
+                Assert.That(em.Exists(depositEntity), Is.True);
+                Assert.That(em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em)).CurrentAppliedVersion, Is.EqualTo(2u));
 
                 ApplyStage(world, 1);
                 AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 2, expectedDepositTotal: 1, expectedDepositEnabled: 1);
+                Assert.That(em.Exists(sourceEntityA), Is.True);
+                Assert.That(em.Exists(sourceEntityB), Is.True);
+                Assert.That(em.Exists(depositEntity), Is.True);
+                Assert.That(em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em)).CurrentAppliedVersion, Is.EqualTo(3u));
             }
             finally
             {
@@ -302,9 +339,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 ApplyStage(world, 2);
 
                 var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                var lifecycleState = em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em));
                 Assert.That(topologyState.SelectedStageId, Is.EqualTo(2));
                 Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
                 Assert.That(topologyState.Ready, Is.EqualTo(0));
+                Assert.That(lifecycleState.CurrentAppliedVersion, Is.EqualTo(1u));
                 Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
                 Assert.That(IsEnabledDepositStableIdPresent(em, 2001u), Is.True);
                 Assert.That(IsEnabledSourceStableIdPresent(em, 1101u), Is.False);
@@ -509,11 +548,27 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             if (!em.HasComponent<StageTopologyOwnedTag>(entity))
                 em.AddComponent<StageTopologyOwnedTag>(entity);
+            if (!em.HasComponent<StageTopologyOwnedComponent>(entity))
+            {
+                em.AddComponentData(entity, new StageTopologyOwnedComponent
+                {
+                    Kind = StageTopologyKind.Source,
+                    LastAppliedVersion = 0u,
+                });
+            }
             if (!em.HasComponent<StageTopologySourceTag>(entity))
                 em.AddComponent<StageTopologySourceTag>(entity);
             if (em.HasComponent<StageTopologyDepositTag>(entity))
                 em.RemoveComponent<StageTopologyDepositTag>(entity);
             em.SetComponentData(entity, new SourceStableIdComponent { Value = stableId });
+        }
+
+        private static void AssertTopologyOwned(EntityManager em, Entity entity, StageTopologyKind expectedKind, uint expectedVersion)
+        {
+            Assert.That(em.HasComponent<StageTopologyOwnedComponent>(entity), Is.True);
+            var owned = em.GetComponentData<StageTopologyOwnedComponent>(entity);
+            Assert.That(owned.Kind, Is.EqualTo(expectedKind));
+            Assert.That(owned.LastAppliedVersion, Is.EqualTo(expectedVersion));
         }
 
         private static void AssertOwnedCounts(EntityManager em, int expectedSourceTotal, int expectedSourceEnabled, int expectedDepositTotal, int expectedDepositEnabled)
@@ -564,6 +619,8 @@ namespace SweepNDodge.DotsBullets.Tests
             var world = new World(worldName);
             var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
             DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
+            var lifecycleEntity = world.EntityManager.CreateEntity(typeof(StageTopologyLifecycleStateComponent));
+            world.EntityManager.SetComponentData(lifecycleEntity, default(StageTopologyLifecycleStateComponent));
             return world;
         }
 

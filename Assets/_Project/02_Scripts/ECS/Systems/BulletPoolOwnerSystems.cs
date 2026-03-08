@@ -273,6 +273,12 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, default(StageTopologyStateComponent));
             }
 
+            if (!HasSingleton<StageTopologyLifecycleStateComponent>(em))
+            {
+                var e = em.CreateEntity(typeof(StageTopologyLifecycleStateComponent));
+                em.SetComponentData(e, default(StageTopologyLifecycleStateComponent));
+            }
+
             if (!HasSingleton<RunDirectorStageSignalComponent>(em))
             {
                 var e = em.CreateEntity(typeof(RunDirectorStageSignalComponent));

@@ -23,6 +23,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<StageTopologyRequestComponent>();
             state.RequireForUpdate<StageTopologyStateComponent>();
+            state.RequireForUpdate<StageTopologyLifecycleStateComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
             state.RequireForUpdate<StageCatalogRuntimeComponent>();
             state.RequireForUpdate<StageTopologyPrefabCatalogComponent>();
@@ -93,8 +94,18 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            ApplySourceTopology(ref state, requestedStageId, prefabs.SourceTemplate, entry.Layout, entry.Definition);
-            ApplyDepositTopology(ref state, requestedStageId, prefabs.DepositTemplate, entry.Layout);
+            var lifecycleStateEntity = SystemAPI.GetSingletonEntity<StageTopologyLifecycleStateComponent>();
+            var lifecycleState = em.GetComponentData<StageTopologyLifecycleStateComponent>(lifecycleStateEntity);
+            uint currentApplyVersion = lifecycleState.CurrentAppliedVersion + 1u;
+            if (currentApplyVersion == 0u)
+                currentApplyVersion = 1u;
+
+            ApplySourceTopology(ref state, requestedStageId, prefabs.SourceTemplate, entry.Layout, entry.Definition, currentApplyVersion);
+            ApplyDepositTopology(ref state, requestedStageId, prefabs.DepositTemplate, entry.Layout, currentApplyVersion);
+            CleanupUnmappedOwnedEntities(em, currentApplyVersion);
+
+            lifecycleState.CurrentAppliedVersion = currentApplyVersion;
+            em.SetComponentData(lifecycleStateEntity, lifecycleState);
 
             topologyState = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
             topologyState.SelectedStageId = requestedStageId;
@@ -212,7 +223,8 @@ namespace SweepNDodge.DotsBullets
             int stageId,
             Entity sourceTemplate,
             StageLayoutSO layout,
-            StageDefinitionSO definition)
+            StageDefinitionSO definition,
+            uint currentApplyVersion)
         {
             var em = state.EntityManager;
             var layoutById = BuildStageSourceMap(layout != null ? layout.Sources : null, out int layoutDuplicateCount);
@@ -299,7 +311,10 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 if (em.IsEnabled(sourceEntity))
+                {
+                    StampTopologyOwnedEntity(em, sourceEntity, StageTopologyKind.Source, currentApplyVersion);
                     mappedEntities.Add(sourceEntity);
+                }
             }
 
             for (int i = 0; i < sourceEntities.Length; i++)
@@ -316,7 +331,8 @@ namespace SweepNDodge.DotsBullets
             ref SystemState state,
             int stageId,
             Entity depositTemplate,
-            StageLayoutSO layout)
+            StageLayoutSO layout,
+            uint currentApplyVersion)
         {
             var em = state.EntityManager;
             var layoutById = BuildStageDepositMap(layout != null ? layout.Deposits : null, out int layoutDuplicateCount);
@@ -373,6 +389,7 @@ namespace SweepNDodge.DotsBullets
                 EnsureDepositTags(em, depositEntity);
                 em.SetComponentData(depositEntity, new DepositStableIdComponent { Value = stableId });
                 ApplyDeposit(em, depositEntity, layoutData);
+                StampTopologyOwnedEntity(em, depositEntity, StageTopologyKind.Deposit, currentApplyVersion);
                 mappedEntities.Add(depositEntity);
             }
 
@@ -480,6 +497,7 @@ namespace SweepNDodge.DotsBullets
         {
             if (!em.HasComponent<StageTopologyOwnedTag>(entity))
                 em.AddComponent<StageTopologyOwnedTag>(entity);
+            EnsureOwnedMetadata(em, entity, StageTopologyKind.Source);
             if (!em.HasComponent<StageTopologySourceTag>(entity))
                 em.AddComponent<StageTopologySourceTag>(entity);
             if (em.HasComponent<StageTopologyDepositTag>(entity))
@@ -490,10 +508,79 @@ namespace SweepNDodge.DotsBullets
         {
             if (!em.HasComponent<StageTopologyOwnedTag>(entity))
                 em.AddComponent<StageTopologyOwnedTag>(entity);
+            EnsureOwnedMetadata(em, entity, StageTopologyKind.Deposit);
             if (!em.HasComponent<StageTopologyDepositTag>(entity))
                 em.AddComponent<StageTopologyDepositTag>(entity);
             if (em.HasComponent<StageTopologySourceTag>(entity))
                 em.RemoveComponent<StageTopologySourceTag>(entity);
+        }
+
+        private static void EnsureOwnedMetadata(EntityManager em, Entity entity, StageTopologyKind kind)
+        {
+            if (!em.HasComponent<StageTopologyOwnedComponent>(entity))
+            {
+                em.AddComponentData(entity, new StageTopologyOwnedComponent
+                {
+                    Kind = kind,
+                    LastAppliedVersion = 0u,
+                });
+                return;
+            }
+
+            var owned = em.GetComponentData<StageTopologyOwnedComponent>(entity);
+            owned.Kind = kind;
+            em.SetComponentData(entity, owned);
+        }
+
+        private static void StampTopologyOwnedEntity(EntityManager em, Entity entity, StageTopologyKind kind, uint currentApplyVersion)
+        {
+            EnsureOwnedMetadata(em, entity, kind);
+            var owned = em.GetComponentData<StageTopologyOwnedComponent>(entity);
+            owned.Kind = kind;
+            owned.LastAppliedVersion = currentApplyVersion;
+            em.SetComponentData(entity, owned);
+        }
+
+        private static void CleanupUnmappedOwnedEntities(EntityManager em, uint currentApplyVersion)
+        {
+            using var ownedQuery = em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var ownedEntities = ownedQuery.ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < ownedEntities.Length; i++)
+            {
+                var entity = ownedEntities[i];
+                if (!em.Exists(entity))
+                    continue;
+
+                if (!em.HasComponent<StageTopologyOwnedComponent>(entity))
+                {
+                    em.SetEnabled(entity, false);
+                    continue;
+                }
+
+                var owned = em.GetComponentData<StageTopologyOwnedComponent>(entity);
+                if (owned.LastAppliedVersion == currentApplyVersion)
+                    continue;
+
+                switch (owned.Kind)
+                {
+                    case StageTopologyKind.Source:
+                        DisableSourceInstance(em, entity);
+                        break;
+                    case StageTopologyKind.Deposit:
+                        DisableDepositInstance(em, entity);
+                        break;
+                    default:
+                        em.SetEnabled(entity, false);
+                        break;
+                }
+            }
         }
 
         private static Dictionary<uint, StageSourceLayoutData> BuildStageSourceMap(StageSourceLayoutData[] sources, out int duplicateCount)
@@ -846,12 +933,6 @@ namespace SweepNDodge.DotsBullets
 
             using var entities = query.ToEntityArray(Allocator.Temp);
             return entities.Length > 0 ? entities[0] : Entity.Null;
-        }
-
-        private enum StageTopologyKind : byte
-        {
-            Source = 0,
-            Deposit = 1,
         }
     }
 }

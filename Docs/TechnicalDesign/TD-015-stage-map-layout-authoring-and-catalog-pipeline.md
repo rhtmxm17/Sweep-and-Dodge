@@ -141,10 +141,17 @@
   - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 layout+definition 결합 적용
   - `Deposit`은 layout 적용
+  - owned entity 공통 메타
+    - `StageTopologyOwnedComponent.Kind`
+    - `StageTopologyOwnedComponent.LastAppliedVersion`
+  - lifecycle singleton
+    - `StageTopologyLifecycleStateComponent.CurrentAppliedVersion`
+  - 성공 apply에서만 `CurrentAppliedVersion`을 증가시키고, 이번 version에 stamp되지 않은 owned entity는 `disable-to-pool`로 정리한다.
   - 성공 apply 후 현재 stage에 매핑되지 않은 owned entity는 `disable-to-pool`로 전환한다.
   - infrastructure failure(`StageCatalog`/entry/layout/template/instantiate 실패)에서는 기존 applied topology를 유지하고 `SelectedStageId`에 대해서만 `Ready=0`을 남긴다.
   - definition/source mismatch, duplicate stable id, active=false는 `warn + partial apply`로 처리하고 stage 전체 `Ready`는 유지한다.
   - `OnStateEnterOnce`는 initial apply 직후 자동 발화하지 않음
+  - 현재 지원 topology kind는 `Source`, `Deposit`뿐이며, `StageTopologyPrefabCatalogSO`도 동일하게 `SourceTemplatePrefab`, `DepositTemplatePrefab`만 필수 필드로 가진다.
 
 ## 8. 검증 계획 / 합격 기준
 - 공통

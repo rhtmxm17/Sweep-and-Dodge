@@ -80,8 +80,27 @@ namespace SweepNDodge.DotsBullets
         public Entity DepositTemplate;
     }
 
+    public enum StageTopologyKind : byte
+    {
+        Source = 0,
+        Deposit = 1,
+        Obstacle = 2,
+        Visual = 3,
+    }
+
+    public struct StageTopologyLifecycleStateComponent : IComponentData
+    {
+        public uint CurrentAppliedVersion;
+    }
+
     public struct StageTopologyOwnedTag : IComponentData
     {
+    }
+
+    public struct StageTopologyOwnedComponent : IComponentData
+    {
+        public StageTopologyKind Kind;
+        public uint LastAppliedVersion;
     }
 
     public struct StageTopologySourceTag : IComponentData

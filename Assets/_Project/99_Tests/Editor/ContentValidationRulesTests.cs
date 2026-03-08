@@ -48,6 +48,68 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageTopologyPrefabCatalog_WithMissingSourceTemplate_IsError()
+        {
+            var catalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
+            catalog.DepositTemplatePrefab = new GameObject("deposit_template");
+
+            try
+            {
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    new List<ContentValidationRecord<StageTopologyPrefabCatalogSO>>
+                    {
+                        new ContentValidationRecord<StageTopologyPrefabCatalogSO>(catalog, "topology_catalog"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV030").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(catalog.DepositTemplatePrefab);
+                Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyPrefabCatalog_WithMissingDepositTemplate_IsError()
+        {
+            var catalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
+            catalog.SourceTemplatePrefab = new GameObject("source_template");
+
+            try
+            {
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    new List<ContentValidationRecord<StageTopologyPrefabCatalogSO>>
+                    {
+                        new ContentValidationRecord<StageTopologyPrefabCatalogSO>(catalog, "topology_catalog"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                var errors = issues.Where(i => i.Code == "CV031").ToArray();
+                Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+                Assert.That(errors.All(i => i.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(catalog.SourceTemplatePrefab);
+                Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
         public void AutoCorrectionInputs_AreReportedAsWarningsOnly()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();

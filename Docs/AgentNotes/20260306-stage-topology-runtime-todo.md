@@ -68,13 +68,24 @@
   - topology apply 실패 시 현재 stage 유지 원칙이 검증으로 닫힘
 
 ### H4. topology template catalog 일반화 준비
-- 상태: 다음 우선순위
+- 상태: 완료
 - 목표
   - `StageTopologyPrefabCatalogSO`를 이후 `Obstacle / Visual` 확장 가능한 형태로 정리한다.
-- 작업
-  - 현재는 kind별 단일 template라는 사실을 명시
-  - 이후 추가될 topology kind를 위한 필드/검증 규칙 방향만 정리
-  - null template / unsupported kind / kind-specific optionality 정책 정의
+- 반영 내용
+  - `StageTopologyPrefabCatalogSO`는 리스트형으로 바꾸지 않고 `SourceTemplatePrefab`, `DepositTemplatePrefab` 고정 필드를 유지
+  - 공통 topology 메타 도입
+    - `StageTopologyKind`
+    - `StageTopologyOwnedComponent.Kind`
+    - `StageTopologyOwnedComponent.LastAppliedVersion`
+  - lifecycle singleton 도입
+    - `StageTopologyLifecycleStateComponent.CurrentAppliedVersion`
+  - 성공 apply에서만 version 증가, stamp되지 않은 owned entity는 `disable-to-pool`
+  - `TemplateRevision`, `OwnerToken`, 공통 `StableId`는 도입하지 않음
+  - `StageTopologyPrefabCatalogSO` content validation 추가
+    - `SourceTemplatePrefab`, `DepositTemplatePrefab` null만 오류로 취급
+- 완료 기준 판정
+  - 이후 `Obstacle / Visual` 확장 시에도 catalog shape 자체는 explicit field add 방식으로 확장 가능
+  - 공통 lifecycle stamp가 코드/테스트/TD에 반영됨
 
 ### H5. 문서 / ADR / 테스트 재정렬
 - 상태: H4와 병행 또는 직후
@@ -90,30 +101,19 @@
     - owned entity lifecycle/reuse
 
 ## 검증 상태
-- compile: 통과
-- console error: 0
-- EditMode: `132 passed / 0 failed`
-- PlayMode: `16 passed / 0 failed`
+- compile: H4 반영 후 재검증 예정
+- console error: H4 반영 후 재검증 예정
+- EditMode: H4 반영 후 재검증 예정
+- PlayMode: H4 반영 후 재검증 예정
 
-## 다음 작업 계획(H4/H5 요약)
-1. topology template catalog 일반화 경계 확정
-- `Source 1종 / Deposit 1종` 고정 계약을 명시적인 v1 제한으로 문서화
-- 이후 `Obstacle / Visual` 확장을 위해 catalog 필드/검증 규칙의 최소 단위를 설계
-- `unsupported kind`, `null template`, `kind-specific optionality` 처리 방침을 고정
-
-2. topology kind 확장 전 공통 메타 필요성 재평가
-- `kind enum`
-- template revision
-- owner token
-- 위 항목이 실제로 필요한지, 아니면 과설계인지 판단
-
-3. 문서 / ADR / 테스트 재정렬
+## 다음 작업 계획(H5 요약)
+1. 문서 / ADR / 테스트 재정렬
 - `TD-015`의 topology layer 섹션 구조 정리
 - `TD-010`의 bridge / ready gate / boundary-only apply 계약 정리
 - 필요 시 `template catalog generalization` ADR 추가 여부 판단
 - 테스트 축을 `boundary / lifecycle / failure / template resolution` 관점으로 재정리
 
-4. `Obstacle / Visual` 설계 진입 조건 정리
+2. `Obstacle / Visual` 설계 진입 조건 정리
 - H4/H5 결과를 SSOT로 고정한 뒤에만 `Obstacle / Visual topology` 설계로 진입
 - 즉, 다음 확장은 구현보다 계약 정리가 먼저다
 
@@ -124,13 +124,9 @@
 - 운영 빌드 fail-fast 정책 변경
 
 ## 설계 논의에서 남은 확정 항목
-1. topology-owned entity 공통 메타가 필요한지
-   - kind enum
-   - template revision
-   - owner token
-2. failure policy에서 “이전 stage topology 유지 vs 전부 비활성화” 기준
-3. H4에서 multi-kind template catalog의 최소 필드 수준
-4. ADR 신규 작성 여부
+1. H5에서 별도 ADR이 필요한지
+2. `Obstacle / Visual` 확장 시 `StageTopologyKind`에 값을 즉시 사용할지, 구현 시점에 문서상 활성화할지
+3. explicit field add 방식의 catalog 확장을 어느 시점에 문서로 고정할지
 
 ## 체크 포인트
 - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd` 계약 유지
@@ -143,6 +139,6 @@
 - `H1`은 완료됐다.
 - `H2`는 완료됐다.
 - `H3`는 완료됐다.
-- 다음 단계는 `H4: template catalog 일반화 준비`다.
-- `H5: 문서/ADR/테스트 재정렬`은 H4와 병행 또는 직후에 수행한다.
+- `H4`는 완료됐다.
+- 다음 단계는 `H5: 문서/ADR/테스트 재정렬`이다.
 - `Obstacle / Visual topology` 설계는 H4/H5 산출물이 고정된 뒤에 시작한다.
