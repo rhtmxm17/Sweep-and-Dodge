@@ -249,6 +249,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 300,
                 "RunDirector stage singleton setup was not ready within timeout.");
 
+            ResetStageFlowStateForOperationalScene(em);
+
             yield return WaitForCondition(
                 () => FindDemoShell() != null,
                 240,
@@ -1172,6 +1174,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
             if (scenePath == OperationalScenePath)
             {
+                ResetStageFlowStateForOperationalScene(em);
+
                 DemoShellFlowController shell = null;
                 yield return WaitForCondition(
                     () =>
@@ -1489,6 +1493,58 @@ namespace SweepNDodge.DotsBullets.Tests
             em.CompleteAllTrackedJobs();
         }
 
+
+        private static void ResetStageFlowStateForOperationalScene(EntityManager em)
+        {
+            if (HasSingleton<RunDirectorStageStateComponent>(em))
+            {
+                var stageEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
+                em.SetComponentData(stageEntity, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                    StateElapsedSec = 0f,
+                    EnteredFrame = 0u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+                });
+            }
+
+            if (HasSingleton<RunDirectorStageGateComponent>(em))
+            {
+                var gateEntity = GetSingletonEntity<RunDirectorStageGateComponent>(em);
+                em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
+                {
+                    IntroPresentationDone = 0,
+                    ClearPresentationDone = 0,
+                    MinIdleDurationElapsed = 1,
+                    AutoAdvanceTimeoutElapsed = 0,
+                });
+            }
+
+            if (HasSingleton<RunDirectorStageRequestComponent>(em))
+            {
+                var requestEntity = GetSingletonEntity<RunDirectorStageRequestComponent>(em);
+                em.SetComponentData(requestEntity, default(RunDirectorStageRequestComponent));
+            }
+
+            if (HasSingleton<RunDirectorStageSignalComponent>(em))
+            {
+                var signalEntity = GetSingletonEntity<RunDirectorStageSignalComponent>(em);
+                em.SetComponentData(signalEntity, default(RunDirectorStageSignalComponent));
+            }
+
+            if (HasSingleton<StageTopologyRequestComponent>(em))
+            {
+                var topologyRequestEntity = GetSingletonEntity<StageTopologyRequestComponent>(em);
+                em.SetComponentData(topologyRequestEntity, default(StageTopologyRequestComponent));
+            }
+
+            if (HasSingleton<StageTopologyStateComponent>(em))
+            {
+                var topologyStateEntity = GetSingletonEntity<StageTopologyStateComponent>(em);
+                em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
+            }
+        }
+
         private static void ForceStageStateToClearReady(EntityManager em)
         {
             var stageEntity = GetSingletonEntity<RunDirectorStageStateComponent>(em);
@@ -1641,6 +1697,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
+
+
 
 
 

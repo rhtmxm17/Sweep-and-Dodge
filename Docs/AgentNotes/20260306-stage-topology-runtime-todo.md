@@ -43,22 +43,32 @@
   - legacy 타입은 한 페이즈 동안 migration wrapper로만 남아 있음
 
 ### H3. topology-owned lifecycle 규칙 고정
-- 상태: 다음 우선순위
-- 목표
-  - 이후 `Obstacle / Visual`이 같은 규칙으로 붙을 수 있게 공통 lifecycle 계약을 만든다.
-- 작업
-  - 공통 태그/식별/재사용 규칙 문서화
-    - create
-    - reuse
-    - disable-to-pool
-    - stable id overwrite
-    - stage change cleanup
-  - extras disable 정책과 재사용 우선순위 명시
-  - topology apply 실패 시 이전 stage owned entity를 어떻게 유지/비활성화할지 정책 고정
-  - `warn + partial apply`와 `Ready=0 hard gate` 경계 사례를 표로 정리
+- 상태: 완료
+- 반영 내용
+  - topology apply를 `boundary-only`로 고정
+    - 허용: `Idle`, `Completed`, 초기 부트스트랩 경계
+    - 비허용: `Running`, `ClearReady`
+  - 장주기 스테이지(2분+) 안정성 우선 규칙 반영
+    - mid-run topology reapply는 거부
+    - retry / next / lobby return만 정식 재진입 경로로 간주
+  - lifecycle/failure policy 고정
+    - `instantiate -> reuse -> mapped-active -> pooled-disabled`
+    - 성공 apply 후 extras는 `disable-to-pool`
+    - 실패 apply 시 기존 applied topology 유지
+    - infra failure는 `Ready=0 hard gate`
+    - definition/source mismatch는 `warn + partial apply`
+  - 관련 ADR/TD 반영
+    - `ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md`
+    - `TD-010`, `TD-015`
+  - H3 검증 보강 및 회귀 수정
+    - EditMode/PlayMode 테스트 추가
+    - operational scene PlayMode state reset helper 정리
+- 완료 기준 판정
+  - long-cycle stage 전제를 둔 topology lifecycle/failure policy가 코드/TD/ADR/테스트에 일치함
+  - topology apply 실패 시 현재 stage 유지 원칙이 검증으로 닫힘
 
 ### H4. topology template catalog 일반화 준비
-- 상태: H3 이후
+- 상태: 다음 우선순위
 - 목표
   - `StageTopologyPrefabCatalogSO`를 이후 `Obstacle / Visual` 확장 가능한 형태로 정리한다.
 - 작업
@@ -67,7 +77,7 @@
   - null template / unsupported kind / kind-specific optionality 정책 정의
 
 ### H5. 문서 / ADR / 테스트 재정렬
-- 상태: 일부 선반영, 최종 정리는 H3~H4 이후
+- 상태: H4와 병행 또는 직후
 - 작업
   - `TD-015`에 topology layer 책임을 별도 섹션으로 승격
   - `TD-010`에 `RunDirector`와 topology의 경계, ready gate, request 분리 규칙을 유지 갱신
@@ -79,23 +89,33 @@
     - template resolve failure
     - owned entity lifecycle/reuse
 
-## 다음 작업 계획(H3 요약)
-1. topology-owned lifecycle 공통 규칙 확정
-- `Source / Deposit / Obstacle / Visual` 공통으로 적용 가능한 create / reuse / disable-to-pool / cleanup 규칙을 고정
-- stable id overwrite, disabled pool 재사용 우선순위, stage change cleanup 기준을 문서/테스트로 명시
+## 검증 상태
+- compile: 통과
+- console error: 0
+- EditMode: `132 passed / 0 failed`
+- PlayMode: `16 passed / 0 failed`
 
-2. failure policy 경계 정리
-- `Ready=0 hard gate`와 `warn + partial apply`의 구분 기준을 표로 정리
-- topology apply 실패 시 이전 stage owned entity를 유지할지, 전부 disable할지 정책을 확정
+## 다음 작업 계획(H4/H5 요약)
+1. topology template catalog 일반화 경계 확정
+- `Source 1종 / Deposit 1종` 고정 계약을 명시적인 v1 제한으로 문서화
+- 이후 `Obstacle / Visual` 확장을 위해 catalog 필드/검증 규칙의 최소 단위를 설계
+- `unsupported kind`, `null template`, `kind-specific optionality` 처리 방침을 고정
 
-3. 테스트 축 보강
-- owned entity lifecycle/reuse
-- topology apply failure / recovery
-- retry / next / re-enter 시 topology state 일관성
+2. topology kind 확장 전 공통 메타 필요성 재평가
+- `kind enum`
+- template revision
+- owner token
+- 위 항목이 실제로 필요한지, 아니면 과설계인지 판단
 
-4. 문서 반영 준비
-- `TD-015`, `TD-010`에 lifecycle/failure policy를 반영할 초안 정리
-- 필요 시 hardening 결정용 ADR 추가 여부 판단
+3. 문서 / ADR / 테스트 재정렬
+- `TD-015`의 topology layer 섹션 구조 정리
+- `TD-010`의 bridge / ready gate / boundary-only apply 계약 정리
+- 필요 시 `template catalog generalization` ADR 추가 여부 판단
+- 테스트 축을 `boundary / lifecycle / failure / template resolution` 관점으로 재정리
+
+4. `Obstacle / Visual` 설계 진입 조건 정리
+- H4/H5 결과를 SSOT로 고정한 뒤에만 `Obstacle / Visual topology` 설계로 진입
+- 즉, 다음 확장은 구현보다 계약 정리가 먼저다
 
 ## 범위 밖
 - `Obstacle / Visual topology` 실제 instantiate/reconcile 구현
@@ -122,5 +142,7 @@
 ## 현재 결론
 - `H1`은 완료됐다.
 - `H2`는 완료됐다.
-- 다음 단계는 `H3: topology-owned lifecycle / failure policy 고정`이다.
-- 그 다음에 `H4 template catalog 일반화`, `H5 문서/ADR/테스트 재정렬` 순서로 진행한다.
+- `H3`는 완료됐다.
+- 다음 단계는 `H4: template catalog 일반화 준비`다.
+- `H5: 문서/ADR/테스트 재정렬`은 H4와 병행 또는 직후에 수행한다.
+- `Obstacle / Visual topology` 설계는 H4/H5 산출물이 고정된 뒤에 시작한다.

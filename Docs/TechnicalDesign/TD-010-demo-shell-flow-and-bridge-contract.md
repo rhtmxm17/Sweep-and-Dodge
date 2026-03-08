@@ -4,14 +4,14 @@
 - doc_id: `TD-010`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-07`
+- last_updated: `2026-03-08`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](./TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
-
+  - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
 > DemoShell은 화면 전이 Owner를 유지하고, topology 입력은 `StageTopologyBridge`, stage state 입력은 `RunDirectorStageBridge`를 통해 ECS에 전달한다. 현재 런타임은 `StageCatalogSO + StageTopologyPrefabCatalog`를 publish하며, topology apply one-shot의 정식 API는 `StageTopologyBridge.RequestTopologyApply(stageId)`다.
 
 ## 1. 목표 / 비목표
@@ -46,6 +46,10 @@
   1. `StageTopologyBridge.RequestTopologyApply(stageId)` 성공
   2. `SetIntroPresentationDone(true)` + `SetClearPresentationDone(false)`
   3. `RequestStageStart()`
+- H3 long-cycle 규칙
+  - topology apply는 stage 경계(`Idle`, `Completed`, 초기 부트스트랩)에서만 허용한다.
+  - `Running`, `ClearReady` 중 topology apply 요청은 warning 후 무시되고 현재 stage topology는 유지된다.
+  - 2분 이상 장주기 스테이지를 기준으로 mid-run topology reapply는 지원하지 않는다.
 - `DemoShellFlowController`는 ECS 직접 write 금지
 
 ## 4. 데이터 구조 및 입력 계약
@@ -105,5 +109,9 @@
 ## 8. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
+- [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
+
+
+
 
 

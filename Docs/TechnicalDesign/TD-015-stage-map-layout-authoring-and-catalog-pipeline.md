@@ -4,13 +4,13 @@
 - doc_id: `TD-015`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-07`
+- last_updated: `2026-03-08`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
-
+  - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
 > 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyApplyExecutionBeginSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve하고, `Source/Deposit` topology를 runtime template reconcile로 생성/재사용한 뒤 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
 
 ## 1. 목표 / 비목표
@@ -51,6 +51,10 @@
   - `BulletPoolOwnerBootstrapSystem`
   - `StageTopologyApplyExecutionBeginSystem`
   - `BulletFieldAreaUpdateSystem`
+- H3 boundary-only apply 계약
+  - topology apply는 `Idle`, `Completed`, 초기 비플레이 경계에서만 허용한다.
+  - `Running`, `ClearReady` 중 요청은 warning 후 consume만 하고 현재 topology/state는 유지한다.
+  - 장주기 스테이지(2분+) 안정성을 위해 mid-run topology reapply는 지원하지 않는다.
 
 ## 5. 데이터 구조 / 제약
 ### 5.1 SO 계약
@@ -137,6 +141,9 @@
   - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 layout+definition 결합 적용
   - `Deposit`은 layout 적용
+  - 성공 apply 후 현재 stage에 매핑되지 않은 owned entity는 `disable-to-pool`로 전환한다.
+  - infrastructure failure(`StageCatalog`/entry/layout/template/instantiate 실패)에서는 기존 applied topology를 유지하고 `SelectedStageId`에 대해서만 `Ready=0`을 남긴다.
+  - definition/source mismatch, duplicate stable id, active=false는 `warn + partial apply`로 처리하고 stage 전체 `Ready`는 유지한다.
   - `OnStateEnterOnce`는 initial apply 직후 자동 발화하지 않음
 
 ## 8. 검증 계획 / 합격 기준
@@ -161,6 +168,10 @@
 ## 9. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
+- [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
+
+
+
 
 
 

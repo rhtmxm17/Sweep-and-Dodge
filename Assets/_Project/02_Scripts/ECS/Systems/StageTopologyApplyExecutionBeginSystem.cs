@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -23,6 +23,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<StageTopologyRequestComponent>();
             state.RequireForUpdate<StageTopologyStateComponent>();
+            state.RequireForUpdate<RunDirectorStageStateComponent>();
             state.RequireForUpdate<StageCatalogRuntimeComponent>();
             state.RequireForUpdate<StageTopologyPrefabCatalogComponent>();
         }
@@ -42,8 +43,14 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(requestEntity, request);
 
             int requestedStageId = request.RequestedStageId;
+            var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
             var topologyStateEntity = SystemAPI.GetSingletonEntity<StageTopologyStateComponent>();
             var topologyState = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
+            if (!IsApplyBoundaryState(stageState.State, topologyState))
+            {
+                Debug.LogWarning($"[StageTopologyApply] Ignored topology apply outside stage boundary. stageId={requestedStageId}, stageState={stageState.State}");
+                return;
+            }
             topologyState.SelectedStageId = requestedStageId;
             topologyState.Ready = 0;
             em.SetComponentData(topologyStateEntity, topologyState);
@@ -94,6 +101,17 @@ namespace SweepNDodge.DotsBullets
             topologyState.AppliedStageId = requestedStageId;
             topologyState.Ready = 1;
             em.SetComponentData(topologyStateEntity, topologyState);
+        }
+
+        private static bool IsApplyBoundaryState(RunDirectorStageStateId state, StageTopologyStateComponent topologyState)
+        {
+            if (state == RunDirectorStageStateId.Idle || state == RunDirectorStageStateId.Completed)
+                return true;
+
+            return state == RunDirectorStageStateId.Running
+                && topologyState.SelectedStageId <= 0
+                && topologyState.AppliedStageId <= 0
+                && topologyState.Ready == 0;
         }
 
         private static bool TryGetTopologyPrefabCatalog(ref SystemState state, out StageTopologyPrefabCatalogComponent prefabs)
@@ -837,3 +855,7 @@ namespace SweepNDodge.DotsBullets
         }
     }
 }
+
+
+
+

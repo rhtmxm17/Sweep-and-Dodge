@@ -1,10 +1,11 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using NUnit.Framework;
 using Unity.Core;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -32,6 +33,10 @@ namespace SweepNDodge.DotsBullets.Tests
                     ApplyRequested = 1,
                 });
                 SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
 
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
                 world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
@@ -108,6 +113,10 @@ namespace SweepNDodge.DotsBullets.Tests
                     DepositTemplate = CreateDepositTemplate(em),
                 });
                 SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
                 SetSingleton(em, default(StageTopologyRequestComponent));
 
                 ApplyStage(world, 1);
@@ -161,6 +170,10 @@ namespace SweepNDodge.DotsBullets.Tests
                     ApplyRequested = 1,
                 });
                 SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
 
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
                 world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
@@ -186,6 +199,170 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(em.IsEnabled(bound), Is.True);
                 Assert.That(em.IsEnabled(missing), Is.False);
                 Assert.That(em.GetBuffer<SourceClipPatternBuffer>(missing).Length, Is.EqualTo(0));
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [TestCase(RunDirectorStageStateId.Running)]
+        [TestCase(RunDirectorStageStateId.ClearReady)]
+        public void StageTopologyApply_IgnoresRequest_OutsideBoundary_AndKeepsCurrentTopology(RunDirectorStageStateId blockedState)
+        {
+            using var world = CreateDefaultTestWorld($"StageTopologyWorld_Blocked_{blockedState}");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+                createdAssets.Add(catalog);
+                catalog.Entries = new[]
+                {
+                    CreateEntry(createdAssets, 1, new uint[] { 1001u, 1002u }, new uint[] { 2001u }),
+                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }),
+                };
+
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+                SetSingleton(em, default(StageTopologyRequestComponent));
+
+                ApplyStage(world, 1);
+                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
+                Assert.That(IsEnabledSourceStableIdPresent(em, 1101u), Is.False);
+
+                SetStageState(em, blockedState);
+                LogAssert.Expect(LogType.Warning, $"[StageTopologyApply] Ignored topology apply outside stage boundary. stageId=2, stageState={blockedState}");
+                ApplyStage(world, 2);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
+                Assert.That(IsEnabledSourceStableIdPresent(em, 1101u), Is.False);
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_InfrastructureFailure_KeepsPreviouslyAppliedTopology_AndMarksNewSelectionNotReady()
+        {
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_FailureKeep");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+                createdAssets.Add(catalog);
+                catalog.Entries = new[]
+                {
+                    CreateEntry(createdAssets, 1, new uint[] { 1001u }, new uint[] { 2001u }),
+                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }),
+                };
+
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+                SetSingleton(em, default(StageTopologyRequestComponent));
+
+                ApplyStage(world, 1);
+                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
+                Assert.That(IsEnabledDepositStableIdPresent(em, 2001u), Is.True);
+
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = Entity.Null,
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+
+                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Source template prefab is missing. stageId=2");
+                ApplyStage(world, 2);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                Assert.That(topologyState.SelectedStageId, Is.EqualTo(2));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.Ready, Is.EqualTo(0));
+                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
+                Assert.That(IsEnabledDepositStableIdPresent(em, 2001u), Is.True);
+                Assert.That(IsEnabledSourceStableIdPresent(em, 1101u), Is.False);
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_DuplicateActiveRuntimeStableId_DisablesDuplicatePoolEntries_AndKeepsReady()
+        {
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_DuplicateRuntime");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var catalog = CreateStageCatalog(createdAssets, stageId: 1, sourceStableIds: new uint[] { 1001u }, depositStableIds: new uint[] { 2001u });
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+                SetSingleton(em, new StageTopologyRequestComponent
+                {
+                    RequestedStageId = 1,
+                    ApplyRequested = 1,
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+
+                var duplicateA = CreateSourceTemplate(em);
+                EnsureOwnedSource(em, duplicateA, 1001u);
+                em.SetEnabled(duplicateA, true);
+
+                var duplicateB = CreateSourceTemplate(em);
+                EnsureOwnedSource(em, duplicateB, 1001u);
+                em.SetEnabled(duplicateB, true);
+
+                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Duplicate active runtime source stableId detected. stageId=1, duplicateCount=1");
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+                Assert.That(em.IsEnabled(duplicateA), Is.False);
+                Assert.That(em.IsEnabled(duplicateB), Is.False);
+                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(duplicateA).Length, Is.EqualTo(0));
+                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(duplicateB).Length, Is.EqualTo(0));
+                Assert.That(IsEnabledDepositStableIdPresent(em, 2001u), Is.True);
             }
             finally
             {
@@ -266,6 +443,77 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             world.SetTime(new TimeData(1d / 60d, 1f / 60f));
             world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
+        }
+
+        private static void SetStageState(EntityManager em, RunDirectorStageStateId state)
+        {
+            var entity = GetOrCreateSingletonEntity<RunDirectorStageStateComponent>(em);
+            em.SetComponentData(entity, new RunDirectorStageStateComponent
+            {
+                State = state,
+                StateElapsedSec = 0f,
+                EnteredFrame = 0u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+            });
+        }
+
+        private static bool IsEnabledSourceStableIdPresent(EntityManager em, uint stableId)
+        {
+            using var query = em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologySourceTag>(),
+                    ComponentType.ReadOnly<SourceStableIdComponent>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                if (em.GetComponentData<SourceStableIdComponent>(entities[i]).Value != stableId)
+                    continue;
+                if (em.IsEnabled(entities[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsEnabledDepositStableIdPresent(EntityManager em, uint stableId)
+        {
+            using var query = em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologyDepositTag>(),
+                    ComponentType.ReadOnly<DepositStableIdComponent>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                if (em.GetComponentData<DepositStableIdComponent>(entities[i]).Value != stableId)
+                    continue;
+                if (em.IsEnabled(entities[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static void EnsureOwnedSource(EntityManager em, Entity entity, uint stableId)
+        {
+            if (!em.HasComponent<StageTopologyOwnedTag>(entity))
+                em.AddComponent<StageTopologyOwnedTag>(entity);
+            if (!em.HasComponent<StageTopologySourceTag>(entity))
+                em.AddComponent<StageTopologySourceTag>(entity);
+            if (em.HasComponent<StageTopologyDepositTag>(entity))
+                em.RemoveComponent<StageTopologyDepositTag>(entity);
+            em.SetComponentData(entity, new SourceStableIdComponent { Value = stableId });
         }
 
         private static void AssertOwnedCounts(EntityManager em, int expectedSourceTotal, int expectedSourceEnabled, int expectedDepositTotal, int expectedDepositEnabled)
@@ -614,3 +862,8 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
+
+
+
+
+
