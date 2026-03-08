@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Entities;
@@ -1039,6 +1040,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_Replay_RecordResetPlayback_Smoke()
         {
+            LogAssert.Expect(LogType.Error, new Regex(@"\[SpawnBacklog\] hard-limit triggered frame=1 dropped=0 expired=\d+"));
             SceneManager.LoadScene(DedicatedScenePath, LoadSceneMode.Single);
             yield return null;
             yield return null;

@@ -9,8 +9,23 @@ using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class StageTopologyApplyExecutionBeginSystemTests
+    public class StageTopologyApplyPrepareSystemTests
     {
+        [Test]
+        public void StageTopologyBootstrap_CreatesTopologySingletons_WithoutBulletBootstrap()
+        {
+            using var world = new World("StageTopologyBootstrapWorld");
+            var em = world.EntityManager;
+
+            world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
+
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).IsEmptyIgnoreFilter, Is.False);
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyStateComponent>()).IsEmptyIgnoreFilter, Is.False);
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyLifecycleStateComponent>()).IsEmptyIgnoreFilter, Is.False);
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).IsEmptyIgnoreFilter, Is.False);
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>()).IsEmptyIgnoreFilter, Is.False);
+        }
+
         [Test]
         public void StageTopologyApply_InstantiatesOwnedSourceAndDeposit_WhenNoPrebakedEntitiesExist()
         {
@@ -39,7 +54,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 });
 
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
 
                 var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
                 Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
@@ -213,7 +228,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 });
 
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
 
                 var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
                 Assert.That(topologyState.Ready, Is.EqualTo(1));
@@ -391,7 +406,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Duplicate active runtime source stableId detected. stageId=1, duplicateCount=1");
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
 
                 var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
                 Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
@@ -481,7 +496,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 ApplyRequested = 1,
             });
             world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-            world.GetOrCreateSystem<StageTopologyApplyExecutionBeginSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
         }
 
         private static void SetStageState(EntityManager em, RunDirectorStageStateId state)
@@ -619,7 +634,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var world = new World(worldName);
             var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
             DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
-            var lifecycleEntity = world.EntityManager.CreateEntity(typeof(StageTopologyLifecycleStateComponent));
+            var lifecycleEntity = GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(world.EntityManager);
             world.EntityManager.SetComponentData(lifecycleEntity, default(StageTopologyLifecycleStateComponent));
             return world;
         }

@@ -11,7 +11,7 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
   - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
-> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyApplyExecutionBeginSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve하고, `Source/Deposit` topology를 runtime template reconcile로 생성/재사용한 뒤 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyApplyPrepareSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve하고, `Source/Deposit` topology를 runtime template reconcile로 생성/재사용한 뒤 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -27,7 +27,7 @@
 - 운영 빌드 fail-fast 정책 전환
 
 ## 2. 현재 상태(코드 기준)
-- 런타임 적용은 `StageTopologyApplyExecutionBeginSystem`이 `StageCatalogSO`를 `StageId`로 조회해 `Source/Deposit` runtime topology를 reconcile하고, `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+- 런타임 적용은 `StageTopologyApplyPrepareSystem`이 `StageCatalogSO`를 `StageId`로 조회해 `Source/Deposit` runtime topology를 reconcile하고, `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
 - `StageTopologyBridge`가 `StageCatalogRuntimeComponent`를 publish하고 topology prefab singleton을 bind한다.
 - `DemoShellFlowController`는 `StageCatalogSO`가 있으면 카탈로그에서 `StageProfiles`를 구성하고, 없으면 기존 직렬화 `StageProfiles`를 fallback으로 사용한다.
 - `SourceClipRequestBuildSystem`은 stage state gate를 가져 `Running` 전에는 clip request를 만들지 않는다.
@@ -40,17 +40,18 @@
 - Catalog 조립 Owner: `StageCatalogComposer`
 - StageCatalog 검증 Owner: `StageCatalogValidationRules`
 - StageLayout 검증 Owner: `StageLayoutValidationRules`
-- 런타임 Stage topology/apply Owner: `StageTopologyApplyExecutionBeginSystem` (ExecutionBegin)
+- 런타임 Stage topology/apply Owner: `StageTopologyApplyPrepareSystem` (`StageTopologyPrepareGroup`)
 - GO -> ECS Topology Writer: `StageTopologyBridge`
 - GO -> ECS StageState Writer: `RunDirectorStageBridge`
 
 ## 4. 업데이트 순서
-- 파이프라인 계약 유지:
-  - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
+- 상위 파이프라인 계약:
+  - `StageTopologyPrepareGroup -> FixedTickRootGroup`
+  - fixed-tick runtime 내부: `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
 - Stage apply 순서:
-  - `BulletPoolOwnerBootstrapSystem`
-  - `StageTopologyApplyExecutionBeginSystem`
-  - `BulletFieldAreaUpdateSystem`
+  - `StageTopologyBootstrapSystem`
+  - `StageTopologyApplyPrepareSystem`
+  - `FixedTickRootGroup`
 - H3 boundary-only apply 계약
   - topology apply는 `Idle`, `Completed`, 초기 비플레이 경계에서만 허용한다.
   - `Running`, `ClearReady` 중 요청은 warning 후 consume만 하고 현재 topology/state는 유지한다.
@@ -130,8 +131,8 @@
 ## 7. 런타임 반영
 ### 7.1 Topology Layer
 - topology owner
-  - `StageTopologyApplyExecutionBeginSystem`
-  - `ExecutionBegin` 단일 writer
+  - `StageTopologyApplyPrepareSystem`
+  - `StageTopologyPrepareGroup` 단일 writer
 - topology input
   - `StageTopologyBridge`
   - `StageCatalogRuntimeComponent` publish
@@ -152,7 +153,7 @@
   - `RunDirectorStageBridge`는 stage state/gate/signal만 다룬다.
 - `EnterStagePlay`
   - 선택 엔트리의 `Definition.StageId`를 사용해 `StageTopologyBridge.RequestTopologyApply(stageId)` 호출
-- `StageTopologyApplyExecutionBeginSystem`
+- `StageTopologyApplyPrepareSystem`
   - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 layout+definition 결합 적용
   - `Deposit`은 layout 적용
@@ -193,7 +194,7 @@
   - `StageCatalogSampleAssetsTests`
   - `StageTopologyBridgeTests`
   - `RunDirectorStageBridgeTests`
-  - `StageTopologyApplyExecutionBeginSystemTests`
+  - `StageTopologyApplyPrepareSystemTests`
   - `ContentValidationRulesTests`
     - topology prefab catalog required template 검증
 - PlayMode

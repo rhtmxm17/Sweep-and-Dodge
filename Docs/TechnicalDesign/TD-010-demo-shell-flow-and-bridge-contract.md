@@ -36,11 +36,12 @@
 - GO->ECS StageState Writer: `RunDirectorStageBridge`
   - `RequestStageStart()`, `RequestConfirm()`
   - `SetIntroPresentationDone(bool)`, `SetClearPresentationDone(bool)`
-- ECS stage topology/apply Owner: `StageTopologyApplyExecutionBeginSystem`
+- ECS stage topology/apply Owner: `StageTopologyApplyPrepareSystem`
 - ECS Stage 상태/전이 Owner: 기존 시스템 유지 (`RunDirectorStageTransitionSystem` 등)
 
 ## 3. 업데이트 순서 / 전이 계약
 - 파이프라인 순서:
+  - `StageTopologyPrepareGroup -> FixedTickRootGroup`
   - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
 - StagePlay 시작 루프:
   1. `StageTopologyBridge.RequestTopologyApply(stageId)` 성공
@@ -114,7 +115,7 @@
     - topology singleton publish/bind
   - `RunDirectorStageBridgeTests`
     - topology singleton 없이 독립 bind
-  - `StageTopologyApplyExecutionBeginSystemTests`
+  - `StageTopologyApplyPrepareSystemTests`
     - boundary-only apply
     - lifecycle stamp/versioning
     - failure keep-current-stage policy

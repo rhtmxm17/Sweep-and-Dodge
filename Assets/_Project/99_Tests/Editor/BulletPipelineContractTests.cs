@@ -10,6 +10,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void PipelineGroups_AreNestedUnderRootInFixedOrder()
         {
+            AssertUpdateInGroup(typeof(StageTopologyPrepareGroup), typeof(SimulationSystemGroup));
             AssertUpdateInGroup(typeof(FixedTickRootGroup), typeof(SimulationSystemGroup));
             AssertUpdateInGroup(typeof(BulletFramePipelineGroup), typeof(FixedTickRootGroup));
             AssertUpdateInGroup(typeof(BulletExecutionBeginGroup), typeof(BulletFramePipelineGroup));
@@ -17,10 +18,22 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertUpdateInGroup(typeof(BulletRequestGroup), typeof(BulletFramePipelineGroup));
             AssertUpdateInGroup(typeof(BulletExecutionEndGroup), typeof(BulletFramePipelineGroup));
 
+            AssertUpdateBefore(typeof(StageTopologyPrepareGroup), typeof(FixedTickRootGroup));
             AssertUpdateBefore(typeof(BulletExecutionBeginGroup), typeof(BulletSimulationGroup));
             AssertUpdateAfter(typeof(BulletSimulationGroup), typeof(BulletExecutionBeginGroup));
             AssertUpdateAfter(typeof(BulletRequestGroup), typeof(BulletSimulationGroup));
             AssertUpdateAfter(typeof(BulletExecutionEndGroup), typeof(BulletRequestGroup));
+        }
+
+        [Test]
+        public void StageTopologyPrepareSystems_StayInPrepareContractOrder()
+        {
+            var bootstrapAttr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(StageTopologyBootstrapSystem));
+            Assert.That(bootstrapAttr.GroupType, Is.EqualTo(typeof(StageTopologyPrepareGroup)));
+            Assert.That(bootstrapAttr.OrderFirst, Is.True);
+
+            AssertUpdateInGroup(typeof(StageTopologyApplyPrepareSystem), typeof(StageTopologyPrepareGroup));
+            AssertUpdateAfter(typeof(StageTopologyApplyPrepareSystem), typeof(StageTopologyBootstrapSystem));
         }
 
         [Test]
@@ -68,8 +81,6 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ExecutionBeginSpawnSubSequence_StaysInContractOrder()
         {
-            AssertUpdateAfter(typeof(StageTopologyApplyExecutionBeginSystem), typeof(BulletPoolOwnerBootstrapSystem));
-            AssertUpdateBefore(typeof(StageTopologyApplyExecutionBeginSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
             AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateAfter(typeof(SpawnBacklogWarningSystem), typeof(SpawnRequestRoundRobinExecutionSystem));

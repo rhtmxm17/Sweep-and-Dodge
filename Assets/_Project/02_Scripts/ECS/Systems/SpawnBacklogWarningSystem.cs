@@ -24,6 +24,30 @@ namespace SweepNDodge.DotsBullets
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
             var metrics = metricsRW.ValueRO;
 
+            if (SystemAPI.TryGetSingleton<RunDirectorStageStateComponent>(out var stageState)
+                && stageState.State != RunDirectorStageStateId.Running)
+            {
+                metrics.LastFrameBudgetUsed = 0;
+                metrics.DeferredByBudget = 0;
+                metrics.DeferredByPool = 0;
+                metrics.LastFrameDroppedByCapacity = 0;
+                metrics.LastFrameExpiredByAge = 0;
+                metricsRW.ValueRW = metrics;
+                return;
+            }
+
+            bool topologyInactive = SystemAPI.TryGetSingleton<StageTopologyStateComponent>(out var topologyState)
+                && topologyState.SelectedStageId <= 0
+                && topologyState.AppliedStageId <= 0
+                && topologyState.Ready == 0;
+            if (topologyInactive)
+            {
+                metrics.LastFrameDroppedByCapacity = 0;
+                metrics.LastFrameExpiredByAge = 0;
+                metricsRW.ValueRW = metrics;
+                return;
+            }
+
             if (metrics.LastFrameDroppedByCapacity > 0 || metrics.LastFrameExpiredByAge > 0)
             {
                 Debug.LogError(

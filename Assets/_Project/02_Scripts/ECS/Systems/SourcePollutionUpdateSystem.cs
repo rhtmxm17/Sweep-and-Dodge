@@ -26,6 +26,12 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            bool hasTopologyState = SystemAPI.TryGetSingleton<StageTopologyStateComponent>(out var topologyState);
+            bool hasStageState = SystemAPI.TryGetSingleton<RunDirectorStageStateComponent>(out var stageState);
+            if (hasTopologyState
+                && (!hasStageState || !StageTopologyRuntimeGateUtility.ShouldRunGameplay(in topologyState, in stageState)))
+                return;
+
             var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
             if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float deltaTime))
                 return;

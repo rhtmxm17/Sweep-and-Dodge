@@ -205,6 +205,11 @@ namespace SweepNDodge.DotsBullets
             state.CompleteDependency();
 
             var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
+            bool hasTopologyState = SystemAPI.TryGetSingleton<StageTopologyStateComponent>(out var topologyState);
+            if (hasTopologyState
+                && !StageTopologyRuntimeGateUtility.ShouldRunGameplay(in topologyState, in stageState))
+                return;
+
             if (stageState.State != RunDirectorStageStateId.Running)
                 return;
 

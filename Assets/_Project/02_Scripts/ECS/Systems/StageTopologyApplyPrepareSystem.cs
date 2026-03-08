@@ -9,13 +9,12 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// Stage topology runtime apply owner.
-    /// - ExecutionBegin에서 topology apply 요청을 소비한다.
+    /// - StageTopologyPrepareGroup에서 topology apply 요청을 소비한다.
     /// - StageCatalog + topology template prefab을 이용해 Source/Deposit entity set을 reconcile한다.
     /// </summary>
-    [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
-    [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
-    [UpdateBefore(typeof(BulletFieldAreaUpdateSystem))]
-    public partial struct StageTopologyApplyExecutionBeginSystem : ISystem
+    [UpdateInGroup(typeof(StageTopologyPrepareGroup))]
+    [UpdateAfter(typeof(StageTopologyBootstrapSystem))]
+    public partial struct StageTopologyApplyPrepareSystem : ISystem
     {
         private static readonly float3 DepositSinkPosition = new float3(0f, -10000f, 0f);
 

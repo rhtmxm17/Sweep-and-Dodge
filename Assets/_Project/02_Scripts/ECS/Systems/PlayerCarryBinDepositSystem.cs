@@ -30,6 +30,12 @@ namespace SweepNDodge.DotsBullets
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            bool hasTopologyState = SystemAPI.TryGetSingleton<StageTopologyStateComponent>(out var topologyState);
+            bool hasStageState = SystemAPI.TryGetSingleton<RunDirectorStageStateComponent>(out var stageState);
+            if (hasTopologyState
+                && (!hasStageState || !StageTopologyRuntimeGateUtility.ShouldRunGameplay(in topologyState, in stageState)))
+                return;
+
             var playerEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
             var carryBin = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
             if (math.max(0, carryBin.Load) <= 0)

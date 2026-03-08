@@ -221,8 +221,7 @@ namespace SweepNDodge.DotsBullets
                 var e = em.CreateEntity(typeof(RunDirectorStageConfigComponent));
                 em.SetComponentData(e, new RunDirectorStageConfigComponent
                 {
-                    // Backward-compatible default: 기존 런타임 흐름을 유지하기 위해 Running에서 시작.
-                    InitialState = RunDirectorStageStateId.Running,
+                    InitialState = RunDirectorStageStateId.Idle,
                     MinIdleDurationSec = 0f,
                     ClearAutoAdvanceTimeoutSec = 10f,
                 });
@@ -261,50 +260,10 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(e, default(RunDirectorStageRequestComponent));
             }
 
-            if (!HasSingleton<StageTopologyRequestComponent>(em))
-            {
-                var e = em.CreateEntity(typeof(StageTopologyRequestComponent));
-                em.SetComponentData(e, default(StageTopologyRequestComponent));
-            }
-
-            if (!HasSingleton<StageTopologyStateComponent>(em))
-            {
-                var e = em.CreateEntity(typeof(StageTopologyStateComponent));
-                em.SetComponentData(e, default(StageTopologyStateComponent));
-            }
-
-            if (!HasSingleton<StageTopologyLifecycleStateComponent>(em))
-            {
-                var e = em.CreateEntity(typeof(StageTopologyLifecycleStateComponent));
-                em.SetComponentData(e, default(StageTopologyLifecycleStateComponent));
-            }
-
             if (!HasSingleton<RunDirectorStageSignalComponent>(em))
             {
                 var e = em.CreateEntity(typeof(RunDirectorStageSignalComponent));
                 em.SetComponentData(e, default(RunDirectorStageSignalComponent));
-            }
-
-            using (var stageCatalogRuntimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>()))
-            {
-                if (stageCatalogRuntimeQuery.IsEmptyIgnoreFilter)
-                {
-                    var e = em.CreateEntity();
-                    em.AddComponentObject(e, new StageCatalogRuntimeComponent
-                    {
-                        Catalog = null,
-                    });
-                }
-            }
-
-            if (!HasSingleton<StageTopologyPrefabCatalogComponent>(em))
-            {
-                var e = em.CreateEntity(typeof(StageTopologyPrefabCatalogComponent));
-                em.SetComponentData(e, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = Entity.Null,
-                    DepositTemplate = Entity.Null,
-                });
             }
 
             if (!HasSingleton<RunDirectorPressureWeightSingletonTag>(em))
