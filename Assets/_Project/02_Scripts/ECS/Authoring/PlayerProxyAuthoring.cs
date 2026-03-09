@@ -46,6 +46,11 @@ namespace SweepNDodge.DotsBullets
                     Value = authoring.PlayerRadius
                 });
 
+                AddComponent(e, new PlayerPreviousPositionComponent
+                {
+                    Position = authoring.transform.position
+                });
+
                 AddComponent(e, new VacuumActivationConfigComponent
                 {
                     CaptureActiveTime = Mathf.Max(0f, authoring.CaptureActiveTime),

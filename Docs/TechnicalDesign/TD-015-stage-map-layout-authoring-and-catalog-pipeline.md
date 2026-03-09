@@ -23,7 +23,7 @@
 
 ### 1.2 비목표 (다음 페이즈 이월)
 - `RunDirectorStageConfig/RunProgressDirectorConfig/SpawnRequestPolicy` stage-level override 런타임 적용
-- Obstacle runtime 구현, Player blocking fixed-tick 정렬, Visual 런타임 소비
+- Obstacle broadphase/query 최적화, Visual 런타임 소비
 - 운영 빌드 fail-fast 정책 전환
 
 ## 2. 현재 상태(코드 기준)
@@ -109,7 +109,7 @@
 - 새 runtime template authoring baker는 deprecated seed 필드로 runtime clip/threshold/state를 bake하지 않는다. neutral 기본값만 bake하고, 실제 정의는 `StageDefinitionSO` apply가 책임진다.
 
 ### 5.4 Obstacle 설계 계약
-- `Obstacle`는 `StageTopology`의 다음 확장 대상 kind이며, 이번 단계에서는 `데이터/의미 계약`만 고정한다.
+- `Obstacle`는 `StageTopology`에 편입된 runtime kind이며, 현재 단계에서는 `bullet/player` 소비의 기본 경계까지 구현한다.
 - 의미 계약
   - `단일 Obstacle + CollisionMask`
   - `BlockPlayer | BlockBullet`: 플레이어와 총알 모두 차단
@@ -139,15 +139,21 @@
   - topology apply owner/lifecycle/failure policy는 기존 `Source/Deposit`의 `StageTopology` 규칙을 그대로 따른다.
   - 즉 `instantiate -> reuse -> mapped-active -> pooled-disabled`, `LastAppliedVersion` stamp, infrastructure failure 시 `Ready=0 + 기존 applied topology 유지` 규칙을 동일하게 사용한다.
 - bullet read 계약
-  - reader 후보: `BulletObstacleHitRequestSystem`
-  - 그룹: `Request`
+  - reader owner: `BulletObstacleHitRequestSystem`
+  - 그룹: `BulletRequestGroup`
+  - 순서: `BulletVacuumRequestSystem` 이후, `PlayerHazardCollisionRequestSystem` 이전
   - 판정 모델: bullet은 `point`, obstacle는 `Circle/Box` inside test
   - 읽기 source: active obstacle entity 직접 query
-  - 결과: 기존 despawn/remove request 경로 재사용
+  - 결과: 기존 `BulletDespawnRequestTag` enable 경로 재사용
   - 다중 remove 원인은 멱등 처리한다.
 - player read 계약
-  - `BlockPlayer`는 이번 단계에서 `데이터 의미`까지만 고정한다.
-  - 실행 owner, fixed-tick 정렬, 최종 판정 순서는 후속 세션에서 `PlayerIntentMovementSystem` 이관과 함께 다룬다.
+  - reader owner: `PlayerObstacleBlockSystem`
+  - 그룹: `PlayerFixedStepGroup`
+  - 순서: `PlayerPreviousPositionCaptureSystem -> PlayerIntentMovementSystem -> PlayerObstacleBlockSystem -> PlayerIntentConsumeSystem`
+  - 판정 모델: player는 `circle(PlayerRadius)`, obstacle는 `Circle/Box`
+  - 현재 채택안은 `post-move correction`이며, `rollback + axis slide`를 적용한다.
+  - `PlayerPreviousPositionComponent`로 movement 직전 위치를 저장하고 correction에 사용한다.
+  - 향후 dash/knockback/external force 등 이동 영향 요소가 증가하면 `movement-resolve 통합` 재설계가 필요할 수 있다.
 
 ## 6. 에디터 파이프라인
 - `StageLayoutCatalogGenerator`
@@ -198,6 +204,7 @@
   - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 layout+definition 결합 적용
   - `Deposit`은 layout 적용
+  - `Obstacle`는 layout-only topology apply를 수행하고, `BulletObstacleHitRequestSystem`과 `PlayerObstacleBlockSystem`이 runtime consumer로 이를 읽는다.
   - owned entity 공통 메타
     - `StageTopologyOwnedComponent.Kind`
     - `StageTopologyOwnedComponent.LastAppliedVersion`

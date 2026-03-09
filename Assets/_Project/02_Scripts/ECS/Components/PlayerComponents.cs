@@ -43,6 +43,11 @@ namespace SweepNDodge.DotsBullets
         public float Value;
     }
 
+    public struct PlayerPreviousPositionComponent : IComponentData
+    {
+        public float3 Position;
+    }
+
     public struct VacuumActivationConfigComponent : IComponentData
     {
         public float CaptureActiveTime;

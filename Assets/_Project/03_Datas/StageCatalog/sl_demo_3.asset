@@ -31,6 +31,6 @@ MonoBehaviour:
   - StableId: 9003
     Active: 1
     Position: {x: 14, y: 0, z: -8}
-    Euler: {x: 0, y: -20, z: 0}
-    Scale: {x: 1, y: 1, z: 1}
+    YawDeg: 340
     VisualKey: preview_visual_03
+    Scale: {x: 1, y: 1, z: 1}

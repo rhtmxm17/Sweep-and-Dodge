@@ -74,9 +74,15 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(recordAttr.GroupType, Is.EqualTo(typeof(PlayerFixedStepGroup)));
             Assert.That(recordAttr.OrderLast, Is.True);
 
+            AssertUpdateInGroup(typeof(PlayerPreviousPositionCaptureSystem), typeof(PlayerFixedStepGroup));
             AssertUpdateInGroup(typeof(PlayerIntentMovementSystem), typeof(PlayerFixedStepGroup));
+            AssertUpdateInGroup(typeof(PlayerObstacleBlockSystem), typeof(PlayerFixedStepGroup));
             AssertUpdateInGroup(typeof(PlayerIntentConsumeSystem), typeof(PlayerFixedStepGroup));
+            AssertUpdateAfter(typeof(PlayerPreviousPositionCaptureSystem), typeof(ReplayTickInputApplySystem));
+            AssertUpdateBefore(typeof(PlayerPreviousPositionCaptureSystem), typeof(PlayerIntentMovementSystem));
             AssertUpdateAfter(typeof(PlayerIntentMovementSystem), typeof(ReplayTickInputApplySystem));
+            AssertUpdateAfter(typeof(PlayerObstacleBlockSystem), typeof(PlayerIntentMovementSystem));
+            AssertUpdateBefore(typeof(PlayerObstacleBlockSystem), typeof(PlayerIntentConsumeSystem));
             AssertUpdateBefore(typeof(PlayerIntentMovementSystem), typeof(PlayerIntentConsumeSystem));
             AssertUpdateAfter(typeof(PlayerIntentConsumeSystem), typeof(PlayerIntentMovementSystem));
             AssertUpdateBefore(typeof(PlayerIntentConsumeSystem), typeof(ReplayTickRecordSystem));
@@ -87,6 +93,8 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             AssertUpdateBefore(typeof(PlayerCleanupActionSelectSystem), typeof(BulletVacuumRequestSystem));
             AssertUpdateAfter(typeof(SourcePollutionUpdateSystem), typeof(BulletVacuumRequestSystem));
+            AssertUpdateAfter(typeof(BulletObstacleHitRequestSystem), typeof(BulletVacuumRequestSystem));
+            AssertUpdateBefore(typeof(BulletObstacleHitRequestSystem), typeof(PlayerHazardCollisionRequestSystem));
             AssertUpdateBefore(typeof(SourcePollutionUpdateSystem), typeof(PlayerHazardCollisionRequestSystem));
             AssertUpdateAfter(typeof(PlayerHazardCollisionRequestSystem), typeof(BulletVacuumRequestSystem));
             AssertUpdateAfter(typeof(PlayerCarryBinDepositRequestSystem), typeof(PlayerHazardCollisionRequestSystem));
