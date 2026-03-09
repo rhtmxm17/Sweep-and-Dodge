@@ -1,5 +1,6 @@
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
 
@@ -164,28 +165,19 @@ namespace SweepNDodge.DotsBullets
         {
             public LocalTransform Transform;
             public ObstacleGeometryComponent Geometry;
+            public int2 MinCell;
+            public int2 MaxCell;
         }
 
-        private EntityQuery _bulletQuery;
         private EntityQuery _obstacleQuery;
 
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<BulletActiveTag>();
             state.RequireForUpdate<BulletDespawnRequestTag>();
+            state.RequireForUpdate<BulletFieldConfigComponent>();
             state.RequireForUpdate<LocalTransform>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
-
-            _bulletQuery = state.GetEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ReadOnly<BulletActiveTag>(),
-                    ComponentType.ReadOnly<BulletDespawnRequestTag>(),
-                    ComponentType.ReadOnly<LocalTransform>(),
-                },
-                Options = EntityQueryOptions.IgnoreComponentEnabledState,
-            });
 
             _obstacleQuery = state.GetEntityQuery(
                 ComponentType.ReadOnly<StageTopologyObstacleTag>(),
@@ -206,36 +198,44 @@ namespace SweepNDodge.DotsBullets
             if (!FixedTickTimeUtility.ShouldRunLogicStep(in fixedTickRuntime))
                 return;
 
-            using var obstacles = CollectObstacles(state.EntityManager, _obstacleQuery, ObstacleCollisionMask.BlockBullet);
-            if (obstacles.Length <= 0 || _bulletQuery.IsEmptyIgnoreFilter)
+            if (!BulletFieldShared.IsInitialized)
                 return;
 
-            var em = state.EntityManager;
-            using var bullets = _bulletQuery.ToEntityArray(Allocator.Temp);
-            for (int i = 0; i < bullets.Length; i++)
+            float invCellSize = SystemAPI.GetSingleton<BulletFieldConfigComponent>().InvCellSize;
+            var obstacles = CollectBulletObstacles(state.EntityManager, _obstacleQuery, ObstacleCollisionMask.BlockBullet, invCellSize);
+            if (obstacles.Length <= 0)
             {
-                var bullet = bullets[i];
-                if (!em.Exists(bullet))
-                    continue;
-                if (!em.IsEnabled(bullet))
-                    continue;
-                if (!em.IsComponentEnabled<BulletActiveTag>(bullet))
-                    continue;
-                if (em.IsComponentEnabled<BulletDespawnRequestTag>(bullet))
-                    continue;
-
-                var bulletPosition = em.GetComponentData<LocalTransform>(bullet).Position;
-                float2 point = new float2(bulletPosition.x, bulletPosition.z);
-                if (!HitsAnyObstacle(point, obstacles))
-                    continue;
-
-                em.SetComponentEnabled<BulletDespawnRequestTag>(bullet, true);
+                obstacles.Dispose();
+                return;
             }
+
+            var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
+            var activeLookup = SystemAPI.GetComponentLookup<BulletActiveTag>(isReadOnly: true);
+            var despawnRequestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
+
+            txLookup.Update(ref state);
+            activeLookup.Update(ref state);
+            despawnRequestLookup.Update(ref state);
+
+            var deps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.CellMapFence);
+            state.Dependency = new BulletObstacleHitFromCellMapJob
+            {
+                CellMap = BulletFieldShared.CellMap,
+                Obstacles = obstacles.AsArray(),
+                TxLookup = txLookup,
+                ActiveLookup = activeLookup,
+                DespawnRequestLookup = despawnRequestLookup,
+            }.Schedule(deps);
+            state.Dependency = obstacles.Dispose(state.Dependency);
         }
 
-        private static NativeList<ObstacleSnapshot> CollectObstacles(EntityManager em, EntityQuery query, ObstacleCollisionMask requiredMask)
+        private static NativeList<ObstacleSnapshot> CollectBulletObstacles(
+            EntityManager em,
+            EntityQuery query,
+            ObstacleCollisionMask requiredMask,
+            float invCellSize)
         {
-            var list = new NativeList<ObstacleSnapshot>(Allocator.Temp);
+            var list = new NativeList<ObstacleSnapshot>(Allocator.TempJob);
             using var entities = query.ToEntityArray(Allocator.Temp);
             for (int i = 0; i < entities.Length; i++)
             {
@@ -247,27 +247,105 @@ namespace SweepNDodge.DotsBullets
                     continue;
                 var tx = em.GetComponentData<LocalTransform>(entity);
                 var geometry = em.GetComponentData<ObstacleGeometryComponent>(entity);
+                ComputeObstacleCellBounds(in tx, in geometry, invCellSize, out int2 minCell, out int2 maxCell);
 
                 list.Add(new ObstacleSnapshot
                 {
                     Transform = tx,
                     Geometry = geometry,
+                    MinCell = minCell,
+                    MaxCell = maxCell,
                 });
             }
 
             return list;
         }
 
-        private static bool HitsAnyObstacle(float2 point, NativeList<ObstacleSnapshot> obstacles)
+        private static void ComputeObstacleCellBounds(
+            in LocalTransform tx,
+            in ObstacleGeometryComponent geometry,
+            float invCellSize,
+            out int2 minCell,
+            out int2 maxCell)
         {
-            for (int i = 0; i < obstacles.Length; i++)
+            ComputeObstacleBoundsXZ(in tx, in geometry, out float2 min, out float2 max);
+            minCell = (int2)math.floor(min * invCellSize);
+            maxCell = (int2)math.floor(max * invCellSize);
+        }
+
+        private static void ComputeObstacleBoundsXZ(
+            in LocalTransform tx,
+            in ObstacleGeometryComponent geometry,
+            out float2 min,
+            out float2 max)
+        {
+            if (geometry.Shape == ObstacleShape.Circle)
             {
-                var obstacle = obstacles[i];
-                if (ObstacleGeometryUtility.ContainsPointXZ(point, in obstacle.Transform, in obstacle.Geometry))
-                    return true;
+                float radius = math.max(0f, geometry.Radius);
+                float2 center = new float2(tx.Position.x, tx.Position.z);
+                min = center - radius;
+                max = center + radius;
+                return;
             }
 
-            return false;
+            float2 half = math.max(float2.zero, geometry.Size * 0.5f);
+            float3 corner0 = math.rotate(tx.Rotation, new float3(-half.x, 0f, -half.y)) + tx.Position;
+            float3 corner1 = math.rotate(tx.Rotation, new float3(-half.x, 0f, half.y)) + tx.Position;
+            float3 corner2 = math.rotate(tx.Rotation, new float3(half.x, 0f, -half.y)) + tx.Position;
+            float3 corner3 = math.rotate(tx.Rotation, new float3(half.x, 0f, half.y)) + tx.Position;
+
+            min = new float2(
+                math.min(math.min(corner0.x, corner1.x), math.min(corner2.x, corner3.x)),
+                math.min(math.min(corner0.z, corner1.z), math.min(corner2.z, corner3.z)));
+            max = new float2(
+                math.max(math.max(corner0.x, corner1.x), math.max(corner2.x, corner3.x)),
+                math.max(math.max(corner0.z, corner1.z), math.max(corner2.z, corner3.z)));
+        }
+
+        private struct BulletObstacleHitFromCellMapJob : IJob
+        {
+            [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
+            [ReadOnly] public NativeArray<ObstacleSnapshot> Obstacles;
+            [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
+            [ReadOnly] public ComponentLookup<BulletActiveTag> ActiveLookup;
+            public ComponentLookup<BulletDespawnRequestTag> DespawnRequestLookup;
+
+            public void Execute()
+            {
+                for (int obstacleIndex = 0; obstacleIndex < Obstacles.Length; obstacleIndex++)
+                {
+                    var obstacle = Obstacles[obstacleIndex];
+                    for (int y = obstacle.MinCell.y; y <= obstacle.MaxCell.y; y++)
+                    {
+                        for (int x = obstacle.MinCell.x; x <= obstacle.MaxCell.x; x++)
+                        {
+                            int key = SpatialHashUtility.Hash(new int2(x, y));
+                            if (!CellMap.TryGetFirstValue(key, out var bullet, out var iterator))
+                                continue;
+
+                            do
+                            {
+                                if (!TxLookup.HasComponent(bullet))
+                                    continue;
+                                if (!ActiveLookup.HasComponent(bullet) || !ActiveLookup.IsComponentEnabled(bullet))
+                                    continue;
+                                if (!DespawnRequestLookup.HasComponent(bullet))
+                                    continue;
+                                if (DespawnRequestLookup.IsComponentEnabled(bullet))
+                                    continue;
+
+                                float3 bulletPosition = TxLookup[bullet].Position;
+                                float2 point = new float2(bulletPosition.x, bulletPosition.z);
+                                if (!ObstacleGeometryUtility.ContainsPointXZ(point, in obstacle.Transform, in obstacle.Geometry))
+                                    continue;
+
+                                DespawnRequestLookup.SetComponentEnabled(bullet, true);
+                            }
+                            while (CellMap.TryGetNextValue(out bullet, ref iterator));
+                        }
+                    }
+                }
+            }
         }
     }
 }

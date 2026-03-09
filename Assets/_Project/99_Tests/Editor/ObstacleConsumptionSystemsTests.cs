@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -68,10 +69,17 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
 
             SetGameplayReadySingletons(em);
-            var obstacle = CreateObstacle(em, new float3(0f, 0f, 0f), ObstacleShape.Box, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockBullet);
+            SetSingleton(em, new BulletFieldConfigComponent
+            {
+                InvCellSize = 1f,
+            });
+            CreateObstacle(em, new float3(0f, 0f, 0f), ObstacleShape.Box, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockBullet);
             var bullet = CreateBullet(em, new float3(0.4f, 0f, 0.4f));
 
-            world.GetOrCreateSystem<BulletObstacleHitRequestSystem>().Update(world.Unmanaged);
+            WithInitializedCellMap(new[] { bullet }, em, 8, () =>
+            {
+                world.GetOrCreateSystem<BulletObstacleHitRequestSystem>().Update(world.Unmanaged);
+            });
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
         }
@@ -99,13 +107,53 @@ namespace SweepNDodge.DotsBullets.Tests
                 HasStep = 1,
                 UsingFixedTick = 0,
             });
+            SetSingleton(em, new BulletFieldConfigComponent
+            {
+                InvCellSize = 1f,
+            });
 
             CreateObstacle(em, new float3(0f, 0f, 0f), ObstacleShape.Box, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockPlayer);
             var bullet = CreateBullet(em, new float3(0.2f, 0f, 0.2f));
 
-            world.GetOrCreateSystem<BulletObstacleHitRequestSystem>().Update(world.Unmanaged);
+            WithInitializedCellMap(new[] { bullet }, em, 8, () =>
+            {
+                world.GetOrCreateSystem<BulletObstacleHitRequestSystem>().Update(world.Unmanaged);
+            });
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.False);
+        }
+
+        [Test]
+        public void BulletObstacleHit_UsesCellMapBroadphase_ForRotatedBoxAcrossMultipleCells()
+        {
+            using var world = new World("BulletObstacleHit_RotatedBoxBroadphase");
+            var em = world.EntityManager;
+
+            SetGameplayReadySingletons(em);
+            SetSingleton(em, new BulletFieldConfigComponent
+            {
+                InvCellSize = 1f,
+            });
+
+            CreateObstacle(
+                em,
+                new float3(1.5f, 0f, 1.5f),
+                ObstacleShape.Box,
+                radius: 0f,
+                size: new float2(4f, 2f),
+                ObstacleCollisionMask.BlockBullet,
+                rotation: quaternion.RotateY(math.radians(45f)));
+
+            var inside = CreateBullet(em, new float3(1.5f, 0f, 0.8f));
+            var outside = CreateBullet(em, new float3(3.8f, 0f, 0.2f));
+
+            WithInitializedCellMap(new[] { inside, outside }, em, 16, () =>
+            {
+                world.GetOrCreateSystem<BulletObstacleHitRequestSystem>().Update(world.Unmanaged);
+            });
+
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(inside), Is.True);
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(outside), Is.False);
         }
 
         [Test]
@@ -220,7 +268,8 @@ namespace SweepNDodge.DotsBullets.Tests
             ObstacleShape shape,
             float radius,
             float2 size,
-            ObstacleCollisionMask mask)
+            ObstacleCollisionMask mask,
+            quaternion? rotation = null)
         {
             var entity = em.CreateEntity(
                 typeof(StageTopologyObstacleTag),
@@ -237,7 +286,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Radius = radius,
                 Size = size,
             });
-            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(position, rotation ?? quaternion.identity, 1f));
             return entity;
         }
 
@@ -277,6 +326,37 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var entity = em.CreateEntity(typeof(T));
             em.SetComponentData(entity, value);
+        }
+
+        private static void WithInitializedCellMap(Entity[] bullets, EntityManager em, int capacity, System.Action action)
+        {
+            try
+            {
+                BulletFieldShared.CellMap = new NativeParallelMultiHashMap<int, Entity>(capacity, Allocator.Persistent);
+                BulletFieldShared.HazardCellMap = new NativeParallelMultiHashMap<int, Entity>(1, Allocator.Persistent);
+                BulletFieldShared.CellMapFence = default;
+                BulletFieldShared.MarkInitialized();
+
+                for (int i = 0; i < bullets.Length; i++)
+                {
+                    var tx = em.GetComponentData<LocalTransform>(bullets[i]);
+                    var cell = SpatialHashUtility.ToCell(tx.Position, 1f);
+                    BulletFieldShared.CellMap.Add(SpatialHashUtility.Hash(cell), bullets[i]);
+                }
+
+                action();
+                em.CompleteAllTrackedJobs();
+            }
+            finally
+            {
+                BulletFieldShared.CellMapFence.Complete();
+                if (BulletFieldShared.CellMap.IsCreated)
+                    BulletFieldShared.CellMap.Dispose();
+                if (BulletFieldShared.HazardCellMap.IsCreated)
+                    BulletFieldShared.HazardCellMap.Dispose();
+                BulletFieldShared.CellMapFence = default;
+                BulletFieldShared.MarkUninitialized();
+            }
         }
     }
 }
