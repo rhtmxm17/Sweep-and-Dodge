@@ -26,7 +26,15 @@ MonoBehaviour:
     Active: 1
     Position: {x: -8, y: 0, z: -9}
     Radius: 4
-  Obstacles: []
+  Obstacles:
+  - StableId: 3002
+    Active: 1
+    Position: {x: -10, y: 0, z: 0}
+    EulerRotation: {x: 0, y: 20, z: 0}
+    Shape: 1
+    Radius: 0
+    Size: {x: 3.5, y: 2}
+    CollisionMask: 3
   Visuals:
   - StableId: 9002
     Active: 1

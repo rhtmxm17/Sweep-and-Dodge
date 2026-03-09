@@ -3,9 +3,8 @@ using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets
 {
-    [UpdateInGroup(typeof(InitializationSystemGroup))]
-    [UpdateBefore(typeof(PlayerGoSyncSystem))]
-    public partial struct ReplayInputSyncSystem : ISystem
+    [UpdateInGroup(typeof(PlayerFixedStepGroup), OrderFirst = true)]
+    public partial struct ReplayTickInputApplySystem : ISystem
     {
         private EntityQuery _playerQuery;
 
@@ -59,12 +58,14 @@ namespace SweepNDodge.DotsBullets
                 .WithAll<PlayerTag>()
                 .WithAll<PlayerGoSyncComponent>()
                 .WithAll<PlayerInputIntentComponent>()
+                .WithAll<PlayerResolvedInputSnapshotComponent>()
                 .Build();
 
             state.RequireForUpdate(_playerQuery);
             state.RequireForUpdate<ReplayInputControlComponent>();
             state.RequireForUpdate<ReplayInputCursorComponent>();
             state.RequireForUpdate<ReplayTickInputQueueStateComponent>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
         }
 
@@ -73,7 +74,11 @@ namespace SweepNDodge.DotsBullets
             if (_playerQuery.IsEmptyIgnoreFilter)
                 return;
 
-            uint frame = FrameSequenceUtility.GetCurrentFrame(SystemAPI.GetSingleton<BulletFrameCounterComponent>());
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.ShouldRunLogicStep(in fixedTickRuntime))
+                return;
+
+            uint frame = fixedTickRuntime.CurrentLogicFrame;
             Entity playerEntity = _playerQuery.GetSingletonEntity();
             Entity replayEntity = SystemAPI.GetSingletonEntity<ReplayInputControlComponent>();
             var controlRW = SystemAPI.GetComponentRW<ReplayInputControlComponent>(replayEntity);
@@ -82,6 +87,7 @@ namespace SweepNDodge.DotsBullets
             var queueStateRW = SystemAPI.GetComponentRW<ReplayTickInputQueueStateComponent>(replayEntity);
             var queue = SystemAPI.GetBuffer<ReplayTickInputQueueBufferElement>(replayEntity);
 
+            bool playbackStartedThisUpdate = false;
             if (ReplaySessionStaging.TryConsumePlayback(frames, out uint stagedRunSeed))
             {
                 cursorRW.ValueRW = new ReplayInputCursorComponent
@@ -112,7 +118,7 @@ namespace SweepNDodge.DotsBullets
                     });
                 }
 
-                frame = 0u;
+                frame = frames.Length > 0 ? frames[0].Frame : frame;
                 queue.Clear();
                 queueStateRW.ValueRW = new ReplayTickInputQueueStateComponent
                 {
@@ -122,52 +128,17 @@ namespace SweepNDodge.DotsBullets
                     LastConsumedSequence = 0u,
                     PendingCount = 0,
                 };
+                playbackStartedThisUpdate = true;
             }
-            else if (controlRW.ValueRO.Mode != ReplayInputModeId.Playback)
+
+            if (controlRW.ValueRO.Mode != ReplayInputModeId.Playback)
             {
                 var queueState = queueStateRW.ValueRO;
                 CaptureAndConsumeLiveInputQueue(frame, playerEntity, ref queueState, queue, state.EntityManager);
                 queueStateRW.ValueRW = queueState;
-            }
-
-            if (controlRW.ValueRO.Mode == ReplayInputModeId.Record)
-            {
-                var sync = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
-                var intent = SystemAPI.GetComponent<PlayerInputIntentComponent>(playerEntity);
-                byte vacuumRequested = intent.VacuumRequested != 0 ? intent.VacuumRequested : sync.VacuumRequested;
-                byte cleanupRequested = intent.CleanupActionRequested != 0 ? intent.CleanupActionRequested : sync.CleanupActionRequested;
-                byte requestedSlot = intent.RequestedCleanupActionSlot != (byte)PlayerCleanupActionSlotId.None
-                    ? intent.RequestedCleanupActionSlot
-                    : sync.RequestedCleanupActionSlot;
-                var snapshot = new ReplayInputFrameBufferElement
-                {
-                    Frame = frame,
-                    MoveAxis = intent.MoveAxis,
-                    AimWorldXZ = intent.AimWorldXZ,
-                    HasAimWorldPoint = intent.HasAimWorldPoint,
-                    Position = sync.Position,
-                    Rotation = sync.Rotation,
-                    SyncRotation = sync.SyncRotation,
-                    VacuumRequested = vacuumRequested,
-                    CleanupActionRequested = cleanupRequested,
-                    RequestedCleanupActionSlot = requestedSlot,
-                    InputSequence = intent.Sequence,
-                };
-
-                int last = frames.Length - 1;
-                if (last >= 0 && frames[last].Frame == frame)
-                    frames[last] = snapshot;
-                else
-                    frames.Add(snapshot);
-
-                var control = controlRW.ValueRO;
-                control.LastRecordedFrame = frame;
-                controlRW.ValueRW = control;
+                SyncResolvedInputSnapshot(playerEntity, state.EntityManager);
                 return;
             }
-
-            if (controlRW.ValueRO.Mode != ReplayInputModeId.Playback)
-                return;
 
             int nextFrameIndex = cursorRW.ValueRO.NextFrameIndex;
             if (nextFrameIndex < 0)
@@ -179,33 +150,7 @@ namespace SweepNDodge.DotsBullets
             if (nextFrameIndex < frames.Length && frames[nextFrameIndex].Frame == frame)
             {
                 var snapshot = frames[nextFrameIndex];
-                SystemAPI.SetComponent(playerEntity, new PlayerInputIntentComponent
-                {
-                    MoveAxis = snapshot.MoveAxis,
-                    AimWorldXZ = snapshot.AimWorldXZ,
-                    HasAimWorldPoint = snapshot.HasAimWorldPoint,
-                    VacuumRequested = snapshot.VacuumRequested,
-                    CleanupActionRequested = snapshot.CleanupActionRequested,
-                    RequestedCleanupActionSlot = snapshot.RequestedCleanupActionSlot,
-                    Sequence = snapshot.InputSequence,
-                });
-                SystemAPI.SetComponent(playerEntity, new PlayerGoSyncComponent
-                {
-                    Position = snapshot.Position,
-                    Rotation = snapshot.Rotation,
-                    SyncRotation = snapshot.SyncRotation,
-                    VacuumRequested = snapshot.VacuumRequested,
-                    CleanupActionRequested = snapshot.CleanupActionRequested,
-                    RequestedCleanupActionSlot = snapshot.RequestedCleanupActionSlot,
-                });
-                if (SystemAPI.HasComponent<LocalTransform>(playerEntity))
-                {
-                    var tx = SystemAPI.GetComponent<LocalTransform>(playerEntity);
-                    SystemAPI.SetComponent(playerEntity, LocalTransform.FromPositionRotationScale(
-                        snapshot.Position,
-                        snapshot.Rotation,
-                        tx.Scale));
-                }
+                ApplyPlaybackSnapshot(playerEntity, in snapshot, state.EntityManager);
 
                 cursorRW.ValueRW = new ReplayInputCursorComponent
                 {
@@ -222,6 +167,9 @@ namespace SweepNDodge.DotsBullets
             {
                 NextFrameIndex = nextFrameIndex,
             };
+
+            if (playbackStartedThisUpdate)
+                return;
 
             var missingControl = controlRW.ValueRO;
             if (missingControl.MissingFrameCount < int.MaxValue)
@@ -266,6 +214,7 @@ namespace SweepNDodge.DotsBullets
             if (consumeIndex < 0)
             {
                 queueState.PendingCount = queue.Length;
+                SyncResolvedInputSnapshot(playerEntity, em);
                 return;
             }
 
@@ -278,14 +227,17 @@ namespace SweepNDodge.DotsBullets
                 consumed.CleanupActionRequested = 0;
                 consumed.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None;
             }
-            intent.MoveAxis = consumed.MoveAxis;
-            intent.AimWorldXZ = consumed.AimWorldXZ;
-            intent.HasAimWorldPoint = consumed.HasAimWorldPoint;
-            intent.VacuumRequested = consumed.VacuumRequested;
-            intent.CleanupActionRequested = consumed.CleanupActionRequested;
-            intent.RequestedCleanupActionSlot = consumed.RequestedCleanupActionSlot;
-            intent.Sequence = consumed.InputSequence;
-            em.SetComponentData(playerEntity, intent);
+
+            var intentAfter = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+            intentAfter.MoveAxis = consumed.MoveAxis;
+            intentAfter.AimWorldXZ = consumed.AimWorldXZ;
+            intentAfter.HasAimWorldPoint = consumed.HasAimWorldPoint;
+            intentAfter.VacuumRequested = consumed.VacuumRequested;
+            intentAfter.CleanupActionRequested = consumed.CleanupActionRequested;
+            intentAfter.RequestedCleanupActionSlot = consumed.RequestedCleanupActionSlot;
+            intentAfter.Sequence = consumed.InputSequence;
+            em.SetComponentData(playerEntity, intentAfter);
+            SyncResolvedInputSnapshot(playerEntity, em);
 
             queue.RemoveRange(0, consumeIndex + 1);
             queueState.LastConsumedTick = consumed.Tick;
@@ -305,6 +257,124 @@ namespace SweepNDodge.DotsBullets
             }
 
             queue.Add(input);
+        }
+
+        private static void ApplyPlaybackSnapshot(Entity playerEntity, in ReplayInputFrameBufferElement snapshot, EntityManager em)
+        {
+            em.SetComponentData(playerEntity, new PlayerInputIntentComponent
+            {
+                MoveAxis = snapshot.MoveAxis,
+                AimWorldXZ = snapshot.AimWorldXZ,
+                HasAimWorldPoint = snapshot.HasAimWorldPoint,
+                VacuumRequested = snapshot.VacuumRequested,
+                CleanupActionRequested = snapshot.CleanupActionRequested,
+                RequestedCleanupActionSlot = snapshot.RequestedCleanupActionSlot,
+                Sequence = snapshot.InputSequence,
+            });
+            em.SetComponentData(playerEntity, new PlayerResolvedInputSnapshotComponent
+            {
+                MoveAxis = snapshot.MoveAxis,
+                AimWorldXZ = snapshot.AimWorldXZ,
+                HasAimWorldPoint = snapshot.HasAimWorldPoint,
+                VacuumRequested = snapshot.VacuumRequested,
+                CleanupActionRequested = snapshot.CleanupActionRequested,
+                RequestedCleanupActionSlot = snapshot.RequestedCleanupActionSlot,
+                Sequence = snapshot.InputSequence,
+            });
+            em.SetComponentData(playerEntity, new PlayerGoSyncComponent
+            {
+                Position = snapshot.Position,
+                Rotation = snapshot.Rotation,
+                SyncRotation = snapshot.SyncRotation,
+                VacuumRequested = snapshot.VacuumRequested,
+                CleanupActionRequested = snapshot.CleanupActionRequested,
+                RequestedCleanupActionSlot = snapshot.RequestedCleanupActionSlot,
+            });
+            if (em.HasComponent<LocalTransform>(playerEntity))
+            {
+                var tx = em.GetComponentData<LocalTransform>(playerEntity);
+                em.SetComponentData(playerEntity, LocalTransform.FromPositionRotationScale(
+                    snapshot.Position,
+                    snapshot.Rotation,
+                    tx.Scale));
+            }
+        }
+
+        private static void SyncResolvedInputSnapshot(Entity playerEntity, EntityManager em)
+        {
+            var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+            em.SetComponentData(playerEntity, new PlayerResolvedInputSnapshotComponent
+            {
+                MoveAxis = intent.MoveAxis,
+                AimWorldXZ = intent.AimWorldXZ,
+                HasAimWorldPoint = intent.HasAimWorldPoint,
+                VacuumRequested = intent.VacuumRequested,
+                CleanupActionRequested = intent.CleanupActionRequested,
+                RequestedCleanupActionSlot = intent.RequestedCleanupActionSlot,
+                Sequence = intent.Sequence,
+            });
+        }
+    }
+
+    [UpdateInGroup(typeof(PlayerFixedStepGroup), OrderLast = true)]
+    public partial struct ReplayTickRecordSystem : ISystem
+    {
+        private EntityQuery _playerQuery;
+
+        public void OnCreate(ref SystemState state)
+        {
+            _playerQuery = SystemAPI.QueryBuilder()
+                .WithAll<PlayerTag>()
+                .WithAll<PlayerGoSyncComponent>()
+                .WithAll<PlayerResolvedInputSnapshotComponent>()
+                .Build();
+
+            state.RequireForUpdate(_playerQuery);
+            state.RequireForUpdate<ReplayInputControlComponent>();
+            state.RequireForUpdate<ReplayInputCursorComponent>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
+        }
+
+        public void OnUpdate(ref SystemState state)
+        {
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.ShouldRunLogicStep(in fixedTickRuntime))
+                return;
+
+            Entity playerEntity = _playerQuery.GetSingletonEntity();
+            Entity replayEntity = SystemAPI.GetSingletonEntity<ReplayInputControlComponent>();
+            var controlRW = SystemAPI.GetComponentRW<ReplayInputControlComponent>(replayEntity);
+            if (controlRW.ValueRO.Mode != ReplayInputModeId.Record)
+                return;
+
+            uint frame = fixedTickRuntime.CurrentLogicFrame;
+            var frames = SystemAPI.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
+            var sync = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
+            var input = SystemAPI.GetComponent<PlayerResolvedInputSnapshotComponent>(playerEntity);
+            var snapshot = new ReplayInputFrameBufferElement
+            {
+                Frame = frame,
+                MoveAxis = input.MoveAxis,
+                AimWorldXZ = input.AimWorldXZ,
+                HasAimWorldPoint = input.HasAimWorldPoint,
+                Position = sync.Position,
+                Rotation = sync.Rotation,
+                SyncRotation = sync.SyncRotation,
+                VacuumRequested = input.VacuumRequested,
+                CleanupActionRequested = input.CleanupActionRequested,
+                RequestedCleanupActionSlot = input.RequestedCleanupActionSlot,
+                InputSequence = input.Sequence,
+            };
+
+            int last = frames.Length - 1;
+            if (last >= 0 && frames[last].Frame == frame)
+                frames[last] = snapshot;
+            else
+                frames.Add(snapshot);
+
+            var control = controlRW.ValueRO;
+            control.LastRecordedFrame = frame;
+            controlRW.ValueRW = control;
         }
     }
 }

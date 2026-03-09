@@ -40,11 +40,13 @@ namespace SweepNDodge.DotsBullets
                     LogicStepCount = 0,
                     HasStep = 0,
                     UsingFixedTick = 0,
+                    CurrentLogicFrame = 0u,
                 });
             }
 
             state.RequireForUpdate<FixedTickTimeComponent>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
+            state.RequireForUpdate<BulletFrameCounterComponent>();
         }
 
         [BurstCompile]
@@ -101,6 +103,11 @@ namespace SweepNDodge.DotsBullets
 
             fixedTickRW.ValueRW = fixedTick;
 
+            uint currentFrame = SystemAPI.GetSingleton<BulletFrameCounterComponent>().Value;
+            uint currentLogicFrame = hasStep
+                ? currentFrame + 1u
+                : currentFrame;
+
             var runtimeRW = SystemAPI.GetSingletonRW<FixedTickStepRuntimeComponent>();
             runtimeRW.ValueRW = new FixedTickStepRuntimeComponent
             {
@@ -109,6 +116,7 @@ namespace SweepNDodge.DotsBullets
                 LogicStepCount = logicStepCount,
                 HasStep = (byte)(hasStep ? 1 : 0),
                 UsingFixedTick = (byte)(usingFixedTick ? 1 : 0),
+                CurrentLogicFrame = currentLogicFrame,
             };
         }
     }

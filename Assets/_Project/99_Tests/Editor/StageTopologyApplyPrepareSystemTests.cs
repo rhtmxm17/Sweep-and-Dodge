@@ -187,6 +187,196 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageTopologyApply_InstantiatesOwnedObstacle_WhenLayoutContainsObstacle()
+        {
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_ObstacleCreate");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var catalog = CreateStageCatalog(createdAssets, stageId: 1, sourceStableIds: new uint[] { 1001u }, depositStableIds: new uint[] { 2001u }, obstacleStableIds: new uint[] { 3001u });
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                    ObstacleTemplate = CreateObstacleTemplate(em),
+                });
+                SetSingleton(em, new StageTopologyRequestComponent
+                {
+                    RequestedStageId = 1,
+                    ApplyRequested = 1,
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.True);
+
+                using var obstacleQuery = em.CreateEntityQuery(new EntityQueryDesc
+                {
+                    All = new[]
+                    {
+                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                        ComponentType.ReadOnly<StageTopologyObstacleTag>(),
+                        ComponentType.ReadOnly<ObstacleStableIdComponent>(),
+                    },
+                    Options = EntityQueryOptions.IncludeDisabledEntities,
+                });
+                using var obstacles = obstacleQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
+                Assert.That(obstacles.Length, Is.EqualTo(1));
+
+                var obstacle = FindByStableId<ObstacleStableIdComponent>(em, obstacles, 3001u, c => c.Value);
+                var geometry = em.GetComponentData<ObstacleGeometryComponent>(obstacle);
+                var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle);
+
+                Assert.That(geometry.Shape, Is.EqualTo(ObstacleShape.Box));
+                Assert.That(geometry.Size.x, Is.EqualTo(3f).Within(0.01f));
+                Assert.That(geometry.Size.y, Is.EqualTo(2f).Within(0.01f));
+                Assert.That(mask.Value, Is.EqualTo(ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet));
+                AssertTopologyOwned(em, obstacle, StageTopologyKind.Obstacle, 1u);
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_MissingObstacleTemplate_KeepsPreviouslyAppliedTopology_AndMarksNewSelectionNotReady()
+        {
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_ObstacleTemplateMissing");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+                createdAssets.Add(catalog);
+                catalog.Entries = new[]
+                {
+                    CreateEntry(createdAssets, 1, new uint[] { 1001u }, new uint[] { 2001u }, new uint[] { 3001u }),
+                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }, new uint[] { 3101u }),
+                };
+
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                    ObstacleTemplate = CreateObstacleTemplate(em),
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+                SetSingleton(em, default(StageTopologyRequestComponent));
+
+                ApplyStage(world, 1);
+                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.True);
+
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                    ObstacleTemplate = Entity.Null,
+                });
+
+                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Obstacle template prefab is missing. stageId=2");
+                ApplyStage(world, 2);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                var lifecycleState = em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em));
+                Assert.That(topologyState.SelectedStageId, Is.EqualTo(2));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.Ready, Is.EqualTo(0));
+                Assert.That(lifecycleState.CurrentAppliedVersion, Is.EqualTo(1u));
+                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.True);
+                Assert.That(IsEnabledObstacleStableIdPresent(em, 3101u), Is.False);
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_InvalidObstacleItem_WarnsAndSkipsObstacleButKeepsReady()
+        {
+            using var world = CreateDefaultTestWorld("StageTopologyWorld_InvalidObstacle");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var layout = CreateLayout(createdAssets, 1, new uint[] { 1001u }, new uint[] { 2001u }, new uint[] { 3001u });
+                layout.Obstacles[0] = new StageObstacleLayoutData
+                {
+                    StableId = 3001u,
+                    Active = true,
+                    Position = new Vector3(2f, 0f, 1f),
+                    EulerRotation = Vector3.zero,
+                    Shape = ObstacleShape.Circle,
+                    Radius = 0f,
+                    Size = Vector2.zero,
+                    CollisionMask = ObstacleCollisionMask.BlockBullet,
+                };
+
+                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+                createdAssets.Add(catalog);
+                catalog.Entries = new[]
+                {
+                    new StageCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "stage_01",
+                        Definition = CreateDefinition(createdAssets, 1, new uint[] { 1001u }),
+                        Layout = layout,
+                    },
+                };
+
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                    ObstacleTemplate = CreateObstacleTemplate(em),
+                });
+                SetSingleton(em, new StageTopologyRequestComponent
+                {
+                    RequestedStageId = 1,
+                    ApplyRequested = 1,
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+
+                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Obstacle item has invalid shape parameters and will be skipped. stageId=1, stableId=3001, shape=Circle");
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.False);
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
+        }
+
+        [Test]
         public void StageTopologyApply_MissingDefinitionBinding_DisablesOnlyMissingSource_AndKeepsReady()
         {
             using var world = CreateDefaultTestWorld("StageTopologyWorld_C");
@@ -559,6 +749,30 @@ namespace SweepNDodge.DotsBullets.Tests
             return false;
         }
 
+        private static bool IsEnabledObstacleStableIdPresent(EntityManager em, uint stableId)
+        {
+            using var query = em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologyObstacleTag>(),
+                    ComponentType.ReadOnly<ObstacleStableIdComponent>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                if (em.GetComponentData<ObstacleStableIdComponent>(entities[i]).Value != stableId)
+                    continue;
+                if (em.IsEnabled(entities[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
         private static void EnsureOwnedSource(EntityManager em, Entity entity, uint stableId)
         {
             if (!em.HasComponent<StageTopologyOwnedTag>(entity))
@@ -770,22 +984,45 @@ namespace SweepNDodge.DotsBullets.Tests
             return entity;
         }
 
-        private static StageCatalogSO CreateStageCatalog(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds)
+        private static Entity CreateObstacleTemplate(EntityManager em)
+        {
+            var entity = em.CreateEntity(
+                typeof(ObstacleStableIdComponent),
+                typeof(ObstacleCollisionMaskComponent),
+                typeof(ObstacleGeometryComponent),
+                typeof(LocalTransform));
+
+            em.SetComponentData(entity, new ObstacleStableIdComponent { Value = 1u });
+            em.SetComponentData(entity, new ObstacleCollisionMaskComponent
+            {
+                Value = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
+            });
+            em.SetComponentData(entity, new ObstacleGeometryComponent
+            {
+                Shape = ObstacleShape.Box,
+                Radius = 1f,
+                Size = new float2(2f, 2f),
+            });
+            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
+            return entity;
+        }
+
+        private static StageCatalogSO CreateStageCatalog(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds, uint[] obstacleStableIds = null)
         {
             var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
             createdAssets.Add(catalog);
-            catalog.Entries = new[] { CreateEntry(createdAssets, stageId, sourceStableIds, depositStableIds) };
+            catalog.Entries = new[] { CreateEntry(createdAssets, stageId, sourceStableIds, depositStableIds, obstacleStableIds) };
             return catalog;
         }
 
-        private static StageCatalogEntry CreateEntry(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds)
+        private static StageCatalogEntry CreateEntry(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds, uint[] obstacleStableIds = null)
         {
             return new StageCatalogEntry
             {
                 Enabled = true,
                 EntryKey = $"stage_{stageId:00}",
                 Definition = CreateDefinition(createdAssets, stageId, sourceStableIds),
-                Layout = CreateLayout(createdAssets, stageId, sourceStableIds, depositStableIds),
+                Layout = CreateLayout(createdAssets, stageId, sourceStableIds, depositStableIds, obstacleStableIds),
             };
         }
 
@@ -873,7 +1110,7 @@ namespace SweepNDodge.DotsBullets.Tests
             return definition;
         }
 
-        private static StageLayoutSO CreateLayout(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds)
+        private static StageLayoutSO CreateLayout(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds, uint[] obstacleStableIds = null)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
             layout.StageId = stageId;
@@ -903,6 +1140,23 @@ namespace SweepNDodge.DotsBullets.Tests
                     Active = true,
                     Position = new Vector3(stageId * 5f, 0f, i * 4f),
                     Radius = 3f + i,
+                };
+            }
+
+            obstacleStableIds ??= System.Array.Empty<uint>();
+            layout.Obstacles = new StageObstacleLayoutData[obstacleStableIds.Length];
+            for (int i = 0; i < obstacleStableIds.Length; i++)
+            {
+                layout.Obstacles[i] = new StageObstacleLayoutData
+                {
+                    StableId = obstacleStableIds[i],
+                    Active = true,
+                    Position = new Vector3(stageId * 2f, 0f, -4f + (i * 3f)),
+                    EulerRotation = new Vector3(0f, i * 15f, 0f),
+                    Shape = ObstacleShape.Box,
+                    Radius = 0f,
+                    Size = new Vector2(3f + i, 2f + i),
+                    CollisionMask = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
                 };
             }
 

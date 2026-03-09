@@ -4,7 +4,7 @@
 - doc_id: `TD-012`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-09`
 - related_docs:
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
   - [TD-001-player-feedback-event-channel.md](./TD-001-player-feedback-event-channel.md)
@@ -47,7 +47,7 @@
 
 ### 3.2 입력 해석 계약 (`Input -> Slot -> ActionId`)
 - 브리지(`PlayerEcsBridge`)는 입력 시 슬롯(`Primary`/`Secondary`)만 요청한다.
-- 입력 해석 시스템(`PlayerGoSyncSystem`)이 슬롯을 ActionId로 매핑해 `PendingActionId`에 기록한다.
+- fixed-tick consume 시스템(`PlayerIntentConsumeSystem`)이 슬롯을 ActionId로 매핑해 `PendingActionId`에 기록한다.
 - 입력 계층은 ActionId를 직접 소유하지 않는다.
 
 ### 3.3 상태 적용 계약 (`Pending` 확정 타이밍)
@@ -132,3 +132,4 @@
 ## 8. 변경 이력
 - 2026-03-05: 문서 신규 작성. 액션 모델/슬롯 매핑/활성 중 입력 소비/판정 분기 책임 계약을 정식화했다.
 - 2026-03-05: FullBin Hazard 예외 규칙을 반영해 결과 타입(`HazardCaptured`, `HazardRemovedWhenCarryFull`)과 경로별 후처리/피드백 계약을 추가했다.
+- 2026-03-09: 액션 슬롯 해석 책임을 `PlayerGoSyncSystem`에서 `PlayerIntentConsumeSystem`으로 옮기고, fixed-tick player path 기준으로 문구를 갱신했다.

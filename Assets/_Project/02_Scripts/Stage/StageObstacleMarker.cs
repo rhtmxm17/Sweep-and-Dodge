@@ -7,9 +7,10 @@ namespace SweepNDodge.DotsBullets
     {
         [Min(1)] public uint StableId = 1;
         public bool Active = true;
-        public StageMapElementShape Shape = StageMapElementShape.Rectangle;
+        public ObstacleShape Shape = ObstacleShape.Box;
         [Min(0f)] public float Radius = 1f;
         public Vector2 Size = new Vector2(2f, 2f);
+        public ObstacleCollisionMask CollisionMask = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet;
 
         [Header("Debug")]
         public bool DrawGizmo = true;
@@ -23,7 +24,7 @@ namespace SweepNDodge.DotsBullets
             var previousMatrix = Gizmos.matrix;
             Gizmos.color = Active ? new Color(1f, 0.55f, 0.2f, 1f) : new Color(0.35f, 0.35f, 0.35f, 1f);
 
-            if (Shape == StageMapElementShape.Circle)
+            if (Shape == ObstacleShape.Circle)
             {
                 Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, Radius));
             }

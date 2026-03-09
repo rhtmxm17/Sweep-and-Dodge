@@ -179,10 +179,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 StableId = marker.StableId,
                 Active = marker.Active,
                 Position = transform.position,
-                YawDeg = transform.eulerAngles.y,
+                EulerRotation = transform.eulerAngles,
                 Shape = marker.Shape,
                 Radius = Mathf.Max(0f, marker.Radius),
                 Size = new Vector2(Mathf.Max(0f, marker.Size.x), Mathf.Max(0f, marker.Size.y)),
+                CollisionMask = marker.CollisionMask,
             };
         }
 

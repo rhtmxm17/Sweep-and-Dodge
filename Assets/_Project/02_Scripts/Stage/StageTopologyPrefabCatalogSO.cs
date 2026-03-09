@@ -7,5 +7,6 @@ namespace SweepNDodge.DotsBullets
     {
         public GameObject SourceTemplatePrefab;
         public GameObject DepositTemplatePrefab;
+        public GameObject ObstacleTemplatePrefab;
     }
 }

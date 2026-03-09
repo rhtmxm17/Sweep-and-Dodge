@@ -12,6 +12,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             AssertUpdateInGroup(typeof(StageTopologyPrepareGroup), typeof(SimulationSystemGroup));
             AssertUpdateInGroup(typeof(FixedTickRootGroup), typeof(SimulationSystemGroup));
+            AssertUpdateInGroup(typeof(PlayerFixedStepGroup), typeof(FixedTickRootGroup));
             AssertUpdateInGroup(typeof(BulletFramePipelineGroup), typeof(FixedTickRootGroup));
             AssertUpdateInGroup(typeof(BulletExecutionBeginGroup), typeof(BulletFramePipelineGroup));
             AssertUpdateInGroup(typeof(BulletSimulationGroup), typeof(BulletFramePipelineGroup));
@@ -19,6 +20,8 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertUpdateInGroup(typeof(BulletExecutionEndGroup), typeof(BulletFramePipelineGroup));
 
             AssertUpdateBefore(typeof(StageTopologyPrepareGroup), typeof(FixedTickRootGroup));
+            AssertUpdateAfter(typeof(PlayerFixedStepGroup), typeof(FixedTickTimeResolveSystem));
+            AssertUpdateBefore(typeof(PlayerFixedStepGroup), typeof(BulletFramePipelineGroup));
             AssertUpdateBefore(typeof(BulletExecutionBeginGroup), typeof(BulletSimulationGroup));
             AssertUpdateAfter(typeof(BulletSimulationGroup), typeof(BulletExecutionBeginGroup));
             AssertUpdateAfter(typeof(BulletRequestGroup), typeof(BulletSimulationGroup));
@@ -58,6 +61,25 @@ namespace SweepNDodge.DotsBullets.Tests
             var attr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(BulletRequestFencePublishSystem));
             Assert.That(attr.GroupType, Is.EqualTo(typeof(BulletRequestGroup)));
             Assert.That(attr.OrderLast, Is.True);
+        }
+
+        [Test]
+        public void PlayerFixedStepSubSequence_StaysInContractOrder()
+        {
+            var applyAttr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(ReplayTickInputApplySystem));
+            Assert.That(applyAttr.GroupType, Is.EqualTo(typeof(PlayerFixedStepGroup)));
+            Assert.That(applyAttr.OrderFirst, Is.True);
+
+            var recordAttr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(ReplayTickRecordSystem));
+            Assert.That(recordAttr.GroupType, Is.EqualTo(typeof(PlayerFixedStepGroup)));
+            Assert.That(recordAttr.OrderLast, Is.True);
+
+            AssertUpdateInGroup(typeof(PlayerIntentMovementSystem), typeof(PlayerFixedStepGroup));
+            AssertUpdateInGroup(typeof(PlayerIntentConsumeSystem), typeof(PlayerFixedStepGroup));
+            AssertUpdateAfter(typeof(PlayerIntentMovementSystem), typeof(ReplayTickInputApplySystem));
+            AssertUpdateBefore(typeof(PlayerIntentMovementSystem), typeof(PlayerIntentConsumeSystem));
+            AssertUpdateAfter(typeof(PlayerIntentConsumeSystem), typeof(PlayerIntentMovementSystem));
+            AssertUpdateBefore(typeof(PlayerIntentConsumeSystem), typeof(ReplayTickRecordSystem));
         }
 
         [Test]

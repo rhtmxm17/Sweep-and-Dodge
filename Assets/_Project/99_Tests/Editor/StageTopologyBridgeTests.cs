@@ -60,6 +60,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(stageCatalogRuntimeQuery.IsEmptyIgnoreFilter, Is.False);
                 var stageCatalogRuntime = em.GetComponentObject<StageCatalogRuntimeComponent>(stageCatalogRuntimeQuery.GetSingletonEntity());
                 Assert.That(stageCatalogRuntime.Catalog, Is.SameAs(stageCatalog));
+
+                using var topologyCatalogQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>());
+                Assert.That(topologyCatalogQuery.IsEmptyIgnoreFilter, Is.False);
+                var topologyPrefabs = em.GetComponentData<StageTopologyPrefabCatalogComponent>(topologyCatalogQuery.GetSingletonEntity());
+                Assert.That(topologyPrefabs.SourceTemplate, Is.Not.EqualTo(Entity.Null));
+                Assert.That(topologyPrefabs.DepositTemplate, Is.Not.EqualTo(Entity.Null));
+                Assert.That(topologyPrefabs.ObstacleTemplate, Is.Not.EqualTo(Entity.Null));
             }
             finally
             {

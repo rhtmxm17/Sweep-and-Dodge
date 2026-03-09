@@ -58,6 +58,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(layout1.Sources, Is.Not.Null.And.Length.GreaterThan(0));
             Assert.That(layout2.Sources, Is.Not.Null.And.Length.GreaterThan(0));
             Assert.That(layout3.Sources, Is.Not.Null.And.Length.GreaterThan(0));
+            Assert.That(layout2.Obstacles, Is.Not.Null.And.Length.GreaterThan(0));
         }
 
         [Test]

@@ -78,6 +78,7 @@ namespace SweepNDodge.DotsBullets
     {
         public Entity SourceTemplate;
         public Entity DepositTemplate;
+        public Entity ObstacleTemplate;
     }
 
     public enum StageTopologyKind : byte

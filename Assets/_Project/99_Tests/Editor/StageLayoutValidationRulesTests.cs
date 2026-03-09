@@ -102,5 +102,48 @@ namespace SweepNDodge.DotsBullets.Tests
                 Object.DestroyImmediate(layout);
             }
         }
+
+        [Test]
+        public void ObstacleWithEmptyCollisionMask_IsReportedAsError()
+        {
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            try
+            {
+                layout.StageId = 7;
+                layout.Sources = new[]
+                {
+                    new StageSourceLayoutData { StableId = 10, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
+                };
+                layout.Deposits = new[]
+                {
+                    new StageDepositLayoutData { StableId = 20, Active = true, Radius = 1f },
+                };
+                layout.Obstacles = new[]
+                {
+                    new StageObstacleLayoutData
+                    {
+                        StableId = 30,
+                        Active = true,
+                        Shape = ObstacleShape.Box,
+                        Size = new Vector2(2f, 2f),
+                        CollisionMask = ObstacleCollisionMask.None,
+                    },
+                };
+
+                var issues = new List<ContentValidationIssue>();
+                StageLayoutValidationRules.ValidateLayoutRecords(
+                    new List<ContentValidationRecord<StageLayoutSO>>
+                    {
+                        new ContentValidationRecord<StageLayoutSO>(layout, "layout")
+                    },
+                    issues);
+
+                Assert.That(issues.Any(x => x.Code == "STL009" && x.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(layout);
+            }
+        }
     }
 }

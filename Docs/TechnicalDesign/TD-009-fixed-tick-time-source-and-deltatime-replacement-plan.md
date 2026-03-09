@@ -35,11 +35,14 @@
 ## 선택 방안(확정)
 1. Tick 실행 경계
 - `FixedTickRootGroup`를 신설한다.
-- 입력 적용, 플레이어 이동, 탄환 시뮬레이션, 스폰/요청 핵심 경로를 이 그룹 하위로 재배치한다.
+- `PlayerFixedStepGroup`와 `BulletFramePipelineGroup`를 이 그룹 하위에 둔다.
+- `PlayerFixedStepGroup`에서 입력 적용, 플레이어 이동, 1회성 액션 consume, replay 기록을 처리한다.
+- `BulletFramePipelineGroup`에서 탄환 시뮬레이션, 스폰/요청 핵심 경로를 처리한다.
 - 기존 `Initialization/Simulation` 경계는 표현 계층과 로직 계층 분리에 맞춰 정리한다.
 
 2. 입력 수집/소비
-- 1차: InputSystem 이벤트를 tick 소비 큐에 적재하고 tick 루프에서 순서대로 consume한다.
+- 1차: GO/브리지가 `PlayerInputIntentComponent`에 쓴 입력을 tick 소비 큐에 적재하고 tick 루프에서 순서대로 consume한다.
+- replay 적용은 `ReplayTickInputApplySystem`, 기록은 `ReplayTickRecordSystem`으로 분리한다.
 - 2차: 필요 시 InputSystem `Manual Update` 전환으로 tick 경계 일치를 강화한다.
 
 3. 과부하(누적기) 처리
@@ -65,9 +68,13 @@
 1. Stage-0: 시간원 골격 추가
 - `FixedTickTimeComponent`, 시간 유틸 API 추가
 - 기존 경로와 공존(기능 토글 가능) 상태로 시작
+- `FixedTickStepRuntimeComponent.CurrentLogicFrame`을 추가해 현재 logic step의 authoritative tick을 publish한다.
 
 2. Stage-1: 1차 시스템 치환
 - 1차 대상 시스템에서 `SystemAPI.Time.DeltaTime` 직접 참조 제거
+- `PlayerIntentMovementSystem`을 `PlayerFixedStepGroup`으로 이관한다.
+- `ReplayInputSyncSystem`을 `ReplayTickInputApplySystem` / `ReplayTickRecordSystem`으로 분리한다.
+- `PlayerIntentConsumeSystem`을 추가해 vacuum/action one-shot consume을 fixed-tick 경계로 이동한다.
 - 동일 seed/input 반복 실행 결과 비교 테스트 추가
 
 3. Stage-2: 2차 시스템 치환

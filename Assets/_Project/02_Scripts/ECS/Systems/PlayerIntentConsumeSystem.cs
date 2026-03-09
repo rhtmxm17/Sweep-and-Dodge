@@ -1,32 +1,45 @@
-using Unity.Burst;
 using Unity.Entities;
 using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets
 {
-    [UpdateInGroup(typeof(InitializationSystemGroup))]
-    public partial struct PlayerGoSyncSystem : ISystem
+    [UpdateInGroup(typeof(PlayerFixedStepGroup))]
+    [UpdateAfter(typeof(PlayerIntentMovementSystem))]
+    [UpdateBefore(typeof(ReplayTickRecordSystem))]
+    public partial struct PlayerIntentConsumeSystem : ISystem
     {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<PlayerTag>();
+            state.RequireForUpdate<PlayerGoSyncComponent>();
+            state.RequireForUpdate<PlayerInputIntentComponent>();
+            state.RequireForUpdate<PlayerResolvedInputSnapshotComponent>();
+            state.RequireForUpdate<VacuumRuntimeStateComponent>();
+            state.RequireForUpdate<PlayerCleanupActionStateComponent>();
+            state.RequireForUpdate<PlayerCleanupActionSlotMapComponent>();
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
+        }
+
         public void OnUpdate(ref SystemState state)
         {
-            bool isReplayPlayback = SystemAPI.TryGetSingleton<ReplayInputControlComponent>(out var replayControl) &&
-                                    replayControl.Mode == ReplayInputModeId.Playback;
-            var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
-            txLookup.Update(ref state);
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.ShouldRunLogicStep(in fixedTickRuntime))
+                return;
 
-            foreach (var (sync, intent, vacuum, actionState, slotMap, entity) in
+            foreach (var (sync, intent, resolvedInput, vacuum, actionState, slotMap, entity) in
                      SystemAPI.Query<
                          RefRW<PlayerGoSyncComponent>,
                          RefRW<PlayerInputIntentComponent>,
+                         RefRO<PlayerResolvedInputSnapshotComponent>,
                          RefRW<VacuumRuntimeStateComponent>,
                          RefRW<PlayerCleanupActionStateComponent>,
                          RefRO<PlayerCleanupActionSlotMapComponent>>()
                               .WithAll<PlayerTag>()
                               .WithEntityAccess())
             {
-                if (!isReplayPlayback && txLookup.HasComponent(entity))
+                if (SystemAPI.HasComponent<LocalTransform>(entity))
                 {
-                    var tx = txLookup[entity];
+                    var tx = SystemAPI.GetComponent<LocalTransform>(entity);
                     var mirrored = sync.ValueRW;
                     mirrored.Position = tx.Position;
                     if (mirrored.SyncRotation != 0)
@@ -34,21 +47,17 @@ namespace SweepNDodge.DotsBullets
                     sync.ValueRW = mirrored;
                 }
 
-                bool hasVacuumRequest = intent.ValueRO.VacuumRequested != 0 || sync.ValueRO.VacuumRequested != 0;
-                bool hasCleanupRequest = intent.ValueRO.CleanupActionRequested != 0 || sync.ValueRO.CleanupActionRequested != 0;
+                bool hasVacuumRequest = resolvedInput.ValueRO.VacuumRequested != 0;
+                bool hasCleanupRequest = resolvedInput.ValueRO.CleanupActionRequested != 0;
                 if (hasVacuumRequest)
                     vacuum.ValueRW.ActivateRequested = 1;
                 if (hasCleanupRequest)
                 {
-                    byte requestedSlot = intent.ValueRO.CleanupActionRequested != 0
-                        ? intent.ValueRO.RequestedCleanupActionSlot
-                        : sync.ValueRO.RequestedCleanupActionSlot;
                     actionState.ValueRW.PendingActionId = ResolveActionId(
-                        (PlayerCleanupActionSlotId)requestedSlot,
+                        (PlayerCleanupActionSlotId)resolvedInput.ValueRO.RequestedCleanupActionSlot,
                         in slotMap.ValueRO);
                 }
 
-                // 1회성 입력 소비
                 var s = sync.ValueRW;
                 s.VacuumRequested = 0;
                 s.CleanupActionRequested = 0;
@@ -75,5 +84,4 @@ namespace SweepNDodge.DotsBullets
             };
         }
     }
-
 }

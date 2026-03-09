@@ -117,6 +117,7 @@ namespace SweepNDodge.DotsBullets
         public int LogicStepCount;
         public byte HasStep;
         public byte UsingFixedTick;
+        public uint CurrentLogicFrame;
     }
 
     // Spawn/Despawn 프레임 추적 스탬프.

@@ -102,5 +102,29 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
             return entity;
         }
+
+        public static Entity CreateObstacleTemplate(EntityManager em)
+        {
+            var entity = em.CreateEntity(
+                typeof(Prefab),
+                typeof(ObstacleStableIdComponent),
+                typeof(ObstacleCollisionMaskComponent),
+                typeof(ObstacleGeometryComponent),
+                typeof(LocalTransform));
+
+            em.SetComponentData(entity, new ObstacleStableIdComponent { Value = 1u });
+            em.SetComponentData(entity, new ObstacleCollisionMaskComponent
+            {
+                Value = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
+            });
+            em.SetComponentData(entity, new ObstacleGeometryComponent
+            {
+                Shape = ObstacleShape.Box,
+                Radius = 1f,
+                Size = new float2(2f, 2f),
+            });
+            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
+            return entity;
+        }
     }
 }

@@ -27,6 +27,17 @@ namespace SweepNDodge.DotsBullets
         public uint Sequence;
     }
 
+    public struct PlayerResolvedInputSnapshotComponent : IComponentData
+    {
+        public float2 MoveAxis;
+        public float2 AimWorldXZ;
+        public byte HasAimWorldPoint;
+        public byte VacuumRequested;
+        public byte CleanupActionRequested;
+        public byte RequestedCleanupActionSlot;
+        public uint Sequence;
+    }
+
     public struct PlayerRadiusComponent : IComponentData
     {
         public float Value;

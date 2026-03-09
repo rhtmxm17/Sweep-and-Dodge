@@ -567,6 +567,15 @@ namespace SweepNDodge.DotsBullets.Editor
                         catalogs[i].Location,
                         "StageTopologyPrefabCatalogSO.DepositTemplatePrefab is null."));
                 }
+
+                if (catalog.ObstacleTemplatePrefab == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV032",
+                        catalogs[i].Location,
+                        "StageTopologyPrefabCatalogSO.ObstacleTemplatePrefab is null."));
+                }
             }
         }
 

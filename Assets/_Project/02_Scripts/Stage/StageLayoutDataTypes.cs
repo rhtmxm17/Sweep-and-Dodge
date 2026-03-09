@@ -3,12 +3,6 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
-    public enum StageMapElementShape : byte
-    {
-        Circle = 0,
-        Rectangle = 1,
-    }
-
     [Serializable]
     public struct StageSourceLayoutData
     {
@@ -36,10 +30,11 @@ namespace SweepNDodge.DotsBullets
         [Min(1)] public uint StableId;
         public bool Active;
         public Vector3 Position;
-        public float YawDeg;
-        public StageMapElementShape Shape;
+        public Vector3 EulerRotation;
+        public ObstacleShape Shape;
         [Min(0f)] public float Radius;
         public Vector2 Size;
+        public ObstacleCollisionMask CollisionMask;
     }
 
     [Serializable]

@@ -101,11 +101,14 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (entry.StableId == 0)
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL004", location, "StableId must be >= 1."));
 
-                bool invalid = entry.Shape == StageMapElementShape.Circle
-                    ? entry.Radius < 0f
-                    : (entry.Size.x < 0f || entry.Size.y < 0f);
+                bool invalid = entry.Shape == ObstacleShape.Circle
+                    ? entry.Radius <= 0f
+                    : (entry.Size.x <= 0f || entry.Size.y <= 0f);
                 if (invalid)
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL005", location, "Obstacle shape parameters must be >= 0."));
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL005", location, "Obstacle shape parameters must be > 0."));
+
+                if (entry.CollisionMask == ObstacleCollisionMask.None)
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL009", location, "Obstacle CollisionMask must not be None."));
             }
         }
 

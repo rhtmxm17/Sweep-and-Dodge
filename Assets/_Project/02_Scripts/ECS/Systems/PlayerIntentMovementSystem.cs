@@ -6,9 +6,9 @@ using Unity.Transforms;
 namespace SweepNDodge.DotsBullets
 {
     [BurstCompile]
-    [UpdateInGroup(typeof(InitializationSystemGroup))]
-    [UpdateAfter(typeof(ReplayInputSyncSystem))]
-    [UpdateBefore(typeof(PlayerGoSyncSystem))]
+    [UpdateInGroup(typeof(PlayerFixedStepGroup))]
+    [UpdateAfter(typeof(ReplayTickInputApplySystem))]
+    [UpdateBefore(typeof(PlayerIntentConsumeSystem))]
     public partial struct PlayerIntentMovementSystem : ISystem
     {
         private const float DefaultMoveSpeed = 6f;

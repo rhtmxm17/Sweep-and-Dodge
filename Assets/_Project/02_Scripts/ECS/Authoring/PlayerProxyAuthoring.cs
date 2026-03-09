@@ -85,6 +85,17 @@ namespace SweepNDodge.DotsBullets
                     Sequence = 0u,
                 });
 
+                AddComponent(e, new PlayerResolvedInputSnapshotComponent
+                {
+                    MoveAxis = float2.zero,
+                    AimWorldXZ = float2.zero,
+                    HasAimWorldPoint = 0,
+                    VacuumRequested = 0,
+                    CleanupActionRequested = 0,
+                    RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
+                    Sequence = 0u,
+                });
+
                 AddComponent(e, new PlayerCleanupActionStateComponent
                 {
                     SelectedActionId = ResolveInitialSelectedAction(authoring),

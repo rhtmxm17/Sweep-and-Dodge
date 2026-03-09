@@ -159,6 +159,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(fixedTick.FixedDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
             Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent fixedTickRuntime), Is.True);
             Assert.That(fixedTickRuntime.UsingFixedTick, Is.EqualTo(0));
+            Assert.That(fixedTickRuntime.CurrentLogicFrame, Is.EqualTo(1u));
         }
 
         [Test]
@@ -177,6 +178,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(runtime.UsingFixedTick, Is.EqualTo(0));
             Assert.That(runtime.LogicStepCount, Is.EqualTo(1));
             Assert.That(runtime.LogicDeltaTime, Is.EqualTo(dt).Within(1e-6f));
+            Assert.That(runtime.CurrentLogicFrame, Is.EqualTo(1u));
         }
 
         [Test]
@@ -200,6 +202,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(runtime.HasStep, Is.EqualTo(1));
             Assert.That(runtime.UsingFixedTick, Is.EqualTo(1));
             Assert.That(runtime.LogicDeltaTime, Is.EqualTo(0.1f).Within(1e-6f));
+            Assert.That(runtime.CurrentLogicFrame, Is.EqualTo(1u));
 
             Assert.That(TryGetSingleton(em, out FixedTickTimeComponent fixedTickAfter), Is.True);
             Assert.That(fixedTickAfter.Accumulator, Is.EqualTo(0.1f).Within(1e-6f));
@@ -233,6 +236,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick));
             Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pausedRuntime), Is.True);
             Assert.That(pausedRuntime.HasStep, Is.EqualTo(0));
+            Assert.That(pausedRuntime.CurrentLogicFrame, Is.EqualTo(baseTick));
 
             fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
             fixedTick.StepRequested = 1;
@@ -244,12 +248,14 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent stepRuntime), Is.True);
             Assert.That(stepRuntime.HasStep, Is.EqualTo(1));
             Assert.That(stepRuntime.LogicDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
+            Assert.That(stepRuntime.CurrentLogicFrame, Is.EqualTo(baseTick + 1u));
 
             world.SetTime(new TimeData(4d / 60d, 0.2f));
             simGroup.Update();
             Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick + 1u));
             Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pauseRuntimeAfterStep), Is.True);
             Assert.That(pauseRuntimeAfterStep.HasStep, Is.EqualTo(0));
+            Assert.That(pauseRuntimeAfterStep.CurrentLogicFrame, Is.EqualTo(baseTick + 1u));
         }
 
         [Test]
@@ -2684,10 +2690,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ReplayInput_RecordAndPlayback_RoundTripsFrameSnapshots()
         {
-            using var world = CreateDefaultTestWorld("ReplayRecordPlaybackWorld", out _);
-            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
+            using var world = CreateDefaultTestWorld("ReplayRecordPlaybackWorld", out var simGroup);
             var em = world.EntityManager;
             CreatePlayer(em);
 
@@ -2712,7 +2715,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var expected = new List<ReplayInputFrameBufferElement>();
             for (int i = 0; i < 6; i++)
             {
-                uint frame = (uint)i;
+                uint frame = (uint)(i + 1);
                 var sync = new PlayerGoSyncComponent
                 {
                     Position = new float3(i, 0f, i * 2f),
@@ -2749,9 +2752,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 em.SetComponentData(playerEntity, sync);
                 em.SetComponentData(playerEntity, intent);
-                em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = frame });
                 world.SetTime(new TimeData(i + 1d, 1f));
-                initGroup.Update();
+                simGroup.Update();
             }
 
             replayFrames = em.GetBuffer<ReplayInputFrameBufferElement>(replayEntity);
@@ -2778,10 +2780,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastPlaybackFrame = 0u,
                 MissingFrameCount = 0,
             });
+            em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 0u });
 
             for (int i = 0; i < expected.Count; i++)
             {
-                uint frame = (uint)i;
                 em.SetComponentData(playerEntity, new PlayerGoSyncComponent
                 {
                     Position = new float3(-99f, 0f, -99f),
@@ -2801,9 +2803,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     RequestedCleanupActionSlot = 0,
                     Sequence = 0u,
                 });
-                em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = frame });
                 world.SetTime(new TimeData(100d + i, 1f));
-                initGroup.Update();
+                simGroup.Update();
 
                 var replayed = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
                 var replayedIntent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
@@ -2830,10 +2831,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ReplayInputQueue_CapturesAndConsumesAtCurrentTick()
         {
-            using var world = CreateDefaultTestWorld("ReplayInputQueueCaptureConsumeWorld", out _);
-            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
+            using var world = CreateDefaultTestWorld("ReplayInputQueueCaptureConsumeWorld", out var simGroup);
             var em = world.EntityManager;
             CreatePlayer(em);
 
@@ -2870,14 +2868,14 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 3u });
 
             world.SetTime(new TimeData(1d, 1f / 60f));
-            initGroup.Update();
+            simGroup.Update();
 
             var queueState = em.GetComponentData<ReplayTickInputQueueStateComponent>(replayEntity);
             var queue = em.GetBuffer<ReplayTickInputQueueBufferElement>(replayEntity);
             var intentAfter = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
 
-            Assert.That(queueState.LastEnqueuedTick, Is.EqualTo(3u));
-            Assert.That(queueState.LastConsumedTick, Is.EqualTo(3u));
+            Assert.That(queueState.LastEnqueuedTick, Is.EqualTo(4u));
+            Assert.That(queueState.LastConsumedTick, Is.EqualTo(4u));
             Assert.That(queueState.LastEnqueuedSequence, Is.EqualTo(10u));
             Assert.That(queueState.LastConsumedSequence, Is.EqualTo(10u));
             Assert.That(queueState.PendingCount, Is.EqualTo(0));
@@ -2892,10 +2890,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ReplayInputQueue_DeduplicatesOneShot_WhenSameTickAndSequenceReconsumed()
         {
-            using var world = CreateDefaultTestWorld("ReplayInputQueueDedupWorld", out _);
-            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
+            using var world = CreateDefaultTestWorld("ReplayInputQueueDedupWorld", out var simGroup);
             var em = world.EntityManager;
             CreatePlayer(em);
 
@@ -2933,16 +2928,16 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 9u });
             em.SetComponentData(playerEntity, duplicatedOneShot);
             world.SetTime(new TimeData(1d, 1f / 60f));
-            initGroup.Update();
+            simGroup.Update();
 
             em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = 9u });
             em.SetComponentData(playerEntity, duplicatedOneShot);
             world.SetTime(new TimeData(2d, 1f / 60f));
-            initGroup.Update();
+            simGroup.Update();
 
             var intentAfterSecond = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
             var queueState = em.GetComponentData<ReplayTickInputQueueStateComponent>(replayEntity);
-            Assert.That(queueState.LastConsumedTick, Is.EqualTo(9u));
+            Assert.That(queueState.LastConsumedTick, Is.EqualTo(10u));
             Assert.That(queueState.LastConsumedSequence, Is.EqualTo(77u));
             Assert.That(intentAfterSecond.VacuumRequested, Is.EqualTo(0));
             Assert.That(intentAfterSecond.CleanupActionRequested, Is.EqualTo(0));
@@ -2953,10 +2948,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ReplayInput_PlaybackWithLocalTransform_KeepsSnapshotPoseUnderVariableDeltaTime()
         {
-            using var world = CreateDefaultTestWorld("ReplayPlaybackLocalTransformWorld", out _);
-            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
+            using var world = CreateDefaultTestWorld("ReplayPlaybackLocalTransformWorld", out var simGroup);
             var em = world.EntityManager;
             CreatePlayerWithTransform(em, float3.zero);
             CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 64, maxPendingAgeFrames: 30);
@@ -2976,7 +2968,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 new ReplayInputFrameBufferElement
                 {
-                    Frame = 0u,
+                    Frame = 1u,
                     MoveAxis = new float2(1f, 0f),
                     AimWorldXZ = new float2(5f, 0f),
                     HasAimWorldPoint = 1,
@@ -2990,7 +2982,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 new ReplayInputFrameBufferElement
                 {
-                    Frame = 1u,
+                    Frame = 2u,
                     MoveAxis = new float2(0.7f, -0.2f),
                     AimWorldXZ = new float2(6f, 2f),
                     HasAimWorldPoint = 1,
@@ -3004,7 +2996,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 new ReplayInputFrameBufferElement
                 {
-                    Frame = 2u,
+                    Frame = 3u,
                     MoveAxis = new float2(-0.3f, 0.9f),
                     AimWorldXZ = new float2(2f, 7f),
                     HasAimWorldPoint = 1,
@@ -3018,7 +3010,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 new ReplayInputFrameBufferElement
                 {
-                    Frame = 3u,
+                    Frame = 4u,
                     MoveAxis = new float2(0.4f, 0.4f),
                     AimWorldXZ = new float2(-1f, 9f),
                     HasAimWorldPoint = 1,
@@ -3032,7 +3024,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 new ReplayInputFrameBufferElement
                 {
-                    Frame = 4u,
+                    Frame = 5u,
                     MoveAxis = new float2(-1f, 0.1f),
                     AimWorldXZ = new float2(-4f, 3f),
                     HasAimWorldPoint = 1,
@@ -3064,7 +3056,6 @@ namespace SweepNDodge.DotsBullets.Tests
             double elapsed = 0d;
             for (int i = 0; i < expected.Count; i++)
             {
-                em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = (uint)i });
                 em.SetComponentData(playerEntity, LocalTransform.FromPositionRotationScale(
                     new float3(-100f - i, 0f, -100f - i),
                     quaternion.identity,
@@ -3080,7 +3071,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 });
                 elapsed += deltas[i];
                 world.SetTime(new TimeData(elapsed, deltas[i]));
-                initGroup.Update();
+                simGroup.Update();
 
                 var sync = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
                 var tx = em.GetComponentData<LocalTransform>(playerEntity);
@@ -3100,10 +3091,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ReplayInput_StagedPlayback_ResetsFrameAndAppliesSeedAndFrames()
         {
-            using var world = CreateDefaultTestWorld("ReplayStagedPlaybackWorld", out _);
-            var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-            Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
+            using var world = CreateDefaultTestWorld("ReplayStagedPlaybackWorld", out var simGroup);
             var em = world.EntityManager;
             CreatePlayer(em);
             CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 64, maxPendingAgeFrames: 30);
@@ -3132,7 +3120,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 new ReplayInputFrameBufferElement
                 {
-                    Frame = 0u,
+                    Frame = 1u,
                     MoveAxis = new float2(0.25f, 0.75f),
                     AimWorldXZ = new float2(9f, 11f),
                     HasAimWorldPoint = 1,
@@ -3146,7 +3134,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 new ReplayInputFrameBufferElement
                 {
-                    Frame = 1u,
+                    Frame = 2u,
                     MoveAxis = new float2(-1f, 0f),
                     AimWorldXZ = new float2(-3f, 5f),
                     HasAimWorldPoint = 1,
@@ -3162,7 +3150,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             ReplaySessionStaging.StagePlayback(staged, runSeed: 0x1234u);
             world.SetTime(new TimeData(1d, 1f));
-            initGroup.Update();
+            simGroup.Update();
 
             var controlAfter = em.GetComponentData<ReplayInputControlComponent>(replayEntity);
             var cursorAfter = em.GetComponentData<ReplayInputCursorComponent>(replayEntity);
@@ -3172,9 +3160,9 @@ namespace SweepNDodge.DotsBullets.Tests
             var playerIntentAfter = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
 
             Assert.That(controlAfter.Mode, Is.EqualTo(ReplayInputModeId.Playback));
-            Assert.That(cursorAfter.NextFrameIndex, Is.EqualTo(1), "Frame 0 should be consumed on first update");
+            Assert.That(cursorAfter.NextFrameIndex, Is.EqualTo(1), "First staged replay tick should be consumed on first update");
             Assert.That(framesAfter.Length, Is.EqualTo(2));
-            Assert.That(frameAfter.Value, Is.EqualTo(0u));
+            Assert.That(frameAfter.Value, Is.EqualTo(1u));
             Assert.That(seedAfter.Value, Is.EqualTo(0x1234u));
             Assert.That(playerIntentAfter.MoveAxis, Is.EqualTo(staged[0].MoveAxis));
             Assert.That(playerIntentAfter.AimWorldXZ, Is.EqualTo(staged[0].AimWorldXZ));
@@ -3192,9 +3180,6 @@ namespace SweepNDodge.DotsBullets.Tests
             List<ActiveBulletSnapshot> RunScenario(string worldName)
             {
                 using var world = CreateDefaultTestWorld(worldName, out var simGroup);
-                var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-                Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
                 var em = world.EntityManager;
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 8f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 256, lifetime: 8f);
@@ -3230,7 +3215,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     replayFrames.Add(new ReplayInputFrameBufferElement
                     {
-                        Frame = (uint)i,
+                        Frame = (uint)(i + 1),
                         Position = new float3(0f, 0f, 0f),
                         Rotation = quaternion.identity,
                         SyncRotation = 0,
@@ -3253,7 +3238,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     double elapsed = (i + 1d) / 60d;
                     world.SetTime(new TimeData(elapsed, 1f / 60f));
-                    initGroup.Update();
                     simGroup.Update();
                 }
 
@@ -3309,9 +3293,6 @@ namespace SweepNDodge.DotsBullets.Tests
             List<ActiveBulletSnapshot> RunScenario(string worldName)
             {
                 using var world = CreateDefaultTestWorld(worldName, out var simGroup);
-                var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-                Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
                 var em = world.EntityManager;
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 8f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 512, lifetime: 8f);
@@ -3357,7 +3338,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     replayFrames.Add(new ReplayInputFrameBufferElement
                     {
-                        Frame = (uint)i,
+                        Frame = (uint)(i + 1),
                         Position = float3.zero,
                         Rotation = quaternion.identity,
                         SyncRotation = 0,
@@ -3382,7 +3363,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     float dt = ResolveVariableFrameDelta(i);
                     elapsed += dt;
                     world.SetTime(new TimeData(elapsed, dt));
-                    initGroup.Update();
                     simGroup.Update();
                 }
 
@@ -3422,9 +3402,8 @@ namespace SweepNDodge.DotsBullets.Tests
             List<PlayerTrackSnapshot> RunScenario(string worldName)
             {
                 using var world = CreateDefaultTestWorld(worldName, out _);
-                var initGroup = world.GetExistingSystemManaged<InitializationSystemGroup>();
-                Assert.That(initGroup, Is.Not.Null, "InitializationSystemGroup must exist");
-
+                var simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
+                Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
                 var em = world.EntityManager;
                 CreatePlayerWithTransform(em, float3.zero);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
@@ -3443,7 +3422,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     replayFrames.Add(new ReplayInputFrameBufferElement
                     {
-                        Frame = (uint)i,
+                        Frame = (uint)(i + 1),
                         MoveAxis = math.normalizesafe(new float2((i % 3) - 1f, ((i + 1) % 3) - 1f), float2.zero),
                         AimWorldXZ = new float2((i % 7) - 3f, (i % 5) - 2f),
                         HasAimWorldPoint = 1,
@@ -3476,9 +3455,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 var track = new List<PlayerTrackSnapshot>(frameCount);
                 for (int i = 0; i < frameCount; i++)
                 {
-                    em.SetComponentData(frameCounterEntity, new BulletFrameCounterComponent { Value = (uint)i });
                     world.SetTime(new TimeData((i + 1d) / 60d, 1f / 60f));
-                    initGroup.Update();
+                    simGroup.Update();
 
                     var sync = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
                     var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
@@ -3560,6 +3538,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(LocalTransform),
                 typeof(PlayerGoSyncComponent),
                 typeof(PlayerInputIntentComponent),
+                typeof(PlayerResolvedInputSnapshotComponent),
                 typeof(PlayerRadiusComponent),
                 typeof(VacuumActivationConfigComponent),
                 typeof(VacuumRuntimeStateComponent),
@@ -3585,6 +3564,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
             });
             em.SetComponentData(player, new PlayerInputIntentComponent
+            {
+                MoveAxis = float2.zero,
+                AimWorldXZ = float2.zero,
+                HasAimWorldPoint = 0,
+                VacuumRequested = 0,
+                CleanupActionRequested = 0,
+                RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
+                Sequence = 0u,
+            });
+            em.SetComponentData(player, new PlayerResolvedInputSnapshotComponent
             {
                 MoveAxis = float2.zero,
                 AimWorldXZ = float2.zero,
@@ -3849,7 +3838,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static void CreatePlayer(EntityManager em)
         {
-            var player = em.CreateEntity(typeof(PlayerTag), typeof(PlayerGoSyncComponent), typeof(PlayerInputIntentComponent));
+            var player = em.CreateEntity(
+                typeof(PlayerTag),
+                typeof(PlayerGoSyncComponent),
+                typeof(PlayerInputIntentComponent),
+                typeof(PlayerResolvedInputSnapshotComponent));
             em.SetName(player, "SmokeStress_Player");
             em.SetComponentData(player, new PlayerGoSyncComponent
             {
@@ -3870,11 +3863,26 @@ namespace SweepNDodge.DotsBullets.Tests
                 RequestedCleanupActionSlot = 0,
                 Sequence = 0u,
             });
+            em.SetComponentData(player, new PlayerResolvedInputSnapshotComponent
+            {
+                MoveAxis = float2.zero,
+                AimWorldXZ = float2.zero,
+                HasAimWorldPoint = 0,
+                VacuumRequested = 0,
+                CleanupActionRequested = 0,
+                RequestedCleanupActionSlot = 0,
+                Sequence = 0u,
+            });
         }
 
         private static void CreatePlayerWithTransform(EntityManager em, float3 position)
         {
-            var player = em.CreateEntity(typeof(PlayerTag), typeof(LocalTransform), typeof(PlayerGoSyncComponent), typeof(PlayerInputIntentComponent));
+            var player = em.CreateEntity(
+                typeof(PlayerTag),
+                typeof(LocalTransform),
+                typeof(PlayerGoSyncComponent),
+                typeof(PlayerInputIntentComponent),
+                typeof(PlayerResolvedInputSnapshotComponent));
             em.SetName(player, "SmokeStress_Player_WithTransform");
             em.SetComponentData(player, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
             em.SetComponentData(player, new PlayerGoSyncComponent
@@ -3887,6 +3895,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 RequestedCleanupActionSlot = 0,
             });
             em.SetComponentData(player, new PlayerInputIntentComponent
+            {
+                MoveAxis = float2.zero,
+                AimWorldXZ = float2.zero,
+                HasAimWorldPoint = 0,
+                VacuumRequested = 0,
+                CleanupActionRequested = 0,
+                RequestedCleanupActionSlot = 0,
+                Sequence = 0u,
+            });
+            em.SetComponentData(player, new PlayerResolvedInputSnapshotComponent
             {
                 MoveAxis = float2.zero,
                 AimWorldXZ = float2.zero,

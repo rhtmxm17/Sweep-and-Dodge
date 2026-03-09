@@ -33,6 +33,11 @@ namespace SweepNDodge.DotsBullets
     public partial class FixedTickRootGroup : ComponentSystemGroup { }
 
     [UpdateInGroup(typeof(FixedTickRootGroup))]
+    [UpdateAfter(typeof(FixedTickTimeResolveSystem))]
+    [UpdateBefore(typeof(BulletFramePipelineGroup))]
+    public partial class PlayerFixedStepGroup : ComponentSystemGroup { }
+
+    [UpdateInGroup(typeof(FixedTickRootGroup))]
     public partial class BulletFramePipelineGroup : ComponentSystemGroup { }
 
     [UpdateInGroup(typeof(BulletFramePipelineGroup))]
