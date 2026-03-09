@@ -186,6 +186,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceStableIdComponent>();
             state.RequireForUpdate<SourceAnchorComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
+            state.RequireForUpdate<Shape2DComponent>();
             state.RequireForUpdate<SourceRunDirectorStateComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
             _directorConfigQuery = SystemAPI.QueryBuilder()
@@ -242,23 +243,24 @@ namespace SweepNDodge.DotsBullets
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
-            var anchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(true);
-            var areaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
+            var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
+            var shapeLookup = SystemAPI.GetComponentLookup<Shape2DComponent>(true);
             var directorLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(false);
             var pressureInputLookup = SystemAPI.GetBufferLookup<SourceDirectorPressureInputBuffer>(false);
 
             sourceLookup.Update(ref state);
             stableIdLookup.Update(ref state);
-            anchorLookup.Update(ref state);
-            areaLookup.Update(ref state);
+            txLookup.Update(ref state);
+            shapeLookup.Update(ref state);
             directorLookup.Update(ref state);
             pressureInputLookup.Update(ref state);
 
             var sourceQuery = SystemAPI.QueryBuilder()
                 .WithAll<SourceSpawnComponent>()
                 .WithAll<SourceStableIdComponent>()
-                .WithAll<SourceAnchorComponent>()
                 .WithAll<BulletFieldAreaComponent>()
+                .WithAll<Shape2DComponent>()
+                .WithAll<LocalTransform>()
                 .WithAll<SourceRunDirectorStateComponent>()
                 .Build();
 
@@ -288,8 +290,8 @@ namespace SweepNDodge.DotsBullets
 
                 bool isOccupied = IsPlayerInsideSourceArea(
                     playerPosition,
-                    anchorLookup[sourceEntity].Position,
-                    areaLookup[sourceEntity]);
+                    txLookup[sourceEntity],
+                    shapeLookup[sourceEntity]);
                 director.PressureOccupancySec = isOccupied
                     ? holdSec
                     : math.max(0f, director.PressureOccupancySec - deltaTime);
@@ -375,20 +377,13 @@ namespace SweepNDodge.DotsBullets
 
         private static bool IsPlayerInsideSourceArea(
             float3 playerPosition,
-            float3 sourcePosition,
-            in BulletFieldAreaComponent area)
+            in LocalTransform sourceTx,
+            in Shape2DComponent shape)
         {
-            float dx = playerPosition.x - sourcePosition.x;
-            float dz = playerPosition.z - sourcePosition.z;
-            if (area.Shape == BulletFieldShapeId.Rectangle)
-            {
-                float hx = math.max(0f, area.Size.x * 0.5f);
-                float hz = math.max(0f, area.Size.y * 0.5f);
-                return math.abs(dx) <= hx && math.abs(dz) <= hz;
-            }
-
-            float radius = math.max(0f, area.Radius);
-            return dx * dx + dz * dz <= radius * radius;
+            return Shape2DUtility.ContainsPointXZ(
+                new float2(playerPosition.x, playerPosition.z),
+                in sourceTx,
+                in shape);
         }
 
         private static Entity ResolveFirstEntity(ref EntityQuery query)

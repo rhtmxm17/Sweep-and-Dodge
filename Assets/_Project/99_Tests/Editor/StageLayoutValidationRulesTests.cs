@@ -43,8 +43,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 layout.StageId = 3;
                 layout.Sources = new[]
                 {
-                    new StageSourceLayoutData { StableId = 100, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 4f },
-                    new StageSourceLayoutData { StableId = 100, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 5f },
+                    new StageSourceLayoutData { StableId = 100, Active = true, Shape = Shape2DKind.Circle, Radius = 4f },
+                    new StageSourceLayoutData { StableId = 100, Active = true, Shape = Shape2DKind.Circle, Radius = 5f },
                 };
                 layout.Deposits = new[]
                 {
@@ -76,7 +76,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 layout.StageId = 5;
                 layout.Sources = new[]
                 {
-                    new StageSourceLayoutData { StableId = 10, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
+                    new StageSourceLayoutData { StableId = 10, Active = true, Shape = Shape2DKind.Circle, Radius = 2f },
                 };
                 layout.Deposits = new[]
                 {
@@ -112,7 +112,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 layout.StageId = 7;
                 layout.Sources = new[]
                 {
-                    new StageSourceLayoutData { StableId = 10, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
+                    new StageSourceLayoutData { StableId = 10, Active = true, Shape = Shape2DKind.Circle, Radius = 2f },
                 };
                 layout.Deposits = new[]
                 {
@@ -124,7 +124,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         StableId = 30,
                         Active = true,
-                        Shape = ObstacleShape.Box,
+                        Shape = Shape2DKind.Rectangle,
                         Size = new Vector2(2f, 2f),
                         CollisionMask = ObstacleCollisionMask.None,
                     },

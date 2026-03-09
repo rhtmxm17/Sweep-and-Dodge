@@ -98,8 +98,8 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(player, LocalTransform.FromPosition(float3.zero));
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
 
-            var deposit = em.CreateEntity(typeof(DepositPointComponent), typeof(LocalTransform));
-            em.SetComponentData(deposit, new DepositPointComponent { Radius = 1f });
+            var deposit = em.CreateEntity(typeof(DepositPointComponent), typeof(Shape2DComponent), typeof(LocalTransform));
+            em.SetComponentData(deposit, new Shape2DComponent { Kind = Shape2DKind.Circle, Radius = 1f, Size = float2.zero });
             em.SetComponentData(deposit, LocalTransform.FromPosition(new float3(0.25f, 0f, 0f)));
 
             world.GetOrCreateSystem<PlayerCarryBinDepositRequestSystem>().Update(world.Unmanaged);

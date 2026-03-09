@@ -9,9 +9,9 @@ namespace SweepNDodge.DotsBullets
         public bool Active = true;
 
         [Header("Field")]
-        public BulletFieldShapeId FieldShape = BulletFieldShapeId.Circle;
-        [Min(0f)] public float FieldRadius = 8f;
-        public Vector2 FieldSize = new Vector2(12f, 8f);
+        public Shape2DKind Shape = Shape2DKind.Circle;
+        [Min(0f)] public float Radius = 8f;
+        public Vector2 Size = new Vector2(12f, 8f);
 
         [Header("Debug")]
         public bool DrawGizmo = true;
@@ -25,19 +25,28 @@ namespace SweepNDodge.DotsBullets
             var previousMatrix = Gizmos.matrix;
             Gizmos.color = Active ? new Color(0.15f, 0.9f, 0.35f, 1f) : new Color(0.35f, 0.35f, 0.35f, 1f);
 
-            if (FieldShape == BulletFieldShapeId.Rectangle)
+            if (Shape == Shape2DKind.Rectangle)
             {
-                var size = new Vector3(Mathf.Max(0f, FieldSize.x), 0f, Mathf.Max(0f, FieldSize.y));
+                var size = new Vector3(Mathf.Max(0f, Size.x), 0f, Mathf.Max(0f, Size.y));
                 Gizmos.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
                 Gizmos.DrawWireCube(Vector3.zero, size);
             }
             else
             {
-                Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, FieldRadius));
+                Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, Radius));
             }
 
             Gizmos.matrix = previousMatrix;
             Gizmos.color = previousColor;
+        }
+
+        private void OnValidate()
+        {
+            var euler = transform.eulerAngles;
+            if (Mathf.Abs(Mathf.DeltaAngle(0f, euler.x)) > 0.001f || Mathf.Abs(Mathf.DeltaAngle(0f, euler.z)) > 0.001f)
+            {
+                transform.rotation = Quaternion.Euler(0f, euler.y, 0f);
+            }
         }
     }
 }

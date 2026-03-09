@@ -12,9 +12,9 @@ namespace SweepNDodge.DotsBullets.Tests
         public void ObstacleGeometryUtility_ContainsPointXZ_WorksForCircleAndRotatedBox()
         {
             var circleTx = LocalTransform.FromPositionRotationScale(new float3(1f, 0f, 2f), quaternion.identity, 1f);
-            var circle = new ObstacleGeometryComponent
+            var circle = new Shape2DComponent
             {
-                Shape = ObstacleShape.Circle,
+                Kind = Shape2DKind.Circle,
                 Radius = 2f,
                 Size = float2.zero,
             };
@@ -25,9 +25,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 new float3(0f, 0f, 0f),
                 quaternion.RotateY(math.radians(90f)),
                 1f);
-            var box = new ObstacleGeometryComponent
+            var box = new Shape2DComponent
             {
-                Shape = ObstacleShape.Box,
+                Kind = Shape2DKind.Rectangle,
                 Radius = 0f,
                 Size = new float2(4f, 2f),
             };
@@ -39,9 +39,9 @@ namespace SweepNDodge.DotsBullets.Tests
         public void ObstacleGeometryUtility_OverlapsCircleXZ_WorksForCircleAndRotatedBox()
         {
             var circleTx = LocalTransform.FromPositionRotationScale(new float3(0f, 0f, 0f), quaternion.identity, 1f);
-            var circle = new ObstacleGeometryComponent
+            var circle = new Shape2DComponent
             {
-                Shape = ObstacleShape.Circle,
+                Kind = Shape2DKind.Circle,
                 Radius = 1f,
                 Size = float2.zero,
             };
@@ -52,9 +52,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 new float3(0f, 0f, 0f),
                 quaternion.RotateY(math.radians(45f)),
                 1f);
-            var box = new ObstacleGeometryComponent
+            var box = new Shape2DComponent
             {
-                Shape = ObstacleShape.Box,
+                Kind = Shape2DKind.Rectangle,
                 Radius = 0f,
                 Size = new float2(2f, 2f),
             };
@@ -73,7 +73,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 InvCellSize = 1f,
             });
-            CreateObstacle(em, new float3(0f, 0f, 0f), ObstacleShape.Box, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockBullet);
+            CreateObstacle(em, new float3(0f, 0f, 0f), Shape2DKind.Rectangle, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockBullet);
             var bullet = CreateBullet(em, new float3(0.4f, 0f, 0.4f));
 
             WithInitializedCellMap(new[] { bullet }, em, 8, () =>
@@ -112,7 +112,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 InvCellSize = 1f,
             });
 
-            CreateObstacle(em, new float3(0f, 0f, 0f), ObstacleShape.Box, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockPlayer);
+            CreateObstacle(em, new float3(0f, 0f, 0f), Shape2DKind.Rectangle, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockPlayer);
             var bullet = CreateBullet(em, new float3(0.2f, 0f, 0.2f));
 
             WithInitializedCellMap(new[] { bullet }, em, 8, () =>
@@ -138,7 +138,7 @@ namespace SweepNDodge.DotsBullets.Tests
             CreateObstacle(
                 em,
                 new float3(1.5f, 0f, 1.5f),
-                ObstacleShape.Box,
+                Shape2DKind.Rectangle,
                 radius: 0f,
                 size: new float2(4f, 2f),
                 ObstacleCollisionMask.BlockBullet,
@@ -163,7 +163,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
 
             SetGameplayReadySingletons(em);
-            CreateObstacle(em, new float3(0.45f, 0f, 0.8f), ObstacleShape.Circle, radius: 0.45f, size: float2.zero, ObstacleCollisionMask.BlockPlayer);
+            CreateObstacle(em, new float3(0.45f, 0f, 0.8f), Shape2DKind.Circle, radius: 0.45f, size: float2.zero, ObstacleCollisionMask.BlockPlayer);
             var player = CreatePlayer(em, prev: new float3(0f, 0f, 0f), current: new float3(1f, 0f, 1f), radius: 0.25f);
 
             world.GetOrCreateSystem<PlayerObstacleBlockSystem>().Update(world.Unmanaged);
@@ -180,7 +180,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
 
             SetGameplayReadySingletons(em);
-            CreateObstacle(em, new float3(0.8f, 0f, 0.45f), ObstacleShape.Circle, radius: 0.45f, size: float2.zero, ObstacleCollisionMask.BlockPlayer);
+            CreateObstacle(em, new float3(0.8f, 0f, 0.45f), Shape2DKind.Circle, radius: 0.45f, size: float2.zero, ObstacleCollisionMask.BlockPlayer);
             var player = CreatePlayer(em, prev: new float3(0f, 0f, 0f), current: new float3(1f, 0f, 1f), radius: 0.25f);
 
             world.GetOrCreateSystem<PlayerObstacleBlockSystem>().Update(world.Unmanaged);
@@ -197,7 +197,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
 
             SetGameplayReadySingletons(em);
-            CreateObstacle(em, new float3(0.5f, 0f, 0.5f), ObstacleShape.Circle, radius: 0.6f, size: float2.zero, ObstacleCollisionMask.BlockPlayer);
+            CreateObstacle(em, new float3(0.5f, 0f, 0.5f), Shape2DKind.Circle, radius: 0.6f, size: float2.zero, ObstacleCollisionMask.BlockPlayer);
             var player = CreatePlayer(em, prev: new float3(0f, 0f, 0f), current: new float3(1f, 0f, 1f), radius: 0.25f);
 
             world.GetOrCreateSystem<PlayerObstacleBlockSystem>().Update(world.Unmanaged);
@@ -231,7 +231,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 UsingFixedTick = 0,
             });
 
-            CreateObstacle(em, new float3(0f, 0f, 0f), ObstacleShape.Box, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockBullet);
+            CreateObstacle(em, new float3(0f, 0f, 0f), Shape2DKind.Rectangle, radius: 0f, size: new float2(2f, 2f), ObstacleCollisionMask.BlockBullet);
             var player = CreatePlayer(em, prev: new float3(0f, 0f, 0f), current: new float3(0.5f, 0f, 0.5f), radius: 0.25f);
 
             world.GetOrCreateSystem<PlayerObstacleBlockSystem>().Update(world.Unmanaged);
@@ -265,7 +265,7 @@ namespace SweepNDodge.DotsBullets.Tests
         private static Entity CreateObstacle(
             EntityManager em,
             float3 position,
-            ObstacleShape shape,
+            Shape2DKind shape,
             float radius,
             float2 size,
             ObstacleCollisionMask mask,
@@ -276,13 +276,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(ObstacleStableIdComponent),
                 typeof(ObstacleCollisionMaskComponent),
                 typeof(ObstacleGeometryComponent),
+                typeof(Shape2DComponent),
                 typeof(LocalTransform));
 
             em.SetComponentData(entity, new ObstacleStableIdComponent { Value = 1u });
             em.SetComponentData(entity, new ObstacleCollisionMaskComponent { Value = mask });
-            em.SetComponentData(entity, new ObstacleGeometryComponent
+            em.SetComponentData(entity, new Shape2DComponent
             {
-                Shape = shape,
+                Kind = shape,
                 Radius = radius,
                 Size = size,
             });

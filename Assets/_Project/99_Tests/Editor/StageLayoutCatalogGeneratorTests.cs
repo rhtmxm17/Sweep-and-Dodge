@@ -41,13 +41,13 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var sourceA = srcA.AddComponent<StageSourceMarker>();
                 sourceA.StableId = 20;
-                sourceA.FieldShape = BulletFieldShapeId.Circle;
-                sourceA.FieldRadius = 4f;
+                sourceA.Shape = Shape2DKind.Circle;
+                sourceA.Radius = 4f;
 
                 var sourceB = srcB.AddComponent<StageSourceMarker>();
                 sourceB.StableId = 10;
-                sourceB.FieldShape = BulletFieldShapeId.Circle;
-                sourceB.FieldRadius = 4f;
+                sourceB.Shape = Shape2DKind.Circle;
+                sourceB.Radius = 4f;
 
                 var deposit1 = dep1.AddComponent<StageDepositMarker>();
                 deposit1.StableId = 30;

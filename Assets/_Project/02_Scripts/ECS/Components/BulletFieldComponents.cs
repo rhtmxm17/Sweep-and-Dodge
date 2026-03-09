@@ -3,10 +3,17 @@ using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
-    public enum BulletFieldShapeId : byte
+    public enum Shape2DKind : byte
     {
         Circle = 0,
-        Rectangle = 1
+        Rectangle = 1,
+    }
+
+    public struct Shape2DComponent : IComponentData
+    {
+        public Shape2DKind Kind;
+        public float Radius;
+        public float2 Size;
     }
 
     // Singleton Config
@@ -251,12 +258,14 @@ namespace SweepNDodge.DotsBullets
         public float3 Position;
     }
 
-    // Source가 탄환을 뿌리는 영역 정의(형태 + 면적 캐시)
+    // Source가 탄환을 뿌리는 planar field semantic marker.
     public struct BulletFieldAreaComponent : IComponentData
     {
-        public BulletFieldShapeId Shape;
-        public float Radius;
-        public float2 Size;
+    }
+
+    public struct SourceShapeDerivedComponent : IComponentData
+    {
         public float ComputedArea;
+        public float2 HalfExtents;
     }
 }

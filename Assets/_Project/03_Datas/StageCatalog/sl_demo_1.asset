@@ -18,27 +18,30 @@ MonoBehaviour:
     Active: 1
     Position: {x: 0, y: 0, z: 0}
     YawDeg: 0
-    FieldShape: 1
-    FieldRadius: 8
-    FieldSize: {x: 12, y: 8}
+    Shape: 1
+    Radius: 8
+    Size: {x: 12, y: 8}
   Deposits:
   - StableId: 2001
     Active: 1
     Position: {x: 0, y: 0, z: 10}
+    YawDeg: 0
+    Shape: 0
     Radius: 5
+    Size: {x: 0, y: 0}
   Obstacles:
   - StableId: 3001
     Active: 1
     Position: {x: 0, y: 0, z: -5}
-    EulerRotation: {x: -0, y: 0, z: 0}
+    YawDeg: 0
     Shape: 1
     Radius: 1
     Size: {x: 8, y: 2}
-    CollisionMask: 255
+    CollisionMask: 3
   - StableId: 3002
     Active: 1
     Position: {x: 6, y: 0, z: 0}
-    EulerRotation: {x: -0, y: 0, z: 0}
+    YawDeg: 0
     Shape: 1
     Radius: 1
     Size: {x: 2, y: 4}

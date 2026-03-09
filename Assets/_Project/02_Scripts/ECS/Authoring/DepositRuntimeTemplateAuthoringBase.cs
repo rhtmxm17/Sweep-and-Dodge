@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
@@ -9,7 +10,9 @@ namespace SweepNDodge.DotsBullets
         [Header("Identity")]
         [Min(0)] public uint StableIdOverride = 0;
 
+        public Shape2DKind Shape = Shape2DKind.Circle;
         [Min(0f)] public float Radius = 1.2f;
+        public Vector2 Size = new Vector2(2f, 2f);
 
         [Header("Debug")]
         public bool DrawGizmo = true;
@@ -25,7 +28,12 @@ namespace SweepNDodge.DotsBullets
 
             baker.AddComponent(e, new DepositPointComponent
             {
-                Radius = Mathf.Max(0f, authoring.Radius)
+            });
+            baker.AddComponent(e, new Shape2DComponent
+            {
+                Kind = authoring.Shape,
+                Radius = Mathf.Max(0f, authoring.Radius),
+                Size = new float2(Mathf.Max(0f, authoring.Size.x), Mathf.Max(0f, authoring.Size.y)),
             });
 
             baker.AddComponent(e, new DepositStableIdComponent
@@ -86,7 +94,17 @@ namespace SweepNDodge.DotsBullets
         {
             var prev = Gizmos.color;
             Gizmos.color = new Color(0.2f, 0.7f, 1f, 1f);
-            Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, Radius));
+            if (Shape == Shape2DKind.Rectangle)
+            {
+                var prevMatrix = Gizmos.matrix;
+                Gizmos.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
+                Gizmos.DrawWireCube(Vector3.zero, new Vector3(Mathf.Max(0f, Size.x), 0f, Mathf.Max(0f, Size.y)));
+                Gizmos.matrix = prevMatrix;
+            }
+            else
+            {
+                Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, Radius));
+            }
             Gizmos.color = prev;
         }
     }

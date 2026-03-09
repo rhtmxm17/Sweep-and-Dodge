@@ -18,14 +18,17 @@ MonoBehaviour:
     Active: 1
     Position: {x: 14, y: 0, z: -8}
     YawDeg: 0
-    FieldShape: 1
-    FieldRadius: 8
-    FieldSize: {x: 18, y: 12}
+    Shape: 1
+    Radius: 8
+    Size: {x: 18, y: 12}
   Deposits:
   - StableId: 2001
     Active: 1
     Position: {x: 14, y: 0, z: 8}
+    YawDeg: 0
+    Shape: 0
     Radius: 3.5
+    Size: {x: 0, y: 0}
   Obstacles: []
   Visuals:
   - StableId: 9003

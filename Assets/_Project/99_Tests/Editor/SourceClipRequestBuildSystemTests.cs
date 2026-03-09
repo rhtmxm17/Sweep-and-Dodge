@@ -103,6 +103,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(SourceSpawnComponent),
                 typeof(SourceRunDirectorStateComponent),
                 typeof(BulletFieldAreaComponent),
+                typeof(Shape2DComponent),
+                typeof(SourceShapeDerivedComponent),
                 typeof(SourceStableIdComponent),
                 typeof(SourceSustainRuntimeComponent),
                 typeof(SourceEventRuntimeComponent));
@@ -122,12 +124,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 DensityScale = 1f,
                 Version = 1u,
             });
-            em.SetComponentData(entity, new BulletFieldAreaComponent
+            var shape = new Shape2DComponent
             {
-                Shape = BulletFieldShapeId.Circle,
+                Kind = Shape2DKind.Circle,
                 Radius = 1f,
                 Size = new float2(2f, 2f),
-                ComputedArea = math.PI,
+            };
+            em.SetComponentData(entity, shape);
+            em.SetComponentData(entity, new SourceShapeDerivedComponent
+            {
+                ComputedArea = Shape2DUtility.ComputeArea(in shape),
+                HalfExtents = Shape2DUtility.ComputeHalfExtents(in shape),
             });
             em.SetComponentData(entity, new SourceStableIdComponent
             {

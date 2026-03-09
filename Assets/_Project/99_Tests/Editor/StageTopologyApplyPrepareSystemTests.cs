@@ -101,7 +101,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 AssertTopologyOwned(em, deposit, StageTopologyKind.Deposit, 1u);
                 Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceA).Length, Is.GreaterThan(0));
                 Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceB).Length, Is.GreaterThan(0));
-                Assert.That(em.GetComponentData<DepositPointComponent>(deposit).Radius, Is.GreaterThan(0f));
+                Assert.That(em.GetComponentData<Shape2DComponent>(deposit).Radius, Is.GreaterThan(0f));
             }
             finally
             {
@@ -235,10 +235,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(obstacles.Length, Is.EqualTo(1));
 
                 var obstacle = FindByStableId<ObstacleStableIdComponent>(em, obstacles, 3001u, c => c.Value);
-                var geometry = em.GetComponentData<ObstacleGeometryComponent>(obstacle);
+                var geometry = em.GetComponentData<Shape2DComponent>(obstacle);
                 var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle);
 
-                Assert.That(geometry.Shape, Is.EqualTo(ObstacleShape.Box));
+                Assert.That(geometry.Kind, Is.EqualTo(Shape2DKind.Rectangle));
                 Assert.That(geometry.Size.x, Is.EqualTo(3f).Within(0.01f));
                 Assert.That(geometry.Size.y, Is.EqualTo(2f).Within(0.01f));
                 Assert.That(mask.Value, Is.EqualTo(ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet));
@@ -324,8 +324,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     StableId = 3001u,
                     Active = true,
                     Position = new Vector3(2f, 0f, 1f),
-                    EulerRotation = Vector3.zero,
-                    Shape = ObstacleShape.Circle,
+                    YawDeg = 0f,
+                    Shape = Shape2DKind.Circle,
                     Radius = 0f,
                     Size = Vector2.zero,
                     CollisionMask = ObstacleCollisionMask.BlockBullet,
@@ -899,6 +899,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(SourceSpawnRuntimeComponent),
                 typeof(SourceAnchorComponent),
                 typeof(BulletFieldAreaComponent),
+                typeof(Shape2DComponent),
+                typeof(SourceShapeDerivedComponent),
                 typeof(SourcePollutionConfigComponent),
                 typeof(SourcePollutionGridComponent),
                 typeof(SourceSustainRuntimeComponent),
@@ -916,12 +918,17 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             em.SetComponentData(entity, new SourceSpawnRuntimeComponent { SpawnSequence = 1u });
             em.SetComponentData(entity, new SourceAnchorComponent { Position = float3.zero });
-            em.SetComponentData(entity, new BulletFieldAreaComponent
+            var sourceShape = new Shape2DComponent
             {
-                Shape = BulletFieldShapeId.Circle,
+                Kind = Shape2DKind.Circle,
                 Radius = 8f,
                 Size = new float2(12f, 8f),
-                ComputedArea = SourceRuntimeApplyUtility.ComputeArea(BulletFieldShapeId.Circle, 8f, new Vector2(12f, 8f)),
+            };
+            em.SetComponentData(entity, sourceShape);
+            em.SetComponentData(entity, new SourceShapeDerivedComponent
+            {
+                ComputedArea = Shape2DUtility.ComputeArea(in sourceShape),
+                HalfExtents = Shape2DUtility.ComputeHalfExtents(in sourceShape),
             });
             em.SetComponentData(entity, new SourcePollutionConfigComponent
             {
@@ -977,9 +984,10 @@ namespace SweepNDodge.DotsBullets.Tests
             var entity = em.CreateEntity(
                 typeof(DepositStableIdComponent),
                 typeof(DepositPointComponent),
+                typeof(Shape2DComponent),
                 typeof(LocalTransform));
             em.SetComponentData(entity, new DepositStableIdComponent { Value = 1u });
-            em.SetComponentData(entity, new DepositPointComponent { Radius = 1.2f });
+            em.SetComponentData(entity, new Shape2DComponent { Kind = Shape2DKind.Circle, Radius = 1.2f, Size = float2.zero });
             em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
             return entity;
         }
@@ -990,6 +998,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(ObstacleStableIdComponent),
                 typeof(ObstacleCollisionMaskComponent),
                 typeof(ObstacleGeometryComponent),
+                typeof(Shape2DComponent),
                 typeof(LocalTransform));
 
             em.SetComponentData(entity, new ObstacleStableIdComponent { Value = 1u });
@@ -997,9 +1006,9 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 Value = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
             });
-            em.SetComponentData(entity, new ObstacleGeometryComponent
+            em.SetComponentData(entity, new Shape2DComponent
             {
-                Shape = ObstacleShape.Box,
+                Kind = Shape2DKind.Rectangle,
                 Radius = 1f,
                 Size = new float2(2f, 2f),
             });
@@ -1125,9 +1134,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     Active = true,
                     Position = new Vector3(i * 3f, 0f, stageId * 2f),
                     YawDeg = i * 30f,
-                    FieldShape = i % 2 == 0 ? BulletFieldShapeId.Circle : BulletFieldShapeId.Rectangle,
-                    FieldRadius = 6f + i,
-                    FieldSize = new Vector2(8f + i, 6f + i),
+                    Shape = i % 2 == 0 ? Shape2DKind.Circle : Shape2DKind.Rectangle,
+                    Radius = 6f + i,
+                    Size = new Vector2(8f + i, 6f + i),
                 };
             }
 
@@ -1139,6 +1148,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     StableId = depositStableIds[i],
                     Active = true,
                     Position = new Vector3(stageId * 5f, 0f, i * 4f),
+                    Shape = Shape2DKind.Circle,
                     Radius = 3f + i,
                 };
             }
@@ -1152,8 +1162,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     StableId = obstacleStableIds[i],
                     Active = true,
                     Position = new Vector3(stageId * 2f, 0f, -4f + (i * 3f)),
-                    EulerRotation = new Vector3(0f, i * 15f, 0f),
-                    Shape = ObstacleShape.Box,
+                    YawDeg = i * 15f,
+                    Shape = Shape2DKind.Rectangle,
                     Radius = 0f,
                     Size = new Vector2(3f + i, 2f + i),
                     CollisionMask = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,

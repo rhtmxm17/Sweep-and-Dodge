@@ -66,8 +66,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 string location = $"{stageLocation}/Sources[{i}]";
                 if (entry.StableId == 0)
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL004", location, "StableId must be >= 1."));
-                if (entry.FieldRadius < 0f || entry.FieldSize.x < 0f || entry.FieldSize.y < 0f)
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL005", location, "Source field radius/size must be >= 0."));
+                bool invalid = entry.Shape == Shape2DKind.Circle
+                    ? entry.Radius < 0f
+                    : (entry.Size.x < 0f || entry.Size.y < 0f);
+                if (invalid)
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL005", location, "Source shape radius/size must be >= 0."));
             }
         }
 
@@ -83,8 +86,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 string location = $"{stageLocation}/Deposits[{i}]";
                 if (entry.StableId == 0)
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL004", location, "StableId must be >= 1."));
-                if (entry.Radius < 0f)
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL005", location, "Deposit radius must be >= 0."));
+                bool invalid = entry.Shape == Shape2DKind.Circle
+                    ? entry.Radius < 0f
+                    : (entry.Size.x < 0f || entry.Size.y < 0f);
+                if (invalid)
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL005", location, "Deposit shape radius/size must be >= 0."));
             }
         }
 
@@ -101,7 +107,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (entry.StableId == 0)
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL004", location, "StableId must be >= 1."));
 
-                bool invalid = entry.Shape == ObstacleShape.Circle
+                bool invalid = entry.Shape == Shape2DKind.Circle
                     ? entry.Radius <= 0f
                     : (entry.Size.x <= 0f || entry.Size.y <= 0f);
                 if (invalid)

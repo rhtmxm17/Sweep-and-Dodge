@@ -29,8 +29,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 layout.StageId = 1;
                 layout.Sources = new[]
                 {
-                    new StageSourceLayoutData { StableId = 1001u, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
-                    new StageSourceLayoutData { StableId = 1002u, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 3f },
+                    new StageSourceLayoutData { StableId = 1001u, Active = true, Shape = Shape2DKind.Circle, Radius = 2f },
+                    new StageSourceLayoutData { StableId = 1002u, Active = true, Shape = Shape2DKind.Circle, Radius = 3f },
                 };
 
                 definition.StageId = 1;

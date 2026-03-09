@@ -603,6 +603,24 @@ namespace SweepNDodge.DotsBullets
                 em.RemoveComponent<StageTopologyDepositTag>(entity);
             if (em.HasComponent<StageTopologyObstacleTag>(entity))
                 em.RemoveComponent<StageTopologyObstacleTag>(entity);
+            if (!em.HasComponent<BulletFieldAreaComponent>(entity))
+                em.AddComponent<BulletFieldAreaComponent>(entity);
+            if (!em.HasComponent<Shape2DComponent>(entity))
+            {
+                em.AddComponentData(entity, new Shape2DComponent
+                {
+                    Kind = Shape2DKind.Circle,
+                    Radius = 1f,
+                    Size = float2.zero,
+                });
+            }
+            if (!em.HasComponent<SourceShapeDerivedComponent>(entity))
+            {
+                var defaultShape = em.GetComponentData<Shape2DComponent>(entity);
+                var derived = default(SourceShapeDerivedComponent);
+                SourceRuntimeApplyUtility.RefreshSourceShapeDerived(in defaultShape, ref derived);
+                em.AddComponentData(entity, derived);
+            }
         }
 
         private static void EnsureDepositTags(EntityManager em, Entity entity)
@@ -616,6 +634,17 @@ namespace SweepNDodge.DotsBullets
                 em.RemoveComponent<StageTopologySourceTag>(entity);
             if (em.HasComponent<StageTopologyObstacleTag>(entity))
                 em.RemoveComponent<StageTopologyObstacleTag>(entity);
+            if (!em.HasComponent<DepositPointComponent>(entity))
+                em.AddComponent<DepositPointComponent>(entity);
+            if (!em.HasComponent<Shape2DComponent>(entity))
+            {
+                em.AddComponentData(entity, new Shape2DComponent
+                {
+                    Kind = Shape2DKind.Circle,
+                    Radius = 1f,
+                    Size = float2.zero,
+                });
+            }
         }
 
         private static void EnsureObstacleTags(EntityManager em, Entity entity)
@@ -640,10 +669,12 @@ namespace SweepNDodge.DotsBullets
                 });
             }
             if (!em.HasComponent<ObstacleGeometryComponent>(entity))
+                em.AddComponent<ObstacleGeometryComponent>(entity);
+            if (!em.HasComponent<Shape2DComponent>(entity))
             {
-                em.AddComponentData(entity, new ObstacleGeometryComponent
+                em.AddComponentData(entity, new Shape2DComponent
                 {
-                    Shape = ObstacleShape.Box,
+                    Kind = Shape2DKind.Rectangle,
                     Radius = 1f,
                     Size = new float2(2f, 2f),
                 });
@@ -868,7 +899,8 @@ namespace SweepNDodge.DotsBullets
         private static void ApplySourceLayout(EntityManager em, Entity entity, StageSourceLayoutData sourceData)
         {
             var anchor = em.GetComponentData<SourceAnchorComponent>(entity);
-            var area = em.GetComponentData<BulletFieldAreaComponent>(entity);
+            var shape = em.GetComponentData<Shape2DComponent>(entity);
+            var derived = em.GetComponentData<SourceShapeDerivedComponent>(entity);
             var tx = em.GetComponentData<LocalTransform>(entity);
             var pollutionConfig = em.GetComponentData<SourcePollutionConfigComponent>(entity);
             var pollutionGrid = em.GetComponentData<SourcePollutionGridComponent>(entity);
@@ -878,13 +910,14 @@ namespace SweepNDodge.DotsBullets
             tx.Position = position;
             tx.Rotation = quaternion.RotateY(math.radians(sourceData.YawDeg));
 
-            area.Shape = sourceData.FieldShape;
-            area.Radius = math.max(0f, sourceData.FieldRadius);
-            area.Size = math.max(float2.zero, new float2(sourceData.FieldSize.x, sourceData.FieldSize.y));
-            area.ComputedArea = SourceRuntimeApplyUtility.ComputeArea(area.Shape, area.Radius, new Vector2(area.Size.x, area.Size.y));
+            shape.Kind = sourceData.Shape;
+            shape.Radius = math.max(0f, sourceData.Radius);
+            shape.Size = math.max(float2.zero, new float2(sourceData.Size.x, sourceData.Size.y));
+            SourceRuntimeApplyUtility.RefreshSourceShapeDerived(in shape, ref derived);
 
             SourceRuntimeApplyUtility.RebuildPollutionGrid(
-                in area,
+                in shape,
+                in derived,
                 in pollutionConfig,
                 ref pollutionGrid,
                 em.GetBuffer<SourcePollutionCellBuffer>(entity),
@@ -892,7 +925,8 @@ namespace SweepNDodge.DotsBullets
                 em.GetBuffer<SourcePollutionValidCellIndexBuffer>(entity));
 
             em.SetComponentData(entity, anchor);
-            em.SetComponentData(entity, area);
+            em.SetComponentData(entity, shape);
+            em.SetComponentData(entity, derived);
             em.SetComponentData(entity, tx);
             em.SetComponentData(entity, pollutionGrid);
         }
@@ -1064,13 +1098,16 @@ namespace SweepNDodge.DotsBullets
 
         private static void ApplyDeposit(EntityManager em, Entity entity, StageDepositLayoutData depositData)
         {
-            var deposit = em.GetComponentData<DepositPointComponent>(entity);
+            var shape = em.GetComponentData<Shape2DComponent>(entity);
             var tx = em.GetComponentData<LocalTransform>(entity);
 
-            deposit.Radius = math.max(0f, depositData.Radius);
+            shape.Kind = depositData.Shape;
+            shape.Radius = math.max(0f, depositData.Radius);
+            shape.Size = math.max(float2.zero, new float2(depositData.Size.x, depositData.Size.y));
             tx.Position = new float3(depositData.Position.x, depositData.Position.y, depositData.Position.z);
+            tx.Rotation = quaternion.RotateY(math.radians(depositData.YawDeg));
 
-            em.SetComponentData(entity, deposit);
+            em.SetComponentData(entity, shape);
             em.SetComponentData(entity, tx);
         }
 
@@ -1085,29 +1122,31 @@ namespace SweepNDodge.DotsBullets
 
         private static void DisableDeposit(EntityManager em, Entity entity)
         {
-            var deposit = em.GetComponentData<DepositPointComponent>(entity);
+            var shape = em.GetComponentData<Shape2DComponent>(entity);
             var tx = em.GetComponentData<LocalTransform>(entity);
-            deposit.Radius = 0f;
+            shape.Radius = 0f;
+            shape.Size = float2.zero;
             tx.Position = DepositSinkPosition;
-            em.SetComponentData(entity, deposit);
+            tx.Rotation = quaternion.identity;
+            em.SetComponentData(entity, shape);
             em.SetComponentData(entity, tx);
         }
 
         private static void ApplyObstacle(EntityManager em, Entity entity, StageObstacleLayoutData obstacleData)
         {
-            var geometry = em.GetComponentData<ObstacleGeometryComponent>(entity);
+            var shape = em.GetComponentData<Shape2DComponent>(entity);
             var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(entity);
             var tx = em.GetComponentData<LocalTransform>(entity);
 
-            geometry.Shape = obstacleData.Shape;
-            geometry.Radius = math.max(0f, obstacleData.Radius);
-            geometry.Size = math.max(float2.zero, new float2(obstacleData.Size.x, obstacleData.Size.y));
+            shape.Kind = obstacleData.Shape;
+            shape.Radius = math.max(0f, obstacleData.Radius);
+            shape.Size = math.max(float2.zero, new float2(obstacleData.Size.x, obstacleData.Size.y));
             mask.Value = obstacleData.CollisionMask;
 
             tx.Position = new float3(obstacleData.Position.x, obstacleData.Position.y, obstacleData.Position.z);
-            tx.Rotation = quaternion.EulerXYZ(math.radians(obstacleData.EulerRotation));
+            tx.Rotation = quaternion.RotateY(math.radians(obstacleData.YawDeg));
 
-            em.SetComponentData(entity, geometry);
+            em.SetComponentData(entity, shape);
             em.SetComponentData(entity, mask);
             em.SetComponentData(entity, tx);
         }
@@ -1130,8 +1169,8 @@ namespace SweepNDodge.DotsBullets
 
             bool validShape = obstacleData.Shape switch
             {
-                ObstacleShape.Circle => obstacleData.Radius > 0f,
-                ObstacleShape.Box => obstacleData.Size.x > 0f && obstacleData.Size.y > 0f,
+                Shape2DKind.Circle => obstacleData.Radius > 0f,
+                Shape2DKind.Rectangle => obstacleData.Size.x > 0f && obstacleData.Size.y > 0f,
                 _ => false,
             };
 

@@ -7,7 +7,7 @@ namespace SweepNDodge.DotsBullets
     {
         [Min(1)] public uint StableId = 1;
         public bool Active = true;
-        public ObstacleShape Shape = ObstacleShape.Box;
+        public Shape2DKind Shape = Shape2DKind.Rectangle;
         [Min(0f)] public float Radius = 1f;
         public Vector2 Size = new Vector2(2f, 2f);
         public ObstacleCollisionMask CollisionMask = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet;
@@ -24,7 +24,7 @@ namespace SweepNDodge.DotsBullets
             var previousMatrix = Gizmos.matrix;
             Gizmos.color = Active ? new Color(1f, 0.55f, 0.2f, 1f) : new Color(0.35f, 0.35f, 0.35f, 1f);
 
-            if (Shape == ObstacleShape.Circle)
+            if (Shape == Shape2DKind.Circle)
             {
                 Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, Radius));
             }
@@ -37,6 +37,15 @@ namespace SweepNDodge.DotsBullets
 
             Gizmos.matrix = previousMatrix;
             Gizmos.color = previousColor;
+        }
+
+        private void OnValidate()
+        {
+            var euler = transform.eulerAngles;
+            if (Mathf.Abs(Mathf.DeltaAngle(0f, euler.x)) > 0.001f || Mathf.Abs(Mathf.DeltaAngle(0f, euler.z)) > 0.001f)
+            {
+                transform.rotation = Quaternion.Euler(0f, euler.y, 0f);
+            }
         }
     }
 }

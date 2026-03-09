@@ -20,6 +20,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceSpawnComponent>();
             state.RequireForUpdate<SourceRunDirectorStateComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
+            state.RequireForUpdate<SourceShapeDerivedComponent>();
             state.RequireForUpdate<SourceStableIdComponent>();
             state.RequireForUpdate<SourceClipPatternBuffer>();
             state.RequireForUpdate<SourceSustainSlotCandidateBuffer>();
@@ -65,7 +66,7 @@ namespace SweepNDodge.DotsBullets
             int droppedByCapacity = 0;
 
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
-            var areaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
+            var derivedLookup = SystemAPI.GetComponentLookup<SourceShapeDerivedComponent>(true);
             var directorStateLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
             var sustainRuntimeLookup = SystemAPI.GetComponentLookup<SourceSustainRuntimeComponent>(false);
             var eventRuntimeLookup = SystemAPI.GetComponentLookup<SourceEventRuntimeComponent>(false);
@@ -77,7 +78,7 @@ namespace SweepNDodge.DotsBullets
             var requestLookup = SystemAPI.GetBufferLookup<SourceSpawnRequestBuffer>(false);
 
             stableIdLookup.Update(ref state);
-            areaLookup.Update(ref state);
+            derivedLookup.Update(ref state);
             directorStateLookup.Update(ref state);
             sustainRuntimeLookup.Update(ref state);
             eventRuntimeLookup.Update(ref state);
@@ -93,6 +94,7 @@ namespace SweepNDodge.DotsBullets
                 .WithAll<SourceRunDirectorStateComponent>()
                 .WithAll<SourceStableIdComponent>()
                 .WithAll<BulletFieldAreaComponent>()
+                .WithAll<SourceShapeDerivedComponent>()
                 .WithAll<SourceSustainRuntimeComponent>()
                 .WithAll<SourceEventRuntimeComponent>()
                 .WithAll<SourceClipPatternBuffer>()
@@ -108,7 +110,7 @@ namespace SweepNDodge.DotsBullets
             {
                 var sourceEntity = sourceEntities[si];
                 var stableId = stableIdLookup[sourceEntity];
-                var area = areaLookup[sourceEntity];
+                var derived = derivedLookup[sourceEntity];
                 var directorState = directorStateLookup[sourceEntity];
                 var clipPatterns = clipPatternLookup[sourceEntity];
                 var sustainCandidates = sustainCandidateLookup[sourceEntity];
@@ -160,7 +162,7 @@ namespace SweepNDodge.DotsBullets
                         sourceStableId,
                         frame,
                         deltaTime,
-                        area.ComputedArea,
+                        derived.ComputedArea,
                         densityScale,
                         ref clipPatternsRW,
                         ref activeCounts,
@@ -179,7 +181,7 @@ namespace SweepNDodge.DotsBullets
                         sourceStableId,
                         frame,
                         deltaTime,
-                        area.ComputedArea,
+                        derived.ComputedArea,
                         densityScale,
                         restrictFinishToTrashLane,
                         ref clipPatternsRW,

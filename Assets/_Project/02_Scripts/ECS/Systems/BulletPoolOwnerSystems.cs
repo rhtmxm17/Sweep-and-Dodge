@@ -383,28 +383,21 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<SourceSpawnComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
+            state.RequireForUpdate<Shape2DComponent>();
+            state.RequireForUpdate<SourceShapeDerivedComponent>();
         }
 
-        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            state.Dependency = new UpdateFieldAreaJob().ScheduleParallel(state.Dependency);
-        }
-
-        [BurstCompile]
-        private partial struct UpdateFieldAreaJob : IJobEntity
-        {
-            private void Execute(ref BulletFieldAreaComponent area)
+            foreach (var (shapeRW, derivedRW) in SystemAPI.Query<RefRW<Shape2DComponent>, RefRW<SourceShapeDerivedComponent>>().WithAll<BulletFieldAreaComponent>())
             {
-                if (area.Shape == BulletFieldShapeId.Rectangle)
+                var shape = Shape2DUtility.Normalize(in shapeRW.ValueRO);
+                shapeRW.ValueRW = shape;
+                derivedRW.ValueRW = new SourceShapeDerivedComponent
                 {
-                    area.Size = math.max(0f, area.Size);
-                    area.ComputedArea = area.Size.x * area.Size.y;
-                    return;
-                }
-
-                area.Radius = math.max(0f, area.Radius);
-                area.ComputedArea = math.PI * area.Radius * area.Radius;
+                    ComputedArea = Shape2DUtility.ComputeArea(in shape),
+                    HalfExtents = Shape2DUtility.ComputeHalfExtents(in shape),
+                };
             }
         }
     }

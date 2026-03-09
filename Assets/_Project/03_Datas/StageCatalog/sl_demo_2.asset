@@ -18,15 +18,26 @@ MonoBehaviour:
     Active: 1
     Position: {x: -12, y: 0, z: 6}
     YawDeg: 0
-    FieldShape: 0
-    FieldRadius: 6
-    FieldSize: {x: 10, y: 10}
+    Shape: 0
+    Radius: 6
+    Size: {x: 10, y: 10}
   Deposits:
   - StableId: 2001
     Active: 1
     Position: {x: -8, y: 0, z: -9}
+    YawDeg: 0
+    Shape: 0
     Radius: 4
-  Obstacles: []
+    Size: {x: 0, y: 0}
+  Obstacles:
+  - StableId: 3002
+    Active: 1
+    Position: {x: -2, y: 0, z: 1}
+    YawDeg: 0
+    Shape: 1
+    Radius: 0
+    Size: {x: 3.5, y: 2}
+    CollisionMask: 3
   Visuals:
   - StableId: 9002
     Active: 1

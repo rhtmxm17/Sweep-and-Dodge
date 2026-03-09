@@ -27,9 +27,9 @@ namespace SweepNDodge.DotsBullets
         [Min(0)] public uint StableIdOverride = 0;
 
         [Header("Source Field")]
-        public BulletFieldShapeId FieldShape = BulletFieldShapeId.Circle;
-        public float FieldRadius = 8f;
-        public Vector2 FieldSize = new Vector2(12f, 8f);
+        public Shape2DKind Shape = Shape2DKind.Circle;
+        public float Radius = 8f;
+        public Vector2 Size = new Vector2(12f, 8f);
 
         [Header("Source Definition Seed (Deprecated)")]
         public SustainClipSlotAuthoring[] SustainClipSlots;
@@ -69,18 +69,20 @@ namespace SweepNDodge.DotsBullets
                 : ComputeStableSourceId(authoring.transform, authoring.transform.position);
             baker.AddComponent(e, new SourceStableIdComponent { Value = stableId });
 
-            var fieldArea = new BulletFieldAreaComponent
+            var fieldShape = new Shape2DComponent
             {
-                Shape = authoring.FieldShape,
-                Radius = Mathf.Max(0f, authoring.FieldRadius),
-                Size = new float2(Mathf.Max(0f, authoring.FieldSize.x), Mathf.Max(0f, authoring.FieldSize.y)),
-                ComputedArea = SourceRuntimeApplyUtility.ComputeArea(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize),
+                Kind = authoring.Shape,
+                Radius = Mathf.Max(0f, authoring.Radius),
+                Size = new float2(Mathf.Max(0f, authoring.Size.x), Mathf.Max(0f, authoring.Size.y)),
             };
-            baker.AddComponent(e, fieldArea);
+            var derived = default(SourceShapeDerivedComponent);
+            SourceRuntimeApplyUtility.RefreshSourceShapeDerived(in fieldShape, ref derived);
+            baker.AddComponent<BulletFieldAreaComponent>(e);
+            baker.AddComponent(e, fieldShape);
+            baker.AddComponent(e, derived);
 
             baker.AddComponent(e, new SourceSpawnRuntimeComponent { SpawnSequence = 1u });
 
-            var halfExtents = SourceRuntimeApplyUtility.ComputeHalfExtents(authoring.FieldShape, authoring.FieldRadius, authoring.FieldSize);
             float cellSize = Mathf.Max(0.1f, authoring.PollutionCellSize);
             float minValue = Mathf.Max(0f, authoring.PollutionMin);
             float maxValue = Mathf.Max(minValue, authoring.PollutionMax);
@@ -98,7 +100,7 @@ namespace SweepNDodge.DotsBullets
             var pollutionGrid = new SourcePollutionGridComponent
             {
                 CellSize = cellSize,
-                HalfExtents = halfExtents,
+                HalfExtents = derived.HalfExtents,
             };
 
             baker.AddBuffer<SourceActiveBulletCountBuffer>(e).Clear();
@@ -137,7 +139,8 @@ namespace SweepNDodge.DotsBullets
             var pollutionDrops = baker.AddBuffer<SourcePollutionDropRequestBuffer>(e);
             var pollutionValidCellIndices = baker.AddBuffer<SourcePollutionValidCellIndexBuffer>(e);
             SourceRuntimeApplyUtility.RebuildPollutionGrid(
-                in fieldArea,
+                in fieldShape,
+                in derived,
                 in pollutionConfig,
                 ref pollutionGrid,
                 pollutionCells,
@@ -204,16 +207,16 @@ namespace SweepNDodge.DotsBullets
             var prevMatrix = Gizmos.matrix;
             var prev = Gizmos.color;
             Gizmos.color = new Color(0.2f, 0.9f, 0.3f, 1f);
-            if (FieldShape == BulletFieldShapeId.Rectangle)
+            if (Shape == Shape2DKind.Rectangle)
             {
-                var size = new Vector3(Mathf.Max(0f, FieldSize.x), 0f, Mathf.Max(0f, FieldSize.y));
+                var size = new Vector3(Mathf.Max(0f, Size.x), 0f, Mathf.Max(0f, Size.y));
                 Gizmos.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
                 Gizmos.DrawWireCube(Vector3.zero, size);
                 Gizmos.matrix = prevMatrix;
             }
             else
             {
-                Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, FieldRadius));
+                Gizmos.DrawWireSphere(transform.position, Mathf.Max(0f, Radius));
             }
 
             Gizmos.color = prev;

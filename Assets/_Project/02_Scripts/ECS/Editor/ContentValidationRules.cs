@@ -529,8 +529,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 string location = sourceAuthorings[i].Location;
 
-                WarnIf(authoring.FieldRadius < 0f, "CVW024", location, "FieldRadius < 0 will be clamped to 0.", issues);
-                WarnIf(authoring.FieldSize.x < 0f || authoring.FieldSize.y < 0f, "CVW025", location, "FieldSize contains negative values and will be clamped to >= 0.", issues);
+                WarnIf(authoring.Radius < 0f, "CVW024", location, "Radius < 0 will be clamped to 0.", issues);
+                WarnIf(authoring.Size.x < 0f || authoring.Size.y < 0f, "CVW025", location, "Size contains negative values and will be clamped to >= 0.", issues);
                 WarnIf(authoring.PollutionCellSize < 0.1f, "CVW026", location, "PollutionCellSize < 0.1 will be clamped to 0.1.", issues);
                 WarnIf(authoring.PollutionMin < 0f, "CVW027", location, "PollutionMin < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.PollutionMax < authoring.PollutionMin, "CVW028", location, "PollutionMax < PollutionMin will be clamped up to PollutionMin.", issues);

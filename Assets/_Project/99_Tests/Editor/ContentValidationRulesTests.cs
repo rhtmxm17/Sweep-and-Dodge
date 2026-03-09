@@ -160,8 +160,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Radius = -0.5f;
                 def.ScoreValue = -7;
 
-                sourceAuthoring.FieldRadius = -4f;
-                sourceAuthoring.FieldSize = new Vector2(-5f, -6f);
+                sourceAuthoring.Radius = -4f;
+                sourceAuthoring.Size = new Vector2(-5f, -6f);
                 sourceAuthoring.PollutionCellSize = 0.01f;
                 sourceAuthoring.PollutionMin = -1f;
                 sourceAuthoring.PollutionMax = -2f;

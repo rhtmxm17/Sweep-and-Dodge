@@ -10,9 +10,9 @@ namespace SweepNDodge.DotsBullets
         public bool Active;
         public Vector3 Position;
         public float YawDeg;
-        public BulletFieldShapeId FieldShape;
-        [Min(0f)] public float FieldRadius;
-        public Vector2 FieldSize;
+        public Shape2DKind Shape;
+        [Min(0f)] public float Radius;
+        public Vector2 Size;
     }
 
     [Serializable]
@@ -21,7 +21,10 @@ namespace SweepNDodge.DotsBullets
         [Min(1)] public uint StableId;
         public bool Active;
         public Vector3 Position;
+        public float YawDeg;
+        public Shape2DKind Shape;
         [Min(0f)] public float Radius;
+        public Vector2 Size;
     }
 
     [Serializable]
@@ -30,8 +33,8 @@ namespace SweepNDodge.DotsBullets
         [Min(1)] public uint StableId;
         public bool Active;
         public Vector3 Position;
-        public Vector3 EulerRotation;
-        public ObstacleShape Shape;
+        public float YawDeg;
+        public Shape2DKind Shape;
         [Min(0f)] public float Radius;
         public Vector2 Size;
         public ObstacleCollisionMask CollisionMask;

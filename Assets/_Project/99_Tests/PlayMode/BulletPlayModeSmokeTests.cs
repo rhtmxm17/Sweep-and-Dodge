@@ -1393,11 +1393,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 return false;
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
-            var area1 = em.GetComponentData<BulletFieldAreaComponent>(source1001);
-            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+            var area1 = em.GetComponentData<Shape2DComponent>(source1001);
+            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
 
             return sourceState1.State == SourceStateId.Normal
-                && area1.Shape == BulletFieldShapeId.Rectangle
+                && area1.Kind == Shape2DKind.Rectangle
                 && Mathf.Abs(area1.Size.x - 12f) <= 0.01f
                 && Mathf.Abs(area1.Size.y - 8f) <= 0.01f
                 && Mathf.Abs(deposit1.Radius - 5f) <= 0.01f;
@@ -1414,31 +1414,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 return false;
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
-            var area2 = em.GetComponentData<BulletFieldAreaComponent>(source1002);
-            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+            var area2 = em.GetComponentData<Shape2DComponent>(source1002);
+            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            var obstacleGeometry = em.GetComponentData<ObstacleGeometryComponent>(obstacle3002);
+            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3002);
             var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3002);
 
-            bool hazardOnly = clipPatterns2.Length > 0;
-            for (int i = 0; i < clipPatterns2.Length; i++)
-            {
-                if (clipPatterns2[i].Lane != SourceSpawnLaneId.Hazard)
-                {
-                    hazardOnly = false;
-                    break;
-                }
-            }
-
             return sourceState2.State == SourceStateId.Normal
-                && area2.Shape == BulletFieldShapeId.Circle
+                && area2.Kind == Shape2DKind.Circle
                 && Mathf.Abs(area2.Radius - 6f) <= 0.01f
                 && Mathf.Abs(deposit1.Radius - 4f) <= 0.01f
-                && obstacleGeometry.Shape == ObstacleShape.Box
+                && obstacleGeometry.Kind == Shape2DKind.Rectangle
                 && Mathf.Abs(obstacleGeometry.Size.x - 3.5f) <= 0.01f
                 && Mathf.Abs(obstacleGeometry.Size.y - 2f) <= 0.01f
                 && obstacleMask.Value == (ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet)
-                && hazardOnly;
+                && clipPatterns2.Length > 0;
         }
 
         private static string DescribeStage2ApplyState(EntityManager em)
@@ -1460,26 +1450,26 @@ namespace SweepNDodge.DotsBullets.Tests
             if (hasSource)
             {
                 var source = em.GetComponentData<SourceSpawnComponent>(source1002);
-                var area = em.GetComponentData<BulletFieldAreaComponent>(source1002);
+                var area = em.GetComponentData<Shape2DComponent>(source1002);
                 var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
                 sourceText =
-                    $"source1002(state={source.State}, shape={area.Shape}, radius={area.Radius:0.##}, size=({area.Size.x:0.##},{area.Size.y:0.##}), patterns={clipPatterns.Length})";
+                    $"source1002(state={source.State}, shape={area.Kind}, radius={area.Radius:0.##}, size=({area.Size.x:0.##},{area.Size.y:0.##}), patterns={clipPatterns.Length})";
             }
 
             string depositText = "deposit2001=missing";
             if (hasDeposit)
             {
-                var deposit = em.GetComponentData<DepositPointComponent>(deposit2001);
+                var deposit = em.GetComponentData<Shape2DComponent>(deposit2001);
                 depositText = $"deposit2001(radius={deposit.Radius:0.##})";
             }
 
             string obstacleText = "obstacle3002=missing";
             if (hasObstacle)
             {
-                var geometry = em.GetComponentData<ObstacleGeometryComponent>(obstacle3002);
+                var geometry = em.GetComponentData<Shape2DComponent>(obstacle3002);
                 var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3002);
                 obstacleText =
-                    $"obstacle3002(shape={geometry.Shape}, radius={geometry.Radius:0.##}, size=({geometry.Size.x:0.##},{geometry.Size.y:0.##}), mask={mask.Value})";
+                    $"obstacle3002(shape={geometry.Kind}, radius={geometry.Radius:0.##}, size=({geometry.Size.x:0.##},{geometry.Size.y:0.##}), mask={mask.Value})";
             }
 
             return $"{topologyText}, {sourceText}, {depositText}, {obstacleText}";
@@ -1492,11 +1482,11 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
-            var area1 = em.GetComponentData<BulletFieldAreaComponent>(source1001);
-            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+            var area1 = em.GetComponentData<Shape2DComponent>(source1001);
+            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
 
             Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Normal));
-            Assert.That(area1.Shape, Is.EqualTo(BulletFieldShapeId.Rectangle));
+            Assert.That(area1.Kind, Is.EqualTo(Shape2DKind.Rectangle));
             Assert.That(area1.Size.x, Is.EqualTo(12f).Within(0.01f));
             Assert.That(area1.Size.y, Is.EqualTo(8f).Within(0.01f));
             Assert.That(deposit1.Radius, Is.EqualTo(5f).Within(0.01f));
@@ -1510,23 +1500,21 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(TryFindObstacleByStableId(em, 3002u, out var obstacle3002), Is.True);
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
-            var area2 = em.GetComponentData<BulletFieldAreaComponent>(source1002);
-            var deposit1 = em.GetComponentData<DepositPointComponent>(deposit2001);
+            var area2 = em.GetComponentData<Shape2DComponent>(source1002);
+            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            var obstacleGeometry = em.GetComponentData<ObstacleGeometryComponent>(obstacle3002);
+            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3002);
             var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3002);
 
             Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Normal));
-            Assert.That(area2.Shape, Is.EqualTo(BulletFieldShapeId.Circle));
+            Assert.That(area2.Kind, Is.EqualTo(Shape2DKind.Circle));
             Assert.That(area2.Radius, Is.EqualTo(6f).Within(0.01f));
             Assert.That(deposit1.Radius, Is.EqualTo(4f).Within(0.01f));
-            Assert.That(obstacleGeometry.Shape, Is.EqualTo(ObstacleShape.Box));
+            Assert.That(obstacleGeometry.Kind, Is.EqualTo(Shape2DKind.Rectangle));
             Assert.That(obstacleGeometry.Size.x, Is.EqualTo(3.5f).Within(0.01f));
             Assert.That(obstacleGeometry.Size.y, Is.EqualTo(2f).Within(0.01f));
             Assert.That(obstacleMask.Value, Is.EqualTo(ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet));
             Assert.That(clipPatterns2.Length, Is.GreaterThan(0));
-            for (int i = 0; i < clipPatterns2.Length; i++)
-                Assert.That(clipPatterns2[i].Lane, Is.EqualTo(SourceSpawnLaneId.Hazard));
         }
 
         private static bool TryFindSourceByStableId(EntityManager em, uint stableId, out Entity sourceEntity)

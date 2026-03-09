@@ -29,7 +29,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 layout.StageId = 2;
                 layout.Sources = new[]
                 {
-                    new StageSourceLayoutData { StableId = 2001u, Active = true, FieldShape = BulletFieldShapeId.Circle, FieldRadius = 2f },
+                    new StageSourceLayoutData { StableId = 2001u, Active = true, Shape = Shape2DKind.Circle, Radius = 2f },
                 };
 
                 definition.StageId = 2;
@@ -70,8 +70,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
             try
             {
-                sourceAuthoring.FieldRadius = -4f;
-                sourceAuthoring.FieldSize = new Vector2(-5f, -6f);
+                sourceAuthoring.Radius = -4f;
+                sourceAuthoring.Size = new Vector2(-5f, -6f);
                 sourceAuthoring.PollutionCellSize = 0.01f;
                 sourceAuthoring.PollutionMin = -1f;
                 sourceAuthoring.PollutionMax = -2f;

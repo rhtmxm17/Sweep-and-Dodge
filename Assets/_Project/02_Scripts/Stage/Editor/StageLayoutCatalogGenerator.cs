@@ -147,39 +147,45 @@ namespace SweepNDodge.DotsBullets.Editor
         private static StageSourceLayoutData ToSourceData(StageSourceMarker marker)
         {
             var transform = marker.transform;
+            var yawOnlyRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
             return new StageSourceLayoutData
             {
                 StableId = marker.StableId,
                 Active = marker.Active,
                 Position = transform.position,
-                YawDeg = transform.eulerAngles.y,
-                FieldShape = marker.FieldShape,
-                FieldRadius = Mathf.Max(0f, marker.FieldRadius),
-                FieldSize = new Vector2(Mathf.Max(0f, marker.FieldSize.x), Mathf.Max(0f, marker.FieldSize.y)),
+                YawDeg = yawOnlyRotation.eulerAngles.y,
+                Shape = marker.Shape,
+                Radius = Mathf.Max(0f, marker.Radius),
+                Size = new Vector2(Mathf.Max(0f, marker.Size.x), Mathf.Max(0f, marker.Size.y)),
             };
         }
 
         private static StageDepositLayoutData ToDepositData(StageDepositMarker marker)
         {
             var transform = marker.transform;
+            var yawOnlyRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
             return new StageDepositLayoutData
             {
                 StableId = marker.StableId,
                 Active = marker.Active,
                 Position = transform.position,
+                YawDeg = yawOnlyRotation.eulerAngles.y,
+                Shape = marker.Shape,
                 Radius = Mathf.Max(0f, marker.Radius),
+                Size = new Vector2(Mathf.Max(0f, marker.Size.x), Mathf.Max(0f, marker.Size.y)),
             };
         }
 
         private static StageObstacleLayoutData ToObstacleData(StageObstacleMarker marker)
         {
             var transform = marker.transform;
+            var yawOnlyRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
             return new StageObstacleLayoutData
             {
                 StableId = marker.StableId,
                 Active = marker.Active,
                 Position = transform.position,
-                EulerRotation = transform.eulerAngles,
+                YawDeg = yawOnlyRotation.eulerAngles.y,
                 Shape = marker.Shape,
                 Radius = Mathf.Max(0f, marker.Radius),
                 Size = new Vector2(Mathf.Max(0f, marker.Size.x), Mathf.Max(0f, marker.Size.y)),

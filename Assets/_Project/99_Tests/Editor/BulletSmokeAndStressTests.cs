@@ -574,13 +574,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
 
                 EnableV3Source(em, source, stableId: 11u, activeState: SourceStateId.Normal);
                 const int mergeClipId = 1101;
@@ -664,14 +658,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 7f, 0f) });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, new float3(0f, 7f, 0f));
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -717,13 +705,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -770,13 +752,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -821,14 +797,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 1, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 7f, 0f) });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, new float3(0f, 7f, 0f));
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -893,14 +863,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 3, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 6f, 0f) });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, new float3(0f, 6f, 0f));
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -963,14 +927,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 6, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 0f, 0f) });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, new float3(0f, 0f, 0f));
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -1034,14 +992,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 32, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 0f, 0f) });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, new float3(0f, 0f, 0f));
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -1109,14 +1061,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 3, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -1177,14 +1123,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 4, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -1249,13 +1189,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 });
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
 
                 EnableV3Source(em, source, stableId: 12u, activeState: SourceStateId.Normal);
                 const int poissonClipId = 1201;
@@ -1335,13 +1269,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     em.RemoveComponent<PlayerGoSyncComponent>(playerEntity);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
 
                 EnableV3Source(em, source, stableId: 19u, activeState: SourceStateId.Normal);
                 const int poissonClipId = 1901;
@@ -1410,14 +1338,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(0f, 0f, 0f) });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(2f, 2f),
-                    ComputedArea = 4f,
-                });
+                SetSourceAnchor(em, source, new float3(0f, 0f, 0f));
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(2f, 2f));
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -1444,7 +1366,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(snapshots.Count, Is.EqualTo(1));
                 float3 anchoredPosition = snapshots[0].Position;
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(10f, 0f, 0f) });
+                SetSourceAnchor(em, source, new float3(10f, 0f, 0f));
 
                 world.SetTime(new TimeData(0.2d, 0.1f));
                 simGroup.Update();
@@ -1490,14 +1412,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = float2.zero,
-                    ComputedArea = 0f,
-                });
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
 
                 var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 requests.Clear();
@@ -1523,7 +1439,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 world.SetTime(new TimeData(0.1d, 0.1f));
                 simGroup.Update();
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = new float3(10f, 0f, 0f) });
+                SetSourceAnchor(em, source, new float3(10f, 0f, 0f));
 
                 world.SetTime(new TimeData(0.2d, 0.1f));
                 simGroup.Update();
@@ -1671,13 +1587,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 EnableV3Source(em, source, stableId: 101u, activeState: SourceStateId.Normal);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
 
                 var sourceData = em.GetComponentData<SourceSpawnComponent>(source);
                 sourceData.State = SourceStateId.Weakened;
@@ -1770,13 +1680,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 EnableV3Source(em, source, stableId: 111u, activeState: SourceStateId.Normal);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
 
                 var sourceData = em.GetComponentData<SourceSpawnComponent>(source);
                 sourceData.State = SourceStateId.Depleted;
@@ -1944,13 +1848,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 EnableV3Source(em, source, stableId: 102u, activeState: SourceStateId.Normal);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
 
                 var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
                 clipPatterns.Clear();
@@ -2012,13 +1910,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 EnableV3Source(em, source, stableId: 103u, activeState: SourceStateId.Normal);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
 
                 const int firstClipId = 4001;
                 const int secondClipId = 4002;
@@ -2099,13 +1991,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 var keepRunningSource = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
                 em.SetComponentData(source, new SourceSpawnComponent
                 {
                     ThresholdWeakened = 1000,
@@ -2230,13 +2116,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 var keepRunningSource = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Rectangle,
-                    Radius = 0f,
-                    Size = new float2(1f, 1f),
-                    ComputedArea = 1f,
-                });
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(1f, 1f));
                 em.SetComponentData(source, new SourceSpawnComponent
                 {
                     ThresholdWeakened = 1000,
@@ -2386,17 +2266,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     CollectedCount = 0,
                     State = SourceStateId.Normal,
                 });
-                em.SetComponentData(source, new SourceAnchorComponent
-                {
-                    Position = float3.zero,
-                });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Circle,
-                    Radius = 3f,
-                    Size = float2.zero,
-                    ComputedArea = math.PI * 9f,
-                });
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Circle, 3f, float2.zero);
                 em.SetComponentData(source, new SourceRunDirectorStateComponent
                 {
                     State = RunDirectorSourceStateId.Baseline,
@@ -2656,14 +2527,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     LastTransitionReason = RunDirectorStageTransitionReasonId.None,
                 });
 
-                em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
-                em.SetComponentData(source, new BulletFieldAreaComponent
-                {
-                    Shape = BulletFieldShapeId.Circle,
-                    Radius = 3f,
-                    Size = float2.zero,
-                    ComputedArea = math.PI * 9f,
-                });
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Circle, 3f, float2.zero);
                 em.SetComponentData(source, new SourceRunDirectorStateComponent
                 {
                     State = RunDirectorSourceStateId.Baseline,
@@ -4021,7 +3886,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(SourceSpawnComponent),
                 typeof(SourceSpawnRuntimeComponent),
                 typeof(SourceAnchorComponent),
-                typeof(BulletFieldAreaComponent));
+                typeof(BulletFieldAreaComponent),
+                typeof(Shape2DComponent),
+                typeof(SourceShapeDerivedComponent),
+                typeof(LocalTransform));
 
             em.SetComponentData(source, new SourceSpawnComponent
             {
@@ -4031,14 +3899,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 State = SourceStateId.Normal,
             });
             em.SetComponentData(source, new SourceSpawnRuntimeComponent { SpawnSequence = 1 });
-            em.SetComponentData(source, new SourceAnchorComponent { Position = float3.zero });
-            em.SetComponentData(source, new BulletFieldAreaComponent
-            {
-                Shape = BulletFieldShapeId.Rectangle,
-                Radius = 0f,
-                Size = new float2(20f, 20f),
-                ComputedArea = 400f,
-            });
+            SetSourceAnchor(em, source, float3.zero);
+            SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(20f, 20f));
 
             em.AddBuffer<SourceSpawnRequestBuffer>(source);
             em.AddBuffer<SourceActiveBulletCountBuffer>(source);
@@ -4082,6 +3944,30 @@ namespace SweepNDodge.DotsBullets.Tests
             });
 
             return source;
+        }
+
+        private static void SetSourceShape(EntityManager em, Entity source, Shape2DKind kind, float radius, float2 size)
+        {
+            var shape = new Shape2DComponent
+            {
+                Kind = kind,
+                Radius = radius,
+                Size = size,
+            };
+
+            em.SetComponentData(source, shape);
+            em.SetComponentData(source, new SourceShapeDerivedComponent
+            {
+                ComputedArea = Shape2DUtility.ComputeArea(in shape),
+                HalfExtents = Shape2DUtility.ComputeHalfExtents(in shape),
+            });
+        }
+
+        private static void SetSourceAnchor(EntityManager em, Entity source, float3 position)
+        {
+            em.SetComponentData(source, new SourceAnchorComponent { Position = position });
+            if (em.HasComponent<LocalTransform>(source))
+                em.SetComponentData(source, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
         }
 
         private static int ComputeOldestBacklogAge(EntityManager em, uint frame)

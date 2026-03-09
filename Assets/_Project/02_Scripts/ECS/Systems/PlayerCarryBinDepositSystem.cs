@@ -25,6 +25,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerCarryBinDepositRequestTag>();
             state.RequireForUpdate<PlayerCarryBinDepositContextComponent>();
             state.RequireForUpdate<DepositPointComponent>();
+            state.RequireForUpdate<Shape2DComponent>();
         }
 
         [BurstCompile]
@@ -81,7 +82,7 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public ComponentLookup<PlayerRadiusComponent> PlayerRadiusLookup;
             public NativeReference<Entity> TouchedDeposit;
 
-            private void Execute(Entity depositEntity, in DepositPointComponent deposit, in LocalTransform depositTx)
+            private void Execute(Entity depositEntity, in DepositPointComponent deposit, in Shape2DComponent shape, in LocalTransform depositTx)
             {
                 if (TouchedDeposit.Value != Entity.Null)
                     return;
@@ -93,11 +94,14 @@ namespace SweepNDodge.DotsBullets
                     ? math.max(0f, PlayerRadiusLookup[PlayerEntity].Value)
                     : 0f;
 
-                float reach = math.max(0f, deposit.Radius) + playerRadius;
-                float3 delta = depositTx.Position - playerPos;
-                float distSq = delta.x * delta.x + delta.z * delta.z;
-                if (distSq <= reach * reach)
+                if (Shape2DUtility.OverlapsCircleXZ(
+                        new float2(playerPos.x, playerPos.z),
+                        playerRadius,
+                        in depositTx,
+                        in shape))
+                {
                     TouchedDeposit.Value = depositEntity;
+                }
             }
         }
 

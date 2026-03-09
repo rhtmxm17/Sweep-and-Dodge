@@ -16,6 +16,8 @@ namespace SweepNDodge.DotsBullets
                 typeof(SourceSpawnRuntimeComponent),
                 typeof(SourceAnchorComponent),
                 typeof(BulletFieldAreaComponent),
+                typeof(Shape2DComponent),
+                typeof(SourceShapeDerivedComponent),
                 typeof(SourcePollutionConfigComponent),
                 typeof(SourcePollutionGridComponent),
                 typeof(SourceSustainRuntimeComponent),
@@ -33,13 +35,16 @@ namespace SweepNDodge.DotsBullets
             });
             em.SetComponentData(entity, new SourceSpawnRuntimeComponent { SpawnSequence = 1u });
             em.SetComponentData(entity, new SourceAnchorComponent { Position = float3.zero });
-            em.SetComponentData(entity, new BulletFieldAreaComponent
+            var sourceShape = new Shape2DComponent
             {
-                Shape = BulletFieldShapeId.Circle,
+                Kind = Shape2DKind.Circle,
                 Radius = 8f,
                 Size = new float2(12f, 8f),
-                ComputedArea = SourceRuntimeApplyUtility.ComputeArea(BulletFieldShapeId.Circle, 8f, new Vector2(12f, 8f)),
-            });
+            };
+            var sourceDerived = default(SourceShapeDerivedComponent);
+            SourceRuntimeApplyUtility.RefreshSourceShapeDerived(in sourceShape, ref sourceDerived);
+            em.SetComponentData(entity, sourceShape);
+            em.SetComponentData(entity, sourceDerived);
             em.SetComponentData(entity, new SourcePollutionConfigComponent
             {
                 MinValue = 0f,
@@ -52,7 +57,7 @@ namespace SweepNDodge.DotsBullets
             {
                 CellSize = 2f,
                 InvCellSize = 0.5f,
-                HalfExtents = new float2(8f, 8f),
+                HalfExtents = sourceDerived.HalfExtents,
                 Cols = 1,
                 Rows = 1,
             });
@@ -95,10 +100,16 @@ namespace SweepNDodge.DotsBullets
                 typeof(Prefab),
                 typeof(DepositStableIdComponent),
                 typeof(DepositPointComponent),
+                typeof(Shape2DComponent),
                 typeof(LocalTransform));
 
             em.SetComponentData(entity, new DepositStableIdComponent { Value = 1u });
-            em.SetComponentData(entity, new DepositPointComponent { Radius = 1.2f });
+            em.SetComponentData(entity, new Shape2DComponent
+            {
+                Kind = Shape2DKind.Circle,
+                Radius = 1.2f,
+                Size = float2.zero,
+            });
             em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
             return entity;
         }
@@ -110,6 +121,7 @@ namespace SweepNDodge.DotsBullets
                 typeof(ObstacleStableIdComponent),
                 typeof(ObstacleCollisionMaskComponent),
                 typeof(ObstacleGeometryComponent),
+                typeof(Shape2DComponent),
                 typeof(LocalTransform));
 
             em.SetComponentData(entity, new ObstacleStableIdComponent { Value = 1u });
@@ -117,9 +129,9 @@ namespace SweepNDodge.DotsBullets
             {
                 Value = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
             });
-            em.SetComponentData(entity, new ObstacleGeometryComponent
+            em.SetComponentData(entity, new Shape2DComponent
             {
-                Shape = ObstacleShape.Box,
+                Kind = Shape2DKind.Rectangle,
                 Radius = 1f,
                 Size = new float2(2f, 2f),
             });

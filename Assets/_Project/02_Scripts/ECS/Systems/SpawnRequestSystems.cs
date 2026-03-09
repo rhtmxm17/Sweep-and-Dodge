@@ -25,6 +25,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceStableIdComponent>();
             state.RequireForUpdate<SourceAnchorComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
+            state.RequireForUpdate<Shape2DComponent>();
             state.RequireForUpdate<SourceSpawnRuntimeComponent>();
             state.RequireForUpdate<SourceActiveBulletCountBuffer>();
             state.RequireForUpdate<SourceSpawnRequestBuffer>();
@@ -81,7 +82,7 @@ namespace SweepNDodge.DotsBullets
             var renderPartsLookup = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
             var parentLookup = SystemAPI.GetComponentLookup<Parent>(true);
             var sourceAnchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(true);
-            var sourceAreaLookup = SystemAPI.GetComponentLookup<BulletFieldAreaComponent>(true);
+            var sourceAreaLookup = SystemAPI.GetComponentLookup<Shape2DComponent>(true);
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
             var sourceRuntimeLookup = SystemAPI.GetComponentLookup<SourceSpawnRuntimeComponent>(false);
             var pollutionConfigLookup = SystemAPI.GetComponentLookup<SourcePollutionConfigComponent>(true);
@@ -459,7 +460,7 @@ namespace SweepNDodge.DotsBullets
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
-            ref ComponentLookup<BulletFieldAreaComponent> sourceAreaLookup,
+            ref ComponentLookup<Shape2DComponent> sourceAreaLookup,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
@@ -586,6 +587,7 @@ namespace SweepNDodge.DotsBullets
                 sourceEntity,
                 ref request,
                 ref sourceAnchorLookup,
+                ref txLookup,
                 in fieldArea,
                 hasPlayer,
                 playerPosition,
@@ -640,7 +642,7 @@ namespace SweepNDodge.DotsBullets
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
-            ref ComponentLookup<BulletFieldAreaComponent> sourceAreaLookup,
+            ref ComponentLookup<Shape2DComponent> sourceAreaLookup,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
@@ -683,6 +685,7 @@ namespace SweepNDodge.DotsBullets
                 sourceEntity,
                 ref request,
                 ref sourceAnchorLookup,
+                ref txLookup,
                 in fieldArea,
                 hasPlayer,
                 playerPosition,
@@ -845,7 +848,8 @@ namespace SweepNDodge.DotsBullets
             Entity sourceEntity,
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
-            in BulletFieldAreaComponent fieldArea,
+            ref ComponentLookup<LocalTransform> sourceTransformLookup,
+            in Shape2DComponent fieldArea,
             bool hasPlayer,
             float3 playerPosition,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
@@ -860,6 +864,9 @@ namespace SweepNDodge.DotsBullets
                 ref sourceAnchorLookup,
                 hasPlayer,
                 playerPosition);
+            quaternion sourceRotation = sourceTransformLookup.HasComponent(sourceEntity)
+                ? sourceTransformLookup[sourceEntity].Rotation
+                : quaternion.identity;
 
             if (request.EventShotSchedule != SourceSpawnEventShotScheduleId.Timed)
             {
@@ -868,6 +875,7 @@ namespace SweepNDodge.DotsBullets
                     sourceEntity,
                     in request,
                     center,
+                    sourceRotation,
                     in fieldArea,
                     hasPlayer,
                     playerPosition,
@@ -889,6 +897,7 @@ namespace SweepNDodge.DotsBullets
                         sourceEntity,
                         in request,
                         center,
+                        sourceRotation,
                         in fieldArea,
                         hasPlayer,
                         playerPosition,
@@ -923,6 +932,7 @@ namespace SweepNDodge.DotsBullets
                 sourceEntity,
                 in request,
                 request.EventAnchorCenter,
+                sourceRotation,
                 in fieldArea,
                 false,
                 playerPosition,
@@ -1042,7 +1052,8 @@ namespace SweepNDodge.DotsBullets
             Entity sourceEntity,
             in SourceSpawnRequestBuffer request,
             float3 center,
-            in BulletFieldAreaComponent fieldArea,
+            quaternion sourceRotation,
+            in Shape2DComponent fieldArea,
             bool hasPlayer,
             float3 playerPosition,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
@@ -1063,13 +1074,14 @@ namespace SweepNDodge.DotsBullets
                 sampledSequence = sequence;
                 if (request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
                 {
-                    if (TrySampleSpawnPositionFromPollution(
-                            ref random,
-                            sourceEntity,
-                            center,
-                            out var pollutionPos,
-                            ref pollutionConfigLookup,
-                            ref pollutionGridLookup,
+                        if (TrySampleSpawnPositionFromPollution(
+                                ref random,
+                                sourceEntity,
+                                center,
+                                sourceRotation,
+                                out var pollutionPos,
+                                ref pollutionConfigLookup,
+                                ref pollutionGridLookup,
                             ref pollutionCellsLookup,
                             ref pollutionValidCellIndicesLookup))
                     {
@@ -1077,7 +1089,7 @@ namespace SweepNDodge.DotsBullets
                     }
                     else
                     {
-                        lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                        lastSample = SampleSpawnPositionUniform(ref random, center, sourceRotation, fieldArea);
                     }
                 }
                 else if (request.SamplingMode == SourceSpawnSamplingModeId.LineEven)
@@ -1089,11 +1101,11 @@ namespace SweepNDodge.DotsBullets
                     if (TrySampleSpawnPositionPointSet(center, in request, sequence, out var pointSetPos))
                         lastSample = pointSetPos;
                     else
-                        lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                        lastSample = SampleSpawnPositionUniform(ref random, center, sourceRotation, fieldArea);
                 }
                 else
                 {
-                    lastSample = SampleSpawnPositionUniform(ref random, center, fieldArea);
+                    lastSample = SampleSpawnPositionUniform(ref random, center, sourceRotation, fieldArea);
                 }
 
                 if (!hasPlayer || noSpawnRadius <= 0f)
@@ -1150,6 +1162,7 @@ namespace SweepNDodge.DotsBullets
             ref Unity.Mathematics.Random random,
             Entity sourceEntity,
             float3 center,
+            quaternion sourceRotation,
             out float3 position,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
@@ -1198,7 +1211,7 @@ namespace SweepNDodge.DotsBullets
 
             int cols = math.max(1, grid.Cols);
             int rows = math.max(1, grid.Rows);
-            position = SampleInsidePollutionCell(ref random, bestCellIndex, center, cols, rows, in grid);
+            position = SampleInsidePollutionCell(ref random, bestCellIndex, center, sourceRotation, cols, rows, in grid);
             return true;
         }
 
@@ -1218,6 +1231,7 @@ namespace SweepNDodge.DotsBullets
             ref Unity.Mathematics.Random random,
             int cellIndex,
             float3 center,
+            quaternion sourceRotation,
             int cols,
             int rows,
             in SourcePollutionGridComponent grid)
@@ -1234,7 +1248,7 @@ namespace SweepNDodge.DotsBullets
             float localZ = -halfExtents.y + (cellY + random.NextFloat(0f, 1f)) * cellSize;
             localX = math.clamp(localX, -halfExtents.x, halfExtents.x);
             localZ = math.clamp(localZ, -halfExtents.y, halfExtents.y);
-            return new float3(center.x + localX, center.y, center.z + localZ);
+            return Shape2DUtility.LocalToWorldPositionXZ(new float2(localX, localZ), center, sourceRotation);
         }
 
         private static float3 SampleSpawnPositionLineEven(
@@ -1270,22 +1284,10 @@ namespace SweepNDodge.DotsBullets
         private static float3 SampleSpawnPositionUniform(
             ref Unity.Mathematics.Random random,
             float3 center,
-            in BulletFieldAreaComponent fieldArea)
+            quaternion sourceRotation,
+            in Shape2DComponent fieldArea)
         {
-            if (fieldArea.Shape == BulletFieldShapeId.Rectangle)
-            {
-                float2 half = math.max(0f, fieldArea.Size) * 0.5f;
-                float2 offset = new float2(
-                    random.NextFloat(-half.x, half.x),
-                    random.NextFloat(-half.y, half.y));
-                return new float3(center.x + offset.x, center.y, center.z + offset.y);
-            }
-
-            float radius = math.max(0f, fieldArea.Radius);
-            float angle = random.NextFloat(0f, math.PI * 2f);
-            float dist = math.sqrt(random.NextFloat(0f, 1f)) * radius;
-            float2 offsetCircle = new float2(math.cos(angle), math.sin(angle)) * dist;
-            return new float3(center.x + offsetCircle.x, center.y, center.z + offsetCircle.y);
+            return Shape2DUtility.SampleUniformXZ(ref random, center, sourceRotation, in fieldArea);
         }
 
         private static bool TryDequeueByKey(

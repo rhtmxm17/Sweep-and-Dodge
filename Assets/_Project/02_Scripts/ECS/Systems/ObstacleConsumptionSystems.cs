@@ -40,7 +40,7 @@ namespace SweepNDodge.DotsBullets
         private struct ObstacleSnapshot
         {
             public LocalTransform Transform;
-            public ObstacleGeometryComponent Geometry;
+            public Shape2DComponent Shape;
         }
 
         private EntityQuery _obstacleQuery;
@@ -57,6 +57,7 @@ namespace SweepNDodge.DotsBullets
                 ComponentType.ReadOnly<StageTopologyObstacleTag>(),
                 ComponentType.ReadOnly<ObstacleCollisionMaskComponent>(),
                 ComponentType.ReadOnly<ObstacleGeometryComponent>(),
+                ComponentType.ReadOnly<Shape2DComponent>(),
                 ComponentType.ReadOnly<LocalTransform>());
         }
 
@@ -131,12 +132,12 @@ namespace SweepNDodge.DotsBullets
                 if ((mask.Value & requiredMask) == 0)
                     continue;
                 var tx = em.GetComponentData<LocalTransform>(entity);
-                var geometry = em.GetComponentData<ObstacleGeometryComponent>(entity);
+                var shape = em.GetComponentData<Shape2DComponent>(entity);
 
                 list.Add(new ObstacleSnapshot
                 {
                     Transform = tx,
-                    Geometry = geometry,
+                    Shape = shape,
                 });
             }
 
@@ -148,7 +149,7 @@ namespace SweepNDodge.DotsBullets
             for (int i = 0; i < obstacles.Length; i++)
             {
                 var obstacle = obstacles[i];
-                if (ObstacleGeometryUtility.OverlapsCircleXZ(position, radius, in obstacle.Transform, in obstacle.Geometry))
+                if (ObstacleGeometryUtility.OverlapsCircleXZ(position, radius, in obstacle.Transform, in obstacle.Shape))
                     return false;
             }
 
@@ -164,7 +165,7 @@ namespace SweepNDodge.DotsBullets
         private struct ObstacleSnapshot
         {
             public LocalTransform Transform;
-            public ObstacleGeometryComponent Geometry;
+            public Shape2DComponent Shape;
             public int2 MinCell;
             public int2 MaxCell;
         }
@@ -183,6 +184,7 @@ namespace SweepNDodge.DotsBullets
                 ComponentType.ReadOnly<StageTopologyObstacleTag>(),
                 ComponentType.ReadOnly<ObstacleCollisionMaskComponent>(),
                 ComponentType.ReadOnly<ObstacleGeometryComponent>(),
+                ComponentType.ReadOnly<Shape2DComponent>(),
                 ComponentType.ReadOnly<LocalTransform>());
         }
 
@@ -246,13 +248,13 @@ namespace SweepNDodge.DotsBullets
                 if ((mask.Value & requiredMask) == 0)
                     continue;
                 var tx = em.GetComponentData<LocalTransform>(entity);
-                var geometry = em.GetComponentData<ObstacleGeometryComponent>(entity);
-                ComputeObstacleCellBounds(in tx, in geometry, invCellSize, out int2 minCell, out int2 maxCell);
+                var shape = em.GetComponentData<Shape2DComponent>(entity);
+                ComputeObstacleCellBounds(in tx, in shape, invCellSize, out int2 minCell, out int2 maxCell);
 
                 list.Add(new ObstacleSnapshot
                 {
                     Transform = tx,
-                    Geometry = geometry,
+                    Shape = shape,
                     MinCell = minCell,
                     MaxCell = maxCell,
                 });
@@ -263,43 +265,23 @@ namespace SweepNDodge.DotsBullets
 
         private static void ComputeObstacleCellBounds(
             in LocalTransform tx,
-            in ObstacleGeometryComponent geometry,
+            in Shape2DComponent shape,
             float invCellSize,
             out int2 minCell,
             out int2 maxCell)
         {
-            ComputeObstacleBoundsXZ(in tx, in geometry, out float2 min, out float2 max);
+            ComputeObstacleBoundsXZ(in tx, in shape, out float2 min, out float2 max);
             minCell = (int2)math.floor(min * invCellSize);
             maxCell = (int2)math.floor(max * invCellSize);
         }
 
         private static void ComputeObstacleBoundsXZ(
             in LocalTransform tx,
-            in ObstacleGeometryComponent geometry,
+            in Shape2DComponent shape,
             out float2 min,
             out float2 max)
         {
-            if (geometry.Shape == ObstacleShape.Circle)
-            {
-                float radius = math.max(0f, geometry.Radius);
-                float2 center = new float2(tx.Position.x, tx.Position.z);
-                min = center - radius;
-                max = center + radius;
-                return;
-            }
-
-            float2 half = math.max(float2.zero, geometry.Size * 0.5f);
-            float3 corner0 = math.rotate(tx.Rotation, new float3(-half.x, 0f, -half.y)) + tx.Position;
-            float3 corner1 = math.rotate(tx.Rotation, new float3(-half.x, 0f, half.y)) + tx.Position;
-            float3 corner2 = math.rotate(tx.Rotation, new float3(half.x, 0f, -half.y)) + tx.Position;
-            float3 corner3 = math.rotate(tx.Rotation, new float3(half.x, 0f, half.y)) + tx.Position;
-
-            min = new float2(
-                math.min(math.min(corner0.x, corner1.x), math.min(corner2.x, corner3.x)),
-                math.min(math.min(corner0.z, corner1.z), math.min(corner2.z, corner3.z)));
-            max = new float2(
-                math.max(math.max(corner0.x, corner1.x), math.max(corner2.x, corner3.x)),
-                math.max(math.max(corner0.z, corner1.z), math.max(corner2.z, corner3.z)));
+            Shape2DUtility.ComputeBoundsXZ(in tx, in shape, out min, out max);
         }
 
         private struct BulletObstacleHitFromCellMapJob : IJob
@@ -336,7 +318,7 @@ namespace SweepNDodge.DotsBullets
 
                                 float3 bulletPosition = TxLookup[bullet].Position;
                                 float2 point = new float2(bulletPosition.x, bulletPosition.z);
-                                if (!ObstacleGeometryUtility.ContainsPointXZ(point, in obstacle.Transform, in obstacle.Geometry))
+                                if (!ObstacleGeometryUtility.ContainsPointXZ(point, in obstacle.Transform, in obstacle.Shape))
                                     continue;
 
                                 DespawnRequestLookup.SetComponentEnabled(bullet, true);

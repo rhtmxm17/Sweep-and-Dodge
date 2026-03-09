@@ -11,7 +11,8 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
   - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
-> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyApplyPrepareSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve하고, `Source/Deposit` topology를 runtime template reconcile로 생성/재사용한 뒤 `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+  - [ADR-20260309-01-planar-shape2d-yaw-only-runtime-contract.md](../ADR/ADR-20260309-01-planar-shape2d-yaw-only-runtime-contract.md)
+> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyApplyPrepareSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve하고, `Source / Deposit / Obstacle` topology를 runtime template reconcile로 생성/재사용한다. raw planar shape는 `Shape2DComponent`로 통일하고, gameplay 판정은 `XZ 평면 + yaw-only` semantics를 사용한다. `Source`는 layout+definition 결합 적용과 `SourceShapeDerivedComponent`/pollution grid 재생성을 함께 수행하며, `Deposit`과 `Obstacle`는 layout-only shape apply를 수행한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -20,6 +21,8 @@
 - `StageTopologyBridge -> RequestTopologyApply(stageId)` topology 입력 경로를 사용하고, `RunDirectorStageBridge`는 stage state 입력만 담당한다.
 - `StageDefinitionSO.SourceBindings`를 런타임 Source에 적용한다.
 - 샘플 운영 씬과 에디터 파이프라인을 `StageCatalogSO` 중심으로 닫는다.
+- `Source / Deposit / Obstacle`의 planar shape raw data를 `Shape2DComponent`로 통일한다.
+- `Source Rectangle`의 sampling/occupancy를 `yaw-aware planar OBB`로 고정하고, editor에서는 marker GO의 `pitch/roll`을 0으로 강제한다.
 
 ### 1.2 비목표 (다음 페이즈 이월)
 - `RunDirectorStageConfig/RunProgressDirectorConfig/SpawnRequestPolicy` stage-level override 런타임 적용
@@ -27,7 +30,7 @@
 - 운영 빌드 fail-fast 정책 전환
 
 ## 2. 현재 상태(코드 기준)
-- 런타임 적용은 `StageTopologyApplyPrepareSystem`이 `StageCatalogSO`를 `StageId`로 조회해 `Source/Deposit` runtime topology를 reconcile하고, `Source`는 layout+definition 결합 적용, `Deposit`은 layout 적용을 수행한다.
+- 런타임 적용은 `StageTopologyApplyPrepareSystem`이 `StageCatalogSO`를 `StageId`로 조회해 `Source / Deposit / Obstacle` runtime topology를 reconcile하고, `Source`는 layout+definition 결합 apply + 파생 재생성, `Deposit`/`Obstacle`는 layout apply를 수행한다.
 - `StageTopologyBridge`가 `StageCatalogRuntimeComponent`를 publish하고 topology prefab singleton을 bind한다.
 - `DemoShellFlowController`는 `StageCatalogSO`가 있으면 카탈로그에서 `StageProfiles`를 구성하고, 없으면 기존 직렬화 `StageProfiles`를 fallback으로 사용한다.
 - `SourceClipRequestBuildSystem`은 stage state gate를 가져 `Running` 전에는 clip request를 만들지 않는다.
@@ -97,16 +100,42 @@
   - definition binding 미매핑: safe-disable
   - definition stage 미존재: layout-only apply
 
+### 5.2A 공통 planar shape 계약
+- 공통 runtime raw shape
+  - `Shape2DKind`: `Circle`, `Rectangle`
+  - `Shape2DComponent`: `Kind`, `Radius`, `Size`
+- 공통 판정/샘플링 유틸
+  - `Normalize`
+  - `ComputeArea`
+  - `ComputeHalfExtents`
+  - `ContainsPointXZ`
+  - `OverlapsCircleXZ`
+  - `ComputeBoundsXZ`
+  - `SampleUniformXZ`
+- gameplay 판정 좌표계
+  - 모든 판정은 `XZ` 평면에서만 수행한다.
+  - 회전 semantics는 `yaw`만 사용한다.
+  - `pitch/roll`은 gameplay 의미가 없으므로 authoring에서 0으로 강제한다.
+- 사각형 계약
+  - `Rectangle`은 `axis-aligned`가 아니라 `yaw-aware planar OBB`다.
+  - `Circle`은 `yaw` 영향을 받지 않는다.
+- semantic marker
+  - `BulletFieldAreaComponent`, `DepositPointComponent`, `ObstacleGeometryComponent`는 raw shape holder가 아니라 semantic marker로 유지한다.
+- source 전용 파생 번들
+  - `SourceShapeDerivedComponent`: `ComputedArea`, `HalfExtents`
+  - `SourcePollutionGridComponent` 및 pollution buffers는 source owner가 `Shape2DComponent`와 함께 재생성한다.
+
 ### 5.3 runtime template authoring 책임 (`SourceRuntimeTemplateAuthoring` / `DepositRuntimeTemplateAuthoring`)
 - 주 경로 authoring
   - `StableIdOverride`
-  - field shape/radius/size
+  - shape/radius/size
   - pollution grid/config
   - gizmo/debug
 - legacy alias (`BulletSourceAuthoring`, `DepositPointAuthoring`)에 남는 migration data
   - `SustainClipSlots[]`, `EventClipSlots[]`
   - `ThresholdWeakened`, `ThresholdDepleted`, `InitialCollectedCount`, `InitialState`
 - 새 runtime template authoring baker는 deprecated seed 필드로 runtime clip/threshold/state를 bake하지 않는다. neutral 기본값만 bake하고, 실제 정의는 `StageDefinitionSO` apply가 책임진다.
+- `StageSourceMarker`, `StageDepositMarker`, `StageObstacleMarker`는 `OnValidate`와 layout generator 경로에서 `pitch/roll`을 0으로 보정한다.
 
 ### 5.4 Obstacle 설계 계약
 - `Obstacle`는 `StageTopology`에 편입된 runtime kind이며, 현재 단계에서는 `bullet/player` 소비의 기본 경계까지 구현한다.
@@ -119,19 +148,20 @@
   - `StableId`
   - `Active`
   - `Position`
-  - `EulerRotation`
+  - `YawDeg`
   - `Shape`
   - `Radius`
   - `Size`
   - `CollisionMask`
 - shape 범위
-  - 이번 범위에서는 `Circle`, `Box`만 지원한다.
-  - shape 공통화(enum/helper 통합)는 별도 세션 이월 항목이다.
+  - 이번 범위에서는 `Circle`, `Rectangle`만 지원한다.
+  - obstacle raw shape는 `Shape2DComponent`를 사용한다.
 - runtime obstacle component 세트(계약)
   - `StageTopologyObstacleTag`
   - `ObstacleStableIdComponent`
   - `ObstacleCollisionMaskComponent`
   - `ObstacleGeometryComponent`
+  - `Shape2DComponent`
   - `StageTopologyOwnedComponent(Kind=Obstacle)`
   - `LocalTransform`
 - lifecycle / owner
@@ -142,7 +172,7 @@
   - reader owner: `BulletObstacleHitRequestSystem`
   - 그룹: `BulletRequestGroup`
   - 순서: `BulletVacuumRequestSystem` 이후, `PlayerHazardCollisionRequestSystem` 이전
-  - 판정 모델: bullet은 `point`, obstacle는 `Circle/Box` inside test
+  - 판정 모델: bullet은 `point`, obstacle는 `Circle/Rectangle` inside test
   - 읽기 source: active obstacle entity 직접 query
   - 결과: 기존 `BulletDespawnRequestTag` enable 경로 재사용
   - 다중 remove 원인은 멱등 처리한다.
@@ -150,7 +180,7 @@
   - reader owner: `PlayerObstacleBlockSystem`
   - 그룹: `PlayerFixedStepGroup`
   - 순서: `PlayerPreviousPositionCaptureSystem -> PlayerIntentMovementSystem -> PlayerObstacleBlockSystem -> PlayerIntentConsumeSystem`
-  - 판정 모델: player는 `circle(PlayerRadius)`, obstacle는 `Circle/Box`
+  - 판정 모델: player는 `circle(PlayerRadius)`, obstacle는 `Circle/Rectangle`
   - 현재 채택안은 `post-move correction`이며, `rollback + axis slide`를 적용한다.
   - `PlayerPreviousPositionComponent`로 movement 직전 위치를 저장하고 correction에 사용한다.
   - 향후 dash/knockback/external force 등 이동 영향 요소가 증가하면 `movement-resolve 통합` 재설계가 필요할 수 있다.
@@ -202,9 +232,9 @@
   - 선택 엔트리의 `Definition.StageId`를 사용해 `StageTopologyBridge.RequestTopologyApply(stageId)` 호출
   - `StageTopologyApplyPrepareSystem`
   - `RequestedStageId`로 layout/definition을 각각 resolve
-  - `Source`는 layout+definition 결합 적용
-  - `Deposit`은 layout 적용
-  - `Obstacle`는 layout-only topology apply를 수행하고, `BulletObstacleHitRequestSystem`과 `PlayerObstacleBlockSystem`이 runtime consumer로 이를 읽는다.
+  - `Source`는 `Shape2DComponent + SourceShapeDerivedComponent`와 pollution grid 재생성을 포함한 layout+definition 결합 apply를 수행한다.
+  - `Deposit`은 `Shape2DComponent` 기반 layout apply를 수행하고, `PlayerCarryBinDepositRequestSystem`은 `player circle overlap deposit shape`로 접촉 판정한다.
+  - `Obstacle`는 `Shape2DComponent` 기반 layout-only topology apply를 수행하고, `BulletObstacleHitRequestSystem`과 `PlayerObstacleBlockSystem`이 runtime consumer로 이를 읽는다.
   - owned entity 공통 메타
     - `StageTopologyOwnedComponent.Kind`
     - `StageTopologyOwnedComponent.LastAppliedVersion`
@@ -215,8 +245,7 @@
   - infrastructure failure(`StageCatalog`/entry/layout/template/instantiate 실패)에서는 기존 applied topology를 유지하고 `SelectedStageId`에 대해서만 `Ready=0`을 남긴다.
   - definition/source mismatch, duplicate stable id, active=false는 `warn + partial apply`로 처리하고 stage 전체 `Ready`는 유지한다.
   - `OnStateEnterOnce`는 initial apply 직후 자동 발화하지 않음
-  - 현재 구현된 topology kind는 `Source`, `Deposit`뿐이다.
-  - `Obstacle`는 설계 계약까지 확정된 다음 확장 대상 kind이며, 구현 단계에서 `StageTopologyPrefabCatalogSO`에 `ObstacleTemplatePrefab` required 필드를 명시 추가할 예정이다.
+  - 현재 구현된 topology kind는 `Source`, `Deposit`, `Obstacle`다.
   - `Visual`은 별도 세션에서 GO-only presentational layer 여부를 먼저 확정한다.
 
 ### 7.3 Template Catalog / Validation Boundary

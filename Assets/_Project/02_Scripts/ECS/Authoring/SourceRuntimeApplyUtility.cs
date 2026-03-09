@@ -116,8 +116,18 @@ namespace SweepNDodge.DotsBullets
             });
         }
 
+        public static void RefreshSourceShapeDerived(
+            in Shape2DComponent shape,
+            ref SourceShapeDerivedComponent derived)
+        {
+            var normalized = Shape2DUtility.Normalize(in shape);
+            derived.ComputedArea = Shape2DUtility.ComputeArea(in normalized);
+            derived.HalfExtents = Shape2DUtility.ComputeHalfExtents(in normalized);
+        }
+
         public static void RebuildPollutionGrid(
-            in BulletFieldAreaComponent area,
+            in Shape2DComponent shape,
+            in SourceShapeDerivedComponent derived,
             in SourcePollutionConfigComponent config,
             ref SourcePollutionGridComponent grid,
             DynamicBuffer<SourcePollutionCellBuffer> pollutionCells,
@@ -125,7 +135,8 @@ namespace SweepNDodge.DotsBullets
             DynamicBuffer<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndices)
         {
             float cellSize = math.max(0.1f, grid.CellSize);
-            float2 halfExtents = ComputeHalfExtents(area.Shape, area.Radius, area.Size);
+            var normalized = Shape2DUtility.Normalize(in shape);
+            float2 halfExtents = math.max(float2.zero, derived.HalfExtents);
             int cols = math.max(1, Mathf.CeilToInt((halfExtents.x * 2f) / cellSize));
             int rows = math.max(1, Mathf.CeilToInt((halfExtents.y * 2f) / cellSize));
 
@@ -143,32 +154,36 @@ namespace SweepNDodge.DotsBullets
                 rows,
                 cellSize,
                 halfExtents,
-                area.Shape,
-                area.Radius,
+                normalized.Kind,
+                normalized.Radius,
                 math.max(config.MinValue, config.MaxValue));
         }
 
-        public static float ComputeArea(BulletFieldShapeId shape, float radius, Vector2 size)
+        public static float ComputeArea(Shape2DKind kind, float radius, Vector2 size)
         {
-            if (shape == BulletFieldShapeId.Rectangle)
-                return Mathf.Max(0f, size.x) * Mathf.Max(0f, size.y);
-
-            float safeRadius = Mathf.Max(0f, radius);
-            return Mathf.PI * safeRadius * safeRadius;
+            var shape = new Shape2DComponent
+            {
+                Kind = kind,
+                Radius = radius,
+                Size = new float2(size.x, size.y),
+            };
+            return Shape2DUtility.ComputeArea(in shape);
         }
 
-        public static float2 ComputeHalfExtents(BulletFieldShapeId shape, float radius, Vector2 size)
+        public static float2 ComputeHalfExtents(Shape2DKind kind, float radius, Vector2 size)
         {
-            return ComputeHalfExtents(shape, radius, new float2(size.x, size.y));
+            return ComputeHalfExtents(kind, radius, new float2(size.x, size.y));
         }
 
-        public static float2 ComputeHalfExtents(BulletFieldShapeId shape, float radius, float2 size)
+        public static float2 ComputeHalfExtents(Shape2DKind kind, float radius, float2 size)
         {
-            if (shape == BulletFieldShapeId.Rectangle)
-                return math.max(float2.zero, size) * 0.5f;
-
-            float safeRadius = math.max(0f, radius);
-            return new float2(safeRadius, safeRadius);
+            var shape = new Shape2DComponent
+            {
+                Kind = kind,
+                Radius = radius,
+                Size = size,
+            };
+            return Shape2DUtility.ComputeHalfExtents(in shape);
         }
 
         public static int ResolveCollectedCount(SourceStateId state, int thresholdWeakened, int thresholdDepleted)
@@ -328,7 +343,7 @@ namespace SweepNDodge.DotsBullets
             int rows,
             float cellSize,
             float2 halfExtents,
-            BulletFieldShapeId shape,
+            Shape2DKind shape,
             float fieldRadius,
             float maxValue)
         {
@@ -354,7 +369,7 @@ namespace SweepNDodge.DotsBullets
 
                     float centerX = -halfExtents.x + (x + 0.5f) * safeCellSize;
                     float centerZ = -halfExtents.y + (y + 0.5f) * safeCellSize;
-                    bool isValid = shape == BulletFieldShapeId.Rectangle
+                    bool isValid = shape == Shape2DKind.Rectangle
                         || (centerX * centerX + centerZ * centerZ) <= radiusSq;
 
                     pollutionCells.Add(new SourcePollutionCellBuffer
