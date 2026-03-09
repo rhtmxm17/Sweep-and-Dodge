@@ -12,7 +12,8 @@
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
   - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
   - [ADR-20260309-01-planar-shape2d-yaw-only-runtime-contract.md](../ADR/ADR-20260309-01-planar-shape2d-yaw-only-runtime-contract.md)
-> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyApplyPrepareSystem`이 `StageCatalogRuntimeComponent`에서 `StageId` 기준으로 `StageLayoutSO + StageDefinitionSO`를 직접 resolve하고, `Source / Deposit / Obstacle` topology를 runtime template reconcile로 생성/재사용한다. raw planar shape는 `Shape2DComponent`로 통일하고, gameplay 판정은 `XZ 평면 + yaw-only` semantics를 사용한다. `Source`는 layout+definition 결합 적용과 `SourceShapeDerivedComponent`/pollution grid 재생성을 함께 수행하며, `Deposit`과 `Obstacle`는 layout-only shape apply를 수행한다.
+  - [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](../ADR/ADR-20260309-02-stage-session-reset-and-prepare-owner.md)
+> 현재 런타임은 `StageCatalogSO`를 단일 운영 계약으로 사용한다. `StageTopologyPrepareGroup`은 `StageSessionResetPrepareSystem -> StageTopologyApplyPrepareSystem` 순서로 동작하며, stage entry reset과 `Source / Deposit / Obstacle` topology apply를 소유한다. raw planar shape는 `Shape2DComponent`로 통일하고, gameplay 판정은 `XZ 평면 + yaw-only` semantics를 사용한다. `Source`는 layout+definition 결합 적용과 `SourceShapeDerivedComponent`/pollution grid 재생성을 함께 수행하며, `Deposit`과 `Obstacle`는 layout-only shape apply를 수행한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -44,6 +45,7 @@
 - StageCatalog 검증 Owner: `StageCatalogValidationRules`
 - StageLayout 검증 Owner: `StageLayoutValidationRules`
 - 런타임 Stage topology/apply Owner: `StageTopologyApplyPrepareSystem` (`StageTopologyPrepareGroup`)
+- 런타임 Stage session reset Owner: `StageSessionResetPrepareSystem` (`StageTopologyPrepareGroup`)
 - GO -> ECS Topology Writer: `StageTopologyBridge`
 - GO -> ECS StageState Writer: `RunDirectorStageBridge`
 
@@ -53,7 +55,13 @@
   - fixed-tick runtime 내부: `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
 - Stage apply 순서:
   - `StageTopologyBootstrapSystem`
+  - `StageSessionResetPrepareSystem`
   - `StageTopologyApplyPrepareSystem`
+- stage session reset 계약
+  - `StageTopologyBridge.RequestTopologyApply(stageId)`는 stage entry reset과 topology apply를 함께 의미한다.
+  - reset은 world recreation/scene reload에 의존하지 않고 prepare 계층 owner가 수행한다.
+  - reset 대상은 `RunDirector`/`StageTopology`의 session singleton 상태이며, config/template/catalog singleton은 유지한다.
+  - same-frame `apply -> start`를 유지하기 위해 `StageStartRequested`와 intro/clear gate는 explicit reset에서 보존한다.
   - `FixedTickRootGroup`
 - H3 boundary-only apply 계약
   - topology apply는 `Idle`, `Completed`, 초기 비플레이 경계에서만 허용한다.
@@ -214,6 +222,8 @@
   - `StageTopologyBridge`
   - `StageCatalogRuntimeComponent` publish
   - `StageTopologyRequestComponent` one-shot write
+- session reset input
+  - `StageTopologyBridge.RequestTopologyApply(stageId)`가 explicit stage-entry reset을 함께 요청한다
 - stage state input
   - `RunDirectorStageBridge`
   - `RunDirectorStageRequestComponent`, gate/signal write
@@ -230,6 +240,7 @@
   - `RunDirectorStageBridge`는 stage state/gate/signal만 다룬다.
 - `EnterStagePlay`
   - 선택 엔트리의 `Definition.StageId`를 사용해 `StageTopologyBridge.RequestTopologyApply(stageId)` 호출
+  - 이 요청은 먼저 `StageSessionResetPrepareSystem`이 stale session state를 `Idle + not-ready` 기본값으로 정리한 뒤, `StageTopologyApplyPrepareSystem`이 topology를 적용하는 흐름을 의미한다.
   - `StageTopologyApplyPrepareSystem`
   - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 `Shape2DComponent + SourceShapeDerivedComponent`와 pollution grid 재생성을 포함한 layout+definition 결합 apply를 수행한다.
@@ -284,6 +295,7 @@
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
+- [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](../ADR/ADR-20260309-02-stage-session-reset-and-prepare-owner.md)
 
 
 

@@ -53,6 +53,7 @@ namespace SweepNDodge.DotsBullets
         private bool _warnedNoTopologyBridge;
         private bool _warnedStageCatalogIssue;
         private float _stagePlayElapsedSec;
+        private bool _stageRunningObserved;
         private int _stageStartTotalCollectValue;
         private int _stageStartTotalCleanupValue;
         private int _stageStartTotalHitValue;
@@ -108,6 +109,7 @@ namespace SweepNDodge.DotsBullets
             EnsureRuntimeHudBridge();
             EnsureDemoAudioBridge();
             EnsureBridgeSubscription();
+            TryConsumeCompletedStateFallback();
             TryBootFromSessionStagingIfPending();
             ProcessKeyboardFallback();
             TickStagePlayFlow();
@@ -388,6 +390,14 @@ namespace SweepNDodge.DotsBullets
             if (!StageBridge.TryGetStageState(out var stageState))
                 return;
 
+            if (!_stageRunningObserved)
+            {
+                if (stageState.State == RunDirectorStageStateId.Running)
+                    _stageRunningObserved = true;
+                else
+                    return;
+            }
+
             if (stageState.State == RunDirectorStageStateId.ClearReady)
             {
                 EnterStageResult(DemoShellStageOutcomeId.Clear);
@@ -498,6 +508,25 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
+        private void TryConsumeCompletedStateFallback()
+        {
+            if (_currentScreen != DemoShellScreenId.StageResult
+                || !_awaitingCompletedSignal
+                || _currentStageOutcome != DemoShellStageOutcomeId.Clear
+                || StageBridge == null)
+            {
+                return;
+            }
+
+            if (!StageBridge.TryGetStageState(out var stageState))
+                return;
+
+            if (stageState.State != RunDirectorStageStateId.Completed)
+                return;
+
+            OnStageRunCompleted();
+        }
+
         private void EnterStagePlay(int stageIndex)
         {
             if (!TryGetStageProfile(stageIndex, out var profile))
@@ -509,6 +538,7 @@ namespace SweepNDodge.DotsBullets
             _awaitingCompletedSignal = false;
             _pendingResultAction = DemoShellResultActionId.NextStage;
             _stagePlayElapsedSec = 0f;
+            _stageRunningObserved = false;
             _currentStageOutcome = DemoShellStageOutcomeId.Clear;
             _hasCurrentStageResult = false;
             CaptureStageStartTotals();

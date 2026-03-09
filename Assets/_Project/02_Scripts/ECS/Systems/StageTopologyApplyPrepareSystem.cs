@@ -46,7 +46,7 @@ namespace SweepNDodge.DotsBullets
             var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
             var topologyStateEntity = SystemAPI.GetSingletonEntity<StageTopologyStateComponent>();
             var topologyState = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
-            if (!IsApplyBoundaryState(stageState.State, topologyState))
+            if (!StageTopologyPrepareBoundaryUtility.IsApplyBoundaryState(stageState.State, topologyState))
             {
                 Debug.LogWarning($"[StageTopologyApply] Ignored topology apply outside stage boundary. stageId={requestedStageId}, stageState={stageState.State}");
                 return;
@@ -119,17 +119,6 @@ namespace SweepNDodge.DotsBullets
             topologyState.AppliedStageId = requestedStageId;
             topologyState.Ready = 1;
             em.SetComponentData(topologyStateEntity, topologyState);
-        }
-
-        private static bool IsApplyBoundaryState(RunDirectorStageStateId state, StageTopologyStateComponent topologyState)
-        {
-            if (state == RunDirectorStageStateId.Idle || state == RunDirectorStageStateId.Completed)
-                return true;
-
-            return state == RunDirectorStageStateId.Running
-                && topologyState.SelectedStageId <= 0
-                && topologyState.AppliedStageId <= 0
-                && topologyState.Ready == 0;
         }
 
         private static bool TryGetTopologyPrefabCatalog(ref SystemState state, out StageTopologyPrefabCatalogComponent prefabs)

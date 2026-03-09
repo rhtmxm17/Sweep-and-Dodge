@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](ADR-20260309-02-stage-session-reset-and-prepare-owner.md): 씬 리로드/Retry/Next 재진입에서 world 재생성 대신 prepare 계층의 explicit stage session reset owner를 채택
 - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md): 장주기 스테이지를 위한 StageTopology lifecycle/failure policy와 boundary-only apply 계약 고정
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md): 스테이지 정의/레이아웃 분리와 StageCatalog 명시적 페어 엔트리 채택
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md): StageMap 런타임 적용 Owner를 ExecutionBegin 단일 시스템으로 고정하고 DemoShell StageId 입력 경로를 RunDirectorStageBridge로 단일화

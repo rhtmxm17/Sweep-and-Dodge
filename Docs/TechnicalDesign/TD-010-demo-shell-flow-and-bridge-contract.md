@@ -4,7 +4,7 @@
 - doc_id: `TD-010`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-08`
+- last_updated: `2026-03-09`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -12,7 +12,8 @@
   - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
   - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
-> DemoShell은 화면 전이 Owner를 유지하고, topology 입력은 `StageTopologyBridge`, stage state 입력은 `RunDirectorStageBridge`를 통해 ECS에 전달한다. 현재 런타임은 `StageCatalogSO + StageTopologyPrefabCatalog`를 publish하며, topology apply one-shot의 정식 API는 `StageTopologyBridge.RequestTopologyApply(stageId)`다.
+  - [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](../ADR/ADR-20260309-02-stage-session-reset-and-prepare-owner.md)
+> DemoShell은 화면 전이 Owner를 유지하고, topology 입력은 `StageTopologyBridge`, stage state 입력은 `RunDirectorStageBridge`를 통해 ECS에 전달한다. 현재 런타임은 `StageCatalogSO + StageTopologyPrefabCatalog`를 publish하며, topology apply one-shot의 정식 API는 `StageTopologyBridge.RequestTopologyApply(stageId)`다. 이 요청은 stage entry reset과 topology apply를 함께 의미한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -36,6 +37,7 @@
 - GO->ECS StageState Writer: `RunDirectorStageBridge`
   - `RequestStageStart()`, `RequestConfirm()`
   - `SetIntroPresentationDone(bool)`, `SetClearPresentationDone(bool)`
+- ECS stage session reset Owner: `StageSessionResetPrepareSystem`
 - ECS stage topology/apply Owner: `StageTopologyApplyPrepareSystem`
 - ECS Stage 상태/전이 Owner: 기존 시스템 유지 (`RunDirectorStageTransitionSystem` 등)
 
@@ -43,10 +45,19 @@
 - 파이프라인 순서:
   - `StageTopologyPrepareGroup -> FixedTickRootGroup`
   - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd`
+- prepare 계층 순서:
+  - `StageTopologyBootstrapSystem`
+  - `StageSessionResetPrepareSystem`
+  - `StageTopologyApplyPrepareSystem`
 - StagePlay 시작 루프:
   1. `StageTopologyBridge.RequestTopologyApply(stageId)` 성공
   2. `SetIntroPresentationDone(true)` + `SetClearPresentationDone(false)`
   3. `RequestStageStart()`
+- session reset 계약
+  - `RequestTopologyApply(stageId)`는 stage entry reset을 포함한다.
+  - reset owner는 `StageTopologyPrepareGroup`의 ECS 시스템이다.
+  - world recreation이나 scene reload에 의존하지 않고 session singleton 상태를 명시적으로 초기화한다.
+  - same-frame `apply -> start`를 유지하기 위해 `StageStartRequested`와 intro/clear gate는 reset 중 보존한다.
 - H3 long-cycle 규칙
   - topology apply는 stage 경계(`Idle`, `Completed`, 초기 부트스트랩)에서만 허용한다.
   - `Running`, `ClearReady` 중 topology apply 요청은 warning 후 무시되고 현재 stage topology는 유지된다.
@@ -68,12 +79,14 @@
   - `StageTopologyBridge`가 `StageCatalogRuntimeComponent`를 최신화한다
   - topology prefab singleton은 `StageTopologyBridge`가 bind/보강한다
   - `RunDirectorStageBridge`는 topology singleton이 없어도 run-director singleton만으로 bind된다
+  - stage session reset은 `StageTopologyPrepareGroup` owner가 수행한다
 
 ## 5. Topology Boundary
 - `StageTopologyBridge`
   - topology 입력 전용 GO->ECS writer
   - `StageCatalogRuntimeComponent` publish
   - `StageTopologyRequestComponent` one-shot write
+  - `RequestTopologyApply(stageId)`는 stage entry reset을 포함한다
   - `StageTopologyStateComponent`는 read-only 조회만 허용
 - `RunDirectorStageBridge`
   - stage state/gate/signal 입력 전용 GO->ECS writer
@@ -117,6 +130,7 @@
     - topology singleton 없이 독립 bind
   - `StageTopologyApplyPrepareSystemTests`
     - boundary-only apply
+    - explicit stage-entry reset
     - lifecycle stamp/versioning
     - failure keep-current-stage policy
   - `StageCatalogSampleAssetsTests`
@@ -129,6 +143,7 @@
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
 - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
+- [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](../ADR/ADR-20260309-02-stage-session-reset-and-prepare-owner.md)
 
 
 

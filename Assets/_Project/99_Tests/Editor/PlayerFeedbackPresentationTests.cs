@@ -53,6 +53,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             TickWorld(world, simGroup, 1f / 60f);
 
+            uiBuffer = em.GetBuffer<PlayerUiFeedbackEventBufferElement>(player);
             var snapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(player);
             Assert.That(snapshot.Version, Is.EqualTo(1u));
             Assert.That(snapshot.Type, Is.EqualTo(PlayerUiFeedbackEventType.PlayerHazardHit));
@@ -71,6 +72,7 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             TickWorld(world, simGroup, 1f / 60f);
 
+            uiBuffer = em.GetBuffer<PlayerUiFeedbackEventBufferElement>(player);
             var cooldownSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(player);
             Assert.That(cooldownSnapshot.Version, Is.EqualTo(1u), "Hit cooldown should suppress immediate repeated hit feedback.");
             Assert.That(uiBuffer.Length, Is.EqualTo(0));
@@ -78,6 +80,7 @@ namespace SweepNDodge.DotsBullets.Tests
             for (int i = 0; i < 7; i++)
                 TickWorld(world, simGroup, 1f / 60f);
 
+            uiBuffer = em.GetBuffer<PlayerUiFeedbackEventBufferElement>(player);
             uiBuffer.Add(new PlayerUiFeedbackEventBufferElement
             {
                 Type = PlayerUiFeedbackEventType.PlayerHazardHit,
@@ -89,6 +92,7 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             TickWorld(world, simGroup, 1f / 60f);
 
+            uiBuffer = em.GetBuffer<PlayerUiFeedbackEventBufferElement>(player);
             var acceptedSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(player);
             Assert.That(acceptedSnapshot.Version, Is.EqualTo(2u));
             Assert.That(acceptedSnapshot.Value, Is.EqualTo(5));
@@ -124,6 +128,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             TickWorld(world, simGroup, 1f / 60f);
 
+            impulseBuffer = em.GetBuffer<PlayerImpulseEventBufferElement>(player);
             var snapshot = em.GetComponentData<PlayerImpulsePresentationSnapshotComponent>(player);
             Assert.That(snapshot.Version, Is.EqualTo(1u));
             Assert.That(snapshot.MergedEventCount, Is.EqualTo(2));
@@ -162,6 +167,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             TickWorld(world, simGroup, 1f / 60f);
 
+            impulseBuffer = em.GetBuffer<PlayerImpulseEventBufferElement>(player);
             var snapshot = em.GetComponentData<PlayerImpulsePresentationSnapshotComponent>(player);
             Assert.That(snapshot.Version, Is.EqualTo(1u));
             Assert.That(snapshot.MergedEventCount, Is.EqualTo(2));

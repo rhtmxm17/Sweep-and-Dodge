@@ -96,6 +96,11 @@ namespace SweepNDodge.DotsBullets
         public uint CurrentAppliedVersion;
     }
 
+    public struct StageSessionResetBootstrapComponent : IComponentData
+    {
+        public byte InitialResetPending;
+    }
+
     public struct StageTopologyOwnedTag : IComponentData
     {
     }

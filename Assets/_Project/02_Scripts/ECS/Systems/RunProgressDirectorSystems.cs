@@ -88,10 +88,9 @@ namespace SweepNDodge.DotsBullets
             {
                 case RunDirectorStageStateId.Idle:
                 {
+                    bool topologyReady = StageTopologyRuntimeGateUtility.IsTopologyReadyForGameplay(in topologyState);
                     bool canRun = stageRequest.StageStartRequested != 0
-                        && topologyState.Ready != 0
-                        && topologyState.SelectedStageId > 0
-                        && topologyState.AppliedStageId == topologyState.SelectedStageId
+                        && topologyReady
                         && stageGate.MinIdleDurationElapsed != 0
                         && stageGate.IntroPresentationDone != 0;
                     if (canRun)

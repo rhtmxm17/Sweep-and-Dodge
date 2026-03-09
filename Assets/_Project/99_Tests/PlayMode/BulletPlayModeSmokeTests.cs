@@ -263,8 +263,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 300,
                 "RunDirector stage singleton setup was not ready within timeout.");
 
-            ResetStageFlowStateForOperationalScene(em);
-
             yield return WaitForCondition(
                 () => FindDemoShell() != null,
                 240,
@@ -388,7 +386,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 240,
                 "DemoShellFlowController was not ready in operational scene for force clear test.");
 
-            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            Assert.That(shell.RequestStartFromTitle(), Is.True, $"RequestStartFromTitle returned false. screen={shell.CurrentScreen}");
             yield return WaitForCondition(
                 () =>
                 {
@@ -398,7 +396,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 240,
                 "Demo shell did not transition Title -> Lobby for force clear test.");
 
-            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            Assert.That(shell.RequestSelectStageById(1), Is.True, $"RequestSelectStageById returned false. screen={shell.CurrentScreen}");
             yield return WaitForCondition(
                 () =>
                 {
@@ -680,7 +678,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 240,
                 "Demo shell did not enter StagePlay.");
 
-            Assert.That(shell.RequestGiveUp(), Is.True);
+            Assert.That(shell.RequestGiveUp(), Is.True, $"RequestGiveUp returned false. screen={shell.CurrentScreen}, stageId={shell.CurrentStageId}");
             yield return WaitForCondition(
                 () =>
                 {
@@ -692,7 +690,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 240,
                 "Give Up did not transition to Fail result.");
 
-            Assert.That(shell.RequestResultAction(DemoShellResultActionId.ReturnToLobby), Is.True);
+            Assert.That(
+                shell.RequestResultAction(DemoShellResultActionId.ReturnToLobby),
+                Is.True,
+                $"RequestResultAction(ReturnToLobby) returned false. screen={shell.CurrentScreen}, outcome={shell.CurrentStageOutcome}");
             yield return WaitForCondition(
                 () =>
                 {
@@ -775,11 +776,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 360,
                 "Retry after fail did not re-enter Stage1.");
+            yield return WaitForCondition(
+                () => HasCombatEventChannel(em),
+                240,
+                "CombatEventChannel was not ready after Retry Stage1 re-entry.");
 
             // Stage1 clear
             SetCombatTotals(em, totalCollect: 10, totalCleanup: 5, totalHit: 1);
             yield return null;
             yield return null;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                240,
+                "Stage1 did not reach Running before forced ClearReady.");
             ForceStageStateToClearReady(em);
             yield return WaitForCondition(
                 () =>
@@ -802,14 +813,31 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentStageId == 2;
                 },
                 360,
-                "Did not enter Stage2 after Stage1 Next.");
+                () =>
+                {
+                    shell = FindDemoShell();
+                    string shellText = shell == null
+                        ? "shell=null"
+                        : $"shell(screen={shell.CurrentScreen}, stageId={shell.CurrentStageId}, outcome={shell.CurrentStageOutcome})";
+                    return $"Did not enter Stage2 after Stage1 Next. {shellText}, startupPending={DemoShellSessionStaging.IsStartupPending}, {DescribeStageRunState(em)}";
+                });
             world = World.DefaultGameObjectInjectionWorld;
             em = world.EntityManager;
+            yield return WaitForCondition(
+                () => HasCombatEventChannel(em),
+                240,
+                "CombatEventChannel was not ready after Stage2 entry.");
 
             // Stage2 clear
             SetCombatTotals(em, totalCollect: 20, totalCleanup: 8, totalHit: 2);
             yield return null;
             yield return null;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                240,
+                () => $"Stage2 did not reach Running before forced ClearReady. {DescribeStageRunState(em)}");
             ForceStageStateToClearReady(em);
             yield return WaitForCondition(
                 () =>
@@ -835,11 +863,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 "Did not enter Stage3 after Stage2 Next.");
             world = World.DefaultGameObjectInjectionWorld;
             em = world.EntityManager;
+            yield return WaitForCondition(
+                () => HasCombatEventChannel(em),
+                240,
+                "CombatEventChannel was not ready after Stage3 entry.");
 
             // Stage3 clear -> DemoComplete
             SetCombatTotals(em, totalCollect: 30, totalCleanup: 12, totalHit: 3);
             yield return null;
             yield return null;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                240,
+                "Stage3 did not reach Running before forced ClearReady.");
             ForceStageStateToClearReady(em);
             yield return WaitForCondition(
                 () =>
@@ -1259,8 +1297,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             if (scenePath == OperationalScenePath)
             {
-                ResetStageFlowStateForOperationalScene(em);
-
                 DemoShellFlowController shell = null;
                 yield return WaitForCondition(
                     () =>
@@ -1541,6 +1577,45 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return $"{topologyText}, {sourceText}, {depositText}, {obstacleText}";
+        }
+
+        private static string DescribeStageRunState(EntityManager em)
+        {
+            CompleteTrackedJobs(em);
+
+            string stageText = "stage=missing";
+            if (HasSingleton<RunDirectorStageStateComponent>(em))
+            {
+                var stage = GetSingleton<RunDirectorStageStateComponent>(em);
+                stageText =
+                    $"stage(state={stage.State}, elapsed={stage.StateElapsedSec:0.##}, reason={stage.LastTransitionReason})";
+            }
+
+            string gateText = "gate=missing";
+            if (HasSingleton<RunDirectorStageGateComponent>(em))
+            {
+                var gate = GetSingleton<RunDirectorStageGateComponent>(em);
+                gateText =
+                    $"gate(intro={gate.IntroPresentationDone}, clear={gate.ClearPresentationDone}, minIdle={gate.MinIdleDurationElapsed}, auto={gate.AutoAdvanceTimeoutElapsed})";
+            }
+
+            string requestText = "request=missing";
+            if (HasSingleton<RunDirectorStageRequestComponent>(em))
+            {
+                var request = GetSingleton<RunDirectorStageRequestComponent>(em);
+                requestText =
+                    $"request(start={request.StageStartRequested}, confirm={request.ConfirmPressed}, forceClear={request.ForceClearReadyRequested})";
+            }
+
+            string topologyText = "topology=missing";
+            if (HasSingleton<StageTopologyStateComponent>(em))
+            {
+                var topology = GetSingleton<StageTopologyStateComponent>(em);
+                topologyText =
+                    $"topology(selected={topology.SelectedStageId}, applied={topology.AppliedStageId}, ready={topology.Ready})";
+            }
+
+            return $"{stageText}, {gateText}, {requestText}, {topologyText}";
         }
 
         private static void AssertStageMapAppliedForStage1(EntityManager em)

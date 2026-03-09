@@ -23,7 +23,390 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyStateComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyLifecycleStateComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).IsEmptyIgnoreFilter, Is.False);
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageSessionResetBootstrapComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>()).IsEmptyIgnoreFilter, Is.False);
+        }
+
+        [Test]
+        public void StageSessionResetPrepare_BootReset_ClearsSessionSingletons_AndConsumesPendingFlag()
+        {
+            using var world = CreateDefaultTestWorld("StageSessionResetWorld_Boot");
+            var em = world.EntityManager;
+
+            SetSingleton(em, new RunDirectorStageConfigComponent
+            {
+                InitialState = RunDirectorStageStateId.Idle,
+                MinIdleDurationSec = 0f,
+                ClearAutoAdvanceTimeoutSec = 10f,
+            });
+            SetSingleton(em, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.Completed,
+                StateElapsedSec = 3f,
+                EnteredFrame = 12u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
+            });
+            SetSingleton(em, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 1,
+                MinIdleDurationElapsed = 0,
+                AutoAdvanceTimeoutElapsed = 1,
+            });
+            SetSingleton(em, new RunDirectorStageRequestComponent
+            {
+                StageStartRequested = 0,
+                ConfirmPressed = 1,
+                ForceClearReadyRequested = 1,
+            });
+            SetSingleton(em, new RunDirectorStageSignalComponent
+            {
+                StageRunCompleted = 1,
+            });
+            SetSingleton(em, new StageTopologyRequestComponent
+            {
+                RequestedStageId = 0,
+                ApplyRequested = 0,
+            });
+            SetSingleton(em, new StageTopologyStateComponent
+            {
+                SelectedStageId = 2,
+                AppliedStageId = 2,
+                Ready = 1,
+            });
+            SetSingleton(em, new StageTopologyLifecycleStateComponent
+            {
+                CurrentAppliedVersion = 9u,
+            });
+            SetSingleton(em, new StageSessionResetBootstrapComponent
+            {
+                InitialResetPending = 1,
+            });
+
+            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
+
+            var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
+            var gate = GetSingleton<RunDirectorStageGateComponent>(em);
+            var request = GetSingleton<RunDirectorStageRequestComponent>(em);
+            var signal = GetSingleton<RunDirectorStageSignalComponent>(em);
+            var topologyState = GetSingleton<StageTopologyStateComponent>(em);
+            var lifecycle = GetSingleton<StageTopologyLifecycleStateComponent>(em);
+            var bootstrap = GetSingleton<StageSessionResetBootstrapComponent>(em);
+
+            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Idle));
+            Assert.That(stageState.StateElapsedSec, Is.EqualTo(0f));
+            Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.None));
+            Assert.That(gate.IntroPresentationDone, Is.EqualTo(1));
+            Assert.That(gate.ClearPresentationDone, Is.EqualTo(1));
+            Assert.That(gate.MinIdleDurationElapsed, Is.EqualTo(1));
+            Assert.That(gate.AutoAdvanceTimeoutElapsed, Is.EqualTo(0));
+            Assert.That(request.StageStartRequested, Is.EqualTo(0));
+            Assert.That(request.ConfirmPressed, Is.EqualTo(0));
+            Assert.That(request.ForceClearReadyRequested, Is.EqualTo(0));
+            Assert.That(signal.StageRunCompleted, Is.EqualTo(0));
+            Assert.That(topologyState.SelectedStageId, Is.EqualTo(0));
+            Assert.That(topologyState.AppliedStageId, Is.EqualTo(0));
+            Assert.That(topologyState.Ready, Is.EqualTo(0));
+            Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(0u));
+            Assert.That(bootstrap.InitialResetPending, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void StageSessionResetPrepare_ExplicitApplyReset_PreservesStageEntrySignals_AndClearsCompletedState()
+        {
+            using var world = CreateDefaultTestWorld("StageSessionResetWorld_Explicit");
+            var em = world.EntityManager;
+
+            SetSingleton(em, new RunDirectorStageConfigComponent
+            {
+                InitialState = RunDirectorStageStateId.Idle,
+                MinIdleDurationSec = 0f,
+                ClearAutoAdvanceTimeoutSec = 10f,
+            });
+            SetSingleton(em, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.Completed,
+                StateElapsedSec = 3f,
+                EnteredFrame = 12u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
+            });
+            SetSingleton(em, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 0,
+                MinIdleDurationElapsed = 0,
+                AutoAdvanceTimeoutElapsed = 1,
+            });
+            SetSingleton(em, new RunDirectorStageRequestComponent
+            {
+                StageStartRequested = 1,
+                ConfirmPressed = 1,
+                ForceClearReadyRequested = 1,
+            });
+            SetSingleton(em, new RunDirectorStageSignalComponent
+            {
+                StageRunCompleted = 1,
+            });
+            SetSingleton(em, new StageTopologyRequestComponent
+            {
+                RequestedStageId = 2,
+                ApplyRequested = 1,
+            });
+            SetSingleton(em, new StageTopologyStateComponent
+            {
+                SelectedStageId = 1,
+                AppliedStageId = 1,
+                Ready = 1,
+            });
+            SetSingleton(em, new StageTopologyLifecycleStateComponent
+            {
+                CurrentAppliedVersion = 9u,
+            });
+            SetSingleton(em, new StageSessionResetBootstrapComponent
+            {
+                InitialResetPending = 0,
+            });
+
+            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
+
+            var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
+            var gate = GetSingleton<RunDirectorStageGateComponent>(em);
+            var request = GetSingleton<RunDirectorStageRequestComponent>(em);
+            var topologyRequest = GetSingleton<StageTopologyRequestComponent>(em);
+            var topologyState = GetSingleton<StageTopologyStateComponent>(em);
+            var lifecycle = GetSingleton<StageTopologyLifecycleStateComponent>(em);
+
+            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Idle));
+            Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.None));
+            Assert.That(request.StageStartRequested, Is.EqualTo(1));
+            Assert.That(request.ConfirmPressed, Is.EqualTo(0));
+            Assert.That(request.ForceClearReadyRequested, Is.EqualTo(0));
+            Assert.That(gate.IntroPresentationDone, Is.EqualTo(1));
+            Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
+            Assert.That(gate.MinIdleDurationElapsed, Is.EqualTo(1));
+            Assert.That(gate.AutoAdvanceTimeoutElapsed, Is.EqualTo(0));
+            Assert.That(topologyRequest.ApplyRequested, Is.EqualTo(1));
+            Assert.That(topologyRequest.RequestedStageId, Is.EqualTo(2));
+            Assert.That(topologyState.SelectedStageId, Is.EqualTo(0));
+            Assert.That(topologyState.AppliedStageId, Is.EqualTo(0));
+            Assert.That(topologyState.Ready, Is.EqualTo(0));
+            Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(0u));
+        }
+
+        [Test]
+        public void StageSessionResetPrepare_RunningStateApplyRequest_IsIgnored()
+        {
+            using var world = CreateDefaultTestWorld("StageSessionResetWorld_RunningIgnore");
+            var em = world.EntityManager;
+
+            SetSingleton(em, new RunDirectorStageConfigComponent
+            {
+                InitialState = RunDirectorStageStateId.Idle,
+                MinIdleDurationSec = 0f,
+                ClearAutoAdvanceTimeoutSec = 10f,
+            });
+            SetSingleton(em, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.Running,
+                StateElapsedSec = 1f,
+                EnteredFrame = 7u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.StartRequested,
+            });
+            SetSingleton(em, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 0,
+                MinIdleDurationElapsed = 1,
+                AutoAdvanceTimeoutElapsed = 0,
+            });
+            SetSingleton(em, new RunDirectorStageRequestComponent
+            {
+                StageStartRequested = 0,
+            });
+            SetSingleton(em, default(RunDirectorStageSignalComponent));
+            SetSingleton(em, new StageTopologyRequestComponent
+            {
+                RequestedStageId = 2,
+                ApplyRequested = 1,
+            });
+            SetSingleton(em, new StageTopologyStateComponent
+            {
+                SelectedStageId = 1,
+                AppliedStageId = 1,
+                Ready = 1,
+            });
+            SetSingleton(em, new StageTopologyLifecycleStateComponent
+            {
+                CurrentAppliedVersion = 4u,
+            });
+            SetSingleton(em, new StageSessionResetBootstrapComponent
+            {
+                InitialResetPending = 0,
+            });
+
+            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
+
+            Assert.That(GetSingleton<RunDirectorStageStateComponent>(em).State, Is.EqualTo(RunDirectorStageStateId.Running));
+            Assert.That(GetSingleton<StageTopologyRequestComponent>(em).ApplyRequested, Is.EqualTo(1));
+            Assert.That(GetSingleton<StageTopologyStateComponent>(em).SelectedStageId, Is.EqualTo(1));
+            Assert.That(GetSingleton<StageTopologyLifecycleStateComponent>(em).CurrentAppliedVersion, Is.EqualTo(4u));
+        }
+
+        [Test]
+        public void StageSessionResetPrepare_RunningStateApplyWithStageStartRequest_ResetsForStageEntry()
+        {
+            using var world = CreateDefaultTestWorld("StageSessionResetWorld_RunningEntryReset");
+            var em = world.EntityManager;
+
+            SetSingleton(em, new RunDirectorStageConfigComponent
+            {
+                InitialState = RunDirectorStageStateId.Idle,
+                MinIdleDurationSec = 0f,
+                ClearAutoAdvanceTimeoutSec = 10f,
+            });
+            SetSingleton(em, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.Running,
+                StateElapsedSec = 2f,
+                EnteredFrame = 15u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.StartRequested,
+            });
+            SetSingleton(em, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 0,
+                MinIdleDurationElapsed = 1,
+                AutoAdvanceTimeoutElapsed = 0,
+            });
+            SetSingleton(em, new RunDirectorStageRequestComponent
+            {
+                StageStartRequested = 1,
+                ConfirmPressed = 1,
+            });
+            SetSingleton(em, new RunDirectorStageSignalComponent
+            {
+                StageRunCompleted = 1,
+            });
+            SetSingleton(em, new StageTopologyRequestComponent
+            {
+                RequestedStageId = 2,
+                ApplyRequested = 1,
+            });
+            SetSingleton(em, new StageTopologyStateComponent
+            {
+                SelectedStageId = 1,
+                AppliedStageId = 1,
+                Ready = 1,
+            });
+            SetSingleton(em, new StageTopologyLifecycleStateComponent
+            {
+                CurrentAppliedVersion = 4u,
+            });
+            SetSingleton(em, new StageSessionResetBootstrapComponent
+            {
+                InitialResetPending = 0,
+            });
+
+            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
+
+            var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
+            var gate = GetSingleton<RunDirectorStageGateComponent>(em);
+            var request = GetSingleton<RunDirectorStageRequestComponent>(em);
+            var topologyRequest = GetSingleton<StageTopologyRequestComponent>(em);
+            var topologyState = GetSingleton<StageTopologyStateComponent>(em);
+            var lifecycle = GetSingleton<StageTopologyLifecycleStateComponent>(em);
+
+            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Idle));
+            Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.None));
+            Assert.That(request.StageStartRequested, Is.EqualTo(1));
+            Assert.That(request.ConfirmPressed, Is.EqualTo(0));
+            Assert.That(gate.IntroPresentationDone, Is.EqualTo(1));
+            Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
+            Assert.That(topologyRequest.ApplyRequested, Is.EqualTo(1));
+            Assert.That(topologyRequest.RequestedStageId, Is.EqualTo(2));
+            Assert.That(topologyState.SelectedStageId, Is.EqualTo(0));
+            Assert.That(topologyState.AppliedStageId, Is.EqualTo(0));
+            Assert.That(topologyState.Ready, Is.EqualTo(0));
+            Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(0u));
+        }
+
+        [Test]
+        public void StageSessionResetAndTopologyApply_CompletedStateCanReenterRunning_SameFrame()
+        {
+            using var world = CreateDefaultTestWorld("StageSessionResetWorld_Reenter");
+            var em = world.EntityManager;
+            var createdAssets = new List<ScriptableObject>();
+
+            try
+            {
+                var catalog = CreateStageCatalog(createdAssets, stageId: 2, sourceStableIds: new uint[] { 1001u }, depositStableIds: new uint[] { 2001u });
+                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
+                SetSingleton(em, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                    DepositTemplate = CreateDepositTemplate(em),
+                });
+                SetSingleton(em, new RunDirectorStageConfigComponent
+                {
+                    InitialState = RunDirectorStageStateId.Idle,
+                    MinIdleDurationSec = 0f,
+                    ClearAutoAdvanceTimeoutSec = 10f,
+                });
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Completed,
+                    StateElapsedSec = 0.5f,
+                    EnteredFrame = 3u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
+                });
+                SetSingleton(em, new RunDirectorStageGateComponent
+                {
+                    IntroPresentationDone = 1,
+                    ClearPresentationDone = 0,
+                    MinIdleDurationElapsed = 1,
+                    AutoAdvanceTimeoutElapsed = 0,
+                });
+                SetSingleton(em, new RunDirectorStageRequestComponent
+                {
+                    StageStartRequested = 1,
+                });
+                SetSingleton(em, default(RunDirectorStageSignalComponent));
+                SetSingleton(em, new StageTopologyRequestComponent
+                {
+                    RequestedStageId = 2,
+                    ApplyRequested = 1,
+                });
+                SetSingleton(em, default(StageTopologyStateComponent));
+                SetSingleton(em, new StageTopologyLifecycleStateComponent
+                {
+                    CurrentAppliedVersion = 5u,
+                });
+                SetSingleton(em, new StageSessionResetBootstrapComponent
+                {
+                    InitialResetPending = 0,
+                });
+                SetSingleton(em, new BulletFrameCounterComponent
+                {
+                    Value = 10u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<RunDirectorStageTransitionSystem>().Update(world.Unmanaged);
+
+                var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
+                var topologyState = GetSingleton<StageTopologyStateComponent>(em);
+                Assert.That(topologyState.SelectedStageId, Is.EqualTo(2));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(2));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+                Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Running));
+                Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.StartRequested));
+            }
+            finally
+            {
+                DestroyAll(createdAssets);
+            }
         }
 
         [Test]
@@ -863,6 +1246,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 return query.GetSingletonEntity();
             using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
             return entities[0];
+        }
+
+        private static T GetSingleton<T>(EntityManager em)
+            where T : unmanaged, IComponentData
+        {
+            return em.GetComponentData<T>(GetOrCreateSingletonEntity<T>(em));
         }
 
         private static void SetSingleton<T>(EntityManager em, T value)
