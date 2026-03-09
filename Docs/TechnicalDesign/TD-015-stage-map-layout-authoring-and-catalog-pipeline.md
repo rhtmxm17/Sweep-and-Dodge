@@ -4,7 +4,7 @@
 - doc_id: `TD-015`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-08`
+- last_updated: `2026-03-09`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
@@ -23,7 +23,7 @@
 
 ### 1.2 비목표 (다음 페이즈 이월)
 - `RunDirectorStageConfig/RunProgressDirectorConfig/SpawnRequestPolicy` stage-level override 런타임 적용
-- Deposit/Obstacle/Visual 확장 스키마의 런타임 소비
+- Obstacle runtime 구현, Player blocking fixed-tick 정렬, Visual 런타임 소비
 - 운영 빌드 fail-fast 정책 전환
 
 ## 2. 현재 상태(코드 기준)
@@ -108,6 +108,47 @@
   - `ThresholdWeakened`, `ThresholdDepleted`, `InitialCollectedCount`, `InitialState`
 - 새 runtime template authoring baker는 deprecated seed 필드로 runtime clip/threshold/state를 bake하지 않는다. neutral 기본값만 bake하고, 실제 정의는 `StageDefinitionSO` apply가 책임진다.
 
+### 5.4 Obstacle 설계 계약
+- `Obstacle`는 `StageTopology`의 다음 확장 대상 kind이며, 이번 단계에서는 `데이터/의미 계약`만 고정한다.
+- 의미 계약
+  - `단일 Obstacle + CollisionMask`
+  - `BlockPlayer | BlockBullet`: 플레이어와 총알 모두 차단
+  - `BlockPlayer`: 플레이어 이동만 차단
+  - `BlockBullet` 접촉 탄환 기본 반응: `즉시 despawn`
+- `StageObstacleLayoutData`
+  - `StableId`
+  - `Active`
+  - `Position`
+  - `EulerRotation`
+  - `Shape`
+  - `Radius`
+  - `Size`
+  - `CollisionMask`
+- shape 범위
+  - 이번 범위에서는 `Circle`, `Box`만 지원한다.
+  - shape 공통화(enum/helper 통합)는 별도 세션 이월 항목이다.
+- runtime obstacle component 세트(계약)
+  - `StageTopologyObstacleTag`
+  - `ObstacleStableIdComponent`
+  - `ObstacleCollisionMaskComponent`
+  - `ObstacleGeometryComponent`
+  - `StageTopologyOwnedComponent(Kind=Obstacle)`
+  - `LocalTransform`
+- lifecycle / owner
+  - `Obstacle`는 `layout-only topology kind`다.
+  - topology apply owner/lifecycle/failure policy는 기존 `Source/Deposit`의 `StageTopology` 규칙을 그대로 따른다.
+  - 즉 `instantiate -> reuse -> mapped-active -> pooled-disabled`, `LastAppliedVersion` stamp, infrastructure failure 시 `Ready=0 + 기존 applied topology 유지` 규칙을 동일하게 사용한다.
+- bullet read 계약
+  - reader 후보: `BulletObstacleHitRequestSystem`
+  - 그룹: `Request`
+  - 판정 모델: bullet은 `point`, obstacle는 `Circle/Box` inside test
+  - 읽기 source: active obstacle entity 직접 query
+  - 결과: 기존 despawn/remove request 경로 재사용
+  - 다중 remove 원인은 멱등 처리한다.
+- player read 계약
+  - `BlockPlayer`는 이번 단계에서 `데이터 의미`까지만 고정한다.
+  - 실행 owner, fixed-tick 정렬, 최종 판정 순서는 후속 세션에서 `PlayerIntentMovementSystem` 이관과 함께 다룬다.
+
 ## 6. 에디터 파이프라인
 - `StageLayoutCatalogGenerator`
   - 단일 스테이지 `StageLayoutSO` 생성만 담당한다.
@@ -153,7 +194,7 @@
   - `RunDirectorStageBridge`는 stage state/gate/signal만 다룬다.
 - `EnterStagePlay`
   - 선택 엔트리의 `Definition.StageId`를 사용해 `StageTopologyBridge.RequestTopologyApply(stageId)` 호출
-- `StageTopologyApplyPrepareSystem`
+  - `StageTopologyApplyPrepareSystem`
   - `RequestedStageId`로 layout/definition을 각각 resolve
   - `Source`는 layout+definition 결합 적용
   - `Deposit`은 layout 적용
@@ -167,7 +208,9 @@
   - infrastructure failure(`StageCatalog`/entry/layout/template/instantiate 실패)에서는 기존 applied topology를 유지하고 `SelectedStageId`에 대해서만 `Ready=0`을 남긴다.
   - definition/source mismatch, duplicate stable id, active=false는 `warn + partial apply`로 처리하고 stage 전체 `Ready`는 유지한다.
   - `OnStateEnterOnce`는 initial apply 직후 자동 발화하지 않음
-  - 현재 지원 topology kind는 `Source`, `Deposit`뿐이며, `StageTopologyPrefabCatalogSO`도 동일하게 `SourceTemplatePrefab`, `DepositTemplatePrefab`만 필수 필드로 가진다.
+  - 현재 구현된 topology kind는 `Source`, `Deposit`뿐이다.
+  - `Obstacle`는 설계 계약까지 확정된 다음 확장 대상 kind이며, 구현 단계에서 `StageTopologyPrefabCatalogSO`에 `ObstacleTemplatePrefab` required 필드를 명시 추가할 예정이다.
+  - `Visual`은 별도 세션에서 GO-only presentational layer 여부를 먼저 확정한다.
 
 ### 7.3 Template Catalog / Validation Boundary
 - `StageTopologyPrefabCatalogSO`
