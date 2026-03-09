@@ -17,6 +17,7 @@ namespace SweepNDodge.DotsBullets
         AllSourcesDepleted = 2,
         ConfirmPressed = 3,
         AutoAdvanceTimeout = 4,
+        DebugForceClearReady = 5,
     }
 
     public struct RunDirectorStageConfigComponent : IComponentData
@@ -47,6 +48,7 @@ namespace SweepNDodge.DotsBullets
     {
         public byte StageStartRequested;
         public byte ConfirmPressed;
+        public byte ForceClearReadyRequested;
     }
 
     public struct StageTopologyRequestComponent : IComponentData

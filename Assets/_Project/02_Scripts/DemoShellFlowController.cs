@@ -155,6 +155,12 @@ namespace SweepNDodge.DotsBullets
                         if (limit > 0f)
                             GUILayout.Label($"Time: {_stagePlayElapsedSec:0.0}s / {limit:0.0}s");
                     }
+                    bool canForceClearReady = CanRequestForceClearReady();
+                    using (new GuiEnabledScope(canForceClearReady))
+                    {
+                        if (GUILayout.Button("Force ClearReady (Test)"))
+                            RequestForceClearReadyForTest();
+                    }
                     if (GUILayout.Button("Give Up"))
                         RequestGiveUp();
                     break;
@@ -294,6 +300,20 @@ namespace SweepNDodge.DotsBullets
 
             EnterStageResult(DemoShellStageOutcomeId.Fail);
             return true;
+        }
+
+        public bool RequestForceClearReadyForTest()
+        {
+            if (_currentScreen != DemoShellScreenId.StagePlay)
+                return false;
+            if (StageBridge == null)
+                return false;
+            if (!StageBridge.TryGetStageState(out var stageState))
+                return false;
+            if (stageState.State != RunDirectorStageStateId.Running)
+                return false;
+
+            return StageBridge.RequestForceClearReady();
         }
 
         public bool RequestQuit()
@@ -615,6 +635,16 @@ namespace SweepNDodge.DotsBullets
                 _demoAudioBridge.SetBusVolume(bus, next);
         }
 
+        private bool CanRequestForceClearReady()
+        {
+            if (_currentScreen != DemoShellScreenId.StagePlay || StageBridge == null)
+                return false;
+            if (!StageBridge.TryGetStageState(out var stageState))
+                return false;
+
+            return stageState.State == RunDirectorStageStateId.Running;
+        }
+
         private void TransitionTo(DemoShellScreenId next)
         {
             if (_currentScreen == next)
@@ -867,6 +897,22 @@ namespace SweepNDodge.DotsBullets
                     _ => DefaultStage2TimeLimitSec,
                 },
             };
+        }
+
+        private readonly struct GuiEnabledScope : System.IDisposable
+        {
+            private readonly bool _previous;
+
+            public GuiEnabledScope(bool enabled)
+            {
+                _previous = GUI.enabled;
+                GUI.enabled = enabled;
+            }
+
+            public void Dispose()
+            {
+                GUI.enabled = _previous;
+            }
         }
     }
 }

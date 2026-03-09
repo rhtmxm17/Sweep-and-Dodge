@@ -93,6 +93,17 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
+        public bool RequestForceClearReady()
+        {
+            if (!TryBind())
+                return false;
+
+            var request = _em.GetComponentData<RunDirectorStageRequestComponent>(_stageRequestEntity);
+            request.ForceClearReadyRequested = 1;
+            _em.SetComponentData(_stageRequestEntity, request);
+            return true;
+        }
+
         public bool SetIntroPresentationDone(bool done)
         {
             if (!TryBind())

@@ -2448,6 +2448,53 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void RunDirectorStage_RunningToClearReady_AllowsDebugForceRequest()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("RunDirectorStageForceClearReadyWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                var stageStateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageStateComponent>()).GetSingletonEntity();
+                em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Running,
+                    StateElapsedSec = 0.3f,
+                    EnteredFrame = 9u,
+                    LastTransitionReason = RunDirectorStageTransitionReasonId.StartRequested,
+                });
+
+                var requestEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageRequestComponent>()).GetSingletonEntity();
+                em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
+                {
+                    StageStartRequested = 0,
+                    ConfirmPressed = 1,
+                    ForceClearReadyRequested = 1,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                var stage = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
+                var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
+                Assert.That(stage.State, Is.EqualTo(RunDirectorStageStateId.ClearReady));
+                Assert.That(stage.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.DebugForceClearReady));
+                Assert.That(request.ForceClearReadyRequested, Is.EqualTo(0));
+                Assert.That(request.ConfirmPressed, Is.EqualTo(0));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void RunDirectorStage_ClearReadyToCompleted_AllowsAutoAdvanceTimeout()
         {
             try

@@ -35,6 +35,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(bridge.SetClearPresentationDone(true), Is.True);
                 Assert.That(bridge.RequestStageStart(), Is.True);
                 Assert.That(bridge.RequestConfirm(), Is.True);
+                Assert.That(bridge.RequestForceClearReady(), Is.True);
 
                 var gate = em.GetComponentData<RunDirectorStageGateComponent>(gateEntity);
                 var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
@@ -42,6 +43,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(gate.ClearPresentationDone, Is.EqualTo(1));
                 Assert.That(request.StageStartRequested, Is.EqualTo(1));
                 Assert.That(request.ConfirmPressed, Is.EqualTo(1));
+                Assert.That(request.ForceClearReadyRequested, Is.EqualTo(1));
             }
             finally
             {

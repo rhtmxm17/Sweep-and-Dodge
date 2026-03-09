@@ -107,6 +107,18 @@ namespace SweepNDodge.DotsBullets
                 }
                 case RunDirectorStageStateId.Running:
                 {
+                    if (stageRequest.ForceClearReadyRequested != 0)
+                    {
+                        TransitionTo(
+                            ref stageState,
+                            RunDirectorStageStateId.ClearReady,
+                            RunDirectorStageTransitionReasonId.DebugForceClearReady,
+                            frame);
+                        stageRequest.ForceClearReadyRequested = 0;
+                        stageRequest.ConfirmPressed = 0;
+                        break;
+                    }
+
                     bool anySource = false;
                     bool allFinish = true;
                     foreach (var sourceDirector in SystemAPI.Query<RefRO<SourceRunDirectorStateComponent>>())
@@ -126,6 +138,7 @@ namespace SweepNDodge.DotsBullets
                             RunDirectorStageStateId.ClearReady,
                             RunDirectorStageTransitionReasonId.AllSourcesDepleted,
                             frame);
+                        stageRequest.ForceClearReadyRequested = 0;
                         stageRequest.ConfirmPressed = 0;
                     }
                     break;

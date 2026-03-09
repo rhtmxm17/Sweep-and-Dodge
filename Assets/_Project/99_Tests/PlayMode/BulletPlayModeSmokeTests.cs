@@ -367,6 +367,74 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_ForceClearReadyFromStagePlay_EntersClearResult()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene for force clear test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Demo shell did not transition Title -> Lobby for force clear test.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1;
+                },
+                360,
+                "Demo shell did not enter StagePlay(Stage1) for force clear test.");
+
+            ForceStageStateToRunning(em, 0f);
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                360,
+                "RunDirector stage did not reach Running before force clear test.");
+
+            Assert.That(shell.RequestForceClearReadyForTest(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Clear;
+                },
+                240,
+                "Force ClearReady test button contract did not transition StagePlay -> Clear result.");
+
+            Assert.That(GetSingleton<RunDirectorStageStateComponent>(em).LastTransitionReason,
+                Is.EqualTo(RunDirectorStageTransitionReasonId.DebugForceClearReady));
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_DemoShell_Stage2_AppliesDifferentLayoutAndPattern()
         {
             ClearDemoShellStaging();
