@@ -35,7 +35,7 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateSourceEntries(layout.Sources, stageLocation, issues);
             ValidateDepositEntries(layout.Deposits, stageLocation, issues);
             ValidateObstacleEntries(layout.Obstacles, stageLocation, issues);
-            ValidateVisualEntries(layout.Visuals, stageLocation, issues);
+            ValidatePresentationEntries(layout.Presentations, stageLocation, issues);
 
             bool hasSource = layout.Sources != null && layout.Sources.Length > 0;
             bool hasDeposit = layout.Deposits != null && layout.Deposits.Length > 0;
@@ -47,7 +47,7 @@ namespace SweepNDodge.DotsBullets.Editor
             bool hasAnyElement = (layout.Sources?.Length ?? 0)
                 + (layout.Deposits?.Length ?? 0)
                 + (layout.Obstacles?.Length ?? 0)
-                + (layout.Visuals?.Length ?? 0) > 0;
+                + (layout.Presentations?.Length ?? 0) > 0;
             if (hasAnyElement && IsAllInactive(layout))
             {
                 issues.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STL008", stageLocation, "Stage has layout elements but all are inactive."));
@@ -118,20 +118,30 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateVisualEntries(StageVisualLayoutData[] entries, string stageLocation, List<ContentValidationIssue> issues)
+        private static void ValidatePresentationEntries(StagePresentationLayoutData[] entries, string stageLocation, List<ContentValidationIssue> issues)
         {
-            ValidateStableIdUniqueness(entries, stageLocation, "Visual", issues);
+            ValidateStableIdUniqueness(entries, stageLocation, "Presentation", issues);
             if (entries == null)
                 return;
 
             for (int i = 0; i < entries.Length; i++)
             {
                 var entry = entries[i];
-                string location = $"{stageLocation}/Visuals[{i}]";
+                string location = $"{stageLocation}/Presentations[{i}]";
                 if (entry.StableId == 0)
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL004", location, "StableId must be >= 1."));
-                if (string.IsNullOrWhiteSpace(entry.VisualKey))
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STL007", location, "VisualKey is empty."));
+                if (string.IsNullOrWhiteSpace(entry.PresentationKey))
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STL007", location, "PresentationKey is empty."));
+                if (entry.PlacementMode == StagePresentationPlacementMode.LinkedToParent)
+                {
+                    if (entry.LinkKind == StagePresentationLinkKind.None || entry.LinkedStableId == 0)
+                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL013", location, "LinkedToParent presentation requires LinkKind and LinkedStableId."));
+                }
+                else
+                {
+                    if (entry.LinkKind != StagePresentationLinkKind.None || entry.LinkedStableId != 0)
+                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL014", location, "Standalone presentation must not carry link target data."));
+                }
             }
         }
 
@@ -174,7 +184,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 StageSourceLayoutData source => source.StableId,
                 StageDepositLayoutData deposit => deposit.StableId,
                 StageObstacleLayoutData obstacle => obstacle.StableId,
-                StageVisualLayoutData visual => visual.StableId,
+                StagePresentationLayoutData presentation => presentation.StableId,
                 _ => 0u,
             };
         }
@@ -184,7 +194,7 @@ namespace SweepNDodge.DotsBullets.Editor
             return AreAllInactive(layout.Sources)
                 && AreAllInactive(layout.Deposits)
                 && AreAllInactive(layout.Obstacles)
-                && AreAllInactive(layout.Visuals);
+                && AreAllInactive(layout.Presentations);
         }
 
         private static bool AreAllInactive(StageSourceLayoutData[] entries)
@@ -223,7 +233,7 @@ namespace SweepNDodge.DotsBullets.Editor
             return true;
         }
 
-        private static bool AreAllInactive(StageVisualLayoutData[] entries)
+        private static bool AreAllInactive(StagePresentationLayoutData[] entries)
         {
             if (entries == null || entries.Length == 0)
                 return true;

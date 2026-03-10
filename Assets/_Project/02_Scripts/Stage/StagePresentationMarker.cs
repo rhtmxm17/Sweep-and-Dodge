@@ -1,13 +1,14 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
     [DisallowMultipleComponent]
-    public class StageVisualMarker : MonoBehaviour
+    public class StagePresentationMarker : MonoBehaviour
     {
         [Min(1)] public uint StableId = 1;
         public bool Active = true;
-        public string VisualKey = string.Empty;
+        public StagePresentationPlacementMode PlacementMode = StagePresentationPlacementMode.Standalone;
+        public string PresentationKey = string.Empty;
 
         [Header("Debug")]
         public bool DrawGizmo = true;

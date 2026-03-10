@@ -235,7 +235,7 @@ namespace SweepNDodge.DotsBullets.Tests
             layout.Sources = Array.Empty<StageSourceLayoutData>();
             layout.Deposits = Array.Empty<StageDepositLayoutData>();
             layout.Obstacles = Array.Empty<StageObstacleLayoutData>();
-            layout.Visuals = Array.Empty<StageVisualLayoutData>();
+            layout.Presentations = Array.Empty<StagePresentationLayoutData>();
             created.Add(layout);
             return layout;
         }

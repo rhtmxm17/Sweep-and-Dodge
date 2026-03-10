@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -9,6 +9,6 @@ namespace SweepNDodge.DotsBullets
         public StageSourceLayoutData[] Sources;
         public StageDepositLayoutData[] Deposits;
         public StageObstacleLayoutData[] Obstacles;
-        public StageVisualLayoutData[] Visuals;
+        public StagePresentationLayoutData[] Presentations;
     }
 }

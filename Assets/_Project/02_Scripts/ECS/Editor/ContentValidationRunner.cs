@@ -25,6 +25,7 @@ namespace SweepNDodge.DotsBullets.Editor
             var waveClips = CollectScriptableObjects<WaveClipSO>();
             var stageCatalogs = CollectScriptableObjects<StageCatalogSO>();
             var stageLayouts = CollectScriptableObjects<StageLayoutSO>();
+            var stagePresentationCatalogs = CollectScriptableObjects<StagePresentationCatalogSO>();
             var topologyPrefabCatalogs = CollectScriptableObjects<StageTopologyPrefabCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
@@ -37,6 +38,7 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(waveClips);
             SortRecordsByLocation(stageCatalogs);
             SortRecordsByLocation(stageLayouts);
+            SortRecordsByLocation(stagePresentationCatalogs);
             SortRecordsByLocation(topologyPrefabCatalogs);
             SortRecordsByLocation(visuals);
             SortRecordsByLocation(sources);
@@ -46,6 +48,7 @@ namespace SweepNDodge.DotsBullets.Editor
             var issues = ContentValidationRules.Validate(input);
             StageLayoutValidationRules.ValidateLayoutRecords(stageLayouts, issues);
             StageCatalogValidationRules.ValidateCatalogRecords(stageCatalogs, issues);
+            StagePresentationCatalogValidationRules.ValidateCatalogRecords(stagePresentationCatalogs, stageLayouts, issues);
             SortIssuesInPlace(issues);
             return issues;
         }

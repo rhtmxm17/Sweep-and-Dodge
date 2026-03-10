@@ -46,10 +46,13 @@ MonoBehaviour:
     Radius: 1
     Size: {x: 2, y: 4}
     CollisionMask: 1
-  Visuals:
+  Presentations:
   - StableId: 9001
     Active: 1
+    PlacementMode: 0
+    LinkKind: 0
+    LinkedStableId: 0
     Position: {x: 0, y: 0, z: 0}
-    YawDeg: 0
-    VisualKey: preview_visual_01
+    Euler: {x: 0, y: 0, z: 0}
+    PresentationKey: preview_visual_01
     Scale: {x: 1, y: 1, z: 1}

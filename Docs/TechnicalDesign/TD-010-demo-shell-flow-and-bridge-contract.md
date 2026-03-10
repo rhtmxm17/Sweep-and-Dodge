@@ -4,7 +4,7 @@
 - doc_id: `TD-010`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-09`
+- last_updated: `2026-03-10`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -20,10 +20,11 @@
 - DemoShell 화면 전이를 단일 소유한다.
 - GO->ECS 쓰기 경로를 `StageTopologyBridge`와 `RunDirectorStageBridge`의 이원 경계로 분리한다.
 - Stage 시작 전에 `StageTopologyBridge.RequestTopologyApply(stageId)`를 선행해 topology + layout + definition 적용을 보장한다.
+- 현재 topology 적용 범위인 `Source / Deposit / Obstacle`가 stage 시작 전에 모두 준비되도록 한다.
 - 로비/진행 순서를 `StageCatalogSO.Entries` 기반으로 데이터 주도화한다.
 
 ### 1.2 비목표
-- Source 외 Deposit/Obstacle/Visual 확장 소비
+- `Presentation` continuous follow / pooling / addressable 전환
 - StageDefinition의 stage-level override 적용
 
 ## 2. 소유권 (Owner / Writer)
@@ -105,7 +106,10 @@
 - `SampleScene`
   - `DemoShellFlowController.StageCatalog = sc_demo`
   - `StageTopologyBridge`는 `StageCatalog`를 참조한다
+  - `StagePresentationRuntimeController`는 `StageCatalog`, `StagePresentationCatalogSO`, `StageTopologyBridge`를 참조한다
   - `RunDirectorStageBridge`는 stage state/gate/signal만 다룬다
+  - 현재 stage entry prepare 범위는 `Source / Deposit / Obstacle`다
+  - `Presentation`은 GO-only layer로, `AppliedStageId + Ready` 기준 stage entry rebuild만 수행한다
   - 미연결 시 기존 `StageProfiles` fallback 동작
   - `sc_demo` 갱신은 `StageLayoutEditingSampleV1.unity` 수정 후 generator/composer 실행으로 수행한다
 - `PlayModeSmoke_Dedicated`
@@ -133,11 +137,21 @@
     - explicit stage-entry reset
     - lifecycle stamp/versioning
     - failure keep-current-stage policy
+  - `StagePresentationCatalogValidationRulesTests`
+    - duplicate key
+    - null prefab
+    - usage mismatch
+  - `StagePresentationRuntimeControllerTests`
+    - `Ready` edge rebuild
+    - `AppliedStageId` change rebuild
+    - `Ready -> 0` clear
+    - linked target resolve
   - `StageCatalogSampleAssetsTests`
     - `sc_demo` / `sd_demo_1~3` / `sl_demo_1~3` 자산 유효성
 - PlayMode 회귀
   - `Title -> Lobby -> Stage -> Result -> Retry/Next -> DemoComplete`
-  - `Stage2` layout/pattern 차이 반영
+  - `Stage2` layout/pattern/obstacle 차이 반영
+  - presentation rebuild (`Stage1 -> Next -> Stage2`, `Retry`) 반영
 
 ## 9. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)

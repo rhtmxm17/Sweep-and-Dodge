@@ -492,6 +492,142 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_PresentationController_RebuildsAcrossNextAndRetry()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em) &&
+                    HasSingleton<RunDirectorStageGateComponent>(em) &&
+                    HasSingleton<RunDirectorStageRequestComponent>(em) &&
+                    HasSingleton<RunDirectorStageSignalComponent>(em),
+                300,
+                "RunDirector stage singleton setup was not ready within timeout.");
+
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Demo shell did not transition Title -> Lobby for presentation rebuild test.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            StagePresentationRuntimeController controller = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    controller = FindStagePresentationRuntimeController();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && controller != null
+                        && controller.LastAppliedStageId == 1
+                        && controller.SpawnedRootCount == 1
+                        && controller.transform.childCount == 1
+                        && controller.transform.GetChild(0).name.Contains("preview_visual_01");
+                },
+                360,
+                () => $"Stage1 presentation was not rebuilt within timeout. {DescribePresentationControllerState()}");
+
+            var stage1Presentation = controller.transform.GetChild(0).gameObject;
+
+            ForceStageStateToRunning(em, 0f);
+            yield return WaitForCondition(
+                () => HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                240,
+                "Stage1 did not reach Running before force clear in presentation rebuild test.");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StageResult;
+                },
+                240,
+                "StageResult was not entered before NextStage for presentation rebuild test.");
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    controller = FindStagePresentationRuntimeController();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 2
+                        && controller != null
+                        && controller.LastAppliedStageId == 2
+                        && controller.SpawnedRootCount == 1
+                        && controller.transform.childCount == 1
+                        && controller.transform.GetChild(0).name.Contains("preview_visual_02");
+                },
+                360,
+                () => $"Stage2 presentation was not rebuilt within timeout. {DescribePresentationControllerState()}");
+
+            var stage2Presentation = controller.transform.GetChild(0).gameObject;
+            Assert.That(stage2Presentation, Is.Not.EqualTo(stage1Presentation), "Stage2 presentation should be recreated, not stale Stage1 instance.");
+
+            ForceStageStateToRunning(em, 0f);
+            yield return WaitForCondition(
+                () => HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                240,
+                "Stage2 did not reach Running before force clear in presentation rebuild test.");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StageResult;
+                },
+                240,
+                "StageResult was not entered before Retry for presentation rebuild test.");
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.Retry), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    controller = FindStagePresentationRuntimeController();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 2
+                        && controller != null
+                        && controller.LastAppliedStageId == 2
+                        && controller.SpawnedRootCount == 1
+                        && controller.transform.childCount == 1
+                        && controller.transform.GetChild(0).name.Contains("preview_visual_02")
+                        && controller.transform.GetChild(0).gameObject != stage2Presentation;
+                },
+                360,
+                () => $"Retry did not rebuild Stage2 presentation within timeout. {DescribePresentationControllerState()}");
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_DemoShell_Stage3Next_GoesToDemoComplete_ThenLobby()
         {
             ClearDemoShellStaging();
@@ -1857,6 +1993,29 @@ namespace SweepNDodge.DotsBullets.Tests
 #else
             return Object.FindObjectOfType<DemoAudioBridge>();
 #endif
+        }
+
+        private static StagePresentationRuntimeController FindStagePresentationRuntimeController()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<StagePresentationRuntimeController>();
+#else
+            return Object.FindObjectOfType<StagePresentationRuntimeController>();
+#endif
+        }
+
+        private static string DescribePresentationControllerState()
+        {
+            var controller = FindStagePresentationRuntimeController();
+            if (controller == null)
+                return "presentation-controller=missing";
+
+            string childName = controller.transform.childCount > 0
+                ? controller.transform.GetChild(0).name
+                : "none";
+
+            return
+                $"presentation(lastApplied={controller.LastAppliedStageId}, lastReady={controller.LastReady}, spawned={controller.SpawnedRootCount}, childCount={controller.transform.childCount}, firstChild={childName})";
         }
 
         private static void EnqueueBurstRequestsFromFirstPattern(EntityManager em, int requestCount)

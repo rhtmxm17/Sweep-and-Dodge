@@ -78,6 +78,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 return false;
             }
 
+            ValidatePresentationMarkers(stageNode, issues);
             var layout = BuildStageLayout(stageNode);
             var validation = new List<ContentValidationIssue>(8);
             StageLayoutValidationRules.ValidateLayout(layout, location, validation);
@@ -93,7 +94,7 @@ namespace SweepNDodge.DotsBullets.Editor
             stageNode.TargetLayout.Sources = layout.Sources;
             stageNode.TargetLayout.Deposits = layout.Deposits;
             stageNode.TargetLayout.Obstacles = layout.Obstacles;
-            stageNode.TargetLayout.Visuals = layout.Visuals;
+            stageNode.TargetLayout.Presentations = layout.Presentations;
             EditorUtility.SetDirty(stageNode.TargetLayout);
             UnityEngine.Object.DestroyImmediate(layout);
             if (saveAssets)
@@ -120,10 +121,10 @@ namespace SweepNDodge.DotsBullets.Editor
                 .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
                 .Select(ToObstacleData)
                 .ToArray();
-            layout.Visuals = stageNode.GetComponentsInChildren<StageVisualMarker>(includeInactive: true)
+            layout.Presentations = stageNode.GetComponentsInChildren<StagePresentationMarker>(includeInactive: true)
                 .OrderBy(x => x.StableId)
                 .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                .Select(ToVisualData)
+                .Select(ToPresentationData)
                 .ToArray();
             return layout;
         }
@@ -193,23 +194,99 @@ namespace SweepNDodge.DotsBullets.Editor
             };
         }
 
-        private static StageVisualLayoutData ToVisualData(StageVisualMarker marker)
+        private static StagePresentationLayoutData ToPresentationData(StagePresentationMarker marker)
         {
             var transform = marker.transform;
-            return new StageVisualLayoutData
+            ResolvePresentationLink(marker, out var linkKind, out var linkedStableId);
+            bool linked = marker.PlacementMode == StagePresentationPlacementMode.LinkedToParent;
+            return new StagePresentationLayoutData
             {
                 StableId = marker.StableId,
                 Active = marker.Active,
-                Position = transform.position,
-                YawDeg = transform.eulerAngles.y,
-                VisualKey = marker.VisualKey != null ? marker.VisualKey.Trim() : string.Empty,
+                PlacementMode = marker.PlacementMode,
+                LinkKind = linked ? linkKind : StagePresentationLinkKind.None,
+                LinkedStableId = linked ? linkedStableId : 0u,
+                PresentationKey = marker.PresentationKey != null ? marker.PresentationKey.Trim() : string.Empty,
+                Position = linked ? transform.localPosition : transform.position,
+                Euler = linked ? transform.localEulerAngles : transform.eulerAngles,
                 Scale = transform.localScale,
             };
+        }
+
+        private static void ResolvePresentationLink(StagePresentationMarker marker, out StagePresentationLinkKind linkKind, out uint linkedStableId)
+        {
+            linkKind = StagePresentationLinkKind.None;
+            linkedStableId = 0u;
+
+            if (marker == null || marker.PlacementMode != StagePresentationPlacementMode.LinkedToParent)
+                return;
+
+            TryFindLinkedParent(marker.transform, out linkKind, out linkedStableId);
+        }
+
+        private static bool TryFindLinkedParent(Transform transform, out StagePresentationLinkKind linkKind, out uint linkedStableId)
+        {
+            linkKind = StagePresentationLinkKind.None;
+            linkedStableId = 0u;
+
+            var current = transform != null ? transform.parent : null;
+            while (current != null)
+            {
+                if (current.TryGetComponent<StageSourceMarker>(out var source))
+                {
+                    linkKind = StagePresentationLinkKind.Source;
+                    linkedStableId = source.StableId;
+                    return true;
+                }
+
+                if (current.TryGetComponent<StageDepositMarker>(out var deposit))
+                {
+                    linkKind = StagePresentationLinkKind.Deposit;
+                    linkedStableId = deposit.StableId;
+                    return true;
+                }
+
+                if (current.TryGetComponent<StageObstacleMarker>(out var obstacle))
+                {
+                    linkKind = StagePresentationLinkKind.Obstacle;
+                    linkedStableId = obstacle.StableId;
+                    return true;
+                }
+
+                current = current.parent;
+            }
+
+            return false;
         }
 
         private static int CompareRoots(StageLayoutRootMarker a, StageLayoutRootMarker b)
         {
             return string.CompareOrdinal(BuildHierarchyPath(a != null ? a.transform : null), BuildHierarchyPath(b != null ? b.transform : null));
+        }
+
+        private static void ValidatePresentationMarkers(StageLayoutStageMarker stageNode, List<ContentValidationIssue> issues)
+        {
+            var markers = stageNode.GetComponentsInChildren<StagePresentationMarker>(includeInactive: true);
+            for (int i = 0; i < markers.Length; i++)
+            {
+                var marker = markers[i];
+                if (marker == null)
+                    continue;
+
+                string location = BuildHierarchyPath(marker.transform);
+                bool hasTopologyOnSelf = marker.TryGetComponent<StageSourceMarker>(out _)
+                    || marker.TryGetComponent<StageDepositMarker>(out _)
+                    || marker.TryGetComponent<StageObstacleMarker>(out _);
+                if (hasTopologyOnSelf)
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL010", location, "StagePresentationMarker must not share a GameObject with Source/Deposit/Obstacle marker."));
+
+                bool hasParentTopology = TryFindLinkedParent(marker.transform, out _, out _);
+                if (marker.PlacementMode == StagePresentationPlacementMode.LinkedToParent && !hasParentTopology)
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL011", location, "LinkedToParent presentation requires a parent Source/Deposit/Obstacle marker."));
+
+                if (marker.PlacementMode == StagePresentationPlacementMode.Standalone && hasParentTopology)
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL012", location, "Standalone presentation must not be authored under a topology marker parent."));
+            }
         }
 
         private static bool HasError(IReadOnlyList<ContentValidationIssue> issues)

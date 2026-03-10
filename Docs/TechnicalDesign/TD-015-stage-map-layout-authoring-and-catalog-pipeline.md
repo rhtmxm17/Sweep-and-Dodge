@@ -4,7 +4,7 @@
 - doc_id: `TD-015`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-09`
+- last_updated: `2026-03-10`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
@@ -27,7 +27,7 @@
 
 ### 1.2 비목표 (다음 페이즈 이월)
 - `RunDirectorStageConfig/RunProgressDirectorConfig/SpawnRequestPolicy` stage-level override 런타임 적용
-- Obstacle broadphase/query 최적화, Visual 런타임 소비
+- Obstacle broadphase/query 최적화, Presentation 런타임 소비
 - 운영 빌드 fail-fast 정책 전환
 
 ## 2. 현재 상태(코드 기준)
@@ -89,7 +89,7 @@
   - `StageSourceLayoutData[] Sources`
   - `StageDepositLayoutData[] Deposits`
   - `StageObstacleLayoutData[] Obstacles`
-  - `StageVisualLayoutData[] Visuals`
+  - `StagePresentationLayoutData[] Presentations`
 
 ### 5.2 Source 정의 계약
 - `StageSourceBinding`
@@ -193,6 +193,50 @@
   - `PlayerPreviousPositionComponent`로 movement 직전 위치를 저장하고 correction에 사용한다.
   - 향후 dash/knockback/external force 등 이동 영향 요소가 증가하면 `movement-resolve 통합` 재설계가 필요할 수 있다.
 
+### 5.5 Presentation 명칭 / authoring 계약
+- 공식 명칭은 `Visual`이 아니라 `Presentation`으로 고정한다.
+  - 타입/데이터: `StagePresentationLayoutData`, `PresentationKey`
+  - authoring: `StagePresentationMarker`
+- `Presentation`은 GO-only presentational layer다.
+  - gameplay authoritative topology kind로 편입하지 않는다.
+  - `Source / Deposit / Obstacle`를 read-only로 참조하는 표현 계층으로만 동작한다.
+- 데이터 모델은 `단일 타입 + PlacementMode`를 사용한다.
+  - `StagePresentationPlacementMode.Standalone`
+  - `StagePresentationPlacementMode.LinkedToParent`
+- linked authoring의 기본 규칙은 parent auto-link다.
+  - `StagePresentationMarker`가 `StageSourceMarker`, `StageDepositMarker`, `StageObstacleMarker`의 자식이면 parent topology를 자동 링크한다.
+  - 동일 GO의 topology marker + presentation marker 겸용은 금지한다.
+  - `LinkedToParent`인데 parent topology marker가 없으면 validation error다.
+  - `Standalone`은 topology marker parent 아래에 둘 수 없다.
+- runtime 데이터 최소 계약
+  - `StableId`
+  - `PlacementMode`
+  - `LinkKind`
+  - `LinkedStableId`
+  - `PresentationKey`
+  - `Position`, `Euler`, `Scale`
+  - `Standalone`은 world transform, `LinkedToParent`는 parent 기준 local transform으로 해석한다.
+
+### 5.6 Presentation Catalog / Runtime 계약
+- `StagePresentationCatalogSO`는 stage-local이 아니라 global catalog다.
+  - `SchemaVersion`
+  - `StagePresentationCatalogEntry[]`
+  - `PresentationKey`
+  - `Prefab`
+  - `StagePresentationUsageFlags`
+- stage layout data는 prefab 직접 참조를 갖지 않고 `PresentationKey`만 사용한다.
+- `StagePresentationRuntimeController`
+  - scene-level GO owner
+  - `StageCatalogSO`, `StagePresentationCatalogSO`, `StageTopologyBridge`를 직접 참조한다.
+  - `StageTopologyStateComponent.AppliedStageId + Ready`를 poll하여 rebuild를 수행한다.
+  - `SelectedStageId`는 rebuild 기준으로 사용하지 않는다.
+  - `Ready == 0`이면 stale presentation을 clear한다.
+  - v1은 pooling 없이 destroy/recreate를 사용한다.
+- linked presentation
+  - `Source / Deposit / Obstacle` stable id를 runtime topology에서 read-only로 resolve한다.
+  - stage entry 시 1회 anchor resolve만 수행하며 continuous follow는 지원하지 않는다.
+  - key/prefab/target 누락은 warning + skip/hide로 처리하고 gameplay hard gate로 승격하지 않는다.
+
 ## 6. 에디터 파이프라인
 - `StageLayoutCatalogGenerator`
   - 단일 스테이지 `StageLayoutSO` 생성만 담당한다.
@@ -237,6 +281,7 @@
 - `SampleScene`
   - `DemoShellFlowController.StageCatalog = sc_demo`
   - `StageTopologyBridge`는 `StageCatalog`를 참조한다.
+  - `StagePresentationRuntimeController`는 `StageCatalog`, `StagePresentationCatalogSO`, `StageTopologyBridge`를 참조한다.
   - `RunDirectorStageBridge`는 stage state/gate/signal만 다룬다.
 - `EnterStagePlay`
   - 선택 엔트리의 `Definition.StageId`를 사용해 `StageTopologyBridge.RequestTopologyApply(stageId)` 호출
@@ -246,6 +291,7 @@
   - `Source`는 `Shape2DComponent + SourceShapeDerivedComponent`와 pollution grid 재생성을 포함한 layout+definition 결합 apply를 수행한다.
   - `Deposit`은 `Shape2DComponent` 기반 layout apply를 수행하고, `PlayerCarryBinDepositRequestSystem`은 `player circle overlap deposit shape`로 접촉 판정한다.
   - `Obstacle`는 `Shape2DComponent` 기반 layout-only topology apply를 수행하고, `BulletObstacleHitRequestSystem`과 `PlayerObstacleBlockSystem`이 runtime consumer로 이를 읽는다.
+  - `Presentation`은 `StagePresentationRuntimeController`가 `StageLayoutSO.Presentations`와 global catalog를 읽어 GO-only로 rebuild한다.
   - owned entity 공통 메타
     - `StageTopologyOwnedComponent.Kind`
     - `StageTopologyOwnedComponent.LastAppliedVersion`
@@ -257,17 +303,20 @@
   - definition/source mismatch, duplicate stable id, active=false는 `warn + partial apply`로 처리하고 stage 전체 `Ready`는 유지한다.
   - `OnStateEnterOnce`는 initial apply 직후 자동 발화하지 않음
   - 현재 구현된 topology kind는 `Source`, `Deposit`, `Obstacle`다.
-  - `Visual`은 별도 세션에서 GO-only presentational layer 여부를 먼저 확정한다.
+  - `Presentation`은 GO-only presentational layer로 유지하며 ECS topology kind로 편입하지 않는다.
 
 ### 7.3 Template Catalog / Validation Boundary
 - `StageTopologyPrefabCatalogSO`
   - shape는 v1에서 고정
     - `SourceTemplatePrefab`
     - `DepositTemplatePrefab`
+    - `ObstacleTemplatePrefab`
   - entry-list 구조로 일반화하지 않는다
 - `ContentValidationRunner` / `ContentValidationRules`
   - `StageTopologyPrefabCatalogSO.SourceTemplatePrefab` null은 오류
   - `StageTopologyPrefabCatalogSO.DepositTemplatePrefab` null은 오류
+  - `StageTopologyPrefabCatalogSO.ObstacleTemplatePrefab` null은 오류
+  - current required kind는 `Source`, `Deposit`, `Obstacle`다
   - unsupported kind / optional kind 정책은 아직 도입하지 않는다
 
 ## 8. 검증 계획 / 합격 기준
@@ -280,16 +329,23 @@
   - `StageCatalogValidationRulesTests`
   - `StageLayoutValidationRulesTests`
   - `StageDefinitionGeneratorTests`
+  - `StagePresentationCatalogValidationRulesTests`
+  - `StagePresentationRuntimeControllerTests`
   - `DemoShellFlowControllerStageCatalogTests`
   - `StageCatalogSampleAssetsTests`
   - `StageTopologyBridgeTests`
   - `RunDirectorStageBridgeTests`
   - `StageTopologyApplyPrepareSystemTests`
+  - `ObstacleConsumptionSystemsTests`
+    - bullet point hit -> `BulletDespawnRequestTag`
+    - player circle overlap -> rollback/axis slide
   - `ContentValidationRulesTests`
-    - topology prefab catalog required template 검증
+    - topology prefab catalog required template 검증 (`Source/Deposit/Obstacle`)
 - PlayMode
   - DemoShell 회귀 스모크(`Title -> Lobby -> Stage -> Result -> Retry/Next`)
-  - `Stage2` layout/pattern 차이 반영 확인
+  - `Stage2` layout/pattern/obstacle 차이 반영 확인
+  - obstacle active stage에서 bullet/player 루프 정상성 확인
+  - presentation rebuild (`Stage1 -> Next -> Stage2`, `Retry`) 확인
 
 ## 9. 관련 ADR
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)

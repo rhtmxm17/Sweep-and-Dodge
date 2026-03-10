@@ -1,8 +1,23 @@
-﻿using System;
+using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
+    public enum StagePresentationPlacementMode : byte
+    {
+        Standalone = 0,
+        LinkedToParent = 1,
+    }
+
+    public enum StagePresentationLinkKind : byte
+    {
+        None = 0,
+        Source = 1,
+        Deposit = 2,
+        Obstacle = 3,
+    }
+
     [Serializable]
     public struct StageSourceLayoutData
     {
@@ -41,13 +56,16 @@ namespace SweepNDodge.DotsBullets
     }
 
     [Serializable]
-    public struct StageVisualLayoutData
+    public struct StagePresentationLayoutData
     {
         [Min(1)] public uint StableId;
         public bool Active;
+        public StagePresentationPlacementMode PlacementMode;
+        public StagePresentationLinkKind LinkKind;
+        [Min(0)] public uint LinkedStableId;
+        public string PresentationKey;
         public Vector3 Position;
-        public float YawDeg;
-        public string VisualKey;
+        [FormerlySerializedAs("YawDeg")] public Vector3 Euler;
         public Vector3 Scale;
     }
 }

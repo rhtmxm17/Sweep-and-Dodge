@@ -68,7 +68,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void EmptyVisualKey_IsReportedAsWarning()
+        public void EmptyPresentationKey_IsReportedAsWarning()
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
             try
@@ -82,9 +82,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     new StageDepositLayoutData { StableId = 20, Active = true, Radius = 1f },
                 };
-                layout.Visuals = new[]
+                layout.Presentations = new[]
                 {
-                    new StageVisualLayoutData { StableId = 30, Active = true, VisualKey = "" },
+                    new StagePresentationLayoutData { StableId = 30, Active = true, PresentationKey = "" },
                 };
 
                 var issues = new List<ContentValidationIssue>();
@@ -96,6 +96,50 @@ namespace SweepNDodge.DotsBullets.Tests
                     issues);
 
                 Assert.That(issues.Any(x => x.Code == "STL007" && x.Severity == ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(layout);
+            }
+        }
+
+        [Test]
+        public void LinkedPresentationWithoutTarget_IsReportedAsError()
+        {
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            try
+            {
+                layout.StageId = 6;
+                layout.Sources = new[]
+                {
+                    new StageSourceLayoutData { StableId = 10, Active = true, Shape = Shape2DKind.Circle, Radius = 2f },
+                };
+                layout.Deposits = new[]
+                {
+                    new StageDepositLayoutData { StableId = 20, Active = true, Radius = 1f },
+                };
+                layout.Presentations = new[]
+                {
+                    new StagePresentationLayoutData
+                    {
+                        StableId = 30,
+                        Active = true,
+                        PlacementMode = StagePresentationPlacementMode.LinkedToParent,
+                        LinkKind = StagePresentationLinkKind.None,
+                        LinkedStableId = 0,
+                        PresentationKey = "wall_basic",
+                    },
+                };
+
+                var issues = new List<ContentValidationIssue>();
+                StageLayoutValidationRules.ValidateLayoutRecords(
+                    new List<ContentValidationRecord<StageLayoutSO>>
+                    {
+                        new ContentValidationRecord<StageLayoutSO>(layout, "layout")
+                    },
+                    issues);
+
+                Assert.That(issues.Any(x => x.Code == "STL013" && x.Severity == ContentValidationSeverity.Error), Is.True);
             }
             finally
             {

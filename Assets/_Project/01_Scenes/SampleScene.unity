@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -741,6 +741,7 @@ GameObject:
   - component: {fileID: 2015128780}
   - component: {fileID: 2015128779}
   - component: {fileID: 2015128778}
+  - component: {fileID: 2015128783}
   m_Layer: 0
   m_Name: RunDirectorStageBridge
   m_TagString: Untagged
@@ -779,21 +780,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2015128782
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2015128773}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 324550874272c21458d505f96b15da9a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageTopologyBridge
-  LogBindWarnings: 1
-  StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
-  TopologyPrefabCatalog: {fileID: 11400000, guid: 3023896e72d43dd4fbbdf17556c9259c, type: 2}
 --- !u!114 &2015128777
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1165,6 +1151,39 @@ MonoBehaviour:
   BgmDuckGain: 0.65
   BgmDuckDurationSec: 0.15
   LogCue: 0
+--- !u!114 &2015128782
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 324550874272c21458d505f96b15da9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageTopologyBridge
+  LogBindWarnings: 1
+  StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
+  TopologyPrefabCatalog: {fileID: 11400000, guid: 3023896e72d43dd4fbbdf17556c9259c, type: 2}
+--- !u!114 &2015128783
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90fdaf00c9fef964db1981f59d6d920d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePresentationRuntimeController
+  StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
+  PresentationCatalog: {fileID: 11400000, guid: 58ead03715b01e94cbb0b74a81c0c331, type: 2}
+  TopologyBridge: {fileID: 2015128782}
+  LogWarnings: 1
+  RebuildOnEnable: 1
+  DestroyOnDisable: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1176,6 +1195,3 @@ SceneRoots:
   - {fileID: 352435931}
   - {fileID: 2015128776}
   - {fileID: 219259909}
-
-
-

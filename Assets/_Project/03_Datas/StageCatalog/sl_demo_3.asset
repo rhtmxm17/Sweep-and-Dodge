@@ -30,10 +30,13 @@ MonoBehaviour:
     Radius: 3.5
     Size: {x: 0, y: 0}
   Obstacles: []
-  Visuals:
+  Presentations:
   - StableId: 9003
     Active: 1
+    PlacementMode: 0
+    LinkKind: 0
+    LinkedStableId: 0
     Position: {x: 14, y: 0, z: -8}
-    YawDeg: 340
-    VisualKey: preview_visual_03
+    Euler: {x: 0, y: 340, z: 0}
+    PresentationKey: preview_visual_03
     Scale: {x: 1, y: 1, z: 1}
