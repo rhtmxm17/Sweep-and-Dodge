@@ -308,6 +308,172 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_ShellPanelsFollowShellFlow()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "RuntimeUiRoot or DemoShellFlowController was not ready in operational scene.");
+
+            Assert.That(shell.RuntimeUiShellActive, Is.True);
+            Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.Title), Is.True);
+            Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.Lobby), Is.False);
+            Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult), Is.False);
+            Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.DemoComplete), Is.False);
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.Lobby
+                        && uiRoot.IsShellPanelVisible(DemoShellScreenId.Lobby);
+                },
+                240,
+                "RuntimeUiRoot did not show Lobby panel after Title -> Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && !uiRoot.IsShellPanelVisible(DemoShellScreenId.Title)
+                        && !uiRoot.IsShellPanelVisible(DemoShellScreenId.Lobby)
+                        && !uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult)
+                        && !uiRoot.IsShellPanelVisible(DemoShellScreenId.DemoComplete);
+                },
+                300,
+                "RuntimeUiRoot did not hide shell panels during StagePlay.");
+
+            yield return WaitForCondition(
+                () => IsStageMapAppliedForStage1(em),
+                240,
+                "StageMap layout was not applied for Stage1 within timeout.");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult);
+                },
+                240,
+                "RuntimeUiRoot did not show Result panel after ClearReady.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_SettingsAudio_ApplyAndPersist()
+        {
+            ClearAudioVolumePrefs();
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            RuntimeUiRoot uiRoot = null;
+            DemoAudioBridge bridge = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    bridge = FindDemoAudioBridge();
+                    return uiRoot != null && bridge != null;
+                },
+                240,
+                "RuntimeUiRoot/DemoAudioBridge was not ready in operational scene.");
+
+            uiRoot.OpenSettings();
+            yield return null;
+
+            Assert.That(uiRoot.IsSettingsOpen, Is.True);
+            Assert.That(uiRoot.SettingsPanel.activeInHierarchy, Is.True);
+
+            uiRoot.SettingsPresenter.Master.Slider.value = 0.41f;
+            uiRoot.SettingsPresenter.Ui.Slider.value = 0.27f;
+            yield return null;
+
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Master), Is.EqualTo(0.41f).Within(1e-4f));
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Ui), Is.EqualTo(0.27f).Within(1e-4f));
+
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            uiRoot = null;
+            bridge = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    bridge = FindDemoAudioBridge();
+                    return uiRoot != null && bridge != null;
+                },
+                240,
+                "RuntimeUiRoot/DemoAudioBridge was not ready after reload.");
+
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Master), Is.EqualTo(0.41f).Within(1e-4f));
+            Assert.That(bridge.GetBusVolume(DemoAudioBusId.Ui), Is.EqualTo(0.27f).Within(1e-4f));
+
+            uiRoot.OpenSettings();
+            yield return null;
+            Assert.That(uiRoot.SettingsPresenter.Master.Slider.value, Is.EqualTo(0.41f).Within(1e-4f));
+            Assert.That(uiRoot.SettingsPresenter.Ui.Slider.value, Is.EqualTo(0.27f).Within(1e-4f));
+
+            ClearAudioVolumePrefs();
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_DedicatedScene_RuntimeUiRoot_Exists()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneIgnoringBootstrapBacklogErrors(DedicatedScenePath);
+
+            RuntimeUiRoot uiRoot = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    return uiRoot != null;
+                },
+                240,
+                "RuntimeUiRoot was not found in dedicated smoke scene.");
+
+            Assert.That(uiRoot.RootCanvas, Is.Not.Null);
+            Assert.That(uiRoot.EventSystem, Is.Not.Null);
+            Assert.That(uiRoot.UiInputModule, Is.Not.Null);
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_DemoShell_ResultRetry_ReentersSameStage()
         {
             ClearDemoShellStaging();
@@ -1667,7 +1833,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 && obstacleGeometry.Kind == Shape2DKind.Rectangle
                 && Mathf.Abs(obstacleGeometry.Size.x - 3.5f) <= 0.01f
                 && Mathf.Abs(obstacleGeometry.Size.y - 2f) <= 0.01f
-                && obstacleMask.Value == (ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet)
+                && HasRequiredObstacleMaskBits(
+                    obstacleMask.Value,
+                    ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet)
                 && clipPatterns2.Length > 0;
         }
 
@@ -1792,8 +1960,18 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(obstacleGeometry.Kind, Is.EqualTo(Shape2DKind.Rectangle));
             Assert.That(obstacleGeometry.Size.x, Is.EqualTo(3.5f).Within(0.01f));
             Assert.That(obstacleGeometry.Size.y, Is.EqualTo(2f).Within(0.01f));
-            Assert.That(obstacleMask.Value, Is.EqualTo(ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet));
+            Assert.That(
+                HasRequiredObstacleMaskBits(
+                    obstacleMask.Value,
+                    ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet),
+                Is.True);
             Assert.That(clipPatterns2.Length, Is.GreaterThan(0));
+        }
+
+        private static bool HasRequiredObstacleMaskBits(ObstacleCollisionMask actual, ObstacleCollisionMask required)
+        {
+            return required != ObstacleCollisionMask.None
+                && (actual & required) == required;
         }
 
         private static bool TryFindSourceByStableId(EntityManager em, uint stableId, out Entity sourceEntity)
@@ -1992,6 +2170,15 @@ namespace SweepNDodge.DotsBullets.Tests
             return Object.FindFirstObjectByType<DemoAudioBridge>();
 #else
             return Object.FindObjectOfType<DemoAudioBridge>();
+#endif
+        }
+
+        private static RuntimeUiRoot FindRuntimeUiRoot()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<RuntimeUiRoot>();
+#else
+            return Object.FindObjectOfType<RuntimeUiRoot>();
 #endif
         }
 

@@ -6,9 +6,10 @@
 - doc_id: `OPS-002`
 - type: `ProjectOps`
 - status: `draft`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-12`
 - related_docs:
   - [OPS-001-prototype-core-capability-priority-matrix.md](./OPS-001-prototype-core-capability-priority-matrix.md)
+  - [OPS-003-public-release-readiness-plan.md](./OPS-003-public-release-readiness-plan.md)
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [TD-006-run-progress-director-design.md](../TechnicalDesign/TD-006-run-progress-director-design.md)
   - [TD-007-common-combat-event-channel.md](../TechnicalDesign/TD-007-common-combat-event-channel.md)
@@ -37,6 +38,9 @@
 - 총 개발 기간: 2개월
 - 현재 기준일: 2026-03-04
 - 목표 결과물: 외부 시연 가능한 단일 데모 빌드(3개 스테이지 + 최소 UI/사운드/결과 흐름)
+- 현재 런타임 UI/HUD/옵션 표시는 `OnGUI`와 브리지 중심의 내부 테스트 수준이며, 공개 빌드 전 `출시형 Runtime UI`로 교체가 필요하다.
+- 현재 조작 기준은 `키보드 + 마우스`를 우선한다.
+- 패드 지원은 공개 채널/시연 방식이 요구할 때 확장하되, 현재 단계에서는 `포커스 기반 UI 구조를 유지해 후속 확장 비용을 낮추는 것`을 기본 목표로 둔다.
 - 아트 자산 제작은 범위에서 제외한다.
 - 단, Animator/파티클/사운드가 연결될 수 있는 시스템 구조와 이벤트 계약은 범위에 포함한다.
 - 데모 플레이 방식은 2가지를 모두 지원한다.
@@ -60,8 +64,13 @@
 | S3 | 결과/실패 UX | Clear/Fail 판정, `Next/Retry/Return`, `Demo Complete` 요약 지표/동선 확정 | DONE | 2.0 | P0 |
 | S4 | 이벤트 피드백 브리지 | `PlayerUiFeedback`/`Impulse`를 실제 UI/Animator/Impulse 표현으로 연결 | DONE | 2.0 | P0 |
 | S5 | 사운드 시스템 | BGM/SFX/UI 버스, 이벤트 라우팅, 볼륨 옵션 설계 | DONE | 2.0 | P0 |
-| S6 | 온보딩/가이드 | 첫 진입 30~60초 조작/목표 안내 설계 | TODO | 1.0 | P1 |
-| S7 | 데모 운영/릴리즈 게이트 | 빌드 체크리스트, 시연 모드, QA 체크리스트 확정 | TODO | 1.0 | P0 |
+| S6 | 온보딩/가이드 | `Stage1` 첫 30~60초에 조작/목표/Deposit 루프를 학습시키는 인런 힌트 설계 | TODO | 1.5 | P0 |
+| S7 | 데모 운영/릴리즈 게이트 | 빌드 체크리스트, 시연 모드, QA 체크리스트, 비개발 빌드 합격 기준 확정 | TODO | 1.5 | P0 |
+| S8 | Runtime UI 전환 | `OnGUI` 기반 `Title/Lobby/HUD/Result/Options`를 `uGUI` 기반 출시형 UI로 교체 | TODO | 3.0 | P0 |
+| S9 | KB+Mouse UX / Input Baseline | 마우스+키보드 기준 메뉴/옵션/조작 UX 정리, 포커스 기반 UI로 후속 패드 확장 비용 절감 | TODO | 2.0 | P0 |
+| S10 | 출시형 HUD / 튜토리얼 메시지 | 플레이 정보 구조 재설계 + 문맥형 힌트/실패 학습 루프 연결 | TODO | 2.0 | P0 |
+| S11 | VFX 제품화 | 브리지 이벤트를 실제 화면/월드 VFX로 연결하고 전달 우선순위/쿨다운을 고정 | TODO | 2.0 | P0 |
+| S12 | 브랜딩 / 패키징 마감 | 아이콘, 버전, 앱 메타, 기본 해상도/윈도우 정책, 비개발 빌드 점검 | TODO | 1.0 | P0 |
 
 ## 5. 우선순위 백로그 (세부)
 1. `P0` Demo Shell Flow 실연동 계약
@@ -110,20 +119,55 @@
 - 데모 빌드 옵션(해상도/입력/볼륨 기본값) 고정
 - 시연 체크리스트(기동, 완주, 재시작, 옵션 반영, 에러 0) 확정
 
+8. `P0` Runtime UI 전환
+- 현재 `DemoShellFlowController`, `PlayerRuntimeHudBridge`, `DemoAudioBridge`의 `OnGUI` 표시를 출시형 런타임 UI로 교체
+- 대상 화면: `Title`, `Lobby`, `Stage HUD`, `Pause`, `Settings`, `Stage Result`, `Demo Complete`, 확인 다이얼로그
+- 소유권 원칙 유지: DemoShell/Bridge는 상태/명령 owner, UI는 reader/presenter
+- 권장 기본값: `uGUI + EventSystem + InputSystemUIInputModule`
+- 세부 구현 순서: `Shell -> Modal -> HUD/Fx` 우선 순으로 전환
+
+9. `P0` KB+Mouse UX / Input Baseline
+- 공개 빌드 기준 조작축은 `키보드 + 마우스`
+- 메뉴/옵션은 마우스 우선 사용성을 확보하고, 키보드 포커스 이동은 접근성/후속 패드 확장 대비용으로 유지
+- 현재 `Input` 직접 참조 경로와 `Input System` UI 경로의 역할을 분리/정리
+- 패드 지원은 별도 범위로 분리하되, UI 구조는 포커스/Submit/Cancel 기반으로 설계해 후속 확장을 가능하게 유지
+
+10. `P0` 출시형 HUD / 튜토리얼 메시지
+- 테스트용 텍스트 HUD를 `Carry / Source / Timer / Objective / Danger` 중심 정보 구조로 재설계
+- 첫 이동, 첫 수집, 첫 Carry 증가, 첫 Deposit 필요, 첫 피격, 첫 실패에 문맥형 힌트 연결
+- `Stage1`을 튜토리얼 전용 스테이지가 아니라 인런 학습 구간으로 사용
+- 실패 원인과 재시도 행동(`Deposit`, 회피, 정리 우선순위)을 결과/힌트 카피로 연결
+
+11. `P0` VFX 제품화
+- 현재 "브리지 이벤트 수신 예정" 수준의 VFX를 실제 전달 수단으로 구현
+- 우선순위: `Hit`, `Deposit`, `Cleanup`, `Stage Clear/Fail`, `Timeout Warning`
+- 이벤트 중복 억제, 쿨다운, 강도 옵션, 과도한 플래시 방지 규칙을 계약화
+- 정보 전달 목적의 최소 제품화를 우선하고, 고급 연출은 후순위로 둔다
+
+12. `P0` 브랜딩 / 패키징 마감
+- `PlayerSettings`의 앱 이름/식별자/아이콘/버전/기본 해상도/윈도우 정책을 공개 빌드 기준으로 정리
+- `Development Build` 전용 HUD/로그/테스트 버튼 노출 정책을 분리
+- 배포 패키지, 압축물 구성, 실행 파일 이름, 릴리즈 노트 초안까지 포함한 전달 단위를 고정
+
 ## 6. 남은 기간 실행안 (2~3주)
-1. Week A (P0 집중)
-- S1 Demo Shell Flow 연동
-- S2 HUD 최소 사양
-- S3 결과/실패 루프 1차
+1. Week A (출시형 UI 골격)
+- S8 Runtime UI 전환 1차 (`Title/Lobby/Result/Demo Complete/Settings` 화면 골격)
+- S9 KB+Mouse UX 기준 정리
+- S7 릴리즈 게이트 초안 작성
 
-2. Week B (피드백/사운드)
-- S4 이벤트 피드백 브리지
-- S5 사운드 시스템 1차
-- S7 릴리즈 게이트 초안
+2. Week B (플레이 표시 / 온보딩)
+- S10 HUD 재설계 1차
+- S6 온보딩/가이드 최소 반영
+- S9 입력/옵션 반영 및 저장/복원 정리
 
-3. Week C (안정화, 선택)
-- S6 온보딩 최소 반영
+3. Week C (피드백 / VFX / 안정화)
+- S11 VFX 제품화 1차
+- Pause/Confirm/Recovery 흐름 마감
 - PlayMode 운영 씬 정기 스모크 + 회귀 수정
+
+4. Week D (패키징 / 공개 준비)
+- S12 브랜딩 / 패키징 마감
+- S7 비개발 빌드 QA 체크리스트 실행
 - 데모 빌드 고정 및 문서 정리
 
 ## 7. 설계 문서 분해 계획 (권장)
@@ -131,9 +175,15 @@
   - `TD-010`: Demo Shell Flow/Presentation Contract
   - `TD-011`: Runtime Player HUD Contract
   - `TD-013`: Player Feedback Presentation Bridge Contract
+  - `TD-016`: Runtime UI Shell And Navigation Contract
+  - `TD-017`: KB+Mouse Input / Options / Accessibility Baseline
+  - `TD-018`: Runtime VFX Presentation Bridge Contract
+  - `TD-019`: Release Readiness And Build Gate
 - GD 후속(권장):
   - `GD-008`: 데모 화면/전이 흐름 기준 문서로 유지
   - `GD-009`: Demo Onboarding And Result Copy/UX(필요 시 분리)
+- OPS 후속(권장):
+  - `OPS-003`: 공개 릴리즈 준비/운영 체크리스트와 QA matrix를 별도 운영 문서로 분리
 - ADR 기록 기준:
   - Writer/Owner 변경, 업데이트 순서 변경, 공통 이벤트 계약 변경 시 ADR 생성
   - 단순 화면 구성/문구/레이아웃 조정은 OPS/TD/GD 내에서 관리
@@ -150,6 +200,15 @@
 
 4. 데모 막판에 품질 검증 시간이 부족해질 위험
 - 대응: Week B부터 릴리즈 게이트를 병행 운영하고, Week C는 회귀/패키징 전용으로 확보
+
+5. `OnGUI` 기반 내부 테스트 UI를 늦게 교체해 출시 UX가 한 번에 무너질 위험
+- 대응: S8을 `P0`로 승격하고, 상태/명령 owner는 유지한 채 presenter만 교체한다
+
+6. 마우스+키보드 중심 게임에서 UI 입력/포커스 정책이 늦게 정리되어 옵션/일시정지/확인 흐름이 분산될 위험
+- 대응: S9에서 `KB+Mouse 우선 UX`를 먼저 고정하고, 포커스 기반 UI는 접근성/후속 패드 확장 대비선으로 유지한다
+
+7. VFX를 후반에 한꺼번에 붙여 전달 우선순위와 광과민성/가독성 문제가 동시에 발생할 위험
+- 대응: S11에서 `이벤트 우선순위/쿨다운/강도 옵션`을 먼저 고정하고 최소 제품화부터 적용한다
 
 ## 9. 검증/합격 기준
 - 공통 절차:
@@ -179,10 +238,21 @@
   - S5 Audio: 볼륨 옵션이 씬 재진입/재시작 후 복원된다
   - S5 Audio: DemoShell Overlay에서 `Master/BGM/SFX/UI` 볼륨을 조작하면 즉시 반영된다
   - S7 Gate: 완료 보고 전 `EditMode 전체`, `PlayMode BulletPlayModeSmokeTests 전체(13개 이상)`, `console error 0`를 모두 통과한다
+  - S8 UI: `Title/Lobby/Stage HUD/Result/Demo Complete/Settings/Pause`가 `OnGUI` 없이 동작한다
+  - S8 UI: `Development Build` 전용 디버그 요소와 공개 빌드 UI가 분리된다
+  - S9 Input: 마우스+키보드 기준으로 메뉴/옵션/플레이/일시정지 전 구간 조작이 가능하다
+  - S9 Input: 포커스 기반 기본 내비게이션과 `Submit/Cancel` 경로가 유지되어 후속 패드 확장 가능성이 남는다
+  - S10 HUD: `Carry/Source/Timer/Objective/Danger` 정보가 짧은 시선 이동으로 읽힌다
+  - S10 Onboarding: `Stage1` 첫 60초 내 핵심 루프 힌트가 1회 이상 노출되고, 재시도 시 과잉 반복되지 않는다
+  - S11 VFX: `Hit/Deposit/Cleanup/Clear/Fail/Timeout Warning`가 실제 연출로 구분되며 중복 억제 규칙을 따른다
+  - S11 VFX: 플래시/흔들림 강도 옵션이 있다면 즉시 반영되고, 옵션이 없으면 강도 기본값이 과도하지 않다
+  - S12 Packaging: 제품명/아이콘/버전/기본 해상도/윈도우 정책이 공개 빌드 기준으로 정리된다
+  - S12 Packaging: 비개발 빌드에서 테스트 버튼/디버그 HUD/개발용 경고 노출이 제거되거나 제한된다
   - HUD/사운드 옵션 반영 확인
   - 운영 씬 정기 스모크 결과 기록
 
 ## 10. 변경 이력
+- 2026-03-12: 공개 빌드 기준 부족분을 반영해 S8~S12를 추가했다. `OnGUI -> Runtime UI 전환`, `KB+Mouse UX`, `출시형 HUD/온보딩`, `VFX 제품화`, `브랜딩/패키징`을 후반 P0 작업 스트림으로 승격하고, `OPS-003` 분리 계획을 추가했다.
 - 2026-03-05: S5 잔여 작업 완료. `DemoAudioBridge`에 Source 하이브리드 자동 보정, fallback tone clip 자동 할당/정리, missing cue warn-once 정책을 추가하고 `DemoShellFlowController` Overlay에 4버스 볼륨 슬라이더를 연결했다. EditMode/PlayMode 테스트를 확장해 전이 cue, 자동 세팅, 볼륨 복원을 검증하고 S5 상태를 `DONE`으로 갱신했다.
 - 2026-03-05: S5 1차 구현 반영. `DemoAudioBridge`와 `TD-014`를 추가해 reader-only 오디오 소비 계약(버스/큐/dedupe/cooldown/볼륨 복원)을 고정하고, OPS 합격 기준을 테스트 가능 문장으로 갱신했다.
 - 2026-03-05: S4 구현 반영. `TD-013`을 추가하고 피드백 소비를 snapshot writer로 전환했다. `PlayerEcsBridge` Animator trigger/impulse offset, `PlayerRuntimeHudBridge` feedback feed, dedupe/cooldown 규칙과 EditMode 테스트를 반영해 S4 상태를 `DONE`으로 갱신했다.

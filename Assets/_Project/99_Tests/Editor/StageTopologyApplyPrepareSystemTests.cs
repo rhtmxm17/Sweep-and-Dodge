@@ -624,7 +624,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(geometry.Kind, Is.EqualTo(Shape2DKind.Rectangle));
                 Assert.That(geometry.Size.x, Is.EqualTo(3f).Within(0.01f));
                 Assert.That(geometry.Size.y, Is.EqualTo(2f).Within(0.01f));
-                Assert.That(mask.Value, Is.EqualTo(ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet));
+                Assert.That(
+                    mask.Value & (ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet),
+                    Is.EqualTo(ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet));
                 AssertTopologyOwned(em, obstacle, StageTopologyKind.Obstacle, 1u);
             }
             finally

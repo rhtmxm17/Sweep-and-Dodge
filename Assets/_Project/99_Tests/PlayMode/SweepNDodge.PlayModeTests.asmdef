@@ -4,6 +4,7 @@
     "SweepNDodge.Runtime",
     "Unity.Entities",
     "Unity.Collections",
+    "Unity.InputSystem",
     "Unity.Mathematics"
   ],
   "optionalUnityReferences": [

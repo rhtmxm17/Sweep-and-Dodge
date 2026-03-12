@@ -62,11 +62,17 @@ namespace SweepNDodge.DotsBullets
         private bool _hasCurrentStageResult;
         private DemoShellSessionMetrics _sessionMetrics;
         private bool _hasSessionMetrics;
+        private bool _runtimeUiShellActive;
 
         public DemoShellScreenId CurrentScreen => _currentScreen;
         public int CurrentStageIndex => _currentStageIndex;
         public int CurrentStageId => TryGetStageProfile(_currentStageIndex, out var profile) ? profile.StageId : 0;
         public DemoShellStageOutcomeId CurrentStageOutcome => _currentStageOutcome;
+        public bool HasCurrentStageResult => _hasCurrentStageResult;
+        public DemoShellStageResultMetrics CurrentStageResult => _currentStageResult;
+        public bool HasSessionMetrics => _hasSessionMetrics;
+        public DemoShellSessionMetrics SessionMetrics => _sessionMetrics;
+        public bool RuntimeUiShellActive => _runtimeUiShellActive;
 
         private void Reset()
         {
@@ -117,7 +123,7 @@ namespace SweepNDodge.DotsBullets
 
         private void OnGUI()
         {
-            if (!ShowOverlay)
+            if (!ShowOverlay || _runtimeUiShellActive)
                 return;
 
             GUILayout.BeginArea(OverlayRect, GUI.skin.box);
@@ -418,7 +424,7 @@ namespace SweepNDodge.DotsBullets
 
         private void ProcessKeyboardFallback()
         {
-            if (!EnableKeyboardFallback)
+            if (!EnableKeyboardFallback || _runtimeUiShellActive)
                 return;
 
             switch (_currentScreen)
@@ -927,6 +933,11 @@ namespace SweepNDodge.DotsBullets
                     _ => DefaultStage2TimeLimitSec,
                 },
             };
+        }
+
+        public void SetRuntimeUiShellActive(bool active)
+        {
+            _runtimeUiShellActive = active;
         }
 
         private readonly struct GuiEnabledScope : System.IDisposable
