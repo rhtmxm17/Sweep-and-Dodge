@@ -175,14 +175,6 @@ namespace SweepNDodge.DotsBullets
                         continue;
                     }
 
-                    if (!IsUsageAllowed(entry.Usage, presentation))
-                    {
-                        WarnOnce(
-                            $"usage-mismatch:{stageId}:{presentation.StableId}",
-                            $"[StagePresentation] UsageFlags do not allow this placement. stageId={stageId}, stableId={presentation.StableId}, key={presentation.PresentationKey}, usage={entry.Usage}, placement={presentation.PlacementMode}, linkKind={presentation.LinkKind}");
-                        continue;
-                    }
-
                     if (!TryResolvePresentationTransform(in presentation, out var worldPosition, out var worldRotation))
                     {
                         WarnOnce(
@@ -348,20 +340,6 @@ namespace SweepNDodge.DotsBullets
                 TopologyBridge = GetComponent<StageTopologyBridge>();
             if (StageCatalog == null && TopologyBridge != null)
                 StageCatalog = TopologyBridge.StageCatalog;
-        }
-
-        private bool IsUsageAllowed(StagePresentationUsageFlags usage, in StagePresentationLayoutData presentation)
-        {
-            if (presentation.PlacementMode == StagePresentationPlacementMode.Standalone)
-                return (usage & StagePresentationUsageFlags.Standalone) != 0;
-
-            return presentation.LinkKind switch
-            {
-                StagePresentationLinkKind.Source => (usage & StagePresentationUsageFlags.SourceLinked) != 0,
-                StagePresentationLinkKind.Deposit => (usage & StagePresentationUsageFlags.DepositLinked) != 0,
-                StagePresentationLinkKind.Obstacle => (usage & StagePresentationUsageFlags.ObstacleLinked) != 0,
-                _ => false,
-            };
         }
 
         private void WarnOnce(string key, string message)

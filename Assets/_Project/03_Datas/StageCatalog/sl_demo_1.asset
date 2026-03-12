@@ -38,7 +38,7 @@ MonoBehaviour:
     Radius: 1
     Size: {x: 8, y: 2}
     CollisionMask: 255
-  - StableId: 3002
+  - StableId: 3004
     Active: 1
     Position: {x: 6, y: 0, z: 0}
     YawDeg: 0

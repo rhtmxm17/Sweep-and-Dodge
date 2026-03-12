@@ -197,13 +197,11 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         PresentationKey = "preview_a",
                         Prefab = GameObject.CreatePrimitive(PrimitiveType.Cube),
-                        Usage = StagePresentationUsageFlags.ObstacleLinked,
                     },
                     new StagePresentationCatalogEntry
                     {
                         PresentationKey = "preview_b",
                         Prefab = GameObject.CreatePrimitive(PrimitiveType.Sphere),
-                        Usage = StagePresentationUsageFlags.Standalone,
                     },
                 };
 

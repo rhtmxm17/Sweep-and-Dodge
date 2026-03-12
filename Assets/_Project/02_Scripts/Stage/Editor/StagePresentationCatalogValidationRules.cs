@@ -42,7 +42,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 }
             }
 
-            ValidateLayoutUsage(layouts, entriesByKey, issues);
         }
 
         private static void ValidateCatalog(
@@ -87,64 +86,6 @@ namespace SweepNDodge.DotsBullets.Editor
                         $"Prefab is null for PresentationKey={key}."));
                 }
 
-                if (entry.Usage == StagePresentationUsageFlags.None)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Warning,
-                        "SPC004",
-                        location,
-                        $"UsageFlags is None for PresentationKey={key}."));
-                }
-            }
-        }
-
-        private static void ValidateLayoutUsage(
-            IReadOnlyList<ContentValidationRecord<StageLayoutSO>> layouts,
-            IReadOnlyDictionary<string, StagePresentationCatalogEntry> entriesByKey,
-            List<ContentValidationIssue> issues)
-        {
-            if (layouts == null)
-                return;
-
-            for (int i = 0; i < layouts.Count; i++)
-            {
-                var layout = layouts[i].Value;
-                if (layout == null || layout.Presentations == null)
-                    continue;
-
-                string prefix = layouts[i].Location;
-                for (int p = 0; p < layout.Presentations.Length; p++)
-                {
-                    var presentation = layout.Presentations[p];
-                    if (!presentation.Active || string.IsNullOrWhiteSpace(presentation.PresentationKey))
-                        continue;
-
-                    string key = presentation.PresentationKey.Trim();
-                    if (!entriesByKey.TryGetValue(key, out var entry))
-                        continue;
-
-                    bool allowed = presentation.PlacementMode switch
-                    {
-                        StagePresentationPlacementMode.Standalone => (entry.Usage & StagePresentationUsageFlags.Standalone) != 0,
-                        StagePresentationPlacementMode.LinkedToParent => presentation.LinkKind switch
-                        {
-                            StagePresentationLinkKind.Source => (entry.Usage & StagePresentationUsageFlags.SourceLinked) != 0,
-                            StagePresentationLinkKind.Deposit => (entry.Usage & StagePresentationUsageFlags.DepositLinked) != 0,
-                            StagePresentationLinkKind.Obstacle => (entry.Usage & StagePresentationUsageFlags.ObstacleLinked) != 0,
-                            _ => false,
-                        },
-                        _ => false,
-                    };
-
-                    if (allowed)
-                        continue;
-
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Warning,
-                        "SPC005",
-                        $"{prefix}::Presentations[{p}]",
-                        $"PresentationKey usage mismatch. key={key}, usage={entry.Usage}, placement={presentation.PlacementMode}, linkKind={presentation.LinkKind}"));
-                }
             }
         }
     }

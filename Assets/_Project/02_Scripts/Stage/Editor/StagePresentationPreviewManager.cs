@@ -305,7 +305,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     if (StagePresentationEditorUtility.TryResolveEntry(catalog, marker.PresentationKey, out var entry))
                     {
                         AddHash(ref hash, entry.Prefab != null ? entry.Prefab.GetInstanceID() : 0);
-                        AddHash(ref hash, (int)entry.Usage);
                     }
                 }
 

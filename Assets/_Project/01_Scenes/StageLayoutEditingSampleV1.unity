@@ -130,7 +130,7 @@ GameObject:
   - component: {fileID: 251002766}
   - component: {fileID: 251002767}
   m_Layer: 0
-  m_Name: Obstacle_3002
+  m_Name: Obstacle_3004
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -164,7 +164,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fef95454aaf98174bbe4dd7d8d8d3ff6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageObstacleMarker
-  StableId: 3002
+  StableId: 3004
   Active: 1
   Shape: 1
   Radius: 1

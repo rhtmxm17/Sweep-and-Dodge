@@ -72,7 +72,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     PresentationKey = "preview_visual_01",
                     Prefab = CreatePresentationPrefab("preview_visual_01"),
-                    Usage = StagePresentationUsageFlags.Standalone,
                 },
             };
 
@@ -139,13 +138,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     PresentationKey = "preview_visual_01",
                     Prefab = CreatePresentationPrefab("preview_visual_01"),
-                    Usage = StagePresentationUsageFlags.Standalone,
                 },
                 new StagePresentationCatalogEntry
                 {
                     PresentationKey = "preview_visual_02",
                     Prefab = CreatePresentationPrefab("preview_visual_02"),
-                    Usage = StagePresentationUsageFlags.Standalone,
                 },
             };
 
@@ -189,7 +186,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     PresentationKey = "preview_visual_01",
                     Prefab = CreatePresentationPrefab("preview_visual_01"),
-                    Usage = StagePresentationUsageFlags.Standalone,
                 },
             };
 
@@ -233,7 +229,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     PresentationKey = "preview_visual_01",
                     Prefab = CreatePresentationPrefab("preview_visual_01"),
-                    Usage = StagePresentationUsageFlags.Standalone,
                 },
             };
 
@@ -280,7 +275,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     PresentationKey = "wall_basic",
                     Prefab = CreatePresentationPrefab("wall_basic"),
-                    Usage = StagePresentationUsageFlags.ObstacleLinked,
                 },
             };
             CreateObstacleEntity(3002u, new float3(10f, 0f, 0f), quaternion.RotateY(math.radians(90f)));

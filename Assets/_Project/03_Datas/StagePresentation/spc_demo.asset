@@ -16,10 +16,7 @@ MonoBehaviour:
   Entries:
   - PresentationKey: preview_visual_01
     Prefab: {fileID: 8763477321717207550, guid: f2575b14b31a5a647bcfbd0154d7c8e6, type: 3}
-    Usage: 1
   - PresentationKey: preview_visual_02
     Prefab: {fileID: 4834171608999225774, guid: 572acafca6c0ea443877695587196df7, type: 3}
-    Usage: 1
   - PresentationKey: preview_visual_03
     Prefab: {fileID: 6848677312124372030, guid: ca8d6d58a928443488b814a0b5c67405, type: 3}
-    Usage: 1

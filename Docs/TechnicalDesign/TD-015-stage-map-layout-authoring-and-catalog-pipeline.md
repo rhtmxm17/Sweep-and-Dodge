@@ -233,7 +233,6 @@
   - `StagePresentationCatalogEntry[]`
   - `PresentationKey`
   - `Prefab`
-  - `StagePresentationUsageFlags`
 - stage layout data는 prefab 직접 참조를 갖지 않고 `PresentationKey`만 사용한다.
 - `StagePresentationRuntimeController`
   - scene-level GO owner
