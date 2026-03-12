@@ -221,42 +221,12 @@ namespace SweepNDodge.DotsBullets.Editor
             if (marker == null || marker.PlacementMode != StagePresentationPlacementMode.LinkedToParent)
                 return;
 
-            TryFindLinkedParent(marker.transform, out linkKind, out linkedStableId);
+            StagePresentationEditorUtility.TryFindLinkedParent(marker.transform, out linkKind, out linkedStableId, out _);
         }
 
         private static bool TryFindLinkedParent(Transform transform, out StagePresentationLinkKind linkKind, out uint linkedStableId)
         {
-            linkKind = StagePresentationLinkKind.None;
-            linkedStableId = 0u;
-
-            var current = transform != null ? transform.parent : null;
-            while (current != null)
-            {
-                if (current.TryGetComponent<StageSourceMarker>(out var source))
-                {
-                    linkKind = StagePresentationLinkKind.Source;
-                    linkedStableId = source.StableId;
-                    return true;
-                }
-
-                if (current.TryGetComponent<StageDepositMarker>(out var deposit))
-                {
-                    linkKind = StagePresentationLinkKind.Deposit;
-                    linkedStableId = deposit.StableId;
-                    return true;
-                }
-
-                if (current.TryGetComponent<StageObstacleMarker>(out var obstacle))
-                {
-                    linkKind = StagePresentationLinkKind.Obstacle;
-                    linkedStableId = obstacle.StableId;
-                    return true;
-                }
-
-                current = current.parent;
-            }
-
-            return false;
+            return StagePresentationEditorUtility.TryFindLinkedParent(transform, out linkKind, out linkedStableId, out _);
         }
 
         private static int CompareRoots(StageLayoutRootMarker a, StageLayoutRootMarker b)

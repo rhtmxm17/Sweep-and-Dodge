@@ -18,9 +18,9 @@ MonoBehaviour:
     Active: 1
     Position: {x: 14, y: 0, z: -8}
     YawDeg: 0
-    Shape: 1
+    Shape: 0
     Radius: 8
-    Size: {x: 18, y: 12}
+    Size: {x: 12, y: 8}
   Deposits:
   - StableId: 2001
     Active: 1
@@ -28,7 +28,7 @@ MonoBehaviour:
     YawDeg: 0
     Shape: 0
     Radius: 3.5
-    Size: {x: 0, y: 0}
+    Size: {x: 2, y: 2}
   Obstacles: []
   Presentations:
   - StableId: 9003
@@ -36,7 +36,7 @@ MonoBehaviour:
     PlacementMode: 0
     LinkKind: 0
     LinkedStableId: 0
-    Position: {x: 14, y: 0, z: -8}
-    Euler: {x: 0, y: 340, z: 0}
     PresentationKey: preview_visual_03
+    Position: {x: 15, y: 2, z: 6}
+    Euler: {x: -0, y: 0, z: 0}
     Scale: {x: 1, y: 1, z: 1}

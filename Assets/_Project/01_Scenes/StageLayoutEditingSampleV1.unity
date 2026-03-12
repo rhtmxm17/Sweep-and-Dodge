@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -119,6 +119,58 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &251002765
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 251002766}
+  - component: {fileID: 251002767}
+  m_Layer: 0
+  m_Name: Obstacle_3002
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &251002766
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 251002765}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -10, y: 0, z: -2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1945980057}
+  m_Father: {fileID: 691910919}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &251002767
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 251002765}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fef95454aaf98174bbe4dd7d8d8d3ff6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageObstacleMarker
+  StableId: 3002
+  Active: 1
+  Shape: 1
+  Radius: 1
+  Size: {x: 3.5, y: 2}
+  CollisionMask: 255
+  DrawGizmo: 1
 --- !u!1 &454641822
 GameObject:
   m_ObjectHideFlags: 0
@@ -253,9 +305,9 @@ Transform:
   m_Children:
   - {fileID: 1042918358}
   - {fileID: 694074688}
-  - {fileID: 1320764252}
   - {fileID: 607284422}
   - {fileID: 454641823}
+  - {fileID: 1926940416}
   m_Father: {fileID: 1200092716}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &691910720
@@ -308,7 +360,7 @@ Transform:
   m_Children:
   - {fileID: 1042919358}
   - {fileID: 694074788}
-  - {fileID: 1320764352}
+  - {fileID: 251002766}
   m_Father: {fileID: 1200092716}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &691910920
@@ -361,7 +413,7 @@ Transform:
   m_Children:
   - {fileID: 1042920358}
   - {fileID: 694074888}
-  - {fileID: 1320764452}
+  - {fileID: 1617682004}
   m_Father: {fileID: 1200092716}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &691911120
@@ -428,7 +480,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDepositMarker
   StableId: 2001
   Active: 1
+  Shape: 0
   Radius: 5
+  Size: {x: 2, y: 2}
   DrawGizmo: 1
 --- !u!1 &694074787
 GameObject:
@@ -476,7 +530,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDepositMarker
   StableId: 2001
   Active: 1
+  Shape: 0
   Radius: 4
+  Size: {x: 2, y: 2}
   DrawGizmo: 1
 --- !u!1 &694074887
 GameObject:
@@ -524,7 +580,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDepositMarker
   StableId: 2001
   Active: 1
+  Shape: 0
   Radius: 3.5
+  Size: {x: 2, y: 2}
   DrawGizmo: 1
 --- !u!1 &1042918357
 GameObject:
@@ -572,9 +630,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageSourceMarker
   StableId: 1001
   Active: 1
-  FieldShape: 1
-  FieldRadius: 8
-  FieldSize: {x: 12, y: 8}
+  Shape: 1
+  Radius: 8
+  Size: {x: 12, y: 8}
   DrawGizmo: 1
 --- !u!1 &1042919357
 GameObject:
@@ -622,9 +680,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageSourceMarker
   StableId: 1002
   Active: 1
-  FieldShape: 0
-  FieldRadius: 6
-  FieldSize: {x: 10, y: 10}
+  Shape: 0
+  Radius: 6
+  Size: {x: 12, y: 8}
   DrawGizmo: 1
 --- !u!1 &1042920357
 GameObject:
@@ -672,9 +730,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageSourceMarker
   StableId: 1003
   Active: 1
-  FieldShape: 1
-  FieldRadius: 8
-  FieldSize: {x: 18, y: 12}
+  Shape: 0
+  Radius: 8
+  Size: {x: 12, y: 8}
   DrawGizmo: 1
 --- !u!1 &1200092714
 GameObject:
@@ -706,6 +764,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutRootMarker
   TargetStageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
+  TargetPresentationCatalog: {fileID: 11400000, guid: 58ead03715b01e94cbb0b74a81c0c331, type: 2}
   SortByStageId: 1
 --- !u!4 &1200092716
 Transform:
@@ -725,7 +784,7 @@ Transform:
   - {fileID: 691911119}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1320764251
+--- !u!1 &1617682003
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -733,145 +792,147 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1320764252}
-  - component: {fileID: 1320764253}
+  - component: {fileID: 1617682004}
+  - component: {fileID: 1617682005}
   m_Layer: 0
-  m_Name: Visual_9001
+  m_Name: Presentation_9003
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1320764252
+--- !u!4 &1617682004
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1320764251}
+  m_GameObject: {fileID: 1617682003}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 691910719}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1320764253
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1320764251}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 77363e60e3d5b424abbd4a081eee29fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePresentationMarker
-  StableId: 9001
-  Active: 1
-  PresentationKey: preview_visual_01
-  DrawGizmo: 1
---- !u!1 &1320764351
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1320764352}
-  - component: {fileID: 1320764353}
-  m_Layer: 0
-  m_Name: Visual_9002
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1320764352
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1320764351}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.13052619, z: 0, w: 0.9914449}
-  m_LocalPosition: {x: -12, y: 0, z: 6}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 691910919}
-  m_LocalEulerAnglesHint: {x: 0, y: 15, z: 0}
---- !u!114 &1320764353
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1320764351}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 77363e60e3d5b424abbd4a081eee29fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePresentationMarker
-  StableId: 9002
-  Active: 1
-  PresentationKey: preview_visual_02
-  DrawGizmo: 1
---- !u!1 &1320764451
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1320764452}
-  - component: {fileID: 1320764453}
-  m_Layer: 0
-  m_Name: Visual_9003
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1320764452
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1320764451}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: -0.1736482, z: 0, w: 0.9848077}
-  m_LocalPosition: {x: 14, y: 0, z: -8}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 15, y: 2, z: 6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 691911119}
-  m_LocalEulerAnglesHint: {x: 0, y: -20, z: 0}
---- !u!114 &1320764453
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1617682005
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1320764451}
+  m_GameObject: {fileID: 1617682003}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 77363e60e3d5b424abbd4a081eee29fd, type: 3}
+  m_Script: {fileID: 11500000, guid: a59f46e305e02c741a5c1634793de889, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePresentationMarker
   StableId: 9003
   Active: 1
+  PlacementMode: 0
   PresentationKey: preview_visual_03
+  DrawGizmo: 1
+--- !u!1 &1926940415
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1926940416}
+  - component: {fileID: 1926940417}
+  m_Layer: 0
+  m_Name: Presentation_9001
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1926940416
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926940415}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.1530753, y: 0.13531479, z: 0.27708772, w: 0.93887186}
+  m_LocalPosition: {x: -1.5, y: 2.55, z: -0.22}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 691910719}
+  m_LocalEulerAnglesHint: {x: -21.249, y: 10.463, z: 30.918}
+--- !u!114 &1926940417
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926940415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a59f46e305e02c741a5c1634793de889, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePresentationMarker
+  StableId: 9001
+  Active: 1
+  PlacementMode: 0
+  PresentationKey: preview_visual_01
+  DrawGizmo: 1
+--- !u!1 &1945980056
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1945980057}
+  - component: {fileID: 1945980058}
+  m_Layer: 0
+  m_Name: Presentation_9002
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1945980057
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1945980056}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 2, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 251002766}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1945980058
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1945980056}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a59f46e305e02c741a5c1634793de889, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePresentationMarker
+  StableId: 9002
+  Active: 1
+  PlacementMode: 1
+  PresentationKey: preview_visual_02
   DrawGizmo: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1200092716}
-

@@ -28,7 +28,7 @@ MonoBehaviour:
     YawDeg: 0
     Shape: 0
     Radius: 5
-    Size: {x: 0, y: 0}
+    Size: {x: 2, y: 2}
   Obstacles:
   - StableId: 3001
     Active: 1
@@ -37,7 +37,7 @@ MonoBehaviour:
     Shape: 1
     Radius: 1
     Size: {x: 8, y: 2}
-    CollisionMask: 3
+    CollisionMask: 255
   - StableId: 3002
     Active: 1
     Position: {x: 6, y: 0, z: 0}
@@ -52,7 +52,7 @@ MonoBehaviour:
     PlacementMode: 0
     LinkKind: 0
     LinkedStableId: 0
-    Position: {x: 0, y: 0, z: 0}
-    Euler: {x: 0, y: 0, z: 0}
     PresentationKey: preview_visual_01
+    Position: {x: -1.5, y: 2.55, z: -0.22}
+    Euler: {x: 338.75085, y: 10.463113, z: 30.917606}
     Scale: {x: 1, y: 1, z: 1}

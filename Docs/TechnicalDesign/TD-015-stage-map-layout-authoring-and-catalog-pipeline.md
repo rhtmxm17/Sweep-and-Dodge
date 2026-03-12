@@ -4,7 +4,7 @@
 - doc_id: `TD-015`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-10`
+- last_updated: `2026-03-12`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
@@ -208,6 +208,16 @@
   - 동일 GO의 topology marker + presentation marker 겸용은 금지한다.
   - `LinkedToParent`인데 parent topology marker가 없으면 validation error다.
   - `Standalone`은 topology marker parent 아래에 둘 수 없다.
+- editor authoring 기준점
+  - `StageLayoutRootMarker.TargetPresentationCatalog`를 editor preview/catalog resolve source로 사용한다.
+  - `StagePresentationMarkerEditor`는 `PresentationKey`를 catalog popup으로 제공하고, 씬 뷰에서 linked line/warning label을 표시한다.
+  - `StagePresentationPreviewManager`가 editor 전용 transient prefab preview instance를 소유한다.
+  - preview scope 기본값은 `SelectedStageOnly`이며, 현재 selection의 상위 `StageLayoutStageMarker`만 표시한다. selection이 비면 마지막 활성 stage preview를 유지한다.
+  - preview instance는 `HideAndDontSave` 기반으로 생성하며, 저장/undo/runtime 데이터로 승격하지 않는다.
+  - preview 해석은 generator/runtime과 동일하다.
+    - `Standalone`: marker world transform
+    - `LinkedToParent`: parent topology 기준 local transform
+  - unresolved key, missing catalog, invalid linked parent, topology marker와 동일 GO 겸용은 inspector help box와 scene label warning으로 즉시 드러낸다.
 - runtime 데이터 최소 계약
   - `StableId`
   - `PlacementMode`

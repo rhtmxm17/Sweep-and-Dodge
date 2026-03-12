@@ -20,7 +20,7 @@ MonoBehaviour:
     YawDeg: 0
     Shape: 0
     Radius: 6
-    Size: {x: 10, y: 10}
+    Size: {x: 12, y: 8}
   Deposits:
   - StableId: 2001
     Active: 1
@@ -28,23 +28,23 @@ MonoBehaviour:
     YawDeg: 0
     Shape: 0
     Radius: 4
-    Size: {x: 0, y: 0}
+    Size: {x: 2, y: 2}
   Obstacles:
   - StableId: 3002
     Active: 1
-    Position: {x: -2, y: 0, z: 1}
+    Position: {x: -10, y: 0, z: -2}
     YawDeg: 0
     Shape: 1
-    Radius: 0
+    Radius: 1
     Size: {x: 3.5, y: 2}
-    CollisionMask: 3
+    CollisionMask: 255
   Presentations:
   - StableId: 9002
     Active: 1
-    PlacementMode: 0
-    LinkKind: 0
-    LinkedStableId: 0
-    Position: {x: -12, y: 0, z: 6}
-    Euler: {x: 0, y: 14.999999, z: 0}
+    PlacementMode: 1
+    LinkKind: 3
+    LinkedStableId: 3002
     PresentationKey: preview_visual_02
+    Position: {x: 0, y: 2, z: 0}
+    Euler: {x: -0, y: 0, z: 0}
     Scale: {x: 1, y: 1, z: 1}

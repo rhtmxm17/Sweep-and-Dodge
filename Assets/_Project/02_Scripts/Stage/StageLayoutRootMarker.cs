@@ -7,6 +7,7 @@ namespace SweepNDodge.DotsBullets
     {
         [Header("Catalog")]
         public StageCatalogSO TargetStageCatalog;
+        public StagePresentationCatalogSO TargetPresentationCatalog;
 
         public bool SortByStageId = true;
     }
