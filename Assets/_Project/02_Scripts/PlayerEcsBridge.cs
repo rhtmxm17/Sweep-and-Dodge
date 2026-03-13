@@ -51,6 +51,7 @@ namespace SweepNDodge.DotsBullets
         private uint _lastUiFeedbackVersion;
         private uint _lastImpulseVersion;
         private static bool _warnedAnimatorMissingGlobal;
+        private DemoShellPauseBridge _pauseBridge;
 
         private void Awake()
         {
@@ -69,7 +70,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             // GO -> ECS : 입력 의도만 전달
-            bool suppressLiveInput = IsReplayInputSuppressed();
+            bool suppressLiveInput = IsReplayInputSuppressed() || IsPauseInputSuppressed();
             if (!suppressLiveInput)
             {
                 var intent = _em.GetComponentData<PlayerInputIntentComponent>(_playerEntity);
@@ -154,6 +155,14 @@ namespace SweepNDodge.DotsBullets
         private bool IsReplayInputSuppressed()
         {
             return ReplayInputSuppressionUtility.IsLiveInputSuppressed(_em, _replayQuery);
+        }
+
+        private bool IsPauseInputSuppressed()
+        {
+            if (_pauseBridge == null)
+                _pauseBridge = FindPauseBridge();
+
+            return _pauseBridge != null && _pauseBridge.GameplayInputBlocked;
         }
 
         private void UpdateVisualImpulseOffset()
@@ -279,6 +288,15 @@ namespace SweepNDodge.DotsBullets
                 _visualImpulseOffset = Vector3.zero;
                 _visualImpulseVelocity = Vector3.zero;
             }
+        }
+
+        private static DemoShellPauseBridge FindPauseBridge()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<DemoShellPauseBridge>();
+#else
+            return Object.FindObjectOfType<DemoShellPauseBridge>();
+#endif
         }
     }
 }

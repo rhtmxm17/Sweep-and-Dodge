@@ -15,11 +15,18 @@ namespace SweepNDodge.DotsBullets
         private EntityQuery _playerQuery;
         private EntityQuery _replayQuery;
         private bool _isReplayBound;
+        private DemoShellPauseBridge _pauseBridge;
 
         private void Update()
         {
             if (IsReplayInputSuppressed())
                 return;
+
+            if (IsPauseInputSuppressed())
+            {
+                PublishInputIntent(float2.zero, false, float2.zero);
+                return;
+            }
 
             var moveX = 0f;
             var moveZ = 0f;
@@ -79,6 +86,23 @@ namespace SweepNDodge.DotsBullets
             intent.AimWorldXZ = aimWorldXZ;
             intent.HasAimWorldPoint = (byte)(hasAimPoint ? 1 : 0);
             _em.SetComponentData(playerEntity, intent);
+        }
+
+        private bool IsPauseInputSuppressed()
+        {
+            if (_pauseBridge == null)
+                _pauseBridge = FindPauseBridge();
+
+            return _pauseBridge != null && _pauseBridge.GameplayInputBlocked;
+        }
+
+        private static DemoShellPauseBridge FindPauseBridge()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<DemoShellPauseBridge>();
+#else
+            return Object.FindObjectOfType<DemoShellPauseBridge>();
+#endif
         }
     }
 }

@@ -25,6 +25,15 @@ namespace SweepNDodge.DotsBullets
         Fail = 1,
     }
 
+    public enum DemoShellPauseActionId : byte
+    {
+        Resume = 0,
+        OpenSettings = 1,
+        RestartStage = 2,
+        ReturnToLobby = 3,
+        QuitApplication = 4,
+    }
+
     [Serializable]
     public struct DemoShellStageProfile
     {

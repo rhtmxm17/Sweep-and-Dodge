@@ -13,6 +13,7 @@ namespace SweepNDodge.DotsBullets
         [Header("Scene References")]
         public DemoShellFlowController DemoShell;
         public DemoAudioBridge DemoAudio;
+        public DemoShellPauseBridge PauseBridge;
         public PlayerRuntimeHudBridge RuntimeHudBridge;
 
         [Header("Canvas")]
@@ -33,6 +34,8 @@ namespace SweepNDodge.DotsBullets
         public GameObject LobbyPanel;
         public GameObject ResultPanel;
         public GameObject DemoCompletePanel;
+        public GameObject PausePanel;
+        public GameObject ConfirmDialogPanel;
         public GameObject SettingsPanel;
 
         [Header("Presenters")]
@@ -40,6 +43,8 @@ namespace SweepNDodge.DotsBullets
         public LobbyScreenPresenter LobbyPresenter;
         public ResultPresenter ResultPresenter;
         public DemoCompletePresenter DemoCompletePresenter;
+        public PausePresenter PausePresenter;
+        public ConfirmDialogPresenter ConfirmDialogPresenter;
         public SettingsPresenter SettingsPresenter;
 
         [Header("Policy")]
@@ -49,17 +54,27 @@ namespace SweepNDodge.DotsBullets
         private DemoShellScreenId _lastScreen;
         private bool _hasLastScreen;
         private bool _settingsOpen;
+        private bool _settingsOpenedFromPause;
+        private bool _confirmOpen;
         private bool _lastSettingsOpen;
+        private bool _lastConfirmOpen;
         private Selectable _lastShellSelectable;
+        private Selectable _lastPauseSelectable;
         private DemoShellFlowController _configuredShell;
         private DemoAudioBridge _configuredAudio;
+        private DemoShellPauseBridge _configuredPauseBridge;
         private Action _cachedOpenSettingsAction;
         private Action _cachedCloseSettingsAction;
+        private Action _cachedOpenSettingsFromPauseAction;
+        private Action<DemoShellPauseActionId> _cachedOpenConfirmAction;
+        private Action _cachedCloseConfirmAction;
 #if UNITY_EDITOR
         private bool _editorEnsureHierarchyQueued;
 #endif
 
         public bool IsSettingsOpen => _settingsOpen;
+        public bool IsPauseOpen => PauseBridge != null && PauseBridge.IsPaused;
+        public bool IsConfirmOpen => _confirmOpen;
 
         private void Reset()
         {
@@ -105,8 +120,13 @@ namespace SweepNDodge.DotsBullets
             AutoBindRuntimeReferences();
             ConfigurePresenters();
 
-            if (_settingsOpen && WasCancelPressedThisFrame())
-                CloseSettings();
+            if (WasCancelPressedThisFrame())
+            {
+                if (IsConfirmOpen || IsSettingsOpen || IsPauseOpen)
+                    CloseTopModal();
+                else if (PauseBridge != null && PauseBridge.CanPause)
+                    OpenPause();
+            }
 
             ApplyShellState(force: false);
         }
@@ -126,10 +146,24 @@ namespace SweepNDodge.DotsBullets
 
         public void OpenSettings()
         {
-            if (_settingsOpen)
+            if (_settingsOpen || _confirmOpen)
                 return;
 
             _lastShellSelectable = ResolveCurrentShellDefaultSelectable();
+            _settingsOpenedFromPause = false;
+            _settingsOpen = true;
+            ApplyShellState(force: true);
+        }
+
+        public void OpenSettingsFromPause()
+        {
+            if (_settingsOpen || !IsPauseOpen || _confirmOpen)
+                return;
+
+            _lastPauseSelectable = PausePresenter != null
+                ? PausePresenter.ResolveSelectableForAction(DemoShellPauseActionId.OpenSettings)
+                : null;
+            _settingsOpenedFromPause = true;
             _settingsOpen = true;
             ApplyShellState(force: true);
         }
@@ -141,6 +175,69 @@ namespace SweepNDodge.DotsBullets
 
             _settingsOpen = false;
             ApplyShellState(force: true);
+        }
+
+        public void OpenPause()
+        {
+            if (PauseBridge == null || _settingsOpen || _confirmOpen)
+                return;
+
+            if (!PauseBridge.RequestPause())
+                return;
+
+            ApplyShellState(force: true);
+        }
+
+        public void ClosePause()
+        {
+            if (PauseBridge == null || !PauseBridge.IsPaused)
+                return;
+
+            _confirmOpen = false;
+            _settingsOpen = false;
+            _settingsOpenedFromPause = false;
+            PauseBridge.RequestResume();
+            ApplyShellState(force: true);
+        }
+
+        public void OpenConfirm(DemoShellPauseActionId action)
+        {
+            if (!IsPauseOpen || _settingsOpen)
+                return;
+
+            _lastPauseSelectable = PausePresenter != null
+                ? PausePresenter.ResolveSelectableForAction(action)
+                : null;
+            PauseBridge?.SetPendingAction(action);
+            _confirmOpen = true;
+            ApplyShellState(force: true);
+        }
+
+        public void CloseConfirm()
+        {
+            if (!_confirmOpen)
+                return;
+
+            _confirmOpen = false;
+            ApplyShellState(force: true);
+        }
+
+        public void CloseTopModal()
+        {
+            if (_confirmOpen)
+            {
+                CloseConfirm();
+                return;
+            }
+
+            if (_settingsOpen)
+            {
+                CloseSettings();
+                return;
+            }
+
+            if (IsPauseOpen)
+                ClosePause();
         }
 
         public bool IsShellPanelVisible(DemoShellScreenId screen)
@@ -159,41 +256,66 @@ namespace SweepNDodge.DotsBullets
         {
             _cachedOpenSettingsAction ??= OpenSettings;
             _cachedCloseSettingsAction ??= CloseSettings;
+            _cachedOpenSettingsFromPauseAction ??= OpenSettingsFromPause;
+            _cachedCloseConfirmAction ??= CloseConfirm;
+            _cachedOpenConfirmAction ??= OpenConfirm;
 
-            if (_configuredShell == DemoShell && _configuredAudio == DemoAudio)
+            if (_configuredShell == DemoShell
+                && _configuredAudio == DemoAudio
+                && _configuredPauseBridge == PauseBridge)
                 return;
 
             TitlePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             LobbyPresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             ResultPresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             DemoCompletePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
+            PausePresenter?.Configure(PauseBridge, _cachedOpenSettingsFromPauseAction, _cachedOpenConfirmAction);
+            ConfirmDialogPresenter?.Configure(PauseBridge, _cachedCloseConfirmAction);
             SettingsPresenter?.Configure(DemoAudio, _cachedCloseSettingsAction);
 
             _configuredShell = DemoShell;
             _configuredAudio = DemoAudio;
+            _configuredPauseBridge = PauseBridge;
         }
 
         private void ApplyShellState(bool force)
         {
-            if (DemoShell == null)
-                return;
+            if (DemoShell != null)
+                DemoShell.SetRuntimeUiShellActive(true);
 
-            DemoShell.SetRuntimeUiShellActive(true);
+            bool hasShell = DemoShell != null;
+            DemoShellScreenId screen = hasShell ? DemoShell.CurrentScreen : DemoShellScreenId.Title;
+            bool stagePlay = hasShell && screen == DemoShellScreenId.StagePlay;
 
-            DemoShellScreenId screen = DemoShell.CurrentScreen;
-            if (screen == DemoShellScreenId.StagePlay && _settingsOpen)
-                _settingsOpen = false;
+            if (!stagePlay && IsPauseOpen)
+                PauseBridge?.RequestResume();
 
-            bool showTitle = screen == DemoShellScreenId.Title;
-            bool showLobby = screen == DemoShellScreenId.Lobby;
-            bool showResult = screen == DemoShellScreenId.StageResult;
-            bool showComplete = screen == DemoShellScreenId.DemoComplete;
+            if (!stagePlay)
+            {
+                _confirmOpen = false;
+                if (_settingsOpenedFromPause)
+                {
+                    _settingsOpen = false;
+                    _settingsOpenedFromPause = false;
+                }
+            }
+
+            bool pauseOpen = stagePlay && IsPauseOpen;
+            bool confirmOpen = pauseOpen && _confirmOpen;
+            bool settingsOpen = _settingsOpen;
+
+            bool showTitle = hasShell && screen == DemoShellScreenId.Title;
+            bool showLobby = hasShell && screen == DemoShellScreenId.Lobby;
+            bool showResult = hasShell && screen == DemoShellScreenId.StageResult;
+            bool showComplete = hasShell && screen == DemoShellScreenId.DemoComplete;
 
             SetActive(TitlePanel, showTitle);
             SetActive(LobbyPanel, showLobby);
             SetActive(ResultPanel, showResult);
             SetActive(DemoCompletePanel, showComplete);
-            SetActive(SettingsPanel, _settingsOpen);
+            SetActive(PausePanel, pauseOpen && !settingsOpen && !confirmOpen);
+            SetActive(SettingsPanel, settingsOpen && !confirmOpen);
+            SetActive(ConfirmDialogPanel, confirmOpen);
 
             TitlePresenter?.RefreshPresentation();
             LobbyPresenter?.RefreshPresentation();
@@ -201,27 +323,69 @@ namespace SweepNDodge.DotsBullets
                 ResultPresenter?.RefreshPresentation();
             if (showComplete)
                 DemoCompletePresenter?.RefreshPresentation();
-            if (_settingsOpen)
+            if (pauseOpen)
+                PausePresenter?.RefreshPresentation();
+            if (confirmOpen)
+                ConfirmDialogPresenter?.RefreshPresentation();
+            if (settingsOpen)
                 SettingsPresenter?.RefreshPresentation();
 
-            bool stateChanged = force || !_hasLastScreen || _lastScreen != screen || _lastSettingsOpen != _settingsOpen;
+            bool stateChanged = force
+                || !_hasLastScreen
+                || _lastScreen != screen
+                || _lastSettingsOpen != settingsOpen
+                || _lastConfirmOpen != confirmOpen;
             if (!stateChanged)
                 return;
 
             UpdateSelection();
             _lastScreen = screen;
             _hasLastScreen = true;
-            _lastSettingsOpen = _settingsOpen;
+            _lastSettingsOpen = settingsOpen;
+            _lastConfirmOpen = confirmOpen;
         }
 
         private void UpdateSelection()
         {
             Selectable target;
-            if (_settingsOpen)
+            if (_confirmOpen)
+            {
+                target = ConfirmDialogPresenter != null ? ConfirmDialogPresenter.DefaultSelectable : null;
+            }
+            else if (_settingsOpen)
             {
                 target = SettingsPresenter != null ? SettingsPresenter.DefaultSelectable : null;
             }
+            else if (IsPauseOpen
+                     && _lastSettingsOpen
+                     && _settingsOpenedFromPause
+                     && _lastPauseSelectable != null
+                     && _lastPauseSelectable.gameObject.activeInHierarchy)
+            {
+                target = _lastPauseSelectable;
+            }
+            else if (IsPauseOpen
+                     && _lastConfirmOpen
+                     && _lastPauseSelectable != null
+                     && _lastPauseSelectable.gameObject.activeInHierarchy)
+            {
+                target = _lastPauseSelectable;
+            }
+            else if (IsPauseOpen
+                     && EventSystem != null
+                     && EventSystem.currentSelectedGameObject != null
+                     && PausePanel != null
+                     && EventSystem.currentSelectedGameObject.activeInHierarchy
+                     && EventSystem.currentSelectedGameObject.transform.IsChildOf(PausePanel.transform))
+            {
+                target = EventSystem.currentSelectedGameObject.GetComponent<Selectable>();
+            }
+            else if (IsPauseOpen)
+            {
+                target = PausePresenter != null ? PausePresenter.DefaultSelectable : null;
+            }
             else if (_lastSettingsOpen
+                     && !_settingsOpenedFromPause
                      && _lastShellSelectable != null
                      && _lastShellSelectable.gameObject.activeInHierarchy)
             {
@@ -232,8 +396,10 @@ namespace SweepNDodge.DotsBullets
                 target = ResolveCurrentShellDefaultSelectable();
             }
 
-            if (!_settingsOpen)
+            if (!IsPauseOpen && !_settingsOpen)
                 _lastShellSelectable = target;
+            else if (IsPauseOpen && !_confirmOpen && !_settingsOpen)
+                _lastPauseSelectable = target;
 
             if (target == null || EventSystem == null)
                 return;
@@ -272,6 +438,7 @@ namespace SweepNDodge.DotsBullets
         {
             DemoShell ??= FindFirst<DemoShellFlowController>();
             DemoAudio ??= FindFirst<DemoAudioBridge>();
+            PauseBridge ??= FindFirst<DemoShellPauseBridge>();
             RuntimeHudBridge ??= FindFirst<PlayerRuntimeHudBridge>();
         }
 
@@ -294,12 +461,16 @@ namespace SweepNDodge.DotsBullets
             LobbyPanel ??= FindDirectChild(ShellLayer, "LobbyPanel");
             ResultPanel ??= FindDirectChild(ShellLayer, "ResultPanel");
             DemoCompletePanel ??= FindDirectChild(ShellLayer, "DemoCompletePanel");
+            PausePanel ??= FindDirectChild(ModalLayer, "PausePanel");
+            ConfirmDialogPanel ??= FindDirectChild(ModalLayer, "ConfirmDialogPanel");
             SettingsPanel ??= FindDirectChild(ModalLayer, "SettingsPanel");
 
             TitlePresenter ??= TitlePanel != null ? TitlePanel.GetComponent<TitleScreenPresenter>() : null;
             LobbyPresenter ??= LobbyPanel != null ? LobbyPanel.GetComponent<LobbyScreenPresenter>() : null;
             ResultPresenter ??= ResultPanel != null ? ResultPanel.GetComponent<ResultPresenter>() : null;
             DemoCompletePresenter ??= DemoCompletePanel != null ? DemoCompletePanel.GetComponent<DemoCompletePresenter>() : null;
+            PausePresenter ??= PausePanel != null ? PausePanel.GetComponent<PausePresenter>() : null;
+            ConfirmDialogPresenter ??= ConfirmDialogPanel != null ? ConfirmDialogPanel.GetComponent<ConfirmDialogPresenter>() : null;
             SettingsPresenter ??= SettingsPanel != null ? SettingsPanel.GetComponent<SettingsPresenter>() : null;
         }
     }
@@ -325,6 +496,8 @@ namespace SweepNDodge.DotsBullets
             BuildLobbyPanel();
             BuildResultPanel();
             BuildDemoCompletePanel();
+            BuildPausePanel();
+            BuildConfirmDialogPanel();
             BuildSettingsPanel();
             NormalizeImageSprites(transform);
 
@@ -467,6 +640,36 @@ namespace SweepNDodge.DotsBullets
             SettingsPresenter.Sfx = CreateAudioSliderRow(content, "SfxRow", "SFX");
             SettingsPresenter.Ui = CreateAudioSliderRow(content, "UiRow", "UI");
             SettingsPresenter.CloseButton = CreateButton(content, "CloseButton", "Close");
+        }
+
+        private void BuildPausePanel()
+        {
+            var panelGo = EnsurePanel(ref PausePanel, ModalLayer, "PausePanel", new Color(0f, 0f, 0f, 0.70f));
+            PausePresenter ??= panelGo.GetComponent<PausePresenter>() ?? panelGo.AddComponent<PausePresenter>();
+            if (PausePresenter.HeaderText != null)
+                return;
+
+            var content = CreateContentBox(panelGo.transform, "Content", new Vector2(720f, 460f));
+            PausePresenter.HeaderText = CreateText(content, "Header", "Paused", 42f, FontStyles.Bold, TextAlignmentOptions.Center);
+            PausePresenter.ResumeButton = CreateButton(content, "ResumeButton", "Resume");
+            PausePresenter.SettingsButton = CreateButton(content, "SettingsButton", "Settings");
+            PausePresenter.RestartStageButton = CreateButton(content, "RestartStageButton", "Restart Stage");
+            PausePresenter.ReturnToLobbyButton = CreateButton(content, "ReturnToLobbyButton", "Return to Lobby");
+            PausePresenter.QuitButton = CreateButton(content, "QuitButton", "Quit");
+        }
+
+        private void BuildConfirmDialogPanel()
+        {
+            var panelGo = EnsurePanel(ref ConfirmDialogPanel, ModalLayer, "ConfirmDialogPanel", new Color(0f, 0f, 0f, 0.82f));
+            ConfirmDialogPresenter ??= panelGo.GetComponent<ConfirmDialogPresenter>() ?? panelGo.AddComponent<ConfirmDialogPresenter>();
+            if (ConfirmDialogPresenter.TitleText != null)
+                return;
+
+            var content = CreateContentBox(panelGo.transform, "Content", new Vector2(760f, 320f));
+            ConfirmDialogPresenter.TitleText = CreateText(content, "Title", "Confirm Action?", 38f, FontStyles.Bold, TextAlignmentOptions.Center);
+            ConfirmDialogPresenter.BodyText = CreateText(content, "Body", "This action cannot be undone.", 22f, FontStyles.Normal, TextAlignmentOptions.Center);
+            ConfirmDialogPresenter.ConfirmButton = CreateButton(content, "ConfirmButton", "Confirm");
+            ConfirmDialogPresenter.CancelButton = CreateButton(content, "CancelButton", "Cancel");
         }
     }
 }

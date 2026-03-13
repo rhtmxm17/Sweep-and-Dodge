@@ -152,6 +152,85 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.SettingsPresenter.Ui.ValueText.text, Is.EqualTo("0.42"));
         }
 
+        [Test]
+        public void ModalPanels_ApplyPriority_AndRestorePauseSelection()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            InvokeConfigurePresenters(context.Root);
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.PauseBridge.RequestPause(), Is.True);
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.IsPauseOpen, Is.True);
+            Assert.That(context.Root.PausePanel.activeSelf, Is.True);
+            Assert.That(context.Root.SettingsPanel.activeSelf, Is.False);
+            Assert.That(context.Root.ConfirmDialogPanel.activeSelf, Is.False);
+            Assert.That(context.Root.PausePresenter.DefaultSelectable, Is.EqualTo(context.Root.PausePresenter.ResumeButton));
+
+            context.Root.OpenSettingsFromPause();
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.SettingsPanel.activeSelf, Is.True);
+            Assert.That(context.Root.PausePanel.activeSelf, Is.False);
+
+            context.Root.CloseSettings();
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.PausePanel.activeSelf, Is.True);
+            Assert.That(context.Root.EventSystem.currentSelectedGameObject, Is.EqualTo(context.Root.PausePresenter.SettingsButton.gameObject));
+
+            context.Root.OpenConfirm(DemoShellPauseActionId.RestartStage);
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.IsConfirmOpen, Is.True);
+            Assert.That(context.Root.ConfirmDialogPanel.activeSelf, Is.True);
+            Assert.That(context.Root.SettingsPanel.activeSelf, Is.False);
+            Assert.That(context.Root.PausePanel.activeSelf, Is.False);
+            Assert.That(context.Root.ConfirmDialogPresenter.TitleText.text, Is.EqualTo("Restart Stage?"));
+            Assert.That(context.Root.ConfirmDialogPresenter.DefaultSelectable, Is.EqualTo(context.Root.ConfirmDialogPresenter.CancelButton));
+
+            context.Root.CloseConfirm();
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.IsConfirmOpen, Is.False);
+            Assert.That(context.Root.PausePanel.activeSelf, Is.True);
+            Assert.That(context.Root.EventSystem.currentSelectedGameObject, Is.EqualTo(context.Root.PausePresenter.RestartStageButton.gameObject));
+        }
+
+        [Test]
+        public void PauseBridge_CanPauseOnlyDuringStagePlay_AndRoutesCommands()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.Lobby);
+            Assert.That(context.PauseBridge.CanPause, Is.False);
+            Assert.That(context.PauseBridge.RequestPause(), Is.False);
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 1);
+            Assert.That(context.PauseBridge.CanPause, Is.True);
+            Assert.That(context.PauseBridge.RequestPause(), Is.True);
+            Assert.That(context.PauseBridge.IsPaused, Is.True);
+
+            Assert.That(context.PauseBridge.RequestConfirmedAction(DemoShellPauseActionId.Resume), Is.True);
+            Assert.That(context.PauseBridge.IsPaused, Is.False);
+
+            context.PauseBridge.RequestPause();
+            Assert.That(context.PauseBridge.RequestConfirmedAction(DemoShellPauseActionId.RestartStage), Is.True);
+            Assert.That(DemoShellSessionStaging.TryConsume(out var restartRequest), Is.True);
+            Assert.That(restartRequest.Screen, Is.EqualTo(DemoShellScreenId.StagePlay));
+            Assert.That(restartRequest.StageIndex, Is.EqualTo(1));
+
+            DemoShellSessionStaging.ResetSessionMetrics();
+            context.PauseBridge.RequestPause();
+            Assert.That(context.PauseBridge.RequestConfirmedAction(DemoShellPauseActionId.ReturnToLobby), Is.True);
+            Assert.That(DemoShellSessionStaging.TryConsume(out var lobbyRequest), Is.True);
+            Assert.That(lobbyRequest.Screen, Is.EqualTo(DemoShellScreenId.Lobby));
+        }
+
         private static TestContext CreateContext()
         {
             var shellGo = new GameObject("DemoShell_Test");
@@ -172,6 +251,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var audio = shellGo.AddComponent<DemoAudioBridge>();
             audio.DemoShell = shell;
+            var pauseBridge = shellGo.AddComponent<DemoShellPauseBridge>();
+            pauseBridge.DemoShell = shell;
+            pauseBridge.StageBridge = stageBridge;
             var hud = shellGo.AddComponent<PlayerRuntimeHudBridge>();
             hud.DemoShell = shell;
 
@@ -180,12 +262,13 @@ namespace SweepNDodge.DotsBullets.Tests
             var root = rootGo.AddComponent<RuntimeUiRoot>();
             root.DemoShell = shell;
             root.DemoAudio = audio;
+            root.PauseBridge = pauseBridge;
             root.RuntimeHudBridge = hud;
             root.LogBindWarnings = false;
             root.EnsureHierarchy();
             rootGo.SetActive(true);
 
-            return new TestContext(shellGo, rootGo, shell, audio, hud, root);
+            return new TestContext(shellGo, rootGo, shell, audio, pauseBridge, hud, root);
         }
 
         private static void InvokeConfigurePresenters(RuntimeUiRoot root)
@@ -241,6 +324,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 GameObject rootGo,
                 DemoShellFlowController shell,
                 DemoAudioBridge audio,
+                DemoShellPauseBridge pauseBridge,
                 PlayerRuntimeHudBridge hud,
                 RuntimeUiRoot root)
             {
@@ -248,12 +332,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 _rootGo = rootGo;
                 Shell = shell;
                 Audio = audio;
+                PauseBridge = pauseBridge;
                 Hud = hud;
                 Root = root;
             }
 
             public DemoShellFlowController Shell { get; }
             public DemoAudioBridge Audio { get; }
+            public DemoShellPauseBridge PauseBridge { get; }
             public PlayerRuntimeHudBridge Hud { get; }
             public RuntimeUiRoot Root { get; }
 

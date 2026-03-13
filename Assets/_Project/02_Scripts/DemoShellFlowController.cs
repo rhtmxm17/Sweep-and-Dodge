@@ -290,6 +290,29 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
+        public bool RequestRestartFromPause()
+        {
+            if (_currentScreen != DemoShellScreenId.StagePlay)
+                return false;
+            if (!TryGetStageProfile(_currentStageIndex, out _))
+                return false;
+
+            DemoShellSessionStaging.StageStagePlay(_currentStageIndex);
+            ReloadActiveScene();
+            return true;
+        }
+
+        public bool RequestReturnToLobbyFromPause()
+        {
+            if (_currentScreen != DemoShellScreenId.StagePlay)
+                return false;
+
+            DemoShellSessionStaging.ResetSessionMetrics();
+            DemoShellSessionStaging.StageLobby();
+            ReloadActiveScene();
+            return true;
+        }
+
         public bool RequestReturnToLobbyFromComplete()
         {
             if (_currentScreen != DemoShellScreenId.DemoComplete)

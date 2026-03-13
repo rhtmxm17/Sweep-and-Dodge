@@ -453,6 +453,261 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_PauseResumeAndSettings_Work()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "RuntimeUiRoot/DemoShellFlowController was not ready for pause test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Pause test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && uiRoot.PauseBridge != null
+                        && uiRoot.PauseBridge.CanPause;
+                },
+                360,
+                "Pause test did not reach StagePlay.");
+
+            uiRoot.OpenPause();
+            yield return null;
+
+            Assert.That(uiRoot.IsPauseOpen, Is.True);
+            Assert.That(uiRoot.PausePanel.activeInHierarchy, Is.True);
+
+            uiRoot.OpenSettingsFromPause();
+            yield return null;
+
+            Assert.That(uiRoot.IsSettingsOpen, Is.True);
+            Assert.That(uiRoot.SettingsPanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.PausePanel.activeSelf, Is.False);
+
+            uiRoot.CloseTopModal();
+            yield return null;
+
+            Assert.That(uiRoot.IsPauseOpen, Is.True);
+            Assert.That(uiRoot.IsSettingsOpen, Is.False);
+            Assert.That(uiRoot.PausePanel.activeInHierarchy, Is.True);
+
+            uiRoot.CloseTopModal();
+            yield return null;
+
+            Assert.That(uiRoot.IsPauseOpen, Is.False);
+            Assert.That(uiRoot.PausePanel.activeSelf, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_PauseRestartAndReturnToLobby_Work()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "RuntimeUiRoot/DemoShellFlowController was not ready for pause restart test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Pause restart test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1;
+                },
+                360,
+                "Pause restart test did not reach StagePlay.");
+
+            uiRoot.OpenPause();
+            yield return null;
+            uiRoot.OpenConfirm(DemoShellPauseActionId.RestartStage);
+            yield return null;
+            uiRoot.ConfirmDialogPresenter.ConfirmButton.onClick.Invoke();
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && !uiRoot.IsPauseOpen;
+                },
+                360,
+                "Pause restart confirm did not re-enter the same stage.");
+
+            uiRoot = FindRuntimeUiRoot();
+            shell = FindDemoShell();
+            uiRoot.OpenPause();
+            yield return null;
+            uiRoot.OpenConfirm(DemoShellPauseActionId.ReturnToLobby);
+            yield return null;
+            uiRoot.ConfirmDialogPresenter.ConfirmButton.onClick.Invoke();
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.Lobby
+                        && !uiRoot.IsPauseOpen;
+                },
+                360,
+                "Pause return-to-lobby confirm did not reach Lobby.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_PauseIsBlockedOutsideStagePlay()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "RuntimeUiRoot/DemoShellFlowController was not ready for pause guard test.");
+
+            uiRoot.OpenPause();
+            yield return null;
+            Assert.That(uiRoot.IsPauseOpen, Is.False);
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Pause guard test did not reach Lobby.");
+
+            uiRoot = FindRuntimeUiRoot();
+            uiRoot.OpenPause();
+            yield return null;
+            Assert.That(uiRoot.IsPauseOpen, Is.False);
+
+            Assert.That(shell.RequestSelectStageById(3), Is.True);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null);
+            var em = world.EntityManager;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay && shell.CurrentStageId == 3;
+                },
+                360,
+                "Pause guard test did not reach Stage3 play.");
+
+            yield return WaitForCondition(
+                () =>
+                    HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                360,
+                "Pause guard test did not observe Stage3 running state.");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StageResult;
+                },
+                240,
+                "Pause guard test did not reach StageResult.");
+
+            uiRoot = FindRuntimeUiRoot();
+            uiRoot.OpenPause();
+            yield return null;
+            Assert.That(uiRoot.IsPauseOpen, Is.False);
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.DemoComplete;
+                },
+                240,
+                "Pause guard test did not reach DemoComplete.");
+
+            uiRoot = FindRuntimeUiRoot();
+            uiRoot.OpenPause();
+            yield return null;
+            Assert.That(uiRoot.IsPauseOpen, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_RuntimeUiRoot_Exists()
         {
             ClearDemoShellStaging();
