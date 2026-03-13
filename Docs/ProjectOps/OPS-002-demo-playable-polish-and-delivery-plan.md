@@ -190,7 +190,7 @@
   - `TD-019`: Release Readiness And Build Gate
 - GD 후속(권장):
   - `GD-008`: 데모 화면/전이 흐름 기준 문서로 유지
-  - `GD-009`: Demo Onboarding And Result Copy/UX(필요 시 분리)
+  - `GD-NNN`: Demo Onboarding And Result Copy/UX(필요 시 분리)
 - OPS 후속(권장):
   - `OPS-003`: 공개 릴리즈 준비/운영 체크리스트와 QA matrix를 별도 운영 문서로 분리
 - ADR 기록 기준:

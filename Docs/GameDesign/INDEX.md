@@ -12,3 +12,5 @@
 - [GD-003-stage-cleaning-route-mvp.md](GD-003-stage-cleaning-route-mvp.md): 청소 동선/스폰 분포 MVP
 - [GD-007-data-driven-bullet-pattern-definition.md](GD-007-data-driven-bullet-pattern-definition.md): 데이터 주도 탄막 패턴 방향성 (의도/리듬/리스크-보상)
 - [GD-008-demo-flow-design.md](GD-008-demo-flow-design.md): 데모 외부 플레이 흐름(Title/Lobby/Stage/Result/Demo Complete)
+- [GD-009-in-game-ui-screen-blueprint.md](GD-009-in-game-ui-screen-blueprint.md): 인게임 UI 화면 레이어/레인 청사진
+- [GD-010-in-game-ui-layout-and-zones.md](GD-010-in-game-ui-layout-and-zones.md): 인게임 UI 주요 영역별 기준안과 배치 원칙
