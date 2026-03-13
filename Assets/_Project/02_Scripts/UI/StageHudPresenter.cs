@@ -8,32 +8,24 @@ namespace SweepNDodge.DotsBullets
     public sealed class StageHudPresenter : MonoBehaviour
     {
         [Header("Texts")]
-        public TextMeshProUGUI StageLabel;
-        public TextMeshProUGUI ObjectiveText;
-        public TextMeshProUGUI SourceProgressText;
-        public TextMeshProUGUI PressureSourceLabel;
-        public TextMeshProUGUI PressureSourceValueText;
-        public TextMeshProUGUI TimerLabel;
+        public TextMeshProUGUI ObjectiveSummaryText;
+        public TextMeshProUGUI ObjectiveDetailText;
         public TextMeshProUGUI TimerValueText;
         public TextMeshProUGUI CarryLabel;
         public TextMeshProUGUI CarryValueText;
-        public TextMeshProUGUI DangerText;
+        public TextMeshProUGUI PressureSourceValueText;
 
         [Header("Visuals")]
         public GameObject PressureSourceProgressRoot;
         public Image PressureSourceFillImage;
         public RectTransform PressureSourceWeakThresholdMarker;
         public Image CarryFillImage;
-        public GameObject DangerBannerRoot;
-        public Image DangerBannerImage;
 
         private static readonly Color TimerNormalColor = new(0.92f, 0.96f, 1f, 1f);
         private static readonly Color WarningColor = new(1f, 0.76f, 0.27f, 1f);
         private static readonly Color DangerColor = new(1f, 0.38f, 0.38f, 1f);
         private static readonly Color CarryNormalColor = new(0.32f, 0.78f, 0.95f, 1f);
         private static readonly Color CarryWarningColor = new(1f, 0.72f, 0.18f, 1f);
-        private static readonly Color DangerBannerWarningColor = new(0.42f, 0.27f, 0.10f, 0.92f);
-        private static readonly Color DangerBannerDangerColor = new(0.42f, 0.10f, 0.10f, 0.94f);
 
         private DemoShellFlowController _shell;
         private PlayerRuntimeHudBridge _runtimeHud;
@@ -52,12 +44,6 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            int stageId = Mathf.Max(0, _shell.CurrentStageId);
-            if (StageLabel != null)
-                StageLabel.text = stageId > 0 ? $"Stage {stageId}" : "Stage -";
-
-            if (TimerLabel != null)
-                TimerLabel.text = "Time";
             if (CarryLabel != null)
                 CarryLabel.text = "Carry";
 
@@ -72,29 +58,29 @@ namespace SweepNDodge.DotsBullets
                 ? Mathf.Max(0f, stageLimitSec - snapshot.StageStateElapsedSec)
                 : -1f;
 
-            ApplySourceProgress(snapshot);
+            ApplyObjectiveSummary(snapshot);
+            ApplyObjectiveDetail(snapshot);
             ApplyCarry(snapshot);
             ApplyTimer(remainingSec);
-            ApplyObjective(snapshot);
-            ApplyDanger(snapshot, remainingSec);
         }
 
         private void ApplyDefaultPresentation()
         {
-            if (ObjectiveText != null)
-                ObjectiveText.text = "Collect trash from sources";
+            if (ObjectiveSummaryText != null)
+                ObjectiveSummaryText.text = "Sources 0/0 cleared";
 
-            if (SourceProgressText != null)
+            if (ObjectiveDetailText != null)
             {
-                SourceProgressText.text = string.Empty;
-                SourceProgressText.gameObject.SetActive(false);
+                ObjectiveDetailText.text = string.Empty;
+                ObjectiveDetailText.gameObject.SetActive(false);
             }
+
             if (PressureSourceProgressRoot != null)
                 PressureSourceProgressRoot.SetActive(false);
-            if (PressureSourceLabel != null)
-                PressureSourceLabel.text = "Pressure Source";
+
             if (PressureSourceValueText != null)
                 PressureSourceValueText.text = "0 / 0";
+
             if (PressureSourceFillImage != null)
             {
                 PressureSourceFillImage.type = Image.Type.Filled;
@@ -103,6 +89,7 @@ namespace SweepNDodge.DotsBullets
                 PressureSourceFillImage.fillAmount = 0f;
                 PressureSourceFillImage.color = CarryNormalColor;
             }
+
             if (PressureSourceWeakThresholdMarker != null)
                 PressureSourceWeakThresholdMarker.gameObject.SetActive(false);
 
@@ -114,6 +101,7 @@ namespace SweepNDodge.DotsBullets
 
             if (CarryValueText != null)
                 CarryValueText.text = "0 / 0";
+
             if (CarryFillImage != null)
             {
                 CarryFillImage.type = Image.Type.Filled;
@@ -122,47 +110,30 @@ namespace SweepNDodge.DotsBullets
                 CarryFillImage.fillAmount = 0f;
                 CarryFillImage.color = CarryNormalColor;
             }
-
-            if (DangerBannerRoot != null)
-                DangerBannerRoot.SetActive(false);
-            if (DangerText != null)
-                DangerText.text = string.Empty;
         }
 
-        private void ApplySourceProgress(in PlayerHudSnapshotComponent snapshot)
+        private void ApplyObjectiveSummary(in PlayerHudSnapshotComponent snapshot)
         {
-            if (SourceProgressText == null)
+            if (ObjectiveSummaryText == null)
                 return;
 
-            bool visible = snapshot.TotalSourceCount > 0;
-            SourceProgressText.gameObject.SetActive(visible);
-            if (!visible)
-                return;
-
-            SourceProgressText.text =
+            ObjectiveSummaryText.text =
                 $"Sources {Mathf.Max(0, snapshot.DepletedSourceCount)}/{Mathf.Max(0, snapshot.TotalSourceCount)} cleared";
-
-            ApplyPressureSourceProgress(snapshot);
         }
 
-        private void ApplyCarry(in PlayerHudSnapshotComponent snapshot)
+        private void ApplyObjectiveDetail(in PlayerHudSnapshotComponent snapshot)
         {
-            int capacity = Mathf.Max(0, snapshot.CarryCapacity);
-            int load = Mathf.Clamp(snapshot.CarryLoad, 0, capacity <= 0 ? int.MaxValue : capacity);
-            float ratio = capacity <= 0 ? 0f : Mathf.Clamp01((float)load / capacity);
-            bool carryFull = capacity > 0 && load >= capacity;
+            bool visible = snapshot.PressureSourceStableId > 0u && snapshot.PressureSourceThresholdDepleted > 0;
 
-            if (CarryValueText != null)
-                CarryValueText.text = $"{load} / {capacity}";
-
-            if (CarryFillImage != null)
+            if (ObjectiveDetailText != null)
             {
-                CarryFillImage.type = Image.Type.Filled;
-                CarryFillImage.fillMethod = Image.FillMethod.Horizontal;
-                CarryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
-                CarryFillImage.fillAmount = ratio;
-                CarryFillImage.color = carryFull ? CarryWarningColor : CarryNormalColor;
+                ObjectiveDetailText.gameObject.SetActive(visible);
+                ObjectiveDetailText.text = visible
+                    ? $"Pressure Source #{snapshot.PressureSourceStableId}  {Mathf.Max(0, snapshot.PressureSourceCollected)}/{Mathf.Max(0, snapshot.PressureSourceThresholdDepleted)}"
+                    : string.Empty;
             }
+
+            ApplyPressureSourceProgress(snapshot, visible);
         }
 
         private void ApplyTimer(float remainingSec)
@@ -185,92 +156,39 @@ namespace SweepNDodge.DotsBullets
                     : TimerNormalColor;
         }
 
-        private void ApplyObjective(in PlayerHudSnapshotComponent snapshot)
+        private void ApplyCarry(in PlayerHudSnapshotComponent snapshot)
         {
-            if (ObjectiveText == null)
-                return;
-
-            string objective;
             int capacity = Mathf.Max(0, snapshot.CarryCapacity);
-            bool carryFull = capacity > 0 && snapshot.CarryLoad >= capacity;
-            bool hasSources = snapshot.TotalSourceCount > 0;
-            bool hasRemainingSources = hasSources && snapshot.DepletedSourceCount < snapshot.TotalSourceCount;
+            int load = Mathf.Clamp(snapshot.CarryLoad, 0, capacity <= 0 ? int.MaxValue : capacity);
+            float ratio = capacity <= 0 ? 0f : Mathf.Clamp01((float)load / capacity);
+            bool carryFull = capacity > 0 && load >= capacity;
 
-            if (carryFull)
-                objective = "Deposit collected trash";
-            else if (hasRemainingSources)
-                objective = "Collect trash from sources";
-            else if (snapshot.CarryLoad > 0)
-                objective = "Deposit remaining trash";
-            else
-                objective = "Finish the cleanup";
+            if (CarryValueText != null)
+                CarryValueText.text = $"{load} / {capacity}";
 
-            ObjectiveText.text = objective;
+            if (CarryFillImage != null)
+            {
+                CarryFillImage.type = Image.Type.Filled;
+                CarryFillImage.fillMethod = Image.FillMethod.Horizontal;
+                CarryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+                CarryFillImage.fillAmount = ratio;
+                CarryFillImage.color = carryFull ? CarryWarningColor : CarryNormalColor;
+            }
         }
 
-        private void ApplyDanger(in PlayerHudSnapshotComponent snapshot, float remainingSec)
+        private void ApplyPressureSourceProgress(in PlayerHudSnapshotComponent snapshot, bool visible)
         {
-            if (DangerBannerRoot == null || DangerText == null)
-                return;
-
-            bool showDanger = false;
-            string message = string.Empty;
-            Color color = DangerBannerDangerColor;
-
-            int capacity = Mathf.Max(0, snapshot.CarryCapacity);
-            bool carryFull = capacity > 0 && snapshot.CarryLoad >= capacity;
-            bool allSourcesCleared = snapshot.TotalSourceCount > 0 && snapshot.DepletedSourceCount >= snapshot.TotalSourceCount;
-
-            if (snapshot.HitFlashRemainingSec > 0f && snapshot.LastHitLossValue > 0)
-            {
-                showDanger = true;
-                message = "Hit! Carry lost";
-                color = DangerBannerDangerColor;
-            }
-            else if (remainingSec >= 0f && remainingSec <= 10f)
-            {
-                showDanger = true;
-                message = "Time critical";
-                color = DangerBannerDangerColor;
-            }
-            else if (carryFull)
-            {
-                showDanger = true;
-                message = "Carry full - deposit now";
-                color = DangerBannerDangerColor;
-            }
-            else if (remainingSec >= 0f && remainingSec <= 30f)
-            {
-                showDanger = true;
-                message = "Time is running out";
-                color = DangerBannerWarningColor;
-            }
-            else if (allSourcesCleared && snapshot.CarryLoad > 0)
-            {
-                showDanger = true;
-                message = "Deposit remaining trash";
-                color = DangerBannerWarningColor;
-            }
-
-            DangerBannerRoot.SetActive(showDanger);
-            DangerText.text = showDanger ? message : string.Empty;
-            if (DangerBannerImage != null)
-                DangerBannerImage.color = color;
-        }
-
-        private void ApplyPressureSourceProgress(in PlayerHudSnapshotComponent snapshot)
-        {
-            bool visible = snapshot.PressureSourceStableId > 0u && snapshot.PressureSourceThresholdDepleted >= 0;
             if (PressureSourceProgressRoot != null)
                 PressureSourceProgressRoot.SetActive(visible);
             if (!visible)
                 return;
 
-            if (PressureSourceLabel != null)
-                PressureSourceLabel.text = $"Pressure Source #{snapshot.PressureSourceStableId}";
             if (PressureSourceValueText != null)
+            {
                 PressureSourceValueText.text =
                     $"{Mathf.Max(0, snapshot.PressureSourceCollected)} / {Mathf.Max(0, snapshot.PressureSourceThresholdDepleted)}";
+            }
+
             if (PressureSourceFillImage != null)
             {
                 PressureSourceFillImage.type = Image.Type.Filled;

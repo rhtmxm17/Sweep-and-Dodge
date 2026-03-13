@@ -35,7 +35,8 @@ namespace SweepNDodge.DotsBullets
         public GameObject ResultPanel;
         public GameObject DemoCompletePanel;
         public GameObject StageHudPanel;
-        public GameObject HintToastPanel;
+        public GameObject NotificationPanel;
+        public GameObject HintPanel;
         public GameObject PausePanel;
         public GameObject ConfirmDialogPanel;
         public GameObject SettingsPanel;
@@ -46,7 +47,8 @@ namespace SweepNDodge.DotsBullets
         public ResultPresenter ResultPresenter;
         public DemoCompletePresenter DemoCompletePresenter;
         public StageHudPresenter StageHudPresenter;
-        public HintToastPresenter HintToastPresenter;
+        public NotificationPresenter NotificationPresenter;
+        public HintPresenter HintPresenter;
         public PausePresenter PausePresenter;
         public ConfirmDialogPresenter ConfirmDialogPresenter;
         public SettingsPresenter SettingsPresenter;
@@ -282,7 +284,8 @@ namespace SweepNDodge.DotsBullets
             ResultPresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             DemoCompletePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             StageHudPresenter?.Configure(DemoShell, RuntimeHudBridge);
-            HintToastPresenter?.Configure(DemoShell, RuntimeHudBridge);
+            NotificationPresenter?.Configure(DemoShell, RuntimeHudBridge);
+            HintPresenter?.Configure(DemoShell, PauseBridge, RuntimeHudBridge);
             PausePresenter?.Configure(PauseBridge, _cachedOpenSettingsFromPauseAction, _cachedOpenConfirmAction);
             ConfirmDialogPresenter?.Configure(PauseBridge, _cachedCloseConfirmAction);
             SettingsPresenter?.Configure(DemoAudio, _cachedCloseSettingsAction);
@@ -328,7 +331,8 @@ namespace SweepNDodge.DotsBullets
             SetActive(TitlePanel, showTitle);
             SetActive(LobbyPanel, showLobby);
             SetActive(StageHudPanel, showHud);
-            SetActive(HintToastPanel, showHud);
+            SetActive(NotificationPanel, showHud);
+            SetActive(HintPanel, showHud);
             SetActive(ResultPanel, showResult);
             SetActive(DemoCompletePanel, showComplete);
             SetActive(PausePanel, pauseOpen && !settingsOpen && !confirmOpen);
@@ -340,7 +344,8 @@ namespace SweepNDodge.DotsBullets
             if (showHud)
             {
                 StageHudPresenter?.RefreshPresentation();
-                HintToastPresenter?.RefreshPresentation();
+                NotificationPresenter?.RefreshPresentation();
+                HintPresenter?.RefreshPresentation();
             }
             if (showResult)
                 ResultPresenter?.RefreshPresentation();
@@ -485,7 +490,8 @@ namespace SweepNDodge.DotsBullets
             ResultPanel ??= FindDirectChild(ShellLayer, "ResultPanel");
             DemoCompletePanel ??= FindDirectChild(ShellLayer, "DemoCompletePanel");
             StageHudPanel ??= FindDirectChild(HudLayer, "StageHudPanel");
-            HintToastPanel ??= FindDirectChild(HudLayer, "HintToastPanel");
+            NotificationPanel ??= FindDirectChild(HudLayer, "NotificationPanel");
+            HintPanel ??= FindDirectChild(HudLayer, "HintPanel");
             PausePanel ??= FindDirectChild(ModalLayer, "PausePanel");
             ConfirmDialogPanel ??= FindDirectChild(ModalLayer, "ConfirmDialogPanel");
             SettingsPanel ??= FindDirectChild(ModalLayer, "SettingsPanel");
@@ -495,7 +501,8 @@ namespace SweepNDodge.DotsBullets
             ResultPresenter ??= ResultPanel != null ? ResultPanel.GetComponent<ResultPresenter>() : null;
             DemoCompletePresenter ??= DemoCompletePanel != null ? DemoCompletePanel.GetComponent<DemoCompletePresenter>() : null;
             StageHudPresenter ??= StageHudPanel != null ? StageHudPanel.GetComponent<StageHudPresenter>() : null;
-            HintToastPresenter ??= HintToastPanel != null ? HintToastPanel.GetComponent<HintToastPresenter>() : null;
+            NotificationPresenter ??= NotificationPanel != null ? NotificationPanel.GetComponent<NotificationPresenter>() : null;
+            HintPresenter ??= HintPanel != null ? HintPanel.GetComponent<HintPresenter>() : null;
             PausePresenter ??= PausePanel != null ? PausePanel.GetComponent<PausePresenter>() : null;
             ConfirmDialogPresenter ??= ConfirmDialogPanel != null ? ConfirmDialogPanel.GetComponent<ConfirmDialogPresenter>() : null;
             SettingsPresenter ??= SettingsPanel != null ? SettingsPanel.GetComponent<SettingsPresenter>() : null;
@@ -524,7 +531,8 @@ namespace SweepNDodge.DotsBullets
             BuildResultPanel();
             BuildDemoCompletePanel();
             BuildStageHudPanel();
-            BuildHintToastPanel();
+            BuildNotificationPanel();
+            BuildHintPanel();
             BuildPausePanel();
             BuildConfirmDialogPanel();
             BuildSettingsPanel();

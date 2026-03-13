@@ -500,8 +500,10 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && uiRoot.StageHudPanel != null
                         && uiRoot.StageHudPanel.activeInHierarchy
-                        && uiRoot.HintToastPanel != null
-                        && uiRoot.HintToastPanel.activeInHierarchy
+                        && uiRoot.NotificationPanel != null
+                        && uiRoot.NotificationPanel.activeInHierarchy
+                        && uiRoot.HintPanel != null
+                        && uiRoot.HintPanel.activeInHierarchy
                         && hud.RuntimeUiHudActive;
                 },
                 360,
@@ -513,7 +515,8 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(uiRoot.IsPauseOpen, Is.True);
             Assert.That(uiRoot.PausePanel.activeInHierarchy, Is.True);
             Assert.That(uiRoot.StageHudPanel.activeInHierarchy, Is.True);
-            Assert.That(uiRoot.HintToastPanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.NotificationPanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.HintPanel.activeInHierarchy, Is.True);
 
             var world = World.DefaultGameObjectInjectionWorld;
             Assert.That(world, Is.Not.Null);
@@ -527,7 +530,8 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell != null
                         && shell.CurrentScreen == DemoShellScreenId.StageResult
                         && !uiRoot.StageHudPanel.activeInHierarchy
-                        && !uiRoot.HintToastPanel.activeInHierarchy;
+                        && !uiRoot.NotificationPanel.activeInHierarchy
+                        && !uiRoot.HintPanel.activeInHierarchy;
                 },
                 240,
                 "HUD was not hidden after StageResult transition.");
@@ -599,20 +603,22 @@ namespace SweepNDodge.DotsBullets.Tests
                 HitFlashRemainingSec = 0f,
             });
             uiRoot.StageHudPresenter.RefreshPresentation();
+            uiRoot.NotificationPresenter.RefreshPresentation();
+            uiRoot.HintPresenter.RefreshPresentation();
 
-            Assert.That(uiRoot.StageHudPresenter.StageLabel.text, Is.EqualTo("Stage 1"));
-            Assert.That(uiRoot.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Deposit collected trash"));
-            Assert.That(uiRoot.StageHudPresenter.SourceProgressText.text, Is.EqualTo("Sources 3/3 cleared"));
+            Assert.That(uiRoot.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 3/3 cleared"));
+            Assert.That(uiRoot.StageHudPresenter.ObjectiveDetailText.text, Is.EqualTo("Pressure Source #1002  9/12"));
             Assert.That(uiRoot.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.True);
-            Assert.That(uiRoot.StageHudPresenter.PressureSourceLabel.text, Is.EqualTo("Pressure Source #1002"));
             Assert.That(uiRoot.StageHudPresenter.PressureSourceValueText.text, Is.EqualTo("9 / 12"));
             Assert.That(uiRoot.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
             Assert.That(uiRoot.StageHudPresenter.PressureSourceWeakThresholdMarker.gameObject.activeSelf, Is.True);
             Assert.That(uiRoot.StageHudPresenter.PressureSourceWeakThresholdMarker.anchorMin.x, Is.EqualTo(0.3333f).Within(1e-3f));
             Assert.That(uiRoot.StageHudPresenter.CarryValueText.text, Is.EqualTo("10 / 10"));
             Assert.That(uiRoot.StageHudPresenter.TimerValueText.text, Is.EqualTo("5.0s"));
-            Assert.That(uiRoot.StageHudPresenter.DangerBannerRoot.activeSelf, Is.True);
-            Assert.That(uiRoot.StageHudPresenter.DangerText.text, Is.EqualTo("Time critical"));
+            Assert.That(uiRoot.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.NotificationPresenter.NotificationText.text, Is.EqualTo("Time critical"));
+            Assert.That(uiRoot.HintPresenter.HintRoot.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.HintPresenter.HintText.text, Is.EqualTo("Carry is full. Head to Deposit."));
 
             SetPrivateField(hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
@@ -622,23 +628,39 @@ namespace SweepNDodge.DotsBullets.Tests
                 RemainingSec = 1f,
             });
             SetPrivateField(hud, "_feedbackLine", "Hazard Captured");
-            uiRoot.HintToastPresenter.RefreshPresentation();
+            SetPrivateField(hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 2,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+            });
+            uiRoot.StageHudPresenter.RefreshPresentation();
+            uiRoot.NotificationPresenter.RefreshPresentation();
 
-            Assert.That(uiRoot.HintToastPresenter.ToastRoot.activeSelf, Is.True);
-            Assert.That(uiRoot.HintToastPresenter.ToastText.text, Is.EqualTo("Hazard Captured"));
+            Assert.That(uiRoot.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.NotificationPresenter.NotificationText.text, Is.EqualTo("Hazard Captured"));
 
             SetPrivateField(hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
                 Version = 101u,
-                Type = PlayerUiFeedbackEventType.PlayerHazardHit,
-                Reason = (byte)PlayerUiFeedbackReasonId.Default,
-                Value = 3,
+                Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
+                Reason = (byte)PlayerUiFeedbackReasonId.CarryBinFull,
                 RemainingSec = 1f,
             });
-            SetPrivateField(hud, "_feedbackLine", "Hit -3");
-            uiRoot.HintToastPresenter.RefreshPresentation();
+            SetPrivateField(hud, "_feedbackLine", "Vacuum: CarryBin Full");
+            SetPrivateField(hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+            });
+            uiRoot.NotificationPresenter.RefreshPresentation();
 
-            Assert.That(uiRoot.HintToastPresenter.ToastRoot.activeSelf, Is.False);
+            Assert.That(uiRoot.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
         }
 
         [UnityTest]

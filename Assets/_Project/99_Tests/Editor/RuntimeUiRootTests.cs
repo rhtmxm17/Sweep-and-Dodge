@@ -260,13 +260,12 @@ namespace SweepNDodge.DotsBullets.Tests
             InvokeApplyShellState(context.Root, force: true);
 
             Assert.That(context.Root.StageHudPanel.activeSelf, Is.True);
-            Assert.That(context.Root.HintToastPanel.activeSelf, Is.True);
+            Assert.That(context.Root.NotificationPanel.activeSelf, Is.True);
+            Assert.That(context.Root.HintPanel.activeSelf, Is.True);
             Assert.That(context.Hud.RuntimeUiHudActive, Is.True);
-            Assert.That(context.Root.StageHudPresenter.StageLabel.text, Is.EqualTo("Stage 1"));
-            Assert.That(context.Root.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Collect trash from sources"));
-            Assert.That(context.Root.StageHudPresenter.SourceProgressText.text, Is.EqualTo("Sources 1/3 cleared"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 1/3 cleared"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveDetailText.text, Is.EqualTo("Pressure Source #1002  6/8"));
             Assert.That(context.Root.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.True);
-            Assert.That(context.Root.StageHudPresenter.PressureSourceLabel.text, Is.EqualTo("Pressure Source #1002"));
             Assert.That(context.Root.StageHudPresenter.PressureSourceValueText.text, Is.EqualTo("6 / 8"));
             Assert.That(context.Root.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
             Assert.That(context.Root.StageHudPresenter.PressureSourceWeakThresholdMarker.gameObject.activeSelf, Is.True);
@@ -274,17 +273,19 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.StageHudPresenter.CarryValueText.text, Is.EqualTo("5 / 10"));
             Assert.That(context.Root.StageHudPresenter.CarryFillImage.fillAmount, Is.EqualTo(0.5f).Within(1e-4f));
             Assert.That(context.Root.StageHudPresenter.TimerValueText.text, Is.EqualTo("70.0s"));
-            Assert.That(context.Root.StageHudPresenter.DangerBannerRoot.activeSelf, Is.False);
+            Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.False);
+            Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.False);
 
             SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.Title);
             InvokeApplyShellState(context.Root, force: true);
 
             Assert.That(context.Root.StageHudPanel.activeSelf, Is.False);
-            Assert.That(context.Root.HintToastPanel.activeSelf, Is.False);
+            Assert.That(context.Root.NotificationPanel.activeSelf, Is.False);
+            Assert.That(context.Root.HintPanel.activeSelf, Is.False);
         }
 
         [Test]
-        public void HudPresenters_ApplyDangerPriority_AndToastSuppression()
+        public void HudPresenters_ApplyNotificationPriority_AndHintOneShot()
         {
             using var context = CreateContext();
 
@@ -305,9 +306,11 @@ namespace SweepNDodge.DotsBullets.Tests
             InvokeConfigurePresenters(context.Root);
             InvokeApplyShellState(context.Root, force: true);
 
-            Assert.That(context.Root.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Deposit collected trash"));
-            Assert.That(context.Root.StageHudPresenter.DangerBannerRoot.activeSelf, Is.True);
-            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Hit! Carry lost"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 3/3 cleared"));
+            Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
+            Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.True);
+            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Carry is full. Head to Deposit."));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -320,7 +323,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 HitFlashRemainingSec = 0f,
             });
             context.Root.StageHudPresenter.RefreshPresentation();
-            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Time critical"));
+            context.Root.NotificationPresenter.RefreshPresentation();
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Time critical"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -333,7 +337,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 HitFlashRemainingSec = 0f,
             });
             context.Root.StageHudPresenter.RefreshPresentation();
-            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Carry full - deposit now"));
+            context.Root.NotificationPresenter.RefreshPresentation();
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -346,8 +351,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 HitFlashRemainingSec = 0f,
             });
             context.Root.StageHudPresenter.RefreshPresentation();
-            Assert.That(context.Root.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Deposit remaining trash"));
-            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Deposit remaining trash"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 3/3 cleared"));
             Assert.That(context.Root.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.False);
 
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
@@ -359,8 +363,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 RemainingSec = 1f,
             });
             SetPrivateField(context.Hud, "_feedbackLine", "Hit -4");
-            context.Root.HintToastPresenter.RefreshPresentation();
-            Assert.That(context.Root.HintToastPresenter.ToastRoot.activeSelf, Is.False);
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 2,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+            });
+            context.Root.NotificationPresenter.RefreshPresentation();
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
 
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
@@ -370,9 +382,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 RemainingSec = 1f,
             });
             SetPrivateField(context.Hud, "_feedbackLine", "Vacuum: CarryBin Full");
-            context.Root.HintToastPresenter.RefreshPresentation();
-            Assert.That(context.Root.HintToastPresenter.ToastRoot.activeSelf, Is.False);
+            context.Root.NotificationPresenter.RefreshPresentation();
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
 
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 2,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+            });
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
                 Version = 3u,
@@ -381,9 +401,29 @@ namespace SweepNDodge.DotsBullets.Tests
                 RemainingSec = 1f,
             });
             SetPrivateField(context.Hud, "_feedbackLine", "Hazard Captured");
-            context.Root.HintToastPresenter.RefreshPresentation();
-            Assert.That(context.Root.HintToastPresenter.ToastRoot.activeSelf, Is.True);
-            Assert.That(context.Root.HintToastPresenter.ToastText.text, Is.EqualTo("Hazard Captured"));
+            context.Root.NotificationPresenter.RefreshPresentation();
+            Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hazard Captured"));
+
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 4,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+            });
+            context.Root.HintPresenter.RefreshPresentation();
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+            });
+            context.Root.HintPresenter.RefreshPresentation();
+            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Carry is full. Head to Deposit."));
         }
 
         private static TestContext CreateContext()

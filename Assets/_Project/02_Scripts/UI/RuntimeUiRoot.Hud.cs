@@ -11,23 +11,54 @@ namespace SweepNDodge.DotsBullets
             var panelGo = EnsurePanel(ref StageHudPanel, HudLayer, "StageHudPanel", Color.clear);
             StageHudPresenter ??= panelGo.GetComponent<StageHudPresenter>() ?? panelGo.AddComponent<StageHudPresenter>();
 
-            var topLeft = CreateHudBlock(
-                panelGo.transform,
-                "TopLeftAnchor",
-                new Vector2(0f, 1f),
-                new Vector2(0f, 1f),
-                new Vector2(0f, 1f),
-                new Vector2(24f, -24f),
-                new Vector2(420f, 214f),
-                new Color(0.08f, 0.10f, 0.14f, 0.72f));
-            StageHudPresenter.StageLabel ??= FindOrCreateText(topLeft, "StageLabel", "Stage 1", 30f, FontStyles.Bold, TextAlignmentOptions.Left);
-            StageHudPresenter.ObjectiveText ??= FindOrCreateText(topLeft, "ObjectiveText", "Collect trash from sources", 22f, FontStyles.Normal, TextAlignmentOptions.Left);
-            StageHudPresenter.SourceProgressText ??= FindOrCreateText(topLeft, "SourceProgressText", "Sources 0/0 cleared", 18f, FontStyles.Normal, TextAlignmentOptions.Left);
+            if (NeedsStageHudRebuild(panelGo.transform, StageHudPresenter))
+            {
+                ClearChildrenImmediate(panelGo.transform);
+                ResetStageHudReferences();
+            }
 
-            var pressureBlock = CreatePressureSourceProgressBlock(topLeft, "PressureSourceProgressRoot");
+            var objectiveRoot = CreateHudBlock(
+                panelGo.transform,
+                "TopCenterObjectiveRoot",
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(0f, -24f),
+                new Vector2(520f, 190f),
+                new Color(0.08f, 0.10f, 0.14f, 0.72f));
+            SetVerticalAlignment(objectiveRoot, TextAnchor.UpperCenter);
+            StageHudPresenter.ObjectiveSummaryText ??= FindOrCreateText(
+                objectiveRoot,
+                "ObjectiveSummaryText",
+                "Sources 0/0 cleared",
+                28f,
+                FontStyles.Bold,
+                TextAlignmentOptions.Center);
+            StageHudPresenter.ObjectiveDetailText ??= FindOrCreateText(
+                objectiveRoot,
+                "ObjectiveDetailText",
+                "Pressure Source #1002  0/0",
+                18f,
+                FontStyles.Normal,
+                TextAlignmentOptions.Center);
+            StageHudPresenter.TimerValueText ??= FindOrCreateText(
+                objectiveRoot,
+                "TimerValueText",
+                "--.-s",
+                24f,
+                FontStyles.Bold,
+                TextAlignmentOptions.Center);
+
+            var pressureBlock = CreatePressureSourceProgressBlock(objectiveRoot, "PressureSourceProgressRoot");
+            SetVerticalAlignment(pressureBlock, TextAnchor.UpperCenter);
             StageHudPresenter.PressureSourceProgressRoot ??= pressureBlock.gameObject;
-            StageHudPresenter.PressureSourceLabel ??= FindOrCreateFixedText(pressureBlock, "PressureSourceLabel", "Pressure Source", 18f, 0f, TextAlignmentOptions.Left);
-            StageHudPresenter.PressureSourceValueText ??= FindOrCreateFixedText(pressureBlock, "PressureSourceValueText", "0 / 0", 16f, 0f, TextAlignmentOptions.Right);
+            StageHudPresenter.PressureSourceValueText ??= FindOrCreateFixedText(
+                pressureBlock,
+                "PressureSourceValueText",
+                "0 / 0",
+                16f,
+                220f,
+                TextAlignmentOptions.Center);
             if (StageHudPresenter.PressureSourceFillImage == null || StageHudPresenter.PressureSourceWeakThresholdMarker == null)
             {
                 var refs = CreateProgressBarWithMarker(pressureBlock, "PressureSourceBar", new Vector2(0f, 22f));
@@ -36,55 +67,63 @@ namespace SweepNDodge.DotsBullets
             }
             StageHudPresenter.PressureSourceProgressRoot.SetActive(false);
 
-            var topRight = CreateHudBlock(
+            var carryRoot = CreateHudBlock(
                 panelGo.transform,
-                "TopRightAnchor",
-                new Vector2(1f, 1f),
-                new Vector2(1f, 1f),
-                new Vector2(1f, 1f),
-                new Vector2(-24f, -24f),
-                new Vector2(360f, 188f),
+                "LeftCarryRoot",
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                new Vector2(24f, 0f),
+                new Vector2(300f, 120f),
                 new Color(0.08f, 0.10f, 0.14f, 0.72f));
-            StageHudPresenter.TimerLabel ??= FindOrCreateText(topRight, "TimerLabel", "Time", 20f, FontStyles.Bold, TextAlignmentOptions.Left);
-            StageHudPresenter.TimerValueText ??= FindOrCreateText(topRight, "TimerValueText", "--.-s", 34f, FontStyles.Bold, TextAlignmentOptions.Left);
-            StageHudPresenter.CarryLabel ??= FindOrCreateText(topRight, "CarryLabel", "Carry", 20f, FontStyles.Bold, TextAlignmentOptions.Left);
-            StageHudPresenter.CarryFillImage ??= CreateFillBar(topRight, "CarryBar", new Vector2(0f, 26f));
-            StageHudPresenter.CarryValueText ??= FindOrCreateText(topRight, "CarryValueText", "0 / 0", 18f, FontStyles.Normal, TextAlignmentOptions.Left);
-
-            var topCenter = CreateHudBannerRoot(
-                panelGo.transform,
-                "TopCenterAnchor",
-                new Vector2(0.5f, 1f),
-                new Vector2(0.5f, 1f),
-                new Vector2(0.5f, 1f),
-                new Vector2(0f, -24f),
-                new Vector2(480f, 64f),
-                new Color(0.42f, 0.10f, 0.10f, 0.94f));
-            StageHudPresenter.DangerBannerRoot ??= topCenter.gameObject;
-            StageHudPresenter.DangerBannerImage ??= topCenter.GetComponent<Image>();
-            StageHudPresenter.DangerText ??= CreateCenteredOverlayText(topCenter, "DangerText", "Carry full - deposit now", 22f);
-            StageHudPresenter.DangerBannerRoot.SetActive(false);
+            StageHudPresenter.CarryLabel ??= FindOrCreateText(carryRoot, "CarryLabel", "Carry", 20f, FontStyles.Bold, TextAlignmentOptions.Left);
+            StageHudPresenter.CarryFillImage ??= CreateFillBar(carryRoot, "CarryBar", new Vector2(0f, 24f));
+            StageHudPresenter.CarryValueText ??= FindOrCreateText(carryRoot, "CarryValueText", "0 / 0", 18f, FontStyles.Normal, TextAlignmentOptions.Left);
         }
 
-        private void BuildHintToastPanel()
+        private void BuildNotificationPanel()
         {
-            var panelGo = EnsurePanel(ref HintToastPanel, HudLayer, "HintToastPanel", Color.clear);
-            HintToastPresenter ??= panelGo.GetComponent<HintToastPresenter>() ?? panelGo.AddComponent<HintToastPresenter>();
-            if (HintToastPresenter.ToastRoot != null)
+            DestroyDirectChildIfExists(HudLayer, "HintToastPanel");
+
+            var panelGo = EnsurePanel(ref NotificationPanel, HudLayer, "NotificationPanel", Color.clear);
+            NotificationPresenter ??= panelGo.GetComponent<NotificationPresenter>() ?? panelGo.AddComponent<NotificationPresenter>();
+            if (NotificationPresenter.NotificationRoot != null)
                 return;
 
-            var toastRoot = CreateHudBannerRoot(
+            var root = CreateHudBannerRoot(
                 panelGo.transform,
-                "ToastRoot",
+                "NotificationRoot",
                 new Vector2(0.5f, 0f),
                 new Vector2(0.5f, 0f),
                 new Vector2(0.5f, 0f),
-                new Vector2(0f, 28f),
-                new Vector2(420f, 56f),
+                new Vector2(0f, 64f),
+                new Vector2(520f, 56f),
                 new Color(0.10f, 0.16f, 0.24f, 0.90f));
-            HintToastPresenter.ToastRoot = toastRoot.gameObject;
-            HintToastPresenter.ToastText = CreateCenteredOverlayText(toastRoot, "ToastText", "Hazard Captured", 20f);
-            HintToastPresenter.ToastRoot.SetActive(false);
+            NotificationPresenter.NotificationRoot = root.gameObject;
+            NotificationPresenter.NotificationBackgroundImage = root.GetComponent<Image>();
+            NotificationPresenter.NotificationText = CreateCenteredOverlayText(root, "NotificationText", "Time critical", 20f);
+            NotificationPresenter.NotificationRoot.SetActive(false);
+        }
+
+        private void BuildHintPanel()
+        {
+            var panelGo = EnsurePanel(ref HintPanel, HudLayer, "HintPanel", Color.clear);
+            HintPresenter ??= panelGo.GetComponent<HintPresenter>() ?? panelGo.AddComponent<HintPresenter>();
+            if (HintPresenter.HintRoot != null)
+                return;
+
+            var root = CreateHudBannerRoot(
+                panelGo.transform,
+                "HintRoot",
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0f, 16f),
+                new Vector2(560f, 48f),
+                new Color(0.12f, 0.16f, 0.18f, 0.88f));
+            HintPresenter.HintRoot = root.gameObject;
+            HintPresenter.HintText = CreateCenteredOverlayText(root, "HintText", "Carry is full. Head to Deposit.", 18f);
+            HintPresenter.HintRoot.SetActive(false);
         }
 
         private static RectTransform CreateHudBlock(
@@ -166,6 +205,83 @@ namespace SweepNDodge.DotsBullets
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
             return rect;
+        }
+
+        private static void SetVerticalAlignment(RectTransform root, TextAnchor alignment)
+        {
+            if (root == null)
+                return;
+
+            var layout = root.GetComponent<VerticalLayoutGroup>();
+            if (layout == null)
+                return;
+
+            layout.childAlignment = alignment;
+        }
+
+        private static bool NeedsStageHudRebuild(Transform root, StageHudPresenter presenter)
+        {
+            return presenter == null
+                || presenter.ObjectiveSummaryText == null
+                || presenter.ObjectiveDetailText == null
+                || presenter.CarryFillImage == null
+                || root.Find("TopCenterObjectiveRoot") == null
+                || root.Find("LeftCarryRoot") == null;
+        }
+
+        private void ResetStageHudReferences()
+        {
+            if (StageHudPresenter == null)
+                return;
+
+            StageHudPresenter.ObjectiveSummaryText = null;
+            StageHudPresenter.ObjectiveDetailText = null;
+            StageHudPresenter.TimerValueText = null;
+            StageHudPresenter.CarryLabel = null;
+            StageHudPresenter.CarryValueText = null;
+            StageHudPresenter.PressureSourceValueText = null;
+            StageHudPresenter.PressureSourceProgressRoot = null;
+            StageHudPresenter.PressureSourceFillImage = null;
+            StageHudPresenter.PressureSourceWeakThresholdMarker = null;
+            StageHudPresenter.CarryFillImage = null;
+        }
+
+        private static void ClearChildrenImmediate(Transform root)
+        {
+            if (root == null)
+                return;
+
+            for (int i = root.childCount - 1; i >= 0; i--)
+            {
+                var child = root.GetChild(i).gameObject;
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    Object.DestroyImmediate(child);
+                    continue;
+                }
+#endif
+                Object.Destroy(child);
+            }
+        }
+
+        private static void DestroyDirectChildIfExists(Transform parent, string name)
+        {
+            if (parent == null)
+                return;
+
+            var child = parent.Find(name);
+            if (child == null)
+                return;
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                Object.DestroyImmediate(child.gameObject);
+                return;
+            }
+#endif
+            Object.Destroy(child.gameObject);
         }
 
         private readonly struct ProgressBarMarkerRefs
