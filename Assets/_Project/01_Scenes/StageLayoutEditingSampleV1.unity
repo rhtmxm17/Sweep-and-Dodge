@@ -510,7 +510,7 @@ Transform:
   m_GameObject: {fileID: 694074787}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8, y: 0, z: -9}
+  m_LocalPosition: {x: -8, y: 0, z: -8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -530,9 +530,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDepositMarker
   StableId: 2001
   Active: 1
-  Shape: 0
+  Shape: 1
   Radius: 4
-  Size: {x: 2, y: 2}
+  Size: {x: 8, y: 8}
   DrawGizmo: 1
 --- !u!1 &694074887
 GameObject:
@@ -908,7 +908,7 @@ Transform:
   m_GameObject: {fileID: 1945980056}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 2, z: 0}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

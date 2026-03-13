@@ -13,6 +13,7 @@ namespace SweepNDodge.DotsBullets
 
         public uint PressureSourceStableId;
         public int PressureSourceCollected;
+        public int PressureSourceThresholdWeakened;
         public int PressureSourceThresholdDepleted;
         public float PressureSourceProgress01;
 

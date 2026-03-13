@@ -6,7 +6,7 @@
 - doc_id: `OPS-002`
 - type: `ProjectOps`
 - status: `draft`
-- last_updated: `2026-03-12`
+- last_updated: `2026-03-13`
 - related_docs:
   - [OPS-001-prototype-core-capability-priority-matrix.md](./OPS-001-prototype-core-capability-priority-matrix.md)
   - [OPS-003-public-release-readiness-plan.md](./OPS-003-public-release-readiness-plan.md)
@@ -66,9 +66,9 @@
 | S5 | 사운드 시스템 | BGM/SFX/UI 버스, 이벤트 라우팅, 볼륨 옵션 설계 | DONE | 2.0 | P0 |
 | S6 | 온보딩/가이드 | `Stage1` 첫 30~60초에 조작/목표/Deposit 루프를 학습시키는 인런 힌트 설계 | TODO | 1.5 | P0 |
 | S7 | 데모 운영/릴리즈 게이트 | 빌드 체크리스트, 시연 모드, QA 체크리스트, 비개발 빌드 합격 기준 확정 | TODO | 1.5 | P0 |
-| S8 | Runtime UI 전환 | `OnGUI` 기반 `Title/Lobby/HUD/Result/Options`를 `uGUI` 기반 출시형 UI로 교체 | TODO | 3.0 | P0 |
+| S8 | Runtime UI 전환 | `OnGUI` 기반 `Title/Lobby/HUD/Result/Options`를 `uGUI` 기반 출시형 UI로 교체 | DONE | 3.0 | P0 |
 | S9 | KB+Mouse UX / Input Baseline | 마우스+키보드 기준 메뉴/옵션/조작 UX 정리, 포커스 기반 UI로 후속 패드 확장 비용 절감 | TODO | 2.0 | P0 |
-| S10 | 출시형 HUD / 튜토리얼 메시지 | 플레이 정보 구조 재설계 + 문맥형 힌트/실패 학습 루프 연결 | TODO | 2.0 | P0 |
+| S10 | 출시형 HUD / 튜토리얼 메시지 | 플레이 정보 구조 재설계 + 문맥형 힌트/실패 학습 루프 연결 | IN_PROGRESS | 2.0 | P0 |
 | S11 | VFX 제품화 | 브리지 이벤트를 실제 화면/월드 VFX로 연결하고 전달 우선순위/쿨다운을 고정 | TODO | 2.0 | P0 |
 | S12 | 브랜딩 / 패키징 마감 | 아이콘, 버전, 앱 메타, 기본 해상도/윈도우 정책, 비개발 빌드 점검 | TODO | 1.0 | P0 |
 
@@ -125,6 +125,11 @@
 - 소유권 원칙 유지: DemoShell/Bridge는 상태/명령 owner, UI는 reader/presenter
 - 권장 기본값: `uGUI + EventSystem + InputSystemUIInputModule`
 - 세부 구현 순서: `Shell -> Modal -> HUD/Fx` 우선 순으로 전환
+- 2026-03-13 구현 반영:
+  - `RuntimeUiRoot` 프리팹 + `SampleScene`/`PlayModeSmoke_Dedicated` 씬 고정 인스턴스 배치 완료
+  - `Title`, `Lobby`, `Result`, `DemoComplete`, shared `Settings(audio)` 완료
+  - `Pause`, `Confirm` modal stack 완료
+  - shell/settings/HUD `OnGUI`는 runtime UI 활성 시 비노출 경로로 게이트 완료
 
 9. `P0` KB+Mouse UX / Input Baseline
 - 공개 빌드 기준 조작축은 `키보드 + 마우스`
@@ -137,6 +142,10 @@
 - 첫 이동, 첫 수집, 첫 Carry 증가, 첫 Deposit 필요, 첫 피격, 첫 실패에 문맥형 힌트 연결
 - `Stage1`을 튜토리얼 전용 스테이지가 아니라 인런 학습 구간으로 사용
 - 실패 원인과 재시도 행동(`Deposit`, 회피, 정리 우선순위)을 결과/힌트 카피로 연결
+- 2026-03-13 구현 반영:
+  - HUD V1 완료: `StageLabel`, `Objective`, `SourceProgress`, `Pressure Source progress`, `Carry`, `Timer`, `Danger banner`, `single toast`
+  - `Pressure Source`는 pressure 상태 source에 대해서만 노출되며, bar 위에 `Normal -> Weakened` 임계 marker 표시
+  - 미완료: `Stage1` 온보딩 힌트 시퀀스, 실패 학습 카피, 접근성 옵션 연동
 
 11. `P0` VFX 제품화
 - 현재 "브리지 이벤트 수신 예정" 수준의 VFX를 실제 전달 수단으로 구현
@@ -252,6 +261,7 @@
   - 운영 씬 정기 스모크 결과 기록
 
 ## 10. 변경 이력
+- 2026-03-13: Runtime UI 전환 구현 반영. S8을 `DONE`으로 전환하고 `RuntimeUiRoot` 기반 `Shell/Modal/HUD V1` 구현 상태를 반영했다. S10은 HUD V1이 완료되어 `IN_PROGRESS`로 갱신했고, `Pressure Source` 진행 바/약화 임계 marker와 남은 온보딩 범위를 명시했다.
 - 2026-03-12: 공개 빌드 기준 부족분을 반영해 S8~S12를 추가했다. `OnGUI -> Runtime UI 전환`, `KB+Mouse UX`, `출시형 HUD/온보딩`, `VFX 제품화`, `브랜딩/패키징`을 후반 P0 작업 스트림으로 승격하고, `OPS-003` 분리 계획을 추가했다.
 - 2026-03-05: S5 잔여 작업 완료. `DemoAudioBridge`에 Source 하이브리드 자동 보정, fallback tone clip 자동 할당/정리, missing cue warn-once 정책을 추가하고 `DemoShellFlowController` Overlay에 4버스 볼륨 슬라이더를 연결했다. EditMode/PlayMode 테스트를 확장해 전이 cue, 자동 세팅, 볼륨 복원을 검증하고 S5 상태를 `DONE`으로 갱신했다.
 - 2026-03-05: S5 1차 구현 반영. `DemoAudioBridge`와 `TD-014`를 추가해 reader-only 오디오 소비 계약(버스/큐/dedupe/cooldown/볼륨 복원)을 고정하고, OPS 합격 기준을 테스트 가능 문장으로 갱신했다.

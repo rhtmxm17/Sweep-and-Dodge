@@ -231,6 +231,161 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(lobbyRequest.Screen, Is.EqualTo(DemoShellScreenId.Lobby));
         }
 
+        [Test]
+        public void HudPanels_ShowOnlyDuringStagePlay_AndReflectSnapshotValues()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 0);
+            SetPrivateField(context.Hud, "_hasSnapshot", true);
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 5,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                PressureSourceStableId = 1002u,
+                PressureSourceCollected = 6,
+                PressureSourceThresholdWeakened = 4,
+                PressureSourceThresholdDepleted = 8,
+                PressureSourceProgress01 = 0.75f,
+                StageStateElapsedSec = 50f,
+            });
+            SetPrivateField(context.Hud, "_lastFeedbackSnapshot", default(PlayerUiFeedbackPresentationSnapshotComponent));
+            SetPrivateField(context.Hud, "_feedbackLine", string.Empty);
+            context.Hud.SetRuntimeUiHudActive(true);
+
+            InvokeConfigurePresenters(context.Root);
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.StageHudPanel.activeSelf, Is.True);
+            Assert.That(context.Root.HintToastPanel.activeSelf, Is.True);
+            Assert.That(context.Hud.RuntimeUiHudActive, Is.True);
+            Assert.That(context.Root.StageHudPresenter.StageLabel.text, Is.EqualTo("Stage 1"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Collect trash from sources"));
+            Assert.That(context.Root.StageHudPresenter.SourceProgressText.text, Is.EqualTo("Sources 1/3 cleared"));
+            Assert.That(context.Root.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.True);
+            Assert.That(context.Root.StageHudPresenter.PressureSourceLabel.text, Is.EqualTo("Pressure Source #1002"));
+            Assert.That(context.Root.StageHudPresenter.PressureSourceValueText.text, Is.EqualTo("6 / 8"));
+            Assert.That(context.Root.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
+            Assert.That(context.Root.StageHudPresenter.PressureSourceWeakThresholdMarker.gameObject.activeSelf, Is.True);
+            Assert.That(context.Root.StageHudPresenter.PressureSourceWeakThresholdMarker.anchorMin.x, Is.EqualTo(0.5f).Within(1e-4f));
+            Assert.That(context.Root.StageHudPresenter.CarryValueText.text, Is.EqualTo("5 / 10"));
+            Assert.That(context.Root.StageHudPresenter.CarryFillImage.fillAmount, Is.EqualTo(0.5f).Within(1e-4f));
+            Assert.That(context.Root.StageHudPresenter.TimerValueText.text, Is.EqualTo("70.0s"));
+            Assert.That(context.Root.StageHudPresenter.DangerBannerRoot.activeSelf, Is.False);
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.Title);
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.StageHudPanel.activeSelf, Is.False);
+            Assert.That(context.Root.HintToastPanel.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void HudPresenters_ApplyDangerPriority_AndToastSuppression()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 1);
+            SetPrivateField(context.Hud, "_hasSnapshot", true);
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 3,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 145f,
+                LastHitLossValue = 4,
+                HitFlashRemainingSec = 0.5f,
+            });
+
+            InvokeConfigurePresenters(context.Root);
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Deposit collected trash"));
+            Assert.That(context.Root.StageHudPresenter.DangerBannerRoot.activeSelf, Is.True);
+            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Hit! Carry lost"));
+
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 3,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 141f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+            });
+            context.Root.StageHudPresenter.RefreshPresentation();
+            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Time critical"));
+
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 2,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 70f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+            });
+            context.Root.StageHudPresenter.RefreshPresentation();
+            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Carry full - deposit now"));
+
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 2,
+                CarryCapacity = 10,
+                DepletedSourceCount = 3,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 70f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+            });
+            context.Root.StageHudPresenter.RefreshPresentation();
+            Assert.That(context.Root.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Deposit remaining trash"));
+            Assert.That(context.Root.StageHudPresenter.DangerText.text, Is.EqualTo("Deposit remaining trash"));
+            Assert.That(context.Root.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.False);
+
+            SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 1u,
+                Type = PlayerUiFeedbackEventType.PlayerHazardHit,
+                Reason = (byte)PlayerUiFeedbackReasonId.Default,
+                Value = 4,
+                RemainingSec = 1f,
+            });
+            SetPrivateField(context.Hud, "_feedbackLine", "Hit -4");
+            context.Root.HintToastPresenter.RefreshPresentation();
+            Assert.That(context.Root.HintToastPresenter.ToastRoot.activeSelf, Is.False);
+
+            SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 2u,
+                Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
+                Reason = (byte)PlayerUiFeedbackReasonId.CarryBinFull,
+                RemainingSec = 1f,
+            });
+            SetPrivateField(context.Hud, "_feedbackLine", "Vacuum: CarryBin Full");
+            context.Root.HintToastPresenter.RefreshPresentation();
+            Assert.That(context.Root.HintToastPresenter.ToastRoot.activeSelf, Is.False);
+
+            SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 3u,
+                Type = PlayerUiFeedbackEventType.HazardCaptured,
+                Reason = (byte)PlayerUiFeedbackReasonId.Default,
+                RemainingSec = 1f,
+            });
+            SetPrivateField(context.Hud, "_feedbackLine", "Hazard Captured");
+            context.Root.HintToastPresenter.RefreshPresentation();
+            Assert.That(context.Root.HintToastPresenter.ToastRoot.activeSelf, Is.True);
+            Assert.That(context.Root.HintToastPresenter.ToastText.text, Is.EqualTo("Hazard Captured"));
+        }
+
         private static TestContext CreateContext()
         {
             var shellGo = new GameObject("DemoShell_Test");

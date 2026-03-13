@@ -34,6 +34,8 @@ namespace SweepNDodge.DotsBullets
         public GameObject LobbyPanel;
         public GameObject ResultPanel;
         public GameObject DemoCompletePanel;
+        public GameObject StageHudPanel;
+        public GameObject HintToastPanel;
         public GameObject PausePanel;
         public GameObject ConfirmDialogPanel;
         public GameObject SettingsPanel;
@@ -43,6 +45,8 @@ namespace SweepNDodge.DotsBullets
         public LobbyScreenPresenter LobbyPresenter;
         public ResultPresenter ResultPresenter;
         public DemoCompletePresenter DemoCompletePresenter;
+        public StageHudPresenter StageHudPresenter;
+        public HintToastPresenter HintToastPresenter;
         public PausePresenter PausePresenter;
         public ConfirmDialogPresenter ConfirmDialogPresenter;
         public SettingsPresenter SettingsPresenter;
@@ -63,6 +67,7 @@ namespace SweepNDodge.DotsBullets
         private DemoShellFlowController _configuredShell;
         private DemoAudioBridge _configuredAudio;
         private DemoShellPauseBridge _configuredPauseBridge;
+        private PlayerRuntimeHudBridge _configuredRuntimeHud;
         private Action _cachedOpenSettingsAction;
         private Action _cachedCloseSettingsAction;
         private Action _cachedOpenSettingsFromPauseAction;
@@ -90,6 +95,8 @@ namespace SweepNDodge.DotsBullets
 
             if (Application.isPlaying && DemoShell != null)
                 DemoShell.SetRuntimeUiShellActive(true);
+            if (Application.isPlaying && RuntimeHudBridge != null)
+                RuntimeHudBridge.SetRuntimeUiHudActive(true);
 
             ApplyShellState(force: true);
         }
@@ -98,6 +105,8 @@ namespace SweepNDodge.DotsBullets
         {
             if (Application.isPlaying && DemoShell != null)
                 DemoShell.SetRuntimeUiShellActive(false);
+            if (Application.isPlaying && RuntimeHudBridge != null)
+                RuntimeHudBridge.SetRuntimeUiHudActive(false);
         }
 
         private void OnValidate()
@@ -118,6 +127,8 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             AutoBindRuntimeReferences();
+            if (RuntimeHudBridge != null && !RuntimeHudBridge.RuntimeUiHudActive)
+                RuntimeHudBridge.SetRuntimeUiHudActive(true);
             ConfigurePresenters();
 
             if (WasCancelPressedThisFrame())
@@ -262,13 +273,16 @@ namespace SweepNDodge.DotsBullets
 
             if (_configuredShell == DemoShell
                 && _configuredAudio == DemoAudio
-                && _configuredPauseBridge == PauseBridge)
+                && _configuredPauseBridge == PauseBridge
+                && _configuredRuntimeHud == RuntimeHudBridge)
                 return;
 
             TitlePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             LobbyPresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             ResultPresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             DemoCompletePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
+            StageHudPresenter?.Configure(DemoShell, RuntimeHudBridge);
+            HintToastPresenter?.Configure(DemoShell, RuntimeHudBridge);
             PausePresenter?.Configure(PauseBridge, _cachedOpenSettingsFromPauseAction, _cachedOpenConfirmAction);
             ConfirmDialogPresenter?.Configure(PauseBridge, _cachedCloseConfirmAction);
             SettingsPresenter?.Configure(DemoAudio, _cachedCloseSettingsAction);
@@ -276,6 +290,7 @@ namespace SweepNDodge.DotsBullets
             _configuredShell = DemoShell;
             _configuredAudio = DemoAudio;
             _configuredPauseBridge = PauseBridge;
+            _configuredRuntimeHud = RuntimeHudBridge;
         }
 
         private void ApplyShellState(bool force)
@@ -306,11 +321,14 @@ namespace SweepNDodge.DotsBullets
 
             bool showTitle = hasShell && screen == DemoShellScreenId.Title;
             bool showLobby = hasShell && screen == DemoShellScreenId.Lobby;
+            bool showHud = stagePlay;
             bool showResult = hasShell && screen == DemoShellScreenId.StageResult;
             bool showComplete = hasShell && screen == DemoShellScreenId.DemoComplete;
 
             SetActive(TitlePanel, showTitle);
             SetActive(LobbyPanel, showLobby);
+            SetActive(StageHudPanel, showHud);
+            SetActive(HintToastPanel, showHud);
             SetActive(ResultPanel, showResult);
             SetActive(DemoCompletePanel, showComplete);
             SetActive(PausePanel, pauseOpen && !settingsOpen && !confirmOpen);
@@ -319,6 +337,11 @@ namespace SweepNDodge.DotsBullets
 
             TitlePresenter?.RefreshPresentation();
             LobbyPresenter?.RefreshPresentation();
+            if (showHud)
+            {
+                StageHudPresenter?.RefreshPresentation();
+                HintToastPresenter?.RefreshPresentation();
+            }
             if (showResult)
                 ResultPresenter?.RefreshPresentation();
             if (showComplete)
@@ -461,6 +484,8 @@ namespace SweepNDodge.DotsBullets
             LobbyPanel ??= FindDirectChild(ShellLayer, "LobbyPanel");
             ResultPanel ??= FindDirectChild(ShellLayer, "ResultPanel");
             DemoCompletePanel ??= FindDirectChild(ShellLayer, "DemoCompletePanel");
+            StageHudPanel ??= FindDirectChild(HudLayer, "StageHudPanel");
+            HintToastPanel ??= FindDirectChild(HudLayer, "HintToastPanel");
             PausePanel ??= FindDirectChild(ModalLayer, "PausePanel");
             ConfirmDialogPanel ??= FindDirectChild(ModalLayer, "ConfirmDialogPanel");
             SettingsPanel ??= FindDirectChild(ModalLayer, "SettingsPanel");
@@ -469,6 +494,8 @@ namespace SweepNDodge.DotsBullets
             LobbyPresenter ??= LobbyPanel != null ? LobbyPanel.GetComponent<LobbyScreenPresenter>() : null;
             ResultPresenter ??= ResultPanel != null ? ResultPanel.GetComponent<ResultPresenter>() : null;
             DemoCompletePresenter ??= DemoCompletePanel != null ? DemoCompletePanel.GetComponent<DemoCompletePresenter>() : null;
+            StageHudPresenter ??= StageHudPanel != null ? StageHudPanel.GetComponent<StageHudPresenter>() : null;
+            HintToastPresenter ??= HintToastPanel != null ? HintToastPanel.GetComponent<HintToastPresenter>() : null;
             PausePresenter ??= PausePanel != null ? PausePanel.GetComponent<PausePresenter>() : null;
             ConfirmDialogPresenter ??= ConfirmDialogPanel != null ? ConfirmDialogPanel.GetComponent<ConfirmDialogPresenter>() : null;
             SettingsPresenter ??= SettingsPanel != null ? SettingsPanel.GetComponent<SettingsPresenter>() : null;
@@ -496,6 +523,8 @@ namespace SweepNDodge.DotsBullets
             BuildLobbyPanel();
             BuildResultPanel();
             BuildDemoCompletePanel();
+            BuildStageHudPanel();
+            BuildHintToastPanel();
             BuildPausePanel();
             BuildConfirmDialogPanel();
             BuildSettingsPanel();

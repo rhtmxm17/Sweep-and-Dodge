@@ -299,6 +299,7 @@ namespace SweepNDodge.DotsBullets
                     TotalSourceCount = 0,
                     PressureSourceStableId = 0u,
                     PressureSourceCollected = 0,
+                    PressureSourceThresholdWeakened = 0,
                     PressureSourceThresholdDepleted = 0,
                     PressureSourceProgress01 = 0f,
                     StageState = RunDirectorStageStateId.Idle,

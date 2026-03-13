@@ -453,6 +453,195 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_HudVisibilityAndPauseLayering_Work()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+            PlayerRuntimeHudBridge hud = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    hud = FindPlayerRuntimeHud();
+                    return uiRoot != null
+                        && shell != null
+                        && hud != null
+                        && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "RuntimeUiRoot/HUD bridge was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "HUD visibility test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    hud = FindPlayerRuntimeHud();
+                    return uiRoot != null
+                        && shell != null
+                        && hud != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && uiRoot.StageHudPanel != null
+                        && uiRoot.StageHudPanel.activeInHierarchy
+                        && uiRoot.HintToastPanel != null
+                        && uiRoot.HintToastPanel.activeInHierarchy
+                        && hud.RuntimeUiHudActive;
+                },
+                360,
+                "HUD visibility test did not reach StagePlay with active runtime HUD.");
+
+            uiRoot.OpenPause();
+            yield return null;
+
+            Assert.That(uiRoot.IsPauseOpen, Is.True);
+            Assert.That(uiRoot.PausePanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.StageHudPanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.HintToastPanel.activeInHierarchy, Is.True);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null);
+            ForceStageStateToClearReady(world.EntityManager);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && !uiRoot.StageHudPanel.activeInHierarchy
+                        && !uiRoot.HintToastPanel.activeInHierarchy;
+                },
+                240,
+                "HUD was not hidden after StageResult transition.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_HudPresenter_ReflectsDangerAndToast()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+            PlayerRuntimeHudBridge hud = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    hud = FindPlayerRuntimeHud();
+                    return uiRoot != null
+                        && shell != null
+                        && hud != null
+                        && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "RuntimeUiRoot/HUD bridge was not ready for HUD content test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "HUD content test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && uiRoot.StageHudPanel.activeInHierarchy;
+                },
+                360,
+                "HUD content test did not reach StagePlay.");
+
+            SetPrivateField(hud, "_hasSnapshot", true);
+            SetPrivateField(hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 3,
+                TotalSourceCount = 3,
+                PressureSourceStableId = 1002u,
+                PressureSourceCollected = 9,
+                PressureSourceThresholdWeakened = 4,
+                PressureSourceThresholdDepleted = 12,
+                PressureSourceProgress01 = 0.75f,
+                StageStateElapsedSec = 145f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+            });
+            uiRoot.StageHudPresenter.RefreshPresentation();
+
+            Assert.That(uiRoot.StageHudPresenter.StageLabel.text, Is.EqualTo("Stage 1"));
+            Assert.That(uiRoot.StageHudPresenter.ObjectiveText.text, Is.EqualTo("Deposit collected trash"));
+            Assert.That(uiRoot.StageHudPresenter.SourceProgressText.text, Is.EqualTo("Sources 3/3 cleared"));
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceLabel.text, Is.EqualTo("Pressure Source #1002"));
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceValueText.text, Is.EqualTo("9 / 12"));
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceWeakThresholdMarker.gameObject.activeSelf, Is.True);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceWeakThresholdMarker.anchorMin.x, Is.EqualTo(0.3333f).Within(1e-3f));
+            Assert.That(uiRoot.StageHudPresenter.CarryValueText.text, Is.EqualTo("10 / 10"));
+            Assert.That(uiRoot.StageHudPresenter.TimerValueText.text, Is.EqualTo("5.0s"));
+            Assert.That(uiRoot.StageHudPresenter.DangerBannerRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.StageHudPresenter.DangerText.text, Is.EqualTo("Time critical"));
+
+            SetPrivateField(hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 100u,
+                Type = PlayerUiFeedbackEventType.HazardCaptured,
+                Reason = (byte)PlayerUiFeedbackReasonId.Default,
+                RemainingSec = 1f,
+            });
+            SetPrivateField(hud, "_feedbackLine", "Hazard Captured");
+            uiRoot.HintToastPresenter.RefreshPresentation();
+
+            Assert.That(uiRoot.HintToastPresenter.ToastRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.HintToastPresenter.ToastText.text, Is.EqualTo("Hazard Captured"));
+
+            SetPrivateField(hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 101u,
+                Type = PlayerUiFeedbackEventType.PlayerHazardHit,
+                Reason = (byte)PlayerUiFeedbackReasonId.Default,
+                Value = 3,
+                RemainingSec = 1f,
+            });
+            SetPrivateField(hud, "_feedbackLine", "Hit -3");
+            uiRoot.HintToastPresenter.RefreshPresentation();
+
+            Assert.That(uiRoot.HintToastPresenter.ToastRoot.activeSelf, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_PauseResumeAndSettings_Work()
         {
             ClearDemoShellStaging();
@@ -2536,6 +2725,13 @@ namespace SweepNDodge.DotsBullets.Tests
             for (int i = 0; i < DemoAudioPrefsKeys.AllVolumeKeys.Length; i++)
                 PlayerPrefs.DeleteKey(DemoAudioPrefsKeys.AllVolumeKeys[i]);
             PlayerPrefs.Save();
+        }
+
+        private static void SetPrivateField<T>(object target, string fieldName, T value)
+        {
+            var field = target.GetType().GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, $"{target.GetType().Name}.{fieldName} was not found.");
+            field.SetValue(target, value);
         }
 
     }

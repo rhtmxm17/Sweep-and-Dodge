@@ -26,11 +26,11 @@ MonoBehaviour:
     Active: 1
     Position: {x: -8, y: 0, z: -9}
     YawDeg: 0
-    Shape: 0
+    Shape: 1
     Radius: 4
-    Size: {x: 2, y: 2}
+    Size: {x: 8, y: 8}
   Obstacles:
-  - StableId: 3002
+  - StableId: 3004
     Active: 1
     Position: {x: -10, y: 0, z: -2}
     YawDeg: 0
@@ -43,8 +43,8 @@ MonoBehaviour:
     Active: 1
     PlacementMode: 1
     LinkKind: 3
-    LinkedStableId: 3002
+    LinkedStableId: 3004
     PresentationKey: preview_visual_02
-    Position: {x: 0, y: 2, z: 0}
+    Position: {x: 0, y: 1, z: 0}
     Euler: {x: -0, y: 0, z: 0}
     Scale: {x: 1, y: 1, z: 1}

@@ -8,7 +8,6 @@ namespace SweepNDodge.DotsBullets
     /// 플레이 HUD 표시용 스냅샷 단일 writer.
     /// GO HUD는 본 스냅샷을 read-only로 소비한다.
     /// </summary>
-    [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionEndGroup))]
     [UpdateAfter(typeof(CombatEventChannelConsumeSystem))]
     [UpdateBefore(typeof(PlayerUiFeedbackConsumeSystem))]
@@ -27,7 +26,6 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
-        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             var carry = SystemAPI.GetSingleton<PlayerCarryBinComponent>();
@@ -46,6 +44,7 @@ namespace SweepNDodge.DotsBullets
             bool foundPressureSource = false;
             uint selectedStableId = 0u;
             int selectedCollected = 0;
+            int selectedThresholdWeakened = 0;
             int selectedThresholdDepleted = 0;
 
             foreach (var (source, stableId, director) in SystemAPI
@@ -65,6 +64,7 @@ namespace SweepNDodge.DotsBullets
                 foundPressureSource = true;
                 selectedStableId = candidateStableId;
                 selectedCollected = math.max(0, source.ValueRO.CollectedCount);
+                selectedThresholdWeakened = math.max(0, source.ValueRO.ThresholdWeakened);
                 selectedThresholdDepleted = math.max(0, source.ValueRO.ThresholdDepleted);
             }
 
@@ -81,6 +81,7 @@ namespace SweepNDodge.DotsBullets
                 int denominator = math.max(1, selectedThresholdDepleted);
                 snapshot.PressureSourceStableId = selectedStableId;
                 snapshot.PressureSourceCollected = selectedCollected;
+                snapshot.PressureSourceThresholdWeakened = selectedThresholdWeakened;
                 snapshot.PressureSourceThresholdDepleted = selectedThresholdDepleted;
                 snapshot.PressureSourceProgress01 = math.saturate((float)selectedCollected / denominator);
             }
@@ -88,6 +89,7 @@ namespace SweepNDodge.DotsBullets
             {
                 snapshot.PressureSourceStableId = 0u;
                 snapshot.PressureSourceCollected = 0;
+                snapshot.PressureSourceThresholdWeakened = 0;
                 snapshot.PressureSourceThresholdDepleted = 0;
                 snapshot.PressureSourceProgress01 = 0f;
             }

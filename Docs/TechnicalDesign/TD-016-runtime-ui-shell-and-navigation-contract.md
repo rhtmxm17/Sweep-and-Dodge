@@ -3,8 +3,8 @@
 ## Metadata
 - doc_id: `TD-016`
 - type: `TechnicalDesign`
-- status: `draft`
-- last_updated: `2026-03-12`
+- status: `active`
+- last_updated: `2026-03-13`
 - related_docs:
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [OPS-003-public-release-readiness-plan.md](../ProjectOps/OPS-003-public-release-readiness-plan.md)
@@ -15,6 +15,18 @@
 - related_adr: 중요 결정 없음 (ADR 신규 작성 없음)
 
 > Runtime UI는 `uGUI` 단일 스택으로 고정하고, 기존 owner/bridge 경계를 유지한 채 `OnGUI` 표시를 `reader-only presenter`로 치환한다.
+
+## 0. 구현 상태 요약
+- 구현 완료 범위
+  - `RuntimeUiRoot` 프리팹 + `SampleScene` / `PlayModeSmoke_Dedicated` 씬 고정 인스턴스 배치
+  - Shell V1: `Title`, `Lobby`, `Result`, `DemoComplete`, shared `Settings(audio)`
+  - Modal V2: `Pause`, `Confirm`
+  - HUD V1: `Stage HUD`, `HintToast`
+- 현재 공개 빌드 경로에서 `Title/Lobby/Stage HUD/Result/DemoComplete/Settings/Pause/Confirm`는 `uGUI` 기준으로 동작한다.
+- 미완료 범위
+  - 온보딩 전용 힌트 시퀀스
+  - `FxLayer` 기반 화면 플래시/비네트/타임아웃 overlay
+  - 접근성 확장 옵션(`UI Scale`, `Text Size`, `Hit Flash`, `Screen Shake`, `Background Motion`)
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -104,7 +116,6 @@
 - `HudLayer`
   - `StageHudPanel`
   - `HintToastPanel`
-  - `NotificationPanel`
 - `ModalLayer`
   - `PausePanel`
   - `SettingsPanel`
@@ -113,6 +124,30 @@
   - screen flash
   - hit vignette
   - timeout warning overlay
+
+### 4.2.1 현재 HUD V1 구성
+- `StageHudPanel`
+  - `TopLeftAnchor`
+    - `StageLabel`
+    - `ObjectiveText`
+    - `SourceProgressText`
+    - `PressureSourceProgressRoot`
+      - `PressureSourceLabel`
+      - pressure progress bar
+      - `WeakThresholdMarker`
+      - `PressureSourceValueText`
+  - `TopRightAnchor`
+    - `TimerLabel`
+    - `TimerValueText`
+    - `CarryLabel`
+    - carry fill bar
+    - `CarryValueText`
+  - `TopCenterAnchor`
+    - `DangerBannerRoot`
+    - `DangerText`
+- `HintToastPanel`
+  - `ToastRoot`
+  - `ToastText`
 
 ### 4.3 Presenter 구조
 - `RuntimeUiRoot`
@@ -166,6 +201,7 @@
 - 표시 데이터:
   - Carry
   - Source progress
+  - Pressure source progress + weakened threshold marker
   - Stage timer/state
   - Objective / danger
   - feedback feed
@@ -192,6 +228,23 @@
 - presenter는 매 프레임 전체 UI rebuild를 하지 않는다.
 - `CurrentScreen`, `StageOutcome`, snapshot version, 마지막 표시값을 캐시해 변경 시점에만 표시를 갱신한다.
 - HUD 수치와 feedback/toast는 폴링을 허용하되, 레이아웃 rebuild를 최소화한다.
+
+### 5.6 현재 read-only bridge 계약
+- `PlayerRuntimeHudBridge`
+  - `TryGetLastSnapshot(out PlayerHudSnapshotComponent snapshot)`
+  - `TryGetLastFeedbackSnapshot(out PlayerUiFeedbackPresentationSnapshotComponent snapshot)`
+  - `LastFeedbackLine`
+  - `RuntimeUiHudActive`
+  - `SetRuntimeUiHudActive(bool active)`
+- `PlayerRuntimeHudBridge.OnGUI()`는 `RuntimeUiHudActive == true`일 때 runtime HUD를 그리지 않는다.
+- `PlayerHudSnapshotComponent`의 runtime UI 소비 필드:
+  - `CarryLoad`, `CarryCapacity`
+  - `DepletedSourceCount`, `TotalSourceCount`
+  - `PressureSourceStableId`, `PressureSourceCollected`
+  - `PressureSourceThresholdWeakened`, `PressureSourceThresholdDepleted`, `PressureSourceProgress01`
+  - `StageState`, `StageStateElapsedSec`
+  - `LastHitLossValue`, `HitFlashRemainingSec`
+  - `TotalCollectValue`, `TotalCleanupValue`, `TotalHitValue`
 
 ## 6. 입력 / 내비게이션 정책
 ### 6.1 우선순위
@@ -234,6 +287,14 @@
 - fallback은 `UNITY_EDITOR`/`DEVELOPMENT_BUILD`에 한정한다.
 - 공개 빌드에서는 `OnGUI`를 비활성하거나 제거한다.
 
+### 7.4 현재 마이그레이션 결과
+- `DemoShellFlowController`
+  - Shell/Settings `OnGUI`는 `RuntimeUiShellActive` 기준으로 공개 빌드 경로에서 비활성
+- `PlayerRuntimeHudBridge`
+  - runtime HUD `OnGUI`는 `RuntimeUiHudActive` 기준으로 비활성
+- `DemoAudioBridge`
+  - 볼륨 owner만 유지, settings UI는 `SettingsPresenter`가 소비
+
 ## 8. 성능 / 리스크
 ### 8.1 성능 원칙
 - UI는 엔티티 수에 비례하는 per-entity 접근 금지
@@ -264,6 +325,23 @@
   - 공개 빌드에서 `OnGUI` 경로가 비노출이다
   - 마우스 클릭과 키보드 `Submit/Cancel` 모두 기본 경로에서 동작한다
 
+### 9.1 최신 검증 결과
+- 2026-03-13 기준 확인 완료
+  - compile 성공
+  - Unity Console `error` 0건
+  - EditMode `190/190` 통과
+  - PlayMode 개별 스모크 통과
+    - `PlayMode_OperationalScene_RuntimeUiRoot_ShellPanelsFollowShellFlow`
+    - `PlayMode_OperationalScene_RuntimeUiRoot_SettingsAudio_ApplyAndPersist`
+    - `PlayMode_OperationalScene_RuntimeUiRoot_PauseResumeAndSettings_Work`
+    - `PlayMode_OperationalScene_RuntimeUiRoot_PauseRestartAndReturnToLobby_Work`
+    - `PlayMode_OperationalScene_RuntimeUiRoot_PauseIsBlockedOutsideStagePlay`
+    - `PlayMode_OperationalScene_RuntimeUiRoot_HudVisibilityAndPauseLayering_Work`
+    - `PlayMode_OperationalScene_RuntimeUiRoot_HudPresenter_ReflectsDangerAndToast`
+    - `PlayMode_DedicatedScene_RuntimeUiRoot_Exists`
+- 참고
+  - 전체 PlayMode 스위트는 별도 `BlobAsset/SubScene unload` 계열 불안정성이 남아 있어 TD-016 합격 판정은 개별 Runtime UI 스모크 기준으로 관리한다.
+
 ## 10. 오픈 이슈
 - `Pause`가 `Time.timeScale`을 직접 사용할지, fixed tick gate 기반으로 처리할지는 후속 TD에서 확정 필요
 - 화면 해상도/안전 영역/UI scale 옵션의 세부 기본값은 `TD-017`에서 확정
@@ -272,3 +350,4 @@
 ## 11. 변경 이력
 - 2026-03-12: 초안 작성. Runtime UI를 `uGUI` 단일 스택으로 고정하고, `OnGUI -> reader-only presenter` 마이그레이션 구조와 입력/내비게이션 기준을 정리했다.
 - 2026-03-12: 구현 권장안을 반영해 `RuntimeUiRoot` 프리팹 + 씬 고정 인스턴스, `Shell -> Modal -> HUD/Fx` 마이그레이션 순서, `root coordinator + panel presenter` 구조를 추가로 고정했다.
+- 2026-03-13: 구현 반영. `Shell V1`, `Modal V2`, `HUD V1`의 실제 프리팹/패널/bridge 계약과 최신 검증 결과를 문서에 반영하고, `Pressure Source` 진행 바와 weakened threshold marker를 HUD V1 범위에 포함시켰다.

@@ -32,16 +32,30 @@ namespace SweepNDodge.DotsBullets
         private PlayerUiFeedbackPresentationSnapshotComponent _lastFeedbackSnapshot;
         private uint _lastFeedbackVersion;
         private string _feedbackLine;
+        private bool _runtimeUiHudActive;
 
         public bool HasSnapshot => _hasSnapshot;
         public int LastStageId => _lastStageId;
         public DemoShellScreenId LastScreen => _lastScreen;
         public bool IsHitFlashVisible => _lastSnapshot.HitFlashRemainingSec > 0f && _lastSnapshot.LastHitLossValue > 0;
+        public bool RuntimeUiHudActive => _runtimeUiHudActive;
+        public string LastFeedbackLine => _feedbackLine;
 
         public bool TryGetLastSnapshot(out PlayerHudSnapshotComponent snapshot)
         {
             snapshot = _lastSnapshot;
             return _hasSnapshot;
+        }
+
+        public bool TryGetLastFeedbackSnapshot(out PlayerUiFeedbackPresentationSnapshotComponent snapshot)
+        {
+            snapshot = _lastFeedbackSnapshot;
+            return _lastFeedbackSnapshot.Version > 0u;
+        }
+
+        public void SetRuntimeUiHudActive(bool active)
+        {
+            _runtimeUiHudActive = active;
         }
 
         private void OnEnable()
@@ -79,7 +93,7 @@ namespace SweepNDodge.DotsBullets
 
         private void OnGUI()
         {
-            if (!Application.isPlaying || !ShowHud || !_hasSnapshot)
+            if (!Application.isPlaying || !ShowHud || !_hasSnapshot || _runtimeUiHudActive)
                 return;
 
             GUILayout.BeginArea(HudRect, GUI.skin.box);

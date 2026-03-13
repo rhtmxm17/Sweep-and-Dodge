@@ -48,6 +48,50 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void PlayerHudSnapshotCollect_CapturesPressureSourceWeakenedThreshold()
+        {
+            using var world = CreateDefaultTestWorld("PlayerHudSnapshotWorld_C", out var simGroup);
+            var em = world.EntityManager;
+
+            CreatePlayer(em, load: 12, capacity: 100);
+            CreateSnapshotSingleton(em);
+            CreateStageStateSingleton(em, RunDirectorStageStateId.Running, 1.25f);
+            CreateCombatMetricsSingleton(
+                em,
+                hitCount: 0,
+                hitValue: 0,
+                totalCollectValue: 10,
+                totalCleanupValue: 5,
+                totalHitValue: 1);
+
+            CreateSource(
+                em,
+                stableId: 2u,
+                state: SourceStateId.Normal,
+                directorState: RunDirectorSourceStateId.Pressure,
+                collected: 6,
+                thresholdDepleted: 8,
+                thresholdWeakened: 4);
+            CreateSource(
+                em,
+                stableId: 6u,
+                state: SourceStateId.Normal,
+                directorState: RunDirectorSourceStateId.Pressure,
+                collected: 3,
+                thresholdDepleted: 10,
+                thresholdWeakened: 2);
+
+            TickWorld(world, simGroup, 1f / 60f);
+
+            var snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
+            Assert.That(snapshot.PressureSourceStableId, Is.EqualTo(2u));
+            Assert.That(snapshot.PressureSourceCollected, Is.EqualTo(6));
+            Assert.That(snapshot.PressureSourceThresholdWeakened, Is.EqualTo(4));
+            Assert.That(snapshot.PressureSourceThresholdDepleted, Is.EqualTo(8));
+            Assert.That(snapshot.PressureSourceProgress01, Is.EqualTo(0.75f).Within(1e-6f));
+        }
+
+        [Test]
         public void PlayerHudSnapshotCollect_DecaysHitFlash_WhenNoNewHit()
         {
             using var world = CreateDefaultTestWorld("PlayerHudSnapshotWorld_B", out var simGroup);
@@ -164,7 +208,8 @@ namespace SweepNDodge.DotsBullets.Tests
             SourceStateId state,
             RunDirectorSourceStateId directorState,
             int collected,
-            int thresholdDepleted)
+            int thresholdDepleted,
+            int thresholdWeakened = 0)
         {
             var entity = em.CreateEntity(
                 typeof(SourceSpawnComponent),
@@ -173,7 +218,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             em.SetComponentData(entity, new SourceSpawnComponent
             {
-                ThresholdWeakened = 0,
+                ThresholdWeakened = thresholdWeakened,
                 ThresholdDepleted = thresholdDepleted,
                 CollectedCount = collected,
                 State = state,
