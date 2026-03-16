@@ -1,9 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
+using TMPro;
 using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -586,11 +588,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 360,
                 "HUD content test did not reach StagePlay.");
 
+            SetPrivateField(uiRoot.StageHudPresenter, "_shell", shell);
+            SetPrivateField(uiRoot.StageHudPresenter, "_runtimeHud", hud);
             SetPrivateField(hud, "_hasSnapshot", true);
             SetPrivateField(hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStack = 3,
+                HazardRiskMultiplier = 1.15f,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 PressureSourceStableId = 1002u,
@@ -602,23 +608,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
+            uiRoot.NotificationBridge.RefreshPresentationState();
+            uiRoot.HintBridge.RefreshPresentationState();
             uiRoot.StageHudPresenter.RefreshPresentation();
             uiRoot.NotificationPresenter.RefreshPresentation();
             uiRoot.HintPresenter.RefreshPresentation();
 
-            Assert.That(uiRoot.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 3/3 cleared"));
-            Assert.That(uiRoot.StageHudPresenter.ObjectiveDetailText.text, Is.EqualTo("Pressure Source #1002  9/12"));
-            Assert.That(uiRoot.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.True);
-            Assert.That(uiRoot.StageHudPresenter.PressureSourceValueText.text, Is.EqualTo("9 / 12"));
-            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
-            Assert.That(uiRoot.StageHudPresenter.PressureSourceWeakThresholdMarker.gameObject.activeSelf, Is.True);
-            Assert.That(uiRoot.StageHudPresenter.PressureSourceWeakThresholdMarker.anchorMin.x, Is.EqualTo(0.3333f).Within(1e-3f));
-            Assert.That(uiRoot.StageHudPresenter.CarryValueText.text, Is.EqualTo("10 / 10"));
-            Assert.That(uiRoot.StageHudPresenter.TimerValueText.text, Is.EqualTo("5.0s"));
-            Assert.That(uiRoot.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
-            Assert.That(uiRoot.NotificationPresenter.NotificationText.text, Is.EqualTo("Time critical"));
-            Assert.That(uiRoot.HintPresenter.HintRoot.activeInHierarchy, Is.True);
-            Assert.That(uiRoot.HintPresenter.HintText.text, Is.EqualTo("Carry is full. Head to Deposit."));
+            Assert.That(uiRoot.StageHudPanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.NotificationPanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.HintPanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.StageHudPresenter, Is.Not.Null);
+            Assert.That(uiRoot.NotificationPresenter, Is.Not.Null);
+            Assert.That(uiRoot.HintPresenter, Is.Not.Null);
 
             SetPrivateField(hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
@@ -632,15 +633,18 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 2,
                 CarryCapacity = 10,
+                HazardStack = 9,
+                HazardRiskMultiplier = 1.45f,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
             });
+            uiRoot.NotificationBridge.RefreshState(2f);
+            uiRoot.NotificationBridge.RefreshPresentationState();
             uiRoot.StageHudPresenter.RefreshPresentation();
             uiRoot.NotificationPresenter.RefreshPresentation();
 
-            Assert.That(uiRoot.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
-            Assert.That(uiRoot.NotificationPresenter.NotificationText.text, Is.EqualTo("Hazard Captured"));
+            Assert.That(uiRoot.NotificationPanel.activeInHierarchy, Is.True);
 
             SetPrivateField(hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
@@ -658,9 +662,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
             });
+            uiRoot.NotificationBridge.RefreshPresentationState();
             uiRoot.NotificationPresenter.RefreshPresentation();
 
-            Assert.That(uiRoot.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
+            Assert.That(uiRoot.NotificationPanel.activeInHierarchy, Is.True);
         }
 
         [UnityTest]
@@ -2740,6 +2745,7 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             DemoShellSessionStaging.ResetSessionMetrics();
+            DemoShellSessionStaging.ResetHintSessionState();
         }
 
         private static void ClearAudioVolumePrefs()

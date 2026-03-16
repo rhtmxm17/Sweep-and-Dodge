@@ -20,3 +20,5 @@
 - [TD-016-runtime-ui-shell-and-navigation-contract.md](TD-016-runtime-ui-shell-and-navigation-contract.md): Runtime UI의 `uGUI` 단일 스택, `RuntimeUiRoot`, presenter/read-only 경계, KB+Mouse 우선 내비게이션 계약
 - [TD-017-kb-mouse-input-options-accessibility-baseline.md](TD-017-kb-mouse-input-options-accessibility-baseline.md): 공개 빌드 1차의 `KB+Mouse` 입력 기준, UI 입력/옵션/접근성 최소선, `Input System UI + 기존 gameplay 입력` 분리 계약
 - [TD-018-hazardstack-runtime-contract.md](TD-018-hazardstack-runtime-contract.md): HazardStack 단일 owner, 동프레임 `수거 확정 후 리셋`, 다음 프레임 배율 반영 계약
+- [TD-020-hint-notification-runtime-contract.md](TD-020-hint-notification-runtime-contract.md): 하단 중앙 `Notification` / `Hint` 2레인의 책임 분리, resolver/seen-state, 재노출 정책, V2 구현 계약
+- [TD-021-hazardstack-hud-contract.md](TD-021-hazardstack-hud-contract.md): Carry 인접 `HazardStack` 보조층, `RiskMultiplier` 보조 텍스트, `HazardStackMax` 비표시 HUD 계약

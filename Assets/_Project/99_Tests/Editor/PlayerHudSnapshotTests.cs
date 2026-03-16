@@ -32,6 +32,8 @@ namespace SweepNDodge.DotsBullets.Tests
             var snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
             Assert.That(snapshot.CarryLoad, Is.EqualTo(47));
             Assert.That(snapshot.CarryCapacity, Is.EqualTo(300));
+            Assert.That(snapshot.HazardStack, Is.EqualTo(0));
+            Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1f).Within(1e-6f));
             Assert.That(snapshot.TotalSourceCount, Is.EqualTo(3));
             Assert.That(snapshot.DepletedSourceCount, Is.EqualTo(1));
             Assert.That(snapshot.PressureSourceStableId, Is.EqualTo(3u), "Tie-break must choose the smallest StableId.");
@@ -138,6 +140,41 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(snapshotAfterDecay.TotalHitValue, Is.EqualTo(7));
         }
 
+        [Test]
+        public void PlayerHudSnapshotCollect_CapturesHazardStack_AndReflectsResetWithoutFrameDelay()
+        {
+            using var world = CreateDefaultTestWorld("PlayerHudSnapshotWorld_D", out var simGroup);
+            var em = world.EntityManager;
+
+            var player = CreatePlayer(em, load: 0, capacity: 100, hazardStack: 2, hazardStackMax: 5, hazardBonusRate: 0.05f);
+            CreateSnapshotSingleton(em);
+            CreateStageStateSingleton(em, RunDirectorStageStateId.Running, 0f);
+            CreateCombatMetricsSingleton(em, hitCount: 0, hitValue: 0, totalCollectValue: 0, totalCleanupValue: 0, totalHitValue: 0);
+
+            TickWorld(world, simGroup, 1f / 60f);
+            var snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
+            Assert.That(snapshot.HazardStack, Is.EqualTo(2));
+            Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1.10f).Within(1e-6f));
+
+            var riskRequest = em.GetComponentData<PlayerHazardRiskRequestComponent>(player);
+            riskRequest.PendingHazardCapturedCount = 2;
+            em.SetComponentData(player, riskRequest);
+            TickWorld(world, simGroup, 1f / 60f);
+
+            snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
+            Assert.That(snapshot.HazardStack, Is.EqualTo(4));
+            Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1.20f).Within(1e-6f));
+
+            riskRequest = em.GetComponentData<PlayerHazardRiskRequestComponent>(player);
+            riskRequest.ResetRequested = 1;
+            em.SetComponentData(player, riskRequest);
+            TickWorld(world, simGroup, 1f / 60f);
+
+            snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
+            Assert.That(snapshot.HazardStack, Is.EqualTo(0));
+            Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1f).Within(1e-6f));
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);
@@ -155,14 +192,30 @@ namespace SweepNDodge.DotsBullets.Tests
             simGroup.Update();
         }
 
-        private static void CreatePlayer(EntityManager em, int load, int capacity)
+        private static Entity CreatePlayer(EntityManager em, int load, int capacity, int hazardStack = 0, int hazardStackMax = 5, float hazardBonusRate = 0.05f)
         {
-            var player = em.CreateEntity(typeof(PlayerTag), typeof(PlayerCarryBinComponent));
+            var player = em.CreateEntity(
+                typeof(PlayerTag),
+                typeof(PlayerCarryBinComponent),
+                typeof(PlayerHazardRiskConfigComponent),
+                typeof(PlayerHazardRiskStateComponent),
+                typeof(PlayerHazardRiskRequestComponent));
             em.SetComponentData(player, new PlayerCarryBinComponent
             {
                 Load = load,
                 Capacity = capacity,
             });
+            em.SetComponentData(player, new PlayerHazardRiskConfigComponent
+            {
+                HazardStackMax = hazardStackMax,
+                HazardBonusRate = hazardBonusRate,
+            });
+            em.SetComponentData(player, new PlayerHazardRiskStateComponent
+            {
+                HazardStack = hazardStack,
+            });
+            em.SetComponentData(player, default(PlayerHazardRiskRequestComponent));
+            return player;
         }
 
         private static void CreateSnapshotSingleton(EntityManager em)

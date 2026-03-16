@@ -21,12 +21,14 @@ namespace SweepNDodge.DotsBullets.Tests
         public void SetUp()
         {
             ClearVolumePrefs();
+            DemoShellSessionStaging.ResetHintSessionState();
         }
 
         [TearDown]
         public void TearDown()
         {
             ClearVolumePrefs();
+            DemoShellSessionStaging.ResetHintSessionState();
         }
 
         [Test]
@@ -232,6 +234,27 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void DemoShellSessionStaging_HintSessionAndStageSeen_ArePersistedSeparately()
+        {
+            DemoShellSessionStaging.ResetHintSessionState();
+
+            Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.False);
+            DemoShellSessionStaging.MarkSessionSeenHint(HintId.FirstHitAvoidHazards);
+            DemoShellSessionStaging.SetActiveStageSeen(2, HintResolver.MarkSeen(0UL, HintId.CarryFullGoToDeposit));
+
+            Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.True);
+            Assert.That(DemoShellSessionStaging.TryGetActiveStageSeen(2, out ulong stageSeenMask), Is.True);
+            Assert.That(HintResolver.HasSeen(stageSeenMask, HintId.CarryFullGoToDeposit), Is.True);
+
+            DemoShellSessionStaging.ClearActiveStageSeen();
+            Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.True);
+            Assert.That(DemoShellSessionStaging.TryGetActiveStageSeen(2, out _), Is.False);
+
+            DemoShellSessionStaging.ResetHintSessionState();
+            Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.False);
+        }
+
+        [Test]
         public void HudPanels_ShowOnlyDuringStagePlay_AndReflectSnapshotValues()
         {
             using var context = CreateContext();
@@ -243,6 +266,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 5,
                 CarryCapacity = 10,
+                HazardStack = 0,
+                HazardRiskMultiplier = 1f,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 PressureSourceStableId = 1002u,
@@ -272,9 +297,15 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.StageHudPresenter.PressureSourceWeakThresholdMarker.anchorMin.x, Is.EqualTo(0.5f).Within(1e-4f));
             Assert.That(context.Root.StageHudPresenter.CarryValueText.text, Is.EqualTo("5 / 10"));
             Assert.That(context.Root.StageHudPresenter.CarryFillImage.fillAmount, Is.EqualTo(0.5f).Within(1e-4f));
+            Assert.That(context.Root.StageHudPresenter.HazardStackRoot.activeSelf, Is.True);
+            Assert.That(context.Root.StageHudPresenter.HazardStackSegmentImages, Has.Length.EqualTo(5));
+            Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(0));
+            Assert.That(context.Root.StageHudPresenter.RiskMultiplierText.text, Is.EqualTo("x1.00"));
+            Assert.That(HazardStackDisplaysNoMaxText(context.Root.StageHudPresenter), Is.True);
             Assert.That(context.Root.StageHudPresenter.TimerValueText.text, Is.EqualTo("70.0s"));
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.False);
-            Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.False);
+            Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.True);
+            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Collect trash from active sources."));
 
             SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.Title);
             InvokeApplyShellState(context.Root, force: true);
@@ -296,6 +327,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStack = 3,
+                HazardRiskMultiplier = 1.15f,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 145f,
@@ -307,6 +340,8 @@ namespace SweepNDodge.DotsBullets.Tests
             InvokeApplyShellState(context.Root, force: true);
 
             Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 3/3 cleared"));
+            Assert.That(context.Root.StageHudPresenter.RiskMultiplierText.text, Is.EqualTo("x1.15"));
+            Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(3));
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
             Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
             Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.True);
@@ -314,7 +349,19 @@ namespace SweepNDodge.DotsBullets.Tests
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
-                CarryLoad = 10,
+                CarryLoad = 2,
+                CarryCapacity = 10,
+                DepletedSourceCount = 2,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 80f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+            });
+            context.NotificationBridge.RefreshState(2f);
+
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 2,
                 CarryCapacity = 10,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
@@ -322,9 +369,22 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
+            context.NotificationBridge.RefreshPresentationState();
             context.Root.StageHudPresenter.RefreshPresentation();
             context.Root.NotificationPresenter.RefreshPresentation();
             Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Time critical"));
+
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 2,
+                CarryCapacity = 10,
+                DepletedSourceCount = 2,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 70f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+            });
+            context.NotificationBridge.RefreshState(2f);
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -336,6 +396,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
+            context.NotificationBridge.RefreshPresentationState();
             context.Root.StageHudPresenter.RefreshPresentation();
             context.Root.NotificationPresenter.RefreshPresentation();
             Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
@@ -371,8 +432,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
             });
+            context.NotificationBridge.RefreshPresentationState();
             context.Root.NotificationPresenter.RefreshPresentation();
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
 
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
@@ -382,13 +444,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 RemainingSec = 1f,
             });
             SetPrivateField(context.Hud, "_feedbackLine", "Vacuum: CarryBin Full");
+            context.NotificationBridge.RefreshPresentationState();
             context.Root.NotificationPresenter.RefreshPresentation();
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
                 CarryLoad = 2,
                 CarryCapacity = 10,
+                HazardStack = 9,
+                HazardRiskMultiplier = 1.45f,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
@@ -401,9 +466,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 RemainingSec = 1f,
             });
             SetPrivateField(context.Hud, "_feedbackLine", "Hazard Captured");
+            context.NotificationBridge.RefreshState(2f);
+            context.NotificationBridge.RefreshPresentationState();
+            context.Root.StageHudPresenter.RefreshPresentation();
             context.Root.NotificationPresenter.RefreshPresentation();
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hazard Captured"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hazard captured"));
+            Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(5));
+            Assert.That(context.Root.StageHudPresenter.RiskMultiplierText.text, Is.EqualTo("x1.45"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -413,7 +483,68 @@ namespace SweepNDodge.DotsBullets.Tests
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
             });
+            context.HintBridge.RefreshState(5f);
+            context.HintBridge.RefreshPresentationState();
             context.Root.HintPresenter.RefreshPresentation();
+            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Collect trash from active sources."));
+        }
+
+        [Test]
+        public void NotificationBridge_EmitsStageClearAndTimeUp_OnStageResultTransition()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 0);
+            SetPrivateField(context.Hud, "_hasSnapshot", true);
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 0,
+                CarryCapacity = 10,
+                StageStateElapsedSec = 20f,
+            });
+
+            context.NotificationBridge.RefreshPresentationState();
+            Assert.That(context.NotificationBridge.CurrentNotification.Visible, Is.False);
+
+            SetPrivateField(context.Shell, "_currentStageOutcome", DemoShellStageOutcomeId.Clear);
+            SetPrivateField(context.Shell, "_currentStageResult", new DemoShellStageResultMetrics
+            {
+                StageId = 1,
+                Outcome = DemoShellStageOutcomeId.Clear,
+                ElapsedSec = 110f,
+            });
+            SetPrivateField(context.Shell, "_hasCurrentStageResult", true);
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StageResult);
+
+            context.NotificationBridge.RefreshPresentationState();
+            Assert.That(context.NotificationBridge.CurrentNotification.Id, Is.EqualTo(NotificationId.StageClear));
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            context.NotificationBridge.RefreshPresentationState();
+            SetPrivateField(context.Shell, "_currentStageOutcome", DemoShellStageOutcomeId.Fail);
+            SetPrivateField(context.Shell, "_currentStageResult", new DemoShellStageResultMetrics
+            {
+                StageId = 1,
+                Outcome = DemoShellStageOutcomeId.Fail,
+                ElapsedSec = 120f,
+                HitValue = 4,
+            });
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StageResult);
+
+            context.NotificationBridge.RefreshPresentationState();
+            Assert.That(context.NotificationBridge.CurrentNotification.Id, Is.EqualTo(NotificationId.TimeUp));
+        }
+
+        [Test]
+        public void HintBridge_PersistsStageSeenAcrossRetry_AndSessionSeenAcrossContextReset()
+        {
+            using var context = CreateContext();
+
+            DemoShellSessionStaging.ResetHintSessionState();
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 1);
+            SetPrivateField(context.Hud, "_hasSnapshot", true);
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
                 CarryLoad = 10,
@@ -422,8 +553,57 @@ namespace SweepNDodge.DotsBullets.Tests
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
             });
-            context.Root.HintPresenter.RefreshPresentation();
-            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Carry is full. Head to Deposit."));
+
+            context.HintBridge.RefreshPresentationState();
+            Assert.That(context.HintBridge.CurrentHint.Id, Is.EqualTo(HintId.CarryFullGoToDeposit));
+            Assert.That(DemoShellSessionStaging.TryGetActiveStageSeen(2, out ulong stageSeenMask), Is.True);
+            Assert.That(HintResolver.HasSeen(stageSeenMask, HintId.CarryFullGoToDeposit), Is.True);
+
+            using var retryContext = CreateContext();
+            SetPrivateField(retryContext.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(retryContext.Shell, "_currentStageIndex", 1);
+            SetPrivateField(retryContext.Hud, "_hasSnapshot", true);
+            SetPrivateField(retryContext.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+            });
+            retryContext.HintBridge.RefreshPresentationState();
+            Assert.That(retryContext.HintBridge.CurrentHint.Visible, Is.False);
+
+            SetPrivateField(retryContext.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 0,
+                CarryCapacity = 10,
+                DepletedSourceCount = 3,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+                LastHitLossValue = 2,
+                HitFlashRemainingSec = 0.5f,
+            });
+            retryContext.HintBridge.RefreshPresentationState();
+            Assert.That(retryContext.HintBridge.CurrentHint.Id, Is.EqualTo(HintId.FirstHitAvoidHazards));
+            Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.True);
+
+            using var reloadContext = CreateContext();
+            SetPrivateField(reloadContext.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(reloadContext.Shell, "_currentStageIndex", 2);
+            SetPrivateField(reloadContext.Hud, "_hasSnapshot", true);
+            SetPrivateField(reloadContext.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 0,
+                CarryCapacity = 10,
+                DepletedSourceCount = 3,
+                TotalSourceCount = 3,
+                StageStateElapsedSec = 20f,
+                LastHitLossValue = 2,
+                HitFlashRemainingSec = 0.5f,
+            });
+            reloadContext.HintBridge.RefreshPresentationState();
+            Assert.That(reloadContext.HintBridge.CurrentHint.Visible, Is.False);
         }
 
         private static TestContext CreateContext()
@@ -451,6 +631,14 @@ namespace SweepNDodge.DotsBullets.Tests
             pauseBridge.StageBridge = stageBridge;
             var hud = shellGo.AddComponent<PlayerRuntimeHudBridge>();
             hud.DemoShell = shell;
+            var notificationBridge = shellGo.AddComponent<DemoShellNotificationBridge>();
+            notificationBridge.DemoShell = shell;
+            notificationBridge.RuntimeHudBridge = hud;
+            var hintBridge = shellGo.AddComponent<DemoShellHintBridge>();
+            hintBridge.DemoShell = shell;
+            hintBridge.PauseBridge = pauseBridge;
+            hintBridge.RuntimeHudBridge = hud;
+            hintBridge.NotificationBridge = notificationBridge;
 
             var rootGo = new GameObject("RuntimeUiRoot_Test");
             rootGo.SetActive(false);
@@ -459,11 +647,13 @@ namespace SweepNDodge.DotsBullets.Tests
             root.DemoAudio = audio;
             root.PauseBridge = pauseBridge;
             root.RuntimeHudBridge = hud;
+            root.NotificationBridge = notificationBridge;
+            root.HintBridge = hintBridge;
             root.LogBindWarnings = false;
             root.EnsureHierarchy();
             rootGo.SetActive(true);
 
-            return new TestContext(shellGo, rootGo, shell, audio, pauseBridge, hud, root);
+            return new TestContext(shellGo, rootGo, shell, audio, pauseBridge, hud, notificationBridge, hintBridge, root);
         }
 
         private static void InvokeConfigurePresenters(RuntimeUiRoot root)
@@ -502,6 +692,37 @@ namespace SweepNDodge.DotsBullets.Tests
             return false;
         }
 
+        private static int CountHighlightedHazardSegments(StageHudPresenter presenter)
+        {
+            if (presenter == null || presenter.HazardStackSegmentImages == null)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < presenter.HazardStackSegmentImages.Length; i++)
+            {
+                var image = presenter.HazardStackSegmentImages[i];
+                if (image != null && image.color.a >= 0.95f)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static bool HazardStackDisplaysNoMaxText(StageHudPresenter presenter)
+        {
+            if (presenter == null || presenter.HazardStackRoot == null)
+                return false;
+
+            var texts = presenter.HazardStackRoot.GetComponentsInChildren<TextMeshProUGUI>(true);
+            for (int i = 0; i < texts.Length; i++)
+            {
+                if (texts[i] != null && texts[i].text.Contains("/"))
+                    return false;
+            }
+
+            return true;
+        }
+
         private static void ClearVolumePrefs()
         {
             for (int i = 0; i < DemoAudioPrefsKeys.AllVolumeKeys.Length; i++)
@@ -521,6 +742,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 DemoAudioBridge audio,
                 DemoShellPauseBridge pauseBridge,
                 PlayerRuntimeHudBridge hud,
+                DemoShellNotificationBridge notificationBridge,
+                DemoShellHintBridge hintBridge,
                 RuntimeUiRoot root)
             {
                 _shellGo = shellGo;
@@ -529,6 +752,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 Audio = audio;
                 PauseBridge = pauseBridge;
                 Hud = hud;
+                NotificationBridge = notificationBridge;
+                HintBridge = hintBridge;
                 Root = root;
             }
 
@@ -536,6 +761,8 @@ namespace SweepNDodge.DotsBullets.Tests
             public DemoAudioBridge Audio { get; }
             public DemoShellPauseBridge PauseBridge { get; }
             public PlayerRuntimeHudBridge Hud { get; }
+            public DemoShellNotificationBridge NotificationBridge { get; }
+            public DemoShellHintBridge HintBridge { get; }
             public RuntimeUiRoot Root { get; }
 
             public void Dispose()

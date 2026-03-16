@@ -16,115 +16,39 @@ namespace SweepNDodge.DotsBullets
         private static readonly Color DangerColor = new(0.42f, 0.10f, 0.10f, 0.94f);
         private static readonly Color EventColor = new(0.10f, 0.16f, 0.24f, 0.90f);
 
-        private DemoShellFlowController _shell;
-        private PlayerRuntimeHudBridge _runtimeHud;
+        private DemoShellNotificationBridge _bridge;
 
-        public void Configure(DemoShellFlowController shell, PlayerRuntimeHudBridge runtimeHud)
+        public void Configure(DemoShellNotificationBridge bridge)
         {
-            _shell = shell;
-            _runtimeHud = runtimeHud;
+            _bridge = bridge;
         }
 
         public void RefreshPresentation()
         {
-            if (_shell == null
-                || _shell.CurrentScreen != DemoShellScreenId.StagePlay
-                || _runtimeHud == null
-                || !_runtimeHud.TryGetLastSnapshot(out var snapshot))
+            if (_bridge == null)
             {
                 SetVisible(false, string.Empty, EventColor);
                 return;
             }
 
-            float remainingSec = ResolveRemainingSec(_shell, snapshot.StageStateElapsedSec);
-            if (TryResolveDanger(snapshot, remainingSec, out string dangerMessage, out Color dangerColor))
-            {
-                SetVisible(true, dangerMessage, dangerColor);
-                return;
-            }
-
-            if (!_runtimeHud.TryGetLastFeedbackSnapshot(out var feedbackSnapshot)
-                || feedbackSnapshot.RemainingSec <= 0f
-                || string.IsNullOrEmpty(_runtimeHud.LastFeedbackLine)
-                || ShouldSuppressFeedback(feedbackSnapshot))
+            var state = _bridge.CurrentNotification;
+            if (!state.Visible || string.IsNullOrEmpty(state.Message))
             {
                 SetVisible(false, string.Empty, EventColor);
                 return;
             }
 
-            SetVisible(true, _runtimeHud.LastFeedbackLine, EventColor);
+            SetVisible(true, state.Message, ResolveColor(state.Severity));
         }
 
-        private static bool TryResolveDanger(
-            in PlayerHudSnapshotComponent snapshot,
-            float remainingSec,
-            out string message,
-            out Color color)
+        private static Color ResolveColor(NotificationSeverity severity)
         {
-            int capacity = Mathf.Max(0, snapshot.CarryCapacity);
-            bool carryFull = capacity > 0 && snapshot.CarryLoad >= capacity;
-
-            if (snapshot.HitFlashRemainingSec > 0f && snapshot.LastHitLossValue > 0)
+            return severity switch
             {
-                message = "Hit! Carry lost";
-                color = DangerColor;
-                return true;
-            }
-
-            if (remainingSec >= 0f && remainingSec <= 10f)
-            {
-                message = "Time critical";
-                color = DangerColor;
-                return true;
-            }
-
-            if (carryFull)
-            {
-                message = "Carry full - deposit now";
-                color = DangerColor;
-                return true;
-            }
-
-            if (remainingSec >= 0f && remainingSec <= 30f)
-            {
-                message = "Time is running out";
-                color = WarningColor;
-                return true;
-            }
-
-            message = string.Empty;
-            color = EventColor;
-            return false;
-        }
-
-        private static bool ShouldSuppressFeedback(in PlayerUiFeedbackPresentationSnapshotComponent snapshot)
-        {
-            if (snapshot.Type == PlayerUiFeedbackEventType.PlayerHazardHit)
-                return true;
-
-            return snapshot.Type == PlayerUiFeedbackEventType.VacuumStartBlocked
-                   && snapshot.Reason == (byte)PlayerUiFeedbackReasonId.CarryBinFull;
-        }
-
-        private static float ResolveRemainingSec(DemoShellFlowController shell, float elapsedSec)
-        {
-            if (shell == null || shell.StageProfiles == null || shell.StageProfiles.Length <= 0)
-                return -1f;
-
-            int stageIndex = shell.CurrentStageIndex;
-            if (stageIndex >= 0 && stageIndex < shell.StageProfiles.Length)
-                return Mathf.Max(0f, shell.StageProfiles[stageIndex].StageTimeLimitSec - elapsedSec);
-
-            int stageId = shell.CurrentStageId;
-            for (int i = 0; i < shell.StageProfiles.Length; i++)
-            {
-                if (shell.StageProfiles[i].StageId != stageId)
-                    continue;
-
-                return Mathf.Max(0f, shell.StageProfiles[i].StageTimeLimitSec - elapsedSec);
-            }
-
-            return -1f;
+                NotificationSeverity.Danger => DangerColor,
+                NotificationSeverity.Warning => WarningColor,
+                _ => EventColor,
+            };
         }
 
         private void SetVisible(bool visible, string text, Color color)

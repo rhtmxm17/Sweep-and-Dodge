@@ -18,8 +18,13 @@ namespace SweepNDodge.DotsBullets
         private static DemoShellStartupRequest _request;
         private static bool _hasSessionMetrics;
         private static DemoShellSessionMetrics _sessionMetrics;
+        private static ulong _hintSessionSeenMask;
+        private static bool _hasActiveStageSeen;
+        private static int _activeStageSeenStageId;
+        private static ulong _activeStageSeenMask;
 
         public static bool IsStartupPending => _hasPendingRequest;
+        public static ulong HintSessionSeenMask => _hintSessionSeenMask;
 
         public static void StageLobby()
         {
@@ -37,6 +42,59 @@ namespace SweepNDodge.DotsBullets
         {
             _sessionMetrics = default;
             _hasSessionMetrics = true;
+        }
+
+        public static bool HasSessionSeenHint(HintId id)
+        {
+            if (id == HintId.None)
+                return false;
+
+            ulong flag = 1UL << (int)id;
+            return (_hintSessionSeenMask & flag) != 0UL;
+        }
+
+        public static void MarkSessionSeenHint(HintId id)
+        {
+            if (id == HintId.None)
+                return;
+
+            _hintSessionSeenMask |= 1UL << (int)id;
+        }
+
+        public static void ResetHintSessionState()
+        {
+            _hintSessionSeenMask = 0UL;
+            ClearActiveStageSeen();
+        }
+
+        public static void SetActiveStageSeen(int stageId, ulong stageSeenMask)
+        {
+            if (stageId <= 0 || stageSeenMask == 0UL)
+            {
+                ClearActiveStageSeen();
+                return;
+            }
+
+            _activeStageSeenStageId = stageId;
+            _activeStageSeenMask = stageSeenMask;
+            _hasActiveStageSeen = true;
+        }
+
+        public static bool TryGetActiveStageSeen(int stageId, out ulong stageSeenMask)
+        {
+            stageSeenMask = 0UL;
+            if (!_hasActiveStageSeen || _activeStageSeenStageId != stageId)
+                return false;
+
+            stageSeenMask = _activeStageSeenMask;
+            return true;
+        }
+
+        public static void ClearActiveStageSeen()
+        {
+            _hasActiveStageSeen = false;
+            _activeStageSeenStageId = 0;
+            _activeStageSeenMask = 0UL;
         }
 
         public static void AccumulateSuccessfulStage(in DemoShellStageResultMetrics result)

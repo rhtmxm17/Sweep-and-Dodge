@@ -10,67 +10,29 @@ namespace SweepNDodge.DotsBullets
         public GameObject HintRoot;
         public TextMeshProUGUI HintText;
 
-        private const float CarryFullHintDurationSec = 2.5f;
-        private const string CarryFullHintMessage = "Carry is full. Head to Deposit.";
+        private DemoShellHintBridge _bridge;
 
-        private DemoShellFlowController _shell;
-        private DemoShellPauseBridge _pauseBridge;
-        private PlayerRuntimeHudBridge _runtimeHud;
-        private bool _carryFullHintShown;
-        private bool _previousCarryFull;
-        private float _remainingVisibleSec;
-
-        public void Configure(
-            DemoShellFlowController shell,
-            DemoShellPauseBridge pauseBridge,
-            PlayerRuntimeHudBridge runtimeHud)
+        public void Configure(DemoShellHintBridge bridge)
         {
-            _shell = shell;
-            _pauseBridge = pauseBridge;
-            _runtimeHud = runtimeHud;
+            _bridge = bridge;
         }
 
         public void RefreshPresentation()
         {
-            if (_shell == null
-                || _shell.CurrentScreen != DemoShellScreenId.StagePlay
-                || _runtimeHud == null
-                || !_runtimeHud.TryGetLastSnapshot(out var snapshot))
+            if (_bridge == null)
             {
-                _previousCarryFull = false;
                 SetVisible(false, string.Empty);
                 return;
             }
 
-            bool paused = _pauseBridge != null && _pauseBridge.IsPaused;
-            int capacity = Mathf.Max(0, snapshot.CarryCapacity);
-            bool carryFull = capacity > 0 && snapshot.CarryLoad >= capacity;
-
-            if (!paused && !_carryFullHintShown && !_previousCarryFull && carryFull)
-            {
-                _carryFullHintShown = true;
-                _remainingVisibleSec = CarryFullHintDurationSec;
-                SetVisible(true, CarryFullHintMessage);
-            }
-            else if (!paused && _remainingVisibleSec > 0f)
-            {
-                _remainingVisibleSec = Mathf.Max(0f, _remainingVisibleSec - Time.unscaledDeltaTime);
-                if (_remainingVisibleSec <= 0f)
-                    SetVisible(false, string.Empty);
-                else
-                    SetVisible(true, CarryFullHintMessage);
-            }
-            else if (_remainingVisibleSec > 0f)
-            {
-                SetVisible(true, CarryFullHintMessage);
-            }
-            else
+            var state = _bridge.CurrentHint;
+            if (!state.Visible || string.IsNullOrEmpty(state.Message))
             {
                 SetVisible(false, string.Empty);
+                return;
             }
 
-            if (!paused)
-                _previousCarryFull = carryFull;
+            SetVisible(true, state.Message);
         }
 
         private void SetVisible(bool visible, string text)

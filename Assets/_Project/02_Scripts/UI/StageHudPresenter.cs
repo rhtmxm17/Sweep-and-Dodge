@@ -13,10 +13,14 @@ namespace SweepNDodge.DotsBullets
         public TextMeshProUGUI TimerValueText;
         public TextMeshProUGUI CarryLabel;
         public TextMeshProUGUI CarryValueText;
+        public TextMeshProUGUI HazardStackLabel;
+        public TextMeshProUGUI RiskMultiplierText;
         public TextMeshProUGUI PressureSourceValueText;
 
         [Header("Visuals")]
+        public GameObject HazardStackRoot;
         public GameObject PressureSourceProgressRoot;
+        public Image[] HazardStackSegmentImages;
         public Image PressureSourceFillImage;
         public RectTransform PressureSourceWeakThresholdMarker;
         public Image CarryFillImage;
@@ -26,6 +30,11 @@ namespace SweepNDodge.DotsBullets
         private static readonly Color DangerColor = new(1f, 0.38f, 0.38f, 1f);
         private static readonly Color CarryNormalColor = new(0.32f, 0.78f, 0.95f, 1f);
         private static readonly Color CarryWarningColor = new(1f, 0.72f, 0.18f, 1f);
+        private static readonly Color HazardMutedColor = new(0.54f, 0.59f, 0.66f, 0.42f);
+        private static readonly Color HazardActiveColor = new(1f, 0.69f, 0.26f, 1f);
+        private static readonly Color HazardCapColor = new(1f, 0.44f, 0.32f, 1f);
+        private static readonly Color HazardNeutralTextColor = new(0.82f, 0.88f, 0.94f, 0.74f);
+        private static readonly Color HazardActiveTextColor = new(1f, 0.83f, 0.54f, 1f);
 
         private DemoShellFlowController _shell;
         private PlayerRuntimeHudBridge _runtimeHud;
@@ -38,6 +47,8 @@ namespace SweepNDodge.DotsBullets
 
         public void RefreshPresentation()
         {
+            EnsureRuntimeReferences();
+
             if (_shell == null)
             {
                 ApplyDefaultPresentation();
@@ -61,6 +72,7 @@ namespace SweepNDodge.DotsBullets
             ApplyObjectiveSummary(snapshot);
             ApplyObjectiveDetail(snapshot);
             ApplyCarry(snapshot);
+            ApplyHazardStack(snapshot);
             ApplyTimer(remainingSec);
         }
 
@@ -110,6 +122,8 @@ namespace SweepNDodge.DotsBullets
                 CarryFillImage.fillAmount = 0f;
                 CarryFillImage.color = CarryNormalColor;
             }
+
+            ApplyHazardStack(default);
         }
 
         private void ApplyObjectiveSummary(in PlayerHudSnapshotComponent snapshot)
@@ -176,6 +190,37 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
+        private void EnsureRuntimeReferences()
+        {
+            if (_shell != null && _runtimeHud != null)
+                return;
+
+            var root = GetComponentInParent<RuntimeUiRoot>();
+            if (root != null)
+            {
+                _shell ??= root.DemoShell;
+                _runtimeHud ??= root.RuntimeHudBridge;
+            }
+
+            if (_shell == null)
+            {
+#if UNITY_2023_1_OR_NEWER
+                _shell = FindFirstObjectByType<DemoShellFlowController>();
+#else
+                _shell = FindObjectOfType<DemoShellFlowController>();
+#endif
+            }
+
+            if (_runtimeHud == null)
+            {
+#if UNITY_2023_1_OR_NEWER
+                _runtimeHud = FindFirstObjectByType<PlayerRuntimeHudBridge>();
+#else
+                _runtimeHud = FindObjectOfType<PlayerRuntimeHudBridge>();
+#endif
+            }
+        }
+
         private void ApplyPressureSourceProgress(in PlayerHudSnapshotComponent snapshot, bool visible)
         {
             if (PressureSourceProgressRoot != null)
@@ -211,6 +256,41 @@ namespace SweepNDodge.DotsBullets
             PressureSourceWeakThresholdMarker.pivot = new Vector2(0.5f, 0.5f);
             PressureSourceWeakThresholdMarker.anchoredPosition = Vector2.zero;
             PressureSourceWeakThresholdMarker.sizeDelta = new Vector2(4f, 0f);
+        }
+
+        private void ApplyHazardStack(in PlayerHudSnapshotComponent snapshot)
+        {
+            if (HazardStackRoot != null)
+                HazardStackRoot.SetActive(true);
+
+            if (HazardStackLabel != null)
+                HazardStackLabel.text = "Hazard";
+
+            int visibleSegmentCount = HazardStackSegmentImages != null ? HazardStackSegmentImages.Length : 0;
+            int activeSegments = Mathf.Clamp(snapshot.HazardStack, 0, visibleSegmentCount);
+            bool capped = visibleSegmentCount > 0 && snapshot.HazardStack >= visibleSegmentCount;
+
+            if (HazardStackSegmentImages != null)
+            {
+                for (int i = 0; i < HazardStackSegmentImages.Length; i++)
+                {
+                    var segment = HazardStackSegmentImages[i];
+                    if (segment == null)
+                        continue;
+
+                    segment.enabled = true;
+                    segment.color = i < activeSegments
+                        ? (capped ? HazardCapColor : HazardActiveColor)
+                        : HazardMutedColor;
+                }
+            }
+
+            if (RiskMultiplierText != null)
+            {
+                float multiplier = Mathf.Max(1f, snapshot.HazardRiskMultiplier);
+                RiskMultiplierText.text = $"x{multiplier:0.00}";
+                RiskMultiplierText.color = activeSegments > 0 ? HazardActiveTextColor : HazardNeutralTextColor;
+            }
         }
 
         private float ResolveStageTimeLimitSec()

@@ -233,6 +233,7 @@ namespace SweepNDodge.DotsBullets
                 return false;
 
             DemoShellSessionStaging.ResetSessionMetrics();
+            DemoShellSessionStaging.ClearActiveStageSeen();
             RefreshSessionMetrics();
             EnterStagePlay(stageIndex);
             return true;
@@ -258,6 +259,7 @@ namespace SweepNDodge.DotsBullets
                         return true;
                     case DemoShellResultActionId.ReturnToLobby:
                         DemoShellSessionStaging.ResetSessionMetrics();
+                        DemoShellSessionStaging.ClearActiveStageSeen();
                         DemoShellSessionStaging.StageLobby();
                         ReloadActiveScene();
                         return true;
@@ -285,6 +287,7 @@ namespace SweepNDodge.DotsBullets
                 return false;
 
             DemoShellSessionStaging.ResetSessionMetrics();
+            DemoShellSessionStaging.ResetHintSessionState();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
             return true;
@@ -308,6 +311,7 @@ namespace SweepNDodge.DotsBullets
                 return false;
 
             DemoShellSessionStaging.ResetSessionMetrics();
+            DemoShellSessionStaging.ClearActiveStageSeen();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
             return true;
@@ -319,6 +323,7 @@ namespace SweepNDodge.DotsBullets
                 return false;
 
             DemoShellSessionStaging.ResetSessionMetrics();
+            DemoShellSessionStaging.ClearActiveStageSeen();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
             return true;
@@ -521,6 +526,7 @@ namespace SweepNDodge.DotsBullets
                         return;
                     }
 
+                    DemoShellSessionStaging.ClearActiveStageSeen();
                     DemoShellSessionStaging.StageStagePlay(nextStageIndex);
                     ReloadActiveScene();
                     return;
@@ -531,6 +537,7 @@ namespace SweepNDodge.DotsBullets
                     return;
                 case DemoShellResultActionId.ReturnToLobby:
                     DemoShellSessionStaging.ResetSessionMetrics();
+                    DemoShellSessionStaging.ClearActiveStageSeen();
                     DemoShellSessionStaging.StageLobby();
                     ReloadActiveScene();
                     return;

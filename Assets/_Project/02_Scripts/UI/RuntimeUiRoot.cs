@@ -15,6 +15,8 @@ namespace SweepNDodge.DotsBullets
         public DemoAudioBridge DemoAudio;
         public DemoShellPauseBridge PauseBridge;
         public PlayerRuntimeHudBridge RuntimeHudBridge;
+        public DemoShellNotificationBridge NotificationBridge;
+        public DemoShellHintBridge HintBridge;
 
         [Header("Canvas")]
         public Canvas RootCanvas;
@@ -70,6 +72,8 @@ namespace SweepNDodge.DotsBullets
         private DemoAudioBridge _configuredAudio;
         private DemoShellPauseBridge _configuredPauseBridge;
         private PlayerRuntimeHudBridge _configuredRuntimeHud;
+        private DemoShellNotificationBridge _configuredNotificationBridge;
+        private DemoShellHintBridge _configuredHintBridge;
         private Action _cachedOpenSettingsAction;
         private Action _cachedCloseSettingsAction;
         private Action _cachedOpenSettingsFromPauseAction;
@@ -149,6 +153,8 @@ namespace SweepNDodge.DotsBullets
         {
             _editorEnsureHierarchyQueued = false;
             if (this == null || Application.isPlaying)
+                return;
+            if (UnityEditor.EditorUtility.IsPersistent(gameObject))
                 return;
 
             EnsureHierarchy();
@@ -276,7 +282,9 @@ namespace SweepNDodge.DotsBullets
             if (_configuredShell == DemoShell
                 && _configuredAudio == DemoAudio
                 && _configuredPauseBridge == PauseBridge
-                && _configuredRuntimeHud == RuntimeHudBridge)
+                && _configuredRuntimeHud == RuntimeHudBridge
+                && _configuredNotificationBridge == NotificationBridge
+                && _configuredHintBridge == HintBridge)
                 return;
 
             TitlePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
@@ -284,8 +292,8 @@ namespace SweepNDodge.DotsBullets
             ResultPresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             DemoCompletePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
             StageHudPresenter?.Configure(DemoShell, RuntimeHudBridge);
-            NotificationPresenter?.Configure(DemoShell, RuntimeHudBridge);
-            HintPresenter?.Configure(DemoShell, PauseBridge, RuntimeHudBridge);
+            NotificationPresenter?.Configure(NotificationBridge);
+            HintPresenter?.Configure(HintBridge);
             PausePresenter?.Configure(PauseBridge, _cachedOpenSettingsFromPauseAction, _cachedOpenConfirmAction);
             ConfirmDialogPresenter?.Configure(PauseBridge, _cachedCloseConfirmAction);
             SettingsPresenter?.Configure(DemoAudio, _cachedCloseSettingsAction);
@@ -294,6 +302,8 @@ namespace SweepNDodge.DotsBullets
             _configuredAudio = DemoAudio;
             _configuredPauseBridge = PauseBridge;
             _configuredRuntimeHud = RuntimeHudBridge;
+            _configuredNotificationBridge = NotificationBridge;
+            _configuredHintBridge = HintBridge;
         }
 
         private void ApplyShellState(bool force)
@@ -343,6 +353,8 @@ namespace SweepNDodge.DotsBullets
             LobbyPresenter?.RefreshPresentation();
             if (showHud)
             {
+                NotificationBridge?.RefreshPresentationState();
+                HintBridge?.RefreshPresentationState();
                 StageHudPresenter?.RefreshPresentation();
                 NotificationPresenter?.RefreshPresentation();
                 HintPresenter?.RefreshPresentation();
@@ -468,6 +480,19 @@ namespace SweepNDodge.DotsBullets
             DemoAudio ??= FindFirst<DemoAudioBridge>();
             PauseBridge ??= FindFirst<DemoShellPauseBridge>();
             RuntimeHudBridge ??= FindFirst<PlayerRuntimeHudBridge>();
+            NotificationBridge ??= FindFirst<DemoShellNotificationBridge>();
+            HintBridge ??= FindFirst<DemoShellHintBridge>();
+
+            if (DemoShell != null)
+            {
+                NotificationBridge ??= DemoShell.GetComponent<DemoShellNotificationBridge>();
+                HintBridge ??= DemoShell.GetComponent<DemoShellHintBridge>();
+
+                if (NotificationBridge == null)
+                    NotificationBridge = DemoShell.gameObject.AddComponent<DemoShellNotificationBridge>();
+                if (HintBridge == null)
+                    HintBridge = DemoShell.gameObject.AddComponent<DemoShellHintBridge>();
+            }
         }
 
         private void AutoBindReferences()

@@ -9,6 +9,7 @@ namespace SweepNDodge.DotsBullets
     /// GO HUD는 본 스냅샷을 read-only로 소비한다.
     /// </summary>
     [UpdateInGroup(typeof(BulletExecutionEndGroup))]
+    [UpdateAfter(typeof(PlayerHazardRiskResolveSystem))]
     [UpdateAfter(typeof(CombatEventChannelConsumeSystem))]
     [UpdateBefore(typeof(PlayerUiFeedbackConsumeSystem))]
     public partial struct PlayerHudSnapshotCollectSystem : ISystem
@@ -19,6 +20,8 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
+            state.RequireForUpdate<PlayerHazardRiskConfigComponent>();
+            state.RequireForUpdate<PlayerHazardRiskStateComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
             state.RequireForUpdate<CombatEventMetricsComponent>();
             state.RequireForUpdate<PlayerHudSnapshotComponent>();
@@ -29,6 +32,8 @@ namespace SweepNDodge.DotsBullets
         public void OnUpdate(ref SystemState state)
         {
             var carry = SystemAPI.GetSingleton<PlayerCarryBinComponent>();
+            var hazardRiskConfig = SystemAPI.GetSingleton<PlayerHazardRiskConfigComponent>();
+            var hazardRiskState = SystemAPI.GetSingleton<PlayerHazardRiskStateComponent>();
             var stage = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
             var combat = SystemAPI.GetSingleton<CombatEventMetricsComponent>();
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
@@ -73,6 +78,8 @@ namespace SweepNDodge.DotsBullets
 
             snapshot.CarryLoad = math.max(0, carry.Load);
             snapshot.CarryCapacity = math.max(0, carry.Capacity);
+            snapshot.HazardStack = math.max(0, hazardRiskState.HazardStack);
+            snapshot.HazardRiskMultiplier = 1f + snapshot.HazardStack * math.max(0f, hazardRiskConfig.HazardBonusRate);
             snapshot.TotalSourceCount = math.max(0, totalSources);
             snapshot.DepletedSourceCount = math.clamp(depletedSources, 0, snapshot.TotalSourceCount);
 

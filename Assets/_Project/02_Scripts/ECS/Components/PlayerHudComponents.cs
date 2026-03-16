@@ -7,6 +7,8 @@ namespace SweepNDodge.DotsBullets
     {
         public int CarryLoad;
         public int CarryCapacity;
+        public int HazardStack;
+        public float HazardRiskMultiplier;
 
         public int DepletedSourceCount;
         public int TotalSourceCount;

@@ -12,6 +12,7 @@
   - [TD-011-runtime-player-hud-contract.md](./TD-011-runtime-player-hud-contract.md)
   - [TD-013-player-feedback-presentation-bridge-contract.md](./TD-013-player-feedback-presentation-bridge-contract.md)
   - [TD-014-demo-audio-runtime-contract.md](./TD-014-demo-audio-runtime-contract.md)
+  - [TD-020-hint-notification-runtime-contract.md](./TD-020-hint-notification-runtime-contract.md)
 - related_adr: 중요 결정 없음 (ADR 신규 작성 없음)
 
 > Runtime UI는 `uGUI` 단일 스택으로 고정하고, 기존 owner/bridge 경계를 유지한 채 `OnGUI` 표시를 `reader-only presenter`로 치환한다.
@@ -21,7 +22,7 @@
   - `RuntimeUiRoot` 프리팹 + `SampleScene` / `PlayModeSmoke_Dedicated` 씬 고정 인스턴스 배치
   - Shell V1: `Title`, `Lobby`, `Result`, `DemoComplete`, shared `Settings(audio)`
   - Modal V2: `Pause`, `Confirm`
-  - HUD V1: `Stage HUD`, `HintToast`
+  - HUD V1: `Stage HUD`, `Notification`, `Hint`
 - 현재 공개 빌드 경로에서 `Title/Lobby/Stage HUD/Result/DemoComplete/Settings/Pause/Confirm`는 `uGUI` 기준으로 동작한다.
 - 미완료 범위
   - 온보딩 전용 힌트 시퀀스
@@ -115,7 +116,8 @@
   - `DemoCompletePanel`
 - `HudLayer`
   - `StageHudPanel`
-  - `HintToastPanel`
+  - `NotificationPanel`
+  - `HintPanel`
 - `ModalLayer`
   - `PausePanel`
   - `SettingsPanel`
@@ -127,27 +129,24 @@
 
 ### 4.2.1 현재 HUD V1 구성
 - `StageHudPanel`
-  - `TopLeftAnchor`
-    - `StageLabel`
-    - `ObjectiveText`
-    - `SourceProgressText`
+  - `TopCenterObjectiveRoot`
+    - `ObjectiveSummaryText`
+    - `ObjectiveDetailText`
+    - `TimerValueText`
     - `PressureSourceProgressRoot`
-      - `PressureSourceLabel`
       - pressure progress bar
       - `WeakThresholdMarker`
       - `PressureSourceValueText`
-  - `TopRightAnchor`
-    - `TimerLabel`
-    - `TimerValueText`
+  - `LeftCarryRoot`
     - `CarryLabel`
     - carry fill bar
     - `CarryValueText`
-  - `TopCenterAnchor`
-    - `DangerBannerRoot`
-    - `DangerText`
-- `HintToastPanel`
-  - `ToastRoot`
-  - `ToastText`
+- `NotificationPanel`
+  - `NotificationRoot`
+  - `NotificationText`
+- `HintPanel`
+  - `HintRoot`
+  - `HintText`
 
 ### 4.3 Presenter 구조
 - `RuntimeUiRoot`
@@ -164,7 +163,8 @@
   - `PausePresenter`
   - `SettingsPresenter`
   - `ConfirmDialogPresenter`
-  - `HintToastPresenter`
+  - `NotificationPresenter`
+  - `HintPresenter`
   - `ScreenFxPresenter`
 - 원칙:
   - `RuntimeUiRoot`는 얇은 coordinator로 유지한다.
@@ -217,12 +217,13 @@
   - flash/shake intensity
   - input tooltip/guide visibility
 
-### 5.4 Hint / Toast
+### 5.4 Hint / Notification
 - 입력 source:
   - `PlayerRuntimeHudBridge` feedback state
-  - 온보딩 상태 공급자(후속 도입)
+  - 온보딩/seen-state 공급자(후속 도입)
 - 원칙:
   - gameplay writer를 추가하지 않고 기존 스냅샷/세션 상태를 읽는다
+  - `Notification` / `Hint` 책임 분리와 재노출 정책은 [TD-020-hint-notification-runtime-contract.md](./TD-020-hint-notification-runtime-contract.md)를 SSOT로 둔다
 
 ### 5.5 갱신 방식
 - presenter는 매 프레임 전체 UI rebuild를 하지 않는다.
@@ -351,3 +352,4 @@
 - 2026-03-12: 초안 작성. Runtime UI를 `uGUI` 단일 스택으로 고정하고, `OnGUI -> reader-only presenter` 마이그레이션 구조와 입력/내비게이션 기준을 정리했다.
 - 2026-03-12: 구현 권장안을 반영해 `RuntimeUiRoot` 프리팹 + 씬 고정 인스턴스, `Shell -> Modal -> HUD/Fx` 마이그레이션 순서, `root coordinator + panel presenter` 구조를 추가로 고정했다.
 - 2026-03-13: 구현 반영. `Shell V1`, `Modal V2`, `HUD V1`의 실제 프리팹/패널/bridge 계약과 최신 검증 결과를 문서에 반영하고, `Pressure Source` 진행 바와 weakened threshold marker를 HUD V1 범위에 포함시켰다.
+- 2026-03-16: `HUD V1` 재배치와 후속 설계 반영. `HintToast`를 `Notification` / `Hint` 2레인 구조로 교체하고, `TD-020`을 `Hint/Notification V2` SSOT로 연결했다.

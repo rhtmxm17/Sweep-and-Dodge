@@ -74,11 +74,17 @@ namespace SweepNDodge.DotsBullets
                 new Vector2(0f, 0.5f),
                 new Vector2(0f, 0.5f),
                 new Vector2(24f, 0f),
-                new Vector2(300f, 120f),
+                new Vector2(300f, 184f),
                 new Color(0.08f, 0.10f, 0.14f, 0.72f));
             StageHudPresenter.CarryLabel ??= FindOrCreateText(carryRoot, "CarryLabel", "Carry", 20f, FontStyles.Bold, TextAlignmentOptions.Left);
             StageHudPresenter.CarryFillImage ??= CreateFillBar(carryRoot, "CarryBar", new Vector2(0f, 24f));
             StageHudPresenter.CarryValueText ??= FindOrCreateText(carryRoot, "CarryValueText", "0 / 0", 18f, FontStyles.Normal, TextAlignmentOptions.Left);
+            var hazardRoot = CreateHazardStackRoot(carryRoot, "HazardStackRoot");
+            StageHudPresenter.HazardStackRoot ??= hazardRoot.gameObject;
+            StageHudPresenter.HazardStackLabel ??= FindOrCreateText(hazardRoot, "HazardStackLabel", "Hazard", 16f, FontStyles.Bold, TextAlignmentOptions.Left);
+            var hazardSegmentsRoot = CreateHazardStackSegmentsRoot(hazardRoot, "HazardStackSegmentsRoot");
+            EnsureHazardSegments(hazardSegmentsRoot, StageHudPresenter);
+            StageHudPresenter.RiskMultiplierText ??= FindOrCreateText(hazardRoot, "RiskMultiplierText", "x1.00", 16f, FontStyles.Normal, TextAlignmentOptions.Left);
         }
 
         private void BuildNotificationPanel()
@@ -207,6 +213,75 @@ namespace SweepNDodge.DotsBullets
             return rect;
         }
 
+        private static RectTransform CreateHazardStackRoot(Transform parent, string name)
+        {
+            var go = GetOrCreateChildGameObject(parent, name, typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            var rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(0f, 58f);
+
+            var layoutElement = go.GetComponent<LayoutElement>();
+            layoutElement.minHeight = 58f;
+            layoutElement.preferredHeight = 58f;
+            layoutElement.flexibleWidth = 1f;
+
+            var layout = go.GetComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(0, 0, 2, 0);
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.childControlWidth = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            return rect;
+        }
+
+        private static RectTransform CreateHazardStackSegmentsRoot(Transform parent, string name)
+        {
+            var go = GetOrCreateChildGameObject(parent, name, typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            var rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(0f, 14f);
+
+            var layoutElement = go.GetComponent<LayoutElement>();
+            layoutElement.minHeight = 14f;
+            layoutElement.preferredHeight = 14f;
+            layoutElement.flexibleWidth = 1f;
+
+            var layout = go.GetComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(0, 0, 0, 0);
+            layout.spacing = 6f;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            return rect;
+        }
+
+        private static void EnsureHazardSegments(RectTransform root, StageHudPresenter presenter)
+        {
+            if (root == null || presenter == null)
+                return;
+
+            const int segmentCount = 5;
+            var segments = new Image[segmentCount];
+            for (int i = 0; i < segmentCount; i++)
+            {
+                var segmentGo = GetOrCreateChildGameObject(root, $"Segment_{i}", typeof(Image), typeof(LayoutElement));
+                var layout = segmentGo.GetComponent<LayoutElement>();
+                layout.minWidth = 0f;
+                layout.preferredWidth = 0f;
+                layout.flexibleWidth = 1f;
+                layout.minHeight = 14f;
+                layout.preferredHeight = 14f;
+
+                var image = segmentGo.GetComponent<Image>();
+                image.color = new Color(0.54f, 0.59f, 0.66f, 0.42f);
+                ApplyDefaultImageSprite(image);
+                segments[i] = image;
+            }
+
+            presenter.HazardStackSegmentImages = segments;
+        }
+
         private static void SetVerticalAlignment(RectTransform root, TextAnchor alignment)
         {
             if (root == null)
@@ -225,8 +300,14 @@ namespace SweepNDodge.DotsBullets
                 || presenter.ObjectiveSummaryText == null
                 || presenter.ObjectiveDetailText == null
                 || presenter.CarryFillImage == null
+                || presenter.HazardStackRoot == null
+                || presenter.HazardStackLabel == null
+                || presenter.RiskMultiplierText == null
+                || presenter.HazardStackSegmentImages == null
+                || presenter.HazardStackSegmentImages.Length != 5
                 || root.Find("TopCenterObjectiveRoot") == null
-                || root.Find("LeftCarryRoot") == null;
+                || root.Find("LeftCarryRoot") == null
+                || root.Find("LeftCarryRoot/HazardStackRoot") == null;
         }
 
         private void ResetStageHudReferences()
@@ -239,8 +320,12 @@ namespace SweepNDodge.DotsBullets
             StageHudPresenter.TimerValueText = null;
             StageHudPresenter.CarryLabel = null;
             StageHudPresenter.CarryValueText = null;
+            StageHudPresenter.HazardStackLabel = null;
+            StageHudPresenter.RiskMultiplierText = null;
             StageHudPresenter.PressureSourceValueText = null;
+            StageHudPresenter.HazardStackRoot = null;
             StageHudPresenter.PressureSourceProgressRoot = null;
+            StageHudPresenter.HazardStackSegmentImages = null;
             StageHudPresenter.PressureSourceFillImage = null;
             StageHudPresenter.PressureSourceWeakThresholdMarker = null;
             StageHudPresenter.CarryFillImage = null;
