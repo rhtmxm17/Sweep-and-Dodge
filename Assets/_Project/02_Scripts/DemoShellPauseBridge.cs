@@ -21,7 +21,9 @@ namespace SweepNDodge.DotsBullets
         private DemoShellPauseActionId _pendingAction;
         private bool _warnedBindFailure;
 
-        public bool CanPause => DemoShell != null && DemoShell.CurrentScreen == DemoShellScreenId.StagePlay;
+        public bool CanPause => DemoShell != null
+            && DemoShell.CurrentScreen == DemoShellScreenId.StagePlay
+            && !DemoShell.IsDialogueInputExclusive;
         public bool IsPaused => _isPaused;
         public DemoShellPauseActionId PendingAction => _pendingAction;
         public bool GameplayInputBlocked => _isPaused;

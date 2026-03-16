@@ -394,6 +394,113 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_ClearReadySubscriber_DefersResultUntilCompletion()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+            DemoShellPauseBridge pauseBridge = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null && uiRoot != null && pauseBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene was not ready for clear defer test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Clear defer test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1;
+                },
+                360,
+                "Clear defer test did not reach StagePlay.");
+
+            yield return WaitForCondition(
+                () => IsStageMapAppliedForStage1(em),
+                240,
+                "StageMap layout was not applied for clear defer test.");
+
+            ForceStageStateToRunning(em, 0f);
+            yield return WaitForCondition(
+                () => HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                240,
+                "RunDirector stage did not reach Running before clear defer test.");
+
+            int requestCount = 0;
+            DemoShellStageResultMetrics requestedResult = default;
+            shell.PreResultClearPresentationRequested += result =>
+            {
+                requestCount++;
+                requestedResult = result;
+            };
+
+            ForceStageStateToClearReady(em);
+            yield return null;
+            yield return null;
+
+            shell = FindDemoShell();
+            uiRoot = FindRuntimeUiRoot();
+            pauseBridge = FindPauseBridge();
+
+            Assert.That(shell, Is.Not.Null);
+            Assert.That(uiRoot, Is.Not.Null);
+            Assert.That(pauseBridge, Is.Not.Null);
+            Assert.That(requestCount, Is.EqualTo(1));
+            Assert.That(requestedResult.Outcome, Is.EqualTo(DemoShellStageOutcomeId.Clear));
+            Assert.That(shell.CurrentScreen, Is.EqualTo(DemoShellScreenId.StagePlay));
+            Assert.That(shell.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.ClearPresentation));
+            Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult), Is.False);
+            Assert.That(pauseBridge.CanPause, Is.False);
+
+            var gate = GetSingleton<RunDirectorStageGateComponent>(em);
+            var request = GetSingleton<RunDirectorStageRequestComponent>(em);
+            Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
+            Assert.That(request.ConfirmPressed, Is.EqualTo(0));
+
+            Assert.That(shell.NotifyPreResultClearPresentationCompleted(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    return shell != null
+                        && uiRoot != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult);
+                },
+                240,
+                "StageResult was not entered after clear presentation completion.");
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_RuntimeUiRoot_SettingsAudio_ApplyAndPersist()
         {
             ClearAudioVolumePrefs();
@@ -2653,6 +2760,15 @@ namespace SweepNDodge.DotsBullets.Tests
 #endif
         }
 
+        private static DemoShellPauseBridge FindPauseBridge()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<DemoShellPauseBridge>();
+#else
+            return Object.FindObjectOfType<DemoShellPauseBridge>();
+#endif
+        }
+
         private static StagePresentationRuntimeController FindStagePresentationRuntimeController()
         {
 #if UNITY_2023_1_OR_NEWER
@@ -2746,6 +2862,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             DemoShellSessionStaging.ResetSessionMetrics();
             DemoShellSessionStaging.ResetHintSessionState();
+            DemoShellSessionStaging.ResetDialogueSessionState();
         }
 
         private static void ClearAudioVolumePrefs()

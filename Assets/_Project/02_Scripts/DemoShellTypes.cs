@@ -25,6 +25,15 @@ namespace SweepNDodge.DotsBullets
         Fail = 1,
     }
 
+    public enum DemoShellStagePlayPhaseId : byte
+    {
+        None = 0,
+        Starting = 1,
+        Running = 2,
+        ClearPresentation = 3,
+        AwaitingClearCompleted = 4,
+    }
+
     public enum DemoShellPauseActionId : byte
     {
         Resume = 0,

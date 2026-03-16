@@ -197,7 +197,7 @@
 - 완료 기준
   - stage별 sequence를 데이터로 authoring 가능하다.
   - `StageStart`, `StageClear`, `ThemeTransition` lookup 규칙이 고정된다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 8.2 P2 Shell / gate 통합
 - 목표
@@ -206,7 +206,7 @@
   - `ClearReady` 직후 즉시 `StageResult`로 넘어가지 않는다.
   - clear sequence 완료/skip 시에만 `SetClearPresentationDone(true)` + `RequestConfirm()`가 호출된다.
   - 결과 metrics snapshot 시점이 `ClearReady/fail confirm` 기준으로 재정렬된다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 8.3 P3 Dialogue bridge / runtime state
 - 목표
@@ -271,3 +271,4 @@
 
 ## 11. 변경 이력
 - 2026-03-16: 초안 작성. `StageStart=overlay`, `StageClear=pre-result clear gate`, `DemoShellFlowController` 전환 owner, `DemoShellDialogueBridge` session owner, `PresentationLayer`/anchor 재사용 계약을 정리했다.
+- 2026-03-16: `P1`, `P2` 구현 반영. `DemoShellSessionStaging`에 dialogue state를 추가했고, `DemoShellFlowController`가 `ClearReady -> pre-result defer -> Completed -> StageResult`를 직접 소유하도록 갱신했다. EditMode 210 pass, PlayMode dedicated smoke pass, clear defer subscriber PlayMode pass를 확인했다.
