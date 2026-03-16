@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SweepNDodge.DotsBullets
 {
     public readonly struct DemoShellStartupRequest
@@ -22,6 +24,8 @@ namespace SweepNDodge.DotsBullets
         private static bool _hasActiveStageSeen;
         private static int _activeStageSeenStageId;
         private static ulong _activeStageSeenMask;
+        private static readonly HashSet<string> DialogueSeenEntryKeys = new(System.StringComparer.Ordinal);
+        private static readonly Dictionary<int, int> DialogueStageAttemptCounts = new();
 
         public static bool IsStartupPending => _hasPendingRequest;
         public static ulong HintSessionSeenMask => _hintSessionSeenMask;
@@ -65,6 +69,57 @@ namespace SweepNDodge.DotsBullets
         {
             _hintSessionSeenMask = 0UL;
             ClearActiveStageSeen();
+        }
+
+        public static void IncrementDialogueStageAttempt(int stageId)
+        {
+            if (stageId <= 0)
+                return;
+
+            if (DialogueStageAttemptCounts.TryGetValue(stageId, out int attemptCount))
+            {
+                DialogueStageAttemptCounts[stageId] = attemptCount + 1;
+                return;
+            }
+
+            DialogueStageAttemptCounts.Add(stageId, 1);
+        }
+
+        public static void ResetDialogueStageAttempts()
+        {
+            DialogueStageAttemptCounts.Clear();
+        }
+
+        public static int GetDialogueStageAttemptCount(int stageId)
+        {
+            if (stageId <= 0)
+                return 0;
+
+            return DialogueStageAttemptCounts.TryGetValue(stageId, out int attemptCount)
+                ? attemptCount
+                : 0;
+        }
+
+        public static bool HasSeenDialogueEntry(string entryKey)
+        {
+            if (string.IsNullOrWhiteSpace(entryKey))
+                return false;
+
+            return DialogueSeenEntryKeys.Contains(entryKey.Trim());
+        }
+
+        public static void MarkSeenDialogueEntry(string entryKey)
+        {
+            if (string.IsNullOrWhiteSpace(entryKey))
+                return;
+
+            DialogueSeenEntryKeys.Add(entryKey.Trim());
+        }
+
+        public static void ResetDialogueSessionState()
+        {
+            DialogueSeenEntryKeys.Clear();
+            ResetDialogueStageAttempts();
         }
 
         public static void SetActiveStageSeen(int stageId, ulong stageSeenMask)

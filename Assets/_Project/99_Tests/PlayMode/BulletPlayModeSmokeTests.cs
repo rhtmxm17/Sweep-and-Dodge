@@ -2287,15 +2287,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 return false;
             if (!TryFindDepositByStableId(em, 2001u, out var deposit2001))
                 return false;
-            if (!TryFindObstacleByStableId(em, 3002u, out var obstacle3002))
+            if (!TryFindObstacleByStableId(em, 3004u, out var obstacle3004))
                 return false;
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
             var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3002);
-            var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3002);
+            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3004);
+            var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3004);
 
             return sourceState2.State == SourceStateId.Normal
                 && area2.Kind == Shape2DKind.Circle
@@ -2323,7 +2323,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             bool hasSource = TryFindSourceByStableId(em, 1002u, out var source1002);
             bool hasDeposit = TryFindDepositByStableId(em, 2001u, out var deposit2001);
-            bool hasObstacle = TryFindObstacleByStableId(em, 3002u, out var obstacle3002);
+            bool hasObstacle = TryFindObstacleByStableId(em, 3004u, out var obstacle3004);
 
             string sourceText = "source1002=missing";
             if (hasSource)
@@ -2342,13 +2342,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 depositText = $"deposit2001(radius={deposit.Radius:0.##})";
             }
 
-            string obstacleText = "obstacle3002=missing";
+            string obstacleText = "obstacle3004=missing";
             if (hasObstacle)
             {
-                var geometry = em.GetComponentData<Shape2DComponent>(obstacle3002);
-                var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3002);
+                var geometry = em.GetComponentData<Shape2DComponent>(obstacle3004);
+                var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3004);
                 obstacleText =
-                    $"obstacle3002(shape={geometry.Kind}, radius={geometry.Radius:0.##}, size=({geometry.Size.x:0.##},{geometry.Size.y:0.##}), mask={mask.Value})";
+                    $"obstacle3004(shape={geometry.Kind}, radius={geometry.Radius:0.##}, size=({geometry.Size.x:0.##},{geometry.Size.y:0.##}), mask={mask.Value})";
             }
 
             return $"{topologyText}, {sourceText}, {depositText}, {obstacleText}";
@@ -2415,14 +2415,14 @@ namespace SweepNDodge.DotsBullets.Tests
             CompleteTrackedJobs(em);
             Assert.That(TryFindSourceByStableId(em, 1002u, out var source1002), Is.True);
             Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
-            Assert.That(TryFindObstacleByStableId(em, 3002u, out var obstacle3002), Is.True);
+            Assert.That(TryFindObstacleByStableId(em, 3004u, out var obstacle3004), Is.True);
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
             var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3002);
-            var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3002);
+            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3004);
+            var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3004);
 
             Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Normal));
             Assert.That(area2.Kind, Is.EqualTo(Shape2DKind.Circle));

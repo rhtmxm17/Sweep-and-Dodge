@@ -234,6 +234,7 @@ namespace SweepNDodge.DotsBullets
 
             DemoShellSessionStaging.ResetSessionMetrics();
             DemoShellSessionStaging.ClearActiveStageSeen();
+            DemoShellSessionStaging.ResetDialogueSessionState();
             RefreshSessionMetrics();
             EnterStagePlay(stageIndex);
             return true;
@@ -260,6 +261,7 @@ namespace SweepNDodge.DotsBullets
                     case DemoShellResultActionId.ReturnToLobby:
                         DemoShellSessionStaging.ResetSessionMetrics();
                         DemoShellSessionStaging.ClearActiveStageSeen();
+                        DemoShellSessionStaging.ResetDialogueSessionState();
                         DemoShellSessionStaging.StageLobby();
                         ReloadActiveScene();
                         return true;
@@ -288,6 +290,7 @@ namespace SweepNDodge.DotsBullets
 
             DemoShellSessionStaging.ResetSessionMetrics();
             DemoShellSessionStaging.ResetHintSessionState();
+            DemoShellSessionStaging.ResetDialogueSessionState();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
             return true;
@@ -312,6 +315,7 @@ namespace SweepNDodge.DotsBullets
 
             DemoShellSessionStaging.ResetSessionMetrics();
             DemoShellSessionStaging.ClearActiveStageSeen();
+            DemoShellSessionStaging.ResetDialogueSessionState();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
             return true;
@@ -324,6 +328,7 @@ namespace SweepNDodge.DotsBullets
 
             DemoShellSessionStaging.ResetSessionMetrics();
             DemoShellSessionStaging.ClearActiveStageSeen();
+            DemoShellSessionStaging.ResetDialogueSessionState();
             DemoShellSessionStaging.StageLobby();
             ReloadActiveScene();
             return true;
@@ -538,6 +543,7 @@ namespace SweepNDodge.DotsBullets
                 case DemoShellResultActionId.ReturnToLobby:
                     DemoShellSessionStaging.ResetSessionMetrics();
                     DemoShellSessionStaging.ClearActiveStageSeen();
+                    DemoShellSessionStaging.ResetDialogueSessionState();
                     DemoShellSessionStaging.StageLobby();
                     ReloadActiveScene();
                     return;
@@ -568,6 +574,7 @@ namespace SweepNDodge.DotsBullets
             if (!TryGetStageProfile(stageIndex, out var profile))
                 return;
 
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(profile.StageId);
             _currentStageIndex = stageIndex;
             _stageStartPending = true;
             _stageTopologyApplyPending = true;

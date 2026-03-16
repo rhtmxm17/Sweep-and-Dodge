@@ -27,6 +27,8 @@ namespace SweepNDodge.DotsBullets.Editor
             var stageLayouts = CollectScriptableObjects<StageLayoutSO>();
             var stagePresentationCatalogs = CollectScriptableObjects<StagePresentationCatalogSO>();
             var topologyPrefabCatalogs = CollectScriptableObjects<StageTopologyPrefabCatalogSO>();
+            var inWorldDialogueCatalogs = CollectScriptableObjects<InWorldDialogueCatalogSO>();
+            var inWorldDialogueSpeakerCatalogs = CollectScriptableObjects<InWorldDialogueSpeakerCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
             var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
@@ -40,6 +42,8 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(stageLayouts);
             SortRecordsByLocation(stagePresentationCatalogs);
             SortRecordsByLocation(topologyPrefabCatalogs);
+            SortRecordsByLocation(inWorldDialogueCatalogs);
+            SortRecordsByLocation(inWorldDialogueSpeakerCatalogs);
             SortRecordsByLocation(visuals);
             SortRecordsByLocation(sources);
             SortRecordsByLocation(bullets);
@@ -49,6 +53,7 @@ namespace SweepNDodge.DotsBullets.Editor
             StageLayoutValidationRules.ValidateLayoutRecords(stageLayouts, issues);
             StageCatalogValidationRules.ValidateCatalogRecords(stageCatalogs, issues);
             StagePresentationCatalogValidationRules.ValidateCatalogRecords(stagePresentationCatalogs, stageLayouts, issues);
+            InWorldDialogueCatalogValidationRules.ValidateCatalogRecords(inWorldDialogueCatalogs, inWorldDialogueSpeakerCatalogs, issues);
             SortIssuesInPlace(issues);
             return issues;
         }

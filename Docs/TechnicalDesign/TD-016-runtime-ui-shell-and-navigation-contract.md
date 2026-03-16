@@ -4,7 +4,7 @@
 - doc_id: `TD-016`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-13`
+- last_updated: `2026-03-16`
 - related_docs:
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [OPS-003-public-release-readiness-plan.md](../ProjectOps/OPS-003-public-release-readiness-plan.md)
@@ -13,6 +13,7 @@
   - [TD-013-player-feedback-presentation-bridge-contract.md](./TD-013-player-feedback-presentation-bridge-contract.md)
   - [TD-014-demo-audio-runtime-contract.md](./TD-014-demo-audio-runtime-contract.md)
   - [TD-020-hint-notification-runtime-contract.md](./TD-020-hint-notification-runtime-contract.md)
+  - [TD-022-in-world-dialogue-runtime-contract.md](./TD-022-in-world-dialogue-runtime-contract.md)
 - related_adr: 중요 결정 없음 (ADR 신규 작성 없음)
 
 > Runtime UI는 `uGUI` 단일 스택으로 고정하고, 기존 owner/bridge 경계를 유지한 채 `OnGUI` 표시를 `reader-only presenter`로 치환한다.
@@ -26,6 +27,7 @@
 - 현재 공개 빌드 경로에서 `Title/Lobby/Stage HUD/Result/DemoComplete/Settings/Pause/Confirm`는 `uGUI` 기준으로 동작한다.
 - 미완료 범위
   - 온보딩 전용 힌트 시퀀스
+  - `PresentationLayer` 기반 인월드 연출 대화
   - `FxLayer` 기반 화면 플래시/비네트/타임아웃 overlay
   - 접근성 확장 옵션(`UI Scale`, `Text Size`, `Hit Flash`, `Screen Shake`, `Background Motion`)
 
@@ -84,7 +86,9 @@
   - `ResultPresenter`
   - `DemoCompletePresenter`
   - `SettingsPresenter`
-  - `HintToastPresenter`
+  - `NotificationPresenter`
+  - `HintPresenter`
+  - `InWorldDialoguePresenter`
 - 원칙:
   - UI는 ECS 컴포넌트 write 금지
   - UI는 `DemoShellFlowController`, `PlayerRuntimeHudBridge`, `DemoAudioBridge`를 read-only로 참조한다
@@ -118,6 +122,8 @@
   - `StageHudPanel`
   - `NotificationPanel`
   - `HintPanel`
+- `PresentationLayer`
+  - `InWorldDialoguePanel`
 - `ModalLayer`
   - `PausePanel`
   - `SettingsPanel`
@@ -165,6 +171,7 @@
   - `ConfirmDialogPresenter`
   - `NotificationPresenter`
   - `HintPresenter`
+  - `InWorldDialoguePresenter`
   - `ScreenFxPresenter`
 - 원칙:
   - `RuntimeUiRoot`는 얇은 coordinator로 유지한다.
@@ -173,10 +180,12 @@
 ### 4.4 기본 화면 정책
 - 한 시점에 `ShellLayer`의 주 패널은 1개만 활성
 - `HudLayer`는 `StagePlay`에서만 활성
+- `PresentationLayer`는 `StagePlay`와 `pre-result clear dialogue` 구간에서 활성 가능
 - `ModalLayer`는 shell/hud 위에 중첩 가능
 - `FxLayer`는 shell/hud/modal과 독립적으로 재생 가능
 - Shell 패널은 `DemoShellFlowController.CurrentScreen`에 따라 전환한다.
 - Modal은 shell 상태와 독립적으로 열고 닫되, 최종 명령은 owner에 위임한다.
+- 인월드 연출 대화가 active면 lower-center `Notification` / `Hint`는 suppress 가능하다.
 
 ## 5. 데이터 연결 계약
 ### 5.1 Shell 화면
@@ -224,13 +233,24 @@
 - 원칙:
   - gameplay writer를 추가하지 않고 기존 스냅샷/세션 상태를 읽는다
   - `Notification` / `Hint` 책임 분리와 재노출 정책은 [TD-020-hint-notification-runtime-contract.md](./TD-020-hint-notification-runtime-contract.md)를 SSOT로 둔다
+  - 인월드 연출 대화 active 동안 lower-center lane suppress 규칙은 [TD-022-in-world-dialogue-runtime-contract.md](./TD-022-in-world-dialogue-runtime-contract.md)를 따른다
 
-### 5.5 갱신 방식
+### 5.5 In-World Dialogue
+- 입력 source:
+  - `DemoShellFlowController`
+  - `DemoShellDialogueBridge`
+  - `StagePresentationRuntimeController`
+- 원칙:
+  - `PresentationLayer`는 `InWorldDialoguePresenter`를 통해 reader-only로 갱신한다
+  - `StageClear` dialogue는 `ResultPanel`보다 먼저 노출될 수 있다
+  - `DemoShellFlowController`가 전환 owner이며, UI는 상태 표시와 입력 전달만 담당한다
+
+### 5.6 갱신 방식
 - presenter는 매 프레임 전체 UI rebuild를 하지 않는다.
 - `CurrentScreen`, `StageOutcome`, snapshot version, 마지막 표시값을 캐시해 변경 시점에만 표시를 갱신한다.
 - HUD 수치와 feedback/toast는 폴링을 허용하되, 레이아웃 rebuild를 최소화한다.
 
-### 5.6 현재 read-only bridge 계약
+### 5.7 현재 read-only bridge 계약
 - `PlayerRuntimeHudBridge`
   - `TryGetLastSnapshot(out PlayerHudSnapshotComponent snapshot)`
   - `TryGetLastFeedbackSnapshot(out PlayerUiFeedbackPresentationSnapshotComponent snapshot)`
@@ -262,6 +282,7 @@
 ### 6.3 KB+Mouse UX 기준
 - Title: 클릭 또는 `Submit`
 - Lobby: 버튼 클릭, 필요 시 화살표/WASD + `Submit`
+- Dialogue: `Submit` 또는 좌클릭 advance, `Cancel` 또는 별도 skip binding
 - Settings: 슬라이더 drag, 좌우 입력, `Cancel`로 닫기
 - Pause/Confirm: `Cancel` 또는 명시 버튼으로 닫기
 
@@ -323,6 +344,8 @@
   - HUD가 `PlayerHudSnapshotComponent` 값을 표시한다
   - Settings가 `DemoAudioBridge` 볼륨 값을 읽고 즉시 반영한다
   - `Pause/Confirm` 모달이 shell/hud 위에서 정상 동작한다
+  - `PresentationLayer`가 `HudLayer`와 독립적으로 활성/비활성된다
+  - 인월드 연출 대화 active 동안 `Notification/Hint`가 숨겨지고, clear dialogue 완료 후에만 `ResultPanel`이 열린다
   - 공개 빌드에서 `OnGUI` 경로가 비노출이다
   - 마우스 클릭과 키보드 `Submit/Cancel` 모두 기본 경로에서 동작한다
 
@@ -353,3 +376,4 @@
 - 2026-03-12: 구현 권장안을 반영해 `RuntimeUiRoot` 프리팹 + 씬 고정 인스턴스, `Shell -> Modal -> HUD/Fx` 마이그레이션 순서, `root coordinator + panel presenter` 구조를 추가로 고정했다.
 - 2026-03-13: 구현 반영. `Shell V1`, `Modal V2`, `HUD V1`의 실제 프리팹/패널/bridge 계약과 최신 검증 결과를 문서에 반영하고, `Pressure Source` 진행 바와 weakened threshold marker를 HUD V1 범위에 포함시켰다.
 - 2026-03-16: `HUD V1` 재배치와 후속 설계 반영. `HintToast`를 `Notification` / `Hint` 2레인 구조로 교체하고, `TD-020`을 `Hint/Notification V2` SSOT로 연결했다.
+- 2026-03-16: `TD-022` 연계 반영. `PresentationLayer`, `InWorldDialoguePresenter`, dialogue 입력/표시 우선순위, lower-center lane suppress 규칙을 추가했다.

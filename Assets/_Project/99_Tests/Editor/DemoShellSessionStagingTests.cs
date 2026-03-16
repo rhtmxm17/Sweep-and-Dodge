@@ -12,6 +12,8 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             DemoShellSessionStaging.ResetSessionMetrics();
+            DemoShellSessionStaging.ResetHintSessionState();
+            DemoShellSessionStaging.ResetDialogueSessionState();
         }
 
         [Test]
@@ -66,6 +68,60 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(metrics.TotalCollectValue, Is.EqualTo(0));
             Assert.That(metrics.TotalCleanupValue, Is.EqualTo(0));
             Assert.That(metrics.TotalHitValue, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void DialogueStageAttempts_IncrementAndResetCorrectly()
+        {
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(0));
+
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(2);
+
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(2));
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(2), Is.EqualTo(1));
+
+            DemoShellSessionStaging.ResetDialogueStageAttempts();
+
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(0));
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(2), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void DialogueSeenEntries_PersistAcrossAttempts_AndClearOnSessionReset()
+        {
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("stage1_intro"), Is.False);
+
+            DemoShellSessionStaging.MarkSeenDialogueEntry("stage1_intro");
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("stage1_intro"), Is.True);
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(2));
+
+            DemoShellSessionStaging.ResetDialogueSessionState();
+
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("stage1_intro"), Is.False);
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void HintAndDialogueState_AreStoredSeparately()
+        {
+            DemoShellSessionStaging.MarkSessionSeenHint(HintId.FirstHitAvoidHazards);
+            DemoShellSessionStaging.MarkSeenDialogueEntry("stage1_intro");
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+
+            Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.True);
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("stage1_intro"), Is.True);
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(1));
+
+            DemoShellSessionStaging.ResetHintSessionState();
+
+            Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.False);
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("stage1_intro"), Is.True);
+            Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(1));
         }
     }
 }

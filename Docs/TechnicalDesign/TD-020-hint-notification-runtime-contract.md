@@ -13,9 +13,10 @@
   - [TD-011-runtime-player-hud-contract.md](./TD-011-runtime-player-hud-contract.md)
   - [TD-013-player-feedback-presentation-bridge-contract.md](./TD-013-player-feedback-presentation-bridge-contract.md)
   - [TD-016-runtime-ui-shell-and-navigation-contract.md](./TD-016-runtime-ui-shell-and-navigation-contract.md)
+  - [TD-022-in-world-dialogue-runtime-contract.md](./TD-022-in-world-dialogue-runtime-contract.md)
 - related_adr: 중요 결정 없음 (ADR 신규 작성 없음)
 
-> `Notification`은 사건 통지, `Hint`는 행동 유도로 역할을 분리하고, Runtime UI는 기존 owner가 만든 스냅샷/상태를 읽어 최종 표시 1개를 결정한다.
+> `Notification`은 사건 통지, `Hint`는 행동 유도로 역할을 분리하고, Runtime UI는 기존 owner가 만든 스냅샷/상태를 읽어 최종 표시 1개를 결정한다. 인월드 연출 대화가 active인 동안 lower-center lane은 suppress된다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -93,9 +94,10 @@
 1. ECS owner가 snapshot을 갱신한다.
 2. `PlayerRuntimeHudBridge`가 최신 snapshot을 캐시한다.
 3. `RuntimeUiRoot.Update()`가 화면 활성 상태를 적용한다.
-4. `NotificationResolver`가 discrete event candidate + derived candidate를 평가한다.
-5. `Hint` 판정이 현재 context와 seen-state를 기준으로 hint 후보를 평가한다.
-6. presenter가 최종 텍스트/표시 상태만 갱신한다.
+4. 인월드 연출 대화가 active면 lower-center lane suppress를 먼저 적용한다.
+5. `NotificationResolver`가 discrete event candidate + derived candidate를 평가한다.
+6. `Hint` 판정이 현재 context와 seen-state를 기준으로 hint 후보를 평가한다.
+7. presenter가 최종 텍스트/표시 상태만 갱신한다.
 
 원칙:
 - resolver는 frame 내 최종 출력 owner다.
@@ -169,6 +171,7 @@
 - `VacuumStartBlocked + CarryBinFull` feedback line은 suppress하고 `CarryFull`로 통일한다.
 - danger candidate가 존재하면 feedback candidate보다 항상 우선한다.
 - 한 시점에 1개만 표시한다.
+- 인월드 연출 대화 active 동안 `Notification` lane 표시는 suppress한다.
 
 ### 5.7 Notification runtime state
 ```csharp
@@ -280,6 +283,7 @@ struct HintSeenState
 - 두 레인은 동시에 표시될 수 있다.
 - 같은 의미의 문구는 두 레인에 동시에 표시하지 않는다.
 - `Notification`은 사건 결과, `Hint`는 다음 행동 제시로 언어를 분리한다.
+- 인월드 연출 대화 active 동안 두 레인은 모두 숨긴다.
 - 예:
   - `CarryFull` notification이 표시 중이면 동일 순간 `CarryFullGoToDeposit` hint는 지연 또는 suppress 대상이다.
   - `HitCarryLost` 직후 `FirstHitAvoidHazards` hint는 짧은 지연 뒤 표시하는 편을 기본값으로 둔다.
@@ -299,7 +303,7 @@ struct HintSeenState
 | `HazardCaptured` | `Notification` | `8` | `Hazard captured` | 수집 성공 통지 | `PlayerUiFeedbackConsumeSystem` -> `PlayerUiFeedbackPresentationSnapshotComponent`, 최종 선택은 `NotificationResolver` | `implemented` |
 | `HazardRemoved` | `Notification` | `8` | `Hazard removed` | 제거/정리 결과 통지 | `PlayerUiFeedbackConsumeSystem` -> `PlayerUiFeedbackPresentationSnapshotComponent`, 최종 선택은 `NotificationResolver` | `implemented` |
 | `Deposited` | `Notification` | `8` | `Deposited` | Deposit 성공 통지 | 별도 discrete producer 필요 | `planned_v2_b` |
-| `StageClear` | `Notification` | `9` | `Stage clear` | 스테이지 클리어 통지 | `DemoShellFlowController` screen/result 전이를 `DemoShellNotificationBridge`가 감지, 최종 선택은 `NotificationResolver` | `implemented` |
+| `StageClear` | `Notification` | `9` | `Stage clear` | 스테이지 클리어 통지 fallback | `DemoShellFlowController` stage/result 문맥을 `DemoShellNotificationBridge`가 감지, 인월드 연출 대화 active 시에는 suppress 또는 omit | `implemented_fallback` |
 | `TimeUp` | `Notification` | `9` | `Time up` | 타임아웃 실패 통지 | `DemoShellFlowController` screen/result 전이를 `DemoShellNotificationBridge`가 감지, 최종 선택은 `NotificationResolver` | `implemented` |
 
 ### 8.2 Hint Catalog
@@ -342,6 +346,7 @@ struct HintSeenState
 - `P2` `Retry` / `Stage enter` / `Fail` 시 seen-state reset 연결: `done`
 - `P3` `Deposited`, `StageClear`, `TimeUp` discrete source 보강 여부 결정: `pending`
 - `P3` stage별 카피 override 필요성 검토: `pending`
+- `P3` 인월드 연출 대화 active 시 lower-center lane suppress 연동: `pending`
 
 ## 11. 검증 계획 / 합격 기준
 - compile
@@ -353,18 +358,21 @@ struct HintSeenState
   - `Hint` session/stage/failure scope 검증
   - `Retry` / `Stage enter` 시 seen-state reset 검증
 - PlayMode smoke
-  - `CarryFull` notification + hint 지연/중복 억제
-  - `Hit` notification 우선순위
-  - `TimeLow -> TimeCritical` 전이
-  - 첫 피격 힌트 1회성
-  - 실패 후 timeout/hit 기반 힌트 노출
+- `CarryFull` notification + hint 지연/중복 억제
+- `Hit` notification 우선순위
+- `TimeLow -> TimeCritical` 전이
+- 첫 피격 힌트 1회성
+- 실패 후 timeout/hit 기반 힌트 노출
+- 인월드 연출 대화 active 동안 `Notification/Hint` 숨김
 
 ## 12. 오픈 이슈
 - `HintSeenState`를 presenter 내부 상태로 둘지, 별도 bridge/owner로 둘지 구현 시점에 확정 필요
 - `Retry` 시 `StageSeen` 유지/초기화는 UX 플레이테스트 후 조정 가능
 - `Deposited`, `StageClear`, `TimeUp` discrete source는 현재 snapshot만으로 충분한지 확인 필요
 - stage별 hint copy override가 필요하면 `GameDesign` 후속 문서와 연결 필요
+- `StageClear` fallback notification을 유지할지, clear dialogue가 없는 시나리오 전용으로 축소할지 후속 정리 필요
 
 ## 13. 변경 이력
 - 2026-03-16: 초안 작성. `Notification`과 `Hint`의 책임 분리, owner/read-only 경계, message ID, 재노출 정책, seen-state 모델, V2 구현 전략을 정리했다.
 - 2026-03-16: 현재 구현 기준 `Message Catalog`를 추가했다. 각 문구의 타입, 우선순위, 목적, 발행자/감지 주체, 구현 상태를 표로 정리했다.
+- 2026-03-16: `TD-022` 연계 반영. 인월드 연출 대화 active 동안 lower-center lane suppress와 `StageClear` fallback 정책을 추가했다.
