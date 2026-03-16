@@ -4,11 +4,12 @@
 - doc_id: `GD-006`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-16`
 - related_adr:
   - [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
   - [ADR-20260219-03-player-cleanup-action-profile-so-externalization.md](../ADR/ADR-20260219-03-player-cleanup-action-profile-so-externalization.md)
   - [ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md](../ADR/ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md)
+  - [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](../ADR/ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md)
 
 ## 0. 전제
 - 본 문서는 [`Source 기반 스폰 & 고갈 시스템`](GD-002-source-based-spawn-and-depletion.md)이 이미 적용된 상태를 전제로 한다.
@@ -73,6 +74,7 @@
 - 조건부 수거 성공 결과는 CarryBin 상태에 따라 분기한다.
   - `HazardCaptured` (`Load < Capacity`):
     - 수거 + 보상 적용
+    - `HazardStack`이 1 증가하며, 증가분은 다음 프레임 수거 배율부터 반영된다.
   - `HazardRemovedWhenCarryFull` (`Load == Capacity`):
     - 제거 전용 처리(디스폰)
     - Carry/Source 진행/HazardStack/`Collect` 미반영
@@ -131,7 +133,9 @@ Hazard 성공 결과는 `수거`와 `제거`를 분리한다.
 - `HazardCaptured` 보상형:
   - 보상은 "점수 증가"만으로는 부족하며, 아래 중 1~2개를 MVP에서 사용한다.
   - CarryBin 즉시 증가: `hazardCarryGain` (Trash 다수 분량)
-  - Source 고갈 진행 가속: `hazardDepletionBonus` (마무리 단축)
+  - HazardStack 증가: 성공 시 `+1`, 다음 프레임 수거부터 `RiskMultiplier`에 반영
+  - Source 고갈 진행 가속은 기본적으로 `HazardStack` 경유 배율로 처리한다.
+  - 별도 `hazardDepletionBonus` 직접 가산은 선택 확장으로 남긴다.
   - 짧은 버프: 일정 시간 Vacuum 효율 증가(선택)
 
 - `HazardRemovedWhenCarryFull` 제거형:

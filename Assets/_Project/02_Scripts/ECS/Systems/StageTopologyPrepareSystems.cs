@@ -302,6 +302,32 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
 
             em.SetComponentData(lifecycleEntity, default(StageTopologyLifecycleStateComponent));
+            ResetPlayerHazardRisk(em);
+        }
+
+        private static void ResetPlayerHazardRisk(EntityManager em)
+        {
+            using var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<PlayerTag>(),
+                ComponentType.ReadWrite<PlayerHazardRiskStateComponent>(),
+                ComponentType.ReadWrite<PlayerHazardRiskRequestComponent>());
+            if (query.IsEmptyIgnoreFilter)
+                return;
+
+            using var players = query.ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < players.Length; i++)
+            {
+                var player = players[i];
+                em.SetComponentData(player, new PlayerHazardRiskStateComponent
+                {
+                    HazardStack = 0,
+                });
+                em.SetComponentData(player, new PlayerHazardRiskRequestComponent
+                {
+                    PendingHazardCapturedCount = 0,
+                    ResetRequested = 0,
+                });
+            }
         }
     }
 

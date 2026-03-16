@@ -187,6 +187,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
+            state.RequireForUpdate<PlayerHazardRiskRequestComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyConfigComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerHazardHitContextComponent>();
@@ -219,10 +220,11 @@ namespace SweepNDodge.DotsBullets
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
             sourceLookup.Update(ref state);
 
-            foreach (var (hitReq, carryBin, penaltyConfig, penaltyState, hitContext) in
+            foreach (var (hitReq, carryBin, riskRequest, penaltyConfig, penaltyState, hitContext) in
                      SystemAPI.Query<
                          EnabledRefRW<PlayerHazardHitRequestTag>,
                          RefRW<PlayerCarryBinComponent>,
+                         RefRW<PlayerHazardRiskRequestComponent>,
                          RefRO<PlayerHazardPenaltyConfigComponent>,
                          RefRW<PlayerHazardPenaltyStateComponent>,
                          RefRW<PlayerHazardHitContextComponent>>().WithAll<PlayerTag>())
@@ -277,6 +279,7 @@ namespace SweepNDodge.DotsBullets
                 hitContext.ValueRW.SourceEntity = Entity.Null;
                 hitContext.ValueRW.HitDirX = 0f;
                 hitContext.ValueRW.HitDirZ = 0f;
+                riskRequest.ValueRW.ResetRequested = 1;
                 Debug.Log($"[HazardCollision] 피격 처리 / loss={loss}, load={carryBin.ValueRO.Load}, contaminationApplied={(contaminationApplied ? 1 : 0)}, iFrame={penaltyState.ValueRO.IFrameTimer:0.00}, vacuumLock={penaltyState.ValueRO.VacuumLockTimer:0.00}");
                 hitReq.ValueRW = false;
             }

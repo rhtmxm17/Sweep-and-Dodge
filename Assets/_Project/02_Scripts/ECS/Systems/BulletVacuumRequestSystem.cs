@@ -37,6 +37,9 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<VacuumActivationConfigComponent>();
             state.RequireForUpdate<VacuumRuntimeStateComponent>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
+            state.RequireForUpdate<PlayerHazardRiskConfigComponent>();
+            state.RequireForUpdate<PlayerHazardRiskStateComponent>();
+            state.RequireForUpdate<PlayerHazardRiskRequestComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
             state.RequireForUpdate<PlayerCleanupActionStateComponent>();
@@ -70,6 +73,8 @@ namespace SweepNDodge.DotsBullets
             var vacuumConfigRO = SystemAPI.GetComponent<VacuumActivationConfigComponent>(playerEntity);
             var vacuumStateRW = SystemAPI.GetComponentRW<VacuumRuntimeStateComponent>(playerEntity);
             var penaltyRW = SystemAPI.GetComponentRW<PlayerHazardPenaltyStateComponent>(playerEntity);
+            var hazardRiskConfigRO = SystemAPI.GetComponent<PlayerHazardRiskConfigComponent>(playerEntity);
+            var hazardRiskStateRO = SystemAPI.GetComponent<PlayerHazardRiskStateComponent>(playerEntity);
             var carryBinRO = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
             var goSyncRO = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
             var actionStateRO = SystemAPI.GetComponent<PlayerCleanupActionStateComponent>(playerEntity);
@@ -107,6 +112,8 @@ namespace SweepNDodge.DotsBullets
             var actionProfile = ResolveActionProfile(actionProfiles, actionId);
             float3 playerForward = GetPlayerForward(in goSyncRO);
             float searchRange = ComputeSearchRange(in actionProfile);
+            float hazardRiskMultiplier = 1f
+                + math.max(0, hazardRiskStateRO.HazardStack) * math.max(0f, hazardRiskConfigRO.HazardBonusRate);
 
             // LocalTransform은 메인 스레드에서 읽지 않는다 (타입 충돌 방지).
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
@@ -138,11 +145,15 @@ namespace SweepNDodge.DotsBullets
             combatEventLookup.Update(ref state);
 
             var carryLookup = SystemAPI.GetComponentLookup<PlayerCarryBinComponent>(isReadOnly: false);
+            var hazardRiskRequestLookup = SystemAPI.GetComponentLookup<PlayerHazardRiskRequestComponent>(isReadOnly: false);
             carryLookup.Update(ref state);
+            hazardRiskRequestLookup.Update(ref state);
             Entity combatChannelEntity = ResolveFirstEntity(ref _combatEventChannelQuery);
 
-            var newlyRequested = new NativeReference<int>(Allocator.TempJob);
-            newlyRequested.Value = 0;
+            var carryAdd = new NativeReference<int>(Allocator.TempJob);
+            carryAdd.Value = 0;
+            var hazardCapturedCount = new NativeReference<int>(Allocator.TempJob);
+            hazardCapturedCount.Value = 0;
 
             // CellMap은 SharedStatic이며, Simulation에서 Write → Request에서 ReadOnly로 소비한다.
             // 이전 단계 fence와 결합해 read 순서를 보장한다(최종 fence publish는 Request 그룹 마지막 시스템에서 수행).
@@ -164,6 +175,7 @@ namespace SweepNDodge.DotsBullets
                 ForwardTrashCosHalfAngle = math.cos(math.radians(actionProfile.TrashFanHalfAngleDeg)),
                 ForwardHazardLineLength = actionProfile.HazardLineLength,
                 ForwardHazardLineHalfWidth = actionProfile.HazardLineHalfWidth,
+                HazardRiskMultiplier = hazardRiskMultiplier,
 
                 CellMap = BulletFieldShared.CellMap,
                 TxLookup = txLookup,
@@ -178,21 +190,25 @@ namespace SweepNDodge.DotsBullets
                 SourcePollutionCellLookup = sourcePollutionCellLookup,
                 SourcePollutionDropRequestLookup = sourcePollutionDropRequestLookup,
                 UiFeedbackLookup = uiFeedbackLookup,
-                NewlyRequested = newlyRequested,
+                CarryAdd = carryAdd,
+                HazardCapturedCount = hazardCapturedCount,
                 Frame = frame,
             }.Schedule(deps);
 
-            state.Dependency = new ApplyVacuumCarryLoadJob
+            state.Dependency = new ApplyVacuumPlayerResultsJob
             {
                 PlayerEntity = playerEntity,
                 CarryLookup = carryLookup,
-                Add = newlyRequested,
+                RiskRequestLookup = hazardRiskRequestLookup,
+                CarryAdd = carryAdd,
+                HazardCapturedCount = hazardCapturedCount,
                 CombatChannelEntity = combatChannelEntity,
                 CombatEventLookup = combatEventLookup,
                 Frame = frame,
             }.Schedule(state.Dependency);
 
-            state.Dependency = newlyRequested.Dispose(state.Dependency);
+            state.Dependency = carryAdd.Dispose(state.Dependency);
+            state.Dependency = hazardCapturedCount.Dispose(state.Dependency);
 
         }
 
@@ -352,6 +368,7 @@ namespace SweepNDodge.DotsBullets
             public float ForwardTrashCosHalfAngle;
             public float ForwardHazardLineLength;
             public float ForwardHazardLineHalfWidth;
+            public float HazardRiskMultiplier;
 
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
             [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
@@ -367,7 +384,8 @@ namespace SweepNDodge.DotsBullets
             public BufferLookup<SourcePollutionDropRequestBuffer> SourcePollutionDropRequestLookup;
             public BufferLookup<PlayerUiFeedbackEventBufferElement> UiFeedbackLookup;
 
-            public NativeReference<int> NewlyRequested;
+            public NativeReference<int> CarryAdd;
+            public NativeReference<int> HazardCapturedCount;
             public uint Frame;
 
             public void Execute()
@@ -381,6 +399,7 @@ namespace SweepNDodge.DotsBullets
                 int cellRadius = (int)math.ceil(SearchRange * InvCellSize) + 1;
 
                 int add = 0;
+                int capturedCount = 0;
 
                 for (int dy = -cellRadius; dy <= cellRadius; dy++)
                     for (int dx = -cellRadius; dx <= cellRadius; dx++)
@@ -417,14 +436,16 @@ namespace SweepNDodge.DotsBullets
                             if (!canCapture) continue;
 
                             bool isFull = IsCarryFull != 0;
+                            int scoreValue = ResolveScoreValue(bullet);
+                            int progressDelta = ComputeProgressDelta(scoreValue);
                             if (captureRule == BulletCaptureRuleId.StandardCollectible)
                             {
                                 if (isFull)
                                     continue;
 
                                 RequestLookup.SetComponentEnabled(bullet, true);
-                                TryAccumulateDepletionAndPollution(bullet, p);
-                                add += ResolveScoreValue(bullet);
+                                TryAccumulateDepletionAndPollution(bullet, p, progressDelta);
+                                add = SafeAddNonNegative(add, scoreValue);
                                 continue;
                             }
 
@@ -437,8 +458,9 @@ namespace SweepNDodge.DotsBullets
                                     continue;
                                 }
 
-                                TryAccumulateDepletionAndPollution(bullet, p);
-                                add += ResolveScoreValue(bullet);
+                                TryAccumulateDepletionAndPollution(bullet, p, progressDelta);
+                                add = SafeAddNonNegative(add, scoreValue);
+                                capturedCount = SafeAddNonNegative(capturedCount, 1);
                                 EmitHazardCaptureResult(bullet, captured: true);
                                 continue;
                             }
@@ -446,7 +468,8 @@ namespace SweepNDodge.DotsBullets
                         while (CellMap.TryGetNextValue(out bullet, ref it));
                     }
 
-                NewlyRequested.Value += add;
+                CarryAdd.Value = SafeAddNonNegative(CarryAdd.Value, add);
+                HazardCapturedCount.Value = SafeAddNonNegative(HazardCapturedCount.Value, capturedCount);
             }
 
             private bool EvaluateCapture(
@@ -470,6 +493,14 @@ namespace SweepNDodge.DotsBullets
                 if (ScoreValueLookup.HasComponent(bullet))
                     return math.max(0, ScoreValueLookup[bullet].Value);
                 return 1;
+            }
+
+            private int ComputeProgressDelta(int baseValue)
+            {
+                if (baseValue <= 0)
+                    return 0;
+
+                return math.max(0, (int)math.floor(baseValue * math.max(0f, HazardRiskMultiplier)));
             }
 
             private bool EvaluateTrashCapture(float distSq, float dxp, float dzp, float bulletRadius)
@@ -515,7 +546,7 @@ namespace SweepNDodge.DotsBullets
                 return distSq >= inner * inner && distSq <= outer * outer;
             }
 
-            private void TryAccumulateDepletionAndPollution(Entity bullet, in float3 bulletPos)
+            private void TryAccumulateDepletionAndPollution(Entity bullet, in float3 bulletPos, int progressDelta)
             {
                 if (!BulletSourceLookup.HasComponent(bullet))
                     return;
@@ -527,7 +558,7 @@ namespace SweepNDodge.DotsBullets
                     return;
 
                 var source = SourceLookup[sourceEntity];
-                source.CollectedCount++;
+                source.CollectedCount = SafeAddNonNegative(source.CollectedCount, progressDelta);
 
                 int weakenedThreshold = math.max(0, source.ThresholdWeakened);
                 int depletedThreshold = math.max(weakenedThreshold, source.ThresholdDepleted);
@@ -548,6 +579,12 @@ namespace SweepNDodge.DotsBullets
 
                 SourceLookup[sourceEntity] = source;
                 AppendPollutionDropRequest(sourceEntity, bulletPos);
+            }
+
+            private static int SafeAddNonNegative(int lhs, int rhs)
+            {
+                long value = (long)math.max(0, lhs) + math.max(0, rhs);
+                return value >= int.MaxValue ? int.MaxValue : (int)value;
             }
 
             private void AppendPollutionDropRequest(Entity sourceEntity, in float3 bulletPos)
@@ -649,21 +686,33 @@ namespace SweepNDodge.DotsBullets
         }
 
         [BurstCompile]
-        private struct ApplyVacuumCarryLoadJob : IJob
+        private struct ApplyVacuumPlayerResultsJob : IJob
         {
             public Entity PlayerEntity;
             public ComponentLookup<PlayerCarryBinComponent> CarryLookup;
-            [ReadOnly] public NativeReference<int> Add;
+            public ComponentLookup<PlayerHazardRiskRequestComponent> RiskRequestLookup;
+            [ReadOnly] public NativeReference<int> CarryAdd;
+            [ReadOnly] public NativeReference<int> HazardCapturedCount;
             public Entity CombatChannelEntity;
             public BufferLookup<CombatEventBufferElement> CombatEventLookup;
             public uint Frame;
 
             public void Execute()
             {
-                int add = Add.Value;
-                if (add <= 0)
-                    return;
-                if (!CarryLookup.HasComponent(PlayerEntity))
+                int add = math.max(0, CarryAdd.Value);
+                int capturedCount = math.max(0, HazardCapturedCount.Value);
+
+                if (capturedCount > 0 && RiskRequestLookup.HasComponent(PlayerEntity))
+                {
+                    var request = RiskRequestLookup[PlayerEntity];
+                    long nextCapturedCount = (long)request.PendingHazardCapturedCount + capturedCount;
+                    request.PendingHazardCapturedCount = nextCapturedCount >= int.MaxValue
+                        ? int.MaxValue
+                        : (int)nextCapturedCount;
+                    RiskRequestLookup[PlayerEntity] = request;
+                }
+
+                if (add <= 0 || !CarryLookup.HasComponent(PlayerEntity))
                     return;
 
                 var carry = CarryLookup[PlayerEntity];

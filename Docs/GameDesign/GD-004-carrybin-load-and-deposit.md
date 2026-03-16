@@ -4,8 +4,8 @@
 - doc_id: `GD-004`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-03-05`
-- related_adr: [ADR-20260212-04-carrybin-replaces-score-placeholder.md](../ADR/ADR-20260212-04-carrybin-replaces-score-placeholder.md), [ADR-20260219-05-carrybin-deposit-touch-request-execution.md](../ADR/ADR-20260219-05-carrybin-deposit-touch-request-execution.md)
+- last_updated: `2026-03-16`
+- related_adr: [ADR-20260212-04-carrybin-replaces-score-placeholder.md](../ADR/ADR-20260212-04-carrybin-replaces-score-placeholder.md), [ADR-20260219-05-carrybin-deposit-touch-request-execution.md](../ADR/ADR-20260219-05-carrybin-deposit-touch-request-execution.md), [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](../ADR/ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md)
 
 ## 0. 목적
 CarryBin은 "수거량"을 런 내 규칙으로 승격시켜,
@@ -27,6 +27,8 @@ CarryBin은 "수거량"을 런 내 규칙으로 승격시켜,
 - 의미: 고위험 플레이 구간에서 누적되는 위험 스택
 - 역할: "욕심 구간" 강도를 높이는 상태 변수
 - 상한: `HazardStackMax` (상한 도달 후 증가 정지)
+- 증가: `HazardCaptured` 성공 시 `+1`
+- 리셋: `Deposit`, `Hit`
 
 ### 1.3 Deposit(배출 지점)
 - 성격: **안정적으로 존재**(항상 접근 가능)
@@ -70,12 +72,19 @@ CarryBin은 "수거량"을 런 내 규칙으로 승격시켜,
 - 플레이어 체감:
   - "지금 더 밀면 빨라진다"와 "지금 맞으면 크게 잃는다"가 동시에 성립해야 한다.
 - 계산식/집계 계약은 [TD-002](../TechnicalDesign/TD-002-pattern-wave-progress-runtime-contract.md)에서 관리한다.
+- 현행 구현 범위:
+  - `RiskMultiplier = 1 + (HazardStack × HazardBonusRate)`만 사용한다.
+  - 적용 대상은 `Trash + HazardCaptured`의 Source 진행도다.
+  - `HazardCaptured`로 증가한 `HazardStack`은 다음 프레임 수거 배율부터 반영한다.
 
 ### 3.3 Deposit 리셋
 - Deposit은 점수/메타 정산 장치가 아니다.
 - Deposit에서만 리셋 가능:
   - `CarryBinLoad = 0`
   - `HazardStack = 0`
+- 현행 기준:
+  - 기존 Deposit 요청이 실제로 생성된 경우에만 리셋이 일어난다.
+  - 현재 규칙에서는 `Load == 0`이면 Deposit 요청이 만들어지지 않는다.
 
 ---
 
@@ -88,7 +97,9 @@ Hazard 보상은 점수보다 "흐름을 바꾸는 보상"이어야 한다.
 ### 4.2 보상 방식(권장)
 - `HazardCaptured` (`Load < Capacity`) 성공 시:
   - `CarryBinLoad += SpikeAmount`
+  - `HazardStack = min(HazardStack + 1, HazardStackMax)`
   - SpikeAmount는 "일반 쓰레기 다수 분량"으로 체감되게 설정
+  - 증가한 `HazardStack`은 같은 프레임이 아니라 다음 프레임 `RiskMultiplier`부터 반영된다.
 - `HazardRemovedWhenCarryFull` (`Load == Capacity`) 성공 시:
   - Hazard는 `제거`로만 처리한다.
   - `SpikeAmount`는 적용하지 않는다.
@@ -158,5 +169,7 @@ CarryBinLoad가 높을수록:
 
 현행 기준(구현 반영):
 - Deposit은 **접촉 즉시 비우기**를 사용한다.
+- `RiskMultiplier`는 현재 `HazardStack` 항만 사용한다.
+- 같은 프레임 수거와 `Hit/Deposit`이 겹치면, 수거를 먼저 확정한 뒤 리셋이 최종 상태를 덮는다.
 
 ---

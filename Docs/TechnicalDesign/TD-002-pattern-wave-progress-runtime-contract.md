@@ -4,7 +4,7 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-16`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -13,6 +13,7 @@
   - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
   - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
   - [ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md)
+  - [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](../ADR/ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md)
 
 > GD-007의 기획 의도를 ECS 런타임 데이터 계약으로 변환한 기술 설계 문서.
 > SpawnDirective 분해 모델(Sampling/Emission/Payload) 상세는 `TD-003`을 참조한다.
@@ -77,7 +78,6 @@
 | --- | --- | --- |
 | BaseTrashValue | Trash 1개 기본 진행도 | 1 |
 | BaseHazardValue | Hazard 기본 진행도 | 2~5 |
-| RiskFactor | Load 기반 계수 | 0.5~1.0 |
 | HazardBonusRate | HazardStack 계수 | 0.03~0.08 |
 | HazardStackMax | HazardStack 상한 | 5 (피크 스테이지 최대 10) |
 
@@ -85,17 +85,24 @@
 ```text
 RiskMultiplier =
   1
-    + (Load / Capacity) × RiskFactor
     + (HazardStack × HazardBonusRate)
 ```
 
-기획 상한 목표는 2.5~3.0배이며, 별도 Clamp는 두지 않는다.
+현행 범위에서는 `Load / Capacity` 항을 복구하지 않고, `HazardStack` 항만 사용한다.
+증가한 `HazardStack`은 같은 프레임이 아니라 다음 프레임 수거 배율부터 반영한다.
+정수 진행도는 유지하며, multiplier 적용 해상도는 탄의 정수 진행 값 authoring으로 확보한다.
 
 ### 3.3 이벤트 반영 계약
 ```text
-Trash:  ProgressDelta = BaseTrashValue × RiskMultiplier
-Hazard: ProgressDelta = BaseHazardValue × RiskMultiplier
-        HazardStack = min(HazardStack + 1, HazardStackMax)
+FrameStartHazardStack:
+        Request 프레임 시작 시점의 HazardStack snapshot
+Trash:  ProgressDelta = BaseTrashValue × (1 + FrameStartHazardStack × HazardBonusRate)
+HazardCaptured:
+        ProgressDelta = BaseHazardValue × (1 + FrameStartHazardStack × HazardBonusRate)
+        HazardStack += 1 request (next frame apply)
+HazardRemovedWhenCarryFull:
+        ProgressDelta = 0
+        HazardStack 변화 없음
 Deposit:
         Load = 0
         HazardStack = 0
@@ -104,6 +111,8 @@ Hit:
         HazardStack = 0
         Source Remaining 증가 (기존 반환 규칙 유지)
 ```
+
+`HazardStack`의 단일 writer, 동프레임 `수거 확정 후 리셋`, 다음 프레임 반영 규칙은 [TD-018](./TD-018-hazardstack-runtime-contract.md)에서 관리한다.
 
 ### 3.4 Clip Segment 중첩 정책 (확정)
 - 동일 `WaveClipSO` 내부에서 segment 시간축 중첩을 허용한다.
@@ -145,6 +154,7 @@ Hit:
   - 세트 이월 시 `SpawnSequence`는 증가시키지 않고 동일 좌표/위상으로 다음 프레임에 재시도한다.
 - ExecutionEnd 단계:
 - 디스폰 owner가 반납과 렌더 토글을 처리한다.
+- HazardStack 상태 확정은 별도 player risk owner가 담당하며, 자세한 순서는 `TD-018`을 따른다.
 
 현행 ECS 매핑 대상:
 - Request 빌더 시스템: `SourceClipRequestBuildSystem`
@@ -258,6 +268,7 @@ Hit:
   - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
 
 ## 10. 변경 이력
+- 2026-03-16: `RiskMultiplier` 범위를 `1 + HazardStack × HazardBonusRate`로 축소해 현행 구현 계획과 동기화하고, `HazardStack` 다음 프레임 반영 규칙을 `TD-018` 참조로 분리했다.
 - 2026-03-05: `EventShotSchedule/Interval` 및 관련 검증 문구를 구현 반영 상태로 동기화했다.
 - 2026-02-27: `TD-006` active 전환과 함께, Clip 선택 주체(디렉터), `Baseline/Pressure` Clip 유지+배율 규칙, `Finish` 강제 교체 규칙을 반영해 소유권 문구를 갱신했다.
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 계약을 추가

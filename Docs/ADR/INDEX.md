@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md): HazardStack 단일 owner, 동프레임 `수거 확정 후 리셋`, 다음 프레임 배율 반영 계약 고정
 - [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](ADR-20260309-02-stage-session-reset-and-prepare-owner.md): 씬 리로드/Retry/Next 재진입에서 world 재생성 대신 prepare 계층의 explicit stage session reset owner를 채택
 - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md): 장주기 스테이지를 위한 StageTopology lifecycle/failure policy와 boundary-only apply 계약 고정
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md): 스테이지 정의/레이아웃 분리와 StageCatalog 명시적 페어 엔트리 채택

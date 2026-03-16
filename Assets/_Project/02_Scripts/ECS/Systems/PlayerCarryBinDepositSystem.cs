@@ -147,6 +147,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
+            state.RequireForUpdate<PlayerHazardRiskRequestComponent>();
             state.RequireForUpdate<PlayerCarryBinDepositRequestTag>();
             state.RequireForUpdate<PlayerCarryBinDepositContextComponent>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
@@ -170,11 +171,12 @@ namespace SweepNDodge.DotsBullets
                 hasCombatBuffer = true;
             }
 
-            foreach (var (depositRequest, carryBin, depositContext) in
+            foreach (var (depositRequest, carryBin, depositContext, riskRequest) in
                      SystemAPI.Query<
                          EnabledRefRW<PlayerCarryBinDepositRequestTag>,
                          RefRW<PlayerCarryBinComponent>,
-                         RefRW<PlayerCarryBinDepositContextComponent>>().WithAll<PlayerTag>())
+                         RefRW<PlayerCarryBinDepositContextComponent>,
+                         RefRW<PlayerHazardRiskRequestComponent>>().WithAll<PlayerTag>())
             {
                 if (!depositRequest.ValueRO)
                     continue;
@@ -199,6 +201,7 @@ namespace SweepNDodge.DotsBullets
                     Debug.Log($"[CarryBinDeposit] load={depositedLoad}, deposit={depositContext.ValueRO.DepositEntity}");
                 }
 
+                riskRequest.ValueRW.ResetRequested = 1;
                 depositContext.ValueRW.DepositEntity = Entity.Null;
                 depositRequest.ValueRW = false;
             }

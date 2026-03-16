@@ -4,11 +4,12 @@
 - doc_id: `TD-012`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-09`
+- last_updated: `2026-03-16`
 - related_docs:
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
   - [TD-001-player-feedback-event-channel.md](./TD-001-player-feedback-event-channel.md)
   - [TD-007-common-combat-event-channel.md](./TD-007-common-combat-event-channel.md)
+  - [TD-018-hazardstack-runtime-contract.md](./TD-018-hazardstack-runtime-contract.md)
 - related_adr:
   - [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
   - [ADR-20260219-03-player-cleanup-action-profile-so-externalization.md](../ADR/ADR-20260219-03-player-cleanup-action-profile-so-externalization.md)
@@ -78,6 +79,7 @@
     - `BulletDespawnRequestTag` enable
     - CarryBin 누적 적용
     - Source 진행도 누적/상태 전이 이벤트 발행
+    - `HazardStack` 증가 요청 생성(실제 state write는 `TD-018`의 player risk owner가 담당)
     - Combat event append(`Collect`)
     - UI/VFX 이벤트 `HazardCaptured` 발행
   - `HazardRemovedWhenCarryFull` (`Load == Capacity`):
@@ -99,6 +101,7 @@
 - 소유권 규칙:
   - 액션 선택 확정은 `PlayerCleanupActionSelectSystem` 단일 책임.
   - 판정 분기는 `BulletVacuumRequestSystem` 단일 책임.
+  - `HazardStack` 상태 확정은 `TD-018`의 player risk owner 단일 책임.
   - 실제 디스폰 실행/풀 반납은 ExecutionEnd owner 시스템 책임.
 
 ## 5. 성능/리스크
@@ -130,6 +133,7 @@
 - 액션 타입 확장 시 슬롯 수를 유지할지 여부.
 
 ## 8. 변경 이력
+- 2026-03-16: `HazardCaptured` 결과를 `HazardStack` 직접 write가 아닌 증가 요청 생성으로 정리하고, 실제 상태 확정 owner를 `TD-018` 참조로 분리했다.
 - 2026-03-05: 문서 신규 작성. 액션 모델/슬롯 매핑/활성 중 입력 소비/판정 분기 책임 계약을 정식화했다.
 - 2026-03-05: FullBin Hazard 예외 규칙을 반영해 결과 타입(`HazardCaptured`, `HazardRemovedWhenCarryFull`)과 경로별 후처리/피드백 계약을 추가했다.
 - 2026-03-09: 액션 슬롯 해석 책임을 `PlayerGoSyncSystem`에서 `PlayerIntentConsumeSystem`으로 옮기고, fixed-tick player path 기준으로 문구를 갱신했다.

@@ -82,6 +82,19 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 InitialResetPending = 1,
             });
+            var player = em.CreateEntity(
+                typeof(PlayerTag),
+                typeof(PlayerHazardRiskStateComponent),
+                typeof(PlayerHazardRiskRequestComponent));
+            em.SetComponentData(player, new PlayerHazardRiskStateComponent
+            {
+                HazardStack = 4,
+            });
+            em.SetComponentData(player, new PlayerHazardRiskRequestComponent
+            {
+                PendingHazardCapturedCount = 2,
+                ResetRequested = 1,
+            });
 
             world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
 
@@ -109,6 +122,9 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(topologyState.Ready, Is.EqualTo(0));
             Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(0u));
             Assert.That(bootstrap.InitialResetPending, Is.EqualTo(0));
+            Assert.That(em.GetComponentData<PlayerHazardRiskStateComponent>(player).HazardStack, Is.EqualTo(0));
+            Assert.That(em.GetComponentData<PlayerHazardRiskRequestComponent>(player).PendingHazardCapturedCount, Is.EqualTo(0));
+            Assert.That(em.GetComponentData<PlayerHazardRiskRequestComponent>(player).ResetRequested, Is.EqualTo(0));
         }
 
         [Test]

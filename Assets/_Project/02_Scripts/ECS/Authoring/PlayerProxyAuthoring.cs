@@ -33,6 +33,10 @@ namespace SweepNDodge.DotsBullets
         public float VacuumLockTime = 0.7f;
         public float HitImpulseMagnitude = 1.0f;
 
+        [Header("Hazard Risk")]
+        public int HazardStackMax = 5;
+        public float HazardBonusRate = 0.05f;
+
         private class PlayerProxyBaker : Baker<PlayerProxyAuthoring>
         {
             public override void Bake(PlayerProxyAuthoring authoring)
@@ -138,6 +142,23 @@ namespace SweepNDodge.DotsBullets
                 {
                     IFrameTimer = 0f,
                     VacuumLockTimer = 0f
+                });
+
+                AddComponent(e, new PlayerHazardRiskConfigComponent
+                {
+                    HazardStackMax = Mathf.Max(0, authoring.HazardStackMax),
+                    HazardBonusRate = Mathf.Max(0f, authoring.HazardBonusRate),
+                });
+
+                AddComponent(e, new PlayerHazardRiskStateComponent
+                {
+                    HazardStack = 0,
+                });
+
+                AddComponent(e, new PlayerHazardRiskRequestComponent
+                {
+                    PendingHazardCapturedCount = 0,
+                    ResetRequested = 0,
                 });
 
                 AddComponent<PlayerCarryBinDepositRequestTag>(e);

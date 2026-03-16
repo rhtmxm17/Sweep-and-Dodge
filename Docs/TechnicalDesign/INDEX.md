@@ -19,3 +19,4 @@
 - [TD-014-demo-audio-runtime-contract.md](TD-014-demo-audio-runtime-contract.md): S5 데모 오디오 브리지(버스/큐/옵션/중복 억제) 런타임 계약
 - [TD-016-runtime-ui-shell-and-navigation-contract.md](TD-016-runtime-ui-shell-and-navigation-contract.md): Runtime UI의 `uGUI` 단일 스택, `RuntimeUiRoot`, presenter/read-only 경계, KB+Mouse 우선 내비게이션 계약
 - [TD-017-kb-mouse-input-options-accessibility-baseline.md](TD-017-kb-mouse-input-options-accessibility-baseline.md): 공개 빌드 1차의 `KB+Mouse` 입력 기준, UI 입력/옵션/접근성 최소선, `Input System UI + 기존 gameplay 입력` 분리 계약
+- [TD-018-hazardstack-runtime-contract.md](TD-018-hazardstack-runtime-contract.md): HazardStack 단일 owner, 동프레임 `수거 확정 후 리셋`, 다음 프레임 배율 반영 계약

@@ -120,6 +120,8 @@ namespace SweepNDodge.DotsBullets.Tests
         public void ExecutionEndFeedbackSubSequence_StaysInContractOrder()
         {
             AssertUpdateAfter(typeof(PlayerCarryBinDepositExecutionSystem), typeof(PlayerHazardCollisionExecutionSystem));
+            AssertUpdateAfter(typeof(PlayerHazardRiskResolveSystem), typeof(PlayerCarryBinDepositExecutionSystem));
+            AssertUpdateBefore(typeof(PlayerHazardRiskResolveSystem), typeof(BulletDespawnExecutionSystem));
             AssertUpdateAfter(typeof(CombatEventChannelConsumeSystem), typeof(PlayerCarryBinDepositExecutionSystem));
             AssertUpdateAfter(typeof(PlayerHudSnapshotCollectSystem), typeof(CombatEventChannelConsumeSystem));
             AssertUpdateBefore(typeof(PlayerHudSnapshotCollectSystem), typeof(PlayerUiFeedbackConsumeSystem));

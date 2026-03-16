@@ -391,6 +391,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 var source = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
                 Assert.That(source.CollectedCount, Is.EqualTo(0), "FullBin 제거는 Source 진행에 반영되지 않아야 한다.");
 
+                var riskState = em.GetComponentData<PlayerHazardRiskStateComponent>(playerEntity);
+                Assert.That(riskState.HazardStack, Is.EqualTo(0), "FullBin 제거는 HazardStack을 변경하지 않아야 한다.");
+
                 var metrics = em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>())
                     .GetSingleton<CombatEventMetricsComponent>();
                 Assert.That(metrics.TotalCollectValue, Is.EqualTo(0), "FullBin 제거는 Collect 집계에 포함되면 안 된다.");
@@ -445,7 +448,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(carry.Load, Is.EqualTo(3), "HazardCaptured는 Carry 증가를 반영해야 한다.");
 
                 var source = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
-                Assert.That(source.CollectedCount, Is.EqualTo(1), "HazardCaptured는 Source 진행을 반영해야 한다.");
+                Assert.That(source.CollectedCount, Is.EqualTo(3), "HazardCaptured는 ScoreValue 기반 Source 진행을 반영해야 한다.");
+
+                var riskState = em.GetComponentData<PlayerHazardRiskStateComponent>(playerEntity);
+                Assert.That(riskState.HazardStack, Is.EqualTo(1), "HazardCaptured는 frame end HazardStack 증가를 남겨야 한다.");
 
                 var metrics = em.CreateEntityQuery(ComponentType.ReadOnly<CombatEventMetricsComponent>())
                     .GetSingleton<CombatEventMetricsComponent>();
@@ -465,6 +471,158 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 Assert.That(capturedCount, Is.EqualTo(1), "HazardCaptured 이벤트는 탄환별로 발행되어야 한다.");
                 Assert.That(removedCount, Is.EqualTo(0), "비포화 수거 경로에서 HazardRemoved는 발행되면 안 된다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void HazardStack_NextFrameApply_UsesFrameStartSnapshotOnly()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("HazardStackNextFrameWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(
+                    em,
+                    carryLoad: 0,
+                    carryCapacity: 100,
+                    out var playerEntity,
+                    hazardStack: 1,
+                    hazardStackMax: 5,
+                    hazardBonusRate: 0.1f);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                var sourceEntity = CreateVacuumContractSource(em);
+                CreateVacuumContractBullet(
+                    em,
+                    position: new float3(2.88f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.RiskTimedResolve,
+                    scoreValue: 10,
+                    sourceEntity: sourceEntity);
+                CreateVacuumContractBullet(
+                    em,
+                    position: new float3(-2.88f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.RiskTimedResolve,
+                    scoreValue: 10,
+                    sourceEntity: sourceEntity);
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                var sourceAfterHazards = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+                Assert.That(sourceAfterHazards.CollectedCount, Is.EqualTo(22), "같은 프레임 다중 HazardCaptured는 동일 시작 stack snapshot(1.1x)을 공유해야 한다.");
+                Assert.That(em.GetComponentData<PlayerHazardRiskStateComponent>(playerEntity).HazardStack, Is.EqualTo(3), "두 HazardCaptured 후 frame end HazardStack은 3이어야 한다.");
+
+                CreateVacuumContractBullet(
+                    em,
+                    position: new float3(1.2f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.StandardCollectible,
+                    scoreValue: 10,
+                    sourceEntity: sourceEntity);
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                var sourceAfterTrash = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+                Assert.That(sourceAfterTrash.CollectedCount, Is.EqualTo(35), "다음 프레임 Trash는 증가된 HazardStack(1.3x)을 반영해야 한다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void HazardStack_SameFrameHazardCaptureAndHit_ResolvesToZeroAfterAppliedProgress()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("HazardStackCaptureHitWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(
+                    em,
+                    carryLoad: 0,
+                    carryCapacity: 100,
+                    out var playerEntity,
+                    hazardStack: 2,
+                    hazardStackMax: 5,
+                    hazardBonusRate: 0.1f);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                var captureSource = CreateVacuumContractSource(em);
+                var hitSource = CreateVacuumContractSource(em);
+                CreateVacuumContractBullet(
+                    em,
+                    position: new float3(2.88f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.RiskTimedResolve,
+                    scoreValue: 10,
+                    sourceEntity: captureSource);
+                CreateHazardCollisionBullet(em, new float3(0.15f, 0f, 0f), hitSource);
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
+                Assert.That(carry.Load, Is.EqualTo(9), "수거가 먼저 적용된 뒤 같은 프레임 hit 손실이 반영되어야 한다.");
+
+                var captureSourceState = em.GetComponentData<SourceSpawnComponent>(captureSource);
+                Assert.That(captureSourceState.CollectedCount, Is.EqualTo(12), "같은 프레임 hit가 있어도 captured hazard의 Source 진행은 유지되어야 한다.");
+
+                var riskState = em.GetComponentData<PlayerHazardRiskStateComponent>(playerEntity);
+                Assert.That(riskState.HazardStack, Is.EqualTo(0), "같은 프레임 HazardCaptured + Hit 최종 HazardStack은 0이어야 한다.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void HazardStack_SameFrameHazardCaptureAndDeposit_ResolvesToZeroAfterAppliedProgress()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("HazardStackCaptureDepositWorld", out var simGroup);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(
+                    em,
+                    carryLoad: 5,
+                    carryCapacity: 100,
+                    out var playerEntity,
+                    hazardStack: 2,
+                    hazardStackMax: 5,
+                    hazardBonusRate: 0.1f);
+
+                double elapsed = 0d;
+                StepSimulationFrame(world, simGroup, ref elapsed); // bootstrap
+
+                var captureSource = CreateVacuumContractSource(em);
+                CreateVacuumContractBullet(
+                    em,
+                    position: new float3(2.88f, 0f, 0f),
+                    captureRule: BulletCaptureRuleId.RiskTimedResolve,
+                    scoreValue: 10,
+                    sourceEntity: captureSource);
+                CreateDepositPoint(em, float3.zero, 0.5f);
+
+                RequestVacuum(em, playerEntity);
+                StepSimulationFrame(world, simGroup, ref elapsed);
+
+                var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
+                Assert.That(carry.Load, Is.EqualTo(0), "같은 프레임 Deposit은 수거 이후 최종 Carry를 0으로 리셋해야 한다.");
+
+                var captureSourceState = em.GetComponentData<SourceSpawnComponent>(captureSource);
+                Assert.That(captureSourceState.CollectedCount, Is.EqualTo(12), "같은 프레임 Deposit이 있어도 captured hazard의 Source 진행은 유지되어야 한다.");
+
+                var riskState = em.GetComponentData<PlayerHazardRiskStateComponent>(playerEntity);
+                Assert.That(riskState.HazardStack, Is.EqualTo(0), "같은 프레임 HazardCaptured + Deposit 최종 HazardStack은 0이어야 한다.");
             }
             finally
             {
@@ -3435,15 +3593,24 @@ namespace SweepNDodge.DotsBullets.Tests
             EntityManager em,
             int carryLoad,
             int carryCapacity,
-            out Entity playerEntity)
+            out Entity playerEntity,
+            int hazardStack = 0,
+            int hazardStackMax = 5,
+            float hazardBonusRate = 0.1f)
         {
             var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 8f);
             CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 256, lifetime: 8f);
             CreateConfigSingletons(em, budgetPerFrame: 256, maxPendingCount: 4096, maxPendingAgeFrames: 120);
-            playerEntity = CreateVacuumContractPlayer(em, carryLoad, carryCapacity);
+            playerEntity = CreateVacuumContractPlayer(em, carryLoad, carryCapacity, hazardStack, hazardStackMax, hazardBonusRate);
         }
 
-        private static Entity CreateVacuumContractPlayer(EntityManager em, int carryLoad, int carryCapacity)
+        private static Entity CreateVacuumContractPlayer(
+            EntityManager em,
+            int carryLoad,
+            int carryCapacity,
+            int hazardStack,
+            int hazardStackMax,
+            float hazardBonusRate)
         {
             var player = em.CreateEntity(
                 typeof(PlayerTag),
@@ -3455,6 +3622,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(VacuumActivationConfigComponent),
                 typeof(VacuumRuntimeStateComponent),
                 typeof(PlayerCarryBinComponent),
+                typeof(PlayerHazardRiskConfigComponent),
+                typeof(PlayerHazardRiskStateComponent),
+                typeof(PlayerHazardRiskRequestComponent),
                 typeof(PlayerHazardPenaltyConfigComponent),
                 typeof(PlayerHazardPenaltyStateComponent),
                 typeof(PlayerCleanupActionStateComponent),
@@ -3516,6 +3686,20 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 Load = math.max(0, carryLoad),
                 Capacity = math.max(0, carryCapacity),
+            });
+            em.SetComponentData(player, new PlayerHazardRiskConfigComponent
+            {
+                HazardStackMax = math.max(0, hazardStackMax),
+                HazardBonusRate = math.max(0f, hazardBonusRate),
+            });
+            em.SetComponentData(player, new PlayerHazardRiskStateComponent
+            {
+                HazardStack = math.max(0, hazardStack),
+            });
+            em.SetComponentData(player, new PlayerHazardRiskRequestComponent
+            {
+                PendingHazardCapturedCount = 0,
+                ResetRequested = 0,
             });
             em.SetComponentData(player, new PlayerHazardPenaltyConfigComponent
             {
@@ -3991,6 +4175,22 @@ namespace SweepNDodge.DotsBullets.Tests
             });
 
             return source;
+        }
+
+        private static Entity CreateDepositPoint(EntityManager em, float3 position, float radius)
+        {
+            var deposit = em.CreateEntity(
+                typeof(DepositPointComponent),
+                typeof(Shape2DComponent),
+                typeof(LocalTransform));
+            em.SetComponentData(deposit, new Shape2DComponent
+            {
+                Kind = Shape2DKind.Circle,
+                Radius = math.max(0f, radius),
+                Size = float2.zero,
+            });
+            em.SetComponentData(deposit, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            return deposit;
         }
 
         private static void SetSourceShape(EntityManager em, Entity source, Shape2DKind kind, float radius, float2 size)

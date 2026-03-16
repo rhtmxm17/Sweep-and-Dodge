@@ -4,7 +4,7 @@
 - doc_id: `GD-001`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-16`
 - related_adr: [ADR-20260219-02-cleanup-action-branching-by-profile.md](../ADR/ADR-20260219-02-cleanup-action-branching-by-profile.md)
 
 본 문서는 "단일 스테이지 내 플레이(수거/Deposit/위험탄/Source 고갈)"를
@@ -66,10 +66,14 @@
 - Deposit은 스테이지 내 반복 행동을 위한 "비우기" 기능만 담당한다.
 - 기본 규칙:
   - Deposit 수행 시 `CarryBin.Load = 0`
+  - Deposit 수행 시 `HazardStack = 0`
 - 트리거 방식(결정 필요, MVP는 하나로 고정):
   - 옵션 A: 접촉 즉시 비우기(템포 우선)
   - 옵션 B: 접촉 + 인터랙션(의도성 우선)
 - Deposit은 "안전지대" 연출의 기준점이 될 수 있으나, 무적/치유 같은 추가 효과는 별도 결정.
+- 현행 기준:
+  - Deposit 요청이 실제로 발생한 경우에만 리셋이 적용된다.
+  - 같은 프레임 수거가 먼저 확정되고, 이후 Deposit 리셋이 최종 상태를 덮는다.
 
 ### 2.5 Hazard(위험탄) 규칙(공통 개념)
 - Hazard는 기본 수거로 즉시 처리되지 않으며, 별도의 조건부 제거 룰을 가진다.
@@ -77,6 +81,7 @@
   - `HazardCaptured`:
     - 조건: `Load < Capacity`
     - 처리: 수거 + 보상 적용(Carry/Source 진행/HazardStack/`Collect` 반영)
+    - 증가한 `HazardStack`은 같은 프레임이 아니라 다음 프레임 수거 배율부터 반영한다.
   - `HazardRemovedWhenCarryFull`:
     - 조건: `Load == Capacity`
     - 처리: 제거 전용(디스폰 + 전용 피드백), Carry/Source 진행/HazardStack/`Collect` 미반영
