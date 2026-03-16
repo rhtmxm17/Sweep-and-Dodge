@@ -623,6 +623,17 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!114 &510448299 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5210334589007801274, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
+  m_PrefabInstance: {fileID: 1943341709}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e599f65907babab4b92af0aecb87e666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RuntimeUiRoot
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1661,6 +1672,30 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5210334589007801274, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
+      propertyPath: DemoAudio
+      value: 
+      objectReference: {fileID: 2015128781}
+    - target: {fileID: 5210334589007801274, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
+      propertyPath: DemoShell
+      value: 
+      objectReference: {fileID: 2015128777}
+    - target: {fileID: 5210334589007801274, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
+      propertyPath: HintBridge
+      value: 
+      objectReference: {fileID: 2015128785}
+    - target: {fileID: 5210334589007801274, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
+      propertyPath: PauseBridge
+      value: 
+      objectReference: {fileID: 2015128784}
+    - target: {fileID: 5210334589007801274, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
+      propertyPath: DialogueBridge
+      value: 
+      objectReference: {fileID: 2015128787}
+    - target: {fileID: 5210334589007801274, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
+      propertyPath: NotificationBridge
+      value: 
+      objectReference: {fileID: 2015128786}
     - target: {fileID: 5290059397484571201, guid: 4182ef5c28f6a7a4d85cc330af9a4387, type: 3}
       propertyPath: m_AnchorMax.x
       value: 0
@@ -2450,6 +2485,7 @@ GameObject:
   - component: {fileID: 2015128784}
   - component: {fileID: 2015128786}
   - component: {fileID: 2015128785}
+  - component: {fileID: 2015128787}
   m_Layer: 0
   m_Name: RunDirectorStageBridge
   m_TagString: Untagged
@@ -2939,6 +2975,24 @@ MonoBehaviour:
   DemoShell: {fileID: 2015128777}
   RuntimeHudBridge: {fileID: 0}
   LogBindWarnings: 1
+--- !u!114 &2015128787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2c661bcd981dcd4bb017aff7fec3d74, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellDialogueBridge
+  DemoShell: {fileID: 2015128777}
+  RuntimeUiRoot: {fileID: 510448299}
+  DialogueCatalog: {fileID: 0}
+  SpeakerCatalog: {fileID: 0}
+  LogBindWarnings: 1
+  EnableMouseAdvanceFallback: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

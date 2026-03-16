@@ -17,6 +17,7 @@ namespace SweepNDodge.DotsBullets
         public PlayerRuntimeHudBridge RuntimeHudBridge;
         public DemoShellNotificationBridge NotificationBridge;
         public DemoShellHintBridge HintBridge;
+        public DemoShellDialogueBridge DialogueBridge;
 
         [Header("Canvas")]
         public Canvas RootCanvas;
@@ -74,6 +75,7 @@ namespace SweepNDodge.DotsBullets
         private PlayerRuntimeHudBridge _configuredRuntimeHud;
         private DemoShellNotificationBridge _configuredNotificationBridge;
         private DemoShellHintBridge _configuredHintBridge;
+        private DemoShellDialogueBridge _configuredDialogueBridge;
         private Action _cachedOpenSettingsAction;
         private Action _cachedCloseSettingsAction;
         private Action _cachedOpenSettingsFromPauseAction;
@@ -284,7 +286,8 @@ namespace SweepNDodge.DotsBullets
                 && _configuredPauseBridge == PauseBridge
                 && _configuredRuntimeHud == RuntimeHudBridge
                 && _configuredNotificationBridge == NotificationBridge
-                && _configuredHintBridge == HintBridge)
+                && _configuredHintBridge == HintBridge
+                && _configuredDialogueBridge == DialogueBridge)
                 return;
 
             TitlePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
@@ -304,6 +307,7 @@ namespace SweepNDodge.DotsBullets
             _configuredRuntimeHud = RuntimeHudBridge;
             _configuredNotificationBridge = NotificationBridge;
             _configuredHintBridge = HintBridge;
+            _configuredDialogueBridge = DialogueBridge;
         }
 
         private void ApplyShellState(bool force)
@@ -482,16 +486,20 @@ namespace SweepNDodge.DotsBullets
             RuntimeHudBridge ??= FindFirst<PlayerRuntimeHudBridge>();
             NotificationBridge ??= FindFirst<DemoShellNotificationBridge>();
             HintBridge ??= FindFirst<DemoShellHintBridge>();
+            DialogueBridge ??= FindFirst<DemoShellDialogueBridge>();
 
             if (DemoShell != null)
             {
                 NotificationBridge ??= DemoShell.GetComponent<DemoShellNotificationBridge>();
                 HintBridge ??= DemoShell.GetComponent<DemoShellHintBridge>();
+                DialogueBridge ??= DemoShell.GetComponent<DemoShellDialogueBridge>();
 
                 if (NotificationBridge == null)
                     NotificationBridge = DemoShell.gameObject.AddComponent<DemoShellNotificationBridge>();
                 if (HintBridge == null)
                     HintBridge = DemoShell.gameObject.AddComponent<DemoShellHintBridge>();
+                if (DialogueBridge == null)
+                    DialogueBridge = DemoShell.gameObject.AddComponent<DemoShellDialogueBridge>();
             }
         }
 

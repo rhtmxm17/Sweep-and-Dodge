@@ -73,9 +73,10 @@
 
 ### 3.4 presentation reader
 - `RuntimeUiRoot`
-  - `PresentationLayer` 활성/비활성
-  - dialogue active 시 `Notification` / `Hint` suppress 적용
+  - `DemoShellDialogueBridge`를 auto-bind하고, 후속 `InWorldDialoguePresenter`가 읽을 owner를 노출한다.
+  - dialogue active 시 `Notification` / `Hint` suppress 적용 지점을 제공한다.
 - `InWorldDialoguePresenter`
+  - `P4`에서 추가된다.
   - portrait, nameplate, text plate, advance/skip prompt, world bubble 위치를 표시만 담당한다.
 - `StagePresentationRuntimeController`
   - speaker/world bubble anchor를 read-only로 공급한다.
@@ -83,21 +84,33 @@
 ## 4. 데이터 구조 / authoring 계약
 ### 4.1 Catalog
 - `InWorldDialogueCatalogSO`
+  - `SchemaVersion`
   - `Entries[]`
-- `InWorldDialogueEntry`
-  - `SequenceId`
+- `InWorldDialogueSpeakerCatalogSO`
+  - `SchemaVersion`
+  - `Profiles[]`
+- `InWorldDialogueCatalogEntry`
+  - `Enabled`
+  - `EntryKey`
   - `Trigger`
-  - `StageId` 또는 `ThemeKey`
+  - `TargetKind`
+  - `StageId`
+  - `ThemeKey`
   - `Priority`
   - `BlockingMode`
   - `RetryPolicy`
-  - `Lines`
+  - `FullVariant`
+  - `RetryVariant`
 
 ### 4.2 Trigger / blocking
 - `InWorldDialogueTriggerId`
   - `StageStart`
   - `StageClear`
   - `ThemeTransition`
+- `InWorldDialogueTargetKind`
+  - `Stage`
+  - `Theme`
+  - `Global`
 - `InWorldDialogueBlockingMode`
   - `OverlayOnly`
   - `GateIntro`
@@ -106,12 +119,16 @@
 
 ### 4.3 Line data
 - `InWorldDialogueLine`
-  - `SpeakerId`
+  - `SpeakerKey`
   - `Text`
-  - `PortraitKey`
   - `AnchorRef`
   - `MinHoldSec`
   - `AutoAdvanceSec`
+- `InWorldDialogueSpeakerProfile`
+  - `SpeakerKey`
+  - `DisplayName`
+  - `Portrait`
+  - `PortraitSide`
 
 ### 4.4 Anchor resolution
 - `InWorldDialogueAnchorRef`
@@ -128,7 +145,7 @@
 1. `DemoShellFlowController.EnterStagePlay(stageIndex)`
 2. topology apply 요청
 3. `RunDirectorStageBridge.RequestStageStart()`는 기존 경로 유지
-4. 기본값이 `OverlayOnly`인 start sequence가 있으면 `DemoShellDialogueBridge`가 재생 시작
+4. `CurrentStagePlayPhase == Running` 최초 관측 edge에서 기본값이 `OverlayOnly`인 start sequence가 있으면 `DemoShellDialogueBridge`가 재생 시작
 5. dialogue는 `Running`과 병행 가능하며, 완료/스킵 시 presentation만 정리한다
 
 ### 5.2 StageClear
@@ -214,7 +231,7 @@
 - 완료 기준
   - shell 문맥만으로 active dialogue state를 재현 가능하다.
   - `DemoShellSessionStaging`과 session/stage seen-state 연동이 된다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 8.4 P4 Runtime UI / presenter
 - 목표
@@ -272,3 +289,4 @@
 ## 11. 변경 이력
 - 2026-03-16: 초안 작성. `StageStart=overlay`, `StageClear=pre-result clear gate`, `DemoShellFlowController` 전환 owner, `DemoShellDialogueBridge` session owner, `PresentationLayer`/anchor 재사용 계약을 정리했다.
 - 2026-03-16: `P1`, `P2` 구현 반영. `DemoShellSessionStaging`에 dialogue state를 추가했고, `DemoShellFlowController`가 `ClearReady -> pre-result defer -> Completed -> StageResult`를 직접 소유하도록 갱신했다. EditMode 210 pass, PlayMode dedicated smoke pass, clear defer subscriber PlayMode pass를 확인했다.
+- 2026-03-16: `P3` 구현 반영. `DemoShellDialogueBridge`와 `DialoguePresentationState`를 추가했고, `StageStart` running edge 시작, `StageClear` shell seam 소비, retry/seen-state, skip/auto-advance, PlayMode/Editor 회귀 테스트를 문서 기준으로 맞췄다.

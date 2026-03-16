@@ -13,4 +13,8 @@ MonoBehaviour:
   m_Name: iwdspk_demo
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.InWorldDialogueSpeakerCatalogSO
   SchemaVersion: 1
-  Profiles: []
+  Profiles:
+  - SpeakerKey: hero
+    DisplayName: Hero
+    Portrait: {fileID: 0}
+    PortraitSide: 1

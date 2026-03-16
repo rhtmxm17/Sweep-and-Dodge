@@ -408,6 +408,7 @@ namespace SweepNDodge.DotsBullets.Tests
             RuntimeUiRoot uiRoot = null;
             DemoShellFlowController shell = null;
             DemoShellPauseBridge pauseBridge = null;
+            DemoShellDialogueBridge dialogueBridge = null;
 
             yield return WaitForCondition(
                 () =>
@@ -415,7 +416,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     shell = FindDemoShell();
                     uiRoot = FindRuntimeUiRoot();
                     pauseBridge = FindPauseBridge();
-                    return shell != null && uiRoot != null && pauseBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                    dialogueBridge = FindDialogueBridge();
+                    return shell != null && uiRoot != null && pauseBridge != null && dialogueBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
                 },
                 240,
                 "Operational scene was not ready for clear defer test.");
@@ -469,14 +471,18 @@ namespace SweepNDodge.DotsBullets.Tests
             shell = FindDemoShell();
             uiRoot = FindRuntimeUiRoot();
             pauseBridge = FindPauseBridge();
+            dialogueBridge = FindDialogueBridge();
 
             Assert.That(shell, Is.Not.Null);
             Assert.That(uiRoot, Is.Not.Null);
             Assert.That(pauseBridge, Is.Not.Null);
-            Assert.That(requestCount, Is.EqualTo(1));
+            Assert.That(dialogueBridge, Is.Not.Null);
+            Assert.That(requestCount, Is.EqualTo(1), "Shell clear event should still fire exactly once.");
             Assert.That(requestedResult.Outcome, Is.EqualTo(DemoShellStageOutcomeId.Clear));
             Assert.That(shell.CurrentScreen, Is.EqualTo(DemoShellScreenId.StagePlay));
             Assert.That(shell.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.ClearPresentation));
+            Assert.That(dialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(dialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageClear));
             Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult), Is.False);
             Assert.That(pauseBridge.CanPause, Is.False);
 
@@ -485,7 +491,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
             Assert.That(request.ConfirmPressed, Is.EqualTo(0));
 
-            Assert.That(shell.NotifyPreResultClearPresentationCompleted(), Is.True);
+            Assert.That(dialogueBridge.Skip(), Is.True);
             yield return WaitForCondition(
                 () =>
                 {
@@ -498,6 +504,71 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 240,
                 "StageResult was not entered after clear presentation completion.");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShellDialogueBridge_StageStartOverlay_StartsAfterRunning()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    return shell != null && dialogueBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene was not ready for stage-start dialogue test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Stage-start dialogue test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay && shell.CurrentStageId == 1;
+                },
+                360,
+                "Stage-start dialogue test did not reach StagePlay.");
+
+            yield return WaitForCondition(
+                () => HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                360,
+                "RunDirector stage did not reach Running for stage-start dialogue test.");
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    shell = FindDemoShell();
+                    return dialogueBridge != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart;
+                },
+                240,
+                "Stage-start overlay dialogue did not activate after running edge.");
         }
 
         [UnityTest]
@@ -2766,6 +2837,15 @@ namespace SweepNDodge.DotsBullets.Tests
             return Object.FindFirstObjectByType<DemoShellPauseBridge>();
 #else
             return Object.FindObjectOfType<DemoShellPauseBridge>();
+#endif
+        }
+
+        private static DemoShellDialogueBridge FindDialogueBridge()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindFirstObjectByType<DemoShellDialogueBridge>();
+#else
+            return Object.FindObjectOfType<DemoShellDialogueBridge>();
 #endif
         }
 

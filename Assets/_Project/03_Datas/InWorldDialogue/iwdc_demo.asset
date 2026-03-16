@@ -13,4 +13,83 @@ MonoBehaviour:
   m_Name: iwdc_demo
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.InWorldDialogueCatalogSO
   SchemaVersion: 1
-  Entries: []
+  Entries:
+  - Enabled: 1
+    EntryKey: stage_01_start
+    Trigger: 1
+    TargetKind: 0
+    StageId: 1
+    ThemeKey: 
+    Priority: 10
+    BlockingMode: 0
+    RetryPolicy: 1
+    FullVariant:
+      Lines:
+      - SpeakerKey: hero
+        Text: Full intro
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 2
+        MinHoldSec: 0.2
+        AutoAdvanceSec: 0
+      - SpeakerKey: hero
+        Text: Second line
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0
+        AutoAdvanceSec: 0.1
+    RetryVariant:
+      Lines:
+      - SpeakerKey: hero
+        Text: Retry intro
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 4
+        MinHoldSec: 0
+        AutoAdvanceSec: 0
+  - Enabled: 1
+    EntryKey: stage_01_clear
+    Trigger: 2
+    TargetKind: 0
+    StageId: 1
+    ThemeKey: 
+    Priority: 20
+    BlockingMode: 2
+    RetryPolicy: 0
+    FullVariant:
+      Lines:
+      - SpeakerKey: hero
+        Text: Clear line
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 1
+        MinHoldSec: 0
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
+  - Enabled: 1
+    EntryKey: theme_forest_once
+    Trigger: 3
+    TargetKind: 1
+    StageId: 0
+    ThemeKey: forest
+    Priority: 5
+    BlockingMode: 3
+    RetryPolicy: 3
+    FullVariant:
+      Lines:
+      - SpeakerKey: hero
+        Text: Forest theme
+        Anchor:
+          Kind: 0
+          StagePresentationStableId: 0
+          ScreenAnchor: 0
+        MinHoldSec: 0
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []

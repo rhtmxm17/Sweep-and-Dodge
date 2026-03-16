@@ -16,18 +16,18 @@
 - 한 줄 목표: 인월드 연출 대화를 v1(StageStart, StageClear, ThemeTransition) 까지 구현한다
 
 ## Now
-- [ ] T4. `P3 Dialogue bridge / runtime state` 구현 시작점을 고정한다.
-  - 완료 기준: shell event seam(`PreResultClearPresentationRequested`, completion callback)을 소비하는 bridge owner 계약이 코드 기준으로 정리된다.
-  - 검증: `TD-022` 3.2, 5.2, 8.3과 현재 `DemoShellFlowController` 구현이 일치한다.
-  - 근거: `P2`에서 clear defer seam을 열었으므로 다음 작업은 bridge owner를 붙이는 것이다.
-
-## Next
 - [ ] T5. `P4 Runtime UI / presenter` 구현 상세를 확정한다.
   - 완료 기준: `RuntimeUiRoot.PresentationLayer`, suppress 규칙, 입력 우선순위가 테스트 가능한 수준으로 정리된다.
   - 검증: `TD-022` 5.4, 6장과 `RuntimeUiRoot`, `DemoShellPauseBridge` 경계가 일치한다.
+  - 근거: `P3`에서 bridge owner와 presentation snapshot이 준비됐으므로 다음 작업은 reader 전용 UI 계층을 붙이는 것이다.
+
+## Next
 - [ ] T6. `P5 Anchor / stage presentation 연동` 상세를 확정한다.
   - 완료 기준: `StagePresentationRuntimeController`의 stableId lookup과 screen-space fallback 경로가 정리된다.
   - 검증: `TD-022` 4.4, 8.5와 런타임 read path가 일치한다.
+- [ ] T7. `P6 테스트 / 스모크` 범위를 정리한다.
+  - 완료 기준: `PresentationLayer`, suppress, anchor fallback 회귀가 자동화 범위로 분해된다.
+  - 검증: `TD-022` 8.4~8.6과 실제 PlayMode coverage가 맞는다.
 
 ## Blocked
 - 없음
@@ -49,8 +49,12 @@
   - 검증 결과: `DemoShellFlowController`가 `ClearReady -> pre-result defer -> Completed -> StageResult`를 소유하고, clear presentation subscriber seam 및 fallback immediate 경로가 동작한다.
 - [x] D5. `P2` 검증을 완료했다.
   - 검증 결과: compile + console error 0, EditMode 210 pass, PlayMode dedicated smoke pass, clear defer subscriber PlayMode pass.
+- [x] D6. `P3 Dialogue bridge / runtime state`를 구현했다.
+  - 검증 결과: `DemoShellDialogueBridge`가 `StageStart` running edge, `StageClear` shell seam, retry/seen-state, skip/auto-advance, `DialoguePresentationState` snapshot을 소유한다.
+- [x] D7. `P3` 핵심 검증을 완료했다.
+  - 검증 결과: targeted EditMode 6 pass를 확인했고, 운영 씬 PlayMode 회귀는 이어서 최종 확인한다.
 
 ## End of Session
-- 결과: 인월드 연출 대화는 문서 정합화뿐 아니라 `P1`, `P2` 코드와 자동 검증까지 반영된 상태다.
-- 남은 리스크: `P3~P5`가 아직 없으므로 clear dialogue는 subscriber 부재 시 즉시 fallback 완료를 사용한다.
-- 다음 세션 시작점: `P3 Dialogue bridge / runtime state` 구현 상세와 `RuntimeUiRoot.PresentationLayer` 연동 설계를 확정한다.
+- 결과: 인월드 연출 대화는 `P1~P3` 코드와 핵심 자동 검증까지 반영된 상태다.
+- 남은 리스크: `P4~P5`가 아직 없으므로 실제 대화 UI는 snapshot/state까지만 준비됐고, 화면 연출과 world anchor reader는 후속 작업이 필요하다.
+- 다음 세션 시작점: `P4 Runtime UI / presenter` 상세와 `P5 Anchor / stage presentation` reader 경계를 확정한다.
