@@ -52,8 +52,10 @@
 - pause의 정의가 `입력 잠금`이 아니라 `logic time 정지`로 올라간다.
 - timer/result/time limit이 simulation pause와 같은 기준으로 정렬된다.
 - runtime 기본값으로 fixed tick authority를 더 강하게 요구하게 되므로, 기존 가변 delta 기반 local 경로는 축소 대상이 된다.
+- 운영 씬과 테스트 월드도 같은 tick contract를 따라야 하므로, test bootstrap/helper까지 같은 fixed tick 정책으로 정렬해야 한다.
 
 ## 후속
 1. `TD-023`를 SSOT로 삼아 aggregate owner, ECS apply writer, timer authority를 세부화한다.
 2. `DemoShellPauseBridge`와 `DemoShellDialogueBridge`를 공통 pause owner에 연결한다.
 3. pause 회귀 테스트에 menu, clear dialogue gate, overlay, restart/return 시나리오를 추가한다.
+4. 운영 씬과 테스트 월드의 tick rule을 같은 fixed tick 정책으로 통일한다.

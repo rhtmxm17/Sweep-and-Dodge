@@ -75,22 +75,19 @@
   - requester는 서로 직접 알지 않는다.
   - aggregate owner만이 최종 pause state를 계산한다.
 
-### 3.3 GO -> ECS pause state publisher
-- `DemoShellGameplayPauseController`는 ECS singleton `GameplayPauseStateComponent`를 publish한다.
-- 이 singleton은 gameplay pause의 read model이며, fixed tick time source 자체를 직접 수정하지 않는다.
-- GO -> ECS pause write 경로는 이 controller로 단일화한다.
-
-### 3.4 ECS simulation writer
+### 3.3 ECS pause state publisher / simulation writer
 - 새 ECS system: `GameplayPauseApplySystem`
 - 책임:
-  - `GameplayPauseStateComponent`를 읽는다.
+  - `DemoShellGameplayPauseController.CurrentSnapshot`를 읽는다.
+  - ECS singleton `GameplayPauseStateComponent`를 최신화한다.
   - `FixedTickTimeComponent.PauseRequested`를 write한다.
   - 필요 시 `StepRequested`와의 정합을 유지한다.
 - 원칙:
+  - GO -> ECS publish와 `FixedTickTimeComponent.PauseRequested` write owner는 이 시스템 하나만 둔다.
   - `FixedTickTimeComponent.PauseRequested`의 runtime writer는 이 시스템 하나만 둔다.
   - 개별 UI/dialogue requester는 fixed tick singleton을 직접 수정하지 않는다.
 
-### 3.5 reader
+### 3.4 reader
 - `PlayerWasdMovement`, `PlayerEcsBridge`
   - gameplay input block read-only 소비
 - `RuntimeUiRoot`
@@ -124,10 +121,7 @@
 
 ### 4.4 pause snapshot
 - `GameplayPauseStateComponent`
-  - `byte SimulationPaused`
-  - `byte GameplayInputBlocked`
-  - `byte PresentationInputExclusive`
-  - `byte PauseMenuBlocked`
+  - `GameplayPauseFlags Flags`
   - `uint ReasonMask`
   - `uint Version`
 - 필요 시 디버그용으로 `SimulationPauseOwnerCount`, `ExclusiveOwnerCount`를 추가할 수 있다.
@@ -135,7 +129,6 @@
 ### 4.5 aggregate owner API
 - `PauseHandle Acquire(GameplayPauseReasonId reason, GameplayPauseFlags flags)`
 - `bool Release(PauseHandle handle)`
-- `void ReleaseAll(GameplayPauseReasonId reason)`
 - `GameplayPauseSnapshot CurrentSnapshot { get; }`
 
 ## 5. fixed tick / 시간원 계약
@@ -148,6 +141,9 @@
 - v1 권장 운영값은 gameplay runtime에서 `EnableFixedTick=1` 유지다.
 - 일반 플레이, pause, replay, step debug가 같은 time source contract를 공유해야 한다.
 - `PauseRequested`는 fixed tick authority 위에서만 의미를 가진다.
+- 운영 씬과 테스트 월드는 동일한 tick rule을 공유해야 한다.
+- 현재 `P3` 구현은 `DemoShellGameplayPauseController`가 존재하는 runtime에서 `GameplayPauseApplySystem`이 `EnableFixedTick=1`을 보장하는 과도기 상태다.
+- `P5`에서는 bootstrap/test helper를 정렬해 운영 씬과 테스트 월드가 같은 fixed tick 기본 정책을 사용하도록 통일한다.
 
 ### 5.3 timer authority
 - 아래 값은 logic tick 기반 시간만 사용한다.
@@ -167,7 +163,7 @@
 ### 6.2 pause 반영 순서
 1. requester가 GO `Update()`에서 `Acquire/Release`를 호출한다.
 2. `DemoShellGameplayPauseController`가 aggregate snapshot을 계산한다.
-3. controller가 `GameplayPauseStateComponent` singleton을 최신화한다.
+3. `GameplayPauseApplySystem`이 snapshot을 읽어 `GameplayPauseStateComponent` singleton을 최신화한다.
 4. `GameplayPauseApplySystem`이 `FixedTickTimeComponent.PauseRequested`를 갱신한다.
 5. `FixedTickTimeResolveSystem`이 현재 frame의 logic step 실행 여부를 결정한다.
 6. 이후 `PlayerFixedStepGroup`과 `BulletFramePipelineGroup`이 `HasStep/LogicDeltaTime` 기준으로 실행된다.
@@ -244,14 +240,14 @@
 - 완료 기준:
   - requester가 직접 고정 tick singleton을 수정하지 않는다.
   - 중첩 acquire/release가 안정적으로 동작한다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 9.3 P3 ECS apply
 - 목표:
   - `GameplayPauseStateComponent`와 `GameplayPauseApplySystem`을 추가한다.
 - 완료 기준:
   - `FixedTickTimeResolveSystem` 이전에 pause state가 반영된다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 9.4 P4 requester integration
 - 목표:
@@ -259,13 +255,16 @@
 - 완료 기준:
   - pause menu는 simulation pause를 발생시킨다.
   - `StageClear` dialogue는 gate 동안 simulation pause를 유지한다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 9.5 P5 timer authority 정리
 - 목표:
   - stage elapsed / timeout / result elapsed를 logic tick 기반으로 통일한다.
+  - 운영 씬과 테스트 월드의 tick rule을 동일한 fixed tick 정책으로 통일한다.
 - 완료 기준:
   - pause 중 elapsed/result time이 증가하지 않는다.
+  - 동일한 gameplay scenario가 운영 씬과 테스트 월드에서 같은 tick contract를 따른다.
+  - fixed tick 기본 정책이 bootstrap/test helper 경로에서 일관되게 적용된다.
 - 상태: `pending`
 
 ### 9.6 P6 검증
@@ -287,6 +286,7 @@
   - `Acquire/Release` 중첩과 stale handle 해제 검증
   - `GameplayPauseApplySystem` ordering 검증
   - `PauseRequested` / `StepRequested` 정합 검증
+  - 테스트 월드가 운영 씬과 같은 tick rule을 사용하는지 검증
   - timer authority가 `Time.deltaTime`에 의존하지 않는지 검증
 
 - PlayMode
@@ -299,7 +299,7 @@
 
 ## 11. 리스크 / 오픈 이슈
 - 리스크 1: fixed tick authority를 runtime 기본값으로 켜지 않으면 pause 의미가 약해진다.
-  - 대응: gameplay runtime 기본값을 `EnableFixedTick=1`로 고정한다.
+  - 대응: `P5`에서 운영 씬과 테스트 월드의 fixed tick 기본 정책을 동일하게 고정한다.
 
 - 리스크 2: stage elapsed가 여전히 GO local time에 남아 있으면 pause 중 결과 시간이 증가한다.
   - 대응: timer authority를 logic tick source로 이관한다.
@@ -309,3 +309,5 @@
 
 ## 12. 변경 이력
 - 2026-03-17: 초안 작성. `StagePlay` fixed tick authority, `Acquire/Release` 기반 공통 gameplay pause owner, simulation/input/presentation 분리 계약을 정리했다.
+- 2026-03-17: `P2 aggregate owner` 구현 반영. `GameplayPauseApplySystem` 단일 writer, `GameplayPauseStateComponent`의 `Flags/ReasonMask/Version` shape, `P2/P3` 진행 상태를 현재 코드 기준으로 정정했다.
+- 2026-03-17: `P3 ECS apply` 구현 완료를 반영했다. `P4 requester integration`은 acceptance를 충족한 것으로 정리했고, `P5`에 운영 씬/테스트 월드 tick rule 통일 작업을 추가했다.

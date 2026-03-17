@@ -484,6 +484,13 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult), Is.False);
             Assert.That(pauseBridge.CanPause, Is.False);
 
+            var pauseState = GetSingleton<GameplayPauseStateComponent>(em);
+            Assert.That((pauseState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
+            Assert.That((pauseState.Flags & GameplayPauseFlags.ExclusivePresentationInput) != 0, Is.True);
+            Assert.That(
+                pauseState.ReasonMask,
+                Is.EqualTo(1u << (int)GameplayPauseReasonId.DialogueGate));
+
             var gate = GetSingleton<RunDirectorStageGateComponent>(em);
             var request = GetSingleton<RunDirectorStageRequestComponent>(em);
             Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
@@ -587,6 +594,8 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(controller.TryGetPresentationAnchor(9001u, out var stage1Anchor), Is.True);
             Assert.That(stage1Anchor, Is.Not.Null);
             Assert.That(stage1Anchor.name, Is.EqualTo("DialogueBubbleAnchor"));
+            Assert.That(GetSingleton<GameplayPauseStateComponent>(em).Flags, Is.EqualTo(GameplayPauseFlags.None));
+            Assert.That(GetSingleton<FixedTickTimeComponent>(em).PauseRequested, Is.EqualTo(0));
         }
 
         [UnityTest]
@@ -792,6 +801,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 360,
                 "HUD visibility test did not reach interactive StagePlay with active runtime HUD.");
 
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null);
+            var em = world.EntityManager;
+
+            uint runningFrame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<BulletFrameCounterComponent>(em).Value, Is.GreaterThan(runningFrame));
+
             uiRoot.OpenPause();
             yield return WaitForCondition(
                 () =>
@@ -807,8 +825,28 @@ namespace SweepNDodge.DotsBullets.Tests
                 120,
                 "Pause layering did not settle with the pause modal overlaying active stage HUD.");
 
-            var world = World.DefaultGameObjectInjectionWorld;
-            Assert.That(world, Is.Not.Null);
+            var pausedState = GetSingleton<GameplayPauseStateComponent>(em);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
+            uint pausedFrame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            yield return null;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<BulletFrameCounterComponent>(em).Value, Is.EqualTo(pausedFrame));
+
+            uiRoot.ClosePause();
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    return uiRoot != null && !uiRoot.IsPauseOpen;
+                },
+                120,
+                "Pause modal did not close after resume.");
+            yield return WaitForCondition(
+                () => GetSingleton<BulletFrameCounterComponent>(em).Value > pausedFrame,
+                120,
+                "Bullet frame counter did not resume after closing pause.");
+
             ForceStageStateToClearReady(world.EntityManager);
             yield return WaitForStageResultAfterForcedClearReady(
                 () =>

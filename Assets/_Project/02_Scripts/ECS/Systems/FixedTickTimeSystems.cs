@@ -4,6 +4,59 @@ using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
+    [UpdateInGroup(typeof(FixedTickRootGroup), OrderFirst = true)]
+    [UpdateAfter(typeof(FixedTickBootstrapSystem))]
+    [UpdateBefore(typeof(FixedTickTimeResolveSystem))]
+    public partial struct GameplayPauseApplySystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            var em = state.EntityManager;
+            var pauseStateQuery = SystemAPI.QueryBuilder().WithAll<GameplayPauseStateComponent>().Build();
+            if (pauseStateQuery.IsEmptyIgnoreFilter)
+            {
+                var e = em.CreateEntity(typeof(GameplayPauseStateComponent));
+                em.SetComponentData(e, default(GameplayPauseStateComponent));
+            }
+
+            state.RequireForUpdate<FixedTickTimeComponent>();
+            state.RequireForUpdate<GameplayPauseStateComponent>();
+        }
+
+        public void OnUpdate(ref SystemState state)
+        {
+            GameplayPauseSnapshot snapshot = GameplayPauseSnapshot.Default;
+            bool hasController = DemoShellGameplayPauseController.TryGetActiveOwner(out var controller) && controller != null;
+            if (hasController)
+                snapshot = controller.CurrentSnapshot;
+
+            GameplayPauseFlags flags = GameplayPauseFlags.None;
+            if (snapshot.IsSimulationPaused)
+                flags |= GameplayPauseFlags.PauseSimulation;
+            if (snapshot.IsGameplayInputBlocked)
+                flags |= GameplayPauseFlags.BlockGameplayInput;
+            if (snapshot.IsPresentationInputExclusive)
+                flags |= GameplayPauseFlags.ExclusivePresentationInput;
+            if (snapshot.IsPauseMenuOpenBlocked)
+                flags |= GameplayPauseFlags.BlockPauseMenuOpen;
+
+            var pauseStateRW = SystemAPI.GetSingletonRW<GameplayPauseStateComponent>();
+            pauseStateRW.ValueRW = new GameplayPauseStateComponent
+            {
+                Flags = flags,
+                ReasonMask = snapshot.ReasonMask,
+                Version = snapshot.Version,
+            };
+
+            var fixedTickRW = SystemAPI.GetSingletonRW<FixedTickTimeComponent>();
+            var fixedTick = fixedTickRW.ValueRO;
+            if (hasController && fixedTick.EnableFixedTick == 0)
+                fixedTick.EnableFixedTick = 1;
+            fixedTick.PauseRequested = (byte)((flags & GameplayPauseFlags.PauseSimulation) != 0 ? 1 : 0);
+            fixedTickRW.ValueRW = fixedTick;
+        }
+    }
+
     [BurstCompile]
     [UpdateInGroup(typeof(FixedTickRootGroup), OrderFirst = true)]
     public partial struct FixedTickTimeResolveSystem : ISystem

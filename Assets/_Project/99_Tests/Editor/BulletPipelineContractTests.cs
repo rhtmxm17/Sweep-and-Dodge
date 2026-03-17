@@ -56,6 +56,21 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GameplayPauseApplySystem_IsFixedTickRootOrderFirst()
+        {
+            var attr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(GameplayPauseApplySystem));
+            Assert.That(attr.GroupType, Is.EqualTo(typeof(FixedTickRootGroup)));
+            Assert.That(attr.OrderFirst, Is.True);
+        }
+
+        [Test]
+        public void GameplayPauseApplySystem_StaysBetweenBootstrapAndResolve()
+        {
+            AssertUpdateAfter(typeof(GameplayPauseApplySystem), typeof(FixedTickBootstrapSystem));
+            AssertUpdateBefore(typeof(GameplayPauseApplySystem), typeof(FixedTickTimeResolveSystem));
+        }
+
+        [Test]
         public void RequestFencePublishSystem_IsRequestOrderLast()
         {
             var attr = GetSingleAttribute<UpdateInGroupAttribute>(typeof(BulletRequestFencePublishSystem));

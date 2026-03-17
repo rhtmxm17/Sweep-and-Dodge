@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// Scene-local aggregate owner for gameplay pause requests.
     /// - Requester가 pause reason/flags를 acquire/release하면 same-frame snapshot을 계산한다.
-    /// - 실제 ECS fixed tick 반영은 후속 phase의 단일 writer가 수행한다.
+    /// - 실제 ECS fixed tick 반영은 GameplayPauseApplySystem 단일 writer가 수행한다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DemoShellGameplayPauseController : MonoBehaviour
@@ -33,6 +34,31 @@ namespace SweepNDodge.DotsBullets
         }
 
         public GameplayPauseSnapshot CurrentSnapshot => _currentSnapshot;
+
+        public static bool TryGetActiveOwner(out DemoShellGameplayPauseController controller)
+        {
+            controller = null;
+
+            var activeScene = SceneManager.GetActiveScene();
+            int activeSceneHandle = activeScene.IsValid() ? activeScene.handle : int.MinValue;
+            if (TryGetOwnerForSceneHandle(activeSceneHandle, out controller))
+                return true;
+
+            foreach (var pair in SceneOwnerByHandle)
+            {
+                if (pair.Key == activeSceneHandle)
+                    continue;
+
+                var candidate = pair.Value;
+                if (candidate == null || !candidate._isSceneOwner)
+                    continue;
+
+                controller = candidate;
+                return true;
+            }
+
+            return false;
+        }
 
         private void OnEnable()
         {
@@ -186,6 +212,16 @@ namespace SweepNDodge.DotsBullets
 
             _warnedBindFailure = true;
             Debug.LogWarning($"[DemoShellGameplayPauseController] Duplicate controller in scene '{sceneName}'. Only one DemoShellGameplayPauseController is allowed per scene.");
+        }
+
+        private static bool TryGetOwnerForSceneHandle(int sceneHandle, out DemoShellGameplayPauseController controller)
+        {
+            controller = null;
+            if (!SceneOwnerByHandle.TryGetValue(sceneHandle, out var owner) || owner == null || !owner._isSceneOwner)
+                return false;
+
+            controller = owner;
+            return true;
         }
     }
 }

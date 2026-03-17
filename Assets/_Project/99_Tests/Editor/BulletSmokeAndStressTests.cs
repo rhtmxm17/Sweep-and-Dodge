@@ -211,51 +211,62 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void FixedTick_PauseAndSingleStep_AdvancesExactlyOneTick()
         {
-            using var world = CreateDefaultTestWorld("FixedTickPauseStepWorld", out var simGroup);
-            var em = world.EntityManager;
-            CreatePlayer(em);
+            var pauseControllerGo = new GameObject("FixedTickPauseStepController");
+            try
+            {
+                var pauseController = pauseControllerGo.AddComponent<DemoShellGameplayPauseController>();
+                pauseController.LogBindWarnings = false;
 
-            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-            simGroup.Update();
+                using var world = CreateDefaultTestWorld("FixedTickPauseStepWorld", out var simGroup);
+                var em = world.EntityManager;
+                CreatePlayer(em);
 
-            var fixedTickEntity = em.CreateEntityQuery(ComponentType.ReadWrite<FixedTickTimeComponent>()).GetSingletonEntity();
-            var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
-            uint baseTick = em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value;
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
 
-            var fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
-            fixedTick.EnableFixedTick = 1;
-            fixedTick.PauseRequested = 1;
-            fixedTick.StepRequested = 0;
-            fixedTick.MaxSubSteps = 1;
-            fixedTick.FixedDeltaTime = 1f / 60f;
-            fixedTick.Accumulator = 0f;
-            em.SetComponentData(fixedTickEntity, fixedTick);
+                var fixedTickEntity = em.CreateEntityQuery(ComponentType.ReadWrite<FixedTickTimeComponent>()).GetSingletonEntity();
+                var frameCounterEntity = em.CreateEntityQuery(ComponentType.ReadWrite<BulletFrameCounterComponent>()).GetSingletonEntity();
+                uint baseTick = em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value;
 
-            world.SetTime(new TimeData(2d / 60d, 0.5f));
-            simGroup.Update();
-            Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick));
-            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pausedRuntime), Is.True);
-            Assert.That(pausedRuntime.HasStep, Is.EqualTo(0));
-            Assert.That(pausedRuntime.CurrentLogicFrame, Is.EqualTo(baseTick));
+                var fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
+                fixedTick.StepRequested = 0;
+                fixedTick.MaxSubSteps = 1;
+                fixedTick.FixedDeltaTime = 1f / 60f;
+                fixedTick.Accumulator = 0f;
+                em.SetComponentData(fixedTickEntity, fixedTick);
 
-            fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
-            fixedTick.StepRequested = 1;
-            em.SetComponentData(fixedTickEntity, fixedTick);
+                pauseController.Acquire(GameplayPauseReasonId.Debug, GameplayPauseFlags.PauseSimulation);
 
-            world.SetTime(new TimeData(3d / 60d, 0f));
-            simGroup.Update();
-            Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick + 1u));
-            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent stepRuntime), Is.True);
-            Assert.That(stepRuntime.HasStep, Is.EqualTo(1));
-            Assert.That(stepRuntime.LogicDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
-            Assert.That(stepRuntime.CurrentLogicFrame, Is.EqualTo(baseTick + 1u));
+                world.SetTime(new TimeData(2d / 60d, 0.5f));
+                simGroup.Update();
+                Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick));
+                Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pausedRuntime), Is.True);
+                Assert.That(pausedRuntime.HasStep, Is.EqualTo(0));
+                Assert.That(pausedRuntime.CurrentLogicFrame, Is.EqualTo(baseTick));
 
-            world.SetTime(new TimeData(4d / 60d, 0.2f));
-            simGroup.Update();
-            Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick + 1u));
-            Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pauseRuntimeAfterStep), Is.True);
-            Assert.That(pauseRuntimeAfterStep.HasStep, Is.EqualTo(0));
-            Assert.That(pauseRuntimeAfterStep.CurrentLogicFrame, Is.EqualTo(baseTick + 1u));
+                fixedTick = em.GetComponentData<FixedTickTimeComponent>(fixedTickEntity);
+                fixedTick.StepRequested = 1;
+                em.SetComponentData(fixedTickEntity, fixedTick);
+
+                world.SetTime(new TimeData(3d / 60d, 0f));
+                simGroup.Update();
+                Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick + 1u));
+                Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent stepRuntime), Is.True);
+                Assert.That(stepRuntime.HasStep, Is.EqualTo(1));
+                Assert.That(stepRuntime.LogicDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
+                Assert.That(stepRuntime.CurrentLogicFrame, Is.EqualTo(baseTick + 1u));
+
+                world.SetTime(new TimeData(4d / 60d, 0.2f));
+                simGroup.Update();
+                Assert.That(em.GetComponentData<BulletFrameCounterComponent>(frameCounterEntity).Value, Is.EqualTo(baseTick + 1u));
+                Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent pauseRuntimeAfterStep), Is.True);
+                Assert.That(pauseRuntimeAfterStep.HasStep, Is.EqualTo(0));
+                Assert.That(pauseRuntimeAfterStep.CurrentLogicFrame, Is.EqualTo(baseTick + 1u));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(pauseControllerGo);
+            }
         }
 
         [Test]

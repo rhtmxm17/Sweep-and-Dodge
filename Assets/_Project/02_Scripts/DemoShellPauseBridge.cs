@@ -5,7 +5,7 @@ namespace SweepNDodge.DotsBullets
     /// <summary>
     /// Runtime pause/modal owner.
     /// - UI는 이 브리지를 통해 pause open/close 및 destructive action routing만 요청한다.
-    /// - 실제 world time/fixed tick pause는 후속 단계에서 별도 결정한다.
+    /// - 실제 world time/fixed tick pause는 aggregate pause snapshot과 ECS writer가 반영한다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DemoShellPauseBridge : MonoBehaviour
