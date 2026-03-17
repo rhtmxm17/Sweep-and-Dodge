@@ -53,7 +53,9 @@
   - Carry: `CarryLoad`, `CarryCapacity`
   - Source 집계: `DepletedSourceCount`, `TotalSourceCount`
   - Pressure Source: `PressureSourceStableId`, `PressureSourceCollected`, `PressureSourceThresholdDepleted`, `PressureSourceProgress01`
-  - Stage: `StageState`, `StageStateElapsedSec`
+  - Stage:
+    - `StageState`, `StageStateElapsedSec`
+    - `GameplayElapsedSec`
   - Hit: `LastHitLossValue`, `HitFlashRemainingSec`
   - 갱신 프레임: `LastUpdatedFrame`
 
@@ -74,6 +76,9 @@
 - Stage ID/Screen:
   - `DemoShellFlowController.CurrentStageId`, `CurrentScreen` read-only 사용
   - ECS writer 경로에는 Stage ID 전송 컴포넌트를 추가하지 않는다
+- Stage 시간:
+  - `StageStateElapsedSec`는 상태 체류 시간이다.
+  - `GameplayElapsedSec`는 `StagePlay` timer/timeout/HUD authority다.
 - Stage 시간:
   - `RunDirectorStageStateComponent.StateElapsedSec` 사용
 

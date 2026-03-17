@@ -29,6 +29,7 @@ namespace SweepNDodge.DotsBullets
         private Entity _stageRequestEntity;
         private Entity _stageGateEntity;
         private Entity _stageSignalEntity;
+        private Entity _stageGameplayClockEntity;
         private bool _isBound;
         private bool _warnedBindFailure;
         private int _lastCompletedNotifiedFrame = -1;
@@ -79,6 +80,19 @@ namespace SweepNDodge.DotsBullets
                 return false;
 
             stageState = _em.GetComponentData<RunDirectorStageStateComponent>(_stageStateEntity);
+            return true;
+        }
+
+        public bool TryGetGameplayClock(out StageGameplayClockComponent clock)
+        {
+            clock = default;
+            if (!TryBind())
+                return false;
+
+            if (!TryResolveOptionalSingleton<StageGameplayClockComponent>(ref _stageGameplayClockEntity))
+                return false;
+
+            clock = _em.GetComponentData<StageGameplayClockComponent>(_stageGameplayClockEntity);
             return true;
         }
 
@@ -166,6 +180,7 @@ namespace SweepNDodge.DotsBullets
             _stageGateEntity = ResolveFirstEntity(gateQuery);
             _stageSignalEntity = ResolveFirstEntity(signalQuery);
             _stageStateEntity = stateQuery.IsEmptyIgnoreFilter ? Entity.Null : ResolveFirstEntity(stateQuery);
+            _stageGameplayClockEntity = ResolveOptionalSingletonEntity<StageGameplayClockComponent>(_em);
             _isBound = _stageRequestEntity != Entity.Null && _stageGateEntity != Entity.Null && _stageSignalEntity != Entity.Null;
             if (_isBound)
                 _warnedBindFailure = false;
@@ -210,6 +225,23 @@ namespace SweepNDodge.DotsBullets
 
             using var entities = query.ToEntityArray(Allocator.Temp);
             return entities.Length > 0 ? entities[0] : Entity.Null;
+        }
+
+        private bool TryResolveOptionalSingleton<T>(ref Entity entity)
+            where T : unmanaged, IComponentData
+        {
+            if (entity != Entity.Null && _em.Exists(entity))
+                return true;
+
+            entity = ResolveOptionalSingletonEntity<T>(_em);
+            return entity != Entity.Null && _em.Exists(entity);
+        }
+
+        private static Entity ResolveOptionalSingletonEntity<T>(EntityManager em)
+            where T : unmanaged, IComponentData
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            return query.IsEmptyIgnoreFilter ? Entity.Null : ResolveFirstEntity(query);
         }
 
         private bool TryAcquireSceneOwnership()

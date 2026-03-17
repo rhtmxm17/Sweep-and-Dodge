@@ -56,7 +56,6 @@ namespace SweepNDodge.DotsBullets
         private bool _warnedNoBridge;
         private bool _warnedNoTopologyBridge;
         private bool _warnedStageCatalogIssue;
-        private float _stagePlayElapsedSec;
         private bool _stageRunningObserved;
         private int _stageStartTotalCollectValue;
         private int _stageStartTotalCleanupValue;
@@ -177,7 +176,7 @@ namespace SweepNDodge.DotsBullets
                     {
                         float limit = Mathf.Max(0f, activeProfile.StageTimeLimitSec);
                         if (limit > 0f)
-                            GUILayout.Label($"Time: {_stagePlayElapsedSec:0.0}s / {limit:0.0}s");
+                            GUILayout.Label($"Time: {ReadCurrentStageGameplayElapsedSec():0.0}s / {limit:0.0}s");
                     }
                     bool canForceClearReady = CanRequestForceClearReady();
                     using (new GuiEnabledScope(canForceClearReady))
@@ -489,9 +488,6 @@ namespace SweepNDodge.DotsBullets
             {
                 if (_currentStagePlayPhase == DemoShellStagePlayPhaseId.Starting)
                     _currentStagePlayPhase = DemoShellStagePlayPhaseId.Running;
-
-                if (_currentStagePlayPhase == DemoShellStagePlayPhaseId.Running)
-                    _stagePlayElapsedSec = Mathf.Max(0f, _stagePlayElapsedSec + Time.deltaTime);
             }
 
             if (stageState.State == RunDirectorStageStateId.ClearReady)
@@ -503,9 +499,10 @@ namespace SweepNDodge.DotsBullets
             if (TryGetStageProfile(_currentStageIndex, out var profile))
             {
                 float limit = Mathf.Max(0f, profile.StageTimeLimitSec);
+                float elapsedSec = ReadCurrentStageGameplayElapsedSec();
                 if (limit > 0f
                     && stageState.State == RunDirectorStageStateId.Running
-                    && stageState.StateElapsedSec >= limit)
+                    && elapsedSec >= limit)
                 {
                     EnterStageResult(DemoShellStageOutcomeId.Fail);
                 }
@@ -597,7 +594,6 @@ namespace SweepNDodge.DotsBullets
             _stageStartPending = true;
             _stageTopologyApplyPending = true;
             _currentStagePlayPhase = DemoShellStagePlayPhaseId.Starting;
-            _stagePlayElapsedSec = 0f;
             _stageRunningObserved = false;
             ResetPendingClearPresentationState();
             _currentStageOutcome = DemoShellStageOutcomeId.Clear;
@@ -981,7 +977,7 @@ namespace SweepNDodge.DotsBullets
             {
                 StageId = stageId,
                 Outcome = outcome,
-                ElapsedSec = Mathf.Max(0f, _stagePlayElapsedSec),
+                ElapsedSec = ReadCurrentStageGameplayElapsedSec(),
                 CollectValue = Mathf.Max(0, totalCollect - _stageStartTotalCollectValue),
                 CleanupValue = Mathf.Max(0, totalCleanup - _stageStartTotalCleanupValue),
                 HitValue = Mathf.Max(0, totalHit - _stageStartTotalHitValue),
@@ -1021,6 +1017,23 @@ namespace SweepNDodge.DotsBullets
         private void RefreshSessionMetrics()
         {
             _hasSessionMetrics = DemoShellSessionStaging.TryGetSessionMetrics(out _sessionMetrics);
+        }
+
+        private float ReadCurrentStageGameplayElapsedSec()
+        {
+            return TryGetStageGameplayElapsedSec(out float elapsedSec)
+                ? Mathf.Max(0f, elapsedSec)
+                : 0f;
+        }
+
+        private bool TryGetStageGameplayElapsedSec(out float elapsedSec)
+        {
+            elapsedSec = 0f;
+            if (StageBridge == null || !StageBridge.TryGetGameplayClock(out var clock))
+                return false;
+
+            elapsedSec = clock.ElapsedSec;
+            return true;
         }
 
         private static float ResolveDefaultStageTimeLimitSec(int stageId, int stageIndex)

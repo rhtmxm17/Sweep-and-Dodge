@@ -85,7 +85,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(pauseState.Flags, Is.EqualTo(GameplayPauseFlags.None));
             Assert.That(pauseState.ReasonMask, Is.EqualTo(0u));
             Assert.That(pauseState.Version, Is.EqualTo(0u));
-            Assert.That(fixedTick.EnableFixedTick, Is.EqualTo(0));
+            Assert.That(fixedTick.EnableFixedTick, Is.EqualTo(1));
             Assert.That(fixedTick.PauseRequested, Is.EqualTo(0));
         }
 
@@ -173,7 +173,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var entity = em.CreateEntity(typeof(FixedTickTimeComponent));
             em.SetComponentData(entity, new FixedTickTimeComponent
             {
-                EnableFixedTick = 0,
+                EnableFixedTick = 1,
                 PauseRequested = 0,
                 StepRequested = 0,
                 Reserved = 0,

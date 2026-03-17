@@ -298,6 +298,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 PressureSourceThresholdDepleted = 8,
                 PressureSourceProgress01 = 0.75f,
                 StageStateElapsedSec = 50f,
+                GameplayElapsedSec = 50f,
             });
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", default(PlayerUiFeedbackPresentationSnapshotComponent));
             SetPrivateField(context.Hud, "_feedbackLine", string.Empty);
@@ -354,6 +355,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 145f,
+                GameplayElapsedSec = 145f,
                 LastHitLossValue = 4,
                 HitFlashRemainingSec = 0.5f,
             });
@@ -376,6 +378,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 80f,
+                GameplayElapsedSec = 80f,
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
@@ -388,6 +391,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 141f,
+                GameplayElapsedSec = 141f,
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
@@ -403,6 +407,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 70f,
+                GameplayElapsedSec = 70f,
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
@@ -415,6 +420,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 70f,
+                GameplayElapsedSec = 70f,
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
@@ -430,6 +436,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 70f,
+                GameplayElapsedSec = 70f,
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
@@ -453,6 +460,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
             context.NotificationBridge.RefreshPresentationState();
             context.Root.NotificationPresenter.RefreshPresentation();
@@ -479,6 +487,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
@@ -504,6 +513,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
             context.HintBridge.RefreshState(5f);
             context.HintBridge.RefreshPresentationState();
@@ -524,6 +534,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CarryLoad = 0,
                 CarryCapacity = 10,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
 
             context.NotificationBridge.RefreshPresentationState();
@@ -574,6 +585,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
 
             context.HintBridge.RefreshPresentationState();
@@ -592,6 +604,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
             retryContext.HintBridge.RefreshPresentationState();
             Assert.That(retryContext.HintBridge.CurrentHint.Visible, Is.False);
@@ -603,6 +616,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
                 LastHitLossValue = 2,
                 HitFlashRemainingSec = 0.5f,
             });
@@ -621,6 +635,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
                 LastHitLossValue = 2,
                 HitFlashRemainingSec = 0.5f,
             });

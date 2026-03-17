@@ -62,7 +62,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(GetSingleton<RunDirectorStageGateComponent>(em).ClearPresentationDone, Is.EqualTo(1));
                 Assert.That(GetSingleton<RunDirectorStageRequestComponent>(em).ConfirmPressed, Is.EqualTo(1));
                 Assert.That(shell.NotifyPreResultClearPresentationCompleted(), Is.False, "Fallback completion should already have been sent.");
-                Assert.That(GetPrivateField<float>(shell, "_stagePlayElapsedSec"), Is.EqualTo(12.5f).Within(1e-4f));
+                Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.EqualTo(12.5f).Within(1e-4f));
 
                 em.SetComponentData(stateEntity, new RunDirectorStageStateComponent
                 {
@@ -134,7 +134,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(shell.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.ClearPresentation));
                 Assert.That(GetSingleton<RunDirectorStageGateComponent>(em).ClearPresentationDone, Is.EqualTo(0));
                 Assert.That(GetSingleton<RunDirectorStageRequestComponent>(em).ConfirmPressed, Is.EqualTo(0));
-                Assert.That(GetPrivateField<float>(shell, "_stagePlayElapsedSec"), Is.EqualTo(20f).Within(1e-4f));
+                Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.EqualTo(20f).Within(1e-4f));
 
                 Assert.That(shell.NotifyPreResultClearPresentationCompleted(), Is.True);
                 Assert.That(shell.NotifyPreResultClearPresentationCompleted(), Is.False);
@@ -210,6 +210,9 @@ namespace SweepNDodge.DotsBullets.Tests
             var stateEntity = em.CreateEntity(typeof(RunDirectorStageStateComponent));
             em.SetComponentData(stateEntity, default(RunDirectorStageStateComponent));
 
+            var gameplayClockEntity = em.CreateEntity(typeof(StageGameplayClockComponent));
+            em.SetComponentData(gameplayClockEntity, default(StageGameplayClockComponent));
+
             return world;
         }
 
@@ -231,11 +234,21 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static void PrepareRunningStage(DemoShellFlowController shell, float elapsedSec)
         {
+            if (World.DefaultGameObjectInjectionWorld != null && World.DefaultGameObjectInjectionWorld.IsCreated)
+            {
+                var em = World.DefaultGameObjectInjectionWorld.EntityManager;
+                var gameplayClockEntity = GetSingletonEntity<StageGameplayClockComponent>(em);
+                em.SetComponentData(gameplayClockEntity, new StageGameplayClockComponent
+                {
+                    ElapsedSec = elapsedSec,
+                    Version = 1u,
+                });
+            }
+
             SetPrivateField(shell, "_currentScreen", DemoShellScreenId.StagePlay);
             SetPrivateField(shell, "_currentStageIndex", 0);
             SetPrivateField(shell, "_currentStagePlayPhase", DemoShellStagePlayPhaseId.Running);
             SetPrivateField(shell, "_stageRunningObserved", true);
-            SetPrivateField(shell, "_stagePlayElapsedSec", elapsedSec);
             SetPrivateField(shell, "_stageStartPending", false);
             SetPrivateField(shell, "_stageTopologyApplyPending", false);
             SetPrivateField(shell, "_hasCurrentStageResult", false);
@@ -274,11 +287,5 @@ namespace SweepNDodge.DotsBullets.Tests
             field.SetValue(target, value);
         }
 
-        private static T GetPrivateField<T>(object target, string fieldName)
-        {
-            var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(field, Is.Not.Null, $"{target.GetType().Name}.{fieldName} was not found.");
-            return (T)field.GetValue(target);
-        }
     }
 }

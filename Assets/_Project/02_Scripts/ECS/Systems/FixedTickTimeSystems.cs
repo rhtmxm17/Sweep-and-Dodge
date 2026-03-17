@@ -50,8 +50,6 @@ namespace SweepNDodge.DotsBullets
 
             var fixedTickRW = SystemAPI.GetSingletonRW<FixedTickTimeComponent>();
             var fixedTick = fixedTickRW.ValueRO;
-            if (hasController && fixedTick.EnableFixedTick == 0)
-                fixedTick.EnableFixedTick = 1;
             fixedTick.PauseRequested = (byte)((flags & GameplayPauseFlags.PauseSimulation) != 0 ? 1 : 0);
             fixedTickRW.ValueRW = fixedTick;
         }
@@ -71,7 +69,7 @@ namespace SweepNDodge.DotsBullets
                 var e = em.CreateEntity(typeof(FixedTickTimeComponent));
                 em.SetComponentData(e, new FixedTickTimeComponent
                 {
-                    EnableFixedTick = 0,
+                    EnableFixedTick = 1,
                     PauseRequested = 0,
                     StepRequested = 0,
                     Reserved = 0,

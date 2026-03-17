@@ -57,6 +57,42 @@ namespace SweepNDodge.DotsBullets
     [BurstCompile]
     [UpdateInGroup(typeof(BulletRequestGroup))]
     [UpdateAfter(typeof(RunDirectorStageGateUpdateSystem))]
+    [UpdateBefore(typeof(RunDirectorStageTransitionSystem))]
+    public partial struct StageGameplayClockUpdateSystem : ISystem
+    {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<FixedTickStepRuntimeComponent>();
+            state.RequireForUpdate<RunDirectorStageStateComponent>();
+            state.RequireForUpdate<StageTopologyStateComponent>();
+            state.RequireForUpdate<StageGameplayClockComponent>();
+        }
+
+        public void OnUpdate(ref SystemState state)
+        {
+            var fixedTickRuntime = SystemAPI.GetSingleton<FixedTickStepRuntimeComponent>();
+            if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float dt))
+                return;
+
+            var stageState = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
+            var topologyState = SystemAPI.GetSingleton<StageTopologyStateComponent>();
+            if (!StageTopologyRuntimeGateUtility.ShouldRunGameplay(in topologyState, in stageState)
+                || stageState.State != RunDirectorStageStateId.Running)
+            {
+                return;
+            }
+
+            var clockRW = SystemAPI.GetSingletonRW<StageGameplayClockComponent>();
+            var clock = clockRW.ValueRO;
+            clock.ElapsedSec = math.max(0f, clock.ElapsedSec + dt);
+            clock.Version += 1u;
+            clockRW.ValueRW = clock;
+        }
+    }
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(BulletRequestGroup))]
+    [UpdateAfter(typeof(RunDirectorStageGateUpdateSystem))]
     [UpdateBefore(typeof(RunProgressDirectorSystem))]
     public partial struct RunDirectorStageTransitionSystem : ISystem
     {

@@ -21,6 +21,7 @@ namespace SweepNDodge.DotsBullets
 
         public RunDirectorStageStateId StageState;
         public float StageStateElapsedSec;
+        public float GameplayElapsedSec;
 
         public int LastHitLossValue;
         public float HitFlashRemainingSec;

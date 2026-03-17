@@ -14,6 +14,7 @@ namespace SweepNDodge.DotsBullets
             EnsureSingleton(em, default(StageTopologyStateComponent));
             EnsureSingleton(em, default(StageTopologyLifecycleStateComponent));
             EnsureSingleton(em, default(StageTopologyPrefabCatalogComponent));
+            EnsureSingleton(em, default(StageGameplayClockComponent));
             EnsureSingleton(em, new StageSessionResetBootstrapComponent
             {
                 InitialResetPending = 1,
@@ -146,6 +147,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<RunDirectorStageGateComponent>();
             state.RequireForUpdate<RunDirectorStageRequestComponent>();
             state.RequireForUpdate<RunDirectorStageSignalComponent>();
+            state.RequireForUpdate<StageGameplayClockComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -169,6 +171,7 @@ namespace SweepNDodge.DotsBullets
             var stageState = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
             var signalEntity = SystemAPI.GetSingletonEntity<RunDirectorStageSignalComponent>();
             var signal = em.GetComponentData<RunDirectorStageSignalComponent>(signalEntity);
+            var gameplayClockEntity = SystemAPI.GetSingletonEntity<StageGameplayClockComponent>();
             var topologyStateEntity = SystemAPI.GetSingletonEntity<StageTopologyStateComponent>();
             var topologyState = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
             var lifecycleEntity = SystemAPI.GetSingletonEntity<StageTopologyLifecycleStateComponent>();
@@ -207,6 +210,7 @@ namespace SweepNDodge.DotsBullets
                 gateEntity,
                 stageStateEntity,
                 signalEntity,
+                gameplayClockEntity,
                 topologyStateEntity,
                 lifecycleEntity,
                 bootResetPending,
@@ -254,6 +258,7 @@ namespace SweepNDodge.DotsBullets
             Entity gateEntity,
             Entity stageStateEntity,
             Entity signalEntity,
+            Entity stageGameplayClockEntity,
             Entity topologyStateEntity,
             Entity lifecycleEntity,
             bool bootReset,
@@ -298,6 +303,10 @@ namespace SweepNDodge.DotsBullets
             });
 
             em.SetComponentData(signalEntity, default(RunDirectorStageSignalComponent));
+            var gameplayClock = em.GetComponentData<StageGameplayClockComponent>(stageGameplayClockEntity);
+            gameplayClock.ElapsedSec = 0f;
+            gameplayClock.Version += 1u;
+            em.SetComponentData(stageGameplayClockEntity, gameplayClock);
 
             em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
 

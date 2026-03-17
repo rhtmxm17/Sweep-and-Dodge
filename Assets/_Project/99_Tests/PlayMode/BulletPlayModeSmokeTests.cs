@@ -490,6 +490,10 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(
                 pauseState.ReasonMask,
                 Is.EqualTo(1u << (int)GameplayPauseReasonId.DialogueGate));
+            float pausedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.EqualTo(pausedClock).Within(1e-6f));
 
             var gate = GetSingleton<RunDirectorStageGateComponent>(em);
             var request = GetSingleton<RunDirectorStageRequestComponent>(em);
@@ -596,6 +600,10 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(stage1Anchor.name, Is.EqualTo("DialogueBubbleAnchor"));
             Assert.That(GetSingleton<GameplayPauseStateComponent>(em).Flags, Is.EqualTo(GameplayPauseFlags.None));
             Assert.That(GetSingleton<FixedTickTimeComponent>(em).PauseRequested, Is.EqualTo(0));
+            float overlayClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.GreaterThan(overlayClock));
         }
 
         [UnityTest]
@@ -806,9 +814,14 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
 
             uint runningFrame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            float runningClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
             yield return null;
             yield return null;
             Assert.That(GetSingleton<BulletFrameCounterComponent>(em).Value, Is.GreaterThan(runningFrame));
+            yield return WaitForCondition(
+                () => GetSingleton<StageGameplayClockComponent>(em).ElapsedSec > runningClock,
+                120,
+                "Gameplay clock did not advance before opening pause.");
 
             uiRoot.OpenPause();
             yield return WaitForCondition(
@@ -828,10 +841,12 @@ namespace SweepNDodge.DotsBullets.Tests
             var pausedState = GetSingleton<GameplayPauseStateComponent>(em);
             Assert.That((pausedState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
             uint pausedFrame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            float pausedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
             yield return null;
             yield return null;
             yield return null;
             Assert.That(GetSingleton<BulletFrameCounterComponent>(em).Value, Is.EqualTo(pausedFrame));
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.EqualTo(pausedClock).Within(1e-6f));
 
             uiRoot.ClosePause();
             yield return WaitForCondition(
@@ -843,9 +858,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 120,
                 "Pause modal did not close after resume.");
             yield return WaitForCondition(
-                () => GetSingleton<BulletFrameCounterComponent>(em).Value > pausedFrame,
+                () => GetSingleton<BulletFrameCounterComponent>(em).Value > pausedFrame
+                    && GetSingleton<StageGameplayClockComponent>(em).ElapsedSec > pausedClock,
                 120,
-                "Bullet frame counter did not resume after closing pause.");
+                "Gameplay clock/frame counter did not resume after closing pause.");
 
             ForceStageStateToClearReady(world.EntityManager);
             yield return WaitForStageResultAfterForcedClearReady(
@@ -928,6 +944,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 PressureSourceThresholdDepleted = 12,
                 PressureSourceProgress01 = 0.75f,
                 StageStateElapsedSec = 145f,
+                GameplayElapsedSec = 145f,
                 LastHitLossValue = 0,
                 HitFlashRemainingSec = 0f,
             });
@@ -961,6 +978,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
             uiRoot.NotificationBridge.RefreshState(2f);
             uiRoot.NotificationBridge.RefreshPresentationState();
@@ -984,6 +1002,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
+                GameplayElapsedSec = 20f,
             });
             uiRoot.NotificationBridge.RefreshPresentationState();
             uiRoot.NotificationPresenter.RefreshPresentation();
@@ -2970,6 +2989,16 @@ namespace SweepNDodge.DotsBullets.Tests
             stage.StateElapsedSec = Mathf.Max(0f, elapsedSec);
             stage.LastTransitionReason = RunDirectorStageTransitionReasonId.StartRequested;
             em.SetComponentData(stageEntity, stage);
+
+            if (HasSingleton<StageGameplayClockComponent>(em))
+            {
+                var clockEntity = GetSingletonEntity<StageGameplayClockComponent>(em);
+                em.SetComponentData(clockEntity, new StageGameplayClockComponent
+                {
+                    ElapsedSec = Mathf.Max(0f, elapsedSec),
+                    Version = 1u,
+                });
+            }
         }
 
         private static void TryConsumeClearPresentationForTests()

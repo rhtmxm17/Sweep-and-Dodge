@@ -23,6 +23,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerHazardRiskConfigComponent>();
             state.RequireForUpdate<PlayerHazardRiskStateComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
+            state.RequireForUpdate<StageGameplayClockComponent>();
             state.RequireForUpdate<CombatEventMetricsComponent>();
             state.RequireForUpdate<PlayerHudSnapshotComponent>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
@@ -35,6 +36,7 @@ namespace SweepNDodge.DotsBullets
             var hazardRiskConfig = SystemAPI.GetSingleton<PlayerHazardRiskConfigComponent>();
             var hazardRiskState = SystemAPI.GetSingleton<PlayerHazardRiskStateComponent>();
             var stage = SystemAPI.GetSingleton<RunDirectorStageStateComponent>();
+            var gameplayClock = SystemAPI.GetSingleton<StageGameplayClockComponent>();
             var combat = SystemAPI.GetSingleton<CombatEventMetricsComponent>();
             var frameCounter = SystemAPI.GetSingleton<BulletFrameCounterComponent>();
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
@@ -103,6 +105,7 @@ namespace SweepNDodge.DotsBullets
 
             snapshot.StageState = stage.State;
             snapshot.StageStateElapsedSec = math.max(0f, stage.StateElapsedSec);
+            snapshot.GameplayElapsedSec = math.max(0f, gameplayClock.ElapsedSec);
             snapshot.TotalCollectValue = SaturateToNonNegativeInt(combat.TotalCollectValue);
             snapshot.TotalCleanupValue = SaturateToNonNegativeInt(combat.TotalCleanupValue);
             snapshot.TotalHitValue = SaturateToNonNegativeInt(combat.TotalHitValue);

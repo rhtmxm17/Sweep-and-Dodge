@@ -127,6 +127,12 @@ namespace SweepNDodge.DotsBullets
         public uint Version;
     }
 
+    public struct StageGameplayClockComponent : IComponentData
+    {
+        public float ElapsedSec;
+        public uint Version;
+    }
+
     // Spawn/Despawn 프레임 추적 스탬프.
     // 렌더-활성 상태 불일치(고스트 표시) 진단 시 근거 데이터로 사용한다.
     public struct BulletLifecycleTraceComponent : IComponentData

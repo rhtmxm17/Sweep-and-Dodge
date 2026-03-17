@@ -268,7 +268,7 @@
   - `DepletedSourceCount`, `TotalSourceCount`
   - `PressureSourceStableId`, `PressureSourceCollected`
   - `PressureSourceThresholdWeakened`, `PressureSourceThresholdDepleted`, `PressureSourceProgress01`
-  - `StageState`, `StageStateElapsedSec`
+  - `StageState`, `StageStateElapsedSec`, `GameplayElapsedSec`
   - `LastHitLossValue`, `HitFlashRemainingSec`
   - `TotalCollectValue`, `TotalCleanupValue`, `TotalHitValue`
 

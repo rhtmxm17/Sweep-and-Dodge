@@ -131,7 +131,7 @@ namespace SweepNDodge.DotsBullets
 
         private static void UpdateLatches(in NotificationResolveContext context, ref NotificationRuntimeState runtimeState)
         {
-            float remainingSec = ResolveRemainingSec(context.StageTimeLimitSec, context.HudSnapshot.StageStateElapsedSec);
+            float remainingSec = ResolveRemainingSec(context.StageTimeLimitSec, context.HudSnapshot.GameplayElapsedSec);
             if (remainingSec < 0f || remainingSec > 30f)
                 runtimeState.TimeLowLatched = false;
             if (remainingSec < 0f || remainingSec > 10f)
@@ -174,7 +174,7 @@ namespace SweepNDodge.DotsBullets
         {
             int carryCapacity = Mathf.Max(0, context.HudSnapshot.CarryCapacity);
             bool carryFull = carryCapacity > 0 && context.HudSnapshot.CarryLoad >= carryCapacity;
-            float remainingSec = ResolveRemainingSec(context.StageTimeLimitSec, context.HudSnapshot.StageStateElapsedSec);
+            float remainingSec = ResolveRemainingSec(context.StageTimeLimitSec, context.HudSnapshot.GameplayElapsedSec);
 
             if (context.HudSnapshot.HitFlashRemainingSec > 0f && context.HudSnapshot.LastHitLossValue > 0)
             {

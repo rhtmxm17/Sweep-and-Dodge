@@ -72,7 +72,7 @@ namespace SweepNDodge.DotsBullets
                 var e = em.CreateEntity(typeof(FixedTickTimeComponent));
                 em.SetComponentData(e, new FixedTickTimeComponent
                 {
-                    EnableFixedTick = 0,
+                    EnableFixedTick = 1,
                     PauseRequested = 0,
                     StepRequested = 0,
                     Reserved = 0,

@@ -66,7 +66,7 @@ namespace SweepNDodge.DotsBullets
 
             float stageLimitSec = ResolveStageTimeLimitSec();
             float remainingSec = stageLimitSec >= 0f
-                ? Mathf.Max(0f, stageLimitSec - snapshot.StageStateElapsedSec)
+                ? Mathf.Max(0f, stageLimitSec - snapshot.GameplayElapsedSec)
                 : -1f;
 
             ApplyObjectiveSummary(snapshot);

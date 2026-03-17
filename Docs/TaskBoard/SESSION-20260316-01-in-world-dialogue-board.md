@@ -16,9 +16,7 @@
 - 한 줄 목표: 인월드 연출 대화를 v1(StageStart, StageClear, ThemeTransition) 까지 구현한다
 
 ## Now
-- [ ] T7. `TD-023 P5 timer authority + tick rule 통일` 작업을 구체화한다.
-  - 완료 기준: 운영 씬과 테스트 월드가 같은 fixed tick 정책을 사용하고, stage elapsed / timeout / result elapsed authority가 logic tick 기준으로 정렬된다.
-  - 검증: compile, console error 0, EditMode, PlayMode pause smoke와 timer regression 기준으로 확인한다.
+- 없음
 
 ## Next
 - 없음
@@ -61,8 +59,10 @@
   - 검증 결과: `GameplayPauseStateComponent`, `GameplayPauseApplySystem`, fixed-tick pause smoke를 추가했고 compile + console error 0, EditMode `239 pass`, PlayMode `29 pass`를 확인했다.
 - [x] D14. `TD-023 P4 requester integration` acceptance를 충족했다.
   - 검증 결과: pause menu와 `StageClear` gate가 aggregate owner + ECS apply를 통해 실제 simulation pause를 발생시키고, `StageStart overlay`는 pause를 만들지 않음을 자동 검증으로 확인했다.
+- [x] D15. `TD-023 P5 timer authority + tick rule 통일`을 구현하고 검증했다.
+  - 검증 결과: `StageGameplayClockComponent`, shell/HUD authority 교체, global fixed tick default-on, test opt-out 정리를 반영했고 compile + console error 0, EditMode `243 pass`, PlayMode `29 pass`를 확인했다.
 
 ## End of Session
 - 결과: 인월드 연출 대화는 `P1~P5` 코드와 핵심 자동 검증까지 반영된 상태다.
-- 남은 리스크: `TD-023` 기준으로 stage elapsed/result/timer authority와 운영 씬/테스트 월드 tick rule 통일은 아직 남아 있다.
-- 다음 세션 시작점: `TD-023` 기준으로 `P5 timer authority + tick rule 통일` 구현 계획을 구체화한다.
+- 남은 리스크: common gameplay pause 계약은 구현 완료됐고, 이후 범위는 별도 기능 세션에서 확장 여부를 결정한다.
+- 다음 세션 시작점: 별도 요구사항이 들어오면 후속 기능 범위를 새 세션으로 분리한다.

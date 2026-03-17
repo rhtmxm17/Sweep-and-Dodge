@@ -304,6 +304,7 @@ namespace SweepNDodge.DotsBullets
                     PressureSourceProgress01 = 0f,
                     StageState = RunDirectorStageStateId.Idle,
                     StageStateElapsedSec = 0f,
+                    GameplayElapsedSec = 0f,
                     LastHitLossValue = 0,
                     HitFlashRemainingSec = 0f,
                     TotalCollectValue = 0,

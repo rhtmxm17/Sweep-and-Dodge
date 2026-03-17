@@ -142,8 +142,7 @@
 - 일반 플레이, pause, replay, step debug가 같은 time source contract를 공유해야 한다.
 - `PauseRequested`는 fixed tick authority 위에서만 의미를 가진다.
 - 운영 씬과 테스트 월드는 동일한 tick rule을 공유해야 한다.
-- 현재 `P3` 구현은 `DemoShellGameplayPauseController`가 존재하는 runtime에서 `GameplayPauseApplySystem`이 `EnableFixedTick=1`을 보장하는 과도기 상태다.
-- `P5`에서는 bootstrap/test helper를 정렬해 운영 씬과 테스트 월드가 같은 fixed tick 기본 정책을 사용하도록 통일한다.
+- `P5`에서는 bootstrap 기본값을 `EnableFixedTick=1`로 고정하고, 가변 delta가 필요한 테스트만 명시적으로 opt-out 한다.
 
 ### 5.3 timer authority
 - 아래 값은 logic tick 기반 시간만 사용한다.
@@ -151,7 +150,16 @@
   - timeout 판정 시간
   - result elapsed
 - `Time.deltaTime` 기반 local timer는 authoritative source로 사용하지 않는다.
-- `DemoShellFlowController._stagePlayElapsedSec`는 후속 구현에서 fixed-tick-aware source로 대체한다.
+- authority singleton:
+  - `StageGameplayClockComponent.ElapsedSec`
+- writer:
+  - `StageGameplayClockUpdateSystem`
+- reader:
+  - `DemoShellFlowController`
+  - `PlayerHudSnapshotCollectSystem`
+  - `StageHudPresenter`
+  - `NotificationResolver`
+- `RunDirectorStageStateComponent.StateElapsedSec`는 상태 체류 시간으로 유지하고, stage timer/timeout/result elapsed authority로는 사용하지 않는다.
 
 ## 6. 업데이트 순서 / 상태 흐름
 ### 6.1 ECS 그룹 기준
@@ -265,7 +273,7 @@
   - pause 중 elapsed/result time이 증가하지 않는다.
   - 동일한 gameplay scenario가 운영 씬과 테스트 월드에서 같은 tick contract를 따른다.
   - fixed tick 기본 정책이 bootstrap/test helper 경로에서 일관되게 적용된다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 9.6 P6 검증
 - 목표:
@@ -311,3 +319,5 @@
 - 2026-03-17: 초안 작성. `StagePlay` fixed tick authority, `Acquire/Release` 기반 공통 gameplay pause owner, simulation/input/presentation 분리 계약을 정리했다.
 - 2026-03-17: `P2 aggregate owner` 구현 반영. `GameplayPauseApplySystem` 단일 writer, `GameplayPauseStateComponent`의 `Flags/ReasonMask/Version` shape, `P2/P3` 진행 상태를 현재 코드 기준으로 정정했다.
 - 2026-03-17: `P3 ECS apply` 구현 완료를 반영했다. `P4 requester integration`은 acceptance를 충족한 것으로 정리했고, `P5`에 운영 씬/테스트 월드 tick rule 통일 작업을 추가했다.
+- 2026-03-17: `P5` 구현 반영 중. `StageGameplayClockComponent`와 `StageGameplayClockUpdateSystem`, HUD `GameplayElapsedSec` split, global fixed tick default-on 정책을 현재 구현 기준으로 반영했다.
+- 2026-03-17: `P5` 구현/검증 완료. compile + console error 0, EditMode `243 pass`, PlayMode `29 pass` 기준으로 gameplay clock authority와 tick rule 통일을 확인했다.

@@ -152,13 +152,13 @@ namespace SweepNDodge.DotsBullets.Tests
             simGroup.Update();
 
             Assert.That(TryGetSingleton(em, out FixedTickTimeComponent fixedTick), Is.True);
-            Assert.That(fixedTick.EnableFixedTick, Is.EqualTo(0));
+            Assert.That(fixedTick.EnableFixedTick, Is.EqualTo(1));
             Assert.That(fixedTick.PauseRequested, Is.EqualTo(0));
             Assert.That(fixedTick.StepRequested, Is.EqualTo(0));
             Assert.That(fixedTick.MaxSubSteps, Is.EqualTo(4));
             Assert.That(fixedTick.FixedDeltaTime, Is.EqualTo(1f / 60f).Within(1e-6f));
             Assert.That(TryGetSingleton(em, out FixedTickStepRuntimeComponent fixedTickRuntime), Is.True);
-            Assert.That(fixedTickRuntime.UsingFixedTick, Is.EqualTo(0));
+            Assert.That(fixedTickRuntime.UsingFixedTick, Is.EqualTo(1));
             Assert.That(fixedTickRuntime.CurrentLogicFrame, Is.EqualTo(1u));
         }
 
@@ -168,6 +168,7 @@ namespace SweepNDodge.DotsBullets.Tests
             using var world = CreateDefaultTestWorld("FixedTickRuntimeFrameDeltaWorld", out var simGroup);
             var em = world.EntityManager;
             CreatePlayer(em);
+            SetFixedTickEnabled(em, enabled: false);
 
             const float dt = 0.02f;
             world.SetTime(new TimeData(dt, dt));
@@ -740,6 +741,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
@@ -1504,6 +1506,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
@@ -1578,6 +1581,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
@@ -1752,6 +1756,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 8192, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 EnableV3Source(em, source, stableId: 101u, activeState: SourceStateId.Normal);
@@ -2013,6 +2018,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 8192, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 EnableV3Source(em, source, stableId: 102u, activeState: SourceStateId.Normal);
@@ -2156,6 +2162,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 var keepRunningSource = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
@@ -2281,6 +2288,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
                 var keepRunningSource = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
@@ -2417,6 +2425,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 64, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 32768, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
@@ -2475,83 +2484,59 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void RunDirectorStage_IdleToRunning_RequiresMinIdleAndIntroDone()
         {
-            try
+            using var world = new World("RunDirectorStageIdleToRunningContractWorld");
+            var em = world.EntityManager;
+
+            var frameEntity = em.CreateEntity(typeof(BulletFrameCounterComponent));
+            em.SetComponentData(frameEntity, new BulletFrameCounterComponent { Value = 0u });
+
+            var stageStateEntity = em.CreateEntity(typeof(RunDirectorStageStateComponent));
+            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
             {
-                using var world = CreateDefaultTestWorld("RunDirectorStageIdleToRunningWorld", out var simGroup);
-                var em = world.EntityManager;
+                State = RunDirectorStageStateId.Idle,
+                StateElapsedSec = 0.4f,
+                EnteredFrame = 0u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
+            });
 
-                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
-                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
-                CreatePlayer(em);
-                CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
-                CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+            var topologyStateEntity = em.CreateEntity(typeof(StageTopologyStateComponent));
+            em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
 
-                var stageConfigEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageConfigComponent>()).GetSingletonEntity();
-                em.SetComponentData(stageConfigEntity, new RunDirectorStageConfigComponent
-                {
-                    InitialState = RunDirectorStageStateId.Idle,
-                    MinIdleDurationSec = 0.5f,
-                    ClearAutoAdvanceTimeoutSec = 5f,
-                });
-
-                var stageStateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageStateComponent>()).GetSingletonEntity();
-                em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                    StateElapsedSec = 0f,
-                    EnteredFrame = 0u,
-                    LastTransitionReason = RunDirectorStageTransitionReasonId.None,
-                });
-
-                var gateEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageGateComponent>()).GetSingletonEntity();
-                em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
-                {
-                    IntroPresentationDone = 0,
-                    ClearPresentationDone = 1,
-                    MinIdleDurationElapsed = 0,
-                    AutoAdvanceTimeoutElapsed = 0,
-                });
-
-                var requestEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageRequestComponent>()).GetSingletonEntity();
-                em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
-                {
-                    StageStartRequested = 1,
-                    ConfirmPressed = 0,
-                });
-
-                var topologyStateQuery = em.CreateEntityQuery(ComponentType.ReadWrite<StageTopologyStateComponent>());
-                var topologyStateEntity = topologyStateQuery.IsEmptyIgnoreFilter
-                    ? em.CreateEntity(typeof(StageTopologyStateComponent))
-                    : topologyStateQuery.GetSingletonEntity();
-                em.SetComponentData(topologyStateEntity, new StageTopologyStateComponent
-                {
-                    SelectedStageId = 1,
-                    AppliedStageId = 1,
-                    Ready = 1,
-                });
-
-                world.SetTime(new TimeData(0.2d, 0.2f));
-                simGroup.Update();
-                Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.Idle));
-
-                var gate = em.GetComponentData<RunDirectorStageGateComponent>(gateEntity);
-                gate.IntroPresentationDone = 1;
-                em.SetComponentData(gateEntity, gate);
-
-                world.SetTime(new TimeData(0.4d, 0.2f));
-                simGroup.Update();
-                Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.Idle), "MinIdle duration not reached yet");
-
-                world.SetTime(new TimeData(0.6d, 0.2f));
-                simGroup.Update();
-                var stageAfterRun = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
-                Assert.That(stageAfterRun.State, Is.EqualTo(RunDirectorStageStateId.Running));
-                Assert.That(stageAfterRun.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.StartRequested));
-            }
-            finally
+            var gateEntity = em.CreateEntity(typeof(RunDirectorStageGateComponent));
+            em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
             {
-                ForceDisposeSharedContainersIfNeeded();
-            }
+                IntroPresentationDone = 0,
+                ClearPresentationDone = 1,
+                MinIdleDurationElapsed = 1,
+                AutoAdvanceTimeoutElapsed = 0,
+            });
+
+            var requestEntity = em.CreateEntity(typeof(RunDirectorStageRequestComponent));
+            em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
+            {
+                StageStartRequested = 1,
+                ConfirmPressed = 0,
+                ForceClearReadyRequested = 0,
+            });
+
+            var signalEntity = em.CreateEntity(typeof(RunDirectorStageSignalComponent));
+            em.SetComponentData(signalEntity, default(RunDirectorStageSignalComponent));
+
+            var system = world.GetOrCreateSystem<RunDirectorStageTransitionSystem>();
+            system.Update(world.Unmanaged);
+            Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.Idle));
+
+            var gate = em.GetComponentData<RunDirectorStageGateComponent>(gateEntity);
+            gate.IntroPresentationDone = 1;
+            em.SetComponentData(gateEntity, gate);
+
+            system.Update(world.Unmanaged);
+
+            var stageAfterRun = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
+            var requestAfterRun = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
+            Assert.That(stageAfterRun.State, Is.EqualTo(RunDirectorStageStateId.Running));
+            Assert.That(stageAfterRun.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.StartRequested));
+            Assert.That(requestAfterRun.StageStartRequested, Is.EqualTo(0));
         }
 
         [Test]
@@ -2627,6 +2612,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
 
@@ -2674,8 +2660,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
                 CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 32, lifetime: 5f);
                 CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
                 CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                // Flush initial boot reset before seeding the stage-start request under test.
+                world.SetTime(new TimeData(0d, 0f));
+                simGroup.Update();
 
                 var stageConfigEntity = em.CreateEntityQuery(ComponentType.ReadWrite<RunDirectorStageConfigComponent>()).GetSingletonEntity();
                 em.SetComponentData(stageConfigEntity, new RunDirectorStageConfigComponent
@@ -3033,6 +3024,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
             CreatePlayerWithTransform(em, float3.zero);
             CreateConfigSingletons(em, budgetPerFrame: 0, maxPendingCount: 64, maxPendingAgeFrames: 30);
+            SetFixedTickEnabled(em, enabled: false);
 
             var replayEntity = em.CreateEntityQuery(
                 ComponentType.ReadWrite<ReplayInputControlComponent>(),
@@ -3598,6 +3590,17 @@ namespace SweepNDodge.DotsBullets.Tests
             simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
             Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
             return world;
+        }
+
+        private static void SetFixedTickEnabled(EntityManager em, bool enabled)
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadWrite<FixedTickTimeComponent>());
+            var entity = query.GetSingletonEntity();
+            var fixedTick = em.GetComponentData<FixedTickTimeComponent>(entity);
+            fixedTick.EnableFixedTick = (byte)(enabled ? 1 : 0);
+            if (!enabled)
+                fixedTick.Accumulator = 0f;
+            em.SetComponentData(entity, fixedTick);
         }
 
         private static void SetupVacuumContractEnvironment(

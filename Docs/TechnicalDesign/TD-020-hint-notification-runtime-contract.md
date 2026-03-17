@@ -361,6 +361,7 @@ struct HintSeenState
 - `CarryFull` notification + hint 지연/중복 억제
 - `Hit` notification 우선순위
 - `TimeLow -> TimeCritical` 전이
+  - stage timer 기준은 `GameplayElapsedSec` authority를 사용한다
 - 첫 피격 힌트 1회성
 - 실패 후 timeout/hit 기반 힌트 노출
 - 인월드 연출 대화 active 동안 `Notification/Hint` 숨김
