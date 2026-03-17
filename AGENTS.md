@@ -217,6 +217,10 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 기본 모드: read-only
 - 파일 수정/명령 실행이 필요한 경우에만 권한 상승(최소 권한 원칙)
 - 네트워크/외부 업로드는 기본 금지(필요 시 명시적 승인)
+- `RuntimeUiRoot`와 유사한 공용 UI 루트는 prefab SSOT로 관리한다.
+  - Agent는 공통 UI 구조/레이아웃/presenter 변경 시 씬 인스턴스를 직접 수정하지 않고 prefab 자산을 우선 수정한다.
+  - scene 수정은 scene-specific binding 또는 배치처럼 씬 소유 값에 한정한다.
+  - 예외적으로 scene override가 필요하면 완료 보고에 이유와 범위를 명시한다.
 
 ---
 

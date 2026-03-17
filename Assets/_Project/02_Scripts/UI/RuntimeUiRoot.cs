@@ -4,6 +4,10 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.SceneManagement;
+#endif
 
 namespace SweepNDodge.DotsBullets
 {
@@ -104,6 +108,19 @@ namespace SweepNDodge.DotsBullets
 
         private void OnEnable()
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                if (ShouldAutoAuthorInEditor())
+                {
+                    EnsureHierarchy();
+                    AutoBindReferences();
+                }
+
+                return;
+            }
+#endif
+
             EnsureHierarchy();
             AutoBindReferences();
             ConfigurePresenters();
@@ -126,12 +143,11 @@ namespace SweepNDodge.DotsBullets
 
         private void OnValidate()
         {
-            AutoBindReferences();
 #if UNITY_EDITOR
-            if (!Application.isPlaying && !_editorEnsureHierarchyQueued)
+            if (!Application.isPlaying && ShouldAutoAuthorInEditor() && !_editorEnsureHierarchyQueued)
             {
                 _editorEnsureHierarchyQueued = true;
-                UnityEditor.EditorApplication.delayCall += EnsureHierarchyInEditor;
+                EditorApplication.delayCall += EnsureHierarchyInEditor;
             }
 #endif
         }
@@ -163,12 +179,29 @@ namespace SweepNDodge.DotsBullets
             _editorEnsureHierarchyQueued = false;
             if (this == null || Application.isPlaying)
                 return;
-            if (UnityEditor.EditorUtility.IsPersistent(gameObject))
+            if (!ShouldAutoAuthorInEditor())
                 return;
 
             EnsureHierarchy();
             AutoBindReferences();
-            UnityEditor.EditorUtility.SetDirty(gameObject);
+        }
+
+        private bool ShouldAutoAuthorInEditor()
+        {
+#if UNITY_EDITOR
+            if (Application.isPlaying)
+                return false;
+
+            if (EditorUtility.IsPersistent(gameObject))
+                return true;
+
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            return prefabStage != null
+                   && prefabStage.prefabContentsRoot != null
+                   && gameObject.scene == prefabStage.scene;
+#else
+            return false;
+#endif
         }
 #endif
 

@@ -4,7 +4,7 @@
 - doc_id: `TD-016`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-16`
+- last_updated: `2026-03-17`
 - related_docs:
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [OPS-003-public-release-readiness-plan.md](../ProjectOps/OPS-003-public-release-readiness-plan.md)
@@ -99,6 +99,11 @@
 - `RuntimeUiRoot`를 `SampleScene`의 고정 GO로 둔다.
 - `RuntimeUiRoot`는 프리팹으로 authoring하고, `SampleScene`, `PlayModeSmoke_Dedicated`에는 미리 배치된 인스턴스를 사용한다.
 - 초기 단계에서는 런타임 instantiate를 사용하지 않는다.
+- 운영 가드레일:
+  - `Assets/_Project/04_Prefabs/UI/RuntimeUiRoot.prefab`을 공통 구조의 SSOT로 둔다.
+  - `RuntimeUiRoot`의 공통 hierarchy, presenter 구성, 기본 레이아웃, 공통 스타일 변경은 prefab 자산에서 수정한다.
+  - `SampleScene`, `PlayModeSmoke_Dedicated`의 씬 인스턴스는 prefab instance로 유지하고, scene override는 scene-specific binding 또는 배치 값으로 제한한다.
+  - scene 인스턴스에서 공통 구조를 먼저 수정한 경우에도 최종 반영은 prefab override 적용으로 정리한다.
 - 구성:
   - `Canvas`
   - `CanvasScaler`
@@ -377,3 +382,4 @@
 - 2026-03-13: 구현 반영. `Shell V1`, `Modal V2`, `HUD V1`의 실제 프리팹/패널/bridge 계약과 최신 검증 결과를 문서에 반영하고, `Pressure Source` 진행 바와 weakened threshold marker를 HUD V1 범위에 포함시켰다.
 - 2026-03-16: `HUD V1` 재배치와 후속 설계 반영. `HintToast`를 `Notification` / `Hint` 2레인 구조로 교체하고, `TD-020`을 `Hint/Notification V2` SSOT로 연결했다.
 - 2026-03-16: `TD-022` 연계 반영. `PresentationLayer`, `InWorldDialoguePresenter`, dialogue 입력/표시 우선순위, lower-center lane suppress 규칙을 추가했다.
+- 2026-03-17: `RuntimeUiRoot` 운영 가드레일을 추가했다. 공용 UI 구조의 SSOT를 `RuntimeUiRoot.prefab`으로 고정하고, agent와 씬 작업은 prefab 우선 / scene-specific override 제한 규칙을 따른다.
