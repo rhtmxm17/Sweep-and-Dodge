@@ -432,34 +432,10 @@ namespace SweepNDodge.DotsBullets
             DemoShell ??= GetComponent<DemoShellFlowController>() ?? FindFirst<DemoShellFlowController>();
             RuntimeUiRoot ??= FindFirst<RuntimeUiRoot>();
 
-            if (DialogueCatalog == null)
-            {
-#if UNITY_EDITOR
-                string[] dialogueCatalogGuids = UnityEditor.AssetDatabase.FindAssets("t:InWorldDialogueCatalogSO");
-                if (dialogueCatalogGuids.Length > 0)
-                {
-                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(dialogueCatalogGuids[0]);
-                    DialogueCatalog = UnityEditor.AssetDatabase.LoadAssetAtPath<InWorldDialogueCatalogSO>(path);
-                }
-#endif
-            }
-
-            if (SpeakerCatalog == null)
-            {
-#if UNITY_EDITOR
-                string[] speakerCatalogGuids = UnityEditor.AssetDatabase.FindAssets("t:InWorldDialogueSpeakerCatalogSO");
-                if (speakerCatalogGuids.Length > 0)
-                {
-                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(speakerCatalogGuids[0]);
-                    SpeakerCatalog = UnityEditor.AssetDatabase.LoadAssetAtPath<InWorldDialogueSpeakerCatalogSO>(path);
-                }
-#endif
-            }
-
             if ((DemoShell == null || DialogueCatalog == null || SpeakerCatalog == null) && !_warnedBindFailure && LogBindWarnings)
             {
                 _warnedBindFailure = true;
-                Debug.LogWarning("[DemoShellDialogueBridge] Required references were not found.");
+                Debug.LogWarning("[DemoShellDialogueBridge] Required references were not found. Assign DialogueCatalog and SpeakerCatalog explicitly.");
             }
             else if (DemoShell != null && DialogueCatalog != null && SpeakerCatalog != null)
             {

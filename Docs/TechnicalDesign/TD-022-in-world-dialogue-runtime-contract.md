@@ -35,6 +35,7 @@
 - `StageStart`
 - `StageClear`
 - `ThemeTransition`
+  - 단, `ThemeTransition`은 현재 demo flow의 실제 호출 목표가 아니라 확장 예시를 위한 schema/API 범위다.
 
 ### 2.2 기본 개입 강도
 - `StageStart`: `OverlayOnly`
@@ -44,6 +45,7 @@
   - `ClearReady` 직후 `Result`로 즉시 넘어가지 않고 월드 위에서 짧은 연출 대화를 재생한다.
 - `ThemeTransition`: `ShellOverlay`
   - current demo에서는 별도 chapter screen이 없으므로, stage 전환 전후 shell 문맥에서 재생 가능한 타입으로만 정의한다.
+  - v1에서는 authoring/resolver/API만 유지하고, 실제 runtime caller는 연결하지 않는다.
 
 ### 2.3 반복 노출 기본값
 - 첫 노출은 full variant를 우선한다.
@@ -141,6 +143,12 @@
   - 가능한 경우 `StagePresentationRuntimeController`가 stage presentation stableId로 spawned GO를 찾아 bubble anchor를 공급한다.
   - 앵커를 찾지 못하면 screen-space fallback으로 내려간다.
 
+### 4.5 Runtime asset binding
+- `DemoShellDialogueBridge`는 `DialogueCatalog`, `SpeakerCatalog`를 직접 serialized reference로 가진다.
+- current demo의 운영 경로에서는 `SampleScene`에 배치된 `DemoShellDialogueBridge`가 두 SO를 명시적으로 참조한다.
+- editor-only asset search fallback은 사용하지 않는다.
+- 참조 누락 시 warning만 남기고 재생을 시작하지 않는다.
+
 ## 5. 업데이트 순서 / 상태 전이 계약
 ### 5.1 StageStart
 1. `DemoShellFlowController.EnterStagePlay(stageIndex)`
@@ -162,6 +170,8 @@
 ### 5.3 ThemeTransition
 - `ThemeTransition`은 shell screen 전환 문맥에서 재생한다.
 - current demo에서는 stage clear 직후 `Result`를 대체하지 않고, stage 진입/다음 stage 진입 전후 shell overlay로만 허용한다.
+- 현재 v1 구현에서는 `DemoShellDialogueBridge.TryStartThemeTransition(themeKey)` seam만 제공하고, 실제 demo flow에서 이 메서드를 호출하는 runtime wiring은 넣지 않는다.
+- 따라서 `ThemeTransition`은 현 시점에서 기능 확장 예시이며, 공개 빌드 합격 기준은 `StageStart`, `StageClear` 중심으로 판단한다.
 - 별도 chapter screen이 도입되면 이 항목을 해당 shell screen owner에 연결한다.
 
 ### 5.4 suppress 계약
@@ -286,7 +296,7 @@
   - dialogue active 동안 `Hint/Notification`이 suppress되는지 검증
 
 ## 10. 오픈 이슈
-- `ThemeTransition` 전용 문맥을 현재 demo flow에서 별도 screen으로 둘지, stage start variant로 흡수할지 후속 정리 필요
+- `ThemeTransition`은 현재 확장 예시용 seam만 유지한다. 실제 caller를 `chapter screen`, `stage transition shell overlay`, `stage start variant` 중 어디에 둘지는 후속 세션에서 정리한다.
 - `StageStart`의 `GateIntro` 모드를 실제 공개 빌드 기본값으로 승격할지 플레이테스트가 필요
 - speaker portrait와 world actor visual이 항상 1:1 대응해야 하는지 art pipeline 합의가 필요
 - accessibility 옵션(`자동 진행 속도`, `skip hold`, `dim 강도`)을 v1에 넣을지 후속으로 미룰지 결정 필요
@@ -297,3 +307,5 @@
 - 2026-03-16: `P3` 구현 반영. `DemoShellDialogueBridge`와 `DialoguePresentationState`를 추가했고, `StageStart` running edge 시작, `StageClear` shell seam 소비, retry/seen-state, skip/auto-advance, PlayMode/Editor 회귀 테스트를 문서 기준으로 맞췄다.
 - 2026-03-17: `P4` 구현 반영. `RuntimeUiRoot`에 `PresentationLayer`와 `DialoguePanel`을 추가했고, `InWorldDialoguePresenter`가 screen-space plate/portrait/dim과 prompt를 reader-only로 갱신하도록 반영했다. dialogue active 동안 `NotificationPanel`과 `HintPanel` suppress를 적용했다.
 - 2026-03-17: `P5` 구현 반영. `StagePresentationRuntimeController`에 stableId root/anchor read API를 추가했고, `StagePresentationAnchorMarker`와 stage presentation prefab seam을 통해 marker 우선 / root fallback anchor 규칙을 적용했다. `InWorldDialoguePresenter`는 world anchor를 screen projection으로 배치하고, 실패 시 bubble을 숨긴 채 plate fallback을 유지한다.
+- 2026-03-17: `ThemeTransition` 범위 설명을 보강했다. 현재 demo에서는 실제 runtime caller를 두지 않고, schema/API seam만 유지하는 확장 예시 항목임을 명시했다.
+- 2026-03-17: runtime asset binding 경로를 직접 참조 방식으로 고정했다. `DemoShellDialogueBridge`는 editor-only asset search fallback 없이 `DialogueCatalog`, `SpeakerCatalog`를 serialized reference로 받는다.

@@ -2825,8 +2825,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellDialogueBridge
   DemoShell: {fileID: 2015128777}
   RuntimeUiRoot: {fileID: 510448299}
-  DialogueCatalog: {fileID: 0}
-  SpeakerCatalog: {fileID: 0}
+  DialogueCatalog: {fileID: 11400000, guid: 0e6d9ab548eedfa47abf54dc1da77925, type: 2}
+  SpeakerCatalog: {fileID: 11400000, guid: d917f032ddb23264dbd8f7d0b8feb252, type: 2}
   LogBindWarnings: 1
   EnableMouseAdvanceFallback: 1
 --- !u!1660057539 &9223372036854775807

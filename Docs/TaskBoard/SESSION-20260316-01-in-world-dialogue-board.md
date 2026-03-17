@@ -21,9 +21,6 @@
   - 검증: `TD-022` 8.4~8.6과 실제 PlayMode coverage가 맞는다.
 
 ## Next
-- [ ] T8. build/runtime asset binding 경로를 정리한다.
-  - 완료 기준: `DemoShellDialogueBridge`의 editor-only asset fallback 의존을 줄일 방식이 구현 계획으로 정리된다.
-  - 검증: standalone에서도 dialogue catalog/speaker catalog 참조가 scene/asset wiring 기준으로 재현 가능하다.
 - [ ] T9. `공통 gameplay pause 계약`을 별도 작업으로 분리한다.
   - 완료 기준: dialogue, pause menu, 이후 컷신이 공유할 `Acquire/Release` 기반 pause owner 초안이 정리된다.
   - 검증: `DemoShellPauseBridge` UI modal owner와 simulation pause owner 경계가 분리된다.
@@ -56,6 +53,8 @@
   - 검증 결과: `RuntimeUiRoot`에 `PresentationLayer`, `DialoguePanel`, `InWorldDialoguePresenter`를 추가했고, dialogue active 동안 `NotificationPanel`, `HintPanel` suppress가 적용된다.
 - [x] D9. `P5 Anchor / stage presentation 연동`을 구현했다.
   - 검증 결과: `StagePresentationRuntimeController`의 stableId root/anchor lookup, `StagePresentationAnchorMarker` seam, marker 우선 / root fallback, `InWorldDialoguePresenter`의 screen projection world bubble이 연결됐다. stage1 marker anchor와 stage2 root fallback PlayMode 회귀가 통과했다.
+- [x] D10. runtime asset binding을 직접 참조 방식으로 고정했다.
+  - 검증 결과: `DemoShellDialogueBridge`의 editor-only `AssetDatabase` fallback을 제거했고, `SampleScene`의 bridge가 `DialogueCatalog`와 `SpeakerCatalog`를 명시적으로 참조하도록 반영했다.
 
 ## End of Session
 - 결과: 인월드 연출 대화는 `P1~P5` 코드와 핵심 자동 검증까지 반영된 상태다.
