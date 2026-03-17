@@ -61,6 +61,8 @@
   - 검증 결과: pause menu와 `StageClear` gate가 aggregate owner + ECS apply를 통해 실제 simulation pause를 발생시키고, `StageStart overlay`는 pause를 만들지 않음을 자동 검증으로 확인했다.
 - [x] D15. `TD-023 P5 timer authority + tick rule 통일`을 구현하고 검증했다.
   - 검증 결과: `StageGameplayClockComponent`, shell/HUD authority 교체, global fixed tick default-on, test opt-out 정리를 반영했고 compile + console error 0, EditMode `243 pass`, PlayMode `29 pass`를 확인했다.
+- [x] D16. `TD-023 P6 전체 스모크 검증`을 완료했다.
+  - 검증 결과: Unity MCP active instance를 재연결한 뒤 compile + console error 0, EditMode `243/243`, PlayMode `29/29`를 재확인했다.
 
 ## End of Session
 - 결과: 인월드 연출 대화는 `P1~P5` 코드와 핵심 자동 검증까지 반영된 상태다.

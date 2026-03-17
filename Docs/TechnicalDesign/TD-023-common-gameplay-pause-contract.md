@@ -280,7 +280,7 @@
   - pause contract 회귀 테스트를 추가한다.
 - 완료 기준:
   - 아래 검증 계획을 통과한다.
-- 상태: `pending`
+- 상태: `completed`
 
 ## 10. 검증 계획 / 합격 기준
 - 공통
@@ -321,3 +321,4 @@
 - 2026-03-17: `P3 ECS apply` 구현 완료를 반영했다. `P4 requester integration`은 acceptance를 충족한 것으로 정리했고, `P5`에 운영 씬/테스트 월드 tick rule 통일 작업을 추가했다.
 - 2026-03-17: `P5` 구현 반영 중. `StageGameplayClockComponent`와 `StageGameplayClockUpdateSystem`, HUD `GameplayElapsedSec` split, global fixed tick default-on 정책을 현재 구현 기준으로 반영했다.
 - 2026-03-17: `P5` 구현/검증 완료. compile + console error 0, EditMode `243 pass`, PlayMode `29 pass` 기준으로 gameplay clock authority와 tick rule 통일을 확인했다.
+- 2026-03-17: `P6` 전체 스모크 검증 완료. active Unity instance 재연결 후 compile + console error 0, EditMode `243/243`, PlayMode `29/29`를 재확인했다.
