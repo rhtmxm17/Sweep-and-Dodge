@@ -4,7 +4,7 @@
 - doc_id: `TD-022`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-03-16`
+- last_updated: `2026-03-17`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [GD-011-in-world-dialogue-direction.md](../GameDesign/GD-011-in-world-dialogue-direction.md)
@@ -74,10 +74,11 @@
 ### 3.4 presentation reader
 - `RuntimeUiRoot`
   - `DemoShellDialogueBridge`를 auto-bind하고, 후속 `InWorldDialoguePresenter`가 읽을 owner를 노출한다.
+  - `PresentationLayer`와 `DialoguePanel` visibility를 소유한다.
   - dialogue active 시 `Notification` / `Hint` suppress 적용 지점을 제공한다.
 - `InWorldDialoguePresenter`
-  - `P4`에서 추가된다.
   - portrait, nameplate, text plate, advance/skip prompt, world bubble 위치를 표시만 담당한다.
+  - `DialoguePresentationState` snapshot만 읽고 입력은 직접 읽지 않는다.
 - `StagePresentationRuntimeController`
   - speaker/world bubble anchor를 read-only로 공급한다.
 
@@ -165,7 +166,8 @@
 
 ### 5.4 suppress 계약
 - dialogue active 동안 `NotificationPresenter`와 `HintPresenter`는 기본적으로 숨긴다.
-- `StageHudPresenter`는 유지하되, lower-center 레인의 이벤트성 문구는 충돌 방지를 위해 비활성화한다.
+- `StageHudPresenter`는 유지한다.
+- current v1 UI에는 별도 lower-center toast lane이 없으므로, suppress 대상은 `NotificationPanel`, `HintPanel`로 한정한다.
 
 ## 6. Runtime UI / 입력 계약
 ### 6.1 레이어
@@ -181,11 +183,14 @@
 - `InWorldDialoguePresenter`
   - `DimRoot`
   - `PortraitRoot`
+  - `DialoguePlateRoot`
   - `NameText`
   - `BodyText`
   - `AdvancePrompt`
   - `SkipPrompt`
   - `WorldBubbleRoot`
+  - `StagePresentationStableId` anchor는 `StagePresentationRuntimeController` read API를 통해 screen projection으로 해석한다.
+  - lookup 실패, camera 부재, off-screen, behind-camera인 경우는 즉시 plate fallback으로 내린다.
 
 ### 6.3 입력
 - advance: `Submit` 또는 좌클릭
@@ -239,7 +244,7 @@
 - 완료 기준
   - portrait, nameplate, text plate, prompt, world bubble이 reader-only로 갱신된다.
   - dialogue active 동안 `Notification/Hint`가 suppress된다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 8.5 P5 Anchor / stage presentation 연동
 - 목표
@@ -247,7 +252,7 @@
 - 완료 기준
   - stableId 기반 월드 bubble anchor를 찾을 수 있다.
   - lookup 실패 시 screen-space fallback이 즉시 동작한다.
-- 상태: `pending`
+- 상태: `completed`
 
 ### 8.6 P6 테스트 / 스모크
 - 목표
@@ -290,3 +295,5 @@
 - 2026-03-16: 초안 작성. `StageStart=overlay`, `StageClear=pre-result clear gate`, `DemoShellFlowController` 전환 owner, `DemoShellDialogueBridge` session owner, `PresentationLayer`/anchor 재사용 계약을 정리했다.
 - 2026-03-16: `P1`, `P2` 구현 반영. `DemoShellSessionStaging`에 dialogue state를 추가했고, `DemoShellFlowController`가 `ClearReady -> pre-result defer -> Completed -> StageResult`를 직접 소유하도록 갱신했다. EditMode 210 pass, PlayMode dedicated smoke pass, clear defer subscriber PlayMode pass를 확인했다.
 - 2026-03-16: `P3` 구현 반영. `DemoShellDialogueBridge`와 `DialoguePresentationState`를 추가했고, `StageStart` running edge 시작, `StageClear` shell seam 소비, retry/seen-state, skip/auto-advance, PlayMode/Editor 회귀 테스트를 문서 기준으로 맞췄다.
+- 2026-03-17: `P4` 구현 반영. `RuntimeUiRoot`에 `PresentationLayer`와 `DialoguePanel`을 추가했고, `InWorldDialoguePresenter`가 screen-space plate/portrait/dim과 prompt를 reader-only로 갱신하도록 반영했다. dialogue active 동안 `NotificationPanel`과 `HintPanel` suppress를 적용했다.
+- 2026-03-17: `P5` 구현 반영. `StagePresentationRuntimeController`에 stableId root/anchor read API를 추가했고, `StagePresentationAnchorMarker`와 stage presentation prefab seam을 통해 marker 우선 / root fallback anchor 규칙을 적용했다. `InWorldDialoguePresenter`는 world anchor를 screen projection으로 배치하고, 실패 시 bubble을 숨긴 채 plate fallback을 유지한다.

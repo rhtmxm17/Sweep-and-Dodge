@@ -483,6 +483,12 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(shell.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.ClearPresentation));
             Assert.That(dialogueBridge.IsDialogueActive, Is.True);
             Assert.That(dialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageClear));
+            Assert.That(uiRoot.DialoguePanel, Is.Not.Null);
+            Assert.That(uiRoot.DialoguePresenter, Is.Not.Null);
+            Assert.That(uiRoot.DialoguePanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.DialoguePresenter.DialogueRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.DialoguePresenter.DimRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.StageHudPanel.activeInHierarchy, Is.True);
             Assert.That(uiRoot.IsShellPanelVisible(DemoShellScreenId.StageResult), Is.False);
             Assert.That(pauseBridge.CanPause, Is.False);
 
@@ -520,12 +526,16 @@ namespace SweepNDodge.DotsBullets.Tests
 
             DemoShellFlowController shell = null;
             DemoShellDialogueBridge dialogueBridge = null;
+            RuntimeUiRoot uiRoot = null;
+            StagePresentationRuntimeController controller = null;
             yield return WaitForCondition(
                 () =>
                 {
                     shell = FindDemoShell();
                     dialogueBridge = FindDialogueBridge();
-                    return shell != null && dialogueBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                    uiRoot = FindRuntimeUiRoot();
+                    controller = FindStagePresentationRuntimeController();
+                    return shell != null && dialogueBridge != null && uiRoot != null && controller != null && shell.CurrentScreen == DemoShellScreenId.Title;
                 },
                 240,
                 "Operational scene was not ready for stage-start dialogue test.");
@@ -561,14 +571,117 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     dialogueBridge = FindDialogueBridge();
                     shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    controller = FindStagePresentationRuntimeController();
                     return dialogueBridge != null
                         && shell != null
+                        && uiRoot != null
+                        && controller != null
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && dialogueBridge.IsDialogueActive
-                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart;
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart
+                        && uiRoot.DialoguePresenter != null
+                        && uiRoot.DialoguePresenter.WorldBubbleRoot != null
+                        && uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf;
                 },
                 240,
                 "Stage-start overlay dialogue did not activate after running edge.");
+
+            Assert.That(uiRoot.DialoguePanel, Is.Not.Null);
+            Assert.That(uiRoot.DialoguePresenter, Is.Not.Null);
+            Assert.That(controller, Is.Not.Null);
+            Assert.That(uiRoot.DialoguePanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.DialoguePresenter.DialogueRoot.activeSelf, Is.True);
+            Assert.That(uiRoot.DialoguePresenter.DimRoot.activeSelf, Is.False);
+            Assert.That(uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
+            Assert.That(controller.TryGetPresentationAnchor(9001u, out var stage1Anchor), Is.True);
+            Assert.That(stage1Anchor, Is.Not.Null);
+            Assert.That(stage1Anchor.name, Is.EqualTo("DialogueBubbleAnchor"));
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShellDialogueBridge_Stage2StartUsesPresentationRootFallback()
+        {
+            ClearDemoShellStaging();
+            SceneManager.LoadScene(OperationalScenePath, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            RuntimeUiRoot uiRoot = null;
+            StagePresentationRuntimeController controller = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    controller = FindStagePresentationRuntimeController();
+                    return shell != null && dialogueBridge != null && uiRoot != null && controller != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene was not ready for stage2 dialogue anchor test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Stage2 dialogue anchor test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(2), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    controller = FindStagePresentationRuntimeController();
+                    return shell != null
+                        && controller != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 2
+                        && controller.LastAppliedStageId == 2
+                        && controller.SpawnedRootCount == 1;
+                },
+                360,
+                "Stage2 dialogue anchor test did not reach StagePlay.");
+
+            yield return WaitForCondition(
+                () => HasSingleton<RunDirectorStageStateComponent>(em)
+                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
+                360,
+                "RunDirector stage did not reach Running for stage2 dialogue anchor test.");
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    controller = FindStagePresentationRuntimeController();
+                    return dialogueBridge != null
+                        && uiRoot != null
+                        && controller != null
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart
+                        && uiRoot.DialoguePresenter != null
+                        && uiRoot.DialoguePresenter.WorldBubbleRoot != null
+                        && uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf;
+                },
+                240,
+                "Stage2 overlay dialogue did not activate with root fallback bubble.");
+
+            Assert.That(controller.TryGetPresentationRoot(9002u, out var stage2Root), Is.True);
+            Assert.That(stage2Root, Is.Not.Null);
+            Assert.That(controller.TryGetPresentationAnchor(9002u, out var stage2Anchor), Is.True);
+            Assert.That(stage2Anchor, Is.EqualTo(stage2Root.transform));
+            Assert.That(uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
         }
 
         [UnityTest]

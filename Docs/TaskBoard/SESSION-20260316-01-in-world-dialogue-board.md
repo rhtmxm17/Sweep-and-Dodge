@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260316-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-03-16`
+- last_updated: `2026-03-17`
 - related_docs:
   - [../TechnicalDesign/TD-022-in-world-dialogue-runtime-contract.md](../TechnicalDesign/TD-022-in-world-dialogue-runtime-contract.md)
   - [../ADR/ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md](../ADR/ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md)
@@ -16,18 +16,17 @@
 - 한 줄 목표: 인월드 연출 대화를 v1(StageStart, StageClear, ThemeTransition) 까지 구현한다
 
 ## Now
-- [ ] T5. `P4 Runtime UI / presenter` 구현 상세를 확정한다.
-  - 완료 기준: `RuntimeUiRoot.PresentationLayer`, suppress 규칙, 입력 우선순위가 테스트 가능한 수준으로 정리된다.
-  - 검증: `TD-022` 5.4, 6장과 `RuntimeUiRoot`, `DemoShellPauseBridge` 경계가 일치한다.
-  - 근거: `P3`에서 bridge owner와 presentation snapshot이 준비됐으므로 다음 작업은 reader 전용 UI 계층을 붙이는 것이다.
-
-## Next
-- [ ] T6. `P5 Anchor / stage presentation 연동` 상세를 확정한다.
-  - 완료 기준: `StagePresentationRuntimeController`의 stableId lookup과 screen-space fallback 경로가 정리된다.
-  - 검증: `TD-022` 4.4, 8.5와 런타임 read path가 일치한다.
 - [ ] T7. `P6 테스트 / 스모크` 범위를 정리한다.
   - 완료 기준: `PresentationLayer`, suppress, anchor fallback 회귀가 자동화 범위로 분해된다.
   - 검증: `TD-022` 8.4~8.6과 실제 PlayMode coverage가 맞는다.
+
+## Next
+- [ ] T8. build/runtime asset binding 경로를 정리한다.
+  - 완료 기준: `DemoShellDialogueBridge`의 editor-only asset fallback 의존을 줄일 방식이 구현 계획으로 정리된다.
+  - 검증: standalone에서도 dialogue catalog/speaker catalog 참조가 scene/asset wiring 기준으로 재현 가능하다.
+- [ ] T9. `공통 gameplay pause 계약`을 별도 작업으로 분리한다.
+  - 완료 기준: dialogue, pause menu, 이후 컷신이 공유할 `Acquire/Release` 기반 pause owner 초안이 정리된다.
+  - 검증: `DemoShellPauseBridge` UI modal owner와 simulation pause owner 경계가 분리된다.
 
 ## Blocked
 - 없음
@@ -53,8 +52,12 @@
   - 검증 결과: `DemoShellDialogueBridge`가 `StageStart` running edge, `StageClear` shell seam, retry/seen-state, skip/auto-advance, `DialoguePresentationState` snapshot을 소유한다.
 - [x] D7. `P3` 핵심 검증을 완료했다.
   - 검증 결과: targeted EditMode 6 pass를 확인했고, 운영 씬 PlayMode 회귀는 이어서 최종 확인한다.
+- [x] D8. `P4 Runtime UI / presenter`를 구현했다.
+  - 검증 결과: `RuntimeUiRoot`에 `PresentationLayer`, `DialoguePanel`, `InWorldDialoguePresenter`를 추가했고, dialogue active 동안 `NotificationPanel`, `HintPanel` suppress가 적용된다.
+- [x] D9. `P5 Anchor / stage presentation 연동`을 구현했다.
+  - 검증 결과: `StagePresentationRuntimeController`의 stableId root/anchor lookup, `StagePresentationAnchorMarker` seam, marker 우선 / root fallback, `InWorldDialoguePresenter`의 screen projection world bubble이 연결됐다. stage1 marker anchor와 stage2 root fallback PlayMode 회귀가 통과했다.
 
 ## End of Session
-- 결과: 인월드 연출 대화는 `P1~P3` 코드와 핵심 자동 검증까지 반영된 상태다.
-- 남은 리스크: `P4~P5`가 아직 없으므로 실제 대화 UI는 snapshot/state까지만 준비됐고, 화면 연출과 world anchor reader는 후속 작업이 필요하다.
-- 다음 세션 시작점: `P4 Runtime UI / presenter` 상세와 `P5 Anchor / stage presentation` reader 경계를 확정한다.
+- 결과: 인월드 연출 대화는 `P1~P5` 코드와 핵심 자동 검증까지 반영된 상태다.
+- 남은 리스크: dialogue 중 실제 gameplay pause는 아직 공통 계약이 없으므로, clear dialogue는 UI input exclusive만 보장하고 world simulation pause는 하지 않는다.
+- 다음 세션 시작점: `P6 테스트 / 스모크` 범위 정리와 공통 gameplay pause 계약 초안 작성.

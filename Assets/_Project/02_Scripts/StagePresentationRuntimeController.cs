@@ -42,6 +42,36 @@ namespace SweepNDodge.DotsBullets
         public bool LastReady => _lastReady;
         public int SpawnedRootCount => _spawnedRoots.Count;
 
+        public bool TryGetPresentationRoot(uint stableId, out GameObject root)
+        {
+            root = null;
+            if (stableId == 0)
+                return false;
+
+            return _spawnedByStableId.TryGetValue(stableId, out root) && root != null;
+        }
+
+        public bool TryGetPresentationAnchor(uint stableId, out Transform anchor)
+        {
+            anchor = null;
+            if (!TryGetPresentationRoot(stableId, out var root) || root == null)
+                return false;
+
+            var markers = root.GetComponentsInChildren<StagePresentationAnchorMarker>(includeInactive: true);
+            for (int i = 0; i < markers.Length; i++)
+            {
+                var marker = markers[i];
+                if (marker == null || marker.AnchorKind != StagePresentationAnchorKind.DialogueBubble)
+                    continue;
+
+                anchor = marker.transform;
+                return true;
+            }
+
+            anchor = root.transform;
+            return true;
+        }
+
         private void Reset()
         {
             if (TopologyBridge == null)

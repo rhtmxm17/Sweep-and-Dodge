@@ -18,6 +18,7 @@ namespace SweepNDodge.DotsBullets
         public DemoShellNotificationBridge NotificationBridge;
         public DemoShellHintBridge HintBridge;
         public DemoShellDialogueBridge DialogueBridge;
+        public StagePresentationRuntimeController PresentationRuntimeController;
 
         [Header("Canvas")]
         public Canvas RootCanvas;
@@ -29,6 +30,7 @@ namespace SweepNDodge.DotsBullets
         [Header("Layers")]
         public RectTransform ShellLayer;
         public RectTransform HudLayer;
+        public RectTransform PresentationLayer;
         public RectTransform ModalLayer;
         public RectTransform FxLayer;
 
@@ -40,6 +42,7 @@ namespace SweepNDodge.DotsBullets
         public GameObject StageHudPanel;
         public GameObject NotificationPanel;
         public GameObject HintPanel;
+        public GameObject DialoguePanel;
         public GameObject PausePanel;
         public GameObject ConfirmDialogPanel;
         public GameObject SettingsPanel;
@@ -52,6 +55,7 @@ namespace SweepNDodge.DotsBullets
         public StageHudPresenter StageHudPresenter;
         public NotificationPresenter NotificationPresenter;
         public HintPresenter HintPresenter;
+        public InWorldDialoguePresenter DialoguePresenter;
         public PausePresenter PausePresenter;
         public ConfirmDialogPresenter ConfirmDialogPresenter;
         public SettingsPresenter SettingsPresenter;
@@ -76,6 +80,9 @@ namespace SweepNDodge.DotsBullets
         private DemoShellNotificationBridge _configuredNotificationBridge;
         private DemoShellHintBridge _configuredHintBridge;
         private DemoShellDialogueBridge _configuredDialogueBridge;
+        private StagePresentationRuntimeController _configuredPresentationRuntimeController;
+        private InWorldDialoguePresenter _configuredDialoguePresenter;
+        private Canvas _configuredRootCanvas;
         private Action _cachedOpenSettingsAction;
         private Action _cachedCloseSettingsAction;
         private Action _cachedOpenSettingsFromPauseAction;
@@ -287,7 +294,10 @@ namespace SweepNDodge.DotsBullets
                 && _configuredRuntimeHud == RuntimeHudBridge
                 && _configuredNotificationBridge == NotificationBridge
                 && _configuredHintBridge == HintBridge
-                && _configuredDialogueBridge == DialogueBridge)
+                && _configuredDialogueBridge == DialogueBridge
+                && _configuredPresentationRuntimeController == PresentationRuntimeController
+                && _configuredDialoguePresenter == DialoguePresenter
+                && _configuredRootCanvas == RootCanvas)
                 return;
 
             TitlePresenter?.Configure(DemoShell, _cachedOpenSettingsAction);
@@ -297,6 +307,7 @@ namespace SweepNDodge.DotsBullets
             StageHudPresenter?.Configure(DemoShell, RuntimeHudBridge);
             NotificationPresenter?.Configure(NotificationBridge);
             HintPresenter?.Configure(HintBridge);
+            DialoguePresenter?.Configure(DialogueBridge, PresentationRuntimeController, RootCanvas);
             PausePresenter?.Configure(PauseBridge, _cachedOpenSettingsFromPauseAction, _cachedOpenConfirmAction);
             ConfirmDialogPresenter?.Configure(PauseBridge, _cachedCloseConfirmAction);
             SettingsPresenter?.Configure(DemoAudio, _cachedCloseSettingsAction);
@@ -308,6 +319,9 @@ namespace SweepNDodge.DotsBullets
             _configuredNotificationBridge = NotificationBridge;
             _configuredHintBridge = HintBridge;
             _configuredDialogueBridge = DialogueBridge;
+            _configuredPresentationRuntimeController = PresentationRuntimeController;
+            _configuredDialoguePresenter = DialoguePresenter;
+            _configuredRootCanvas = RootCanvas;
         }
 
         private void ApplyShellState(bool force)
@@ -339,14 +353,16 @@ namespace SweepNDodge.DotsBullets
             bool showTitle = hasShell && screen == DemoShellScreenId.Title;
             bool showLobby = hasShell && screen == DemoShellScreenId.Lobby;
             bool showHud = stagePlay;
+            bool showDialogue = DialogueBridge != null && DialogueBridge.CurrentPresentation.Visible;
             bool showResult = hasShell && screen == DemoShellScreenId.StageResult;
             bool showComplete = hasShell && screen == DemoShellScreenId.DemoComplete;
 
             SetActive(TitlePanel, showTitle);
             SetActive(LobbyPanel, showLobby);
             SetActive(StageHudPanel, showHud);
-            SetActive(NotificationPanel, showHud);
-            SetActive(HintPanel, showHud);
+            SetActive(NotificationPanel, showHud && !showDialogue);
+            SetActive(HintPanel, showHud && !showDialogue);
+            SetActive(DialoguePanel, showDialogue);
             SetActive(ResultPanel, showResult);
             SetActive(DemoCompletePanel, showComplete);
             SetActive(PausePanel, pauseOpen && !settingsOpen && !confirmOpen);
@@ -363,6 +379,7 @@ namespace SweepNDodge.DotsBullets
                 NotificationPresenter?.RefreshPresentation();
                 HintPresenter?.RefreshPresentation();
             }
+            DialoguePresenter?.RefreshPresentation();
             if (showResult)
                 ResultPresenter?.RefreshPresentation();
             if (showComplete)
@@ -487,6 +504,8 @@ namespace SweepNDodge.DotsBullets
             NotificationBridge ??= FindFirst<DemoShellNotificationBridge>();
             HintBridge ??= FindFirst<DemoShellHintBridge>();
             DialogueBridge ??= FindFirst<DemoShellDialogueBridge>();
+            PresentationRuntimeController ??= FindFirst<StagePresentationRuntimeController>();
+            DialoguePresenter ??= FindFirst<InWorldDialoguePresenter>();
 
             if (DemoShell != null)
             {
@@ -515,6 +534,7 @@ namespace SweepNDodge.DotsBullets
 
             ShellLayer ??= FindDirectChildRect(transform, "ShellLayer");
             HudLayer ??= FindDirectChildRect(transform, "HudLayer");
+            PresentationLayer ??= FindDirectChildRect(transform, "PresentationLayer");
             ModalLayer ??= FindDirectChildRect(transform, "ModalLayer");
             FxLayer ??= FindDirectChildRect(transform, "FxLayer");
 
@@ -525,6 +545,7 @@ namespace SweepNDodge.DotsBullets
             StageHudPanel ??= FindDirectChild(HudLayer, "StageHudPanel");
             NotificationPanel ??= FindDirectChild(HudLayer, "NotificationPanel");
             HintPanel ??= FindDirectChild(HudLayer, "HintPanel");
+            DialoguePanel ??= FindDirectChild(PresentationLayer, "DialoguePanel");
             PausePanel ??= FindDirectChild(ModalLayer, "PausePanel");
             ConfirmDialogPanel ??= FindDirectChild(ModalLayer, "ConfirmDialogPanel");
             SettingsPanel ??= FindDirectChild(ModalLayer, "SettingsPanel");
@@ -536,6 +557,7 @@ namespace SweepNDodge.DotsBullets
             StageHudPresenter ??= StageHudPanel != null ? StageHudPanel.GetComponent<StageHudPresenter>() : null;
             NotificationPresenter ??= NotificationPanel != null ? NotificationPanel.GetComponent<NotificationPresenter>() : null;
             HintPresenter ??= HintPanel != null ? HintPanel.GetComponent<HintPresenter>() : null;
+            DialoguePresenter ??= DialoguePanel != null ? DialoguePanel.GetComponent<InWorldDialoguePresenter>() : null;
             PausePresenter ??= PausePanel != null ? PausePanel.GetComponent<PausePresenter>() : null;
             ConfirmDialogPresenter ??= ConfirmDialogPanel != null ? ConfirmDialogPanel.GetComponent<ConfirmDialogPresenter>() : null;
             SettingsPresenter ??= SettingsPanel != null ? SettingsPanel.GetComponent<SettingsPresenter>() : null;
@@ -556,8 +578,14 @@ namespace SweepNDodge.DotsBullets
             EnsureCanvasSetup();
             ShellLayer = EnsureLayer(ShellLayer, "ShellLayer");
             HudLayer = EnsureLayer(HudLayer, "HudLayer");
+            PresentationLayer = EnsureLayer(PresentationLayer, "PresentationLayer");
             ModalLayer = EnsureLayer(ModalLayer, "ModalLayer");
             FxLayer = EnsureLayer(FxLayer, "FxLayer");
+            SetLayerOrder(ShellLayer, 0);
+            SetLayerOrder(HudLayer, 1);
+            SetLayerOrder(PresentationLayer, 2);
+            SetLayerOrder(ModalLayer, 3);
+            SetLayerOrder(FxLayer, 4);
 
             BuildTitlePanel();
             BuildLobbyPanel();
@@ -566,6 +594,7 @@ namespace SweepNDodge.DotsBullets
             BuildStageHudPanel();
             BuildNotificationPanel();
             BuildHintPanel();
+            BuildDialoguePanel();
             BuildPausePanel();
             BuildConfirmDialogPanel();
             BuildSettingsPanel();
@@ -620,6 +649,14 @@ namespace SweepNDodge.DotsBullets
             var rect = go.GetComponent<RectTransform>();
             Stretch(rect);
             return rect;
+        }
+
+        private static void SetLayerOrder(RectTransform layer, int siblingIndex)
+        {
+            if (layer == null)
+                return;
+
+            layer.SetSiblingIndex(siblingIndex);
         }
 
         private void BuildTitlePanel()

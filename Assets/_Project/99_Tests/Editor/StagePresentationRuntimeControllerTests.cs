@@ -289,6 +289,103 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(child.rotation.eulerAngles.y, Is.EqualTo(135f).Within(0.5f));
         }
 
+        [Test]
+        public void TryGetPresentationAnchor_ReturnsMarkerBeforeRootFallback()
+        {
+            var (controller, _, stageCatalog, presentationCatalog) = CreateControllerGraph();
+            stageCatalog.Entries = new[]
+            {
+                new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_01",
+                    Layout = CreateLayout(
+                        1,
+                        new StagePresentationLayoutData
+                        {
+                            StableId = 9001,
+                            Active = true,
+                            PlacementMode = StagePresentationPlacementMode.Standalone,
+                            PresentationKey = "preview_visual_01",
+                            Position = new Vector3(2f, 0f, 3f),
+                            Euler = Vector3.zero,
+                            Scale = Vector3.one,
+                        }),
+                },
+            };
+            presentationCatalog.Entries = new[]
+            {
+                new StagePresentationCatalogEntry
+                {
+                    PresentationKey = "preview_visual_01",
+                    Prefab = CreatePresentationPrefab("preview_visual_01", withDialogueAnchor: true),
+                },
+            };
+
+            SetTopologyState(selected: 1, applied: 1, ready: 1);
+            controller.Tick();
+
+            Assert.That(controller.TryGetPresentationRoot(9001u, out var root), Is.True);
+            Assert.That(root, Is.Not.Null);
+            Assert.That(controller.TryGetPresentationAnchor(9001u, out var anchor), Is.True);
+            Assert.That(anchor, Is.Not.Null);
+            Assert.That(anchor.name, Is.EqualTo("DialogueBubbleAnchor"));
+            Assert.That(anchor, Is.Not.EqualTo(root.transform));
+        }
+
+        [Test]
+        public void TryGetPresentationAnchor_FallsBackToRootWhenMarkerMissing()
+        {
+            var (controller, _, stageCatalog, presentationCatalog) = CreateControllerGraph();
+            stageCatalog.Entries = new[]
+            {
+                new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_01",
+                    Layout = CreateLayout(
+                        1,
+                        new StagePresentationLayoutData
+                        {
+                            StableId = 9002,
+                            Active = true,
+                            PlacementMode = StagePresentationPlacementMode.Standalone,
+                            PresentationKey = "preview_visual_02",
+                            Position = new Vector3(-1f, 1f, 4f),
+                            Euler = Vector3.zero,
+                            Scale = Vector3.one,
+                        }),
+                },
+            };
+            presentationCatalog.Entries = new[]
+            {
+                new StagePresentationCatalogEntry
+                {
+                    PresentationKey = "preview_visual_02",
+                    Prefab = CreatePresentationPrefab("preview_visual_02"),
+                },
+            };
+
+            SetTopologyState(selected: 1, applied: 1, ready: 1);
+            controller.Tick();
+
+            Assert.That(controller.TryGetPresentationRoot(9002u, out var root), Is.True);
+            Assert.That(root, Is.Not.Null);
+            Assert.That(controller.TryGetPresentationAnchor(9002u, out var anchor), Is.True);
+            Assert.That(anchor, Is.EqualTo(root.transform));
+        }
+
+        [Test]
+        public void TryGetPresentationRoot_ReturnsFalse_WhenStableIdMissing()
+        {
+            var (controller, _, _, _) = CreateControllerGraph();
+
+            Assert.That(controller.TryGetPresentationRoot(9999u, out var root), Is.False);
+            Assert.That(root, Is.Null);
+            Assert.That(controller.TryGetPresentationAnchor(9999u, out var anchor), Is.False);
+            Assert.That(anchor, Is.Null);
+        }
+
         private (StagePresentationRuntimeController Controller, StageTopologyBridge TopologyBridge, StageCatalogSO StageCatalog, StagePresentationCatalogSO PresentationCatalog) CreateControllerGraph()
         {
             var root = new GameObject("presentation_controller");
@@ -328,9 +425,17 @@ namespace SweepNDodge.DotsBullets.Tests
             return layout;
         }
 
-        private GameObject CreatePresentationPrefab(string name)
+        private GameObject CreatePresentationPrefab(string name, bool withDialogueAnchor = false)
         {
             var prefab = new GameObject(name);
+            if (withDialogueAnchor)
+            {
+                var anchor = new GameObject("DialogueBubbleAnchor");
+                anchor.transform.SetParent(prefab.transform, false);
+                anchor.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+                anchor.AddComponent<StagePresentationAnchorMarker>().AnchorKind = StagePresentationAnchorKind.DialogueBubble;
+            }
+
             _toDestroy.Add(prefab);
             return prefab;
         }

@@ -22,6 +22,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             ClearVolumePrefs();
             DemoShellSessionStaging.ResetHintSessionState();
+            DemoShellSessionStaging.ResetDialogueSessionState();
         }
 
         [TearDown]
@@ -29,6 +30,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             ClearVolumePrefs();
             DemoShellSessionStaging.ResetHintSessionState();
+            DemoShellSessionStaging.ResetDialogueSessionState();
         }
 
         [Test]
@@ -606,6 +608,249 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(reloadContext.HintBridge.CurrentHint.Visible, Is.False);
         }
 
+        [Test]
+        public void EnsureHierarchy_BuildsPresentationLayer_AndDialoguePresenter()
+        {
+            using var context = CreateContext();
+
+            Assert.That(context.Root.PresentationLayer, Is.Not.Null);
+            Assert.That(context.Root.DialoguePanel, Is.Not.Null);
+            Assert.That(context.Root.DialoguePresenter, Is.Not.Null);
+            Assert.That(context.Root.PresentationLayer.GetSiblingIndex(), Is.EqualTo(2));
+            Assert.That(context.Root.DialoguePresenter.DialogueRoot, Is.Not.Null);
+            Assert.That(context.Root.DialoguePresenter.DialoguePlateRoot, Is.Not.Null);
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleRoot, Is.Not.Null);
+        }
+
+        [Test]
+        public void ApplyShellState_ShowsDialoguePanel_AndSuppressesHudBanners()
+        {
+            using var context = CreateContext();
+
+            InvokeConfigurePresenters(context.Root);
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 0);
+            SetPrivateField(context.Shell, "_currentStagePlayPhase", DemoShellStagePlayPhaseId.Running);
+
+            var portrait = CreateTestSprite();
+            SetPrivateField(context.NotificationBridge, "_currentNotification", new NotificationResolvedState
+            {
+                Id = NotificationId.StageClear,
+                Message = "Clear",
+                Severity = NotificationSeverity.Info,
+                Visible = true,
+            });
+            SetPrivateField(context.HintBridge, "_currentHint", new HintResolvedState
+            {
+                Id = HintId.CollectFromSources,
+                Message = "Collect",
+                Visible = true,
+            });
+            SetPrivateField(context.DialogueBridge, "_currentPresentation", new DialoguePresentationState(
+                visible: true,
+                trigger: InWorldDialogueTriggerId.StageClear,
+                blockingMode: InWorldDialogueBlockingMode.GateClear,
+                entryKey: "stage1_clear",
+                lineIndex: 0,
+                lineCount: 1,
+                speakerKey: "hero",
+                speakerDisplayName: "Hero",
+                speakerPortrait: portrait,
+                portraitSide: DialoguePortraitSide.Right,
+                bodyText: "Clear line",
+                anchor: new InWorldDialogueAnchorRef
+                {
+                    Kind = InWorldDialogueAnchorKind.ScreenAnchor,
+                    ScreenAnchor = InWorldDialogueScreenAnchorId.Center,
+                },
+                canAdvance: true,
+                canSkip: true,
+                autoAdvanceEnabled: false,
+                lineElapsedSec: 0.4f,
+                minHoldSec: 0.1f,
+                autoAdvanceSec: 0f));
+
+            context.Root.NotificationPresenter.RefreshPresentation();
+            context.Root.HintPresenter.RefreshPresentation();
+            context.Root.DialoguePresenter.RefreshPresentation();
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.StageHudPanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.DialoguePanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.NotificationPanel.activeInHierarchy, Is.False);
+            Assert.That(context.Root.HintPanel.activeInHierarchy, Is.False);
+            Assert.That(context.Root.DialoguePresenter.DialogueRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.DimRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.AdvancePromptRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.SkipPromptRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.NameText.text, Is.EqualTo("Hero"));
+            Assert.That(context.Root.DialoguePresenter.BodyText.text, Is.EqualTo("Clear line"));
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleText.text, Is.EqualTo("Clear line"));
+            Assert.That(context.Root.DialoguePresenter.PortraitRoot.activeSelf, Is.True);
+
+            var portraitRect = context.Root.DialoguePresenter.PortraitRoot.GetComponent<RectTransform>();
+            Assert.That(portraitRect.anchorMin.x, Is.EqualTo(1f).Within(1e-4f));
+
+            Object.DestroyImmediate(portrait.texture);
+            Object.DestroyImmediate(portrait);
+        }
+
+        [Test]
+        public void DialoguePresenter_AppliesOverlayFallback_AndHiddenState()
+        {
+            using var context = CreateContext();
+
+            InvokeConfigurePresenters(context.Root);
+            SetPrivateField(context.DialogueBridge, "_currentPresentation", new DialoguePresentationState(
+                visible: true,
+                trigger: InWorldDialogueTriggerId.StageStart,
+                blockingMode: InWorldDialogueBlockingMode.OverlayOnly,
+                entryKey: "stage1_start",
+                lineIndex: 0,
+                lineCount: 1,
+                speakerKey: "hero",
+                speakerDisplayName: "Hero",
+                speakerPortrait: null,
+                portraitSide: DialoguePortraitSide.Auto,
+                bodyText: "Intro line",
+                anchor: new InWorldDialogueAnchorRef
+                {
+                    Kind = InWorldDialogueAnchorKind.StagePresentationStableId,
+                    StagePresentationStableId = 1001u,
+                },
+                canAdvance: false,
+                canSkip: true,
+                autoAdvanceEnabled: false,
+                lineElapsedSec: 0f,
+                minHoldSec: 0.2f,
+                autoAdvanceSec: 0f));
+
+            context.Root.DialoguePresenter.RefreshPresentation();
+
+            Assert.That(context.Root.DialoguePresenter.DialogueRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.DimRoot.activeSelf, Is.False);
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.False);
+            Assert.That(context.Root.DialoguePresenter.PortraitRoot.activeSelf, Is.False);
+            Assert.That(context.Root.DialoguePresenter.AdvancePromptRoot.activeSelf, Is.False);
+            Assert.That(context.Root.DialoguePresenter.SkipPromptRoot.activeSelf, Is.True);
+
+            SetPrivateField(context.DialogueBridge, "_currentPresentation", DialoguePresentationState.Hidden);
+            context.Root.DialoguePresenter.RefreshPresentation();
+            Assert.That(context.Root.DialoguePresenter.DialogueRoot.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void DialoguePresenter_ProjectsStablePresentationAnchor_WhenVisibleOnScreen()
+        {
+            using var context = CreateContext();
+
+            var cameraGo = new GameObject("ProjectionCamera");
+            var camera = cameraGo.AddComponent<Camera>();
+            camera.tag = "MainCamera";
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+            camera.transform.rotation = Quaternion.identity;
+            camera.orthographic = true;
+            camera.orthographicSize = 5f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+
+            var spawnedRoot = new GameObject("Presentation_9001_preview_visual_01");
+            var markerGo = new GameObject("DialogueBubbleAnchor");
+            markerGo.transform.SetParent(spawnedRoot.transform, false);
+            markerGo.transform.position = new Vector3(0f, 1.5f, 0f);
+            markerGo.AddComponent<StagePresentationAnchorMarker>().AnchorKind = StagePresentationAnchorKind.DialogueBubble;
+
+            RegisterSpawnedPresentation(context.PresentationRuntime, 9001u, spawnedRoot);
+            context.Root.DialoguePresenter.ProjectionCamera = camera;
+            InvokeConfigurePresenters(context.Root);
+            SetPrivateField(context.DialogueBridge, "_currentPresentation", new DialoguePresentationState(
+                visible: true,
+                trigger: InWorldDialogueTriggerId.StageStart,
+                blockingMode: InWorldDialogueBlockingMode.OverlayOnly,
+                entryKey: "stage1_start_world",
+                lineIndex: 0,
+                lineCount: 1,
+                speakerKey: "hero",
+                speakerDisplayName: "Hero",
+                speakerPortrait: null,
+                portraitSide: DialoguePortraitSide.Left,
+                bodyText: "World anchor line",
+                anchor: new InWorldDialogueAnchorRef
+                {
+                    Kind = InWorldDialogueAnchorKind.StagePresentationStableId,
+                    StagePresentationStableId = 9001u,
+                },
+                canAdvance: true,
+                canSkip: true,
+                autoAdvanceEnabled: false,
+                lineElapsedSec: 0.2f,
+                minHoldSec: 0.1f,
+                autoAdvanceSec: 0f));
+
+            context.Root.DialoguePresenter.RefreshPresentation();
+
+            Assert.That(context.PresentationRuntime.TryGetPresentationAnchor(9001u, out var anchor), Is.True);
+            Assert.That(anchor, Is.Not.Null);
+            Assert.That(anchor.name, Is.EqualTo("DialogueBubbleAnchor"));
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleText.text, Is.EqualTo("World anchor line"));
+
+            Object.DestroyImmediate(spawnedRoot);
+            Object.DestroyImmediate(cameraGo);
+        }
+
+        [Test]
+        public void DialoguePresenter_HidesWorldBubble_WhenAnchorIsBehindCamera()
+        {
+            using var context = CreateContext();
+
+            var cameraGo = new GameObject("ProjectionCamera");
+            var camera = cameraGo.AddComponent<Camera>();
+            camera.tag = "MainCamera";
+            camera.transform.position = Vector3.zero;
+            camera.transform.rotation = Quaternion.identity;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+
+            var spawnedRoot = new GameObject("Presentation_9002_preview_visual_02");
+            spawnedRoot.transform.position = new Vector3(0f, 0f, -5f);
+            RegisterSpawnedPresentation(context.PresentationRuntime, 9002u, spawnedRoot);
+            context.Root.DialoguePresenter.ProjectionCamera = camera;
+            InvokeConfigurePresenters(context.Root);
+            SetPrivateField(context.DialogueBridge, "_currentPresentation", new DialoguePresentationState(
+                visible: true,
+                trigger: InWorldDialogueTriggerId.StageStart,
+                blockingMode: InWorldDialogueBlockingMode.OverlayOnly,
+                entryKey: "stage2_start_world",
+                lineIndex: 0,
+                lineCount: 1,
+                speakerKey: "hero",
+                speakerDisplayName: "Hero",
+                speakerPortrait: null,
+                portraitSide: DialoguePortraitSide.Auto,
+                bodyText: "Behind camera",
+                anchor: new InWorldDialogueAnchorRef
+                {
+                    Kind = InWorldDialogueAnchorKind.StagePresentationStableId,
+                    StagePresentationStableId = 9002u,
+                },
+                canAdvance: true,
+                canSkip: true,
+                autoAdvanceEnabled: false,
+                lineElapsedSec: 0f,
+                minHoldSec: 0f,
+                autoAdvanceSec: 0f));
+
+            context.Root.DialoguePresenter.RefreshPresentation();
+
+            Assert.That(context.PresentationRuntime.TryGetPresentationAnchor(9002u, out var anchor), Is.True);
+            Assert.That(anchor, Is.EqualTo(spawnedRoot.transform));
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.False);
+            Assert.That(context.Root.DialoguePresenter.DialogueRoot.activeSelf, Is.True);
+
+            Object.DestroyImmediate(spawnedRoot);
+            Object.DestroyImmediate(cameraGo);
+        }
+
         private static TestContext CreateContext()
         {
             var shellGo = new GameObject("DemoShell_Test");
@@ -639,6 +884,13 @@ namespace SweepNDodge.DotsBullets.Tests
             hintBridge.PauseBridge = pauseBridge;
             hintBridge.RuntimeHudBridge = hud;
             hintBridge.NotificationBridge = notificationBridge;
+            var dialogueBridge = shellGo.AddComponent<DemoShellDialogueBridge>();
+            dialogueBridge.DemoShell = shell;
+            dialogueBridge.LogBindWarnings = false;
+            var presentationRuntime = shellGo.AddComponent<StagePresentationRuntimeController>();
+            presentationRuntime.LogWarnings = false;
+            presentationRuntime.RebuildOnEnable = false;
+            presentationRuntime.DestroyOnDisable = true;
 
             var rootGo = new GameObject("RuntimeUiRoot_Test");
             rootGo.SetActive(false);
@@ -649,11 +901,14 @@ namespace SweepNDodge.DotsBullets.Tests
             root.RuntimeHudBridge = hud;
             root.NotificationBridge = notificationBridge;
             root.HintBridge = hintBridge;
+            root.DialogueBridge = dialogueBridge;
+            root.PresentationRuntimeController = presentationRuntime;
             root.LogBindWarnings = false;
+            dialogueBridge.RuntimeUiRoot = root;
             root.EnsureHierarchy();
             rootGo.SetActive(true);
 
-            return new TestContext(shellGo, rootGo, shell, audio, pauseBridge, hud, notificationBridge, hintBridge, root);
+            return new TestContext(shellGo, rootGo, shell, audio, pauseBridge, hud, notificationBridge, hintBridge, dialogueBridge, presentationRuntime, root);
         }
 
         private static void InvokeConfigurePresenters(RuntimeUiRoot root)
@@ -679,6 +934,16 @@ namespace SweepNDodge.DotsBullets.Tests
             var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null, $"{target.GetType().Name}.{fieldName} was not found.");
             field.SetValue(target, value);
+        }
+
+        private static void RegisterSpawnedPresentation(StagePresentationRuntimeController controller, uint stableId, GameObject root)
+        {
+            Assert.That(controller, Is.Not.Null);
+            var field = typeof(StagePresentationRuntimeController).GetField("_spawnedByStableId", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var map = field.GetValue(controller) as System.Collections.IDictionary;
+            Assert.That(map, Is.Not.Null);
+            map[stableId] = root;
         }
 
         private static bool ContainsText(TextMeshProUGUI[] texts, string expected)
@@ -723,6 +988,14 @@ namespace SweepNDodge.DotsBullets.Tests
             return true;
         }
 
+        private static Sprite CreateTestSprite()
+        {
+            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+            return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+        }
+
         private static void ClearVolumePrefs()
         {
             for (int i = 0; i < DemoAudioPrefsKeys.AllVolumeKeys.Length; i++)
@@ -744,6 +1017,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 PlayerRuntimeHudBridge hud,
                 DemoShellNotificationBridge notificationBridge,
                 DemoShellHintBridge hintBridge,
+                DemoShellDialogueBridge dialogueBridge,
+                StagePresentationRuntimeController presentationRuntime,
                 RuntimeUiRoot root)
             {
                 _shellGo = shellGo;
@@ -754,6 +1029,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 Hud = hud;
                 NotificationBridge = notificationBridge;
                 HintBridge = hintBridge;
+                DialogueBridge = dialogueBridge;
+                PresentationRuntime = presentationRuntime;
                 Root = root;
             }
 
@@ -763,6 +1040,8 @@ namespace SweepNDodge.DotsBullets.Tests
             public PlayerRuntimeHudBridge Hud { get; }
             public DemoShellNotificationBridge NotificationBridge { get; }
             public DemoShellHintBridge HintBridge { get; }
+            public DemoShellDialogueBridge DialogueBridge { get; }
+            public StagePresentationRuntimeController PresentationRuntime { get; }
             public RuntimeUiRoot Root { get; }
 
             public void Dispose()

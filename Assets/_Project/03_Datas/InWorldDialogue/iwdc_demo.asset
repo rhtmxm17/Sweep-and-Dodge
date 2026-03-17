@@ -28,9 +28,9 @@ MonoBehaviour:
       - SpeakerKey: hero
         Text: Full intro
         Anchor:
-          Kind: 2
-          StagePresentationStableId: 0
-          ScreenAnchor: 2
+          Kind: 1
+          StagePresentationStableId: 9001
+          ScreenAnchor: 0
         MinHoldSec: 0.2
         AutoAdvanceSec: 0
       - SpeakerKey: hero
@@ -51,6 +51,27 @@ MonoBehaviour:
           ScreenAnchor: 4
         MinHoldSec: 0
         AutoAdvanceSec: 0
+  - Enabled: 1
+    EntryKey: stage_02_start
+    Trigger: 1
+    TargetKind: 0
+    StageId: 2
+    ThemeKey: 
+    Priority: 10
+    BlockingMode: 0
+    RetryPolicy: 0
+    FullVariant:
+      Lines:
+      - SpeakerKey: hero
+        Text: Stage 2 intro
+        Anchor:
+          Kind: 1
+          StagePresentationStableId: 9002
+          ScreenAnchor: 0
+        MinHoldSec: 0.2
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
   - Enabled: 1
     EntryKey: stage_01_clear
     Trigger: 2
