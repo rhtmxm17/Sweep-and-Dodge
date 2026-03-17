@@ -452,7 +452,9 @@ namespace SweepNDodge.DotsBullets
 
         private void AcquireGatePauseIfNeeded(InWorldDialogueBlockingMode blockingMode)
         {
-            if (blockingMode != InWorldDialogueBlockingMode.GateClear || PauseController == null || _gatePauseHandle.IsValid)
+            bool isGatePause = blockingMode == InWorldDialogueBlockingMode.GateIntro
+                || blockingMode == InWorldDialogueBlockingMode.GateClear;
+            if (!isGatePause || PauseController == null || _gatePauseHandle.IsValid)
                 return;
 
             _gatePauseHandle = PauseController.Acquire(

@@ -17,6 +17,9 @@ namespace SweepNDodge.DotsBullets.Tests
         private static readonly MethodInfo ResolveCurrentShellDefaultSelectableMethod = typeof(RuntimeUiRoot)
             .GetMethod("ResolveCurrentShellDefaultSelectable", BindingFlags.Instance | BindingFlags.NonPublic);
 
+        private static readonly MethodInfo PauseBridgeUpdateMethod = typeof(DemoShellPauseBridge)
+            .GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
+
         [SetUp]
         public void SetUp()
         {
@@ -253,6 +256,66 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(handle.IsValid, Is.True);
             Assert.That(context.PauseBridge.CanPause, Is.False);
             Assert.That(context.PauseBridge.RequestPause(), Is.False);
+        }
+
+        [Test]
+        public void PauseBridge_AutoReleasesPauseMenuHandle_WhenPauseBecomesBlocked()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 1);
+
+            Assert.That(context.PauseBridge.RequestPause(), Is.True);
+            var pauseMenuHandle = context.PauseController.CurrentSnapshot.ReasonMask;
+            Assert.That((pauseMenuHandle & (1u << (int)GameplayPauseReasonId.PauseMenu)) != 0, Is.True);
+
+            GameplayPauseHandle dialogueHandle = context.PauseController.Acquire(
+                GameplayPauseReasonId.DialogueGate,
+                GameplayPauseFlags.PauseSimulation
+                | GameplayPauseFlags.BlockGameplayInput
+                | GameplayPauseFlags.ExclusivePresentationInput
+                | GameplayPauseFlags.BlockPauseMenuOpen);
+
+            Assert.That(dialogueHandle.IsValid, Is.True);
+            InvokePauseBridgeUpdate(context.PauseBridge);
+
+            Assert.That(context.PauseBridge.IsPaused, Is.False);
+            Assert.That(context.PauseController.CurrentSnapshot.IsPauseMenuOpenBlocked, Is.True);
+            Assert.That(
+                context.PauseController.CurrentSnapshot.ReasonMask,
+                Is.EqualTo(1u << (int)GameplayPauseReasonId.DialogueGate));
+        }
+
+        [Test]
+        public void PauseBridge_AutoClosesPause_WhenDialogueGateBlocksPauseMenu()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 1);
+            InvokeConfigurePresenters(context.Root);
+
+            Assert.That(context.PauseBridge.RequestPause(), Is.True);
+            InvokeApplyShellState(context.Root, force: true);
+            Assert.That(context.Root.PausePanel.activeSelf, Is.True);
+
+            GameplayPauseHandle dialogueHandle = context.PauseController.Acquire(
+                GameplayPauseReasonId.DialogueGate,
+                GameplayPauseFlags.PauseSimulation
+                | GameplayPauseFlags.BlockGameplayInput
+                | GameplayPauseFlags.ExclusivePresentationInput
+                | GameplayPauseFlags.BlockPauseMenuOpen);
+
+            Assert.That(dialogueHandle.IsValid, Is.True);
+            InvokePauseBridgeUpdate(context.PauseBridge);
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.PauseBridge.IsPaused, Is.False);
+            Assert.That(context.Root.PausePanel.activeSelf, Is.False);
+            Assert.That(
+                context.PauseController.CurrentSnapshot.ReasonMask,
+                Is.EqualTo(1u << (int)GameplayPauseReasonId.DialogueGate));
         }
 
         [Test]
@@ -960,6 +1023,12 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             Assert.That(ApplyShellStateMethod, Is.Not.Null, "RuntimeUiRoot.ApplyShellState method not found.");
             ApplyShellStateMethod.Invoke(root, new object[] { force });
+        }
+
+        private static void InvokePauseBridgeUpdate(DemoShellPauseBridge bridge)
+        {
+            Assert.That(PauseBridgeUpdateMethod, Is.Not.Null, "DemoShellPauseBridge.Update method not found.");
+            PauseBridgeUpdateMethod.Invoke(bridge, null);
         }
 
         private static Selectable ResolveCurrentDefaultSelectable(RuntimeUiRoot root)

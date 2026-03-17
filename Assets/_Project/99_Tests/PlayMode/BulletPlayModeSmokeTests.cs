@@ -38,16 +38,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 var world = World.DefaultGameObjectInjectionWorld;
                 Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
 
-                var em = world.EntityManager;
-                DemoShellFlowController shell = null;
-                yield return WaitForCondition(
-                    () =>
-                    {
-                        shell = FindDemoShell();
-                        return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
-                    },
-                    240,
-                    "DemoShellFlowController was not ready in operational scene for stress test.");
+            var em = world.EntityManager;
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "DemoShellFlowController was not ready in operational scene for stress test.");
 
                 Assert.That(shell.RequestStartFromTitle(), Is.True);
                 yield return WaitForCondition(
@@ -59,20 +59,21 @@ namespace SweepNDodge.DotsBullets.Tests
                     240,
                     "Operational stress test did not reach Lobby.");
 
-                Assert.That(shell.RequestSelectStageById(1), Is.True);
-                yield return WaitForCondition(
-                    () =>
-                        CountByComponentType<PlayerTag>(em) > 0 &&
-                        CountByComponentType<SourceSpawnComponent>(em) > 0 &&
-                        CountByComponentType<BulletFrameCounterComponent>(em) > 0 &&
-                        (shell = FindDemoShell()) != null &&
-                        shell.CurrentScreen == DemoShellScreenId.StagePlay &&
-                        shell.CurrentStageId == 1 &&
-                        IsStageMapAppliedForStage1(em) &&
-                        HasSingleton<SpawnBacklogMetricsComponent>(em) &&
-                        HasSingleton<DebugHudMetricsComponent>(em),
-                    480,
-                    "ECS singleton setup for stress/HUD was not ready within timeout.");
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                    CountByComponentType<PlayerTag>(em) > 0 &&
+                    CountByComponentType<SourceSpawnComponent>(em) > 0 &&
+                    CountByComponentType<BulletFrameCounterComponent>(em) > 0 &&
+                    (shell = FindDemoShell()) != null &&
+                    shell.CurrentScreen == DemoShellScreenId.StagePlay &&
+                    shell.CurrentStageId == 1 &&
+                    shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running &&
+                    IsStageMapAppliedForStage1(em) &&
+                    HasSingleton<SpawnBacklogMetricsComponent>(em) &&
+                    HasSingleton<DebugHudMetricsComponent>(em),
+                480,
+                "ECS singleton setup for stress/HUD was not ready within timeout.");
                 ForceStageStateToRunning(em, 0f);
 
                 int baselineMaxPending = 0;
@@ -116,12 +117,17 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
 
             var em = world.EntityManager;
-            yield return WaitForCondition(
+            DemoShellFlowController shell = null;
+            yield return WaitForStagePlayRunning(
                 () =>
                     CountByComponentType<SourceSpawnComponent>(em) > 0 &&
                     IsStageMapAppliedForStage1(em) &&
                     HasSingleton<SpawnBacklogMetricsComponent>(em) &&
-                    HasSingleton<BulletFrameCounterComponent>(em),
+                    HasSingleton<BulletFrameCounterComponent>(em) &&
+                    (shell = FindDemoShell()) != null &&
+                    shell.CurrentScreen == DemoShellScreenId.StagePlay &&
+                    shell.CurrentStageId == 1 &&
+                    shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running,
                 300,
                 "Data-driven scenario setup was not ready within timeout.");
 
@@ -516,7 +522,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
-        public IEnumerator PlayMode_OperationalScene_DemoShellDialogueBridge_StageStartOverlay_StartsAfterRunning()
+        public IEnumerator PlayMode_OperationalScene_DemoShellDialogueBridge_StageStartGateIntro_PausesSimulationAfterRunning()
         {
             ClearDemoShellStaging();
             yield return LoadSceneWithSettle(OperationalScenePath);
@@ -539,7 +545,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     return shell != null && dialogueBridge != null && uiRoot != null && controller != null && shell.CurrentScreen == DemoShellScreenId.Title;
                 },
                 240,
-                "Operational scene was not ready for stage-start dialogue test.");
+                "Operational scene was not ready for stage-start gate test.");
 
             Assert.That(shell.RequestStartFromTitle(), Is.True);
             yield return WaitForCondition(
@@ -549,7 +555,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
                 },
                 240,
-                "Stage-start dialogue test did not reach Lobby.");
+                "Stage-start gate test did not reach Lobby.");
 
             Assert.That(shell.RequestSelectStageById(1), Is.True);
             yield return WaitForCondition(
@@ -559,13 +565,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay && shell.CurrentStageId == 1;
                 },
                 360,
-                "Stage-start dialogue test did not reach StagePlay.");
+                "Stage-start gate test did not reach StagePlay.");
 
             yield return WaitForCondition(
                 () => HasSingleton<RunDirectorStageStateComponent>(em)
                     && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
                 360,
-                "RunDirector stage did not reach Running for stage-start dialogue test.");
+                "RunDirector stage did not reach Running for stage-start gate test.");
 
             yield return WaitForCondition(
                 () =>
@@ -586,7 +592,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         && uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf;
                 },
                 240,
-                "Stage-start overlay dialogue did not activate after running edge.");
+                "Stage-start gate dialogue did not activate after running edge.");
 
             Assert.That(uiRoot.DialoguePanel, Is.Not.Null);
             Assert.That(uiRoot.DialoguePresenter, Is.Not.Null);
@@ -598,12 +604,37 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(controller.TryGetPresentationAnchor(9001u, out var stage1Anchor), Is.True);
             Assert.That(stage1Anchor, Is.Not.Null);
             Assert.That(stage1Anchor.name, Is.EqualTo("DialogueBubbleAnchor"));
-            Assert.That(GetSingleton<GameplayPauseStateComponent>(em).Flags, Is.EqualTo(GameplayPauseFlags.None));
-            Assert.That(GetSingleton<FixedTickTimeComponent>(em).PauseRequested, Is.EqualTo(0));
-            float overlayClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            var pausedState = GetSingleton<GameplayPauseStateComponent>(em);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.BlockGameplayInput) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.ExclusivePresentationInput) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.BlockPauseMenuOpen) != 0, Is.True);
+            Assert.That(GetSingleton<FixedTickTimeComponent>(em).PauseRequested, Is.EqualTo(1));
+            float pausedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
             yield return null;
             yield return null;
-            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.GreaterThan(overlayClock));
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.EqualTo(pausedClock).Within(1e-6f));
+
+            Assert.That(dialogueBridge.Skip(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    return shell != null
+                        && dialogueBridge != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && !dialogueBridge.IsDialogueActive;
+                },
+                240,
+                "Stage-start gate dialogue did not complete after skip.");
+
+            Assert.That((GetSingleton<GameplayPauseStateComponent>(em).Flags & GameplayPauseFlags.PauseSimulation) == 0, Is.True);
+            float resumedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.GreaterThan(resumedClock));
         }
 
         [UnityTest]
@@ -687,6 +718,90 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(controller.TryGetPresentationAnchor(9002u, out var stage2Anchor), Is.True);
             Assert.That(stage2Anchor, Is.EqualTo(stage2Root.transform));
             Assert.That(uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_PauseMenuAutoCloses_WhenClearDialogueGateStarts()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            RuntimeUiRoot uiRoot = null;
+            DemoShellFlowController shell = null;
+            DemoShellPauseBridge pauseBridge = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    dialogueBridge = FindDialogueBridge();
+                    return shell != null && uiRoot != null && pauseBridge != null && dialogueBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene was not ready for pause auto-close test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Pause auto-close test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null
+                        && pauseBridge != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && pauseBridge.CanPause;
+                },
+                360,
+                "Pause auto-close test did not reach interactive StagePlay.");
+
+            uiRoot = FindRuntimeUiRoot();
+            pauseBridge = FindPauseBridge();
+            dialogueBridge = FindDialogueBridge();
+            Assert.That(uiRoot, Is.Not.Null);
+            Assert.That(pauseBridge, Is.Not.Null);
+            Assert.That(dialogueBridge, Is.Not.Null);
+            Assert.That(pauseBridge.RequestPause(), Is.True);
+            yield return null;
+            Assert.That(uiRoot.PausePanel.activeInHierarchy, Is.True);
+
+            ForceStageStateToClearReady(em);
+            yield return null;
+            yield return null;
+
+            shell = FindDemoShell();
+            uiRoot = FindRuntimeUiRoot();
+            pauseBridge = FindPauseBridge();
+            dialogueBridge = FindDialogueBridge();
+
+            Assert.That(shell.CurrentScreen, Is.EqualTo(DemoShellScreenId.StagePlay));
+            Assert.That(shell.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.ClearPresentation));
+            Assert.That(dialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(dialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageClear));
+            Assert.That(pauseBridge.IsPaused, Is.False);
+            Assert.That(uiRoot.PausePanel.activeInHierarchy, Is.False);
+
+            var pauseState = GetSingleton<GameplayPauseStateComponent>(em);
+            Assert.That(
+                pauseState.ReasonMask,
+                Is.EqualTo(1u << (int)GameplayPauseReasonId.DialogueGate));
+            Assert.That((pauseState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
         }
 
         [UnityTest]
@@ -1041,7 +1156,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 "Pause test did not reach Lobby.");
 
             Assert.That(shell.RequestSelectStageById(1), Is.True);
-            yield return WaitForCondition(
+            yield return WaitForStagePlayRunning(
                 () =>
                 {
                     uiRoot = FindRuntimeUiRoot();
@@ -1049,6 +1164,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     return uiRoot != null
                         && shell != null
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
                         && uiRoot.PauseBridge != null
                         && uiRoot.PauseBridge.CanPause;
                 },
@@ -1113,7 +1229,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 "Pause restart test did not reach Lobby.");
 
             Assert.That(shell.RequestSelectStageById(1), Is.True);
-            yield return WaitForCondition(
+            yield return WaitForStagePlayRunning(
                 () =>
                 {
                     uiRoot = FindRuntimeUiRoot();
@@ -1121,7 +1237,10 @@ namespace SweepNDodge.DotsBullets.Tests
                     return uiRoot != null
                         && shell != null
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
-                        && shell.CurrentStageId == 1;
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && uiRoot.PauseBridge != null
+                        && uiRoot.PauseBridge.CanPause;
                 },
                 360,
                 "Pause restart test did not reach StagePlay.");
@@ -1145,6 +1264,22 @@ namespace SweepNDodge.DotsBullets.Tests
                 },
                 360,
                 "Pause restart confirm did not re-enter the same stage.");
+
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    shell = FindDemoShell();
+                    return uiRoot != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && uiRoot.PauseBridge != null
+                        && uiRoot.PauseBridge.CanPause;
+                },
+                360,
+                "Pause restart test did not return to interactive StagePlay after restart.");
 
             uiRoot = FindRuntimeUiRoot();
             shell = FindDemoShell();
@@ -2049,14 +2184,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 "Demo shell did not transition to Lobby.");
 
             Assert.That(shell.RequestSelectStageById(1), Is.True);
-            yield return WaitForCondition(
+            yield return WaitForStagePlayRunning(
                 () =>
                 {
                     shell = FindDemoShell();
-                    return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
                 },
                 240,
-                "Demo shell did not enter StagePlay.");
+                "Demo shell did not enter interactive StagePlay.");
 
             yield return WaitForCondition(
                 () => FindPlayerRuntimeHud() != null,
@@ -2417,14 +2555,17 @@ namespace SweepNDodge.DotsBullets.Tests
                     "Operational scene smoke did not reach Lobby.");
 
                 Assert.That(shell.RequestSelectStageById(1), Is.True, "Operational smoke must start Stage1.");
-                yield return WaitForCondition(
+                yield return WaitForStagePlayRunning(
                     () =>
                     {
                         shell = FindDemoShell();
-                        return shell != null && shell.CurrentScreen == DemoShellScreenId.StagePlay;
+                        return shell != null
+                            && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                            && shell.CurrentStageId == 1
+                            && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
                     },
                     360,
-                    "Operational scene smoke did not enter StagePlay.");
+                    "Operational scene smoke did not enter interactive StagePlay.");
 
                 yield return WaitForCondition(
                     () => IsStageMapAppliedForStage1(em),
@@ -2529,10 +2670,17 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             for (int i = 0; i < timeoutFrames; i++)
             {
-                if (predicate())
+                var dialogueBridge = FindDialogueBridge();
+                bool startDialogueActive = dialogueBridge != null
+                    && dialogueBridge.IsDialogueActive
+                    && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart;
+                if (predicate() && !startDialogueActive)
                     yield break;
 
-                TryConsumeStartDialogueForTests();
+                if (startDialogueActive)
+                    dialogueBridge.Skip();
+                else
+                    TryConsumeStartDialogueForTests();
                 yield return null;
             }
 

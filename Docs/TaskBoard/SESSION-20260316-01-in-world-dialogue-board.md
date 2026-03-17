@@ -16,7 +16,7 @@
 - 한 줄 목표: 인월드 연출 대화를 v1(StageStart, StageClear, ThemeTransition) 까지 구현한다
 
 ## Now
-- 없음
+- pause 연동 보정 구현 및 회귀 검증
 
 ## Next
 - 없음
@@ -63,6 +63,8 @@
   - 검증 결과: `StageGameplayClockComponent`, shell/HUD authority 교체, global fixed tick default-on, test opt-out 정리를 반영했고 compile + console error 0, EditMode `243 pass`, PlayMode `29 pass`를 확인했다.
 - [x] D16. `TD-023 P6 전체 스모크 검증`을 완료했다.
   - 검증 결과: Unity MCP active instance를 재연결한 뒤 compile + console error 0, EditMode `243/243`, PlayMode `29/29`를 재확인했다.
+- [x] D17. 인월드 대화와 gameplay pause의 start/clear gate 정합성을 보정했다.
+  - 검증 기준: `GateIntro`와 `GateClear`가 동일한 pause flags를 사용하고, pause menu가 열린 상태에서 gate dialogue가 시작되면 기존 pause handle이 누수 없이 release되어 dialogue gate가 단독 owner가 된다.
 
 ## End of Session
 - 결과: 인월드 연출 대화는 `P1~P5` 코드와 핵심 자동 검증까지 반영된 상태다.

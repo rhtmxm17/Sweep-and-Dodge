@@ -13,7 +13,7 @@
   - [TD-020-hint-notification-runtime-contract.md](./TD-020-hint-notification-runtime-contract.md)
   - [ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md](../ADR/ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md)
 
-> 인월드 연출 대화는 `DemoShellFlowController`가 전환 타이밍을 소유하고, `DemoShellDialogueBridge`가 active sequence 상태를 소유하는 GO 전용 계층으로 운영한다. v1 기본 정책은 `StageStart=overlay`, `StageClear=pre-result clear gate`다.
+> 인월드 연출 대화는 `DemoShellFlowController`가 전환 타이밍을 소유하고, `DemoShellDialogueBridge`가 active sequence 상태를 소유하는 GO 전용 계층으로 운영한다. current demo 정책은 `StageStart=GateIntro`, `StageClear=pre-result clear gate`다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -38,9 +38,9 @@
   - 단, `ThemeTransition`은 현재 demo flow의 실제 호출 목표가 아니라 확장 예시를 위한 schema/API 범위다.
 
 ### 2.2 기본 개입 강도
-- `StageStart`: `OverlayOnly`
-  - 기본값은 플레이 진입 템포를 보존하는 비차단 오버레이다.
-  - 데이터는 후속 확장을 위해 `GateIntro`도 표현 가능하게 설계한다.
+- `StageStart`: current demo는 `GateIntro`
+  - 스키마 기본값은 여전히 `OverlayOnly`를 표현 가능하게 유지한다.
+  - current demo asset은 start dialogue를 `GateIntro`로 authoring해 running-edge 이후 gameplay pause를 획득한다.
 - `StageClear`: `GateClear`
   - `ClearReady` 직후 `Result`로 즉시 넘어가지 않고 월드 위에서 짧은 연출 대화를 재생한다.
 - `ThemeTransition`: `ShellOverlay`
@@ -154,8 +154,9 @@
 1. `DemoShellFlowController.EnterStagePlay(stageIndex)`
 2. topology apply 요청
 3. `RunDirectorStageBridge.RequestStageStart()`는 기존 경로 유지
-4. `CurrentStagePlayPhase == Running` 최초 관측 edge에서 기본값이 `OverlayOnly`인 start sequence가 있으면 `DemoShellDialogueBridge`가 재생 시작
-5. dialogue는 `Running`과 병행 가능하며, 완료/스킵 시 presentation만 정리한다
+4. `CurrentStagePlayPhase == Running` 최초 관측 edge에서 current demo의 `GateIntro` start sequence가 있으면 `DemoShellDialogueBridge`가 재생 시작
+5. `GateIntro`인 경우 clear gate와 동일한 gameplay pause flags를 획득한다.
+6. dialogue 완료/스킵 시 presentation을 정리하고, `GateIntro`였다면 pause handle도 함께 해제한다.
 
 ### 5.2 StageClear
 1. ECS가 `RunDirectorStageStateId.ClearReady`에 진입
@@ -207,6 +208,12 @@
 - skip: `Cancel` 또는 별도 skip binding
 - presentation owner가 입력을 해석하고, presenter는 입력을 직접 소비하지 않는다.
 - `StageClear` gate 재생 중에는 pause/confirm modal 입력보다 dialogue advance/skip이 우선한다.
+- `StageStart`와 `StageClear`가 gate mode일 때는 동일한 gameplay pause flags를 사용한다.
+  - `PauseSimulation`
+  - `BlockGameplayInput`
+  - `ExclusivePresentationInput`
+  - `BlockPauseMenuOpen`
+- gate dialogue가 시작될 때 pause menu가 이미 열려 있으면 `DemoShellPauseBridge`는 기존 pause handle을 즉시 release하고, dialogue gate가 단독 pause owner가 된다.
 
 ## 7. 성능 / 리스크
 ### 7.1 성능 원칙
@@ -218,7 +225,7 @@
 - 리스크 1: `ClearReady -> Result` 지연으로 결과 시간 집계가 흔들릴 수 있다
   - 대응: 결과 metrics snapshot 시점을 `StageResult` 진입 시점이 아니라 `ClearReady` 또는 fail 확정 시점으로 고정한다.
 - 리스크 2: start overlay와 gameplay/pause 입력 충돌
-  - 대응: v1 기본값은 overlay지만 pause 우선순위를 명시하고, `StageClear` gate 중에는 dialogue 입력 우선으로 고정한다.
+  - 대응: current demo start entry는 `GateIntro`를 사용하고, gate dialogue는 start/clear 공통으로 dialogue 입력 우선 + pause menu auto-close 정책을 따른다.
 - 리스크 3: 월드 앵커 유실 시 bubble이 튀는 문제
   - 대응: stableId lookup 실패 시 즉시 screen-space fallback으로 내린다.
 
@@ -291,13 +298,13 @@
   - retry policy(`FullFirstSeen`, `ShortOnRetry`, `SkipOnRetry`) 판정 검증
   - anchor resolve 실패 시 screen-space fallback 검증
 - 추가 PlayMode
-  - `StageStart` overlay가 `Running`과 병행되는지 검증
+  - `StageStart` gate가 `Running` edge 이후 시작되고 gameplay pause를 획득하는지 검증
   - `StageClear` dialogue가 월드 위에서 노출된 뒤 `Result`로 넘어가는지 검증
   - dialogue active 동안 `Hint/Notification`이 suppress되는지 검증
 
 ## 10. 오픈 이슈
 - `ThemeTransition`은 현재 확장 예시용 seam만 유지한다. 실제 caller를 `chapter screen`, `stage transition shell overlay`, `stage start variant` 중 어디에 둘지는 후속 세션에서 정리한다.
-- `StageStart`의 `GateIntro` 모드를 실제 공개 빌드 기본값으로 승격할지 플레이테스트가 필요
+- current demo의 `StageStart GateIntro`가 opening tempo와 플레이 가독성에 미치는 영향은 플레이테스트로 계속 확인한다.
 - speaker portrait와 world actor visual이 항상 1:1 대응해야 하는지 art pipeline 합의가 필요
 - accessibility 옵션(`자동 진행 속도`, `skip hold`, `dim 강도`)을 v1에 넣을지 후속으로 미룰지 결정 필요
 
@@ -309,3 +316,4 @@
 - 2026-03-17: `P5` 구현 반영. `StagePresentationRuntimeController`에 stableId root/anchor read API를 추가했고, `StagePresentationAnchorMarker`와 stage presentation prefab seam을 통해 marker 우선 / root fallback anchor 규칙을 적용했다. `InWorldDialoguePresenter`는 world anchor를 screen projection으로 배치하고, 실패 시 bubble을 숨긴 채 plate fallback을 유지한다.
 - 2026-03-17: `ThemeTransition` 범위 설명을 보강했다. 현재 demo에서는 실제 runtime caller를 두지 않고, schema/API seam만 유지하는 확장 예시 항목임을 명시했다.
 - 2026-03-17: runtime asset binding 경로를 직접 참조 방식으로 고정했다. `DemoShellDialogueBridge`는 editor-only asset search fallback 없이 `DialogueCatalog`, `SpeakerCatalog`를 serialized reference로 받는다.
+- 2026-03-17: gameplay pause 연동 보정을 반영했다. current demo의 `StageStart` entry는 `GateIntro`를 사용하고, `GateIntro`와 `GateClear`는 동일한 gameplay pause flags를 획득한다. pause menu가 열린 상태에서 gate dialogue가 시작되면 `DemoShellPauseBridge`가 기존 pause handle을 즉시 release해 dialogue gate가 단독 owner가 되도록 정리했다.

@@ -213,7 +213,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 
 ## 9. 보안/권한(코딩 에이전트 운영)
 - 모든 .md 파일과 Assets/_Project 아래 .cs 파일을 읽을 때는 UTF-8로 강제(Get-Content -Encoding UTF8).
-- 답변에서 프로젝트 내부 파일을 참조할 때는 웹 링크나 절대 경로를 사용하지 않고, 프로젝트 루트 기준 상대 경로 형식으로 표기한다.
+- 답변에서 프로젝트 내부 파일을 참조할 때는 웹 링크를 사용하지 않는다.
 - 기본 모드: read-only
 - 파일 수정/명령 실행이 필요한 경우에만 권한 상승(최소 권한 원칙)
 - 네트워크/외부 업로드는 기본 금지(필요 시 명시적 승인)
@@ -272,7 +272,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
   - 충돌 시 임의 결정 금지 항목과 보고 조건
 - 플랜에 다중 해석 여지가 남아 있거나, 구현자가 설계를 새로 결정해야만 진행 가능한 상태라면 실행 가능한 플랜으로 간주하지 않는다.
 - 구현 중 문서를 수정해야 하는 경우, 어떤 문서를 어느 범위까지 갱신할지 플랜에 명시한다.
-  
+
 ### 11.2.2 플랜 첨부 구현 요청 / Subagent 구현 규칙
 - 사용자가 "플랜 첨부 + 구현 요청" 형태로 요청하면, 첨부 플랜을 현재 단계의 SSOT로 간주하고 구현한다.
 - Agent 또는 `Subagent`는 로컬 코드베이스 탐색을 통해 파일 위치, 기존 네이밍, 배치 방식 같은 로컬 세부사항만 보완한다.
@@ -286,7 +286,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
   - 남은 리스크 및 후속 문서 반영 필요 사항
 - 위 규칙은 `Subagent`를 사용할 때도 그대로 적용한다.
 - 반복 사용이 필요하면 위 규칙을 프로젝트 전용 `Custom Subagent`의 `developer_instructions` 또는 spawn 시 전달하는 고정 구현 지침으로 옮겨 사용한다.
-  
+
 ### 11.2.3 Subagent 시범 운영 규칙
 - 플랜 기반의 중규모 이상 코드 구현은 기본적으로 `Subagent` 사용을 우선 권장한다.
 - 시범 운영 기간에는 "설계 세션 + Subagent 구현 worker" 흐름을 기본값으로 삼고, 별도 thread/new session 기반 자동화 개선 작업은 보류 상태로 둔다.

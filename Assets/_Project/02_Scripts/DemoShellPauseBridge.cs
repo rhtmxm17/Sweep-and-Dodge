@@ -58,10 +58,7 @@ namespace SweepNDodge.DotsBullets
             EnsureReferences();
 
             if (_isPaused && !CanPause)
-            {
-                _isPaused = false;
-                _pendingAction = DemoShellPauseActionId.Resume;
-            }
+                ReleasePauseState();
         }
 
         public bool RequestPause()

@@ -21,7 +21,7 @@ MonoBehaviour:
     StageId: 1
     ThemeKey: 
     Priority: 10
-    BlockingMode: 0
+    BlockingMode: 1
     RetryPolicy: 1
     FullVariant:
       Lines:
@@ -58,7 +58,7 @@ MonoBehaviour:
     StageId: 2
     ThemeKey: 
     Priority: 10
-    BlockingMode: 0
+    BlockingMode: 1
     RetryPolicy: 0
     FullVariant:
       Lines:

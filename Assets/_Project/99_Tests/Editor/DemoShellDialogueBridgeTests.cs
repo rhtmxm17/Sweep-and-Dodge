@@ -169,9 +169,56 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageStartGateIntro_AcquiresAndReleasesPauseHandle_OnSkip()
+        {
+            using var context = CreateContext();
+
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+            SetShellStagePlay(context.Shell, stageIndex: 0, DemoShellStagePlayPhaseId.Running);
+            InvokeUpdateStartTriggerState(context.Bridge);
+
+            Assert.That(context.Bridge.IsDialogueActive, Is.True);
+            Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageStart));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsPauseMenuOpenBlocked, Is.True);
+
+            Assert.That(context.Bridge.Skip(), Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.False);
+        }
+
+        [Test]
+        public void StageStartGateIntro_ReleasesPauseHandle_OnComplete()
+        {
+            using var context = CreateContext();
+
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+            SetShellStagePlay(context.Shell, stageIndex: 0, DemoShellStagePlayPhaseId.Running);
+            InvokeUpdateStartTriggerState(context.Bridge);
+
+            Assert.That(context.Bridge.IsDialogueActive, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
+
+            InvokeTick(context.Bridge, 0.25f);
+            Assert.That(context.Bridge.Advance(), Is.True);
+            InvokeTick(context.Bridge, 0.11f);
+
+            Assert.That(context.Bridge.IsDialogueActive, Is.False);
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.False);
+        }
+
+        [Test]
         public void StageStartOverlay_DoesNotAcquirePauseHandle()
         {
             using var context = CreateContext();
+            context.DialogueCatalog.Entries = new[]
+            {
+                CreateStageStartEntry(InWorldDialogueBlockingMode.OverlayOnly),
+                CreateStageClearEntry(),
+                CreateThemeTransitionEntry(),
+            };
 
             DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
             SetShellStagePlay(context.Shell, stageIndex: 0, DemoShellStagePlayPhaseId.Running);
@@ -291,7 +338,7 @@ namespace SweepNDodge.DotsBullets.Tests
             return new TestContextData(shellGo, runtimeUiGo, shell, pauseController, bridge, dialogueCatalog, speakerCatalog, world, previousDefaultWorld);
         }
 
-        private static InWorldDialogueCatalogEntry CreateStageStartEntry()
+        private static InWorldDialogueCatalogEntry CreateStageStartEntry(InWorldDialogueBlockingMode blockingMode = InWorldDialogueBlockingMode.GateIntro)
         {
             return new InWorldDialogueCatalogEntry
             {
@@ -301,7 +348,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 TargetKind = InWorldDialogueTargetKind.Stage,
                 StageId = 1,
                 Priority = 10,
-                BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
+                BlockingMode = blockingMode,
                 RetryPolicy = InWorldDialogueRetryPolicy.ShortOnRetry,
                 FullVariant = new InWorldDialogueSequenceVariant
                 {
