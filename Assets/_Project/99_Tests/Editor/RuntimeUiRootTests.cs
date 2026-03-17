@@ -236,6 +236,26 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void PauseBridge_CanPauseFalse_WhenPauseMenuBlockedBySnapshot()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 1);
+
+            GameplayPauseHandle handle = context.PauseController.Acquire(
+                GameplayPauseReasonId.DialogueGate,
+                GameplayPauseFlags.PauseSimulation
+                | GameplayPauseFlags.BlockGameplayInput
+                | GameplayPauseFlags.ExclusivePresentationInput
+                | GameplayPauseFlags.BlockPauseMenuOpen);
+
+            Assert.That(handle.IsValid, Is.True);
+            Assert.That(context.PauseBridge.CanPause, Is.False);
+            Assert.That(context.PauseBridge.RequestPause(), Is.False);
+        }
+
+        [Test]
         public void DemoShellSessionStaging_HintSessionAndStageSeen_ArePersistedSeparately()
         {
             DemoShellSessionStaging.ResetHintSessionState();
@@ -871,9 +891,12 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var audio = shellGo.AddComponent<DemoAudioBridge>();
             audio.DemoShell = shell;
+            var pauseController = shellGo.AddComponent<DemoShellGameplayPauseController>();
+            pauseController.LogBindWarnings = false;
             var pauseBridge = shellGo.AddComponent<DemoShellPauseBridge>();
             pauseBridge.DemoShell = shell;
             pauseBridge.StageBridge = stageBridge;
+            pauseBridge.PauseController = pauseController;
             var hud = shellGo.AddComponent<PlayerRuntimeHudBridge>();
             hud.DemoShell = shell;
             var notificationBridge = shellGo.AddComponent<DemoShellNotificationBridge>();
@@ -886,6 +909,7 @@ namespace SweepNDodge.DotsBullets.Tests
             hintBridge.NotificationBridge = notificationBridge;
             var dialogueBridge = shellGo.AddComponent<DemoShellDialogueBridge>();
             dialogueBridge.DemoShell = shell;
+            dialogueBridge.PauseController = pauseController;
             dialogueBridge.LogBindWarnings = false;
             var presentationRuntime = shellGo.AddComponent<StagePresentationRuntimeController>();
             presentationRuntime.LogWarnings = false;
@@ -908,7 +932,7 @@ namespace SweepNDodge.DotsBullets.Tests
             root.EnsureHierarchy();
             rootGo.SetActive(true);
 
-            return new TestContext(shellGo, rootGo, shell, audio, pauseBridge, hud, notificationBridge, hintBridge, dialogueBridge, presentationRuntime, root);
+            return new TestContext(shellGo, rootGo, shell, audio, pauseController, pauseBridge, hud, notificationBridge, hintBridge, dialogueBridge, presentationRuntime, root);
         }
 
         private static void InvokeConfigurePresenters(RuntimeUiRoot root)
@@ -1013,6 +1037,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 GameObject rootGo,
                 DemoShellFlowController shell,
                 DemoAudioBridge audio,
+                DemoShellGameplayPauseController pauseController,
                 DemoShellPauseBridge pauseBridge,
                 PlayerRuntimeHudBridge hud,
                 DemoShellNotificationBridge notificationBridge,
@@ -1025,6 +1050,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 _rootGo = rootGo;
                 Shell = shell;
                 Audio = audio;
+                PauseController = pauseController;
                 PauseBridge = pauseBridge;
                 Hud = hud;
                 NotificationBridge = notificationBridge;
@@ -1036,6 +1062,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             public DemoShellFlowController Shell { get; }
             public DemoAudioBridge Audio { get; }
+            public DemoShellGameplayPauseController PauseController { get; }
             public DemoShellPauseBridge PauseBridge { get; }
             public PlayerRuntimeHudBridge Hud { get; }
             public DemoShellNotificationBridge NotificationBridge { get; }

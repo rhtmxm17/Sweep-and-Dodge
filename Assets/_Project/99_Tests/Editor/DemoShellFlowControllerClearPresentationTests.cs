@@ -173,8 +173,11 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 go = CreateShellGameObject("DemoShellFlowController_PauseGuard");
                 var shell = go.GetComponent<DemoShellFlowController>();
+                var pauseController = go.GetComponent<DemoShellGameplayPauseController>() ?? go.AddComponent<DemoShellGameplayPauseController>();
+                pauseController.LogBindWarnings = false;
                 var pauseBridge = go.GetComponent<DemoShellPauseBridge>() ?? go.AddComponent<DemoShellPauseBridge>();
                 pauseBridge.DemoShell = shell;
+                pauseBridge.PauseController = pauseController;
 
                 SetPrivateField(shell, "_currentScreen", DemoShellScreenId.StagePlay);
                 SetPrivateField(shell, "_currentStagePlayPhase", DemoShellStagePlayPhaseId.ClearPresentation);

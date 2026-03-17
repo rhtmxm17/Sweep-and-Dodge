@@ -11,6 +11,7 @@ namespace SweepNDodge.DotsBullets
         [Header("References")]
         public DemoShellFlowController DemoShell;
         public RuntimeUiRoot RuntimeUiRoot;
+        public DemoShellGameplayPauseController PauseController;
         public InWorldDialogueCatalogSO DialogueCatalog;
         public InWorldDialogueSpeakerCatalogSO SpeakerCatalog;
 
@@ -32,6 +33,7 @@ namespace SweepNDodge.DotsBullets
         private bool _startTriggerIssuedForCurrentStage;
         private int _startTriggerObservedStageId;
         private bool _wasRunningLastFrame;
+        private GameplayPauseHandle _gatePauseHandle;
         private bool _warnedBindFailure;
 
         public bool IsDialogueActive => _activeLineIndex >= 0 && _activeVariant.HasLines;
@@ -57,6 +59,7 @@ namespace SweepNDodge.DotsBullets
         {
             if (DemoShell != null)
                 DemoShell.PreResultClearPresentationRequested -= HandlePreResultClearPresentationRequested;
+            ResetActiveSequence();
         }
 
         private void Update()
@@ -297,6 +300,7 @@ namespace SweepNDodge.DotsBullets
             InWorldDialogueTriggerId trigger,
             DemoShellStageResultMetrics clearResultContext)
         {
+            ReleaseGatePauseHandle();
             _activeEntry = entry;
             _activeVariant = variant;
             _activeTrigger = trigger;
@@ -304,6 +308,7 @@ namespace SweepNDodge.DotsBullets
             _activeLineIndex = 0;
             _lineElapsedSec = 0f;
             _completionNotified = false;
+            AcquireGatePauseIfNeeded(entry.BlockingMode);
             RefreshPresentation();
         }
 
@@ -327,6 +332,7 @@ namespace SweepNDodge.DotsBullets
 
         private void ResetActiveSequence()
         {
+            ReleaseGatePauseHandle();
             _activeEntry = default;
             _activeVariant = default;
             _activeTrigger = InWorldDialogueTriggerId.None;
@@ -431,16 +437,38 @@ namespace SweepNDodge.DotsBullets
         {
             DemoShell ??= GetComponent<DemoShellFlowController>() ?? FindFirst<DemoShellFlowController>();
             RuntimeUiRoot ??= FindFirst<RuntimeUiRoot>();
+            PauseController ??= GetComponent<DemoShellGameplayPauseController>() ?? FindFirst<DemoShellGameplayPauseController>();
 
-            if ((DemoShell == null || DialogueCatalog == null || SpeakerCatalog == null) && !_warnedBindFailure && LogBindWarnings)
+            if ((DemoShell == null || DialogueCatalog == null || SpeakerCatalog == null || PauseController == null) && !_warnedBindFailure && LogBindWarnings)
             {
                 _warnedBindFailure = true;
-                Debug.LogWarning("[DemoShellDialogueBridge] Required references were not found. Assign DialogueCatalog and SpeakerCatalog explicitly.");
+                Debug.LogWarning("[DemoShellDialogueBridge] Required references were not found. Assign DialogueCatalog, SpeakerCatalog, and DemoShellGameplayPauseController explicitly.");
             }
-            else if (DemoShell != null && DialogueCatalog != null && SpeakerCatalog != null)
+            else if (DemoShell != null && DialogueCatalog != null && SpeakerCatalog != null && PauseController != null)
             {
                 _warnedBindFailure = false;
             }
+        }
+
+        private void AcquireGatePauseIfNeeded(InWorldDialogueBlockingMode blockingMode)
+        {
+            if (blockingMode != InWorldDialogueBlockingMode.GateClear || PauseController == null || _gatePauseHandle.IsValid)
+                return;
+
+            _gatePauseHandle = PauseController.Acquire(
+                GameplayPauseReasonId.DialogueGate,
+                GameplayPauseFlags.PauseSimulation
+                | GameplayPauseFlags.BlockGameplayInput
+                | GameplayPauseFlags.ExclusivePresentationInput
+                | GameplayPauseFlags.BlockPauseMenuOpen);
+        }
+
+        private void ReleaseGatePauseHandle()
+        {
+            if (PauseController != null && _gatePauseHandle.IsValid)
+                PauseController.Release(_gatePauseHandle);
+
+            _gatePauseHandle = GameplayPauseHandle.Invalid;
         }
 
         private void BuildSpeakerLookup()

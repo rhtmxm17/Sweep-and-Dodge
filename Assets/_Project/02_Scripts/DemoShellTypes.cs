@@ -43,6 +43,52 @@ namespace SweepNDodge.DotsBullets
         QuitApplication = 4,
     }
 
+    public enum GameplayPauseReasonId : byte
+    {
+        None = 0,
+        PauseMenu = 1,
+        DialogueGate = 2,
+        Cutscene = 3,
+        Debug = 4,
+    }
+
+    [Flags]
+    public enum GameplayPauseFlags : byte
+    {
+        None = 0,
+        PauseSimulation = 1 << 0,
+        BlockGameplayInput = 1 << 1,
+        ExclusivePresentationInput = 1 << 2,
+        BlockPauseMenuOpen = 1 << 3,
+    }
+
+    [Serializable]
+    public struct GameplayPauseHandle
+    {
+        public int Id;
+        public GameplayPauseReasonId Reason;
+        public GameplayPauseFlags Flags;
+        public uint VersionToken;
+
+        public bool IsValid => Id > 0 && VersionToken != 0;
+
+        public static GameplayPauseHandle Invalid => default;
+    }
+
+    [Serializable]
+    public struct GameplayPauseSnapshot
+    {
+        public bool IsSimulationPaused;
+        public bool IsGameplayInputBlocked;
+        public bool IsPresentationInputExclusive;
+        public bool IsPauseMenuOpenBlocked;
+        public uint ReasonMask;
+        public int ActiveHandleCount;
+        public uint Version;
+
+        public static GameplayPauseSnapshot Default => default;
+    }
+
     [Serializable]
     public struct DemoShellStageProfile
     {

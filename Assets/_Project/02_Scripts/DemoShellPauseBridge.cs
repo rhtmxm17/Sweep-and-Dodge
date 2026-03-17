@@ -13,25 +13,44 @@ namespace SweepNDodge.DotsBullets
         [Header("References")]
         public DemoShellFlowController DemoShell;
         public RunDirectorStageBridge StageBridge;
+        public DemoShellGameplayPauseController PauseController;
 
         [Header("Policy")]
         public bool LogBindWarnings = true;
 
         private bool _isPaused;
         private DemoShellPauseActionId _pendingAction;
+        private GameplayPauseHandle _pauseHandle;
         private bool _warnedBindFailure;
 
-        public bool CanPause => DemoShell != null
-            && DemoShell.CurrentScreen == DemoShellScreenId.StagePlay
-            && !DemoShell.IsDialogueInputExclusive;
+        public bool CanPause
+        {
+            get
+            {
+                EnsureReferences();
+                return DemoShell != null
+                       && PauseController != null
+                       && DemoShell.CurrentScreen == DemoShellScreenId.StagePlay
+                       && !DemoShell.IsDialogueInputExclusive
+                       && !PauseController.CurrentSnapshot.IsPauseMenuOpenBlocked;
+            }
+        }
         public bool IsPaused => _isPaused;
         public DemoShellPauseActionId PendingAction => _pendingAction;
-        public bool GameplayInputBlocked => _isPaused;
+        public bool GameplayInputBlocked
+        {
+            get
+            {
+                EnsureReferences();
+                return PauseController != null && PauseController.CurrentSnapshot.IsGameplayInputBlocked;
+            }
+        }
 
         private void Reset()
         {
             DemoShell = GetComponent<DemoShellFlowController>();
             StageBridge = GetComponent<RunDirectorStageBridge>();
+            PauseController = GetComponent<DemoShellGameplayPauseController>();
         }
 
         private void Update()
@@ -50,7 +69,16 @@ namespace SweepNDodge.DotsBullets
             EnsureReferences();
             if (!CanPause)
                 return false;
+            if (_isPaused)
+                return true;
 
+            GameplayPauseHandle handle = PauseController.Acquire(
+                GameplayPauseReasonId.PauseMenu,
+                GameplayPauseFlags.PauseSimulation | GameplayPauseFlags.BlockGameplayInput);
+            if (!handle.IsValid)
+                return false;
+
+            _pauseHandle = handle;
             _isPaused = true;
             _pendingAction = DemoShellPauseActionId.Resume;
             return true;
@@ -61,8 +89,7 @@ namespace SweepNDodge.DotsBullets
             if (!_isPaused)
                 return false;
 
-            _isPaused = false;
-            _pendingAction = DemoShellPauseActionId.Resume;
+            ReleasePauseState();
             return true;
         }
 
@@ -86,7 +113,7 @@ namespace SweepNDodge.DotsBullets
 
             _pendingAction = action;
             if (action != DemoShellPauseActionId.QuitApplication)
-                _isPaused = false;
+                ReleasePauseState();
             return true;
         }
 
@@ -111,15 +138,32 @@ namespace SweepNDodge.DotsBullets
                     StageBridge = FindFirst<RunDirectorStageBridge>();
             }
 
-            if (DemoShell == null && !_warnedBindFailure && LogBindWarnings)
+            if (PauseController == null)
+            {
+                PauseController = GetComponent<DemoShellGameplayPauseController>();
+                if (PauseController == null)
+                    PauseController = FindFirst<DemoShellGameplayPauseController>();
+            }
+
+            if ((DemoShell == null || PauseController == null) && !_warnedBindFailure && LogBindWarnings)
             {
                 _warnedBindFailure = true;
-                Debug.LogWarning("[DemoShellPauseBridge] DemoShellFlowController was not found.");
+                Debug.LogWarning("[DemoShellPauseBridge] DemoShellFlowController or DemoShellGameplayPauseController was not found.");
             }
-            else if (DemoShell != null)
+            else if (DemoShell != null && PauseController != null)
             {
                 _warnedBindFailure = false;
             }
+        }
+
+        private void ReleasePauseState()
+        {
+            if (PauseController != null && _pauseHandle.IsValid)
+                PauseController.Release(_pauseHandle);
+
+            _pauseHandle = GameplayPauseHandle.Invalid;
+            _isPaused = false;
+            _pendingAction = DemoShellPauseActionId.Resume;
         }
 
         private static T FindFirst<T>() where T : Object

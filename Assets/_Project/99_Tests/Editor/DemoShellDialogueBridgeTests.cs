@@ -160,9 +160,27 @@ namespace SweepNDodge.DotsBullets.Tests
 
             Assert.That(context.Bridge.IsDialogueActive, Is.True);
             Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageClear));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.True);
             Assert.That(context.Bridge.Skip(), Is.True);
             Assert.That(context.Shell.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.AwaitingClearCompleted));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
             Assert.That(context.Shell.NotifyPreResultClearPresentationCompleted(), Is.False, "Shell completion must only be sent once by bridge.");
+        }
+
+        [Test]
+        public void StageStartOverlay_DoesNotAcquirePauseHandle()
+        {
+            using var context = CreateContext();
+
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+            SetShellStagePlay(context.Shell, stageIndex: 0, DemoShellStagePlayPhaseId.Running);
+            InvokeUpdateStartTriggerState(context.Bridge);
+
+            Assert.That(context.Bridge.IsDialogueActive, Is.True);
+            Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageStart));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.False);
         }
 
         [Test]
@@ -239,6 +257,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var runtimeUiGo = new GameObject("RuntimeUiRoot_Test");
             var runtimeUiRoot = runtimeUiGo.AddComponent<RuntimeUiRoot>();
+            var pauseController = shellGo.AddComponent<DemoShellGameplayPauseController>();
+            pauseController.LogBindWarnings = false;
 
             var dialogueCatalog = ScriptableObject.CreateInstance<InWorldDialogueCatalogSO>();
             dialogueCatalog.Entries = new[]
@@ -263,11 +283,12 @@ namespace SweepNDodge.DotsBullets.Tests
             var bridge = shellGo.AddComponent<DemoShellDialogueBridge>();
             bridge.DemoShell = shell;
             bridge.RuntimeUiRoot = runtimeUiRoot;
+            bridge.PauseController = pauseController;
             bridge.DialogueCatalog = dialogueCatalog;
             bridge.SpeakerCatalog = speakerCatalog;
             bridge.LogBindWarnings = false;
 
-            return new TestContextData(shellGo, runtimeUiGo, shell, bridge, dialogueCatalog, speakerCatalog, world, previousDefaultWorld);
+            return new TestContextData(shellGo, runtimeUiGo, shell, pauseController, bridge, dialogueCatalog, speakerCatalog, world, previousDefaultWorld);
         }
 
         private static InWorldDialogueCatalogEntry CreateStageStartEntry()
@@ -400,6 +421,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 GameObject shellGo,
                 GameObject runtimeUiGo,
                 DemoShellFlowController shell,
+                DemoShellGameplayPauseController pauseController,
                 DemoShellDialogueBridge bridge,
                 InWorldDialogueCatalogSO dialogueCatalog,
                 InWorldDialogueSpeakerCatalogSO speakerCatalog,
@@ -411,12 +433,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 _world = world;
                 _previousDefaultWorld = previousDefaultWorld;
                 Shell = shell;
+                PauseController = pauseController;
                 Bridge = bridge;
                 DialogueCatalog = dialogueCatalog;
                 SpeakerCatalog = speakerCatalog;
             }
 
             public DemoShellFlowController Shell { get; }
+            public DemoShellGameplayPauseController PauseController { get; }
             public DemoShellDialogueBridge Bridge { get; }
             public InWorldDialogueCatalogSO DialogueCatalog { get; }
             public InWorldDialogueSpeakerCatalogSO SpeakerCatalog { get; }

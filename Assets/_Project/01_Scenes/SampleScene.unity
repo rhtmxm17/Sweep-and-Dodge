@@ -2322,6 +2322,7 @@ GameObject:
   - component: {fileID: 2015128786}
   - component: {fileID: 2015128785}
   - component: {fileID: 2015128787}
+  - component: {fileID: 2015128788}
   m_Layer: 0
   m_Name: RunDirectorStageBridge
   m_TagString: Untagged
@@ -2778,6 +2779,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellPauseBridge
   DemoShell: {fileID: 2015128777}
   StageBridge: {fileID: 2015128775}
+  PauseController: {fileID: 0}
   LogBindWarnings: 1
 --- !u!114 &2015128785
 MonoBehaviour:
@@ -2825,10 +2827,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellDialogueBridge
   DemoShell: {fileID: 2015128777}
   RuntimeUiRoot: {fileID: 510448299}
+  PauseController: {fileID: 0}
   DialogueCatalog: {fileID: 11400000, guid: 0e6d9ab548eedfa47abf54dc1da77925, type: 2}
   SpeakerCatalog: {fileID: 11400000, guid: d917f032ddb23264dbd8f7d0b8feb252, type: 2}
   LogBindWarnings: 1
   EnableMouseAdvanceFallback: 1
+--- !u!114 &2015128788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 15d16f786e2b26b43948366d35c689f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.DemoShellGameplayPauseController
+  LogBindWarnings: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
