@@ -23,3 +23,4 @@
 - [TD-020-hint-notification-runtime-contract.md](TD-020-hint-notification-runtime-contract.md): 하단 중앙 `Notification` / `Hint` 2레인의 책임 분리, resolver/seen-state, 재노출 정책, V2 구현 계약
 - [TD-021-hazardstack-hud-contract.md](TD-021-hazardstack-hud-contract.md): Carry 인접 `HazardStack` 보조층, `RiskMultiplier` 보조 텍스트, `HazardStackMax` 비표시 HUD 계약
 - [TD-022-in-world-dialogue-runtime-contract.md](TD-022-in-world-dialogue-runtime-contract.md): 인월드 연출 대화의 shell owner, `StageStart=overlay`, `StageClear=pre-result clear gate`, `PresentationLayer`/anchor 재사용 계약
+- [TD-023-common-gameplay-pause-contract.md](TD-023-common-gameplay-pause-contract.md): `StagePlay` fixed tick authority, `Acquire/Release` 기반 공통 gameplay pause owner, simulation/input/presentation 분리 계약

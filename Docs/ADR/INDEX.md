@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260317-01-fixed-tick-authoritative-stageplay-and-common-gameplay-pause.md](ADR-20260317-01-fixed-tick-authoritative-stageplay-and-common-gameplay-pause.md): `StagePlay` gameplay 시간을 fixed tick authority로 고정하고, `Acquire/Release` 기반 공통 gameplay pause owner를 채택
 - [ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md](ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md): 인월드 연출 대화를 GO 전용 계층으로 두고, 시작 overlay 기본값과 `Result` 전 clear gate 정책을 채택
 - [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md): HazardStack 단일 owner, 동프레임 `수거 확정 후 리셋`, 다음 프레임 배율 반영 계약 고정
 - [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](ADR-20260309-02-stage-session-reset-and-prepare-owner.md): 씬 리로드/Retry/Next 재진입에서 world 재생성 대신 prepare 계층의 explicit stage session reset owner를 채택

@@ -21,9 +21,7 @@
   - 검증: `TD-022` 8.4~8.6과 실제 PlayMode coverage가 맞는다.
 
 ## Next
-- [ ] T9. `공통 gameplay pause 계약`을 별도 작업으로 분리한다.
-  - 완료 기준: dialogue, pause menu, 이후 컷신이 공유할 `Acquire/Release` 기반 pause owner 초안이 정리된다.
-  - 검증: `DemoShellPauseBridge` UI modal owner와 simulation pause owner 경계가 분리된다.
+- 없음
 
 ## Blocked
 - 없음
@@ -55,8 +53,10 @@
   - 검증 결과: `StagePresentationRuntimeController`의 stableId root/anchor lookup, `StagePresentationAnchorMarker` seam, marker 우선 / root fallback, `InWorldDialoguePresenter`의 screen projection world bubble이 연결됐다. stage1 marker anchor와 stage2 root fallback PlayMode 회귀가 통과했다.
 - [x] D10. runtime asset binding을 직접 참조 방식으로 고정했다.
   - 검증 결과: `DemoShellDialogueBridge`의 editor-only `AssetDatabase` fallback을 제거했고, `SampleScene`의 bridge가 `DialogueCatalog`와 `SpeakerCatalog`를 명시적으로 참조하도록 반영했다.
+- [x] D11. `공통 gameplay pause 계약` 문서 초안을 작성했다.
+  - 검증 결과: `TD-023`과 `ADR-20260317-01`에 `StagePlay` fixed tick authority, `Acquire/Release` 기반 pause owner, simulation/input/presentation 분리 계약을 정리했다.
 
 ## End of Session
 - 결과: 인월드 연출 대화는 `P1~P5` 코드와 핵심 자동 검증까지 반영된 상태다.
-- 남은 리스크: dialogue 중 실제 gameplay pause는 아직 공통 계약이 없으므로, clear dialogue는 UI input exclusive만 보장하고 world simulation pause는 하지 않는다.
-- 다음 세션 시작점: `P6 테스트 / 스모크` 범위 정리와 공통 gameplay pause 계약 초안 작성.
+- 남은 리스크: `공통 gameplay pause 계약`은 문서 초안만 작성됐고, aggregate owner / ECS apply / timer authority 구현은 아직 남아 있다.
+- 다음 세션 시작점: `TD-023` 기준으로 `P2 aggregate owner`, `P3 ECS apply`, `P5 timer authority` 구현 계획을 구체화한다.
