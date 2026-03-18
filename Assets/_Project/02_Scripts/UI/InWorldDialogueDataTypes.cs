@@ -88,8 +88,8 @@ namespace SweepNDodge.DotsBullets
     [Serializable]
     public struct InWorldDialogueCatalogEntry
     {
-        public bool Enabled;
         public string EntryKey;
+        public bool Enabled;
         public InWorldDialogueTriggerId Trigger;
         public InWorldDialogueTargetKind TargetKind;
         [Min(0)] public int StageId;
