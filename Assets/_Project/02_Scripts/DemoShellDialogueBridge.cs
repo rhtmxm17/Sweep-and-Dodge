@@ -114,6 +114,25 @@ namespace SweepNDodge.DotsBullets
                 clearResultContext: default);
         }
 
+        public bool TryStartStagePlayIntervention(InWorldDialogueTriggerId trigger, int stageId)
+        {
+            if (trigger != InWorldDialogueTriggerId.InterventionCarryFull
+                && trigger != InWorldDialogueTriggerId.InterventionFirstHit)
+            {
+                return false;
+            }
+
+            if (stageId <= 0 || IsDialogueActive)
+                return false;
+
+            return TryStartSequence(
+                trigger,
+                InWorldDialogueTargetKind.Stage,
+                stageId,
+                themeKey: null,
+                clearResultContext: default);
+        }
+
         private void Tick(float deltaSec)
         {
             if (!IsDialogueActive)
@@ -320,6 +339,13 @@ namespace SweepNDodge.DotsBullets
             _completionNotified = true;
             if (!string.IsNullOrWhiteSpace(_activeEntry.EntryKey))
                 DemoShellSessionStaging.MarkSeenDialogueEntry(_activeEntry.EntryKey);
+            if (_activeTrigger == InWorldDialogueTriggerId.InterventionCarryFull)
+            {
+                int stageId = _activeEntry.StageId > 0
+                    ? _activeEntry.StageId
+                    : (DemoShell != null ? Mathf.Max(0, DemoShell.CurrentStageId) : 0);
+                DemoShellSessionStaging.MarkSeenDialogueTriggerThisRun(stageId, _activeTrigger);
+            }
 
             bool isClearGate = _activeTrigger == InWorldDialogueTriggerId.StageClear
                 && _activeEntry.BlockingMode == InWorldDialogueBlockingMode.GateClear;

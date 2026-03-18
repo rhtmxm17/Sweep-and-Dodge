@@ -26,6 +26,9 @@ namespace SweepNDodge.DotsBullets
         private static ulong _activeStageSeenMask;
         private static readonly HashSet<string> DialogueSeenEntryKeys = new(System.StringComparer.Ordinal);
         private static readonly Dictionary<int, int> DialogueStageAttemptCounts = new();
+        private static bool _hasActiveDialogueRunSeen;
+        private static int _activeDialogueRunStageId;
+        private static ulong _activeDialogueRunSeenMask;
 
         public static bool IsStartupPending => _hasPendingRequest;
         public static ulong HintSessionSeenMask => _hintSessionSeenMask;
@@ -90,6 +93,47 @@ namespace SweepNDodge.DotsBullets
             DialogueStageAttemptCounts.Clear();
         }
 
+        public static void BeginDialogueStageRun(int stageId)
+        {
+            if (stageId <= 0)
+            {
+                ClearDialogueRunSeen();
+                return;
+            }
+
+            _activeDialogueRunStageId = stageId;
+            _activeDialogueRunSeenMask = 0UL;
+            _hasActiveDialogueRunSeen = true;
+        }
+
+        public static void ClearDialogueRunSeen()
+        {
+            _hasActiveDialogueRunSeen = false;
+            _activeDialogueRunStageId = 0;
+            _activeDialogueRunSeenMask = 0UL;
+        }
+
+        public static bool HasSeenDialogueTriggerThisRun(int stageId, InWorldDialogueTriggerId trigger)
+        {
+            if (!_hasActiveDialogueRunSeen || _activeDialogueRunStageId != stageId)
+                return false;
+
+            ulong flag = GetDialogueRunSeenFlag(trigger);
+            return flag != 0UL && (_activeDialogueRunSeenMask & flag) != 0UL;
+        }
+
+        public static void MarkSeenDialogueTriggerThisRun(int stageId, InWorldDialogueTriggerId trigger)
+        {
+            if (!_hasActiveDialogueRunSeen || _activeDialogueRunStageId != stageId)
+                return;
+
+            ulong flag = GetDialogueRunSeenFlag(trigger);
+            if (flag == 0UL)
+                return;
+
+            _activeDialogueRunSeenMask |= flag;
+        }
+
         public static int GetDialogueStageAttemptCount(int stageId)
         {
             if (stageId <= 0)
@@ -120,6 +164,7 @@ namespace SweepNDodge.DotsBullets
         {
             DialogueSeenEntryKeys.Clear();
             ResetDialogueStageAttempts();
+            ClearDialogueRunSeen();
         }
 
         public static void SetActiveStageSeen(int stageId, ulong stageSeenMask)
@@ -188,6 +233,16 @@ namespace SweepNDodge.DotsBullets
             _request = default;
             _hasPendingRequest = false;
             return true;
+        }
+
+        private static ulong GetDialogueRunSeenFlag(InWorldDialogueTriggerId trigger)
+        {
+            return trigger switch
+            {
+                InWorldDialogueTriggerId.InterventionCarryFull => 1UL << 0,
+                InWorldDialogueTriggerId.InterventionFirstHit => 1UL << 1,
+                _ => 0UL,
+            };
         }
     }
 }

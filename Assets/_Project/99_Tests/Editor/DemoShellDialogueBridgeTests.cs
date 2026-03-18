@@ -218,6 +218,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateStageStartEntry(InWorldDialogueBlockingMode.OverlayOnly),
                 CreateStageClearEntry(),
                 CreateThemeTransitionEntry(),
+                CreateInterventionCarryFullEntry(),
+                CreateInterventionFirstHitEntry(),
             };
 
             DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
@@ -228,6 +230,35 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageStart));
             Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
             Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.False);
+        }
+
+        [Test]
+        public void TryStartStagePlayIntervention_OverlayOnly_DoesNotAcquirePauseHandle()
+        {
+            using var context = CreateContext();
+
+            Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionCarryFull, 1), Is.True);
+            Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.InterventionCarryFull));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.False);
+        }
+
+        [Test]
+        public void InterventionCarryFull_CompleteAndSkip_MarkRunSeen()
+        {
+            using var context = CreateContext();
+
+            DemoShellSessionStaging.BeginDialogueStageRun(1);
+            Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionCarryFull, 1), Is.True);
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull), Is.False);
+            Assert.That(context.Bridge.Skip(), Is.True);
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull), Is.True);
+
+            DemoShellSessionStaging.BeginDialogueStageRun(1);
+            Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionCarryFull, 1), Is.True);
+            InvokeTick(context.Bridge, 0.11f);
+            Assert.That(context.Bridge.IsDialogueActive, Is.False);
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull), Is.True);
         }
 
         [Test]
@@ -313,6 +344,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CreateStageStartEntry(),
                 CreateStageClearEntry(),
                 CreateThemeTransitionEntry(),
+                CreateInterventionCarryFullEntry(),
+                CreateInterventionFirstHitEntry(),
             };
 
             var speakerCatalog = ScriptableObject.CreateInstance<InWorldDialogueSpeakerCatalogSO>();
@@ -452,6 +485,70 @@ namespace SweepNDodge.DotsBullets.Tests
                             {
                                 Kind = InWorldDialogueAnchorKind.None,
                             },
+                        },
+                    },
+                },
+            };
+        }
+
+        private static InWorldDialogueCatalogEntry CreateInterventionCarryFullEntry()
+        {
+            return new InWorldDialogueCatalogEntry
+            {
+                Enabled = true,
+                EntryKey = "stage1_carry_full",
+                Trigger = InWorldDialogueTriggerId.InterventionCarryFull,
+                TargetKind = InWorldDialogueTargetKind.Stage,
+                StageId = 1,
+                Priority = 30,
+                BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
+                RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
+                FullVariant = new InWorldDialogueSequenceVariant
+                {
+                    Lines = new[]
+                    {
+                        new InWorldDialogueLine
+                        {
+                            SpeakerKey = "hero",
+                            Text = "Carry is full",
+                            Anchor = new InWorldDialogueAnchorRef
+                            {
+                                Kind = InWorldDialogueAnchorKind.ScreenAnchor,
+                                ScreenAnchor = InWorldDialogueScreenAnchorId.LowerCenter,
+                            },
+                            AutoAdvanceSec = 0.1f,
+                        },
+                    },
+                },
+            };
+        }
+
+        private static InWorldDialogueCatalogEntry CreateInterventionFirstHitEntry()
+        {
+            return new InWorldDialogueCatalogEntry
+            {
+                Enabled = true,
+                EntryKey = "stage1_first_hit",
+                Trigger = InWorldDialogueTriggerId.InterventionFirstHit,
+                TargetKind = InWorldDialogueTargetKind.Stage,
+                StageId = 1,
+                Priority = 40,
+                BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
+                RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
+                FullVariant = new InWorldDialogueSequenceVariant
+                {
+                    Lines = new[]
+                    {
+                        new InWorldDialogueLine
+                        {
+                            SpeakerKey = "hero",
+                            Text = "That hurt",
+                            Anchor = new InWorldDialogueAnchorRef
+                            {
+                                Kind = InWorldDialogueAnchorKind.ScreenAnchor,
+                                ScreenAnchor = InWorldDialogueScreenAnchorId.LowerCenter,
+                            },
+                            AutoAdvanceSec = 0.1f,
                         },
                     },
                 },

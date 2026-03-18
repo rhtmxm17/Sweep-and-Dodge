@@ -9,6 +9,8 @@ namespace SweepNDodge.DotsBullets
         StageStart = 1,
         StageClear = 2,
         ThemeTransition = 3,
+        InterventionCarryFull = 4,
+        InterventionFirstHit = 5,
     }
 
     public enum InWorldDialogueTargetKind : byte

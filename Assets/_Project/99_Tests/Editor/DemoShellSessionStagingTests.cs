@@ -107,6 +107,68 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void DialogueInterventionRunSeen_TracksCurrentRun_AndResetsOnBeginStageRun()
+        {
+            DemoShellSessionStaging.BeginDialogueStageRun(1);
+
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull),
+                Is.False);
+
+            DemoShellSessionStaging.MarkSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull);
+
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull),
+                Is.True);
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionFirstHit),
+                Is.False);
+
+            DemoShellSessionStaging.BeginDialogueStageRun(1);
+
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull),
+                Is.False);
+
+            DemoShellSessionStaging.BeginDialogueStageRun(2);
+            DemoShellSessionStaging.MarkSeenDialogueTriggerThisRun(2, InWorldDialogueTriggerId.InterventionFirstHit);
+
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionFirstHit),
+                Is.False);
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(2, InWorldDialogueTriggerId.InterventionFirstHit),
+                Is.True);
+        }
+
+        [Test]
+        public void DialogueInterventionRunSeen_IsIndependentFromSessionEntrySeen()
+        {
+            DemoShellSessionStaging.MarkSeenDialogueEntry("first_hit_once");
+            DemoShellSessionStaging.BeginDialogueStageRun(1);
+            DemoShellSessionStaging.MarkSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull);
+
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("first_hit_once"), Is.True);
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull),
+                Is.True);
+
+            DemoShellSessionStaging.ClearDialogueRunSeen();
+
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("first_hit_once"), Is.True);
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull),
+                Is.False);
+
+            DemoShellSessionStaging.ResetDialogueSessionState();
+
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("first_hit_once"), Is.False);
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull),
+                Is.False);
+        }
+
+        [Test]
         public void HintAndDialogueState_AreStoredSeparately()
         {
             DemoShellSessionStaging.MarkSessionSeenHint(HintId.FirstHitAvoidHazards);
@@ -122,6 +184,20 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(DemoShellSessionStaging.HasSessionSeenHint(HintId.FirstHitAvoidHazards), Is.False);
             Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("stage1_intro"), Is.True);
             Assert.That(DemoShellSessionStaging.GetDialogueStageAttemptCount(1), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DialogueInterventionRunSeen_IgnoresNonInterventionTriggers()
+        {
+            DemoShellSessionStaging.BeginDialogueStageRun(1);
+            DemoShellSessionStaging.MarkSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.StageStart);
+
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.StageStart),
+                Is.False);
+            Assert.That(
+                DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.StageClear),
+                Is.False);
         }
     }
 }

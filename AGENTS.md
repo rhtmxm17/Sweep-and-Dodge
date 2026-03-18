@@ -289,6 +289,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 
 ### 11.2.3 Subagent 시범 운영 규칙
 - 플랜 기반의 중규모 이상 코드 구현은 기본적으로 `Subagent` 사용을 우선 권장한다.
+- Subagent는 parent에서 spawn된 시점에 delegation 요청이 이미 소비된 것으로 간주한다. child는 추가 delegation을 다시 시도하지 않는다.
 - 시범 운영 기간에는 "설계 세션 + Subagent 구현 worker" 흐름을 기본값으로 삼고, 별도 thread/new session 기반 자동화 개선 작업은 보류 상태로 둔다.
 - `Subagent` 적용 결과는 최소한 아래 관점으로 관찰한다.
   - 설계 세션 컨텍스트 유지성

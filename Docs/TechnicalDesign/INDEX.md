@@ -24,3 +24,4 @@
 - [TD-021-hazardstack-hud-contract.md](TD-021-hazardstack-hud-contract.md): Carry 인접 `HazardStack` 보조층, `RiskMultiplier` 보조 텍스트, `HazardStackMax` 비표시 HUD 계약
 - [TD-022-in-world-dialogue-runtime-contract.md](TD-022-in-world-dialogue-runtime-contract.md): 인월드 연출 대화의 shell owner, `StageStart=overlay`, `StageClear=pre-result clear gate`, `PresentationLayer`/anchor 재사용 계약
 - [TD-023-common-gameplay-pause-contract.md](TD-023-common-gameplay-pause-contract.md): `StagePlay` fixed tick authority, `Acquire/Release` 기반 공통 gameplay pause owner, simulation/input/presentation 분리 계약
+- [TD-024-stageplay-intervention-dialogue-contract.md](TD-024-stageplay-intervention-dialogue-contract.md): `StagePlay` 도중 특수 조건에서 끼어드는 개입형 인월드 대화의 owner, trigger 우선순위, seen-state, hint/pause 정합성 계약

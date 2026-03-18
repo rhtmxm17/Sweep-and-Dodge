@@ -206,6 +206,102 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void ValidateCatalog_InterventionStageAndGlobalTargets_AreAccepted()
+        {
+            var dialogueCatalog = ScriptableObject.CreateInstance<InWorldDialogueCatalogSO>();
+            var speakerCatalog = CreateSpeakerCatalog();
+
+            try
+            {
+                dialogueCatalog.Entries = new[]
+                {
+                    CreateEntry("intervention_stage", InWorldDialogueTriggerId.InterventionCarryFull, 1),
+                    new InWorldDialogueCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "intervention_global",
+                        Trigger = InWorldDialogueTriggerId.InterventionFirstHit,
+                        TargetKind = InWorldDialogueTargetKind.Global,
+                        StageId = 0,
+                        ThemeKey = string.Empty,
+                        BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
+                        RetryPolicy = InWorldDialogueRetryPolicy.OncePerSession,
+                        FullVariant = CreateFullVariant(),
+                    },
+                };
+
+                var issues = Validate(dialogueCatalog, speakerCatalog);
+                Assert.That(issues.Any(x => x.Severity == ContentValidationSeverity.Error), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(dialogueCatalog);
+                Object.DestroyImmediate(speakerCatalog);
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_InterventionThemeTarget_IsReportedAsError()
+        {
+            var dialogueCatalog = ScriptableObject.CreateInstance<InWorldDialogueCatalogSO>();
+            var speakerCatalog = CreateSpeakerCatalog();
+
+            try
+            {
+                dialogueCatalog.Entries = new[]
+                {
+                    new InWorldDialogueCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "bad_intervention_theme",
+                        Trigger = InWorldDialogueTriggerId.InterventionCarryFull,
+                        TargetKind = InWorldDialogueTargetKind.Theme,
+                        StageId = 0,
+                        ThemeKey = "forbidden",
+                        BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
+                        RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
+                        FullVariant = CreateFullVariant(),
+                    },
+                };
+
+                var issues = Validate(dialogueCatalog, speakerCatalog);
+                Assert.That(issues.Any(x => x.Code == "IWD019" && x.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(dialogueCatalog);
+                Object.DestroyImmediate(speakerCatalog);
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_InterventionNonOverlayBlockingMode_IsReportedAsError()
+        {
+            var dialogueCatalog = ScriptableObject.CreateInstance<InWorldDialogueCatalogSO>();
+            var speakerCatalog = CreateSpeakerCatalog();
+
+            try
+            {
+                dialogueCatalog.Entries = new[]
+                {
+                    CreateInterventionEntryWithBlockingMode(
+                        "bad_intervention_blocking",
+                        InWorldDialogueTriggerId.InterventionFirstHit,
+                        1,
+                        InWorldDialogueBlockingMode.GateIntro),
+                };
+
+                var issues = Validate(dialogueCatalog, speakerCatalog);
+                Assert.That(issues.Any(x => x.Code == "IWD020" && x.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(dialogueCatalog);
+                Object.DestroyImmediate(speakerCatalog);
+            }
+        }
+
         private static List<ContentValidationIssue> Validate(
             InWorldDialogueCatalogSO dialogueCatalog,
             InWorldDialogueSpeakerCatalogSO speakerCatalog)
@@ -254,6 +350,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
                 FullVariant = CreateFullVariant(),
             };
+        }
+
+        private static InWorldDialogueCatalogEntry CreateInterventionEntryWithBlockingMode(
+            string entryKey,
+            InWorldDialogueTriggerId trigger,
+            int stageId,
+            InWorldDialogueBlockingMode blockingMode)
+        {
+            var entry = CreateEntry(entryKey, trigger, stageId);
+            entry.BlockingMode = blockingMode;
+            return entry;
         }
 
         private static InWorldDialogueSequenceVariant CreateFullVariant()

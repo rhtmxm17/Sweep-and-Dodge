@@ -177,6 +177,16 @@ namespace SweepNDodge.DotsBullets.Editor
             string location,
             List<ContentValidationIssue> issues)
         {
+            if (IsInterventionTrigger(entry.Trigger) && entry.TargetKind == InWorldDialogueTargetKind.Theme)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "IWD019",
+                    location,
+                    $"Intervention trigger only allows Stage or Global target. trigger={entry.Trigger}, targetKind={entry.TargetKind}"));
+                return;
+            }
+
             bool hasThemeKey = !string.IsNullOrWhiteSpace(entry.ThemeKey);
             switch (entry.TargetKind)
             {
@@ -225,6 +235,20 @@ namespace SweepNDodge.DotsBullets.Editor
             string location,
             List<ContentValidationIssue> issues)
         {
+            if (IsInterventionTrigger(entry.Trigger))
+            {
+                if (entry.BlockingMode != InWorldDialogueBlockingMode.OverlayOnly)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "IWD020",
+                        location,
+                        $"Intervention trigger only allows OverlayOnly. trigger={entry.Trigger}, blockingMode={entry.BlockingMode}"));
+                }
+
+                return;
+            }
+
             if (entry.BlockingMode == InWorldDialogueBlockingMode.GateClear
                 && entry.Trigger != InWorldDialogueTriggerId.StageClear)
             {
@@ -370,6 +394,12 @@ namespace SweepNDodge.DotsBullets.Editor
                 InWorldDialogueTargetKind.Global => $"{entry.Trigger}|Global",
                 _ => $"{entry.Trigger}|Unknown|{(int)entry.TargetKind}",
             };
+        }
+
+        private static bool IsInterventionTrigger(InWorldDialogueTriggerId trigger)
+        {
+            return trigger == InWorldDialogueTriggerId.InterventionCarryFull
+                || trigger == InWorldDialogueTriggerId.InterventionFirstHit;
         }
     }
 }

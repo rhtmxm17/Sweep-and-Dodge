@@ -590,6 +590,7 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             DemoShellSessionStaging.IncrementDialogueStageAttempt(profile.StageId);
+            DemoShellSessionStaging.BeginDialogueStageRun(profile.StageId);
             _currentStageIndex = stageIndex;
             _stageStartPending = true;
             _stageTopologyApplyPending = true;
