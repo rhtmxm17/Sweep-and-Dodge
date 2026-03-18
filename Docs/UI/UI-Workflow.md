@@ -41,6 +41,8 @@
 - 큰 UI 구조 변경은 Penpot 초안만으로 곧바로 씬 인스턴스를 수정하지 않는다.
 - 공용 UI 구조는 `RuntimeUiRoot` prefab SSOT 원칙을 유지한다.
 - Exploration 보드와 Approved 보드를 분리한다.
+- `Board`는 화면/레이어/패널처럼 구현 대응이 있는 단위를 표현하는 기본 컨테이너로 사용한다.
+- `Group`은 여러 요소를 함께 이동하거나 비교하는 작업 보조 단위로 제한한다.
 - 코멘트는 "무엇을 왜 바꾸는가"에 집중하고, 위치/크기 의도는 가능한 한 직접 조작으로 표현한다.
 
 ## 4. 운영 단위
@@ -59,6 +61,26 @@
   - 구현 반영 기준안
 - `Components/<Domain>`
   - 공용 파츠 또는 반복 블록
+
+### 4.3 Penpot 계층 규칙
+- 화면 단위 작업은 가능하면 `WorkArea Board -> Viewport Board -> Layer Board -> Panel Board` 순서로 계층화한다.
+- `Viewport Board`는 실제 런타임 화면 후보를 표현하는 기준 프레임으로 사용한다.
+- `Layer Board`는 Unity의 `HudLayer`, `ModalLayer`, `PresentationLayer`, `WorldIndicatorLayer`처럼 의미가 고정된 레이어를 표현한다.
+- `Panel Board`는 `ObjectiveBoard`, `CarryBoard`, `NotificationBoard`처럼 구현 대응이 있는 UI 블록을 표현한다.
+- `Board` 이름은 구현 대응형으로 짓는다.
+  - 예: `ObjectiveBoard`, `BottomCenterLanesBoard`, `WorldIndicatorLayer`
+- `Group` 이름은 작업 보조 의도가 드러나게 짓는다.
+  - 예: `MoveCandidateGroup`, `CompareGroup`
+
+### 4.4 작업용 메모와 반영 대상 구분
+- `Viewport Board` 내부에는 원칙적으로 실제 UI 후보만 둔다.
+- 작업용 메모, 질문, 비교안, reasoning은 `WorkArea Board`의 별도 `NotesBoard`, `OpenQuestionsBoard`, `ReviewBoard` 등에 둔다.
+- `Viewport Board` 내부에 메모를 잠시 둘 경우에도 실제 UI 후보와 혼동되지 않게 구분한다.
+  - 이름에 `NOTE/`, `TODO/`, `Q/` 같은 접두를 붙인다.
+  - 실제 UI 후보와 다른 중립색/annotation 스타일을 사용한다.
+  - 구현 반영 전에는 `Viewport Board` 밖으로 옮기거나 제거한다.
+- Unity 반영 후보 판단은 `Viewport Board` 내부의 구현 대응형 `Board`만 기준으로 삼는다.
+- `WorkArea Board` 바깥 메모/참고 카드는 반영 대상이 아니다.
 
 ## 5. 표준 워크플로우
 ### 5.1 기능 중심 대화
@@ -157,11 +179,15 @@ Unity 반영 전 아래 중 하나 이상을 갱신한다.
 - 대안 비교 허용
 - 임시 노트 허용
 - 빠른 이동/재배치 우선
+- 작업용 `WorkArea Board`와 실제 화면 후보 `Viewport Board`를 함께 둘 수 있다.
+- Exploration 단계의 메모/질문 카드는 `Viewport` 밖에 두는 것을 기본값으로 한다.
 
 ### 7.2 Approved 보드
 - 구현 기준안만 유지
 - 불확정 메모 최소화
 - 구현자 관점의 읽기 쉬움 우선
+- Approved 단계에서는 실제 반영 후보 `Board`만 남기고 작업용 메모 카드는 제거하거나 별도 Exploration 보드로 되돌린다.
+- View mode 또는 prototype에 바로 써야 하는 경우, 실제 화면용 `Viewport Board`는 top-level board 또는 별도 page로 유지하는 것을 권장한다.
 
 ### 7.3 코멘트 규칙
 - "왼쪽이 더 예쁨"보다 "Carry 판단 시선 이동을 줄이기 위해 좌측 고정"처럼 남긴다
@@ -199,3 +225,4 @@ Agent가 Penpot만으로 확정하지 않는 것:
 
 ## 11. 변경 이력
 - 2026-03-18: Penpot MCP 기반 UI 레이아웃 협업 루프를 프로젝트 운영 문서로 추가했다.
+- 2026-03-18: `Board`를 화면/레이어/패널 단위 컨테이너로 사용하는 규칙과 `WorkArea`/`Viewport`, 작업용 메모/실제 반영 대상 구분 규칙을 추가했다.

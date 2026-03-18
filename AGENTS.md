@@ -215,6 +215,11 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - Exploration 보드와 Approved 보드를 분리한다.
   - Exploration: 빠른 배치 실험, 대안 비교, 코멘트 중심
   - Approved: 구현 반영 기준안
+- Penpot에서 `Board`는 화면/레이어/패널처럼 구현 대응이 있는 단위를 표현하는 기본 컨테이너로 사용한다.
+- `Group`은 비교, 임시 이동, 묶음 조작 같은 작업 보조 단위로 제한한다.
+- 필요 시 `WorkArea Board -> Viewport Board -> Layer Board -> Panel Board` 순서로 계층화한다.
+  - `Viewport Board` 내부의 구현 대응형 `Board`만 Unity 반영 후보로 본다.
+  - 메모, 질문, 비교안은 `WorkArea`의 `NotesBoard`/`OpenQuestionsBoard` 등으로 분리하고 반영 대상에서 제외한다.
 - 사용자는 위치/크기/그룹 의도를 가능한 한 Penpot 객체 조작으로 표현하고, 코멘트는 "왜 바꾸는가"에 집중한다.
 - Agent는 Penpot 변경사항을 재해석할 때 레이아웃 변화, 의도 변화, 구현 영향, 남은 open question을 분리해서 정리한다.
 - 공용 UI 구조 변경은 Penpot 승인안만으로 바로 씬 인스턴스를 수정하지 않는다.
