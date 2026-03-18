@@ -9,6 +9,9 @@ namespace SweepNDodge.DotsBullets.Tests
         private static readonly MethodInfo UpdateMethod = typeof(StagePlayInterventionBridge)
             .GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
 
+        private static readonly MethodInfo UpdateStartTriggerStateMethod = typeof(DemoShellDialogueBridge)
+            .GetMethod("UpdateStartTriggerState", BindingFlags.Instance | BindingFlags.NonPublic);
+
         [SetUp]
         public void SetUp()
         {
@@ -92,6 +95,30 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GateDialogueActive_DropsIntervention_WithoutReplacingActivePresentation()
+        {
+            using var context = CreateContext();
+            DemoShellSessionStaging.IncrementDialogueStageAttempt(1);
+            InvokeStartTrigger(context.DialogueBridge);
+            Assert.That(context.DialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(context.DialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageStart));
+
+            SetFeedbackSnapshot(context.RuntimeHudBridge, new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 5u,
+                Type = PlayerUiFeedbackEventType.PlayerHazardHit,
+                Value = 2,
+            });
+
+            InvokeUpdate(context.InterventionBridge);
+
+            Assert.That(context.InterventionBridge.LastTriggeredIntervention, Is.EqualTo(InWorldDialogueTriggerId.None));
+            Assert.That(context.DialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(context.DialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageStart));
+            Assert.That(context.DialogueBridge.CurrentPresentation.EntryKey, Is.EqualTo("stage1_start"));
+        }
+
+        [Test]
         public void DoesNotStartWhilePaused()
         {
             using var context = CreateContext();
@@ -132,6 +159,12 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             Assert.That(UpdateMethod, Is.Not.Null, "StagePlayInterventionBridge.Update method not found.");
             UpdateMethod.Invoke(bridge, null);
+        }
+
+        private static void InvokeStartTrigger(DemoShellDialogueBridge bridge)
+        {
+            Assert.That(UpdateStartTriggerStateMethod, Is.Not.Null, "DemoShellDialogueBridge.UpdateStartTriggerState method not found.");
+            UpdateStartTriggerStateMethod.Invoke(bridge, null);
         }
 
         private static void SetHudSnapshot(PlayerRuntimeHudBridge runtimeHudBridge, PlayerHudSnapshotComponent snapshot)
@@ -184,6 +217,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var dialogueCatalog = ScriptableObject.CreateInstance<InWorldDialogueCatalogSO>();
             dialogueCatalog.Entries = new[]
             {
+                CreateStageStartEntry(),
                 CreateInterventionCarryFullEntry(),
                 CreateInterventionFirstHitEntry(),
             };
@@ -272,7 +306,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 StageId = 1,
                 Priority = 20,
                 BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
-                RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
+                RetryPolicy = InWorldDialogueRetryPolicy.OncePerSession,
                 FullVariant = new InWorldDialogueSequenceVariant
                 {
                     Lines = new[]
@@ -287,6 +321,37 @@ namespace SweepNDodge.DotsBullets.Tests
                                 ScreenAnchor = InWorldDialogueScreenAnchorId.LowerCenter,
                             },
                             AutoAdvanceSec = 0.25f,
+                        },
+                    },
+                },
+            };
+        }
+
+        private static InWorldDialogueCatalogEntry CreateStageStartEntry()
+        {
+            return new InWorldDialogueCatalogEntry
+            {
+                Enabled = true,
+                EntryKey = "stage1_start",
+                Trigger = InWorldDialogueTriggerId.StageStart,
+                TargetKind = InWorldDialogueTargetKind.Stage,
+                StageId = 1,
+                Priority = 10,
+                BlockingMode = InWorldDialogueBlockingMode.GateIntro,
+                RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
+                FullVariant = new InWorldDialogueSequenceVariant
+                {
+                    Lines = new[]
+                    {
+                        new InWorldDialogueLine
+                        {
+                            SpeakerKey = "hero",
+                            Text = "Stage intro",
+                            Anchor = new InWorldDialogueAnchorRef
+                            {
+                                Kind = InWorldDialogueAnchorKind.ScreenAnchor,
+                                ScreenAnchor = InWorldDialogueScreenAnchorId.LowerCenter,
+                            },
                         },
                     },
                 },

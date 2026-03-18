@@ -94,6 +94,48 @@ MonoBehaviour:
     RetryVariant:
       Lines: []
   - Enabled: 1
+    EntryKey: stage_01_intervention_carry_full
+    Trigger: 4
+    TargetKind: 0
+    StageId: 1
+    ThemeKey:
+    Priority: 30
+    BlockingMode: 0
+    RetryPolicy: 0
+    FullVariant:
+      Lines:
+      - SpeakerKey: hero
+        Text: Carry full
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 2
+        MinHoldSec: 0
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
+  - Enabled: 1
+    EntryKey: stage_01_intervention_first_hit
+    Trigger: 5
+    TargetKind: 0
+    StageId: 1
+    ThemeKey:
+    Priority: 40
+    BlockingMode: 0
+    RetryPolicy: 3
+    FullVariant:
+      Lines:
+      - SpeakerKey: hero
+        Text: Watch the hazards
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 2
+        MinHoldSec: 0
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
+  - Enabled: 1
     EntryKey: theme_forest_once
     Trigger: 3
     TargetKind: 1

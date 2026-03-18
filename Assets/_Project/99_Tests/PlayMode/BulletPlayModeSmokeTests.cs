@@ -721,6 +721,404 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_CarryFull_ShowsDialogueAndSuppressesHintNotification()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            RuntimeUiRoot uiRoot = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            PlayerRuntimeHudBridge hud = null;
+            DemoShellPauseBridge pauseBridge = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    dialogueBridge = FindDialogueBridge();
+                    hud = FindPlayerRuntimeHud();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null && uiRoot != null && dialogueBridge != null && hud != null && pauseBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene was not ready for carry-full intervention test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Carry-full intervention test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    hud = FindPlayerRuntimeHud();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null
+                        && uiRoot != null
+                        && hud != null
+                        && pauseBridge != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && uiRoot.StageHudPanel != null
+                        && uiRoot.StageHudPanel.activeInHierarchy
+                        && uiRoot.NotificationPanel != null
+                        && uiRoot.NotificationPanel.activeInHierarchy
+                        && uiRoot.HintPanel != null
+                        && uiRoot.HintPanel.activeInHierarchy
+                        && pauseBridge.CanPause;
+                },
+                360,
+                "Carry-full intervention test did not reach interactive StagePlay.");
+
+            var carryEntity = GetSingletonEntity<PlayerCarryBinComponent>(em);
+            var carry = em.GetComponentData<PlayerCarryBinComponent>(carryEntity);
+            carry.Capacity = Mathf.Max(10, carry.Capacity);
+            carry.Load = carry.Capacity;
+            em.SetComponentData(carryEntity, carry);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    hud = FindPlayerRuntimeHud();
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    return hud != null
+                        && hud.TryGetLastSnapshot(out var latest)
+                        && latest.CarryCapacity > 0
+                        && latest.CarryLoad >= latest.CarryCapacity
+                        && dialogueBridge != null
+                        && uiRoot != null
+                        && pauseBridge != null
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.InterventionCarryFull
+                        && uiRoot.DialoguePanel != null
+                        && uiRoot.DialoguePanel.activeInHierarchy
+                        && uiRoot.StageHudPanel.activeInHierarchy
+                        && !uiRoot.NotificationPanel.activeInHierarchy
+                        && !uiRoot.HintPanel.activeInHierarchy
+                        && uiRoot.DialoguePresenter != null
+                        && uiRoot.DialoguePresenter.DimRoot != null
+                        && !uiRoot.DialoguePresenter.DimRoot.activeSelf
+                        && !pauseBridge.CanPause
+                        && uiRoot.PausePanel != null
+                        && !uiRoot.PausePanel.activeInHierarchy;
+                },
+                240,
+                "Carry-full intervention dialogue did not activate or suppress HUD banners.");
+
+            Assert.That(dialogueBridge.CurrentPresentation.EntryKey, Is.EqualTo("stage_01_intervention_carry_full"));
+            var pausedState = GetSingleton<GameplayPauseStateComponent>(em);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.BlockGameplayInput) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.ExclusivePresentationInput) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.BlockPauseMenuOpen) != 0, Is.True);
+            float pausedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.EqualTo(pausedClock).Within(1e-6f));
+            Assert.That(dialogueBridge.Skip(), Is.True);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    return dialogueBridge != null
+                        && uiRoot != null
+                        && pauseBridge != null
+                        && !dialogueBridge.IsDialogueActive
+                        && uiRoot.StageHudPanel.activeInHierarchy
+                        && uiRoot.NotificationPanel.activeInHierarchy
+                        && uiRoot.HintPanel.activeInHierarchy
+                        && !uiRoot.DialoguePanel.activeInHierarchy
+                        && pauseBridge.CanPause;
+                },
+                240,
+                "Carry-full intervention suppress state did not restore after skip.");
+
+            Assert.That((GetSingleton<GameplayPauseStateComponent>(em).Flags & GameplayPauseFlags.PauseSimulation) == 0, Is.True);
+            float resumedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.GreaterThan(resumedClock));
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_FirstHit_ShowsDialogueAndSuppressesHintNotification()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            RuntimeUiRoot uiRoot = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            PlayerRuntimeHudBridge hud = null;
+            DemoShellPauseBridge pauseBridge = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    dialogueBridge = FindDialogueBridge();
+                    hud = FindPlayerRuntimeHud();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null && uiRoot != null && dialogueBridge != null && hud != null && pauseBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene was not ready for first-hit intervention test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "First-hit intervention test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    hud = FindPlayerRuntimeHud();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null
+                        && uiRoot != null
+                        && hud != null
+                        && pauseBridge != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && uiRoot.StageHudPanel != null
+                        && uiRoot.StageHudPanel.activeInHierarchy
+                        && uiRoot.NotificationPanel != null
+                        && uiRoot.NotificationPanel.activeInHierarchy
+                        && uiRoot.HintPanel != null
+                        && uiRoot.HintPanel.activeInHierarchy
+                        && pauseBridge.CanPause;
+                },
+                360,
+                "First-hit intervention test did not reach interactive StagePlay.");
+
+            var playerEntity = GetSingletonEntity<PlayerTag>(em);
+            CompleteTrackedJobs(em);
+            uint frame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            var feedbackSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(playerEntity);
+            feedbackSnapshot.Version = 700u;
+            feedbackSnapshot.Type = PlayerUiFeedbackEventType.PlayerHazardHit;
+            feedbackSnapshot.Reason = (byte)PlayerUiFeedbackReasonId.Default;
+            feedbackSnapshot.Value = 11;
+            feedbackSnapshot.RelatedEntity = playerEntity;
+            feedbackSnapshot.Frame = frame;
+            feedbackSnapshot.RemainingSec = 0.6f;
+            feedbackSnapshot.ClockSec = Mathf.Max(0f, feedbackSnapshot.ClockSec);
+            feedbackSnapshot.NextAllowedHitSec = feedbackSnapshot.ClockSec + 0.1f;
+            em.SetComponentData(playerEntity, feedbackSnapshot);
+
+            var hudSnapshotEntity = GetSingletonEntity<PlayerHudSnapshotComponent>(em);
+            var hudSnapshot = em.GetComponentData<PlayerHudSnapshotComponent>(hudSnapshotEntity);
+            hudSnapshot.LastHitLossValue = 11;
+            hudSnapshot.HitFlashRemainingSec = 0.6f;
+            em.SetComponentData(hudSnapshotEntity, hudSnapshot);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    hud = FindPlayerRuntimeHud();
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    return hud != null
+                        && hud.TryGetLastSnapshot(out var latest)
+                        && latest.LastHitLossValue == 11
+                        && hud.IsHitFlashVisible
+                        && dialogueBridge != null
+                        && uiRoot != null
+                        && pauseBridge != null
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.InterventionFirstHit
+                        && uiRoot.DialoguePanel.activeInHierarchy
+                        && uiRoot.StageHudPanel.activeInHierarchy
+                        && !uiRoot.NotificationPanel.activeInHierarchy
+                        && !uiRoot.HintPanel.activeInHierarchy
+                        && uiRoot.DialoguePresenter != null
+                        && !uiRoot.DialoguePresenter.DimRoot.activeSelf
+                        && !pauseBridge.CanPause
+                        && uiRoot.PausePanel != null
+                        && !uiRoot.PausePanel.activeInHierarchy;
+                },
+                240,
+                "First-hit intervention dialogue did not activate or suppress HUD banners.");
+
+            Assert.That(dialogueBridge.CurrentPresentation.EntryKey, Is.EqualTo("stage_01_intervention_first_hit"));
+            var pausedState = GetSingleton<GameplayPauseStateComponent>(em);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.BlockGameplayInput) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.ExclusivePresentationInput) != 0, Is.True);
+            Assert.That((pausedState.Flags & GameplayPauseFlags.BlockPauseMenuOpen) != 0, Is.True);
+            float pausedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.EqualTo(pausedClock).Within(1e-6f));
+            Assert.That(dialogueBridge.Skip(), Is.True);
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    return dialogueBridge != null
+                        && uiRoot != null
+                        && pauseBridge != null
+                        && !dialogueBridge.IsDialogueActive
+                        && uiRoot.StageHudPanel.activeInHierarchy
+                        && uiRoot.NotificationPanel.activeInHierarchy
+                        && uiRoot.HintPanel.activeInHierarchy
+                        && !uiRoot.DialoguePanel.activeInHierarchy
+                        && pauseBridge.CanPause;
+                },
+                240,
+                "First-hit intervention suppress state did not restore after skip.");
+
+            Assert.That((GetSingleton<GameplayPauseStateComponent>(em).Flags & GameplayPauseFlags.PauseSimulation) == 0, Is.True);
+            float resumedClock = GetSingleton<StageGameplayClockComponent>(em).ElapsedSec;
+            yield return null;
+            yield return null;
+            Assert.That(GetSingleton<StageGameplayClockComponent>(em).ElapsedSec, Is.GreaterThan(resumedClock));
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_FirstHit_DoesNotInterruptStageStartGate()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            RuntimeUiRoot uiRoot = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            PlayerRuntimeHudBridge hud = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    dialogueBridge = FindDialogueBridge();
+                    hud = FindPlayerRuntimeHud();
+                    return shell != null && uiRoot != null && dialogueBridge != null && hud != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene was not ready for gate/intervention priority test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Gate/intervention priority test did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    return shell != null
+                        && dialogueBridge != null
+                        && uiRoot != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart
+                        && uiRoot.DialoguePanel.activeInHierarchy;
+                },
+                360,
+                "StageStart gate dialogue did not activate for gate/intervention priority test.");
+
+            var playerEntity = GetSingletonEntity<PlayerTag>(em);
+            CompleteTrackedJobs(em);
+            uint frame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            var feedbackSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(playerEntity);
+            feedbackSnapshot.Version = 701u;
+            feedbackSnapshot.Type = PlayerUiFeedbackEventType.PlayerHazardHit;
+            feedbackSnapshot.Reason = (byte)PlayerUiFeedbackReasonId.Default;
+            feedbackSnapshot.Value = 7;
+            feedbackSnapshot.RelatedEntity = playerEntity;
+            feedbackSnapshot.Frame = frame;
+            feedbackSnapshot.RemainingSec = 0.6f;
+            feedbackSnapshot.ClockSec = Mathf.Max(0f, feedbackSnapshot.ClockSec);
+            feedbackSnapshot.NextAllowedHitSec = feedbackSnapshot.ClockSec + 0.1f;
+            em.SetComponentData(playerEntity, feedbackSnapshot);
+
+            var hudSnapshotEntity = GetSingletonEntity<PlayerHudSnapshotComponent>(em);
+            var hudSnapshot = em.GetComponentData<PlayerHudSnapshotComponent>(hudSnapshotEntity);
+            hudSnapshot.LastHitLossValue = 7;
+            hudSnapshot.HitFlashRemainingSec = 0.6f;
+            em.SetComponentData(hudSnapshotEntity, hudSnapshot);
+
+            yield return null;
+            yield return null;
+
+            shell = FindDemoShell();
+            dialogueBridge = FindDialogueBridge();
+            uiRoot = FindRuntimeUiRoot();
+            Assert.That(shell.CurrentScreen, Is.EqualTo(DemoShellScreenId.StagePlay));
+            Assert.That(dialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(dialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageStart));
+            Assert.That(dialogueBridge.CurrentPresentation.EntryKey, Is.EqualTo("stage_01_start"));
+            Assert.That(uiRoot.DialoguePanel.activeInHierarchy, Is.True);
+            Assert.That(uiRoot.DialoguePresenter.DimRoot.activeSelf, Is.False);
+
+            Assert.That(dialogueBridge.Skip(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    shell = FindDemoShell();
+                    return dialogueBridge != null
+                        && shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && !dialogueBridge.IsDialogueActive;
+                },
+                240,
+                "StageStart gate did not complete after skip in gate/intervention priority test.");
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_DemoShell_PauseMenuAutoCloses_WhenClearDialogueGateStarts()
         {
             ClearDemoShellStaging();
@@ -2202,6 +2600,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 "PlayerRuntimeHudBridge was not found in operational scene.");
 
             var hud = FindPlayerRuntimeHud();
+            var dialogueBridge = FindDialogueBridge();
             Assert.That(hud, Is.Not.Null);
             yield return WaitForCondition(
                 () => hud.HasSnapshot,
@@ -2248,13 +2647,30 @@ namespace SweepNDodge.DotsBullets.Tests
                 () =>
                 {
                     hud = FindPlayerRuntimeHud();
+                    dialogueBridge = FindDialogueBridge();
                     return hud != null
+                        && dialogueBridge != null
                         && hud.TryGetLastSnapshot(out var latest)
                         && latest.LastHitLossValue == 11
                         && hud.IsHitFlashVisible;
                 },
                 180,
                 "Player HUD did not expose hit flash/loss from combat event.");
+
+            if (dialogueBridge != null
+                && dialogueBridge.IsDialogueActive
+                && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.InterventionFirstHit)
+            {
+                Assert.That(dialogueBridge.Skip(), Is.True);
+                yield return WaitForCondition(
+                    () =>
+                    {
+                        dialogueBridge = FindDialogueBridge();
+                        return dialogueBridge != null && !dialogueBridge.IsDialogueActive;
+                    },
+                    180,
+                    "First-hit intervention did not complete before hit-flash decay verification.");
+            }
 
             for (int i = 0; i < 45; i++)
                 yield return null;

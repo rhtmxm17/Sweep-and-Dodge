@@ -795,6 +795,93 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ApplyShellState_InterventionOverlay_SuppressesHudBanners_AndRestoresAfterHide()
+        {
+            using var context = CreateContext();
+
+            InvokeConfigurePresenters(context.Root);
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 0);
+            SetPrivateField(context.Shell, "_currentStagePlayPhase", DemoShellStagePlayPhaseId.Running);
+            SetPrivateField(context.Hud, "_hasSnapshot", true);
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 10,
+                CarryCapacity = 10,
+                DepletedSourceCount = 1,
+                TotalSourceCount = 3,
+                GameplayElapsedSec = 35f,
+                StageStateElapsedSec = 35f,
+            });
+            context.Hud.SetRuntimeUiHudActive(true);
+            SetPrivateField(context.NotificationBridge, "_currentNotification", new NotificationResolvedState
+            {
+                Id = NotificationId.CarryFull,
+                Message = "Carry Full",
+                Severity = NotificationSeverity.Warning,
+                Visible = true,
+            });
+            SetPrivateField(context.HintBridge, "_currentHint", new HintResolvedState
+            {
+                Id = HintId.CarryFullGoToDeposit,
+                Message = "Deposit now",
+                Visible = true,
+            });
+            context.Root.NotificationPresenter.RefreshPresentation();
+            context.Root.HintPresenter.RefreshPresentation();
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.StageHudPanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.NotificationPanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.HintPanel.activeInHierarchy, Is.True);
+
+            SetPrivateField(context.DialogueBridge, "_currentPresentation", new DialoguePresentationState(
+                visible: true,
+                trigger: InWorldDialogueTriggerId.InterventionCarryFull,
+                blockingMode: InWorldDialogueBlockingMode.OverlayOnly,
+                entryKey: "stage_01_intervention_carry_full",
+                lineIndex: 0,
+                lineCount: 1,
+                speakerKey: "hero",
+                speakerDisplayName: "Hero",
+                speakerPortrait: null,
+                portraitSide: DialoguePortraitSide.Auto,
+                bodyText: "Carry full",
+                anchor: new InWorldDialogueAnchorRef
+                {
+                    Kind = InWorldDialogueAnchorKind.ScreenAnchor,
+                    ScreenAnchor = InWorldDialogueScreenAnchorId.LowerCenter,
+                },
+                canAdvance: true,
+                canSkip: true,
+                autoAdvanceEnabled: false,
+                lineElapsedSec: 0.2f,
+                minHoldSec: 0f,
+                autoAdvanceSec: 0f));
+
+            context.Root.DialoguePresenter.RefreshPresentation();
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.StageHudPanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.DialoguePanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.NotificationPanel.activeInHierarchy, Is.False);
+            Assert.That(context.Root.HintPanel.activeInHierarchy, Is.False);
+            Assert.That(context.Root.DialoguePresenter.DialogueRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.DimRoot.activeSelf, Is.False);
+            Assert.That(context.Root.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
+            Assert.That(context.Root.DialoguePresenter.BodyText.text, Is.EqualTo("Carry full"));
+
+            SetPrivateField(context.DialogueBridge, "_currentPresentation", DialoguePresentationState.Hidden);
+            context.Root.DialoguePresenter.RefreshPresentation();
+            InvokeApplyShellState(context.Root, force: true);
+
+            Assert.That(context.Root.DialoguePanel.activeInHierarchy, Is.False);
+            Assert.That(context.Root.StageHudPanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.NotificationPanel.activeInHierarchy, Is.True);
+            Assert.That(context.Root.HintPanel.activeInHierarchy, Is.True);
+        }
+
+        [Test]
         public void DialoguePresenter_AppliesOverlayFallback_AndHiddenState()
         {
             using var context = CreateContext();

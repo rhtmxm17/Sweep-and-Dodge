@@ -4,7 +4,7 @@
 - doc_id: `TD-023`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-03-17`
+- last_updated: `2026-03-18`
 - related_docs:
   - [TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md](./TD-009-fixed-tick-time-source-and-deltatime-replacement-plan.md)
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
@@ -23,7 +23,7 @@
 - UI modal owner와 simulation pause owner를 분리한다.
 - `StagePlay` gameplay 시간원을 `Unity Update deltaTime`과 분리된 fixed tick authority로 고정한다.
 - pause 중 world simulation, stage timer, timeout 판정, result elapsed가 함께 멈추도록 계약을 정리한다.
-- `StageStart=overlay`처럼 gameplay를 멈추지 않는 연출도 같은 runtime contract 안에서 표현 가능하게 한다.
+- `StagePlay` 문맥의 인월드 대화가 blocking mode와 무관하게 같은 gameplay pause contract를 재사용할 수 있게 한다.
 
 ### 1.2 비목표
 - `Time.timeScale` 기반 전역 정지
@@ -57,8 +57,8 @@
   - pause menu open/close에 대응해 gameplay pause를 요청한다.
   - modal stack과 destructive action routing만 소유한다.
 - `DemoShellDialogueBridge`
-  - `StageClear` gate 또는 후속 `GateIntro/Cutscene`에서 gameplay pause를 요청한다.
-  - `StageStart overlay` 기본값에서는 gameplay pause를 요청하지 않는다.
+  - `StagePlay` 문맥의 인월드 대화(`StageStart`, `StageClear`, intervention`)에서 gameplay pause를 요청한다.
+  - shell-context dialogue(`ThemeTransition`)는 현재 runtime caller가 없으며, 이번 계약 일반화 범위 밖이다.
 - future requester
   - cutscene controller
   - tutorial intervention controller
@@ -192,15 +192,16 @@
   - menu 입력은 허용
   - destructive action confirm은 modal owner가 계속 소유
 
-### 7.2 StageStart overlay
-- 기본값:
-  - acquire 없음
+### 7.2 StagePlay dialogue
+- acquire flags:
+  - `PauseSimulation`
+  - `BlockGameplayInput`
+  - `ExclusivePresentationInput`
+  - `BlockPauseMenuOpen`
 - 정책:
-  - gameplay 계속 진행
-  - player input 허용
-  - dialogue presentation만 표시
-- 후속 확장:
-  - `GateIntro` variant는 `DialogueGate`와 같은 계약으로 승격 가능
+  - `StageStart`, `StageClear`, intervention(`CarryFull`, `FirstHit`)은 모두 `DialogueGate` reason으로 같은 pause contract를 획득한다.
+  - `OverlayOnly`는 pause 비대상이 아니라 dim/defer/UI 차이를 나타내는 presentation mode다.
+  - dialogue line hold/auto-advance는 계속 `unscaledDeltaTime` 기준으로 진행된다.
 
 ### 7.3 StageClear dialogue gate
 - acquire flags:
@@ -300,8 +301,7 @@
 - PlayMode
   - pause menu open 시 bullet/player/source/run director가 정지한다
   - pause menu close 시 gameplay가 정상 resume된다
-  - `StageClear` dialogue active 동안 simulation이 정지하고 dialogue 입력만 허용된다
-  - `StageStart overlay`는 gameplay를 멈추지 않는다
+  - `StagePlay` dialogue active 동안 simulation이 정지하고 dialogue 입력만 허용된다
   - pause 중 restart/return to lobby 이후 stale handle이 남지 않는다
   - pause 중 result elapsed와 timeout이 증가하지 않는다
 

@@ -22,7 +22,7 @@
 - 현재 `StageStart`, `StageClear` 전환형 dialogue와 충돌하지 않는 계약을 정의한다.
 
 ### 1.2 비목표
-- pause를 동반한 modal intervention
+- shell-context dialogue(`ThemeTransition`)까지 같은 pause contract로 일반화하는 구조 변경
 - queue/stack 기반 cut-in 스케줄러
 - 튜토리얼 전체를 대화 시스템으로 치환하는 구조 변경
 - 카메라 컷, 타임스케일 제어, 별도 cinematic screen
@@ -55,7 +55,7 @@
 - `DemoShellDialogueBridge`
   - 대화 line 진행, skip, auto-advance, anchor/presentation state를 계속 소유한다.
   - stage-play intervention도 기존 sequence 재생 경로를 재사용한다.
-  - 이번 범위에서는 intervention에 대해 gameplay pause를 획득하지 않는다.
+  - stage-play intervention도 다른 `StagePlay` dialogue와 동일하게 `GameplayPauseReasonId.DialogueGate`를 획득한다.
 
 ### 3.3 durable state owner
 - `DemoShellSessionStaging`
@@ -135,8 +135,8 @@
 - hint는 intervention을 발생시키지 않는다. hint bridge는 read-only 문맥 공급자에 머문다.
 
 ### 7.2 Pause
-- 이번 범위에서는 intervention이 `GameplayPauseReasonId.DialogueGate`를 획득하지 않는다.
-- 공통 gameplay pause 계약은 `TD-023`을 따르되, intervention은 아직 pause caller로 연결하지 않는다.
+- intervention은 `StagePlay` dialogue로서 `GameplayPauseReasonId.DialogueGate`를 획득한다.
+- 공통 gameplay pause 계약은 `TD-023`을 따르며, `CarryFull`, `FirstHit`도 같은 pause flags를 사용한다.
 - pause 중 새 intervention을 시작하지 않는다.
 
 ## 8. 업데이트 순서 / 상태 전이
@@ -163,7 +163,8 @@
 ### 9.3 P3 UI / suppress 회귀
 - intervention active 동안 기존 dialogue suppress가 그대로 유지되는지 검증
 - hint/notification과 충돌하지 않는지 확인
-- 상태: `planned`
+- `Stage 1` sample intervention authoring을 추가해 운영 씬에서 실제 노출 기준으로 회귀를 검증한다.
+- 상태: `completed`
 
 ### 9.4 P4 자동 검증
 - EditMode
@@ -173,7 +174,8 @@
 - PlayMode
   - `CarryFull`, `FirstHit` overlay intervention
   - start/clear gate보다 낮은 우선순위
-  - pause 중 intervention 비개시
+  - intervention 중 simulation/gameplay clock 정지 및 종료 후 resume
+  - intervention active 동안 pause menu 비허용
 - 상태: `planned`
 
 ## 10. 검증 계획 / 합격 기준
@@ -186,7 +188,8 @@
   - `FirstHit`은 동일 session에서 1회만 나온다.
   - active start/clear dialogue가 있으면 intervention은 시작되지 않는다.
   - intervention active 동안 `Hint/Notification`은 숨겨지고, 종료 후 복원된다.
-  - pause menu가 열린 동안 intervention은 시작되지 않는다.
+  - intervention active 동안 world simulation은 멈추고, 종료 후 resume된다.
+  - intervention active 동안 pause menu는 열리지 않는다.
 
 ## 11. 오픈 이슈
 - `LowTime`, `SourceDepleted`, `HazardHigh`를 같은 bridge에 계속 올릴지 후속 세션에서 검토한다.
@@ -196,3 +199,5 @@
 ## 12. 변경 이력
 - 2026-03-18: `P1 trigger/state 확장`을 반영했다. intervention trigger enum을 추가했고, `DemoShellSessionStaging`에 active-stage-run seen-state를 도입했다. `EnterStagePlay`는 stage 진입 시 run seen-state를 초기화하고, validation은 intervention trigger의 `Theme` target 및 non-`OverlayOnly` blocking mode를 금지하도록 확장했다.
 - 2026-03-18: `P2 StagePlayInterventionBridge`를 반영했다. `StagePlay`의 `Running` 상태에서 `FirstHit`, `CarryFull` intervention을 overlay-only로 판정하는 owner bridge를 추가했고, `DemoShellDialogueBridge.TryStartStagePlayIntervention(trigger, stageId)` seam을 통해 playback을 재사용하도록 연결했다. `FirstHit`은 feedback snapshot version edge + `PlayerHazardHit` type으로만 판정하고, `CarryFull`은 완료/skip 시 current-run seen-state를 기록한다.
+- 2026-03-18: `P3 UI / suppress 회귀`를 반영했다. `Stage 1` sample intervention entry(`CarryFull`, `FirstHit`)를 demo catalog에 추가했고, 운영 씬과 EditMode/PlayMode 회귀에서 intervention active 동안 `DialoguePanel` 표시, `NotificationPanel`/`HintPanel` suppress, `StageHudPanel` 유지, `OverlayOnly` dim 비표시, 종료 후 visibility 복구를 실제 노출 기준으로 검증했다.
+- 2026-03-18: `StagePlay dialogue pause` 일반화를 반영했다. `CarryFull`, `FirstHit` intervention도 `StageStart`, `StageClear`와 같은 `DialogueGate` pause flags를 획득하도록 규약을 정정했고, `OverlayOnly`는 pause 비대상이 아니라 presentation policy만 표현하는 mode로 재정의했다.

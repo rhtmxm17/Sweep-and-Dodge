@@ -319,7 +319,7 @@ namespace SweepNDodge.DotsBullets
             InWorldDialogueTriggerId trigger,
             DemoShellStageResultMetrics clearResultContext)
         {
-            ReleaseGatePauseHandle();
+            ReleaseStagePlayDialoguePauseHandle();
             _activeEntry = entry;
             _activeVariant = variant;
             _activeTrigger = trigger;
@@ -327,7 +327,7 @@ namespace SweepNDodge.DotsBullets
             _activeLineIndex = 0;
             _lineElapsedSec = 0f;
             _completionNotified = false;
-            AcquireGatePauseIfNeeded(entry.BlockingMode);
+            AcquireStagePlayDialoguePauseIfNeeded(entry, trigger);
             RefreshPresentation();
         }
 
@@ -358,7 +358,7 @@ namespace SweepNDodge.DotsBullets
 
         private void ResetActiveSequence()
         {
-            ReleaseGatePauseHandle();
+            ReleaseStagePlayDialoguePauseHandle();
             _activeEntry = default;
             _activeVariant = default;
             _activeTrigger = InWorldDialogueTriggerId.None;
@@ -476,11 +476,13 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private void AcquireGatePauseIfNeeded(InWorldDialogueBlockingMode blockingMode)
+        private void AcquireStagePlayDialoguePauseIfNeeded(
+            in InWorldDialogueCatalogEntry entry,
+            InWorldDialogueTriggerId trigger)
         {
-            bool isGatePause = blockingMode == InWorldDialogueBlockingMode.GateIntro
-                || blockingMode == InWorldDialogueBlockingMode.GateClear;
-            if (!isGatePause || PauseController == null || _gatePauseHandle.IsValid)
+            if (!ShouldAcquireStagePlayDialoguePause(entry, trigger)
+                || PauseController == null
+                || _gatePauseHandle.IsValid)
                 return;
 
             _gatePauseHandle = PauseController.Acquire(
@@ -491,7 +493,20 @@ namespace SweepNDodge.DotsBullets
                 | GameplayPauseFlags.BlockPauseMenuOpen);
         }
 
-        private void ReleaseGatePauseHandle()
+        private static bool ShouldAcquireStagePlayDialoguePause(
+            in InWorldDialogueCatalogEntry entry,
+            InWorldDialogueTriggerId trigger)
+        {
+            if (entry.TargetKind != InWorldDialogueTargetKind.Stage)
+                return false;
+
+            return trigger == InWorldDialogueTriggerId.StageStart
+                   || trigger == InWorldDialogueTriggerId.StageClear
+                   || trigger == InWorldDialogueTriggerId.InterventionCarryFull
+                   || trigger == InWorldDialogueTriggerId.InterventionFirstHit;
+        }
+
+        private void ReleaseStagePlayDialoguePauseHandle()
         {
             if (PauseController != null && _gatePauseHandle.IsValid)
                 PauseController.Release(_gatePauseHandle);

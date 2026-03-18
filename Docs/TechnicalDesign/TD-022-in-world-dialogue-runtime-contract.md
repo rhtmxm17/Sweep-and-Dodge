@@ -4,7 +4,7 @@
 - doc_id: `TD-022`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-03-17`
+- last_updated: `2026-03-18`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [GD-011-in-world-dialogue-direction.md](../GameDesign/GD-011-in-world-dialogue-direction.md)
@@ -119,6 +119,9 @@
   - `GateIntro`
   - `GateClear`
   - `ShellOverlay`
+  - `StagePlay` 문맥에서는 blocking mode와 무관하게 `DialogueGate` gameplay pause를 획득한다.
+  - `OverlayOnly`는 pause 비대상이 아니라 dim/defer/UI 차이를 나타내는 presentation mode다.
+  - `ShellOverlay`는 현재 `ThemeTransition` 전용 shell-context seam으로 남기며, 이번 pause 일반화 범위 밖이다.
 
 ### 4.3 Line data
 - `InWorldDialogueLine`
@@ -155,8 +158,8 @@
 2. topology apply 요청
 3. `RunDirectorStageBridge.RequestStageStart()`는 기존 경로 유지
 4. `CurrentStagePlayPhase == Running` 최초 관측 edge에서 current demo의 `GateIntro` start sequence가 있으면 `DemoShellDialogueBridge`가 재생 시작
-5. `GateIntro`인 경우 clear gate와 동일한 gameplay pause flags를 획득한다.
-6. dialogue 완료/스킵 시 presentation을 정리하고, `GateIntro`였다면 pause handle도 함께 해제한다.
+5. `StagePlay` 문맥 dialogue인 경우 blocking mode와 무관하게 동일한 gameplay pause flags를 획득한다.
+6. dialogue 완료/스킵 시 presentation을 정리하고, 획득했던 pause handle도 함께 해제한다.
 
 ### 5.2 StageClear
 1. ECS가 `RunDirectorStageStateId.ClearReady`에 진입
@@ -208,12 +211,12 @@
 - skip: `Cancel` 또는 별도 skip binding
 - presentation owner가 입력을 해석하고, presenter는 입력을 직접 소비하지 않는다.
 - `StageClear` gate 재생 중에는 pause/confirm modal 입력보다 dialogue advance/skip이 우선한다.
-- `StageStart`와 `StageClear`가 gate mode일 때는 동일한 gameplay pause flags를 사용한다.
+- `StagePlay` 문맥의 active dialogue는 blocking mode와 무관하게 동일한 gameplay pause flags를 사용한다.
   - `PauseSimulation`
   - `BlockGameplayInput`
   - `ExclusivePresentationInput`
   - `BlockPauseMenuOpen`
-- gate dialogue가 시작될 때 pause menu가 이미 열려 있으면 `DemoShellPauseBridge`는 기존 pause handle을 즉시 release하고, dialogue gate가 단독 pause owner가 된다.
+- stage-play dialogue가 시작될 때 pause menu가 이미 열려 있으면 `DemoShellPauseBridge`는 기존 pause handle을 즉시 release하고, dialogue gate가 단독 pause owner가 된다.
 
 ## 7. 성능 / 리스크
 ### 7.1 성능 원칙
@@ -317,3 +320,4 @@
 - 2026-03-17: `ThemeTransition` 범위 설명을 보강했다. 현재 demo에서는 실제 runtime caller를 두지 않고, schema/API seam만 유지하는 확장 예시 항목임을 명시했다.
 - 2026-03-17: runtime asset binding 경로를 직접 참조 방식으로 고정했다. `DemoShellDialogueBridge`는 editor-only asset search fallback 없이 `DialogueCatalog`, `SpeakerCatalog`를 serialized reference로 받는다.
 - 2026-03-17: gameplay pause 연동 보정을 반영했다. current demo의 `StageStart` entry는 `GateIntro`를 사용하고, `GateIntro`와 `GateClear`는 동일한 gameplay pause flags를 획득한다. pause menu가 열린 상태에서 gate dialogue가 시작되면 `DemoShellPauseBridge`가 기존 pause handle을 즉시 release해 dialogue gate가 단독 owner가 되도록 정리했다.
+- 2026-03-18: `StagePlay dialogue pause` 일반화를 반영했다. `StageStart`, `StageClear`, `CarryFull`, `FirstHit`처럼 `StagePlay` 문맥에서 재생되는 dialogue는 모두 `DialogueGate` gameplay pause flags를 획득한다. `OverlayOnly`는 pause 비대상이 아니라 presentation policy만 표현하고, `ThemeTransition` 같은 shell-context dialogue는 여전히 pause 일반화 범위 밖으로 유지한다.

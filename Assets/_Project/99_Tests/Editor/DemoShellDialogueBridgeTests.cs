@@ -210,7 +210,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void StageStartOverlay_DoesNotAcquirePauseHandle()
+        public void StageStartOverlay_AcquiresPauseHandle_WithoutChangingOverlayPresentation()
         {
             using var context = CreateContext();
             context.DialogueCatalog.Entries = new[]
@@ -228,17 +228,37 @@ namespace SweepNDodge.DotsBullets.Tests
 
             Assert.That(context.Bridge.IsDialogueActive, Is.True);
             Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageStart));
-            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
-            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.False);
+            Assert.That(context.Bridge.CurrentPresentation.BlockingMode, Is.EqualTo(InWorldDialogueBlockingMode.OverlayOnly));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsPauseMenuOpenBlocked, Is.True);
         }
 
         [Test]
-        public void TryStartStagePlayIntervention_OverlayOnly_DoesNotAcquirePauseHandle()
+        public void TryStartStagePlayIntervention_OverlayOnly_AcquiresPauseHandle_WithoutDim()
         {
             using var context = CreateContext();
 
             Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionCarryFull, 1), Is.True);
             Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.InterventionCarryFull));
+            Assert.That(context.Bridge.CurrentPresentation.BlockingMode, Is.EqualTo(InWorldDialogueBlockingMode.OverlayOnly));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsPauseMenuOpenBlocked, Is.True);
+        }
+
+        [Test]
+        public void InterventionFirstHit_AcquiresAndReleasesPauseHandle()
+        {
+            using var context = CreateContext();
+
+            Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionFirstHit, 1), Is.True);
+            Assert.That(context.Bridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.InterventionFirstHit));
+            Assert.That(context.Bridge.CurrentPresentation.BlockingMode, Is.EqualTo(InWorldDialogueBlockingMode.OverlayOnly));
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.True);
+
+            Assert.That(context.Bridge.Skip(), Is.True);
             Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
             Assert.That(context.PauseController.CurrentSnapshot.IsGameplayInputBlocked, Is.False);
         }
@@ -251,14 +271,29 @@ namespace SweepNDodge.DotsBullets.Tests
             DemoShellSessionStaging.BeginDialogueStageRun(1);
             Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionCarryFull, 1), Is.True);
             Assert.That(DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull), Is.False);
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
             Assert.That(context.Bridge.Skip(), Is.True);
             Assert.That(DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull), Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
 
             DemoShellSessionStaging.BeginDialogueStageRun(1);
             Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionCarryFull, 1), Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.True);
             InvokeTick(context.Bridge, 0.11f);
             Assert.That(context.Bridge.IsDialogueActive, Is.False);
             Assert.That(DemoShellSessionStaging.HasSeenDialogueTriggerThisRun(1, InWorldDialogueTriggerId.InterventionCarryFull), Is.True);
+            Assert.That(context.PauseController.CurrentSnapshot.IsSimulationPaused, Is.False);
+        }
+
+        [Test]
+        public void InterventionFirstHit_UsesOncePerSessionPolicy()
+        {
+            using var context = CreateContext();
+
+            Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionFirstHit, 1), Is.True);
+            Assert.That(context.Bridge.Skip(), Is.True);
+            Assert.That(DemoShellSessionStaging.HasSeenDialogueEntry("stage1_first_hit"), Is.True);
+            Assert.That(context.Bridge.TryStartStagePlayIntervention(InWorldDialogueTriggerId.InterventionFirstHit, 1), Is.False);
         }
 
         [Test]
@@ -534,7 +569,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 StageId = 1,
                 Priority = 40,
                 BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
-                RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
+                RetryPolicy = InWorldDialogueRetryPolicy.OncePerSession,
                 FullVariant = new InWorldDialogueSequenceVariant
                 {
                     Lines = new[]
