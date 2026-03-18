@@ -209,6 +209,19 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - TaskBoard 갱신을 근거로 작업 범위를 새로 확장하거나, 사용자와 합의되지 않은 결정 사항을 확정하지 않는다.
 - 명시적 근거가 없는 항목은 TaskBoard에 새로 만들어 기록하지 않는다.
 
+### 8.4 UI 레이아웃 워크플로우
+- UI 레이아웃 작업은 기본적으로 `기능 중심 대화 -> Penpot 초안 -> 사용자 직접 조작 -> Agent 재해석 -> 승인 후 Unity 반영` 순서를 따른다.
+- Penpot은 협업용 시각 캔버스이며, 구현 SSOT는 repo 내부 문서/JSON/Prefab으로 유지한다.
+- Exploration 보드와 Approved 보드를 분리한다.
+  - Exploration: 빠른 배치 실험, 대안 비교, 코멘트 중심
+  - Approved: 구현 반영 기준안
+- 사용자는 위치/크기/그룹 의도를 가능한 한 Penpot 객체 조작으로 표현하고, 코멘트는 "왜 바꾸는가"에 집중한다.
+- Agent는 Penpot 변경사항을 재해석할 때 레이아웃 변화, 의도 변화, 구현 영향, 남은 open question을 분리해서 정리한다.
+- 공용 UI 구조 변경은 Penpot 승인안만으로 바로 씬 인스턴스를 수정하지 않는다.
+  - 구현 전 `RuntimeUiRoot` prefab SSOT, TD, 관련 운영 문서와의 정합성을 먼저 확인한다.
+- UI 워크플로우 상세 절차는 아래 문서를 따른다.
+  - `Docs/UI/UI-Workflow.md`
+
 ---
 
 ## 9. 보안/권한(코딩 에이전트 운영)
@@ -225,10 +238,17 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 ---
 
 ## 10. MCP 사용 원칙 (MCP 연결 시)
-- MCP 기본 사용 범위:
+- Unity MCP 기본 사용 범위:
   - 관측(Observability): 콘솔, 씬 상태, 에셋 참조 관계 조회
   - 반영(Apply): 프리팹, 씬, ScriptableObject 변경 적용
   - 검증(Verify): refresh, 콘솔 확인, 테스트 실행
+- Penpot MCP 사용 범위:
+  - 관측(Observability): 페이지/보드/선택 요소 구조 조회, 시각 자료 export, 레이아웃 상태 확인
+  - 반영(Apply): UI 레이아웃 초안 생성, 시각 자료 배치 조정, 협업용 보드 갱신
+  - 협업(Collaboration): 사용자 조작 이후 변경 해석, Exploration/Approved 보드 운영 지원
+  - 제한(Limit): Penpot 변경은 설계/협업 산출물로 취급하며, Unity 코드/프리팹 반영의 SSOT로 직접 사용하지 않는다
+- 공통 규칙:
+  - Penpot 변경은 설계/협업 산출물로 취급하며, 코드/프리팹 반영 전 승인 게이트와 문서 정합성 확인을 유지한다.
 - 예외: 사용자가 명시적으로 요청하면 범위를 확장할 수 있다.
 - 스크립트 편집은 MCP 대상에서 제외하고 일반 파일 편집 워크플로우를 사용한다.
 
