@@ -1119,6 +1119,339 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_CarryFull_OncePerRun_DoesNotReplaySameRun()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            DemoShellPauseBridge pauseBridge = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null && dialogueBridge != null && pauseBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Carry-full once-per-run test was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(() => (shell = FindDemoShell()) != null && shell.CurrentScreen == DemoShellScreenId.Lobby, 240, "Carry-full once-per-run test did not reach Lobby.");
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null
+                        && pauseBridge != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && pauseBridge.CanPause;
+                },
+                360,
+                "Carry-full once-per-run test did not reach interactive StagePlay.");
+
+            SetCarryFull(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    return dialogueBridge != null
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.InterventionCarryFull;
+                },
+                240,
+                "Carry-full intervention did not activate for once-per-run test.");
+
+            Assert.That(dialogueBridge.Skip(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    pauseBridge = FindPauseBridge();
+                    return dialogueBridge != null
+                        && pauseBridge != null
+                        && !dialogueBridge.IsDialogueActive
+                        && pauseBridge.CanPause;
+                },
+                240,
+                "Carry-full intervention did not restore after skip in once-per-run test.");
+
+            var carryEntity = GetSingletonEntity<PlayerCarryBinComponent>(em);
+            var carry = em.GetComponentData<PlayerCarryBinComponent>(carryEntity);
+            carry.Load = 0;
+            em.SetComponentData(carryEntity, carry);
+            yield return null;
+            yield return null;
+
+            SetCarryFull(em);
+            for (int i = 0; i < 60; i++)
+            {
+                yield return null;
+                dialogueBridge = FindDialogueBridge();
+                pauseBridge = FindPauseBridge();
+                Assert.That(
+                    dialogueBridge == null
+                    || !dialogueBridge.IsDialogueActive
+                    || dialogueBridge.CurrentPresentation.Trigger != InWorldDialogueTriggerId.InterventionCarryFull,
+                    Is.True,
+                    "Carry-full intervention must not replay during the same run.");
+                Assert.That(pauseBridge == null || pauseBridge.CanPause, Is.True);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_FirstHit_OncePerSession_DoesNotReplaySameSession()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            DemoShellPauseBridge pauseBridge = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null && dialogueBridge != null && pauseBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "First-hit once-per-session test was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(() => (shell = FindDemoShell()) != null && shell.CurrentScreen == DemoShellScreenId.Lobby, 240, "First-hit once-per-session test did not reach Lobby.");
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null
+                        && pauseBridge != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && pauseBridge.CanPause;
+                },
+                360,
+                "First-hit once-per-session test did not reach interactive StagePlay.");
+
+            TriggerFirstHitFeedback(em, version: 710u, lossValue: 9);
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    return dialogueBridge != null
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.InterventionFirstHit;
+                },
+                240,
+                "First-hit intervention did not activate for once-per-session test.");
+
+            Assert.That(dialogueBridge.Skip(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    dialogueBridge = FindDialogueBridge();
+                    pauseBridge = FindPauseBridge();
+                    return dialogueBridge != null
+                        && pauseBridge != null
+                        && !dialogueBridge.IsDialogueActive
+                        && pauseBridge.CanPause;
+                },
+                240,
+                "First-hit intervention did not restore after skip in once-per-session test.");
+
+            TriggerFirstHitFeedback(em, version: 711u, lossValue: 5);
+            for (int i = 0; i < 60; i++)
+            {
+                yield return null;
+                dialogueBridge = FindDialogueBridge();
+                pauseBridge = FindPauseBridge();
+                Assert.That(
+                    dialogueBridge == null
+                    || !dialogueBridge.IsDialogueActive
+                    || dialogueBridge.CurrentPresentation.Trigger != InWorldDialogueTriggerId.InterventionFirstHit,
+                    Is.True,
+                    "First-hit intervention must not replay during the same app session.");
+                Assert.That(pauseBridge == null || pauseBridge.CanPause, Is.True);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_FirstHit_DoesNotInterruptStageClearGate()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+            RuntimeUiRoot uiRoot = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    return shell != null && dialogueBridge != null && uiRoot != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "StageClear priority test was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(() => (shell = FindDemoShell()) != null && shell.CurrentScreen == DemoShellScreenId.Lobby, 240, "StageClear priority test did not reach Lobby.");
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
+                },
+                360,
+                "StageClear priority test did not reach interactive StagePlay.");
+
+            ForceStageStateToClearReady(em);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    dialogueBridge = FindDialogueBridge();
+                    uiRoot = FindRuntimeUiRoot();
+                    return shell != null
+                        && dialogueBridge != null
+                        && uiRoot != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.ClearPresentation
+                        && dialogueBridge.IsDialogueActive
+                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageClear
+                        && uiRoot.DialoguePanel.activeInHierarchy;
+                },
+                240,
+                "StageClear gate dialogue did not activate for clear-priority test.");
+
+            TriggerFirstHitFeedback(em, version: 712u, lossValue: 13);
+            yield return null;
+            yield return null;
+
+            shell = FindDemoShell();
+            dialogueBridge = FindDialogueBridge();
+            uiRoot = FindRuntimeUiRoot();
+            Assert.That(shell.CurrentScreen, Is.EqualTo(DemoShellScreenId.StagePlay));
+            Assert.That(shell.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.ClearPresentation));
+            Assert.That(dialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(dialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageClear));
+            Assert.That(dialogueBridge.CurrentPresentation.EntryKey, Is.EqualTo("stage_01_clear"));
+            Assert.That(uiRoot.DialoguePanel.activeInHierarchy, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_DoesNotStartWhilePauseMenuOpen()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            RuntimeUiRoot uiRoot = null;
+            DemoShellPauseBridge pauseBridge = null;
+            DemoShellDialogueBridge dialogueBridge = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    dialogueBridge = FindDialogueBridge();
+                    return shell != null && uiRoot != null && pauseBridge != null && dialogueBridge != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Pause-block test was not ready in operational scene.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(() => (shell = FindDemoShell()) != null && shell.CurrentScreen == DemoShellScreenId.Lobby, 240, "Pause-block test did not reach Lobby.");
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    pauseBridge = FindPauseBridge();
+                    return shell != null
+                        && pauseBridge != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && pauseBridge.CanPause;
+                },
+                360,
+                "Pause-block test did not reach interactive StagePlay.");
+
+            uiRoot.OpenPause();
+            yield return WaitForCondition(
+                () =>
+                {
+                    uiRoot = FindRuntimeUiRoot();
+                    pauseBridge = FindPauseBridge();
+                    return uiRoot != null
+                        && pauseBridge != null
+                        && uiRoot.IsPauseOpen
+                        && uiRoot.PausePanel.activeInHierarchy
+                        && pauseBridge.IsPaused;
+                },
+                120,
+                "Pause-block test did not open pause menu.");
+
+            SetCarryFull(em);
+            TriggerFirstHitFeedback(em, version: 713u, lossValue: 4);
+
+            for (int i = 0; i < 60; i++)
+            {
+                yield return null;
+                dialogueBridge = FindDialogueBridge();
+                uiRoot = FindRuntimeUiRoot();
+                pauseBridge = FindPauseBridge();
+                Assert.That(
+                    dialogueBridge == null
+                    || !dialogueBridge.IsDialogueActive
+                    || (dialogueBridge.CurrentPresentation.Trigger != InWorldDialogueTriggerId.InterventionCarryFull
+                        && dialogueBridge.CurrentPresentation.Trigger != InWorldDialogueTriggerId.InterventionFirstHit),
+                    Is.True,
+                    "Intervention must not start while pause menu is open.");
+                Assert.That(uiRoot.IsPauseOpen, Is.True);
+                Assert.That(uiRoot.PausePanel.activeInHierarchy, Is.True);
+                Assert.That(pauseBridge.IsPaused, Is.True);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_DemoShell_PauseMenuAutoCloses_WhenClearDialogueGateStarts()
         {
             ClearDemoShellStaging();
@@ -3563,6 +3896,39 @@ namespace SweepNDodge.DotsBullets.Tests
                     Version = 1u,
                 });
             }
+        }
+
+        private static void SetCarryFull(EntityManager em)
+        {
+            var carryEntity = GetSingletonEntity<PlayerCarryBinComponent>(em);
+            var carry = em.GetComponentData<PlayerCarryBinComponent>(carryEntity);
+            carry.Capacity = Mathf.Max(10, carry.Capacity);
+            carry.Load = carry.Capacity;
+            em.SetComponentData(carryEntity, carry);
+        }
+
+        private static void TriggerFirstHitFeedback(EntityManager em, uint version, int lossValue)
+        {
+            var playerEntity = GetSingletonEntity<PlayerTag>(em);
+            CompleteTrackedJobs(em);
+            uint frame = GetSingleton<BulletFrameCounterComponent>(em).Value;
+            var feedbackSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(playerEntity);
+            feedbackSnapshot.Version = version;
+            feedbackSnapshot.Type = PlayerUiFeedbackEventType.PlayerHazardHit;
+            feedbackSnapshot.Reason = (byte)PlayerUiFeedbackReasonId.Default;
+            feedbackSnapshot.Value = Mathf.Max(0, lossValue);
+            feedbackSnapshot.RelatedEntity = playerEntity;
+            feedbackSnapshot.Frame = frame;
+            feedbackSnapshot.RemainingSec = 0.6f;
+            feedbackSnapshot.ClockSec = Mathf.Max(0f, feedbackSnapshot.ClockSec);
+            feedbackSnapshot.NextAllowedHitSec = feedbackSnapshot.ClockSec + 0.1f;
+            em.SetComponentData(playerEntity, feedbackSnapshot);
+
+            var hudSnapshotEntity = GetSingletonEntity<PlayerHudSnapshotComponent>(em);
+            var hudSnapshot = em.GetComponentData<PlayerHudSnapshotComponent>(hudSnapshotEntity);
+            hudSnapshot.LastHitLossValue = Mathf.Max(0, lossValue);
+            hudSnapshot.HitFlashRemainingSec = 0.6f;
+            em.SetComponentData(hudSnapshotEntity, hudSnapshot);
         }
 
         private static void TryConsumeClearPresentationForTests()

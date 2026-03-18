@@ -15,10 +15,10 @@
 - 한 줄 목표: `StagePlay` 도중 특수 조건에서 끼어드는 개입형 인월드 대화 범위를 설계한다.
 
 ## Now
-- `P4 자동 검증` 범위 점검
+- 후속 trigger 설계 또는 cooldown/pause 정책 재평가 대기
 
 ## Next
-- intervention sample authoring을 포함한 targeted PlayMode 검증 확장 여부 점검
+- `LowTime`, `SourceDepleted`, `HazardHigh` 후속 trigger 설계 여부 결정
 
 ## Blocked
 - 없음
@@ -42,8 +42,12 @@
   - `Stage 1` sample intervention entry(`CarryFull`, `FirstHit`)를 demo catalog에 추가했다.
   - 운영 씬 PlayMode와 EditMode에서 intervention active 중 `DialoguePanel` 표시, `NotificationPanel`/`HintPanel` suppress, `StageHudPanel` 유지, `OverlayOnly` dim 비표시, 종료 후 visibility 복구를 검증했다.
   - `StageStart` gate active 중 `FirstHit` edge가 들어와도 intervention이 현재 presentation을 교체하지 않는 회귀를 추가했다.
+- [x] D8. `P4 자동 검증`을 구현했다.
+  - `CarryFull` same-run 비재생과 `FirstHit` same-session 비재생을 자동 검증으로 추가했다.
+  - `StageClear` gate active 중 intervention 비개시, pause menu open 중 intervention 비개시를 EditMode/PlayMode에서 잠갔다.
+  - intervention active 동안 simulation/gameplay clock 정지, pause menu 비허용, 종료 후 resume를 운영 씬 기준으로 검증했다.
 
 ## End of Session
-- 결과: `TD-024 P3` 기준으로 `Stage 1` intervention sample authoring과 UI/suppress 회귀 검증이 들어갔다. 운영 씬에서 `CarryFull`, `FirstHit` intervention이 실제로 노출되고, 기존 dialogue suppress 계약이 유지되는 상태다.
-- 남은 리스크: cooldown authoring 여부, 후속 trigger 확장 범위, pause caller 승격 여부는 여전히 열려 있다.
-- 다음 세션 시작점: `P4 자동 검증` 범위로 확장할지, 또는 추가 intervention trigger(`LowTime`, `SourceDepleted`, `HazardHigh`) 설계로 넘어갈지 결정한다.
+- 결과: `TD-024 P4` 기준으로 `CarryFull`, `FirstHit`의 주요 acceptance가 자동 검증으로 잠겼다. 운영 씬 기준으로 same-run/session 재노출 방지, gate 비개입, pause menu 비개시, intervention pause/resume가 회귀 테스트로 고정된 상태다.
+- 남은 리스크: cooldown authoring 여부, 후속 trigger 확장 범위, `LowTime`/`SourceDepleted`/`HazardHigh` 추가 기준은 여전히 열려 있다.
+- 다음 세션 시작점: 추가 intervention trigger 설계 또는 cooldown/pause 정책 세분화로 넘어간다.

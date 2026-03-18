@@ -213,7 +213,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 
 ## 9. 보안/권한(코딩 에이전트 운영)
 - 모든 .md 파일과 Assets/_Project 아래 .cs 파일을 읽을 때는 UTF-8로 강제(Get-Content -Encoding UTF8).
-- 답변에서 프로젝트 내부 파일을 참조할 때는 웹 링크를 사용하지 않는다.
+- 보고에서 프로젝트 내부 파일을 언급할 때는 웹 링크를 사용하지 않는다.
 - 기본 모드: read-only
 - 파일 수정/명령 실행이 필요한 경우에만 권한 상승(최소 권한 원칙)
 - 네트워크/외부 업로드는 기본 금지(필요 시 명시적 승인)

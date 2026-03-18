@@ -176,7 +176,7 @@
   - start/clear gate보다 낮은 우선순위
   - intervention 중 simulation/gameplay clock 정지 및 종료 후 resume
   - intervention active 동안 pause menu 비허용
-- 상태: `planned`
+- 상태: `completed`
 
 ## 10. 검증 계획 / 합격 기준
 - compile
@@ -201,3 +201,4 @@
 - 2026-03-18: `P2 StagePlayInterventionBridge`를 반영했다. `StagePlay`의 `Running` 상태에서 `FirstHit`, `CarryFull` intervention을 overlay-only로 판정하는 owner bridge를 추가했고, `DemoShellDialogueBridge.TryStartStagePlayIntervention(trigger, stageId)` seam을 통해 playback을 재사용하도록 연결했다. `FirstHit`은 feedback snapshot version edge + `PlayerHazardHit` type으로만 판정하고, `CarryFull`은 완료/skip 시 current-run seen-state를 기록한다.
 - 2026-03-18: `P3 UI / suppress 회귀`를 반영했다. `Stage 1` sample intervention entry(`CarryFull`, `FirstHit`)를 demo catalog에 추가했고, 운영 씬과 EditMode/PlayMode 회귀에서 intervention active 동안 `DialoguePanel` 표시, `NotificationPanel`/`HintPanel` suppress, `StageHudPanel` 유지, `OverlayOnly` dim 비표시, 종료 후 visibility 복구를 실제 노출 기준으로 검증했다.
 - 2026-03-18: `StagePlay dialogue pause` 일반화를 반영했다. `CarryFull`, `FirstHit` intervention도 `StageStart`, `StageClear`와 같은 `DialogueGate` pause flags를 획득하도록 규약을 정정했고, `OverlayOnly`는 pause 비대상이 아니라 presentation policy만 표현하는 mode로 재정의했다.
+- 2026-03-18: `P4 자동 검증`을 반영했다. `CarryFull`의 same-run 비재생, `FirstHit`의 same-session 비재생, `StageClear` gate active 중 intervention 비개시, pause menu open 중 intervention 비개시를 EditMode/PlayMode 자동 검증으로 추가했고, intervention active 동안 simulation/gameplay clock 정지와 resume, pause menu 비허용을 운영 씬 기준으로 잠갔다.

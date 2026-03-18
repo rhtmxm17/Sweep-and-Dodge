@@ -12,6 +12,9 @@ namespace SweepNDodge.DotsBullets.Tests
         private static readonly MethodInfo UpdateStartTriggerStateMethod = typeof(DemoShellDialogueBridge)
             .GetMethod("UpdateStartTriggerState", BindingFlags.Instance | BindingFlags.NonPublic);
 
+        private static readonly MethodInfo HandlePreResultClearPresentationRequestedMethod = typeof(DemoShellDialogueBridge)
+            .GetMethod("HandlePreResultClearPresentationRequested", BindingFlags.Instance | BindingFlags.NonPublic);
+
         [SetUp]
         public void SetUp()
         {
@@ -119,6 +122,36 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ClearDialogueActive_DropsIntervention_WithoutReplacingActivePresentation()
+        {
+            using var context = CreateContext();
+            SetShellStagePlay(context.Shell, stageIndex: 0);
+            SetPrivateField(context.Shell, "_currentStagePlayPhase", DemoShellStagePlayPhaseId.ClearPresentation);
+            InvokeClearTrigger(context.DialogueBridge, new DemoShellStageResultMetrics
+            {
+                StageId = 1,
+                Outcome = DemoShellStageOutcomeId.Clear,
+                ElapsedSec = 10f,
+            });
+            Assert.That(context.DialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(context.DialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageClear));
+
+            SetFeedbackSnapshot(context.RuntimeHudBridge, new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 6u,
+                Type = PlayerUiFeedbackEventType.PlayerHazardHit,
+                Value = 2,
+            });
+
+            InvokeUpdate(context.InterventionBridge);
+
+            Assert.That(context.InterventionBridge.LastTriggeredIntervention, Is.EqualTo(InWorldDialogueTriggerId.None));
+            Assert.That(context.DialogueBridge.IsDialogueActive, Is.True);
+            Assert.That(context.DialogueBridge.CurrentPresentation.Trigger, Is.EqualTo(InWorldDialogueTriggerId.StageClear));
+            Assert.That(context.DialogueBridge.CurrentPresentation.EntryKey, Is.EqualTo("stage1_clear"));
+        }
+
+        [Test]
         public void DoesNotStartWhilePaused()
         {
             using var context = CreateContext();
@@ -165,6 +198,12 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             Assert.That(UpdateStartTriggerStateMethod, Is.Not.Null, "DemoShellDialogueBridge.UpdateStartTriggerState method not found.");
             UpdateStartTriggerStateMethod.Invoke(bridge, null);
+        }
+
+        private static void InvokeClearTrigger(DemoShellDialogueBridge bridge, DemoShellStageResultMetrics result)
+        {
+            Assert.That(HandlePreResultClearPresentationRequestedMethod, Is.Not.Null, "DemoShellDialogueBridge.HandlePreResultClearPresentationRequested method not found.");
+            HandlePreResultClearPresentationRequestedMethod.Invoke(bridge, new object[] { result });
         }
 
         private static void SetHudSnapshot(PlayerRuntimeHudBridge runtimeHudBridge, PlayerHudSnapshotComponent snapshot)
@@ -218,6 +257,7 @@ namespace SweepNDodge.DotsBullets.Tests
             dialogueCatalog.Entries = new[]
             {
                 CreateStageStartEntry(),
+                CreateStageClearEntry(),
                 CreateInterventionCarryFullEntry(),
                 CreateInterventionFirstHitEntry(),
             };
@@ -295,6 +335,37 @@ namespace SweepNDodge.DotsBullets.Tests
             };
         }
 
+        private static InWorldDialogueCatalogEntry CreateStageClearEntry()
+        {
+            return new InWorldDialogueCatalogEntry
+            {
+                Enabled = true,
+                EntryKey = "stage1_clear",
+                Trigger = InWorldDialogueTriggerId.StageClear,
+                TargetKind = InWorldDialogueTargetKind.Stage,
+                StageId = 1,
+                Priority = 30,
+                BlockingMode = InWorldDialogueBlockingMode.GateClear,
+                RetryPolicy = InWorldDialogueRetryPolicy.AlwaysFull,
+                FullVariant = new InWorldDialogueSequenceVariant
+                {
+                    Lines = new[]
+                    {
+                        new InWorldDialogueLine
+                        {
+                            SpeakerKey = "hero",
+                            Text = "Clear line",
+                            Anchor = new InWorldDialogueAnchorRef
+                            {
+                                Kind = InWorldDialogueAnchorKind.ScreenAnchor,
+                                ScreenAnchor = InWorldDialogueScreenAnchorId.Center,
+                            },
+                        },
+                    },
+                },
+            };
+        }
+
         private static InWorldDialogueCatalogEntry CreateInterventionFirstHitEntry()
         {
             return new InWorldDialogueCatalogEntry
@@ -304,7 +375,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Trigger = InWorldDialogueTriggerId.InterventionFirstHit,
                 TargetKind = InWorldDialogueTargetKind.Stage,
                 StageId = 1,
-                Priority = 20,
+                Priority = 40,
                 BlockingMode = InWorldDialogueBlockingMode.OverlayOnly,
                 RetryPolicy = InWorldDialogueRetryPolicy.OncePerSession,
                 FullVariant = new InWorldDialogueSequenceVariant
