@@ -40,7 +40,15 @@ MonoBehaviour:
           StagePresentationStableId: 0
           ScreenAnchor: 3
         MinHoldSec: 0
-        AutoAdvanceSec: 0.1
+        AutoAdvanceSec: 0
+      - SpeakerKey: hero
+        Text: 3 line
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0
+        AutoAdvanceSec: 0
     RetryVariant:
       Lines:
       - SpeakerKey: hero
@@ -98,7 +106,7 @@ MonoBehaviour:
     Trigger: 4
     TargetKind: 0
     StageId: 1
-    ThemeKey:
+    ThemeKey: 
     Priority: 30
     BlockingMode: 0
     RetryPolicy: 0
@@ -119,7 +127,7 @@ MonoBehaviour:
     Trigger: 5
     TargetKind: 0
     StageId: 1
-    ThemeKey:
+    ThemeKey: 
     Priority: 40
     BlockingMode: 0
     RetryPolicy: 3

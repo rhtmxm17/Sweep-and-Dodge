@@ -306,7 +306,7 @@
   - dialogue active 동안 `Hint/Notification`이 suppress되는지 검증
 
 ## 10. 오픈 이슈
-- `ThemeTransition`은 현재 확장 예시용 seam만 유지한다. 실제 caller를 `chapter screen`, `stage transition shell overlay`, `stage start variant` 중 어디에 둘지는 후속 세션에서 정리한다.
+- `ThemeTransition`은 현재 확장 예시용 seam만 유지한다. 실제 caller를 어디에 둘지는 경로 예약 항목으로만 남기며, 실제 필요가 생기기 전까지는 작업 비대상으로 둔다.
 - current demo의 `StageStart GateIntro`가 opening tempo와 플레이 가독성에 미치는 영향은 플레이테스트로 계속 확인한다.
 - speaker portrait와 world actor visual이 항상 1:1 대응해야 하는지 art pipeline 합의가 필요
 - accessibility 옵션(`자동 진행 속도`, `skip hold`, `dim 강도`)을 v1에 넣을지 후속으로 미룰지 결정 필요
@@ -321,3 +321,4 @@
 - 2026-03-17: runtime asset binding 경로를 직접 참조 방식으로 고정했다. `DemoShellDialogueBridge`는 editor-only asset search fallback 없이 `DialogueCatalog`, `SpeakerCatalog`를 serialized reference로 받는다.
 - 2026-03-17: gameplay pause 연동 보정을 반영했다. current demo의 `StageStart` entry는 `GateIntro`를 사용하고, `GateIntro`와 `GateClear`는 동일한 gameplay pause flags를 획득한다. pause menu가 열린 상태에서 gate dialogue가 시작되면 `DemoShellPauseBridge`가 기존 pause handle을 즉시 release해 dialogue gate가 단독 owner가 되도록 정리했다.
 - 2026-03-18: `StagePlay dialogue pause` 일반화를 반영했다. `StageStart`, `StageClear`, `CarryFull`, `FirstHit`처럼 `StagePlay` 문맥에서 재생되는 dialogue는 모두 `DialogueGate` gameplay pause flags를 획득한다. `OverlayOnly`는 pause 비대상이 아니라 presentation policy만 표현하고, `ThemeTransition` 같은 shell-context dialogue는 여전히 pause 일반화 범위 밖으로 유지한다.
+- 2026-03-18: `ThemeTransition`은 경로 예약 항목으로 재정리했다. schema/API seam은 유지하되, 실제 필요가 생기기 전까지는 runtime wiring 작업을 진행하지 않는다.

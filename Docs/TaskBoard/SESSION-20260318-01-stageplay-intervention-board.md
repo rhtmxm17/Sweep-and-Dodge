@@ -15,17 +15,17 @@
 - 한 줄 목표: `StagePlay` 도중 특수 조건에서 끼어드는 개입형 인월드 대화 범위를 설계한다.
 
 ## Now
-- 후속 trigger 설계 또는 cooldown/pause 정책 재평가 대기
+- cooldown 설계 검토 대기
 
 ## Next
-- `LowTime`, `SourceDepleted`, `HazardHigh` 후속 trigger 설계 여부 결정
+- cooldown authoring 여부와 shape 정리
 
 ## Blocked
 - 없음
 
 ## Parking Lot
-- [ ] P1. `LowTime`, `SourceDepleted`, `HazardHigh`는 후속 세션에서 우선순위와 개입 가치 재평가 후 추가한다.
-- [ ] P2. intervention을 pause caller로 승격할지는 별도 플레이테스트와 `TD-023` caller 정책 정리 이후 결정한다.
+- [x] P1. `LowTime`, `SourceDepleted`, `HazardHigh`는 경로 예약으로 정리했고, 실제 필요 전까지 작업 비대상으로 둔다.
+- [x] P2. `ThemeTransition`, `Global`, `Stage 2` 이상 intervention authoring은 경로 예약으로만 유지한다.
 
 ## Done
 - [x] D1. `StagePlayInterventionBridge` 분리 방향과 `DemoShellDialogueBridge` playback 재사용 방향을 고정했다.
@@ -46,8 +46,10 @@
   - `CarryFull` same-run 비재생과 `FirstHit` same-session 비재생을 자동 검증으로 추가했다.
   - `StageClear` gate active 중 intervention 비개시, pause menu open 중 intervention 비개시를 EditMode/PlayMode에서 잠갔다.
   - intervention active 동안 simulation/gameplay clock 정지, pause menu 비허용, 종료 후 resume를 운영 씬 기준으로 검증했다.
+- [x] D9. `ThemeTransition`, `Global`, `Stage 2` 이상 intervention authoring, 후속 trigger는 경로 예약으로 정리했다.
+  - 실제 필요가 생기기 전까지는 작업 비대상으로 유지한다.
 
 ## End of Session
 - 결과: `TD-024 P4` 기준으로 `CarryFull`, `FirstHit`의 주요 acceptance가 자동 검증으로 잠겼다. 운영 씬 기준으로 same-run/session 재노출 방지, gate 비개입, pause menu 비개시, intervention pause/resume가 회귀 테스트로 고정된 상태다.
-- 남은 리스크: cooldown authoring 여부, 후속 trigger 확장 범위, `LowTime`/`SourceDepleted`/`HazardHigh` 추가 기준은 여전히 열려 있다.
-- 다음 세션 시작점: 추가 intervention trigger 설계 또는 cooldown/pause 정책 세분화로 넘어간다.
+- 남은 리스크: cooldown authoring 여부와 적용 방식은 여전히 열려 있다.
+- 다음 세션 시작점: cooldown 정책과 authoring shape 세분화로 넘어간다.

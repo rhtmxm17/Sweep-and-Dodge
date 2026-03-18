@@ -34,6 +34,7 @@
 - `InterventionFirstHit`
 
 ### 2.2 후속 확장 후보
+- 아래 항목은 현재 기준에서 "경로 예약" 성격의 확장 후보이며, 실제 필요가 생기기 전까지는 작업 비대상으로 둔다.
 - `InterventionLowTime`
 - `InterventionSourceDepleted`
 - `InterventionHazardHigh`
@@ -107,6 +108,7 @@
 ### 5.2 target 제한
 - 첫 범위에서는 `Stage`, `Global`만 허용한다.
 - `Theme` target은 intervention 범위에서 사용하지 않는다.
+- `Global` target은 현재 schema 경로만 예약한다. 실제 authoring/runtime wiring은 필요 시점 전까지 진행하지 않는다.
 
 ### 5.3 조건 필드 정책
 - 첫 구현에서는 별도 authoring 조건 필드를 추가하지 않는다.
@@ -192,9 +194,9 @@
   - intervention active 동안 pause menu는 열리지 않는다.
 
 ## 11. 오픈 이슈
-- `LowTime`, `SourceDepleted`, `HazardHigh`를 같은 bridge에 계속 올릴지 후속 세션에서 검토한다.
 - intervention에 cooldown authoring 필드를 둘지, bridge 고정 상수로 둘지 아직 미정이다.
 - 특정 intervention을 `OverlayOnly`에서 `GateIntro` 수준으로 승격할 필요가 있는지는 플레이테스트 후 결정한다.
+- `ThemeTransition`, `Global`, `Stage 2` 이상 intervention authoring, `LowTime`/`SourceDepleted`/`HazardHigh`는 경로 예약 항목으로 유지한다. 실제 필요가 생기기 전까지는 작업 비대상이다.
 
 ## 12. 변경 이력
 - 2026-03-18: `P1 trigger/state 확장`을 반영했다. intervention trigger enum을 추가했고, `DemoShellSessionStaging`에 active-stage-run seen-state를 도입했다. `EnterStagePlay`는 stage 진입 시 run seen-state를 초기화하고, validation은 intervention trigger의 `Theme` target 및 non-`OverlayOnly` blocking mode를 금지하도록 확장했다.
@@ -202,3 +204,4 @@
 - 2026-03-18: `P3 UI / suppress 회귀`를 반영했다. `Stage 1` sample intervention entry(`CarryFull`, `FirstHit`)를 demo catalog에 추가했고, 운영 씬과 EditMode/PlayMode 회귀에서 intervention active 동안 `DialoguePanel` 표시, `NotificationPanel`/`HintPanel` suppress, `StageHudPanel` 유지, `OverlayOnly` dim 비표시, 종료 후 visibility 복구를 실제 노출 기준으로 검증했다.
 - 2026-03-18: `StagePlay dialogue pause` 일반화를 반영했다. `CarryFull`, `FirstHit` intervention도 `StageStart`, `StageClear`와 같은 `DialogueGate` pause flags를 획득하도록 규약을 정정했고, `OverlayOnly`는 pause 비대상이 아니라 presentation policy만 표현하는 mode로 재정의했다.
 - 2026-03-18: `P4 자동 검증`을 반영했다. `CarryFull`의 same-run 비재생, `FirstHit`의 same-session 비재생, `StageClear` gate active 중 intervention 비개시, pause menu open 중 intervention 비개시를 EditMode/PlayMode 자동 검증으로 추가했고, intervention active 동안 simulation/gameplay clock 정지와 resume, pause menu 비허용을 운영 씬 기준으로 잠갔다.
+- 2026-03-18: `ThemeTransition`, `Global`, `Stage 2` 이상 intervention authoring, 후속 trigger(`LowTime`, `SourceDepleted`, `HazardHigh`)는 현재 기준에서 경로 예약으로 정리했다. 실제 필요가 생기기 전까지는 작업 비대상으로 유지한다.
