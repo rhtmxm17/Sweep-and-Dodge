@@ -44,6 +44,8 @@
 - `Board`는 화면/레이어/패널처럼 구현 대응이 있는 단위를 표현하는 기본 컨테이너로 사용한다.
 - `Group`은 여러 요소를 함께 이동하거나 비교하는 작업 보조 단위로 제한한다.
 - 코멘트는 "무엇을 왜 바꾸는가"에 집중하고, 위치/크기 의도는 가능한 한 직접 조작으로 표현한다.
+- 위치/정렬/점유 비율 판단이 중요한 경우, 구조 데이터만으로 충분하다고 가정하지 않는다.
+- 필요 시 `Viewport Board` 또는 `Approved` 보드를 단일 이미지로 export해 구조 데이터와 함께 본다.
 
 ## 4. 운영 단위
 ### 4.1 화면 단위
@@ -71,6 +73,7 @@
   - 예: `ObjectiveBoard`, `BottomCenterLanesBoard`, `WorldIndicatorLayer`
 - `Group` 이름은 작업 보조 의도가 드러나게 짓는다.
   - 예: `MoveCandidateGroup`, `CompareGroup`
+- Agent가 이미지 보조 판단을 할 때는 현재 선택에 의존하지 않고 상위 `Viewport Board`를 직접 찾아 export하는 방식을 우선한다.
 
 ### 4.4 작업용 메모와 반영 대상 구분
 - `Viewport Board` 내부에는 원칙적으로 실제 UI 후보만 둔다.
@@ -124,6 +127,11 @@ Agent는 Penpot 변경 후 아래 관점으로 결과를 재정리한다.
 - 구현 영향
 - 남은 open question
 
+위치/정렬 의도가 애매하면 아래를 추가 수행한다.
+- 상위 `Viewport Board` 구조 조회
+- 같은 보드의 PNG 또는 SVG export
+- 구조 데이터와 이미지 기준의 교차 확인
+
 권장 출력 형식:
 1. 변경된 배치 요약
 2. 유지할 의도
@@ -149,6 +157,7 @@ Unity 반영 전 아래 중 하나 이상을 갱신한다.
 - 공용 구조 변경은 prefab 우선
 - scene 변경은 scene-specific binding 또는 배치 값에 한정
 - Penpot 배치를 기계적으로 복사하지 않고 runtime 제약을 함께 본다
+- 위치/정렬 반영 전에는 가능하면 `보드 구조 + 보드 export 이미지`를 함께 보고 anchor, alignment, spacing, 점유 비율을 재확인한다
 
 ### 5.7 검증
 - compile
@@ -194,12 +203,18 @@ Unity 반영 전 아래 중 하나 이상을 갱신한다.
 - 코멘트만 남기지 말고 가능하면 실제 위치도 함께 바꾼다
 - 동일 주제 논의는 한 스레드로 유지한다
 
+### 7.4 Export 보조 규칙
+- Agent가 판단 보조용 이미지를 만들 때는 현재 selection이 아니라 상위 `Viewport Board` 또는 `Approved` 보드를 직접 지정해 export하는 방식을 우선한다.
+- export 이미지는 "현재 에디터 전체 화면"이 아니라 "해당 보드의 렌더 결과"로 해석한다.
+- 구조 데이터와 export 이미지가 어긋나면, 구현 전에 보드 기준과 포함 범위를 다시 확인한다.
+
 ## 8. Agent가 Penpot으로 할 일
 - 현재 페이지/보드 구조 읽기
 - 저충실도 wireframe 생성/조정
 - 선택 요소 요약
 - 시안 export로 시각 확인
 - 사용자 변경 이후 차이 해석
+- viewport/approved 보드 export로 위치/정렬 판단 보조
 
 Agent가 Penpot만으로 확정하지 않는 것:
 - 구현 승인
@@ -213,6 +228,7 @@ Agent가 Penpot만으로 확정하지 않는 것:
 - scene override가 필요한가
 - 관련 TD/GD와 의도가 충돌하지 않는가
 - Penpot Approved 보드와 repo 문서 기준이 일치하는가
+- 위치/정렬 판단이 중요하다면 viewport 또는 approved 보드 export 이미지를 같이 확인했는가
 
 ## 10. 추천 운영 예시
 1. 사용자: `Pause 화면은 설정 진입보다 즉시 재개/재시작 판단이 빨라야 한다`
@@ -226,3 +242,4 @@ Agent가 Penpot만으로 확정하지 않는 것:
 ## 11. 변경 이력
 - 2026-03-18: Penpot MCP 기반 UI 레이아웃 협업 루프를 프로젝트 운영 문서로 추가했다.
 - 2026-03-18: `Board`를 화면/레이어/패널 단위 컨테이너로 사용하는 규칙과 `WorkArea`/`Viewport`, 작업용 메모/실제 반영 대상 구분 규칙을 추가했다.
+- 2026-03-19: 위치/정렬 판단 보조를 위해 `Viewport/Approved Board export 이미지`를 구조 데이터와 함께 사용하는 규칙을 추가했다.

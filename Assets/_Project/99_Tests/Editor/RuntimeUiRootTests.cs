@@ -374,15 +374,17 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.NotificationPanel.activeSelf, Is.True);
             Assert.That(context.Root.HintPanel.activeSelf, Is.True);
             Assert.That(context.Hud.RuntimeUiHudActive, Is.True);
-            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 1/3 cleared"));
-            Assert.That(context.Root.StageHudPresenter.ObjectiveDetailText.text, Is.EqualTo("Pressure Source #1002  6/8"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("1 / 3"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveDetailText.text, Is.EqualTo("Pressure Source #1002"));
             Assert.That(context.Root.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.True);
             Assert.That(context.Root.StageHudPresenter.PressureSourceValueText.text, Is.EqualTo("6 / 8"));
             Assert.That(context.Root.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
             Assert.That(context.Root.StageHudPresenter.PressureSourceWeakThresholdMarker.gameObject.activeSelf, Is.True);
             Assert.That(context.Root.StageHudPresenter.PressureSourceWeakThresholdMarker.anchorMin.x, Is.EqualTo(0.5f).Within(1e-4f));
-            Assert.That(context.Root.StageHudPresenter.CarryValueText.text, Is.EqualTo("5 / 10"));
+            Assert.That(context.Root.StageHudPresenter.CarryValueText, Is.Null);
+            Assert.That(context.Root.StageHudPresenter.HazardStackLabel, Is.Null);
             Assert.That(context.Root.StageHudPresenter.CarryFillImage.fillAmount, Is.EqualTo(0.5f).Within(1e-4f));
+            Assert.That(context.Root.StageHudPresenter.CarryFillImage.fillMethod, Is.EqualTo(Image.FillMethod.Vertical));
             Assert.That(context.Root.StageHudPresenter.HazardStackRoot.activeSelf, Is.True);
             Assert.That(context.Root.StageHudPresenter.HazardStackSegmentImages, Has.Length.EqualTo(5));
             Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(0));
@@ -426,7 +428,7 @@ namespace SweepNDodge.DotsBullets.Tests
             InvokeConfigurePresenters(context.Root);
             InvokeApplyShellState(context.Root, force: true);
 
-            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 3/3 cleared"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("3 / 3"));
             Assert.That(context.Root.StageHudPresenter.RiskMultiplierText.text, Is.EqualTo("x1.15"));
             Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(3));
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
@@ -504,7 +506,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 HitFlashRemainingSec = 0f,
             });
             context.Root.StageHudPresenter.RefreshPresentation();
-            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("Sources 3/3 cleared"));
+            Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("3 / 3"));
             Assert.That(context.Root.StageHudPresenter.PressureSourceProgressRoot.activeSelf, Is.False);
 
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent

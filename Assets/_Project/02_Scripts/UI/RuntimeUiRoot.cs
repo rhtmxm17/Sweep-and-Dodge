@@ -192,9 +192,6 @@ namespace SweepNDodge.DotsBullets
             if (Application.isPlaying)
                 return false;
 
-            if (EditorUtility.IsPersistent(gameObject))
-                return true;
-
             var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
             return prefabStage != null
                    && prefabStage.prefabContentsRoot != null
@@ -1070,7 +1067,21 @@ namespace SweepNDodge.DotsBullets
         {
             var existing = parent.Find(name);
             if (existing != null)
+            {
+                if (extraTypes != null)
+                {
+                    for (int i = 0; i < extraTypes.Length; i++)
+                    {
+                        var extraType = extraTypes[i];
+                        if (extraType == null || existing.GetComponent(extraType) != null)
+                            continue;
+
+                        existing.gameObject.AddComponent(extraType);
+                    }
+                }
+
                 return existing.gameObject;
+            }
 
             int extraCount = extraTypes != null ? extraTypes.Length : 0;
             var types = new System.Type[extraCount + 1];

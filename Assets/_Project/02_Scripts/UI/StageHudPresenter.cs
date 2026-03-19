@@ -28,7 +28,7 @@ namespace SweepNDodge.DotsBullets
         private static readonly Color TimerNormalColor = new(0.92f, 0.96f, 1f, 1f);
         private static readonly Color WarningColor = new(1f, 0.76f, 0.27f, 1f);
         private static readonly Color DangerColor = new(1f, 0.38f, 0.38f, 1f);
-        private static readonly Color CarryNormalColor = new(0.32f, 0.78f, 0.95f, 1f);
+        private static readonly Color CarryNormalColor = new(0.22f, 0.74f, 0.97f, 1f);
         private static readonly Color CarryWarningColor = new(1f, 0.72f, 0.18f, 1f);
         private static readonly Color HazardMutedColor = new(0.54f, 0.59f, 0.66f, 0.42f);
         private static readonly Color HazardActiveColor = new(1f, 0.69f, 0.26f, 1f);
@@ -55,9 +55,6 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            if (CarryLabel != null)
-                CarryLabel.text = "Carry";
-
             if (_runtimeHud == null || !_runtimeHud.TryGetLastSnapshot(out var snapshot))
             {
                 ApplyDefaultPresentation();
@@ -79,7 +76,7 @@ namespace SweepNDodge.DotsBullets
         private void ApplyDefaultPresentation()
         {
             if (ObjectiveSummaryText != null)
-                ObjectiveSummaryText.text = "Sources 0/0 cleared";
+                ObjectiveSummaryText.text = "0 / 0";
 
             if (ObjectiveDetailText != null)
             {
@@ -117,8 +114,8 @@ namespace SweepNDodge.DotsBullets
             if (CarryFillImage != null)
             {
                 CarryFillImage.type = Image.Type.Filled;
-                CarryFillImage.fillMethod = Image.FillMethod.Horizontal;
-                CarryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+                CarryFillImage.fillMethod = Image.FillMethod.Vertical;
+                CarryFillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
                 CarryFillImage.fillAmount = 0f;
                 CarryFillImage.color = CarryNormalColor;
             }
@@ -132,7 +129,7 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             ObjectiveSummaryText.text =
-                $"Sources {Mathf.Max(0, snapshot.DepletedSourceCount)}/{Mathf.Max(0, snapshot.TotalSourceCount)} cleared";
+                $"{Mathf.Max(0, snapshot.DepletedSourceCount)} / {Mathf.Max(0, snapshot.TotalSourceCount)}";
         }
 
         private void ApplyObjectiveDetail(in PlayerHudSnapshotComponent snapshot)
@@ -143,7 +140,7 @@ namespace SweepNDodge.DotsBullets
             {
                 ObjectiveDetailText.gameObject.SetActive(visible);
                 ObjectiveDetailText.text = visible
-                    ? $"Pressure Source #{snapshot.PressureSourceStableId}  {Mathf.Max(0, snapshot.PressureSourceCollected)}/{Mathf.Max(0, snapshot.PressureSourceThresholdDepleted)}"
+                    ? $"Pressure Source #{snapshot.PressureSourceStableId}"
                     : string.Empty;
             }
 
@@ -183,8 +180,8 @@ namespace SweepNDodge.DotsBullets
             if (CarryFillImage != null)
             {
                 CarryFillImage.type = Image.Type.Filled;
-                CarryFillImage.fillMethod = Image.FillMethod.Horizontal;
-                CarryFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+                CarryFillImage.fillMethod = Image.FillMethod.Vertical;
+                CarryFillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
                 CarryFillImage.fillAmount = ratio;
                 CarryFillImage.color = carryFull ? CarryWarningColor : CarryNormalColor;
             }
@@ -263,9 +260,6 @@ namespace SweepNDodge.DotsBullets
             if (HazardStackRoot != null)
                 HazardStackRoot.SetActive(true);
 
-            if (HazardStackLabel != null)
-                HazardStackLabel.text = "Hazard";
-
             int visibleSegmentCount = HazardStackSegmentImages != null ? HazardStackSegmentImages.Length : 0;
             int activeSegments = Mathf.Clamp(snapshot.HazardStack, 0, visibleSegmentCount);
             bool capped = visibleSegmentCount > 0 && snapshot.HazardStack >= visibleSegmentCount;
@@ -282,6 +276,21 @@ namespace SweepNDodge.DotsBullets
                     segment.color = i < activeSegments
                         ? (capped ? HazardCapColor : HazardActiveColor)
                         : HazardMutedColor;
+                }
+
+                int drawIndex = 0;
+                for (int i = HazardStackSegmentImages.Length - 1; i >= activeSegments; i--)
+                {
+                    var segment = HazardStackSegmentImages[i];
+                    if (segment != null)
+                        segment.transform.SetSiblingIndex(drawIndex++);
+                }
+
+                for (int i = 0; i < activeSegments; i++)
+                {
+                    var segment = HazardStackSegmentImages[i];
+                    if (segment != null)
+                        segment.transform.SetSiblingIndex(drawIndex++);
                 }
             }
 

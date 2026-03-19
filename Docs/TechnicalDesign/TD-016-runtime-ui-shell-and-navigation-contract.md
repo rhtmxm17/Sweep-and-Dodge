@@ -141,23 +141,32 @@
 ### 4.2.1 현재 HUD V1 구성
 - `StageHudPanel`
   - `TopCenterObjectiveRoot`
-    - `ObjectiveSummaryText`
-    - `ObjectiveDetailText`
-    - `TimerValueText`
+    - `ObjectiveBadgeRow`
+      - `ObjectiveSummaryText`
+      - `TimerValueText`
     - `PressureSourceProgressRoot`
+      - `ObjectiveDetailText`
+      - `PressureSourceValueText`
       - pressure progress bar
       - `WeakThresholdMarker`
-      - `PressureSourceValueText`
   - `LeftCarryRoot`
-    - `CarryLabel`
-    - carry fill bar
-    - `CarryValueText`
+    - `CarryTotemRoot`
+      - vertical carry fill bar
+      - `HazardStackRoot`
+        - hazard segment stack
+        - `RiskMultiplierText`
 - `NotificationPanel`
   - `NotificationRoot`
   - `NotificationText`
 - `HintPanel`
   - `HintRoot`
   - `HintText`
+
+### 4.2.2 승인된 배치 보정 규칙
+- `TopCenterObjectiveRoot`는 자체 배경을 사용하지 않는다. 배경은 badge와 pressure source progress 카드에만 둔다.
+- `LeftCarryRoot`는 viewport 좌측 약 `1/3` 지점의 세로 토템으로 둔다.
+- `CarryBar`와 `HazardStack` 세그먼트는 같은 바닥 기준선에서 시작한다.
+- lower-center `Notification` / `Hint` 배너는 얇은 윤곽만 남는 고투명 배경(`Notification ~= 0.12`, `Hint ~= 0.10`)을 기준으로 둔다.
 
 ### 4.3 Presenter 구조
 - `RuntimeUiRoot`

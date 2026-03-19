@@ -4,7 +4,7 @@
 - doc_id: `TD-021`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-03-16`
+- last_updated: `2026-03-18`
 - related_docs:
   - [GD-009-in-game-ui-screen-blueprint.md](../GameDesign/GD-009-in-game-ui-screen-blueprint.md)
   - [GD-010-in-game-ui-layout-and-zones.md](../GameDesign/GD-010-in-game-ui-layout-and-zones.md)
@@ -14,11 +14,11 @@
 - related_adr:
   - [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](../ADR/ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md)
 
-> `HazardStack`은 Carry 본체가 아니라 Carry 인접의 반상시 보조층으로 HUD에 표시하고, `RiskMultiplier`는 보조 텍스트로만 보여준다. `HazardStackMax`는 HUD에 직접 표시하지 않는다.
+> `HazardStack`은 좌측 Carry 세로 토템에 결합된 보조층으로 HUD에 표시하고, `RiskMultiplier`는 보조 텍스트로만 보여준다. `HazardStackMax`는 HUD에 직접 표시하지 않는다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
-- `HazardStack`을 `Carry` 인접 보조층으로 HUD에 추가한다.
+- `HazardStack`을 좌측 `Carry` 세로 토템의 보조층으로 HUD에 추가한다.
 - 메인 표현은 세그먼트, 보조 표현은 `RiskMultiplier` 텍스트로 고정한다.
 - HUD는 기존 `PlayerHazardRisk*` owner를 유지한 채 snapshot reader-only로 동작한다.
 - `Hit` / `Deposit` reset 결과가 HUD에 같은 프레임에 반영되도록 snapshot 수집 순서를 고정한다.
@@ -32,8 +32,8 @@
 
 ## 2. UX 기준
 - 위치:
-  - `LeftCarryRoot` 내부 하단
-  - Carry와 같은 시선 축에서 읽히되, Carry 본체보다 존재감은 낮게 둔다.
+  - `LeftCarryRoot` 내부의 세로 토템 오른쪽 보조 레인
+  - Carry fill과 같은 카드 안에서 읽히되, Carry 본체보다 존재감은 낮게 둔다.
 - 표현:
   - 메인: 세그먼트
   - 보조: `RiskMultiplier` 텍스트 (`x1.15`)
@@ -89,23 +89,24 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 ## 5. 표현 계약
 ### 5.1 레이아웃
 `LeftCarryRoot`
-- `CarryLabel`
-- `CarryBar`
-- `CarryValueText`
-- `HazardStackRoot`
-  - `HazardStackLabel`
-  - `HazardStackSegmentsRoot`
-  - `RiskMultiplierText`
+- `CarryTotemRoot`
+  - `CarryBar`
+  - `HazardStackRoot`
+    - `HazardStackSegmentsRoot`
+    - `RiskMultiplierText`
 
 ### 5.2 세그먼트 규칙
 - 세그먼트 수는 V1.5에서는 고정 visual slot으로 둔다.
 - 활성 세그먼트 수는 `HazardStack` 값에 맞춘다.
 - `HazardStack`이 세그먼트 수를 초과하면 마지막 세그먼트까지 모두 활성으로 clamp한다.
 - `HazardStack == 0`이면 모든 세그먼트 비활성
+- 세그먼트는 baseline을 공유한 채 세로로 일부 겹치게 쌓는다.
+- draw order:
+  - 활성 세그먼트는 비활성 세그먼트 위에 그린다.
+  - 활성 세그먼트끼리는 위쪽 세그먼트가 아래쪽 세그먼트 위에 온다.
+  - 비활성 세그먼트끼리는 아래쪽 세그먼트가 위쪽 세그먼트 위에 온다.
 
 ### 5.3 텍스트 규칙
-- `HazardStackLabel`
-  - `Hazard`
 - `RiskMultiplierText`
   - `x{HazardRiskMultiplier:0.00}`
 - `HazardStackMax`나 `current / max` 형식 수치는 노출하지 않는다.
@@ -139,7 +140,6 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 
 추가 필드:
 - `GameObject HazardStackRoot`
-- `TextMeshProUGUI HazardStackLabel`
 - `TextMeshProUGUI RiskMultiplierText`
 - `Image[] HazardStackSegmentImages`
 
@@ -147,7 +147,7 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 - `ApplyHazardStack(in PlayerHudSnapshotComponent snapshot)`
 
 역할:
-- `Carry`와 같은 좌측 레인 안에서 `HazardStack` 보조층을 갱신
+- `Carry` 세로 토템 안에서 `HazardStack` 보조층을 갱신
 - 세그먼트 fill / 색 / multiplier 텍스트만 갱신
 
 비역할:
@@ -186,4 +186,6 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 - `RiskMultiplier` 소수점 자릿수를 `0.00`로 고정할지, stage별로 줄일지
 
 ## 11. 변경 이력
+- 2026-03-19: Penpot viewport export 재검토를 반영해 세그먼트 overlap 및 draw-order 규칙을 명시했다.
+- 2026-03-18: 승인된 HUD 레이아웃에 맞춰 `HazardStack` 위치를 `Carry` 세로 토템 내부 보조 레인으로 정리하고, 라벨 없는 세그먼트 + multiplier 구성을 기준안으로 갱신했다.
 - 2026-03-16: 초안 작성. `Carry` 인접 보조층, `HazardStackMax` 비표시, snapshot reader-only, risk resolve 이후 HUD snapshot 수집 순서를 기준안으로 고정했다.

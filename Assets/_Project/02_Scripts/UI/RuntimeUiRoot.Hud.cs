@@ -17,7 +17,7 @@ namespace SweepNDodge.DotsBullets
                 ResetStageHudReferences();
             }
 
-            var objectiveRoot = CreateHudBlock(
+            var objectiveRoot = CreateHudBannerRoot(
                 panelGo.transform,
                 "TopCenterObjectiveRoot",
                 new Vector2(0.5f, 1f),
@@ -25,66 +25,88 @@ namespace SweepNDodge.DotsBullets
                 new Vector2(0.5f, 1f),
                 new Vector2(0f, -24f),
                 new Vector2(520f, 190f),
-                new Color(0.08f, 0.10f, 0.14f, 0.72f));
-            SetVerticalAlignment(objectiveRoot, TextAnchor.UpperCenter);
-            StageHudPresenter.ObjectiveSummaryText ??= FindOrCreateText(
-                objectiveRoot,
-                "ObjectiveSummaryText",
-                "Sources 0/0 cleared",
-                28f,
-                FontStyles.Bold,
-                TextAlignmentOptions.Center);
-            StageHudPresenter.ObjectiveDetailText ??= FindOrCreateText(
-                objectiveRoot,
-                "ObjectiveDetailText",
-                "Pressure Source #1002  0/0",
-                18f,
-                FontStyles.Normal,
-                TextAlignmentOptions.Center);
-            StageHudPresenter.TimerValueText ??= FindOrCreateText(
-                objectiveRoot,
-                "TimerValueText",
-                "--.-s",
-                24f,
-                FontStyles.Bold,
-                TextAlignmentOptions.Center);
+                Color.clear);
+            var objectiveBadgeRow = GetOrCreateChildGameObject(objectiveRoot, "ObjectiveBadgeRow").GetComponent<RectTransform>();
+            Stretch(objectiveBadgeRow);
+            var clearedBadge = CreateHudBadge(
+                objectiveBadgeRow,
+                "ClearedCountBadge",
+                new Vector2(102f, 87f),
+                new Color(0.20f, 0.27f, 0.37f, 1f));
+            SetTopLeftRect(clearedBadge, 209f, -22f, 102f, 87f);
+            StageHudPresenter.ObjectiveSummaryText ??= CreateCenteredOverlayText(clearedBadge, "ObjectiveSummaryText", "0 / 0", 28f);
 
-            var pressureBlock = CreatePressureSourceProgressBlock(objectiveRoot, "PressureSourceProgressRoot");
-            SetVerticalAlignment(pressureBlock, TextAnchor.UpperCenter);
+            var timerBadge = CreateHudBadge(
+                objectiveBadgeRow,
+                "TimerBadge",
+                new Vector2(102f, 76f),
+                new Color(0.20f, 0.27f, 0.37f, 1f));
+            SetTopLeftRect(timerBadge, 294f, -22f, 102f, 76f);
+            StageHudPresenter.TimerValueText ??= CreateCenteredOverlayText(timerBadge, "TimerValueText", "--.-s", 24f);
+
+            var pressureBlock = GetOrCreateChildGameObject(objectiveRoot, "PressureSourceProgressRoot", typeof(Image)).GetComponent<RectTransform>();
+            SetTopLeftRect(pressureBlock, 20f, 100f, 480f, 66f);
+            var pressureBlockImage = pressureBlock.GetComponent<Image>();
+            pressureBlockImage.color = new Color(0.07f, 0.11f, 0.17f, 1f);
+            ApplyDefaultImageSprite(pressureBlockImage);
             StageHudPresenter.PressureSourceProgressRoot ??= pressureBlock.gameObject;
+            var pressureHeader = GetOrCreateChildGameObject(pressureBlock, "PressureSourceHeaderRow").GetComponent<RectTransform>();
+            SetTopLeftRect(pressureHeader, 18f, 10f, 444f, 18f);
+            StageHudPresenter.ObjectiveDetailText ??= FindOrCreateText(
+                pressureHeader,
+                "ObjectiveDetailText",
+                "Pressure Source #1002",
+                18f,
+                FontStyles.Bold,
+                TextAlignmentOptions.Left);
+            SetTopLeftRect(StageHudPresenter.ObjectiveDetailText.rectTransform, 0f, 0f, 320f, 18f);
             StageHudPresenter.PressureSourceValueText ??= FindOrCreateFixedText(
-                pressureBlock,
+                pressureHeader,
                 "PressureSourceValueText",
                 "0 / 0",
                 16f,
-                220f,
-                TextAlignmentOptions.Center);
+                96f,
+                TextAlignmentOptions.Right);
+            SetTopLeftRect(StageHudPresenter.PressureSourceValueText.rectTransform, 348f, 0f, 96f, 18f);
             if (StageHudPresenter.PressureSourceFillImage == null || StageHudPresenter.PressureSourceWeakThresholdMarker == null)
             {
-                var refs = CreateProgressBarWithMarker(pressureBlock, "PressureSourceBar", new Vector2(0f, 22f));
+                var refs = CreateProgressBarWithMarker(pressureBlock, "PressureSourceBar", new Vector2(444f, 16f));
+                SetTopLeftRect(refs.RootRect, 18f, 34f, 444f, 16f);
                 StageHudPresenter.PressureSourceFillImage ??= refs.FillImage;
                 StageHudPresenter.PressureSourceWeakThresholdMarker ??= refs.Marker;
             }
             StageHudPresenter.PressureSourceProgressRoot.SetActive(false);
 
-            var carryRoot = CreateHudBlock(
+            var carryRoot = CreateHudBannerRoot(
                 panelGo.transform,
                 "LeftCarryRoot",
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                new Vector2(24f, 0f),
-                new Vector2(300f, 184f),
-                new Color(0.08f, 0.10f, 0.14f, 0.72f));
-            StageHudPresenter.CarryLabel ??= FindOrCreateText(carryRoot, "CarryLabel", "Carry", 20f, FontStyles.Bold, TextAlignmentOptions.Left);
-            StageHudPresenter.CarryFillImage ??= CreateFillBar(carryRoot, "CarryBar", new Vector2(0f, 24f));
-            StageHudPresenter.CarryValueText ??= FindOrCreateText(carryRoot, "CarryValueText", "0 / 0", 18f, FontStyles.Normal, TextAlignmentOptions.Left);
-            var hazardRoot = CreateHazardStackRoot(carryRoot, "HazardStackRoot");
+                new Vector2(0.33333334f, 0.5f),
+                new Vector2(0.33333334f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                new Vector2(68f, 167f),
+                new Color(0.39f, 0.45f, 0.55f, 0.45f));
+            var carryTotemRoot = CreateCarryTotemRoot(carryRoot, "CarryTotemRoot");
+            Stretch(carryTotemRoot);
+            StageHudPresenter.CarryLabel = null;
+            StageHudPresenter.CarryValueText = null;
+            StageHudPresenter.HazardStackLabel = null;
+            StageHudPresenter.CarryFillImage ??= CreateVerticalFillBar(carryTotemRoot, "CarryBar", new Vector2(22f, 132f));
+            SetBottomLeftRect(StageHudPresenter.CarryFillImage.transform.parent.GetComponent<RectTransform>(), 38f, 28f, 22f, 132f);
+            var hazardRoot = CreateHazardStackRoot(carryTotemRoot, "HazardStackRoot");
+            Stretch(hazardRoot);
             StageHudPresenter.HazardStackRoot ??= hazardRoot.gameObject;
-            StageHudPresenter.HazardStackLabel ??= FindOrCreateText(hazardRoot, "HazardStackLabel", "Hazard", 16f, FontStyles.Bold, TextAlignmentOptions.Left);
             var hazardSegmentsRoot = CreateHazardStackSegmentsRoot(hazardRoot, "HazardStackSegmentsRoot");
+            SetBottomLeftRect(hazardSegmentsRoot, 8f, 28f, 22f, 74f);
             EnsureHazardSegments(hazardSegmentsRoot, StageHudPresenter);
-            StageHudPresenter.RiskMultiplierText ??= FindOrCreateText(hazardRoot, "RiskMultiplierText", "x1.00", 16f, FontStyles.Normal, TextAlignmentOptions.Left);
+            StageHudPresenter.RiskMultiplierText ??= FindOrCreateFixedText(
+                hazardRoot,
+                "RiskMultiplierText",
+                "x1.00",
+                16f,
+                42f,
+                TextAlignmentOptions.Center);
+            SetBottomLeftRect(StageHudPresenter.RiskMultiplierText.rectTransform, -8f, 6f, 42f, 17f);
         }
 
         private void BuildNotificationPanel()
@@ -93,9 +115,6 @@ namespace SweepNDodge.DotsBullets
 
             var panelGo = EnsurePanel(ref NotificationPanel, HudLayer, "NotificationPanel", Color.clear);
             NotificationPresenter ??= panelGo.GetComponent<NotificationPresenter>() ?? panelGo.AddComponent<NotificationPresenter>();
-            if (NotificationPresenter.NotificationRoot != null)
-                return;
-
             var root = CreateHudBannerRoot(
                 panelGo.transform,
                 "NotificationRoot",
@@ -104,10 +123,10 @@ namespace SweepNDodge.DotsBullets
                 new Vector2(0.5f, 0f),
                 new Vector2(0f, 64f),
                 new Vector2(520f, 56f),
-                new Color(0.10f, 0.16f, 0.24f, 0.90f));
+                new Color(0.09f, 0.19f, 0.29f, 0.12f));
             NotificationPresenter.NotificationRoot = root.gameObject;
             NotificationPresenter.NotificationBackgroundImage = root.GetComponent<Image>();
-            NotificationPresenter.NotificationText = CreateCenteredOverlayText(root, "NotificationText", "Time critical", 20f);
+            NotificationPresenter.NotificationText ??= CreateCenteredOverlayText(root, "NotificationText", "Time critical", 20f);
             NotificationPresenter.NotificationRoot.SetActive(false);
         }
 
@@ -115,9 +134,6 @@ namespace SweepNDodge.DotsBullets
         {
             var panelGo = EnsurePanel(ref HintPanel, HudLayer, "HintPanel", Color.clear);
             HintPresenter ??= panelGo.GetComponent<HintPresenter>() ?? panelGo.AddComponent<HintPresenter>();
-            if (HintPresenter.HintRoot != null)
-                return;
-
             var root = CreateHudBannerRoot(
                 panelGo.transform,
                 "HintRoot",
@@ -126,9 +142,9 @@ namespace SweepNDodge.DotsBullets
                 new Vector2(0.5f, 0f),
                 new Vector2(0f, 16f),
                 new Vector2(560f, 48f),
-                new Color(0.12f, 0.16f, 0.18f, 0.88f));
+                new Color(0.10f, 0.15f, 0.21f, 0.10f));
             HintPresenter.HintRoot = root.gameObject;
-            HintPresenter.HintText = CreateCenteredOverlayText(root, "HintText", "Carry is full. Head to Deposit.", 18f);
+            HintPresenter.HintText ??= CreateCenteredOverlayText(root, "HintText", "Carry is full. Head to Deposit.", 18f);
             HintPresenter.HintRoot.SetActive(false);
         }
 
@@ -194,65 +210,68 @@ namespace SweepNDodge.DotsBullets
 
         private static RectTransform CreatePressureSourceProgressBlock(Transform parent, string name)
         {
-            var go = GetOrCreateChildGameObject(parent, name, typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            var go = GetOrCreateChildGameObject(parent, name, typeof(Image), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             var rect = go.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(0f, 72f);
+            rect.sizeDelta = new Vector2(0f, 80f);
 
             var layoutElement = go.GetComponent<LayoutElement>();
-            layoutElement.minHeight = 72f;
-            layoutElement.preferredHeight = 72f;
+            layoutElement.minHeight = 80f;
+            layoutElement.preferredHeight = 80f;
             layoutElement.flexibleWidth = 1f;
 
+            var image = go.GetComponent<Image>();
+            image.color = new Color(0.11f, 0.14f, 0.19f, 0.96f);
+            ApplyDefaultImageSprite(image);
+
             var layout = go.GetComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(0, 0, 4, 0);
-            layout.spacing = 6f;
+            layout.padding = new RectOffset(14, 14, 12, 10);
+            layout.spacing = 8f;
             layout.childAlignment = TextAnchor.UpperLeft;
             layout.childControlWidth = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
+            return rect;
+        }
+
+        private static RectTransform CreateCarryTotemRoot(Transform parent, string name)
+        {
+            var go = GetOrCreateChildGameObject(parent, name, typeof(LayoutElement));
+            var rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(68f, 167f);
+
+            var layoutElement = go.GetComponent<LayoutElement>();
+            layoutElement.minWidth = 68f;
+            layoutElement.preferredWidth = 68f;
+            layoutElement.minHeight = 167f;
+            layoutElement.preferredHeight = 167f;
+            layoutElement.flexibleWidth = 0f;
             return rect;
         }
 
         private static RectTransform CreateHazardStackRoot(Transform parent, string name)
         {
-            var go = GetOrCreateChildGameObject(parent, name, typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            var go = GetOrCreateChildGameObject(parent, name, typeof(LayoutElement));
             var rect = go.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(0f, 58f);
+            rect.sizeDelta = new Vector2(68f, 167f);
 
             var layoutElement = go.GetComponent<LayoutElement>();
-            layoutElement.minHeight = 58f;
-            layoutElement.preferredHeight = 58f;
-            layoutElement.flexibleWidth = 1f;
-
-            var layout = go.GetComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(0, 0, 2, 0);
-            layout.spacing = 4f;
-            layout.childAlignment = TextAnchor.UpperLeft;
-            layout.childControlWidth = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
+            layoutElement.minWidth = 68f;
+            layoutElement.preferredWidth = 68f;
+            layoutElement.minHeight = 167f;
+            layoutElement.preferredHeight = 167f;
+            layoutElement.flexibleWidth = 0f;
             return rect;
         }
 
         private static RectTransform CreateHazardStackSegmentsRoot(Transform parent, string name)
         {
-            var go = GetOrCreateChildGameObject(parent, name, typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            var go = GetOrCreateChildGameObject(parent, name, typeof(Image));
             var rect = go.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(0f, 14f);
+            rect.sizeDelta = new Vector2(22f, 74f);
 
-            var layoutElement = go.GetComponent<LayoutElement>();
-            layoutElement.minHeight = 14f;
-            layoutElement.preferredHeight = 14f;
-            layoutElement.flexibleWidth = 1f;
-
-            var layout = go.GetComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(0, 0, 0, 0);
-            layout.spacing = 6f;
-            layout.childAlignment = TextAnchor.MiddleLeft;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
+            var image = go.GetComponent<Image>();
+            image.color = new Color(0.07f, 0.11f, 0.17f, 1f);
+            ApplyDefaultImageSprite(image);
             return rect;
         }
 
@@ -265,14 +284,9 @@ namespace SweepNDodge.DotsBullets
             var segments = new Image[segmentCount];
             for (int i = 0; i < segmentCount; i++)
             {
-                var segmentGo = GetOrCreateChildGameObject(root, $"Segment_{i}", typeof(Image), typeof(LayoutElement));
-                var layout = segmentGo.GetComponent<LayoutElement>();
-                layout.minWidth = 0f;
-                layout.preferredWidth = 0f;
-                layout.flexibleWidth = 1f;
-                layout.minHeight = 14f;
-                layout.preferredHeight = 14f;
-
+                var segmentGo = GetOrCreateChildGameObject(root, $"Segment_{i}", typeof(Image));
+                var segmentRect = segmentGo.GetComponent<RectTransform>();
+                SetBottomLeftRect(segmentRect, 2f, i * 14f, 18f, 18f);
                 var image = segmentGo.GetComponent<Image>();
                 image.color = new Color(0.54f, 0.59f, 0.66f, 0.42f);
                 ApplyDefaultImageSprite(image);
@@ -294,20 +308,81 @@ namespace SweepNDodge.DotsBullets
             layout.childAlignment = alignment;
         }
 
+        private static RectTransform CreateHorizontalStack(
+            Transform parent,
+            string name,
+            float minHeight,
+            float spacing,
+            TextAnchor alignment,
+            RectOffset padding,
+            bool childControlWidth,
+            bool childForceExpandWidth)
+        {
+            var go = GetOrCreateChildGameObject(parent, name, typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            var rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(0f, minHeight);
+
+            var layoutElement = go.GetComponent<LayoutElement>();
+            layoutElement.minHeight = minHeight;
+            layoutElement.preferredHeight = minHeight;
+            layoutElement.flexibleWidth = 1f;
+
+            var layout = go.GetComponent<HorizontalLayoutGroup>();
+            layout.padding = padding ?? new RectOffset();
+            layout.spacing = spacing;
+            layout.childAlignment = alignment;
+            layout.childControlWidth = childControlWidth;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = childForceExpandWidth;
+            layout.childForceExpandHeight = false;
+            return rect;
+        }
+
+        private static RectTransform CreateHudBadge(Transform parent, string name, Vector2 size, Color backgroundColor)
+        {
+            var go = GetOrCreateChildGameObject(parent, name, typeof(Image), typeof(LayoutElement));
+            var rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = size;
+
+            var layout = go.GetComponent<LayoutElement>();
+            layout.minWidth = size.x;
+            layout.preferredWidth = size.x;
+            layout.minHeight = size.y;
+            layout.preferredHeight = size.y;
+            layout.flexibleWidth = 0f;
+
+            var image = go.GetComponent<Image>();
+            image.color = backgroundColor;
+            ApplyDefaultImageSprite(image);
+            return rect;
+        }
+
         private static bool NeedsStageHudRebuild(Transform root, StageHudPresenter presenter)
         {
             return presenter == null
                 || presenter.ObjectiveSummaryText == null
                 || presenter.ObjectiveDetailText == null
+                || presenter.TimerValueText == null
+                || presenter.PressureSourceProgressRoot == null
+                || presenter.PressureSourceValueText == null
+                || presenter.PressureSourceFillImage == null
+                || presenter.PressureSourceWeakThresholdMarker == null
                 || presenter.CarryFillImage == null
                 || presenter.HazardStackRoot == null
-                || presenter.HazardStackLabel == null
                 || presenter.RiskMultiplierText == null
                 || presenter.HazardStackSegmentImages == null
                 || presenter.HazardStackSegmentImages.Length != 5
                 || root.Find("TopCenterObjectiveRoot") == null
+                || root.Find("TopCenterObjectiveRoot/ObjectiveBadgeRow") == null
+                || root.Find("TopCenterObjectiveRoot/PressureSourceProgressRoot") == null
                 || root.Find("LeftCarryRoot") == null
-                || root.Find("LeftCarryRoot/HazardStackRoot") == null;
+                || root.Find("LeftCarryRoot/CarryTotemRoot") == null
+                || root.Find("LeftCarryRoot/CarryTotemRoot/HazardStackRoot") == null
+                || root.Find("TopCenterObjectiveRoot").GetComponent<VerticalLayoutGroup>() != null
+                || root.Find("TopCenterObjectiveRoot/PressureSourceProgressRoot").GetComponent<VerticalLayoutGroup>() != null
+                || root.Find("LeftCarryRoot").GetComponent<VerticalLayoutGroup>() != null
+                || root.Find("LeftCarryRoot").GetComponent<RectTransform>().sizeDelta != new Vector2(68f, 167f)
+                || root.Find("LeftCarryRoot/CarryTotemRoot/HazardStackRoot/HazardStackSegmentsRoot").GetComponent<VerticalLayoutGroup>() != null;
         }
 
         private void ResetStageHudReferences()
@@ -338,15 +413,19 @@ namespace SweepNDodge.DotsBullets
 
             for (int i = root.childCount - 1; i >= 0; i--)
             {
-                var child = root.GetChild(i).gameObject;
+                var child = root.GetChild(i);
 #if UNITY_EDITOR
                 if (!Application.isPlaying)
                 {
-                    Object.DestroyImmediate(child);
+                    Object.DestroyImmediate(child.gameObject);
                     continue;
                 }
 #endif
-                Object.Destroy(child);
+
+                // In play mode, Destroy() is deferred until end-of-frame.
+                // Detach first so same-frame rebuilds do not rebind soon-to-be-destroyed children by name.
+                child.SetParent(null, false);
+                Object.Destroy(child.gameObject);
             }
         }
 
@@ -371,12 +450,14 @@ namespace SweepNDodge.DotsBullets
 
         private readonly struct ProgressBarMarkerRefs
         {
-            public ProgressBarMarkerRefs(Image fillImage, RectTransform marker)
+            public ProgressBarMarkerRefs(RectTransform rootRect, Image fillImage, RectTransform marker)
             {
+                RootRect = rootRect;
                 FillImage = fillImage;
                 Marker = marker;
             }
 
+            public RectTransform RootRect { get; }
             public Image FillImage { get; }
             public RectTransform Marker { get; }
         }
@@ -393,7 +474,7 @@ namespace SweepNDodge.DotsBullets
             layout.flexibleWidth = 1f;
 
             var background = root.GetComponent<Image>();
-            background.color = new Color(0.18f, 0.20f, 0.24f, 0.95f);
+            background.color = new Color(0.14f, 0.20f, 0.27f, 1f);
             ApplyDefaultImageSprite(background);
 
             var fill = GetOrCreateChildGameObject(root.transform, "Fill", typeof(Image));
@@ -401,7 +482,7 @@ namespace SweepNDodge.DotsBullets
             Stretch(fillRect, 3f, 3f);
 
             var fillImage = fill.GetComponent<Image>();
-            fillImage.color = new Color(0.38f, 0.82f, 0.58f, 1f);
+            fillImage.color = new Color(0.22f, 0.74f, 0.97f, 1f);
             ApplyDefaultImageSprite(fillImage);
             fillImage.type = Image.Type.Filled;
             fillImage.fillMethod = Image.FillMethod.Horizontal;
@@ -421,7 +502,7 @@ namespace SweepNDodge.DotsBullets
             markerImage.color = new Color(0.98f, 0.94f, 0.62f, 1f);
             ApplyDefaultImageSprite(markerImage);
 
-            return new ProgressBarMarkerRefs(fillImage, markerRect);
+            return new ProgressBarMarkerRefs(rootRect, fillImage, markerRect);
         }
 
         private static TextMeshProUGUI FindOrCreateText(Transform parent, string name, string text, float fontSize, FontStyles fontStyle, TextAlignmentOptions alignment)
@@ -464,7 +545,7 @@ namespace SweepNDodge.DotsBullets
             layout.flexibleWidth = 1f;
 
             var background = root.GetComponent<Image>();
-            background.color = new Color(0.18f, 0.20f, 0.24f, 0.95f);
+            background.color = new Color(0.14f, 0.20f, 0.27f, 1f);
             ApplyDefaultImageSprite(background);
 
             var fill = GetOrCreateChildGameObject(root.transform, "Fill", typeof(Image));
@@ -477,6 +558,37 @@ namespace SweepNDodge.DotsBullets
             fillImage.type = Image.Type.Filled;
             fillImage.fillMethod = Image.FillMethod.Horizontal;
             fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+            fillImage.fillAmount = 0f;
+            return fillImage;
+        }
+
+        private static Image CreateVerticalFillBar(Transform parent, string name, Vector2 size)
+        {
+            var root = GetOrCreateChildGameObject(parent, name, typeof(Image), typeof(LayoutElement));
+            var rootRect = root.GetComponent<RectTransform>();
+            rootRect.sizeDelta = size;
+
+            var layout = root.GetComponent<LayoutElement>();
+            layout.minWidth = size.x;
+            layout.preferredWidth = size.x;
+            layout.minHeight = size.y;
+            layout.preferredHeight = size.y;
+            layout.flexibleWidth = 0f;
+
+            var background = root.GetComponent<Image>();
+            background.color = new Color(0.18f, 0.20f, 0.24f, 0.95f);
+            ApplyDefaultImageSprite(background);
+
+            var fill = GetOrCreateChildGameObject(root.transform, "Fill", typeof(Image));
+            var fillRect = fill.GetComponent<RectTransform>();
+            Stretch(fillRect, 3f, 3f);
+
+            var fillImage = fill.GetComponent<Image>();
+            fillImage.color = new Color(0.32f, 0.78f, 0.95f, 1f);
+            ApplyDefaultImageSprite(fillImage);
+            fillImage.type = Image.Type.Filled;
+            fillImage.fillMethod = Image.FillMethod.Vertical;
+            fillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
             fillImage.fillAmount = 0f;
             return fillImage;
         }
@@ -496,6 +608,24 @@ namespace SweepNDodge.DotsBullets
             if (textComponent.font == null && TMP_Settings.defaultFontAsset != null)
                 textComponent.font = TMP_Settings.defaultFontAsset;
             return textComponent;
+        }
+
+        private static void SetTopLeftRect(RectTransform rect, float x, float y, float width, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -y);
+            rect.sizeDelta = new Vector2(width, height);
+        }
+
+        private static void SetBottomLeftRect(RectTransform rect, float x, float y, float width, float height)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = Vector2.zero;
+            rect.anchoredPosition = new Vector2(x, y);
+            rect.sizeDelta = new Vector2(width, height);
         }
     }
 }

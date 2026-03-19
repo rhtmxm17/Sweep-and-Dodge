@@ -220,12 +220,14 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 필요 시 `WorkArea Board -> Viewport Board -> Layer Board -> Panel Board` 순서로 계층화한다.
   - `Viewport Board` 내부의 구현 대응형 `Board`만 Unity 반영 후보로 본다.
   - 메모, 질문, 비교안은 `WorkArea`의 `NotesBoard`/`OpenQuestionsBoard` 등으로 분리하고 반영 대상에서 제외한다.
-- 사용자는 위치/크기/그룹 의도를 가능한 한 Penpot 객체 조작으로 표현하고, 코멘트는 "왜 바꾸는가"에 집중한다.
-- Agent는 Penpot 변경사항을 재해석할 때 레이아웃 변화, 의도 변화, 구현 영향, 남은 open question을 분리해서 정리한다.
-- 공용 UI 구조 변경은 Penpot 승인안만으로 바로 씬 인스턴스를 수정하지 않는다.
-  - 구현 전 `RuntimeUiRoot` prefab SSOT, TD, 관련 운영 문서와의 정합성을 먼저 확인한다.
-- UI 워크플로우 상세 절차는 아래 문서를 따른다.
-  - `Docs/UI/UI-Workflow.md`
+  - 사용자는 위치/크기/그룹 의도를 가능한 한 Penpot 객체 조작으로 표현하고, 코멘트는 "왜 바꾸는가"에 집중한다.
+  - Agent는 Penpot 변경사항을 재해석할 때 레이아웃 변화, 의도 변화, 구현 영향, 남은 open question을 분리해서 정리한다.
+  - 위치/정렬/점유 비율 의도가 구조 데이터만으로 충분히 전달되지 않으면, Agent는 선택 상태와 무관하게 `Viewport Board` 또는 `Approved` 보드를 직접 export한 단일 이미지(PNG/SVG)를 함께 사용해 판단을 보조한다.
+  - Unity UI 반영 전에는 가능하면 `보드 구조 데이터 + Viewport/Approved 보드 export 이미지`를 함께 확인해 위치/정렬 오해를 줄인다.
+  - 공용 UI 구조 변경은 Penpot 승인안만으로 바로 씬 인스턴스를 수정하지 않는다.
+    - 구현 전 `RuntimeUiRoot` prefab SSOT, TD, 관련 운영 문서와의 정합성을 먼저 확인한다.
+  - UI 워크플로우 상세 절차는 아래 문서를 따른다.
+    - `Docs/UI/UI-Workflow.md`
 
 ---
 
@@ -254,6 +256,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
   - 제한(Limit): Penpot 변경은 설계/협업 산출물로 취급하며, Unity 코드/프리팹 반영의 SSOT로 직접 사용하지 않는다
 - 공통 규칙:
   - Penpot 변경은 설계/협업 산출물로 취급하며, 코드/프리팹 반영 전 승인 게이트와 문서 정합성 확인을 유지한다.
+  - 위치/정렬 판단이 중요한 UI 작업에서는 구조 조회만으로 충분하다고 가정하지 않고, 필요 시 보드 export 이미지를 함께 확인한다.
 - 예외: 사용자가 명시적으로 요청하면 범위를 확장할 수 있다.
 - 스크립트 편집은 MCP 대상에서 제외하고 일반 파일 편집 워크플로우를 사용한다.
 
