@@ -332,8 +332,8 @@ MonoBehaviour:
   FollowOffset: {x: 0, y: 15, z: -2}
   PreferEcsPlayerState: 1
   PositionSmoothTime: 0.08
-  MaxLookAhead: 2.5
-  LookAheadDistanceFactor: 0.35
+  MaxLookAhead: 1
+  LookAheadDistanceFactor: 0.15
   LookAheadLerpSpeed: 12
   AimDeadZone: 0.08
 --- !u!1 &352435927
