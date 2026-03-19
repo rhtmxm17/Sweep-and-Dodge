@@ -87,6 +87,20 @@
   - 내부 배치가 `manual`, `stretch`, `layout-driven` 중 무엇인가
 - `top-center pinned`, `bottom-center pinned`, `x 20% / y center pinned` 같은 attach intent는 Penpot 보드 구조나 명시적 메모로 남긴다.
 - Penpot의 작업 메모는 Unity 속성명을 그대로 나열하는 것보다, 먼저 사람이 읽는 attach intent를 남기고 이후 Unity 반영 시 `Anchor + Pivot + anchored position`으로 번역하는 것을 우선한다.
+- Penpot에서 attach intent를 기록할 때는 아래 3요소 조합을 기본값으로 사용한다.
+  - 실제 위젯 `Board` 또는 layer의 `constraints`
+  - 관련 위치에 함께 두는 `REF__*` 기준선/기준 사각형
+  - 짧은 `SPEC__Attach` 또는 `SPEC__Layout` 명세 텍스트
+- `constraints`는 표준 부착 의도를 표현하는 1차 수단으로 사용한다.
+  - 예: `center + top`, `center + bottom`, `left + center`
+- `REF__*`는 export 이미지에도 남는 기준 정보로 사용한다.
+  - 기준선은 가능하면 관련 위젯 또는 관련 부모 `Board` 안에 함께 두고 lock한다.
+  - 네이밍은 `REF__CarryAnchor20pLine`, `REF__CarryBaselineLine`처럼 목적이 드러나게 짓는다.
+- `SPEC__Attach`는 Unity 번역용 최소 계약만 남긴다.
+  - 권장 형식: `parent=HudLayer anchor=(0.5,1.0) pivot=(0.5,1.0) offset=(0,-24) owner=manual`
+- `SPEC__Layout`은 내부 배치 소유 방식이 중요할 때만 추가한다.
+  - 예: `owner=stretch`, `owner=layout-driven`, `owner=manual`
+- comments는 질문과 토론 전용으로만 사용하고, 최종 attach contract는 `constraints + REF__ + SPEC__` 조합으로 남긴다.
 
 ### 4.5 작업용 메모와 반영 대상 구분
 - `Viewport Board` 내부에는 원칙적으로 실제 UI 후보만 둔다.

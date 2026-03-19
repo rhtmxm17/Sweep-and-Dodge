@@ -223,6 +223,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
   - 사용자는 위치/크기/그룹 의도를 가능한 한 Penpot 객체 조작으로 표현하고, 코멘트는 "왜 바꾸는가"에 집중한다.
   - `Approved` 보드의 실제 반영 후보는 각 위젯의 `screen attach intent`가 Unity의 `Anchor + Pivot`으로 번역 가능하도록 표현한다.
   - 레이아웃 반영 판단 시에는 `어느 부모 프레임에 붙는가(parent frame)`와 내부 배치가 `manual / stretch / layout-driven` 중 무엇인지도 함께 본다.
+  - Penpot에서 attach intent를 남길 때는 `constraints + REF__ 기준선 + SPEC__Attach/SPEC__Layout` 조합을 기본값으로 사용한다.
   - Agent는 Penpot 변경사항을 재해석할 때 레이아웃 변화, 의도 변화, 구현 영향, 남은 open question을 분리해서 정리한다.
   - 위치/정렬/점유 비율 의도가 구조 데이터만으로 충분히 전달되지 않으면, Agent는 선택 상태와 무관하게 `Viewport Board` 또는 `Approved` 보드를 직접 export한 단일 이미지(PNG/SVG)를 함께 사용해 판단을 보조한다.
   - Unity UI 반영 전에는 가능하면 `보드 구조 데이터 + Viewport/Approved 보드 export 이미지`를 함께 확인해 위치/정렬 오해를 줄인다.
