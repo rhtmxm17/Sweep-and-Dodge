@@ -4,10 +4,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
-#if UNITY_EDITOR
-using UnityEditor;
-using UnityEditor.SceneManagement;
-#endif
 
 namespace SweepNDodge.DotsBullets
 {
@@ -65,7 +61,6 @@ namespace SweepNDodge.DotsBullets
         public SettingsPresenter SettingsPresenter;
 
         [Header("Policy")]
-        public bool AutoBuildHierarchy = true;
         public bool LogBindWarnings = true;
 
         private DemoShellScreenId _lastScreen;
@@ -92,36 +87,16 @@ namespace SweepNDodge.DotsBullets
         private Action _cachedOpenSettingsFromPauseAction;
         private Action<DemoShellPauseActionId> _cachedOpenConfirmAction;
         private Action _cachedCloseConfirmAction;
-#if UNITY_EDITOR
-        private bool _editorEnsureHierarchyQueued;
-#endif
 
         public bool IsSettingsOpen => _settingsOpen;
         public bool IsPauseOpen => PauseBridge != null && PauseBridge.IsPaused;
         public bool IsConfirmOpen => _confirmOpen;
 
-        private void Reset()
-        {
-            EnsureHierarchy();
-            AutoBindReferences();
-        }
-
         private void OnEnable()
         {
-#if UNITY_EDITOR
             if (!Application.isPlaying)
-            {
-                if (ShouldAutoAuthorInEditor())
-                {
-                    EnsureHierarchy();
-                    AutoBindReferences();
-                }
-
                 return;
-            }
-#endif
 
-            EnsureHierarchy();
             AutoBindReferences();
             ConfigurePresenters();
 
@@ -139,17 +114,6 @@ namespace SweepNDodge.DotsBullets
                 DemoShell.SetRuntimeUiShellActive(false);
             if (Application.isPlaying && RuntimeHudBridge != null)
                 RuntimeHudBridge.SetRuntimeUiHudActive(false);
-        }
-
-        private void OnValidate()
-        {
-#if UNITY_EDITOR
-            if (!Application.isPlaying && ShouldAutoAuthorInEditor() && !_editorEnsureHierarchyQueued)
-            {
-                _editorEnsureHierarchyQueued = true;
-                EditorApplication.delayCall += EnsureHierarchyInEditor;
-            }
-#endif
         }
 
         private void Update()
@@ -172,35 +136,6 @@ namespace SweepNDodge.DotsBullets
 
             ApplyShellState(force: false);
         }
-
-#if UNITY_EDITOR
-        private void EnsureHierarchyInEditor()
-        {
-            _editorEnsureHierarchyQueued = false;
-            if (this == null || Application.isPlaying)
-                return;
-            if (!ShouldAutoAuthorInEditor())
-                return;
-
-            EnsureHierarchy();
-            AutoBindReferences();
-        }
-
-        private bool ShouldAutoAuthorInEditor()
-        {
-#if UNITY_EDITOR
-            if (Application.isPlaying)
-                return false;
-
-            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
-            return prefabStage != null
-                   && prefabStage.prefabContentsRoot != null
-                   && gameObject.scene == prefabStage.scene;
-#else
-            return false;
-#endif
-        }
-#endif
 
         public void OpenSettings()
         {
@@ -599,12 +534,13 @@ namespace SweepNDodge.DotsBullets
 {
     public sealed partial class RuntimeUiRoot
     {
-        [ContextMenu("Ensure Default Hierarchy")]
-        public void EnsureHierarchy()
+#if UNITY_EDITOR
+        /// <summary>
+        /// Builds the default RuntimeUiRoot scaffold for temporary test GameObjects.
+        /// Do not use this to author or repair the prefab SSOT.
+        /// </summary>
+        public void BuildDefaultHierarchyForTests()
         {
-            if (!AutoBuildHierarchy)
-                return;
-
             EnsureCanvasSetup();
             ShellLayer = EnsureLayer(ShellLayer, "ShellLayer");
             HudLayer = EnsureLayer(HudLayer, "HudLayer");
@@ -632,6 +568,7 @@ namespace SweepNDodge.DotsBullets
 
             AutoBindReferences();
         }
+#endif
 
         private void EnsureCanvasSetup()
         {

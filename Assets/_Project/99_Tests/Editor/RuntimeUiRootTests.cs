@@ -37,6 +37,52 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void OnEnable_DoesNotBuildHierarchyByDefault()
+        {
+            var go = new GameObject("RuntimeUiRoot_NoAutoBuild");
+            try
+            {
+                go.SetActive(false);
+                var root = go.AddComponent<RuntimeUiRoot>();
+                root.LogBindWarnings = false;
+
+                go.SetActive(true);
+
+                Assert.That(root.RootCanvas, Is.Null);
+                Assert.That(root.ShellLayer, Is.Null);
+                Assert.That(root.HudLayer, Is.Null);
+                Assert.That(root.TitlePanel, Is.Null);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void BuildDefaultHierarchyForTests_BuildsExplicitly()
+        {
+            var go = new GameObject("RuntimeUiRoot_ExplicitBuild");
+            try
+            {
+                var root = go.AddComponent<RuntimeUiRoot>();
+                root.LogBindWarnings = false;
+
+                root.BuildDefaultHierarchyForTests();
+
+                Assert.That(root.RootCanvas, Is.Not.Null);
+                Assert.That(root.ShellLayer, Is.Not.Null);
+                Assert.That(root.HudLayer, Is.Not.Null);
+                Assert.That(root.TitlePanel, Is.Not.Null);
+                Assert.That(root.SettingsPanel, Is.Not.Null);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void ApplyShellState_MapsPanelsAndDefaultSelectables_PerScreen()
         {
             using var context = CreateContext();
@@ -1096,7 +1142,7 @@ namespace SweepNDodge.DotsBullets.Tests
             root.PresentationRuntimeController = presentationRuntime;
             root.LogBindWarnings = false;
             dialogueBridge.RuntimeUiRoot = root;
-            root.EnsureHierarchy();
+            root.BuildDefaultHierarchyForTests();
             rootGo.SetActive(true);
 
             return new TestContext(shellGo, rootGo, shell, audio, pauseController, pauseBridge, hud, notificationBridge, hintBridge, dialogueBridge, presentationRuntime, root);
