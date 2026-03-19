@@ -221,9 +221,12 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
   - `Viewport Board` 내부의 구현 대응형 `Board`만 Unity 반영 후보로 본다.
   - 메모, 질문, 비교안은 `WorkArea`의 `NotesBoard`/`OpenQuestionsBoard` 등으로 분리하고 반영 대상에서 제외한다.
   - 사용자는 위치/크기/그룹 의도를 가능한 한 Penpot 객체 조작으로 표현하고, 코멘트는 "왜 바꾸는가"에 집중한다.
+  - `Approved` 보드의 실제 반영 후보는 각 위젯의 `screen attach intent`가 Unity의 `Anchor + Pivot`으로 번역 가능하도록 표현한다.
+  - 레이아웃 반영 판단 시에는 `어느 부모 프레임에 붙는가(parent frame)`와 내부 배치가 `manual / stretch / layout-driven` 중 무엇인지도 함께 본다.
   - Agent는 Penpot 변경사항을 재해석할 때 레이아웃 변화, 의도 변화, 구현 영향, 남은 open question을 분리해서 정리한다.
   - 위치/정렬/점유 비율 의도가 구조 데이터만으로 충분히 전달되지 않으면, Agent는 선택 상태와 무관하게 `Viewport Board` 또는 `Approved` 보드를 직접 export한 단일 이미지(PNG/SVG)를 함께 사용해 판단을 보조한다.
   - Unity UI 반영 전에는 가능하면 `보드 구조 데이터 + Viewport/Approved 보드 export 이미지`를 함께 확인해 위치/정렬 오해를 줄인다.
+  - Penpot, 관련 문서, 현재 Unity 상태만으로 `Anchor / Pivot / parent frame / 배치 소유 방식`을 단일하게 결정할 수 없으면, Agent는 임의 적용하지 않고 필요한 확인 사항을 사용자에게 보고한 뒤 작업을 중단한다.
   - 공용 UI 구조 변경은 Penpot 승인안만으로 바로 씬 인스턴스를 수정하지 않는다.
     - 구현 전 `RuntimeUiRoot` prefab SSOT, TD, 관련 운영 문서와의 정합성을 먼저 확인한다.
   - UI 워크플로우 상세 절차는 아래 문서를 따른다.

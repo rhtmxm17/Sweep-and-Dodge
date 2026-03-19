@@ -4,7 +4,7 @@
 - doc_id: `UI-WORKFLOW`
 - type: `ProjectOps`
 - status: `active`
-- last_updated: `2026-03-18`
+- last_updated: `2026-03-19`
 - related_docs:
   - [../../AGENTS.md](../../AGENTS.md)
   - [../GameDesign/GD-009-in-game-ui-screen-blueprint.md](../GameDesign/GD-009-in-game-ui-screen-blueprint.md)
@@ -46,6 +46,9 @@
 - 코멘트는 "무엇을 왜 바꾸는가"에 집중하고, 위치/크기 의도는 가능한 한 직접 조작으로 표현한다.
 - 위치/정렬/점유 비율 판단이 중요한 경우, 구조 데이터만으로 충분하다고 가정하지 않는다.
 - 필요 시 `Viewport Board` 또는 `Approved` 보드를 단일 이미지로 export해 구조 데이터와 함께 본다.
+- `Approved` 보드에는 각 HUD 위젯의 `어디에 붙는가(screen attach intent)`가 Unity의 `Anchor + Pivot`으로 번역 가능하도록 표현되어야 한다.
+- `어디에 붙는가`를 기록할 때는 `무엇을 기준 부모로 삼는가(parent frame)`와 `manual / stretch / layout-driven` 중 어떤 방식이 내부 배치를 소유하는지도 함께 남긴다.
+- 레이아웃 적용 단계에서 Penpot, 관련 문서, 현재 Unity 상태만으로 `Anchor / Pivot / parent frame / 배치 소유 방식`을 단일하게 결정할 수 없으면, Agent는 임의 적용하지 않고 필요한 확인 사항을 사용자에게 보고한 뒤 작업을 중단한다.
 
 ## 4. 운영 단위
 ### 4.1 화면 단위
@@ -75,7 +78,17 @@
   - 예: `MoveCandidateGroup`, `CompareGroup`
 - Agent가 이미지 보조 판단을 할 때는 현재 선택에 의존하지 않고 상위 `Viewport Board`를 직접 찾아 export하는 방식을 우선한다.
 
-### 4.4 작업용 메모와 반영 대상 구분
+### 4.4 배치 의도 기록 규칙
+- `Approved` 보드의 실제 반영 후보 `Board`는 가능한 한 Unity의 `Anchor + Pivot`으로 직결되는 형태로 배치 의도를 표현한다.
+- 배치 의도는 최소한 아래 항목 중 필요한 것을 확인할 수 있어야 한다.
+  - 어느 부모 프레임에 붙는가
+  - 화면 어느 지점에 붙는가
+  - 기준점이 가운데/상단/하단/좌측/우측 중 어디인가
+  - 내부 배치가 `manual`, `stretch`, `layout-driven` 중 무엇인가
+- `top-center pinned`, `bottom-center pinned`, `x 20% / y center pinned` 같은 attach intent는 Penpot 보드 구조나 명시적 메모로 남긴다.
+- Penpot의 작업 메모는 Unity 속성명을 그대로 나열하는 것보다, 먼저 사람이 읽는 attach intent를 남기고 이후 Unity 반영 시 `Anchor + Pivot + anchored position`으로 번역하는 것을 우선한다.
+
+### 4.5 작업용 메모와 반영 대상 구분
 - `Viewport Board` 내부에는 원칙적으로 실제 UI 후보만 둔다.
 - 작업용 메모, 질문, 비교안, reasoning은 `WorkArea Board`의 별도 `NotesBoard`, `OpenQuestionsBoard`, `ReviewBoard` 등에 둔다.
 - `Viewport Board` 내부에 메모를 잠시 둘 경우에도 실제 UI 후보와 혼동되지 않게 구분한다.
@@ -149,6 +162,15 @@ Unity 반영 전 아래 중 하나 이상을 갱신한다.
 - prefab 우선 반영 대상
 - scene-specific 값 여부
 - binding/presenter 영향 범위
+- 주요 HUD 위젯의 `parent frame + Anchor/Pivot 번역 기준`
+- 내부 배치 소유 방식(`manual / stretch / layout-driven`)
+
+레이아웃 적용 전에 아래를 만족하지 못하면 바로 구현하지 않는다.
+- Penpot 승인안과 export 이미지 기준으로 attach intent가 충분히 읽히는가
+- 현재 Unity 상태와 비교했을 때 어떤 부모 기준에 붙여야 하는지가 단일하게 결정되는가
+- Anchor/Pivot으로 옮길 때 해석이 2개 이상 나오지 않는가
+
+위 조건 중 하나라도 불명확하면 Agent는 적용 방식을 사용자에게 확인 요청으로 보고하고, 확인 전까지 작업을 중단한다.
 
 ### 5.6 Unity 반영
 승인 후 Unity에 반영한다.
@@ -243,3 +265,4 @@ Agent가 Penpot만으로 확정하지 않는 것:
 - 2026-03-18: Penpot MCP 기반 UI 레이아웃 협업 루프를 프로젝트 운영 문서로 추가했다.
 - 2026-03-18: `Board`를 화면/레이어/패널 단위 컨테이너로 사용하는 규칙과 `WorkArea`/`Viewport`, 작업용 메모/실제 반영 대상 구분 규칙을 추가했다.
 - 2026-03-19: 위치/정렬 판단 보조를 위해 `Viewport/Approved Board export 이미지`를 구조 데이터와 함께 사용하는 규칙을 추가했다.
+- 2026-03-19: `screen attach intent -> Anchor/Pivot 번역`, `parent frame / 배치 소유 방식` 기록, 정보 부족 시 사용자 확인 후 중단 규칙을 추가했다.
