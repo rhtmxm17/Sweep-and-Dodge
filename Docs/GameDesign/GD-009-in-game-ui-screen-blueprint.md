@@ -4,7 +4,7 @@
 - doc_id: `GD-009`
 - type: `GameDesign`
 - status: `draft`
-- last_updated: `2026-03-13`
+- last_updated: `2026-03-20`
 - related_docs:
   - [GD-001-campaign-loop-design.md](./GD-001-campaign-loop-design.md)
   - [GD-004-carrybin-load-and-deposit.md](./GD-004-carrybin-load-and-deposit.md)
@@ -14,6 +14,7 @@
   - [TD-011-runtime-player-hud-contract.md](../TechnicalDesign/TD-011-runtime-player-hud-contract.md)
   - [TD-013-player-feedback-presentation-bridge-contract.md](../TechnicalDesign/TD-013-player-feedback-presentation-bridge-contract.md)
   - [TD-016-runtime-ui-shell-and-navigation-contract.md](../TechnicalDesign/TD-016-runtime-ui-shell-and-navigation-contract.md)
+  - [TD-021-hazardstack-hud-contract.md](../TechnicalDesign/TD-021-hazardstack-hud-contract.md)
 
 > 인게임 플레이 화면에서 어떤 정보가 어느 위치와 레이어에 속하는지 정의하는 상위 청사진 문서. 개별 위젯 스펙이나 구현 계약은 후속 문서에서 다룬다.
 
@@ -236,7 +237,8 @@ Source, Deposit, 위험 구역의 "어디"는 가능한 한 월드 인디케이�
 ## 11. 현재 기준안
 - 좌측은 Carry 축으로 사용한다.
 - 상단 중앙은 Objective 축으로 사용한다.
-- HazardStack은 Carry에 붙는 반상시 보조 요소로 둔다.
+- HazardStack은 Carry에 붙는 반상시 보조 요소로 두고, 세그먼트 + `RiskMultiplier` 보조 텍스트 구성으로 유지한다.
+- `HazardStackMax`는 숫자나 `current / max` 텍스트로 노출하지 않는다.
 - 하단 중앙은 Hint / Notification 전용 레인으로 사용한다.
 - 전체 화면 가장자리는 Screen FX 레인으로 사용한다.
 - Source / Deposit의 방향성과 위치성은 월드 인디케이터가 담당한다.
@@ -244,7 +246,6 @@ Source, Deposit, 위험 구역의 "어디"는 가능한 한 월드 인디케이�
 ## 12. 열어둘 결정
 - Timer를 Objective 바 내부에 포함할지, 우측 보조 슬롯으로 분리할지
 - Hint와 Notification을 시각적으로 두 줄 분리할지, 한 레인 안에서 상태 전환형으로 운영할지
-- HazardStack의 표현을 숫자 중심으로 둘지, 세그먼트/링 기반으로 둘지
 - 월드 인디케이터의 적극도를 최소 유도선 수준으로 둘지, 강한 목표 유도로 둘지
 
 ## 13. 후속 상세 설계 항목
@@ -256,4 +257,5 @@ Source, Deposit, 위험 구역의 "어디"는 가능한 한 월드 인디케이�
 - 월드 인디케이터의 노출 조건과 강도 기준
 
 ## 14. 변경 이력
+- 2026-03-20: 현재 HUD 구현을 반영해 `HazardStack`을 Carry 인접 `세그먼트 + RiskMultiplier` 보조층으로 명시하고, `HazardStackMax` 비표시 원칙을 추가했다.
 - 2026-03-13: 초안 작성

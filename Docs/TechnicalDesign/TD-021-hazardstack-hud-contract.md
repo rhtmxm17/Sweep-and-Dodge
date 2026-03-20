@@ -3,8 +3,8 @@
 ## Metadata
 - doc_id: `TD-021`
 - type: `TechnicalDesign`
-- status: `draft`
-- last_updated: `2026-03-18`
+- status: `active`
+- last_updated: `2026-03-20`
 - related_docs:
   - [GD-009-in-game-ui-screen-blueprint.md](../GameDesign/GD-009-in-game-ui-screen-blueprint.md)
   - [GD-010-in-game-ui-layout-and-zones.md](../GameDesign/GD-010-in-game-ui-layout-and-zones.md)
@@ -68,12 +68,16 @@
 
 ```csharp
 public int HazardStack;
+public int HazardStackMax;
 public float HazardRiskMultiplier;
 ```
 
 설명:
 - `HazardStack`
   - 현재 frame-end 기준 최종 stack
+- `HazardStackMax`
+  - HUD 레이아웃 입력용 최대 stack
+  - slot 수와 frame 높이 계산에만 사용하고, 숫자 텍스트로는 노출하지 않는다.
 - `HazardRiskMultiplier`
   - HUD 표시용 최종 multiplier
   - 계산식:
@@ -82,29 +86,45 @@ public float HazardRiskMultiplier;
 HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 ```
 
-제외:
-- `HazardStackMax`는 snapshot에 넣지 않는다.
-  - HUD 직접 표시 대상이 아니고, 세그먼트 개수는 현재 V1.5 범위에서 `config`를 직접 읽지 않고 고정 visual slot 수로 처리한다.
-
 ## 5. 표현 계약
 ### 5.1 레이아웃
 `LeftCarryRoot`
 - `CarryTotemRoot`
   - `CarryBar`
   - `HazardStackRoot`
+    - `Segment Frame`
     - `HazardStackSegmentsRoot`
+      - `SegmentSlotTemplate`
+        - `Display`
     - `RiskMultiplierText`
 
+원칙:
+- `RuntimeUiRoot.prefab`을 layout SSOT로 둔다.
+- `RuntimeUiRoot.Hud` builder는 테스트용 mirror로만 유지한다.
+
 ### 5.2 세그먼트 규칙
-- 세그먼트 수는 V1.5에서는 고정 visual slot으로 둔다.
+- 세그먼트 수는 `HazardStackMax`와 동일하다.
 - 활성 세그먼트 수는 `HazardStack` 값에 맞춘다.
-- `HazardStack`이 세그먼트 수를 초과하면 마지막 세그먼트까지 모두 활성으로 clamp한다.
+- `HazardStack`이 `HazardStackMax`를 초과하면 마지막 세그먼트까지 모두 활성으로 clamp한다.
 - `HazardStack == 0`이면 모든 세그먼트 비활성
-- 세그먼트는 baseline을 공유한 채 세로로 일부 겹치게 쌓는다.
+- 세그먼트는 `slot + display` 이중 구조를 사용한다.
+  - `slot`: anchored position / sibling order만 담당
+  - `display`: sprite pivot 적용과 실제 렌더만 담당
+- `slot`은 `anchoredPosition.y = index * SegmentStepY`로 배치한다.
+- `display`는 sprite pivot 적용 후 `localPosition = (0, 0)`을 유지한다.
+- `display` 크기는 `SetNativeSize()` 이후 `SegmentScale`을 곱해 맞춘다.
 - draw order:
   - 활성 세그먼트는 비활성 세그먼트 위에 그린다.
   - 활성 세그먼트끼리는 위쪽 세그먼트가 아래쪽 세그먼트 위에 온다.
   - 비활성 세그먼트끼리는 아래쪽 세그먼트가 위쪽 세그먼트 위에 온다.
+- slot sibling order는 아래 순서를 강제한다.
+  1. inactive: 높은 index -> 낮은 index
+  2. active: 낮은 index -> 높은 index
+- frame 높이는 아래 식으로 계산한다.
+
+```text
+FrameHeight = FrameBaseHeight + (HazardStackMax × FrameHeightPerSegment)
+```
 
 ### 5.3 텍스트 규칙
 - `RiskMultiplierText`
@@ -113,9 +133,9 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 
 ### 5.4 색 정책
 - 비활성 세그먼트:
-  - 저채도 중립색
+  - `brush gray` sprite
 - 활성 세그먼트:
-  - Carry bar보다 약간 따뜻한 강조색
+  - `brush gold` sprite
 - `HazardStack == 0`
   - 전체 존재감 낮음
 - `HazardStack > 0`
@@ -141,14 +161,24 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 추가 필드:
 - `GameObject HazardStackRoot`
 - `TextMeshProUGUI RiskMultiplierText`
+- `RectTransform HazardStackSegmentsRoot`
+- `Image HazardStackFrameImage`
+- `RectTransform HazardStackSegmentSlotTemplate`
+- `Sprite HazardStackActiveSprite`
+- `Sprite HazardStackInactiveSprite`
 - `Image[] HazardStackSegmentImages`
+- `float SegmentScale`
+- `float SegmentStepY`
+- `float FrameBaseHeight`
+- `float FrameHeightPerSegment`
 
 추가 메서드:
 - `ApplyHazardStack(in PlayerHudSnapshotComponent snapshot)`
 
 역할:
 - `Carry` 세로 토템 안에서 `HazardStack` 보조층을 갱신
-- 세그먼트 fill / 색 / multiplier 텍스트만 갱신
+- `HazardStackMax` 기준 slot 수와 frame 높이를 보정
+- 세그먼트 sprite(active/inactive), sibling order, multiplier 텍스트를 갱신
 
 비역할:
 - `RiskMultiplier` 재계산
@@ -157,19 +187,24 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
 
 ## 8. 작업 분해 / 진행 상태
 1. TD 초안 작성 (`done`)
-2. `PlayerHudSnapshotComponent` 확장 (`pending`)
-3. `PlayerHudSnapshotCollectSystem`에 risk snapshot 수집 추가 (`pending`)
-4. HUD snapshot 수집 순서 보강 (`pending`)
-5. `RuntimeUiRoot.Hud`에 `HazardStackRoot` 빌드 추가 (`pending`)
-6. `StageHudPresenter.ApplyHazardStack()` 구현 (`pending`)
-7. EditMode / PlayMode 검증 추가 (`pending`)
+2. `PlayerHudSnapshotComponent`에 `HazardStack/HazardStackMax/HazardRiskMultiplier` 확장 (`done`)
+3. `PlayerHudSnapshotCollectSystem`에 risk snapshot 수집 추가 (`done`)
+4. HUD snapshot 수집 순서 보강 (`done`)
+5. `RuntimeUiRoot.prefab` hazard lane을 `slot + display` 구조로 정리 (`done`)
+6. `StageHudPresenter.ApplyHazardStack()`를 `HazardStackMax` 기반 구성으로 구현 (`done`)
+7. EditMode / PlayMode 검증 추가 (`done`)
 
 ## 9. 검증 계획 / 합격 기준
 - compile
 - console error 0
 - EditMode
-  - `HazardStack == 0`이면 모든 세그먼트 비활성
-  - `HazardStack > 0`이면 해당 수만큼 세그먼트 활성
+  - `HazardStackMax=5`, `HazardStack=0`이면 slot 5개와 inactive sprite 5개 생성
+  - `HazardStack=3`이면 active 3개 / inactive 2개 sprite 적용
+  - `HazardStack=9`, `HazardStackMax=5`이면 active 5개로 clamp
+  - frame 높이가 `FrameBaseHeight + max * FrameHeightPerSegment`로 계산
+  - `Display.localPosition == (0,0)` 유지
+  - sprite pivot과 `native size * scale`이 반영
+  - sibling order가 active/inactive 규칙대로 적용
   - `RiskMultiplierText == x1.15` 형식 검증
   - `HazardStackMax` 수치가 HUD 어디에도 노출되지 않음
   - `PlayerHudSnapshotCollectSystem`가 risk state 최종값을 snapshot에 기록
@@ -181,11 +216,12 @@ HazardRiskMultiplier = 1 + (HazardStack × HazardBonusRate)
   - retry / stage start 후 HUD stack 0 시작
 
 ## 10. 오픈 이슈
-- 세그먼트 고정 개수를 몇 칸으로 둘지 (`5` vs `10`)
 - stack 증가/리셋 순간의 반응 FX를 V1.5에 넣을지, HUD V2로 미룰지
-- `RiskMultiplier` 소수점 자릿수를 `0.00`로 고정할지, stage별로 줄일지
+- stage 시작 시 brush 외의 sprite 세트를 선택 가능하게 확장할지
+- `RiskMultiplier` 소수점 자릿수를 `0.00`로 고정 유지할지, stage별로 줄일지
 
 ## 11. 변경 이력
+- 2026-03-20: 구현 반영. `HazardStackMax`를 HUD snapshot에 포함시키고, `RuntimeUiRoot.prefab` hazard lane을 `slot + display` 구조와 `brush gold/gray` sprite 기준으로 고정했다. `StageHudPresenter`의 frame height, sibling order, pivot/size 검증과 prefab SSOT 원칙을 문서에 반영했다.
 - 2026-03-19: Penpot viewport export 재검토를 반영해 세그먼트 overlap 및 draw-order 규칙을 명시했다.
 - 2026-03-18: 승인된 HUD 레이아웃에 맞춰 `HazardStack` 위치를 `Carry` 세로 토템 내부 보조 레인으로 정리하고, 라벨 없는 세그먼트 + multiplier 구성을 기준안으로 갱신했다.
 - 2026-03-16: 초안 작성. `Carry` 인접 보조층, `HazardStackMax` 비표시, snapshot reader-only, risk resolve 이후 HUD snapshot 수집 순서를 기준안으로 고정했다.

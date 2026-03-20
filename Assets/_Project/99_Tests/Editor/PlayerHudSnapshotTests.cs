@@ -33,6 +33,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(snapshot.CarryLoad, Is.EqualTo(47));
             Assert.That(snapshot.CarryCapacity, Is.EqualTo(300));
             Assert.That(snapshot.HazardStack, Is.EqualTo(0));
+            Assert.That(snapshot.HazardStackMax, Is.EqualTo(5));
             Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1f).Within(1e-6f));
             Assert.That(snapshot.TotalSourceCount, Is.EqualTo(3));
             Assert.That(snapshot.DepletedSourceCount, Is.EqualTo(1));
@@ -154,6 +155,7 @@ namespace SweepNDodge.DotsBullets.Tests
             TickWorld(world, simGroup, 1f / 60f);
             var snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
             Assert.That(snapshot.HazardStack, Is.EqualTo(2));
+            Assert.That(snapshot.HazardStackMax, Is.EqualTo(5));
             Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1.10f).Within(1e-6f));
 
             var riskRequest = em.GetComponentData<PlayerHazardRiskRequestComponent>(player);
@@ -163,6 +165,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
             Assert.That(snapshot.HazardStack, Is.EqualTo(4));
+            Assert.That(snapshot.HazardStackMax, Is.EqualTo(5));
             Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1.20f).Within(1e-6f));
 
             riskRequest = em.GetComponentData<PlayerHazardRiskRequestComponent>(player);
@@ -172,6 +175,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             snapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
             Assert.That(snapshot.HazardStack, Is.EqualTo(0));
+            Assert.That(snapshot.HazardStackMax, Is.EqualTo(5));
             Assert.That(snapshot.HazardRiskMultiplier, Is.EqualTo(1f).Within(1e-6f));
         }
 

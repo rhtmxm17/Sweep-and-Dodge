@@ -398,6 +398,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CarryLoad = 5,
                 CarryCapacity = 10,
                 HazardStack = 0,
+                HazardStackMax = 5,
                 HazardRiskMultiplier = 1f,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
@@ -434,6 +435,10 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.StageHudPresenter.HazardStackRoot.activeSelf, Is.True);
             Assert.That(context.Root.StageHudPresenter.HazardStackSegmentImages, Has.Length.EqualTo(5));
             Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(0));
+            Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(5));
+            AssertHazardSegmentOrder(context.Root.StageHudPresenter, activeCount: 0);
+            AssertHazardStackFrameHeight(context.Root.StageHudPresenter, maxSegments: 5);
+            AssertHazardSegmentDisplayLayout(context.Root.StageHudPresenter, width: 20.5f, height: 24f);
             Assert.That(context.Root.StageHudPresenter.RiskMultiplierText.text, Is.EqualTo("x1.00"));
             Assert.That(HazardStackDisplaysNoMaxText(context.Root.StageHudPresenter), Is.True);
             Assert.That(context.Root.StageHudPresenter.TimerValueText.text, Is.EqualTo("70.0s"));
@@ -462,6 +467,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CarryLoad = 10,
                 CarryCapacity = 10,
                 HazardStack = 3,
+                HazardStackMax = 5,
                 HazardRiskMultiplier = 1.15f,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
@@ -477,6 +483,8 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.StageHudPresenter.ObjectiveSummaryText.text, Is.EqualTo("3 / 3"));
             Assert.That(context.Root.StageHudPresenter.RiskMultiplierText.text, Is.EqualTo("x1.15"));
             Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(3));
+            Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(2));
+            AssertHazardSegmentOrder(context.Root.StageHudPresenter, activeCount: 3);
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
             Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
             Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.True);
@@ -486,6 +494,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 2,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 80f,
@@ -499,6 +508,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 2,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 141f,
@@ -515,6 +525,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 2,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 70f,
@@ -528,6 +539,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 70f,
@@ -544,6 +556,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 2,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 70f,
@@ -568,6 +581,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 2,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
@@ -594,6 +608,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CarryLoad = 2,
                 CarryCapacity = 10,
                 HazardStack = 9,
+                HazardStackMax = 5,
                 HazardRiskMultiplier = 1.45f,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
@@ -615,12 +630,15 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
             Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hazard captured"));
             Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(5));
+            Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(0));
+            AssertHazardSegmentOrder(context.Root.StageHudPresenter, activeCount: 5);
             Assert.That(context.Root.StageHudPresenter.RiskMultiplierText.text, Is.EqualTo("x1.45"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
                 CarryLoad = 4,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
@@ -644,6 +662,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 0,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 StageStateElapsedSec = 20f,
                 GameplayElapsedSec = 20f,
             });
@@ -693,6 +712,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
@@ -712,6 +732,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
@@ -724,6 +745,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 0,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
@@ -743,6 +765,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 0,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,
@@ -856,6 +879,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 GameplayElapsedSec = 35f,
@@ -1143,9 +1167,37 @@ namespace SweepNDodge.DotsBullets.Tests
             root.LogBindWarnings = false;
             dialogueBridge.RuntimeUiRoot = root;
             root.BuildDefaultHierarchyForTests();
+            var hazardActiveSprite = CreateTestSprite(
+                "HazardBrushActive",
+                new Color(0.95f, 0.82f, 0.34f, 1f),
+                82,
+                96,
+                new Vector2(0.5121951f, 0.46875f));
+            var hazardInactiveSprite = CreateTestSprite(
+                "HazardBrushInactive",
+                new Color(0.58f, 0.62f, 0.68f, 1f),
+                82,
+                96,
+                new Vector2(0.5121951f, 0.46875f));
+            root.StageHudPresenter.HazardStackActiveSprite = hazardActiveSprite;
+            root.StageHudPresenter.HazardStackInactiveSprite = hazardInactiveSprite;
             rootGo.SetActive(true);
 
-            return new TestContext(shellGo, rootGo, shell, audio, pauseController, pauseBridge, hud, notificationBridge, hintBridge, dialogueBridge, presentationRuntime, root);
+            return new TestContext(
+                shellGo,
+                rootGo,
+                shell,
+                audio,
+                pauseController,
+                pauseBridge,
+                hud,
+                notificationBridge,
+                hintBridge,
+                dialogueBridge,
+                presentationRuntime,
+                root,
+                hazardActiveSprite,
+                hazardInactiveSprite);
         }
 
         private static void InvokeConfigurePresenters(RuntimeUiRoot root)
@@ -1209,11 +1261,83 @@ namespace SweepNDodge.DotsBullets.Tests
             for (int i = 0; i < presenter.HazardStackSegmentImages.Length; i++)
             {
                 var image = presenter.HazardStackSegmentImages[i];
-                if (image != null && image.color.a >= 0.95f)
+                if (image != null && image.sprite == presenter.HazardStackActiveSprite)
                     count++;
             }
 
             return count;
+        }
+
+        private static int CountInactiveHazardSegments(StageHudPresenter presenter)
+        {
+            if (presenter == null || presenter.HazardStackSegmentImages == null)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < presenter.HazardStackSegmentImages.Length; i++)
+            {
+                var image = presenter.HazardStackSegmentImages[i];
+                if (image != null && image.sprite == presenter.HazardStackInactiveSprite)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static void AssertHazardSegmentOrder(StageHudPresenter presenter, int activeCount)
+        {
+            Assert.That(presenter, Is.Not.Null);
+            Assert.That(presenter.HazardStackSegmentImages, Is.Not.Null);
+
+            int maxSegments = presenter.HazardStackSegmentImages.Length;
+            for (int i = 0; i < maxSegments; i++)
+            {
+                var image = presenter.HazardStackSegmentImages[i];
+                Assert.That(image, Is.Not.Null, $"Hazard segment image {i} is missing.");
+
+                var slot = image.transform.parent as RectTransform;
+                Assert.That(slot, Is.Not.Null, $"Hazard segment slot {i} is missing.");
+
+                int expectedSibling = i < activeCount
+                    ? (maxSegments - activeCount) + i
+                    : (maxSegments - 1) - i;
+                Assert.That(slot.GetSiblingIndex(), Is.EqualTo(expectedSibling), $"Hazard segment {i} sibling order mismatch.");
+            }
+        }
+
+        private static void AssertHazardStackFrameHeight(StageHudPresenter presenter, int maxSegments)
+        {
+            Assert.That(presenter, Is.Not.Null);
+            Assert.That(presenter.HazardStackFrameImage, Is.Not.Null);
+            Assert.That(presenter.HazardStackSegmentsRoot, Is.Not.Null);
+
+            float expectedHeight = presenter.FrameBaseHeight + maxSegments * presenter.FrameHeightPerSegment;
+            Assert.That(presenter.HazardStackFrameImage.rectTransform.sizeDelta.y, Is.EqualTo(expectedHeight).Within(1e-4f));
+            Assert.That(presenter.HazardStackFrameImage.rectTransform.anchoredPosition.y, Is.EqualTo(expectedHeight * 0.5f).Within(1e-4f));
+            Assert.That(presenter.HazardStackSegmentsRoot.sizeDelta.y, Is.EqualTo(expectedHeight).Within(1e-4f));
+        }
+
+        private static void AssertHazardSegmentDisplayLayout(StageHudPresenter presenter, float width, float height)
+        {
+            Assert.That(presenter, Is.Not.Null);
+            Assert.That(presenter.HazardStackSegmentImages, Is.Not.Null);
+
+            for (int i = 0; i < presenter.HazardStackSegmentImages.Length; i++)
+            {
+                var image = presenter.HazardStackSegmentImages[i];
+                Assert.That(image, Is.Not.Null, $"Hazard segment image {i} is missing.");
+
+                var rect = image.rectTransform;
+                Assert.That(rect.localPosition.x, Is.EqualTo(0f).Within(1e-4f));
+                Assert.That(rect.localPosition.y, Is.EqualTo(0f).Within(1e-4f));
+                Assert.That(rect.localPosition.z, Is.EqualTo(0f).Within(1e-4f));
+                Assert.That(rect.anchoredPosition.x, Is.EqualTo(0f).Within(1e-4f));
+                Assert.That(rect.anchoredPosition.y, Is.EqualTo(0f).Within(1e-4f));
+                Assert.That(rect.pivot.x, Is.EqualTo(0.5121951f).Within(1e-4f));
+                Assert.That(rect.pivot.y, Is.EqualTo(0.46875f).Within(1e-4f));
+                Assert.That(rect.sizeDelta.x, Is.EqualTo(width).Within(1e-4f));
+                Assert.That(rect.sizeDelta.y, Is.EqualTo(height).Within(1e-4f));
+            }
         }
 
         private static bool HazardStackDisplaysNoMaxText(StageHudPresenter presenter)
@@ -1231,12 +1355,31 @@ namespace SweepNDodge.DotsBullets.Tests
             return true;
         }
 
-        private static Sprite CreateTestSprite()
+        private static Sprite CreateTestSprite(
+            string name = "TestSprite",
+            Color? color = null,
+            int width = 1,
+            int height = 1,
+            Vector2? pivot = null)
         {
-            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            texture.SetPixel(0, 0, Color.white);
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = $"{name}_Texture",
+            };
+            Color pixelColor = color ?? Color.white;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                    texture.SetPixel(x, y, pixelColor);
+            }
             texture.Apply();
-            return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+            var sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, width, height),
+                pivot ?? new Vector2(0.5f, 0.5f),
+                100f);
+            sprite.name = name;
+            return sprite;
         }
 
         private static void ClearVolumePrefs()
@@ -1250,6 +1393,8 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             private readonly GameObject _shellGo;
             private readonly GameObject _rootGo;
+            private readonly Sprite _hazardActiveSprite;
+            private readonly Sprite _hazardInactiveSprite;
 
             public TestContext(
                 GameObject shellGo,
@@ -1263,10 +1408,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 DemoShellHintBridge hintBridge,
                 DemoShellDialogueBridge dialogueBridge,
                 StagePresentationRuntimeController presentationRuntime,
-                RuntimeUiRoot root)
+                RuntimeUiRoot root,
+                Sprite hazardActiveSprite,
+                Sprite hazardInactiveSprite)
             {
                 _shellGo = shellGo;
                 _rootGo = rootGo;
+                _hazardActiveSprite = hazardActiveSprite;
+                _hazardInactiveSprite = hazardInactiveSprite;
                 Shell = shell;
                 Audio = audio;
                 PauseController = pauseController;
@@ -1292,10 +1441,22 @@ namespace SweepNDodge.DotsBullets.Tests
 
             public void Dispose()
             {
+                DestroySprite(_hazardActiveSprite);
+                DestroySprite(_hazardInactiveSprite);
                 if (_rootGo != null)
                     Object.DestroyImmediate(_rootGo);
                 if (_shellGo != null)
                     Object.DestroyImmediate(_shellGo);
+            }
+
+            private static void DestroySprite(Sprite sprite)
+            {
+                if (sprite == null)
+                    return;
+
+                if (sprite.texture != null)
+                    Object.DestroyImmediate(sprite.texture);
+                Object.DestroyImmediate(sprite);
             }
         }
     }

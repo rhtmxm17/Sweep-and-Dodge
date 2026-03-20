@@ -1781,6 +1781,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CarryLoad = 10,
                 CarryCapacity = 10,
                 HazardStack = 3,
+                HazardStackMax = 5,
                 HazardRiskMultiplier = 1.15f,
                 DepletedSourceCount = 3,
                 TotalSourceCount = 3,
@@ -1820,6 +1821,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 CarryLoad = 2,
                 CarryCapacity = 10,
                 HazardStack = 9,
+                HazardStackMax = 5,
                 HazardRiskMultiplier = 1.45f,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
@@ -1845,6 +1847,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 CarryLoad = 10,
                 CarryCapacity = 10,
+                HazardStackMax = 5,
                 DepletedSourceCount = 1,
                 TotalSourceCount = 3,
                 StageStateElapsedSec = 20f,

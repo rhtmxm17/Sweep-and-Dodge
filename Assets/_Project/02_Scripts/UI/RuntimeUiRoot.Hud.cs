@@ -96,9 +96,16 @@ namespace SweepNDodge.DotsBullets
             var hazardRoot = CreateHazardStackRoot(carryTotemRoot, "HazardStackRoot");
             Stretch(hazardRoot);
             StageHudPresenter.HazardStackRoot ??= hazardRoot.gameObject;
+            StageHudPresenter.HazardStackFrameImage ??= CreateHazardStackFrame(hazardRoot, "Segment Frame");
             var hazardSegmentsRoot = CreateHazardStackSegmentsRoot(hazardRoot, "HazardStackSegmentsRoot");
-            SetBottomLeftRect(hazardSegmentsRoot, 8f, 28f, 22f, 74f);
-            EnsureHazardSegments(hazardSegmentsRoot, StageHudPresenter);
+            SetBottomLeftRect(hazardSegmentsRoot, 0f, 14f, 52f, 130f);
+            StageHudPresenter.HazardStackSegmentsRoot ??= hazardSegmentsRoot;
+            StageHudPresenter.HazardStackSegmentSlotTemplate ??= CreateHazardSegmentSlotTemplate(hazardSegmentsRoot, "SegmentSlotTemplate");
+            StageHudPresenter.SegmentScale = 0.25f;
+            StageHudPresenter.SegmentStepY = 16f;
+            StageHudPresenter.FrameBaseHeight = 10f;
+            StageHudPresenter.FrameHeightPerSegment = 24f;
+            StageHudPresenter.HazardStackSegmentImages = System.Array.Empty<Image>();
             StageHudPresenter.RiskMultiplierText ??= FindOrCreateFixedText(
                 hazardRoot,
                 "RiskMultiplierText",
@@ -265,35 +272,51 @@ namespace SweepNDodge.DotsBullets
 
         private static RectTransform CreateHazardStackSegmentsRoot(Transform parent, string name)
         {
-            var go = GetOrCreateChildGameObject(parent, name, typeof(Image));
+            var go = GetOrCreateChildGameObject(parent, name);
             var rect = go.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(22f, 74f);
-
-            var image = go.GetComponent<Image>();
-            image.color = new Color(0.07f, 0.11f, 0.17f, 1f);
-            ApplyDefaultImageSprite(image);
+            rect.sizeDelta = new Vector2(52f, 130f);
             return rect;
         }
 
-        private static void EnsureHazardSegments(RectTransform root, StageHudPresenter presenter)
+        private static Image CreateHazardStackFrame(Transform parent, string name)
         {
-            if (root == null || presenter == null)
-                return;
+            var go = GetOrCreateChildGameObject(parent, name, typeof(Image));
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(-1.5f, 65f);
+            rect.sizeDelta = new Vector2(3f, 130f);
 
-            const int segmentCount = 5;
-            var segments = new Image[segmentCount];
-            for (int i = 0; i < segmentCount; i++)
-            {
-                var segmentGo = GetOrCreateChildGameObject(root, $"Segment_{i}", typeof(Image));
-                var segmentRect = segmentGo.GetComponent<RectTransform>();
-                SetBottomLeftRect(segmentRect, 2f, i * 14f, 18f, 18f);
-                var image = segmentGo.GetComponent<Image>();
-                image.color = new Color(0.54f, 0.59f, 0.66f, 0.42f);
-                ApplyDefaultImageSprite(image);
-                segments[i] = image;
-            }
+            var image = go.GetComponent<Image>();
+            image.color = Color.white;
+            ApplyDefaultImageSprite(image);
+            return image;
+        }
 
-            presenter.HazardStackSegmentImages = segments;
+        private static RectTransform CreateHazardSegmentSlotTemplate(Transform parent, string name)
+        {
+            var go = GetOrCreateChildGameObject(parent, name);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0f);
+            rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
+
+            var display = GetOrCreateChildGameObject(go.transform, "Display", typeof(Image));
+            var displayRect = display.GetComponent<RectTransform>();
+            displayRect.anchorMin = Vector2.zero;
+            displayRect.anchorMax = Vector2.zero;
+            displayRect.pivot = new Vector2(0.5f, 0.5f);
+            displayRect.anchoredPosition = Vector2.zero;
+            displayRect.sizeDelta = new Vector2(20.5f, 24f);
+
+            var image = display.GetComponent<Image>();
+            image.color = Color.white;
+            image.raycastTarget = false;
+            ApplyDefaultImageSprite(image);
+            return rect;
         }
 
         private static void SetVerticalAlignment(RectTransform root, TextAnchor alignment)
@@ -370,14 +393,17 @@ namespace SweepNDodge.DotsBullets
                 || presenter.CarryFillImage == null
                 || presenter.HazardStackRoot == null
                 || presenter.RiskMultiplierText == null
-                || presenter.HazardStackSegmentImages == null
-                || presenter.HazardStackSegmentImages.Length != 5
+                || presenter.HazardStackSegmentsRoot == null
+                || presenter.HazardStackFrameImage == null
+                || presenter.HazardStackSegmentSlotTemplate == null
                 || root.Find("TopCenterObjectiveRoot") == null
                 || root.Find("TopCenterObjectiveRoot/ObjectiveBadgeRow") == null
                 || root.Find("TopCenterObjectiveRoot/PressureSourceProgressRoot") == null
                 || root.Find("LeftCarryRoot") == null
                 || root.Find("LeftCarryRoot/CarryTotemRoot") == null
                 || root.Find("LeftCarryRoot/CarryTotemRoot/HazardStackRoot") == null
+                || root.Find("LeftCarryRoot/CarryTotemRoot/HazardStackRoot/Segment Frame") == null
+                || root.Find("LeftCarryRoot/CarryTotemRoot/HazardStackRoot/HazardStackSegmentsRoot/SegmentSlotTemplate") == null
                 || root.Find("TopCenterObjectiveRoot").GetComponent<VerticalLayoutGroup>() != null
                 || root.Find("TopCenterObjectiveRoot/PressureSourceProgressRoot").GetComponent<VerticalLayoutGroup>() != null
                 || root.Find("LeftCarryRoot").GetComponent<VerticalLayoutGroup>() != null
@@ -399,11 +425,20 @@ namespace SweepNDodge.DotsBullets
             StageHudPresenter.RiskMultiplierText = null;
             StageHudPresenter.PressureSourceValueText = null;
             StageHudPresenter.HazardStackRoot = null;
+            StageHudPresenter.HazardStackSegmentsRoot = null;
+            StageHudPresenter.HazardStackFrameImage = null;
+            StageHudPresenter.HazardStackSegmentSlotTemplate = null;
             StageHudPresenter.PressureSourceProgressRoot = null;
             StageHudPresenter.HazardStackSegmentImages = null;
+            StageHudPresenter.HazardStackActiveSprite = null;
+            StageHudPresenter.HazardStackInactiveSprite = null;
             StageHudPresenter.PressureSourceFillImage = null;
             StageHudPresenter.PressureSourceWeakThresholdMarker = null;
             StageHudPresenter.CarryFillImage = null;
+            StageHudPresenter.SegmentScale = 0.25f;
+            StageHudPresenter.SegmentStepY = 16f;
+            StageHudPresenter.FrameBaseHeight = 10f;
+            StageHudPresenter.FrameHeightPerSegment = 24f;
         }
 
         private static void ClearChildrenImmediate(Transform root)

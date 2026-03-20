@@ -81,6 +81,7 @@ namespace SweepNDodge.DotsBullets
             snapshot.CarryLoad = math.max(0, carry.Load);
             snapshot.CarryCapacity = math.max(0, carry.Capacity);
             snapshot.HazardStack = math.max(0, hazardRiskState.HazardStack);
+            snapshot.HazardStackMax = math.max(0, hazardRiskConfig.HazardStackMax);
             snapshot.HazardRiskMultiplier = 1f + snapshot.HazardStack * math.max(0f, hazardRiskConfig.HazardBonusRate);
             snapshot.TotalSourceCount = math.max(0, totalSources);
             snapshot.DepletedSourceCount = math.clamp(depletedSources, 0, snapshot.TotalSourceCount);

@@ -4,7 +4,7 @@
 - doc_id: `GD-010`
 - type: `GameDesign`
 - status: `draft`
-- last_updated: `2026-03-13`
+- last_updated: `2026-03-20`
 - related_docs:
   - [GD-001-campaign-loop-design.md](./GD-001-campaign-loop-design.md)
   - [GD-004-carrybin-load-and-deposit.md](./GD-004-carrybin-load-and-deposit.md)
@@ -15,6 +15,7 @@
   - [TD-011-runtime-player-hud-contract.md](../TechnicalDesign/TD-011-runtime-player-hud-contract.md)
   - [TD-013-player-feedback-presentation-bridge-contract.md](../TechnicalDesign/TD-013-player-feedback-presentation-bridge-contract.md)
   - [TD-016-runtime-ui-shell-and-navigation-contract.md](../TechnicalDesign/TD-016-runtime-ui-shell-and-navigation-contract.md)
+  - [TD-021-hazardstack-hud-contract.md](../TechnicalDesign/TD-021-hazardstack-hud-contract.md)
 
 > [GD-009](./GD-009-in-game-ui-screen-blueprint.md)에서 정리한 인게임 UI 청사진을 영역별 기준안으로 풀어쓰는 후속 상세 기획 문서. Carry 블록, Objective 블록, 하단 중앙 레인, 월드 인디케이터의 역할과 우선순위를 구체화한다.
 
@@ -163,6 +164,7 @@ Carry 블록은 "지금 얼마나 담았는가"를 넘어서, "계속 수거 가
 - 상태 단계는 최소 3단계(여유 / 욕심 구간 / Full)로 둔다.
 - Full 상태는 별도 강조가 필요하다.
 - HazardStack은 Carry 본체가 아니라 인접 보조층으로 유지한다.
+- HazardStack 보조층은 세그먼트와 `RiskMultiplier` 텍스트를 사용하고, `HazardStackMax` 숫자는 노출하지 않는다.
 
 ## 10. Objective 블록 내부 구성
 ### 10.1 역할
@@ -306,4 +308,5 @@ Objective 블록은 현재 런의 방향성을 요약한다.
 - 패턴 전조 인디케이터의 시각 강도와 표현 범위는 실제 플레이 테스트 기준으로 보정이 필요하다.
 
 ## 15. 변경 이력
+- 2026-03-20: 현재 HUD 구현을 반영해 Carry 인접 `HazardStack` 보조층의 기본 표현을 `세그먼트 + RiskMultiplier`로 명시하고 `HazardStackMax` 비표시 원칙을 추가했다.
 - 2026-03-13: 초안 작성

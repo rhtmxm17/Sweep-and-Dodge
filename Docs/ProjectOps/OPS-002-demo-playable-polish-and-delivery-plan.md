@@ -6,7 +6,7 @@
 - doc_id: `OPS-002`
 - type: `ProjectOps`
 - status: `draft`
-- last_updated: `2026-03-13`
+- last_updated: `2026-03-20`
 - related_docs:
   - [OPS-001-prototype-core-capability-priority-matrix.md](./OPS-001-prototype-core-capability-priority-matrix.md)
   - [OPS-003-public-release-readiness-plan.md](./OPS-003-public-release-readiness-plan.md)
@@ -18,6 +18,7 @@
   - [TD-011-runtime-player-hud-contract.md](../TechnicalDesign/TD-011-runtime-player-hud-contract.md)
   - [TD-013-player-feedback-presentation-bridge-contract.md](../TechnicalDesign/TD-013-player-feedback-presentation-bridge-contract.md)
   - [TD-014-demo-audio-runtime-contract.md](../TechnicalDesign/TD-014-demo-audio-runtime-contract.md)
+  - [TD-021-hazardstack-hud-contract.md](../TechnicalDesign/TD-021-hazardstack-hud-contract.md)
   - [GD-001-campaign-loop-design.md](../GameDesign/GD-001-campaign-loop-design.md)
   - [GD-004-carrybin-load-and-deposit.md](../GameDesign/GD-004-carrybin-load-and-deposit.md)
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
@@ -145,6 +146,7 @@
 - 2026-03-13 구현 반영:
   - HUD V1 완료: `StageLabel`, `Objective`, `SourceProgress`, `Pressure Source progress`, `Carry`, `Timer`, `Danger banner`, `single toast`
   - `Pressure Source`는 pressure 상태 source에 대해서만 노출되며, bar 위에 `Normal -> Weakened` 임계 marker 표시
+  - `HazardStack` lane은 `Carry` 인접 보조 레인에 `slot + display` 구조로 고정하고, stage-start `HazardStackMax` 기준 slot 수 / frame height / `brush gold/gray` sprite를 사용한다
   - 미완료: `Stage1` 온보딩 힌트 시퀀스, 실패 학습 카피, 접근성 옵션 연동
 
 11. `P0` VFX 제품화
@@ -261,6 +263,7 @@
   - 운영 씬 정기 스모크 결과 기록
 
 ## 10. 변경 이력
+- 2026-03-20: S10 진행 상태 반영. `HazardStack` HUD를 `HazardStackMax` 기반 slot/frame 구조와 `brush gold/gray` sprite 기준으로 고정하고, 관련 EditMode/PlayMode 검증이 통과한 상태를 문서에 반영했다.
 - 2026-03-13: Runtime UI 전환 구현 반영. S8을 `DONE`으로 전환하고 `RuntimeUiRoot` 기반 `Shell/Modal/HUD V1` 구현 상태를 반영했다. S10은 HUD V1이 완료되어 `IN_PROGRESS`로 갱신했고, `Pressure Source` 진행 바/약화 임계 marker와 남은 온보딩 범위를 명시했다.
 - 2026-03-12: 공개 빌드 기준 부족분을 반영해 S8~S12를 추가했다. `OnGUI -> Runtime UI 전환`, `KB+Mouse UX`, `출시형 HUD/온보딩`, `VFX 제품화`, `브랜딩/패키징`을 후반 P0 작업 스트림으로 승격하고, `OPS-003` 분리 계획을 추가했다.
 - 2026-03-05: S5 잔여 작업 완료. `DemoAudioBridge`에 Source 하이브리드 자동 보정, fallback tone clip 자동 할당/정리, missing cue warn-once 정책을 추가하고 `DemoShellFlowController` Overlay에 4버스 볼륨 슬라이더를 연결했다. EditMode/PlayMode 테스트를 확장해 전이 cue, 자동 세팅, 볼륨 복원을 검증하고 S5 상태를 `DONE`으로 갱신했다.

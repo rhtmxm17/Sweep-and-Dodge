@@ -4,15 +4,17 @@
 - doc_id: `TD-011`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-20`
 - related_docs:
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [TD-007-common-combat-event-channel.md](./TD-007-common-combat-event-channel.md)
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
+  - [TD-016-runtime-ui-shell-and-navigation-contract.md](./TD-016-runtime-ui-shell-and-navigation-contract.md)
+  - [TD-021-hazardstack-hud-contract.md](./TD-021-hazardstack-hud-contract.md)
 - related_adr: 중요 결정 없음 (ADR 신규 작성 없음)
 
-> S2 범위의 플레이 HUD를 `OnGUI + ECS snapshot` 계약으로 고정하고, 디버그 HUD와의 공존 정책을 명확히 한다.
+> 플레이 HUD의 공통 snapshot writer/read-only 소비 계약을 고정하고, Runtime UI와 개발용 overlay가 같은 HUD snapshot을 공유하도록 한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -51,13 +53,17 @@
 ### 4.1 스냅샷 계약
 - `PlayerHudSnapshotComponent`
   - Carry: `CarryLoad`, `CarryCapacity`
+  - Hazard: `HazardStack`, `HazardStackMax`, `HazardRiskMultiplier`
   - Source 집계: `DepletedSourceCount`, `TotalSourceCount`
-  - Pressure Source: `PressureSourceStableId`, `PressureSourceCollected`, `PressureSourceThresholdDepleted`, `PressureSourceProgress01`
+  - Pressure Source: `PressureSourceStableId`, `PressureSourceCollected`, `PressureSourceThresholdWeakened`, `PressureSourceThresholdDepleted`, `PressureSourceProgress01`
   - Stage:
     - `StageState`, `StageStateElapsedSec`
     - `GameplayElapsedSec`
   - Hit: `LastHitLossValue`, `HitFlashRemainingSec`
+  - Totals: `TotalCollectValue`, `TotalCleanupValue`, `TotalHitValue`
   - 갱신 프레임: `LastUpdatedFrame`
+
+Hazard 관련 표현 계약은 [TD-021-hazardstack-hud-contract.md](./TD-021-hazardstack-hud-contract.md)에서 상세화한다.
 
 ### 4.2 계산 규칙
 - Pressure Source 선택:
@@ -124,5 +130,6 @@
 - 따라서 ADR 신규 작성은 생략한다.
 
 ## 9. 변경 이력
+- 2026-03-20: 현재 HUD snapshot 스키마와 동기화했다. `HazardStack/HazardStackMax/HazardRiskMultiplier`, `PressureSourceThresholdWeakened`, total 메트릭 필드를 문서에 반영하고 Runtime UI 관련 참조 문서를 연결했다.
 - 2026-03-05: OPS-002 S2 문서 마감 반영. 진행 상태/검증 기준과 일치하도록 최신화했다.
 - 2026-03-04: 문서 신규 작성. S2 플레이 HUD 계약(`OnGUI + ECS snapshot`), Stage 메타 read-only 공급, Debug HUD 빌드 노출 정책을 고정했다.
