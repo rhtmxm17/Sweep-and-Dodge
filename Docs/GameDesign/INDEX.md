@@ -16,3 +16,4 @@
 - [GD-010-in-game-ui-layout-and-zones.md](GD-010-in-game-ui-layout-and-zones.md): 인게임 UI 주요 영역별 기준안과 배치 원칙
 - [GD-011-in-world-dialogue-direction.md](GD-011-in-world-dialogue-direction.md): 스테이지 전환성 순간의 인월드 연출 대화 방향
 - [GD-012-characterized-hud-toast-direction.md](GD-012-characterized-hud-toast-direction.md): 플레이 도중 비차단형 캐릭터형 HUD 토스트 방향
+- [GD-013-visual-tone-keyword-board.md](GD-013-visual-tone-keyword-board.md): 세션 레퍼런스 이미지 기반 비주얼 톤 키워드와 적용 힌트

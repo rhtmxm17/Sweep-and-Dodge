@@ -4,6 +4,7 @@
 
 ## 폴더 구조
 - [`Docs/ADR`](ADR/INDEX.md): 확정된 아키텍처/설계 결정 기록
+- [`Docs/Art`](Art/INDEX.md): 컨셉 레퍼런스 이미지와 문서 연결용 자산 보관
 - [`Docs/GameDesign`](GameDesign/INDEX.md): 게임 규칙, 루프, 체감 설계 기획
 - [`Docs/TechnicalDesign`](TechnicalDesign/INDEX.md): 구현 전 기술 설계/구성안
 - [`Docs/ProjectOps`](ProjectOps/INDEX.md): 우선순위, 일정, 운영/관리 문서
@@ -25,6 +26,7 @@
 
 ## 바로가기
 - [Docs/ADR/INDEX.md](ADR/INDEX.md)
+- [Docs/Art/INDEX.md](Art/INDEX.md)
 - [Docs/GameDesign/INDEX.md](GameDesign/INDEX.md)
 - [Docs/TechnicalDesign/INDEX.md](TechnicalDesign/INDEX.md)
 - [Docs/ProjectOps/INDEX.md](ProjectOps/INDEX.md)
