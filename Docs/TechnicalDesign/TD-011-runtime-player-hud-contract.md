@@ -63,6 +63,12 @@
   - Totals: `TotalCollectValue`, `TotalCleanupValue`, `TotalHitValue`
   - 갱신 프레임: `LastUpdatedFrame`
 
+- stage-entry seed
+  - `StageSessionResetPrepareSystem`이 stage entry reset 중 `PlayerHudSnapshotComponent`를 새 run 초기 표시값으로 재작성한다.
+  - seed 값은 `CarryLoad=0`, `CarryCapacity=현재 player capacity`, `HazardStack=0`, `HazardStackMax=현재 config max`, `HazardRiskMultiplier=1`, `StageState=reset 후 stage state`, `StageStateElapsedSec=0`, `GameplayElapsedSec=0`, hit/pressure/totals는 0을 사용한다.
+  - 목적은 첫 `ExecutionEnd` snapshot collect 이전에도 runtime UI가 이전 스테이지 carry/hazard 상태를 보여주지 않도록 하는 것이다.
+  - `PlayerRuntimeHudBridge`는 `DemoShellStagePlayPhaseId.Starting` 동안 last snapshot/feed를 동일한 neutral seed로 정규화해, reset 요청 직전 1프레임 stale presentation을 추가로 차단한다.
+
 Hazard 관련 표현 계약은 [TD-021-hazardstack-hud-contract.md](./TD-021-hazardstack-hud-contract.md)에서 상세화한다.
 
 ### 4.2 계산 규칙
@@ -130,6 +136,7 @@ Hazard 관련 표현 계약은 [TD-021-hazardstack-hud-contract.md](./TD-021-haz
 - 따라서 ADR 신규 작성은 생략한다.
 
 ## 9. 변경 이력
+- 2026-03-20: stage-entry HUD snapshot seed 계약을 추가했다. `StageSessionResetPrepareSystem`이 새 run 진입 직후 stale carry/hazard/UI feedback 노출을 막기 위해 HUD snapshot 초기값을 명시적으로 다시 쓰는 규칙을 반영했다.
 - 2026-03-20: 현재 HUD snapshot 스키마와 동기화했다. `HazardStack/HazardStackMax/HazardRiskMultiplier`, `PressureSourceThresholdWeakened`, total 메트릭 필드를 문서에 반영하고 Runtime UI 관련 참조 문서를 연결했다.
 - 2026-03-05: OPS-002 S2 문서 마감 반영. 진행 상태/검증 기준과 일치하도록 최신화했다.
 - 2026-03-04: 문서 신규 작성. S2 플레이 HUD 계약(`OnGUI + ECS snapshot`), Stage 메타 read-only 공급, Debug HUD 빌드 노출 정책을 고정했다.

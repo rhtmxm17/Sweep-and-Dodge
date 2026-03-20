@@ -589,11 +589,14 @@ namespace SweepNDodge.DotsBullets
             if (!TryGetStageProfile(stageIndex, out var profile))
                 return;
 
+            EnsureTopologyBridgeReference();
+            SyncTopologyBridgeStageCatalogReference();
+
             DemoShellSessionStaging.IncrementDialogueStageAttempt(profile.StageId);
             DemoShellSessionStaging.BeginDialogueStageRun(profile.StageId);
             _currentStageIndex = stageIndex;
             _stageStartPending = true;
-            _stageTopologyApplyPending = true;
+            _stageTopologyApplyPending = !(TopologyBridge != null && TopologyBridge.RequestTopologyApply(profile.StageId));
             _currentStagePlayPhase = DemoShellStagePlayPhaseId.Starting;
             _stageRunningObserved = false;
             ResetPendingClearPresentationState();

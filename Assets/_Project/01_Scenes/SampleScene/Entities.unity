@@ -256,6 +256,8 @@ MonoBehaviour:
   IFrameTime: 0.7
   VacuumLockTime: 0.7
   HitImpulseMagnitude: 1
+  HazardStackMax: 5
+  HazardBonusRate: 0.05
 --- !u!4 &1191526536
 Transform:
   m_ObjectHideFlags: 0
@@ -346,7 +348,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 69e4cb670ba50694786ec89241661e6f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.RunProgressDirectorSettingsAuthoring
-  PressureHoldSec: 0.35
+  PressureHoldSec: 2.5
   BaselineTrashDensityScale: 0.45
   PressureDensityScale: 1
   InitialStageState: 0

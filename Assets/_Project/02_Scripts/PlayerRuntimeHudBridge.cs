@@ -68,6 +68,17 @@ namespace SweepNDodge.DotsBullets
         {
             EnsureDemoShellReference();
 
+            if (DemoShell != null)
+            {
+                _lastStageId = Mathf.Max(0, DemoShell.CurrentStageId);
+                _lastScreen = DemoShell.CurrentScreen;
+            }
+            else
+            {
+                _lastStageId = 0;
+                _lastScreen = DemoShellScreenId.Title;
+            }
+
             if (!TryBind())
                 return;
 
@@ -79,16 +90,8 @@ namespace SweepNDodge.DotsBullets
             _hasSnapshot = true;
             UpdateFeedbackState();
 
-            if (DemoShell != null)
-            {
-                _lastStageId = Mathf.Max(0, DemoShell.CurrentStageId);
-                _lastScreen = DemoShell.CurrentScreen;
-            }
-            else
-            {
-                _lastStageId = 0;
-                _lastScreen = DemoShellScreenId.Title;
-            }
+            if (ShouldUseStageEntryPresentationSeed())
+                ApplyStageEntryPresentationSeed();
         }
 
         private void OnGUI()
@@ -206,6 +209,45 @@ namespace SweepNDodge.DotsBullets
 
             _lastFeedbackVersion = _lastFeedbackSnapshot.Version;
             _feedbackLine = BuildFeedbackLine(_lastFeedbackSnapshot);
+        }
+
+        private bool ShouldUseStageEntryPresentationSeed()
+        {
+            return DemoShell != null
+                && DemoShell.CurrentScreen == DemoShellScreenId.StagePlay
+                && DemoShell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Starting;
+        }
+
+        private void ApplyStageEntryPresentationSeed()
+        {
+            _lastSnapshot = new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 0,
+                CarryCapacity = Mathf.Max(0, _lastSnapshot.CarryCapacity),
+                HazardStack = 0,
+                HazardStackMax = Mathf.Max(0, _lastSnapshot.HazardStackMax),
+                HazardRiskMultiplier = 1f,
+                DepletedSourceCount = 0,
+                TotalSourceCount = 0,
+                PressureSourceStableId = 0u,
+                PressureSourceCollected = 0,
+                PressureSourceThresholdWeakened = 0,
+                PressureSourceThresholdDepleted = 0,
+                PressureSourceProgress01 = 0f,
+                StageState = RunDirectorStageStateId.Idle,
+                StageStateElapsedSec = 0f,
+                GameplayElapsedSec = 0f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+                TotalCollectValue = 0,
+                TotalCleanupValue = 0,
+                TotalHitValue = 0,
+                LastUpdatedFrame = 0u,
+            };
+
+            _lastFeedbackSnapshot = default;
+            _lastFeedbackVersion = 0u;
+            _feedbackLine = string.Empty;
         }
 
         private static string BuildFeedbackLine(in PlayerUiFeedbackPresentationSnapshotComponent snapshot)

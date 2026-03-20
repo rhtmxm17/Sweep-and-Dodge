@@ -4,7 +4,7 @@
 - doc_id: `TD-010`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-16`
+- last_updated: `2026-03-20`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -67,8 +67,9 @@
 - session reset 계약
   - `RequestTopologyApply(stageId)`는 stage entry reset을 포함한다.
   - reset owner는 `StageTopologyPrepareGroup`의 ECS 시스템이다.
-  - world recreation이나 scene reload에 의존하지 않고 session singleton 상태를 명시적으로 초기화한다.
+  - world recreation이나 scene reload에 의존하지 않고 session singleton + player stage-entry transient state를 명시적으로 초기화한다.
   - same-frame `apply -> start`를 유지하기 위해 `StageStartRequested`와 intro/clear gate는 reset 중 보존한다.
+  - stage entry transient reset 범위에는 `PlayerCarryBin.Load`, `PlayerHazardRisk/HazardPenalty` 임시 상태, request tag/context, UI feedback snapshot/buffer, HUD snapshot seed가 포함된다.
 - H3 long-cycle 규칙
   - topology apply는 stage 경계(`Idle`, `Completed`, 초기 부트스트랩)에서만 허용한다.
   - `Running`, `ClearReady` 중 topology apply 요청은 warning 후 무시되고 현재 stage topology는 유지된다.
@@ -175,6 +176,7 @@
 - [ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md](../ADR/ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md)
 
 ## 10. 변경 이력
+- 2026-03-20: stage entry reset scope를 player transient state까지 확장 반영했다. `CarryBin/HazardStack/UI feedback/HUD snapshot`이 새 stage 진입 직후 stale 값을 노출하지 않도록 prepare owner 책임 범위를 문서에 명시했다.
 - 2026-03-16: `TD-022` 연계 반영. `StageStart=overlay` 기본값과 `StageClear`의 `pre-result clear dialogue -> confirm -> result` defer 계약을 추가했다.
 
 

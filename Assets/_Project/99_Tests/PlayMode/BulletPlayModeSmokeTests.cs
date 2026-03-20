@@ -2205,6 +2205,146 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_NextStageEntry_ClearsCarryHazardAndCarryFullPresentationImmediately()
+        {
+            ClearDemoShellStaging();
+            DemoShellSessionStaging.StageStagePlay(0);
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            RuntimeUiRoot uiRoot = null;
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    return shell != null
+                        && uiRoot != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
+                },
+                360,
+                "Stage1 did not reach running before next-stage reset regression setup.");
+
+            SeedStageEntryStaleState(em, hazardStack: 3);
+            ForceStageStateToClearReady(em);
+            yield return WaitForStageResultAfterForcedClearReady(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Clear;
+                },
+                240,
+                "Stage1 did not enter clear result before next-stage reset regression.");
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+
+            bool sawStale = false;
+            string staleDetails = string.Empty;
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    world = World.DefaultGameObjectInjectionWorld;
+                    if (shell == null || uiRoot == null || world == null)
+                        return false;
+                    if (shell.CurrentScreen != DemoShellScreenId.StagePlay || shell.CurrentStageId != 2)
+                        return false;
+
+                    em = world.EntityManager;
+                    if (!IsFreshStageEntryState(em, uiRoot, out staleDetails))
+                    {
+                        sawStale = true;
+                        return false;
+                    }
+
+                    return shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
+                },
+                360,
+                () => $"Stage2 entry did not stabilize with fresh carry/hazard state. staleObserved={sawStale}, details={staleDetails}");
+
+            Assert.That(sawStale, Is.False, $"Stage2 entry exposed stale carry/hazard state before reset. {staleDetails}");
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_DemoShell_RetryEntry_ClearsCarryHazardAndCarryFullPresentationImmediately()
+        {
+            ClearDemoShellStaging();
+            DemoShellSessionStaging.StageStagePlay(0);
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+            var em = world.EntityManager;
+
+            DemoShellFlowController shell = null;
+            RuntimeUiRoot uiRoot = null;
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    return shell != null
+                        && uiRoot != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
+                },
+                360,
+                "Stage1 did not reach running before retry reset regression setup.");
+
+            SeedStageEntryStaleState(em, hazardStack: 4);
+            ForceStageStateToClearReady(em);
+            yield return WaitForStageResultAfterForcedClearReady(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StageResult
+                        && shell.CurrentStageOutcome == DemoShellStageOutcomeId.Clear;
+                },
+                240,
+                "Stage1 did not enter clear result before retry reset regression.");
+
+            Assert.That(shell.RequestResultAction(DemoShellResultActionId.Retry), Is.True);
+
+            bool sawStale = false;
+            string staleDetails = string.Empty;
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    uiRoot = FindRuntimeUiRoot();
+                    world = World.DefaultGameObjectInjectionWorld;
+                    if (shell == null || uiRoot == null || world == null)
+                        return false;
+                    if (shell.CurrentScreen != DemoShellScreenId.StagePlay || shell.CurrentStageId != 1)
+                        return false;
+
+                    em = world.EntityManager;
+                    if (!IsFreshStageEntryState(em, uiRoot, out staleDetails))
+                    {
+                        sawStale = true;
+                        return false;
+                    }
+
+                    return shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
+                },
+                360,
+                () => $"Retry entry did not stabilize with fresh carry/hazard state. staleObserved={sawStale}, details={staleDetails}");
+
+            Assert.That(sawStale, Is.False, $"Retry entry exposed stale carry/hazard state before reset. {staleDetails}");
+        }
+
+        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_DemoShell_ForceClearReadyFromStagePlay_EntersClearResult()
         {
             ClearDemoShellStaging();
@@ -3908,6 +4048,116 @@ namespace SweepNDodge.DotsBullets.Tests
             carry.Capacity = Mathf.Max(10, carry.Capacity);
             carry.Load = carry.Capacity;
             em.SetComponentData(carryEntity, carry);
+        }
+
+        private static void SeedStageEntryStaleState(EntityManager em, int hazardStack)
+        {
+            var playerEntity = GetSingletonEntity<PlayerTag>(em);
+            var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
+            carry.Capacity = Mathf.Max(10, carry.Capacity);
+            carry.Load = carry.Capacity;
+            em.SetComponentData(playerEntity, carry);
+
+            if (em.HasComponent<PlayerHazardRiskStateComponent>(playerEntity))
+            {
+                em.SetComponentData(playerEntity, new PlayerHazardRiskStateComponent
+                {
+                    HazardStack = Mathf.Max(0, hazardStack),
+                });
+            }
+
+            if (em.HasComponent<PlayerUiFeedbackPresentationSnapshotComponent>(playerEntity))
+            {
+                uint frame = HasSingleton<BulletFrameCounterComponent>(em)
+                    ? GetSingleton<BulletFrameCounterComponent>(em).Value
+                    : 0u;
+                em.SetComponentData(playerEntity, new PlayerUiFeedbackPresentationSnapshotComponent
+                {
+                    Version = 900u,
+                    Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
+                    Reason = (byte)PlayerUiFeedbackReasonId.CarryBinFull,
+                    Value = 0,
+                    RelatedEntity = playerEntity,
+                    Frame = frame,
+                    RemainingSec = 1.25f,
+                    ClockSec = 0f,
+                    NextAllowedVacuumBlockedSec = 0.15f,
+                    NextAllowedSourceStateChangedSec = 0f,
+                    NextAllowedHazardCapturedSec = 0f,
+                    NextAllowedHazardRemovedSec = 0f,
+                    NextAllowedHitSec = 0f,
+                });
+            }
+
+            if (HasSingleton<PlayerHudSnapshotComponent>(em))
+            {
+                var snapshotEntity = GetSingletonEntity<PlayerHudSnapshotComponent>(em);
+                var snapshot = em.GetComponentData<PlayerHudSnapshotComponent>(snapshotEntity);
+                snapshot.CarryLoad = carry.Load;
+                snapshot.CarryCapacity = carry.Capacity;
+                snapshot.HazardStack = Mathf.Max(0, hazardStack);
+                snapshot.HazardStackMax = Mathf.Max(snapshot.HazardStackMax, Mathf.Max(1, hazardStack));
+                snapshot.HazardRiskMultiplier = 1f + snapshot.HazardStack * 0.05f;
+                snapshot.LastUpdatedFrame = HasSingleton<BulletFrameCounterComponent>(em)
+                    ? GetSingleton<BulletFrameCounterComponent>(em).Value
+                    : 0u;
+                em.SetComponentData(snapshotEntity, snapshot);
+            }
+        }
+
+        private static bool IsFreshStageEntryState(EntityManager em, RuntimeUiRoot uiRoot, out string details)
+        {
+            details = string.Empty;
+
+            if (uiRoot == null || uiRoot.RuntimeHudBridge == null)
+            {
+                details = "RuntimeHudBridge missing.";
+                return false;
+            }
+
+            if (!uiRoot.RuntimeHudBridge.TryGetLastSnapshot(out var snapshot))
+            {
+                details = "RuntimeHudBridge has no snapshot.";
+                return false;
+            }
+
+            if (snapshot.CarryLoad != 0 || snapshot.HazardStack != 0)
+            {
+                details = $"HUD snapshot stale: carry={snapshot.CarryLoad}/{snapshot.CarryCapacity}, hazard={snapshot.HazardStack}/{snapshot.HazardStackMax}.";
+                return false;
+            }
+
+            if (uiRoot.RuntimeHudBridge.TryGetLastFeedbackSnapshot(out var feedback))
+            {
+                if (feedback.Type == PlayerUiFeedbackEventType.VacuumStartBlocked
+                    && feedback.Reason == (byte)PlayerUiFeedbackReasonId.CarryBinFull
+                    && feedback.RemainingSec > 0f)
+                {
+                    details = $"Feedback snapshot still reports CarryBinFull. version={feedback.Version}, remaining={feedback.RemainingSec:0.00}.";
+                    return false;
+                }
+            }
+
+            if (uiRoot != null
+                && uiRoot.NotificationBridge != null
+                && uiRoot.NotificationBridge.CurrentNotification.Id == NotificationId.CarryFull)
+            {
+                details = "NotificationBridge still resolves CarryFull.";
+                return false;
+            }
+
+            if (uiRoot != null
+                && uiRoot.NotificationPanel != null
+                && uiRoot.NotificationPanel.activeInHierarchy
+                && uiRoot.NotificationPresenter != null
+                && uiRoot.NotificationPresenter.NotificationText != null
+                && uiRoot.NotificationPresenter.NotificationText.text == "Carry full - deposit now")
+            {
+                details = "NotificationPresenter still shows Carry full - deposit now.";
+                return false;
+            }
+
+            return true;
         }
 
         private static void TriggerFirstHitFeedback(EntityManager em, uint version, int lossValue)

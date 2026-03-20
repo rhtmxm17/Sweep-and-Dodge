@@ -294,13 +294,14 @@ namespace SweepNDodge.DotsBullets
             gate.AutoAdvanceTimeoutElapsed = 0;
             em.SetComponentData(gateEntity, gate);
 
-            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
+            var resetStageState = new RunDirectorStageStateComponent
             {
                 State = bootReset ? stageConfig.InitialState : RunDirectorStageStateId.Idle,
                 StateElapsedSec = 0f,
                 EnteredFrame = 0u,
                 LastTransitionReason = RunDirectorStageTransitionReasonId.None,
-            });
+            };
+            em.SetComponentData(stageStateEntity, resetStageState);
 
             em.SetComponentData(signalEntity, default(RunDirectorStageSignalComponent));
             var gameplayClock = em.GetComponentData<StageGameplayClockComponent>(stageGameplayClockEntity);
@@ -311,32 +312,178 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
 
             em.SetComponentData(lifecycleEntity, default(StageTopologyLifecycleStateComponent));
-            ResetPlayerHazardRisk(em);
+            ResetPlayerStageEntryTransientState(em, in resetStageState);
         }
 
-        private static void ResetPlayerHazardRisk(EntityManager em)
+        private static void ResetPlayerStageEntryTransientState(
+            EntityManager em,
+            in RunDirectorStageStateComponent stageState)
         {
-            using var query = em.CreateEntityQuery(
-                ComponentType.ReadOnly<PlayerTag>(),
-                ComponentType.ReadWrite<PlayerHazardRiskStateComponent>(),
-                ComponentType.ReadWrite<PlayerHazardRiskRequestComponent>());
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<PlayerTag>());
+
+            int carryCapacity = 0;
+            bool hasCarryCapacity = false;
+            int hazardStackMax = 0;
+            bool hasHazardStackMax = false;
+
             if (query.IsEmptyIgnoreFilter)
+            {
+                SeedPlayerHudSnapshot(em, carryCapacity, hazardStackMax, in stageState);
                 return;
+            }
 
             using var players = query.ToEntityArray(Allocator.Temp);
             for (int i = 0; i < players.Length; i++)
             {
                 var player = players[i];
-                em.SetComponentData(player, new PlayerHazardRiskStateComponent
+
+                if (em.HasComponent<PlayerCarryBinComponent>(player))
                 {
-                    HazardStack = 0,
-                });
-                em.SetComponentData(player, new PlayerHazardRiskRequestComponent
+                    var carry = em.GetComponentData<PlayerCarryBinComponent>(player);
+                    if (!hasCarryCapacity)
+                    {
+                        carryCapacity = carry.Capacity >= 0 ? carry.Capacity : 0;
+                        hasCarryCapacity = true;
+                    }
+
+                    carry.Load = 0;
+                    em.SetComponentData(player, carry);
+                }
+
+                if (em.HasComponent<PlayerHazardPenaltyStateComponent>(player))
                 {
-                    PendingHazardCapturedCount = 0,
-                    ResetRequested = 0,
-                });
+                    em.SetComponentData(player, new PlayerHazardPenaltyStateComponent
+                    {
+                        IFrameTimer = 0f,
+                        VacuumLockTimer = 0f,
+                    });
+                }
+
+                if (em.HasComponent<PlayerHazardRiskConfigComponent>(player) && !hasHazardStackMax)
+                {
+                    var riskConfig = em.GetComponentData<PlayerHazardRiskConfigComponent>(player);
+                    hazardStackMax = riskConfig.HazardStackMax >= 0 ? riskConfig.HazardStackMax : 0;
+                    hasHazardStackMax = true;
+                }
+
+                if (em.HasComponent<PlayerHazardRiskStateComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerHazardRiskStateComponent
+                    {
+                        HazardStack = 0,
+                    });
+                }
+
+                if (em.HasComponent<PlayerHazardRiskRequestComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerHazardRiskRequestComponent
+                    {
+                        PendingHazardCapturedCount = 0,
+                        ResetRequested = 0,
+                    });
+                }
+
+                if (em.HasComponent<PlayerCarryBinDepositRequestTag>(player))
+                    em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
+
+                if (em.HasComponent<PlayerCarryBinDepositContextComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
+                    {
+                        DepositEntity = Entity.Null,
+                    });
+                }
+
+                if (em.HasComponent<PlayerHazardHitRequestTag>(player))
+                    em.SetComponentEnabled<PlayerHazardHitRequestTag>(player, false);
+
+                if (em.HasComponent<PlayerHazardHitContextComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerHazardHitContextComponent
+                    {
+                        SourceEntity = Entity.Null,
+                        HitDirX = 0f,
+                        HitDirZ = 0f,
+                    });
+                }
+
+                if (em.HasBuffer<PlayerUiFeedbackEventBufferElement>(player))
+                    em.GetBuffer<PlayerUiFeedbackEventBufferElement>(player).Clear();
+
+                if (em.HasComponent<PlayerUiFeedbackPresentationSnapshotComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerUiFeedbackPresentationSnapshotComponent
+                    {
+                        Version = 0u,
+                        Type = PlayerUiFeedbackEventType.None,
+                        Reason = (byte)PlayerUiFeedbackReasonId.None,
+                        Value = 0,
+                        RelatedEntity = Entity.Null,
+                        Frame = 0u,
+                        RemainingSec = 0f,
+                        ClockSec = 0f,
+                        NextAllowedVacuumBlockedSec = 0f,
+                        NextAllowedSourceStateChangedSec = 0f,
+                        NextAllowedHazardCapturedSec = 0f,
+                        NextAllowedHazardRemovedSec = 0f,
+                        NextAllowedHitSec = 0f,
+                    });
+                }
             }
+
+            SeedPlayerHudSnapshot(em, carryCapacity, hazardStackMax, in stageState);
+        }
+
+        private static void SeedPlayerHudSnapshot(
+            EntityManager em,
+            int carryCapacity,
+            int hazardStackMax,
+            in RunDirectorStageStateComponent stageState)
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadWrite<PlayerHudSnapshotComponent>());
+            if (query.IsEmptyIgnoreFilter)
+                return;
+
+            Entity snapshotEntity = ResolveFirstEntity(query);
+            if (snapshotEntity == Entity.Null || !em.Exists(snapshotEntity))
+                return;
+
+            em.SetComponentData(snapshotEntity, new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 0,
+                CarryCapacity = carryCapacity >= 0 ? carryCapacity : 0,
+                HazardStack = 0,
+                HazardStackMax = hazardStackMax >= 0 ? hazardStackMax : 0,
+                HazardRiskMultiplier = 1f,
+                DepletedSourceCount = 0,
+                TotalSourceCount = 0,
+                PressureSourceStableId = 0u,
+                PressureSourceCollected = 0,
+                PressureSourceThresholdWeakened = 0,
+                PressureSourceThresholdDepleted = 0,
+                PressureSourceProgress01 = 0f,
+                StageState = stageState.State,
+                StageStateElapsedSec = 0f,
+                GameplayElapsedSec = 0f,
+                LastHitLossValue = 0,
+                HitFlashRemainingSec = 0f,
+                TotalCollectValue = 0,
+                TotalCleanupValue = 0,
+                TotalHitValue = 0,
+                LastUpdatedFrame = 0u,
+            });
+        }
+
+        private static Entity ResolveFirstEntity(EntityQuery query)
+        {
+            int count = query.CalculateEntityCount();
+            if (count <= 0)
+                return Entity.Null;
+            if (count == 1)
+                return query.GetSingletonEntity();
+
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
         }
     }
 

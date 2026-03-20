@@ -210,6 +210,134 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageSessionResetPrepare_ExplicitApplyReset_ResetsPlayerTransientState_AndSeedsHudSnapshot()
+        {
+            using var world = CreateDefaultTestWorld("StageSessionResetWorld_PlayerTransient");
+            var em = world.EntityManager;
+
+            SetSingleton(em, new RunDirectorStageConfigComponent
+            {
+                InitialState = RunDirectorStageStateId.Idle,
+                MinIdleDurationSec = 0f,
+                ClearAutoAdvanceTimeoutSec = 10f,
+            });
+            SetSingleton(em, new RunDirectorStageStateComponent
+            {
+                State = RunDirectorStageStateId.Completed,
+                StateElapsedSec = 2f,
+                EnteredFrame = 12u,
+                LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
+            });
+            SetSingleton(em, new RunDirectorStageGateComponent
+            {
+                IntroPresentationDone = 1,
+                ClearPresentationDone = 0,
+                MinIdleDurationElapsed = 0,
+                AutoAdvanceTimeoutElapsed = 1,
+            });
+            SetSingleton(em, new RunDirectorStageRequestComponent
+            {
+                StageStartRequested = 1,
+                ConfirmPressed = 1,
+                ForceClearReadyRequested = 1,
+            });
+            SetSingleton(em, new RunDirectorStageSignalComponent
+            {
+                StageRunCompleted = 1,
+            });
+            SetSingleton(em, new StageTopologyRequestComponent
+            {
+                RequestedStageId = 2,
+                ApplyRequested = 1,
+            });
+            SetSingleton(em, new StageTopologyStateComponent
+            {
+                SelectedStageId = 1,
+                AppliedStageId = 1,
+                Ready = 1,
+            });
+            SetSingleton(em, new StageTopologyLifecycleStateComponent
+            {
+                CurrentAppliedVersion = 5u,
+            });
+            SetSingleton(em, new StageSessionResetBootstrapComponent
+            {
+                InitialResetPending = 0,
+            });
+            SetSingleton(em, new PlayerHudSnapshotComponent
+            {
+                CarryLoad = 9,
+                CarryCapacity = 9,
+                HazardStack = 3,
+                HazardStackMax = 5,
+                HazardRiskMultiplier = 1.15f,
+                DepletedSourceCount = 2,
+                TotalSourceCount = 3,
+                PressureSourceStableId = 7u,
+                PressureSourceCollected = 8,
+                PressureSourceThresholdWeakened = 4,
+                PressureSourceThresholdDepleted = 10,
+                PressureSourceProgress01 = 0.8f,
+                StageState = RunDirectorStageStateId.Running,
+                StageStateElapsedSec = 9f,
+                GameplayElapsedSec = 15f,
+                LastHitLossValue = 5,
+                HitFlashRemainingSec = 0.4f,
+                TotalCollectValue = 101,
+                TotalCleanupValue = 31,
+                TotalHitValue = 4,
+                LastUpdatedFrame = 99u,
+            });
+
+            var player = CreatePlayerWithStageEntryTransientState(em);
+
+            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
+
+            var carry = em.GetComponentData<PlayerCarryBinComponent>(player);
+            var penalty = em.GetComponentData<PlayerHazardPenaltyStateComponent>(player);
+            var riskState = em.GetComponentData<PlayerHazardRiskStateComponent>(player);
+            var riskRequest = em.GetComponentData<PlayerHazardRiskRequestComponent>(player);
+            var depositContext = em.GetComponentData<PlayerCarryBinDepositContextComponent>(player);
+            var hitContext = em.GetComponentData<PlayerHazardHitContextComponent>(player);
+            var feedbackSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(player);
+            var hudSnapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
+
+            Assert.That(carry.Load, Is.EqualTo(0));
+            Assert.That(carry.Capacity, Is.EqualTo(12));
+            Assert.That(penalty.IFrameTimer, Is.EqualTo(0f));
+            Assert.That(penalty.VacuumLockTimer, Is.EqualTo(0f));
+            Assert.That(riskState.HazardStack, Is.EqualTo(0));
+            Assert.That(riskRequest.PendingHazardCapturedCount, Is.EqualTo(0));
+            Assert.That(riskRequest.ResetRequested, Is.EqualTo(0));
+            Assert.That(em.IsComponentEnabled<PlayerCarryBinDepositRequestTag>(player), Is.False);
+            Assert.That(em.IsComponentEnabled<PlayerHazardHitRequestTag>(player), Is.False);
+            Assert.That(depositContext.DepositEntity, Is.EqualTo(Entity.Null));
+            Assert.That(hitContext.SourceEntity, Is.EqualTo(Entity.Null));
+            Assert.That(hitContext.HitDirX, Is.EqualTo(0f));
+            Assert.That(hitContext.HitDirZ, Is.EqualTo(0f));
+            Assert.That(em.GetBuffer<PlayerUiFeedbackEventBufferElement>(player).Length, Is.EqualTo(0));
+            Assert.That(feedbackSnapshot.Version, Is.EqualTo(0u));
+            Assert.That(feedbackSnapshot.Type, Is.EqualTo(PlayerUiFeedbackEventType.None));
+            Assert.That(feedbackSnapshot.Reason, Is.EqualTo((byte)PlayerUiFeedbackReasonId.None));
+            Assert.That(feedbackSnapshot.RemainingSec, Is.EqualTo(0f));
+            Assert.That(hudSnapshot.CarryLoad, Is.EqualTo(0));
+            Assert.That(hudSnapshot.CarryCapacity, Is.EqualTo(12));
+            Assert.That(hudSnapshot.HazardStack, Is.EqualTo(0));
+            Assert.That(hudSnapshot.HazardStackMax, Is.EqualTo(5));
+            Assert.That(hudSnapshot.HazardRiskMultiplier, Is.EqualTo(1f).Within(1e-6f));
+            Assert.That(hudSnapshot.PressureSourceStableId, Is.EqualTo(0u));
+            Assert.That(hudSnapshot.StageState, Is.EqualTo(RunDirectorStageStateId.Idle));
+            Assert.That(hudSnapshot.StageStateElapsedSec, Is.EqualTo(0f));
+            Assert.That(hudSnapshot.GameplayElapsedSec, Is.EqualTo(0f));
+            Assert.That(hudSnapshot.LastHitLossValue, Is.EqualTo(0));
+            Assert.That(hudSnapshot.HitFlashRemainingSec, Is.EqualTo(0f));
+            Assert.That(hudSnapshot.TotalCollectValue, Is.EqualTo(0));
+            Assert.That(hudSnapshot.TotalCleanupValue, Is.EqualTo(0));
+            Assert.That(hudSnapshot.TotalHitValue, Is.EqualTo(0));
+            Assert.That(hudSnapshot.LastUpdatedFrame, Is.EqualTo(0u));
+        }
+
+        [Test]
         public void StageSessionResetPrepare_RunningStateApplyRequest_IsIgnored()
         {
             using var world = CreateDefaultTestWorld("StageSessionResetWorld_RunningIgnore");
@@ -1296,6 +1424,88 @@ namespace SweepNDodge.DotsBullets.Tests
                 : query.ToEntityArray(Unity.Collections.Allocator.Temp)[0];
             em.RemoveComponent<T>(entity);
             em.AddComponentObject(entity, value);
+        }
+
+        private static Entity CreatePlayerWithStageEntryTransientState(EntityManager em)
+        {
+            var player = em.CreateEntity(
+                typeof(PlayerTag),
+                typeof(PlayerCarryBinComponent),
+                typeof(PlayerHazardPenaltyStateComponent),
+                typeof(PlayerHazardRiskConfigComponent),
+                typeof(PlayerHazardRiskStateComponent),
+                typeof(PlayerHazardRiskRequestComponent),
+                typeof(PlayerCarryBinDepositRequestTag),
+                typeof(PlayerCarryBinDepositContextComponent),
+                typeof(PlayerHazardHitRequestTag),
+                typeof(PlayerHazardHitContextComponent),
+                typeof(PlayerUiFeedbackPresentationSnapshotComponent));
+
+            em.SetComponentData(player, new PlayerCarryBinComponent
+            {
+                Load = 12,
+                Capacity = 12,
+            });
+            em.SetComponentData(player, new PlayerHazardPenaltyStateComponent
+            {
+                IFrameTimer = 0.75f,
+                VacuumLockTimer = 0.5f,
+            });
+            em.SetComponentData(player, new PlayerHazardRiskConfigComponent
+            {
+                HazardStackMax = 5,
+                HazardBonusRate = 0.05f,
+            });
+            em.SetComponentData(player, new PlayerHazardRiskStateComponent
+            {
+                HazardStack = 3,
+            });
+            em.SetComponentData(player, new PlayerHazardRiskRequestComponent
+            {
+                PendingHazardCapturedCount = 2,
+                ResetRequested = 1,
+            });
+            em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, true);
+            em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
+            {
+                DepositEntity = player,
+            });
+            em.SetComponentEnabled<PlayerHazardHitRequestTag>(player, true);
+            em.SetComponentData(player, new PlayerHazardHitContextComponent
+            {
+                SourceEntity = player,
+                HitDirX = 1f,
+                HitDirZ = -1f,
+            });
+            em.SetComponentData(player, new PlayerUiFeedbackPresentationSnapshotComponent
+            {
+                Version = 8u,
+                Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
+                Reason = (byte)PlayerUiFeedbackReasonId.CarryBinFull,
+                Value = 0,
+                RelatedEntity = player,
+                Frame = 77u,
+                RemainingSec = 1.2f,
+                ClockSec = 2.5f,
+                NextAllowedVacuumBlockedSec = 3f,
+                NextAllowedSourceStateChangedSec = 4f,
+                NextAllowedHazardCapturedSec = 5f,
+                NextAllowedHazardRemovedSec = 6f,
+                NextAllowedHitSec = 7f,
+            });
+
+            var feedbackBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
+            feedbackBuffer.Add(new PlayerUiFeedbackEventBufferElement
+            {
+                Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
+                Reason = (byte)PlayerUiFeedbackReasonId.CarryBinFull,
+                Value = 0,
+                RelatedEntity = player,
+                Frame = 77u,
+                Sequence = 1u,
+            });
+
+            return player;
         }
 
         private static Entity CreateSourceTemplate(EntityManager em)
