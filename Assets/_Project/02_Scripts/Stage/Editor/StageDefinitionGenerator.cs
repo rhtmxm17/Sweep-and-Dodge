@@ -190,6 +190,20 @@ namespace SweepNDodge.DotsBullets.Editor
             var ids = new List<uint>(8);
             var unique = new HashSet<uint>();
 
+            if (stageNode.TargetLayout != null && StageGridLayoutValidationRules.UsesGridSchema(stageNode.TargetLayout))
+            {
+                var sourceRegions = stageNode.TargetLayout.SourceRegions ?? Array.Empty<StageSourceRegionLayoutData>();
+                for (int i = 0; i < sourceRegions.Length; i++)
+                {
+                    uint stableId = Math.Max(1u, sourceRegions[i].StableId);
+                    if (unique.Add(stableId))
+                        ids.Add(stableId);
+                }
+
+                ids.Sort();
+                return ids;
+            }
+
             if (stageNode.TargetLayout != null && stageNode.TargetLayout.Sources != null)
             {
                 for (int i = 0; i < stageNode.TargetLayout.Sources.Length; i++)

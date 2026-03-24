@@ -446,29 +446,57 @@ namespace SweepNDodge.DotsBullets
             if (_currentScreen != DemoShellScreenId.StagePlay)
                 return;
 
-            if (StageBridge == null)
-                return;
-
             if (_stageStartPending)
             {
                 if (!TryGetStageProfile(_currentStageIndex, out var startProfile))
                     return;
 
-                if (_stageTopologyApplyPending)
-                {
-                    bool applyOk = TopologyBridge != null && TopologyBridge.RequestTopologyApply(startProfile.StageId);
-                    if (!applyOk)
-                        return;
-
-                    _stageTopologyApplyPending = false;
-                }
-
-                bool introOk = StageBridge.SetIntroPresentationDone(true);
-                bool clearGateOk = StageBridge.SetClearPresentationDone(false);
-                bool startOk = StageBridge.RequestStageStart();
-                if (introOk && clearGateOk && startOk)
-                    _stageStartPending = false;
+                TryIssueStageEntryRequests(startProfile.StageId);
+                if (_stageStartPending)
+                    return;
             }
+
+            if (StageBridge == null)
+                return;
+
+            TickStagePlayRuntime();
+        }
+
+        private void TryIssueStageEntryRequests(int stageId)
+        {
+            if (stageId <= 0)
+                return;
+
+            EnsureBridgeReference();
+            EnsureTopologyBridgeReference();
+            SyncTopologyBridgeStageCatalogReference();
+
+            if (_stageTopologyApplyPending)
+            {
+                bool applyOk = TopologyBridge != null && TopologyBridge.RequestTopologyApply(stageId);
+                if (!applyOk)
+                    return;
+
+                _stageTopologyApplyPending = false;
+            }
+
+            if (!_stageStartPending)
+                return;
+
+            if (StageBridge == null)
+                return;
+
+            bool introOk = StageBridge.SetIntroPresentationDone(true);
+            bool clearGateOk = StageBridge.SetClearPresentationDone(false);
+            bool startOk = StageBridge.RequestStageStart();
+            if (introOk && clearGateOk && startOk)
+                _stageStartPending = false;
+        }
+
+        private void TickStagePlayRuntime()
+        {
+            if (StageBridge == null)
+                return;
 
             if (!StageBridge.TryGetStageState(out var stageState))
                 return;
@@ -589,6 +617,7 @@ namespace SweepNDodge.DotsBullets
             if (!TryGetStageProfile(stageIndex, out var profile))
                 return;
 
+            EnsureBridgeReference();
             EnsureTopologyBridgeReference();
             SyncTopologyBridgeStageCatalogReference();
 
@@ -596,13 +625,14 @@ namespace SweepNDodge.DotsBullets
             DemoShellSessionStaging.BeginDialogueStageRun(profile.StageId);
             _currentStageIndex = stageIndex;
             _stageStartPending = true;
-            _stageTopologyApplyPending = !(TopologyBridge != null && TopologyBridge.RequestTopologyApply(profile.StageId));
+            _stageTopologyApplyPending = true;
             _currentStagePlayPhase = DemoShellStagePlayPhaseId.Starting;
             _stageRunningObserved = false;
             ResetPendingClearPresentationState();
             _currentStageOutcome = DemoShellStageOutcomeId.Clear;
             _hasCurrentStageResult = false;
             CaptureStageStartTotals();
+            TryIssueStageEntryRequests(profile.StageId);
             TransitionTo(DemoShellScreenId.StagePlay);
 
             if (LogTransitions)

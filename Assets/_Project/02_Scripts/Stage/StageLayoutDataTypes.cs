@@ -4,6 +4,14 @@ using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
+    [Flags]
+    public enum StageCellMovementFlags : byte
+    {
+        None = 0,
+        BlockPlayer = 1 << 0,
+        BlockBullet = 1 << 1,
+    }
+
     public enum StagePresentationPlacementMode : byte
     {
         Standalone = 0,
@@ -18,6 +26,43 @@ namespace SweepNDodge.DotsBullets
         Obstacle = 3,
     }
 
+    [Serializable]
+    public struct StageGridSpec
+    {
+        [Min(1)] public int Width;
+        [Min(1)] public int Height;
+        [Min(0.0001f)] public float CellSize;
+        public Vector3 Origin;
+    }
+
+    [Serializable]
+    public struct StageCellLayoutData
+    {
+        public StageCellMovementFlags MovementFlags;
+        [Min(0)] public uint SourceRegionId;
+        [Min(0)] public uint DepositRegionId;
+    }
+
+    [Serializable]
+    public struct StageSourceRegionLayoutData
+    {
+        [Min(1)] public uint StableId;
+        public bool Active;
+        public Vector2Int AnchorCell;
+        public Vector2 AnchorOffset;
+    }
+
+    [Serializable]
+    public struct StageDepositRegionLayoutData
+    {
+        [Min(1)] public uint StableId;
+        public bool Active;
+        public Vector2Int AnchorCell;
+        public Vector2 AnchorOffset;
+    }
+
+    // Legacy layout entries remain temporarily for runtime/generator compatibility
+    // until the grid-authoritative apply/generator path lands in later phases.
     [Serializable]
     public struct StageSourceLayoutData
     {

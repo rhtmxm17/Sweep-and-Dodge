@@ -113,14 +113,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 };
 
                 var layout = CreateLayout(created, stageId: 5);
-                layout.Sources = new[]
+                layout.SourceRegions = new[]
                 {
-                    new StageSourceLayoutData
+                    new StageSourceRegionLayoutData
                     {
                         StableId = 777u,
                         Active = true,
+                        AnchorCell = new Vector2Int(0, 0),
                     }
                 };
+                layout.Cells[0] = new StageCellLayoutData { SourceRegionId = 777u };
 
                 var catalog = CreateCatalog(created, new StageCatalogEntry
                 {
@@ -163,14 +165,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 };
 
                 var layout = CreateLayout(created, stageId: 3);
-                layout.Sources = new[]
+                layout.SourceRegions = new[]
                 {
-                    new StageSourceLayoutData
+                    new StageSourceRegionLayoutData
                     {
                         StableId = 2002u,
                         Active = true,
+                        AnchorCell = new Vector2Int(0, 0),
                     }
                 };
+                layout.Cells[0] = new StageCellLayoutData { SourceRegionId = 2002u };
 
                 var catalog = CreateCatalog(created, new StageCatalogEntry
                 {
@@ -184,6 +188,126 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 Assert.That(HasIssue(issues, "STC021", ContentValidationSeverity.Warning), Is.True);
                 Assert.That(HasIssue(issues, "STC022", ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                DestroyAll(created);
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_SourceRegionWithoutBinding_IsReportedAsWarning()
+        {
+            var created = new List<ScriptableObject>();
+            try
+            {
+                var definition = CreateDefinition(created, stageId: 6);
+                var layout = CreateLayout(created, stageId: 6);
+                layout.SourceRegions = new[]
+                {
+                    new StageSourceRegionLayoutData
+                    {
+                        StableId = 601u,
+                        Active = true,
+                        AnchorCell = new Vector2Int(0, 0),
+                    }
+                };
+                layout.Cells[0] = new StageCellLayoutData { SourceRegionId = 601u };
+
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_06",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(HasIssue(issues, "STC022", ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                DestroyAll(created);
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_BindingWithoutActiveSourceRegion_IsReportedAsWarning()
+        {
+            var created = new List<ScriptableObject>();
+            try
+            {
+                var definition = CreateDefinition(created, stageId: 7);
+                definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 701u,
+                        InitialSourceState = SourceStateId.Normal,
+                        ThresholdWeakened = 0,
+                        ThresholdDepleted = 0,
+                        SustainSlots = Array.Empty<SustainSlotBinding>(),
+                        EventSlots = Array.Empty<EventSlotBinding>(),
+                    }
+                };
+                var layout = CreateLayout(created, stageId: 7);
+                layout.SourceRegions = new[]
+                {
+                    new StageSourceRegionLayoutData
+                    {
+                        StableId = 701u,
+                        Active = false,
+                        AnchorCell = new Vector2Int(0, 0),
+                    }
+                };
+
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_07",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(HasIssue(issues, "STC021", ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                DestroyAll(created);
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_DepositOnlyLayout_DoesNotCreateSourceCrossMappingWarnings()
+        {
+            var created = new List<ScriptableObject>();
+            try
+            {
+                var definition = CreateDefinition(created, stageId: 8);
+                var layout = CreateLayout(created, stageId: 8);
+                layout.DepositRegions = new[]
+                {
+                    new StageDepositRegionLayoutData
+                    {
+                        StableId = 801u,
+                        Active = true,
+                        AnchorCell = new Vector2Int(0, 0),
+                    }
+                };
+                layout.Cells[0] = new StageCellLayoutData { DepositRegionId = 801u };
+
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_08",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(HasIssue(issues, "STC021", ContentValidationSeverity.Warning), Is.False);
+                Assert.That(HasIssue(issues, "STC022", ContentValidationSeverity.Warning), Is.False);
             }
             finally
             {
@@ -231,10 +355,18 @@ namespace SweepNDodge.DotsBullets.Tests
         private static StageLayoutSO CreateLayout(List<ScriptableObject> created, int stageId)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.SchemaVersion = 2;
             layout.StageId = stageId;
-            layout.Sources = Array.Empty<StageSourceLayoutData>();
-            layout.Deposits = Array.Empty<StageDepositLayoutData>();
-            layout.Obstacles = Array.Empty<StageObstacleLayoutData>();
+            layout.Grid = new StageGridSpec
+            {
+                Width = 1,
+                Height = 1,
+                CellSize = 1f,
+                Origin = Vector3.zero,
+            };
+            layout.Cells = new StageCellLayoutData[1];
+            layout.SourceRegions = Array.Empty<StageSourceRegionLayoutData>();
+            layout.DepositRegions = Array.Empty<StageDepositRegionLayoutData>();
             layout.Presentations = Array.Empty<StagePresentationLayoutData>();
             created.Add(layout);
             return layout;

@@ -6,10 +6,12 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md): 스테이지 layout authority를 grid cell로 전환하고 `Source / Deposit`를 explicit region id 기반 aggregate로 운영
 - [ADR-20260317-01-fixed-tick-authoritative-stageplay-and-common-gameplay-pause.md](ADR-20260317-01-fixed-tick-authoritative-stageplay-and-common-gameplay-pause.md): `StagePlay` gameplay 시간을 fixed tick authority로 고정하고, `Acquire/Release` 기반 공통 gameplay pause owner를 채택
 - [ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md](ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md): 인월드 연출 대화를 GO 전용 계층으로 두고, 시작 overlay 기본값과 `Result` 전 clear gate 정책을 채택
 - [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md): HazardStack 단일 owner, 동프레임 `수거 확정 후 리셋`, 다음 프레임 배율 반영 계약 고정
 - [ADR-20260309-02-stage-session-reset-and-prepare-owner.md](ADR-20260309-02-stage-session-reset-and-prepare-owner.md): 씬 리로드/Retry/Next 재진입에서 world 재생성 대신 prepare 계층의 explicit stage session reset owner를 채택
+- [ADR-20260309-01-planar-shape2d-yaw-only-runtime-contract.md](ADR-20260309-01-planar-shape2d-yaw-only-runtime-contract.md): `Source / Deposit / Obstacle`의 planar shape raw data를 `Shape2DComponent`로 통일하고 gameplay 판정을 `XZ + yaw-only`로 고정
 - [ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md): 장주기 스테이지를 위한 StageTopology lifecycle/failure policy와 boundary-only apply 계약 고정
 - [ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md): 스테이지 정의/레이아웃 분리와 StageCatalog 명시적 페어 엔트리 채택
 - [ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md): StageMap 런타임 적용 Owner를 ExecutionBegin 단일 시스템으로 고정하고 DemoShell StageId 입력 경로를 RunDirectorStageBridge로 단일화
