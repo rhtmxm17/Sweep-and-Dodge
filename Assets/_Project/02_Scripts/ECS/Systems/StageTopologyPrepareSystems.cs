@@ -14,6 +14,7 @@ namespace SweepNDodge.DotsBullets
             EnsureSingleton(em, default(StageTopologyStateComponent));
             EnsureSingleton(em, default(StageTopologyLifecycleStateComponent));
             EnsureSingleton(em, default(StageTopologyPrefabCatalogComponent));
+            EnsureSingleton(em, default(StageRuntimeGridComponent));
             EnsureSingleton(em, default(StageGameplayClockComponent));
             EnsureSingleton(em, new StageSessionResetBootstrapComponent
             {
@@ -28,6 +29,14 @@ namespace SweepNDodge.DotsBullets
                 {
                     Catalog = null,
                 });
+            }
+
+            using var gridBufferQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>());
+            if (!gridBufferQuery.IsEmptyIgnoreFilter)
+            {
+                var entity = gridBufferQuery.GetSingletonEntity();
+                if (!em.HasBuffer<StageRuntimeGridCellBufferElement>(entity))
+                    em.AddBuffer<StageRuntimeGridCellBufferElement>(entity);
             }
         }
 
@@ -390,7 +399,7 @@ namespace SweepNDodge.DotsBullets
                 {
                     em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
                     {
-                        DepositEntity = Entity.Null,
+                        DepositRegionId = 0u,
                     });
                 }
 

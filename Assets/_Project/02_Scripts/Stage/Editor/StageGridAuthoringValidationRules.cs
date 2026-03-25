@@ -93,6 +93,12 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
             }
 
+            if (!IsCanonicalGridRotation(authoring.Grid.transform))
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA021", location, "Grid rotation must be canonical identity or +90deg X only."));
+                valid = false;
+            }
+
             boundsMin = authoring.MovementTilemap.cellBounds.min;
             boundsSize = authoring.MovementTilemap.cellBounds.size;
             if (boundsMin.x != 0 || boundsMin.y != 0 || boundsMin.z != 0)
@@ -299,6 +305,16 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             return path;
+        }
+
+        public static bool IsCanonicalGridRotation(Transform transform)
+        {
+            if (transform == null)
+                return false;
+
+            Quaternion rotation = transform.rotation;
+            return Quaternion.Angle(rotation, Quaternion.identity) <= 0.1f
+                || Quaternion.Angle(rotation, Quaternion.Euler(90f, 0f, 0f)) <= 0.1f;
         }
     }
 }

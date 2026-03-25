@@ -18,7 +18,7 @@ MonoBehaviour:
     Width: 2
     Height: 1
     CellSize: 1
-    Origin: {x: 14, y: 0, z: -8}
+    Origin: {x: 0, y: 0, z: 0}
   Cells:
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -54,12 +54,5 @@ MonoBehaviour:
     Shape: 0
     Radius: 8
     Size: {x: 12, y: 8}
-  Deposits:
-  - StableId: 2001
-    Active: 1
-    Position: {x: 14, y: 0, z: 8}
-    YawDeg: 0
-    Shape: 0
-    Radius: 3.5
-    Size: {x: 2, y: 2}
+  Deposits: []
   Obstacles: []

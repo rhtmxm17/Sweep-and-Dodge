@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260324-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-03-24`
+- last_updated: `2026-03-25`
 - related_docs:
   - [../TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](../TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
   - [../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md)
@@ -17,14 +17,17 @@
 - 이번 세션에서 하지 않을 것: runtime code 구현, tilemap brush 세부 UX 확정, visual auto-generation 세부 알고리즘 확정
 
 ## Now
-- [ ] P4. runtime movement / deposit 이관 준비 정리
-  - 기준: P3 generator 이후 runtime owner 전환 범위를 분리하고 legacy bridge 제거 선행조건을 고정한다.
-  - 산출물: runtime apply 영향 구간, sample asset bridge 제거 조건, PlayMode 회귀 기준 재정리
+- [x] P4. runtime movement / deposit 이관
+  - 기준: runtime authoritative plane은 `xz`로 유지하고, movement/deposit 판정을 grid authority로 이관한다.
+  - 산출물: `StageRuntimeGrid` cache, player movement block grid reader, deposit region request/consume 전환, sample asset/source bridge 보정
+- [x] P4.1 bullet block owner 재정렬
+  - 기준: `BulletObstacleHitRequestSystem`를 제거하고, bullet block owner를 `BulletSimulationSystem`으로 옮긴다.
+  - 산출물: swept path broad phase seam, simulation owner `BlockBullet` full-cell consume, request 단계 bullet-wide full scan 제거
+- [x] 검증 및 회귀 정리
+  - 검증 결과: P4 기준 compile error 0, console error 0, EditMode `269/269` pass, PlayMode `38/38` pass
+  - 구현 메모: source runtime migration은 비범위라 운영 샘플 asset의 `Sources` compatibility bridge는 유지했다. stage2 `9002` presentation은 deposit-link 대신 source-link로 정리했다.
 
 ## Next
-- [ ] P4. runtime movement / deposit 이관
-  - 기준: obstacle/player/bullet/deposit query가 grid authority를 읽는다.
-  - 산출물: prepare cache build, movement/deposit reader 전환, 회귀 테스트
 - [ ] P5. source region runtime 이관
   - 기준: source sampling, pollution, progress가 region cell 집합을 읽는다.
   - 산출물: source runtime geometry 전환, definition binding 연결, 회귀 테스트
@@ -68,8 +71,13 @@
 - [x] D7. `P3 authoring generator`를 구현했다.
   - 검증 결과: `StageGridAuthoring`, `StageRegionPaintAsset`, `StageRegionAnchorMarker`, `StageMovementTile`, grid-only `StageLayoutCatalogGenerator`, 기본 paint editor window, sample authoring scene 구조, `com.unity.2d.tilemap` 의존, grid authoring/editor tests가 반영됐다.
   - 구현 메모: generator 출력은 legacy arrays를 비우지만, runtime migration 전까지 `sl_demo_*` 샘플 asset은 grid schema와 legacy compatibility bridge를 함께 유지한다.
+- [x] D8. `P4 runtime movement / deposit migration` 구현을 시작했다.
+  - 검증 결과: `StageRuntimeGridComponent`/buffer cache, source-only `StageTopologyApplyPrepareSystem`, grid 기반 `PlayerObstacleBlockSystem`, `PlayerCarryBinDeposit*`, canonical grid rotation validation, stage2 presentation fallback PlayMode 의존 제거가 코드 기준으로 반영됐다.
+  - 구현 메모: bullet block owner는 후속 P4.1에서 request 단계 full scan 제거 기준으로 재정렬했다.
+- [x] D9. `P4.1 bullet block owner realignment`를 반영했다.
+  - 검증 기준: `BulletObstacleHitRequestSystem` 제거, `BulletSimulationSystem` owner 이동, `prevXZ -> nextXZ` swept path broad phase, `BlockBullet` full-cell narrow phase, 관련 EditMode/PlayMode 회귀 확인
 
 ## End of Session
-- 결과: P3까지의 editor authoring 경로와 generator cutover가 코드/샘플/검증까지 반영됐다.
-- 남은 리스크: runtime apply는 아직 legacy layout bridge를 소비하므로 generator 재생성 결과를 운영 샘플 asset에 바로 적용할 수 없다. stage topology apply timing 경고 추적도 계속 필요하다.
-- 다음 세션 시작점: `StageTopologyApplyPrepareSystem` 이후 movement/deposit reader를 grid authority로 옮기고, 샘플 asset의 legacy bridge 제거 조건을 고정한다.
+- 결과: P4 코드 반영은 진행 중이며, runtime movement/deposit query는 grid authority 기준으로 정리됐다.
+- 남은 리스크: Unity compile/test 미검증 상태라 compile break 또는 PlayMode 회귀가 남아 있을 수 있다.
+- 다음 세션 시작점: Unity compile -> console -> EditMode -> PlayMode 결과를 보고 남은 회귀를 정리한다.

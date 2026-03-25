@@ -4,7 +4,7 @@
 - doc_id: `TD-015`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-24`
+- last_updated: `2026-03-25`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
@@ -13,7 +13,7 @@
   - [../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
   - [../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md)
   - [../TaskBoard/SESSION-20260324-01-stage-grid-layout-board.md](../TaskBoard/SESSION-20260324-01-stage-grid-layout-board.md)
-> 현재 채택안은 `StageCatalogSO`의 dual catalog 구조는 유지하되, layout 쪽 SSOT를 `shape entry array`에서 `grid cell authoritative`로 전환하는 것이다. `StageTopologyPrepareGroup`은 계속 `StageSessionResetPrepareSystem -> StageTopologyApplyPrepareSystem` 순서로 동작하고, prepare owner는 `StageLayoutSO`의 grid 데이터를 읽어 runtime grid cache를 구축한 뒤 `Source / Deposit` region aggregate를 reconcile한다. obstacle gameplay는 더 이상 독립 shape topology kind가 아니라 cell movement authority로 흡수하며, obstacle visual은 gameplay authority와 분리된 tilemap/presentation 계층으로 유지한다.
+> 현재 채택안은 `StageCatalogSO`의 dual catalog 구조는 유지하되, layout 쪽 SSOT를 `shape entry array`에서 `grid cell authoritative`로 전환하는 것이다. `StageTopologyPrepareGroup`은 계속 `StageSessionResetPrepareSystem -> StageTopologyApplyPrepareSystem` 순서로 동작하고, prepare owner는 `StageLayoutSO`의 grid 데이터를 읽어 runtime grid cache를 구축한다. P4 기준으로 runtime topology reconcile은 `Source`만 유지하고, movement / deposit gameplay는 grid cache를 직접 읽는다. obstacle gameplay는 더 이상 독립 shape topology kind가 아니라 cell movement authority로 흡수하며, obstacle visual은 gameplay authority와 분리된 tilemap/presentation 계층으로 유지한다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -76,7 +76,7 @@
   1. `StageLayoutSO`에서 grid schema를 resolve한다.
   2. runtime `StageGridRuntimeComponent` cache/blob를 rebuild한다.
   3. `SourceRegionId` 기준으로 source aggregate entity를 reconcile한다.
-  4. `DepositRegionId` 기준으로 deposit aggregate entity를 reconcile한다.
+  4. `DepositRegionId` 기준 grid cache를 publish한다.
   5. presentation/tilemap owner가 준비 상태를 읽어 visual rebuild를 수행한다.
 - boundary-only apply 계약은 유지한다.
   - 허용: `Idle`, `Completed`, 초기 비플레이 경계
@@ -170,9 +170,9 @@
 - connected geometry를 shape 하나로 근사하지 않는다.
 
 ### 6.5 Deposit 계약
-- deposit runtime entity는 region 단위 aggregate다.
 - 플레이어 deposit 접촉 판정은 `player circle -> current/neighbor cell -> DepositRegionId lookup` 기반으로 수행한다.
-- deposit 기준점은 anchor를 사용한다.
+- P4 기준으로 deposit gameplay runtime entity는 제거한다.
+- deposit 기준점은 authoring/presentation 기준점으로만 유지한다.
 - deposit anchor는 연출상 진입 불가능한 위치에 놓일 수 있지만, 여전히 해당 deposit region 셀 위에 있어야 한다.
 
 ### 6.6 Obstacle / Movement 계약
@@ -180,7 +180,8 @@
 - `Obstacle` standalone runtime entity와 `StageObstacleLayoutData`는 신규 설계에서 채택하지 않는다.
 - 플레이어 이동 차단과 bullet 차단은 동일 grid를 읽되, 소비 규칙은 각 owner가 가진다.
   - player reader owner: `PlayerObstacleBlockSystem`의 후속 grid reader
-  - bullet reader owner: `BulletObstacleHitRequestSystem`의 후속 grid reader
+  - bullet reader owner: `BulletSimulationSystem`
+    - `prevXZ -> nextXZ` swept path broad phase로 traversed cells를 모으고, `BlockBullet` full-cell narrow phase를 같은 simulation pass 안에서 처리한다.
 - obstacle visual은 gameplay authority가 아니다.
   - visual tilemap 또는 auto-generated mesh/tile은 grid obstacle layer를 read-only로 소비한다.
   - visual 생성 실패는 gameplay hard gate가 아니다.
@@ -261,20 +262,20 @@
 - topology owner는 `StageTopologyApplyPrepareSystem` 단일 writer를 유지한다.
 - 입력 경로는 기존과 동일하게 `StageTopologyBridge.RequestTopologyApply(stageId)`다.
 - apply 성공 시 prepare owner는 아래를 publish한다.
-  - `StageGridRuntimeComponent`
+  - `StageRuntimeGridComponent`
   - source region aggregate runtime set
-  - deposit region aggregate runtime set
 - apply 실패 정책은 기존 `Ready=0 + 이전 topology 유지`를 따른다.
 
 ### 8.2 Runtime Query Boundary
 - movement / obstacle 관련 query는 runtime grid cache를 직접 읽는다.
-- source / deposit 관련 query는 grid -> region id lookup을 수행한 뒤 aggregate runtime entity를 참조한다.
+- source runtime은 기존 aggregate entity를 유지한다.
+- deposit gameplay query는 grid -> region id lookup만 수행한다.
 - `RunProgressDirector`, source spawn, source pollution은 region cell 집합을 authoritative geometry로 사용한다.
-- shape-based compatibility path가 남아 있더라도 source/deposit/obstacle gameplay 의미는 grid가 우선이다.
+- shape-based compatibility path가 남아 있더라도 source 외 gameplay 의미는 grid가 우선이다.
 
 ### 8.3 Lifecycle
 - lifecycle 기본 정책은 `disable-to-pool`을 유지한다.
-- source/deposit aggregate는 `instantiate -> reuse -> mapped-active -> pooled-disabled`를 따른다.
+- source aggregate는 `instantiate -> reuse -> mapped-active -> pooled-disabled`를 따른다.
 - grid cache는 stage entry마다 rebuild하며, mid-run mutation은 지원하지 않는다.
 
 ## 9. 작업 분해 / 진행 상태
@@ -287,6 +288,9 @@
   - generator는 legacy arrays를 비우되, runtime smoke 유지가 필요한 운영 샘플 asset은 compatibility bridge를 병행 유지한다.
 - P4. runtime movement/deposit 이관
   - obstacle/player/bullet/deposit query를 grid authoritative path로 옮긴다.
+- P4.1. bullet block owner 재정렬
+  - `BulletObstacleHitRequestSystem`를 제거하고, bullet block를 `BulletSimulationSystem` owner로 옮긴다.
+  - request 단계의 활성 bullet 전량 재순회를 금지하고, swept path broad phase seam만 남긴다.
 - P5. source region runtime 이관
   - source sampling, pollution, progress를 region cell 집합 기준으로 옮긴다.
 - P6. visual/presentation 정리
@@ -305,7 +309,7 @@
   - grid coord / region id / explicit anchor validation 회귀
 - PlayMode
   - stage entry 시 grid cache build 성공
-  - player movement block / bullet block이 cell flags 기준으로 동작
+  - player movement block은 local grid query로, bullet block은 simulation owner swept query로 동작
   - deposit 접촉이 deposit region 기준으로 동작
   - source sampling / progress가 region cell 집합 기준으로 동작
   - obstacle visual rebuild 실패가 gameplay hard gate로 승격되지 않음

@@ -127,7 +127,10 @@ namespace SweepNDodge.DotsBullets.Editor
                 Width = width,
                 Height = height,
                 CellSize = authoring.Grid.cellSize.x,
-                Origin = authoring.Grid.transform.position,
+                Origin = new Vector3(
+                    authoring.Grid.transform.position.x,
+                    authoring.Grid.transform.position.y,
+                    authoring.Grid.transform.position.z),
             };
 
             layout.Cells = new StageCellLayoutData[width * height];

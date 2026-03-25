@@ -18,7 +18,7 @@ MonoBehaviour:
     Width: 2
     Height: 1
     CellSize: 1
-    Origin: {x: -12, y: 0, z: 6}
+    Origin: {x: 0, y: 0, z: 0}
   Cells:
   - MovementFlags: 0
     SourceRegionId: 1002
@@ -40,8 +40,8 @@ MonoBehaviour:
   - StableId: 9002
     Active: 1
     PlacementMode: 1
-    LinkKind: 2
-    LinkedStableId: 2001
+    LinkKind: 1
+    LinkedStableId: 1002
     PresentationKey: preview_visual_02
     Position: {x: 0, y: 1, z: 0}
     Euler: {x: -0, y: 0, z: 0}
@@ -54,20 +54,5 @@ MonoBehaviour:
     Shape: 0
     Radius: 6
     Size: {x: 12, y: 8}
-  Deposits:
-  - StableId: 2001
-    Active: 1
-    Position: {x: -10, y: 0, z: -2}
-    YawDeg: 0
-    Shape: 1
-    Radius: 4
-    Size: {x: 8, y: 8}
-  Obstacles:
-  - StableId: 3004
-    Active: 1
-    Position: {x: -10, y: 0, z: -2}
-    YawDeg: 0
-    Shape: 1
-    Radius: 1
-    Size: {x: 3.5, y: 2}
-    CollisionMask: 255
+  Deposits: []
+  Obstacles: []

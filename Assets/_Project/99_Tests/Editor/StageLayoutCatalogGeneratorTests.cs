@@ -97,6 +97,30 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GenerateLayoutsForRoot_RotatedGrid_NormalizesToWorldXZOrigin()
+        {
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.StageGo.transform.GetChild(0).rotation = Quaternion.Euler(90f, 0f, 0f);
+                setup.StageGo.transform.GetChild(0).position = new Vector3(3f, 2f, 5f);
+                setup.SourcePaint.SetCell(1, 1, 1001u);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(1, 1));
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.Grid.Origin.x, Is.EqualTo(3f));
+                Assert.That(setup.Layout.Grid.Origin.z, Is.EqualTo(5f));
+                Assert.That(setup.Layout.SourceRegions.Single().AnchorCell, Is.EqualTo(new Vector2Int(1, 1)));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void GenerateLayoutsForRoot_MissingAnchor_FailsWithError()
         {
             var setup = CreateStageSetup();

@@ -77,6 +77,46 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void CanonicalGridRotation_IdentityAndPlus90X_AreAllowed()
+        {
+            var setup = CreateSetup();
+            try
+            {
+                setup.SourcePaint.SetCell(0, 0, 1001u);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
+
+                setup.Grid.transform.rotation = Quaternion.identity;
+                var identityIssues = Validate(setup.Stage);
+                Assert.That(identityIssues.Any(x => x.Code == "STA021"), Is.False);
+
+                setup.Grid.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                var rotatedIssues = Validate(setup.Stage);
+                Assert.That(rotatedIssues.Any(x => x.Code == "STA021"), Is.False);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void NonCanonicalGridRotation_IsReported()
+        {
+            var setup = CreateSetup();
+            try
+            {
+                setup.Grid.transform.rotation = Quaternion.Euler(90f, 15f, 0f);
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA021"), Is.True);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
         private static System.Collections.Generic.List<ContentValidationIssue> Validate(StageLayoutStageMarker stage)
         {
             var issues = new System.Collections.Generic.List<ContentValidationIssue>();
@@ -156,6 +196,7 @@ namespace SweepNDodge.DotsBullets.Tests
             public GameObject StageGo { get; }
             public StageLayoutStageMarker Stage { get; }
             public Tilemap Tilemap { get; }
+            public Grid Grid => (Grid)Tilemap.layoutGrid;
             public StageRegionPaintAsset SourcePaint { get; }
             public StageRegionPaintAsset DepositPaint { get; }
 

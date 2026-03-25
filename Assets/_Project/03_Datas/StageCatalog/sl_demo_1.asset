@@ -15,8 +15,8 @@ MonoBehaviour:
   SchemaVersion: 2
   StageId: 1
   Grid:
-    Width: 2
-    Height: 1
+    Width: 4
+    Height: 4
     CellSize: 1
     Origin: {x: 0, y: 0, z: 0}
   Cells:
@@ -26,6 +26,48 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 2001
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 1
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 1
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 255
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 255
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 255
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 255
+    SourceRegionId: 0
+    DepositRegionId: 0
   SourceRegions:
   - StableId: 1001
     Active: 1
@@ -49,33 +91,10 @@ MonoBehaviour:
   Sources:
   - StableId: 1001
     Active: 1
-    Position: {x: 0, y: 0, z: 0}
+    Position: {x: 2.5, y: 0, z: 5.5}
     YawDeg: 0
     Shape: 1
     Radius: 8
     Size: {x: 12, y: 8}
-  Deposits:
-  - StableId: 2001
-    Active: 1
-    Position: {x: 0, y: 0, z: 10}
-    YawDeg: 0
-    Shape: 0
-    Radius: 5
-    Size: {x: 2, y: 2}
-  Obstacles:
-  - StableId: 3001
-    Active: 1
-    Position: {x: 0, y: 0, z: -5}
-    YawDeg: 0
-    Shape: 1
-    Radius: 1
-    Size: {x: 8, y: 2}
-    CollisionMask: 255
-  - StableId: 3002
-    Active: 1
-    Position: {x: 6, y: 0, z: 0}
-    YawDeg: 0
-    Shape: 1
-    Radius: 1
-    Size: {x: 2, y: 4}
-    CollisionMask: 1
+  Deposits: []
+  Obstacles: []

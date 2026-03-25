@@ -151,10 +151,6 @@ namespace SweepNDodge.DotsBullets
             var topologyPrefabs = _em.GetComponentData<StageTopologyPrefabCatalogComponent>(topologyCatalogEntity);
             if (topologyPrefabs.SourceTemplate == Entity.Null || !_em.Exists(topologyPrefabs.SourceTemplate))
                 topologyPrefabs.SourceTemplate = StageTopologyTemplateFactory.CreateSourceTemplate(_em);
-            if (topologyPrefabs.DepositTemplate == Entity.Null || !_em.Exists(topologyPrefabs.DepositTemplate))
-                topologyPrefabs.DepositTemplate = StageTopologyTemplateFactory.CreateDepositTemplate(_em);
-            if (topologyPrefabs.ObstacleTemplate == Entity.Null || !_em.Exists(topologyPrefabs.ObstacleTemplate))
-                topologyPrefabs.ObstacleTemplate = StageTopologyTemplateFactory.CreateObstacleTemplate(_em);
             _em.SetComponentData(topologyCatalogEntity, topologyPrefabs);
 
             _warnedCatalogBindingFailure = false;
@@ -177,9 +173,7 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 var candidate = _em.GetComponentData<StageTopologyPrefabCatalogComponent>(entity);
-                bool hasAnyPrefab = candidate.SourceTemplate != Entity.Null
-                    || candidate.DepositTemplate != Entity.Null
-                    || candidate.ObstacleTemplate != Entity.Null;
+                bool hasAnyPrefab = candidate.SourceTemplate != Entity.Null;
                 if (keeper == Entity.Null || hasAnyPrefab)
                 {
                     keeper = entity;
@@ -201,10 +195,6 @@ namespace SweepNDodge.DotsBullets
                 var extra = _em.GetComponentData<StageTopologyPrefabCatalogComponent>(entity);
                 if (keeperValue.SourceTemplate == Entity.Null && extra.SourceTemplate != Entity.Null)
                     keeperValue.SourceTemplate = extra.SourceTemplate;
-                if (keeperValue.DepositTemplate == Entity.Null && extra.DepositTemplate != Entity.Null)
-                    keeperValue.DepositTemplate = extra.DepositTemplate;
-                if (keeperValue.ObstacleTemplate == Entity.Null && extra.ObstacleTemplate != Entity.Null)
-                    keeperValue.ObstacleTemplate = extra.ObstacleTemplate;
 
                 _em.RemoveComponent<StageTopologyPrefabCatalogComponent>(entity);
             }

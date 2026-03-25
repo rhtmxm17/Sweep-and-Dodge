@@ -622,7 +622,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 10,
                     sourceEntity: captureSource);
-                CreateDepositPoint(em, float3.zero, 0.5f);
+                CreateDepositRegionGrid(em, depositRegionId: 2001u);
 
                 RequestVacuum(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
@@ -3743,7 +3743,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
             em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
             {
-                DepositEntity = Entity.Null,
+                DepositRegionId = 0u,
             });
             em.SetComponentEnabled<PlayerHazardHitRequestTag>(player, false);
             em.SetComponentData(player, new PlayerHazardHitContextComponent
@@ -4191,20 +4191,38 @@ namespace SweepNDodge.DotsBullets.Tests
             return source;
         }
 
-        private static Entity CreateDepositPoint(EntityManager em, float3 position, float radius)
+        private static Entity CreateDepositRegionGrid(EntityManager em, uint depositRegionId)
         {
-            var deposit = em.CreateEntity(
-                typeof(DepositPointComponent),
-                typeof(Shape2DComponent),
-                typeof(LocalTransform));
-            em.SetComponentData(deposit, new Shape2DComponent
+            Entity grid;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()))
             {
-                Kind = Shape2DKind.Circle,
-                Radius = math.max(0f, radius),
-                Size = float2.zero,
+                grid = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(StageRuntimeGridComponent))
+                    : query.GetSingletonEntity();
+            }
+
+            em.SetComponentData(grid, new StageRuntimeGridComponent
+            {
+                StageId = 1,
+                Width = 1,
+                Height = 1,
+                CellSize = 1f,
+                OriginX = -0.5f,
+                OriginZ = -0.5f,
+                Ready = 1,
             });
-            em.SetComponentData(deposit, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
-            return deposit;
+
+            var cells = em.HasBuffer<StageRuntimeGridCellBufferElement>(grid)
+                ? em.GetBuffer<StageRuntimeGridCellBufferElement>(grid)
+                : em.AddBuffer<StageRuntimeGridCellBufferElement>(grid);
+            cells.Clear();
+            cells.Add(new StageRuntimeGridCellBufferElement
+            {
+                MovementFlags = StageCellMovementFlags.None,
+                DepositRegionId = depositRegionId,
+            });
+
+            return grid;
         }
 
         private static void SetSourceShape(EntityManager em, Entity source, Shape2DKind kind, float radius, float2 size)

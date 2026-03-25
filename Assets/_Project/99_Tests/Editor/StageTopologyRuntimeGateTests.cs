@@ -92,20 +92,33 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
             {
-                DepositEntity = Entity.Null,
+                DepositRegionId = 0u,
             });
             em.SetComponentData(player, new PlayerRadiusComponent { Value = 0.5f });
             em.SetComponentData(player, LocalTransform.FromPosition(float3.zero));
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
 
-            var deposit = em.CreateEntity(typeof(DepositPointComponent), typeof(Shape2DComponent), typeof(LocalTransform));
-            em.SetComponentData(deposit, new Shape2DComponent { Kind = Shape2DKind.Circle, Radius = 1f, Size = float2.zero });
-            em.SetComponentData(deposit, LocalTransform.FromPosition(new float3(0.25f, 0f, 0f)));
+            var gridEntity = em.CreateEntity(typeof(StageRuntimeGridComponent));
+            em.SetComponentData(gridEntity, new StageRuntimeGridComponent
+            {
+                StageId = 1,
+                Width = 1,
+                Height = 1,
+                CellSize = 1f,
+                OriginX = 0f,
+                OriginZ = 0f,
+                Ready = 1,
+            });
+            em.AddBuffer<StageRuntimeGridCellBufferElement>(gridEntity).Add(new StageRuntimeGridCellBufferElement
+            {
+                MovementFlags = StageCellMovementFlags.None,
+                DepositRegionId = 1u,
+            });
 
             world.GetOrCreateSystem<PlayerCarryBinDepositRequestSystem>().Update(world.Unmanaged);
 
             Assert.That(em.IsComponentEnabled<PlayerCarryBinDepositRequestTag>(player), Is.False);
-            Assert.That(em.GetComponentData<PlayerCarryBinDepositContextComponent>(player).DepositEntity, Is.EqualTo(Entity.Null));
+            Assert.That(em.GetComponentData<PlayerCarryBinDepositContextComponent>(player).DepositRegionId, Is.EqualTo(0u));
         }
 
         [Test]
