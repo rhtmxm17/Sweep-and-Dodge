@@ -3622,13 +3622,11 @@ namespace SweepNDodge.DotsBullets.Tests
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var area1 = em.GetComponentData<Shape2DComponent>(source1001);
             var sourceCells1 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1001, isReadOnly: true);
-            int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             return sourceState1.State == SourceStateId.Normal
                 && area1.Kind == Shape2DKind.Rectangle
                 && sourceCells1.Length > 0
-                && depositIndex >= 0
-                && cells[depositIndex].DepositRegionId == 2001u;
+                && HasAnyDepositCell(cells);
         }
 
         private static bool IsStageMapAppliedForStage2(EntityManager em)
@@ -3643,13 +3641,11 @@ namespace SweepNDodge.DotsBullets.Tests
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
             var sourceCells2 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1002, isReadOnly: true);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             return sourceState2.State == SourceStateId.Normal
                 && area2.Kind == Shape2DKind.Rectangle
                 && sourceCells2.Length > 0
-                && depositIndex >= 0
-                && cells[depositIndex].DepositRegionId == 2001u
+                && HasAnyDepositCell(cells)
                 && clipPatterns2.Length > 0;
         }
 
@@ -3680,9 +3676,8 @@ namespace SweepNDodge.DotsBullets.Tests
             string gridText = "grid=missing";
             if (hasGrid)
             {
-                int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
-                uint depositRegionId = depositIndex >= 0 ? cells[depositIndex].DepositRegionId : 0u;
-                gridText = $"grid(stage={grid.StageId}, size={grid.Width}x{grid.Height}, deposit={depositRegionId})";
+                int depositCount = CountDepositCells(cells);
+                gridText = $"grid(stage={grid.StageId}, size={grid.Width}x{grid.Height}, depositCells={depositCount})";
             }
 
             return $"{topologyText}, {sourceText}, {gridText}";
@@ -3736,13 +3731,11 @@ namespace SweepNDodge.DotsBullets.Tests
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var area1 = em.GetComponentData<Shape2DComponent>(source1001);
             var sourceCells1 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1001, isReadOnly: true);
-            int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Normal));
             Assert.That(area1.Kind, Is.EqualTo(Shape2DKind.Rectangle));
             Assert.That(sourceCells1.Length, Is.GreaterThan(0));
-            Assert.That(depositIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(cells[depositIndex].DepositRegionId, Is.EqualTo(2001u));
+            Assert.That(HasAnyDepositCell(cells), Is.True);
         }
 
         private static void AssertStageMapAppliedForStage2(EntityManager em)
@@ -3755,13 +3748,29 @@ namespace SweepNDodge.DotsBullets.Tests
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
             var sourceCells2 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1002, isReadOnly: true);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Normal));
             Assert.That(area2.Kind, Is.EqualTo(Shape2DKind.Rectangle));
             Assert.That(sourceCells2.Length, Is.GreaterThan(0));
-            Assert.That(cells[depositIndex].DepositRegionId, Is.EqualTo(2001u));
+            Assert.That(HasAnyDepositCell(cells), Is.True);
             Assert.That(clipPatterns2.Length, Is.GreaterThan(0));
+        }
+
+        private static bool HasAnyDepositCell(DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
+        {
+            return CountDepositCells(cells) > 0;
+        }
+
+        private static int CountDepositCells(DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
+        {
+            int count = 0;
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (cells[i].DepositRegionId != 0u)
+                    count++;
+            }
+
+            return count;
         }
 
         private static bool TryFindSourceByStableId(EntityManager em, uint stableId, out Entity sourceEntity)

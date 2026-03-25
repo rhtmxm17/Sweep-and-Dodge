@@ -3,6 +3,7 @@ using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -104,18 +105,50 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 setup.StageGo.transform.GetChild(0).rotation = Quaternion.Euler(90f, 0f, 0f);
                 setup.StageGo.transform.GetChild(0).position = new Vector3(3f, 2f, 5f);
+                setup.Authoring.BoundsMinCell = new Vector2Int(-2, 4);
                 setup.SourcePaint.SetCell(1, 1, 1001u);
                 CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(1, 1));
 
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
                 Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
-                Assert.That(setup.Layout.Grid.Origin.x, Is.EqualTo(3f));
-                Assert.That(setup.Layout.Grid.Origin.z, Is.EqualTo(5f));
+                Assert.That(setup.Layout.Grid.Origin.x, Is.EqualTo(1f));
+                Assert.That(setup.Layout.Grid.Origin.z, Is.EqualTo(9f));
                 Assert.That(setup.Layout.SourceRegions.Single().AnchorCell, Is.EqualTo(new Vector2Int(1, 1)));
             }
             finally
             {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void GenerateLayoutsForRoot_NegativeBoundsMin_ReadsMovementFromTilemapCoordinates()
+        {
+            var setup = CreateStageSetup();
+            StageMovementTile tile = null;
+            try
+            {
+                setup.Authoring.BoundsMinCell = new Vector2Int(-3, -2);
+                setup.SourcePaint.SetCell(0, 0, 1001u);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
+                tile = CreateMovementTile(StageCellMovementFlags.BlockPlayer | StageCellMovementFlags.BlockBullet);
+                setup.MovementTilemap.SetTile(new Vector3Int(-3, -2, 0), tile);
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.Grid.Width, Is.EqualTo(2));
+                Assert.That(setup.Layout.Grid.Height, Is.EqualTo(2));
+                Assert.That(setup.Layout.Grid.Origin.x, Is.EqualTo(-3f));
+                Assert.That(setup.Layout.Grid.Origin.z, Is.EqualTo(-2f));
+                Assert.That(setup.Layout.Cells[0].MovementFlags, Is.EqualTo(StageCellMovementFlags.BlockPlayer | StageCellMovementFlags.BlockBullet));
+                Assert.That(setup.Layout.Cells[0].SourceRegionId, Is.EqualTo(1001u));
+            }
+            finally
+            {
+                if (tile != null)
+                    Object.DestroyImmediate(tile);
                 setup.Dispose();
             }
         }
@@ -132,6 +165,33 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 Assert.That(ok, Is.False);
                 Assert.That(issues.Any(x => x.Code == "STA016"), Is.True);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void BuildRuntimeGridSpec_AnchorPreviewMath_RespectsBoundsMin()
+        {
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.StageGo.transform.GetChild(0).position = new Vector3(10f, 2f, -4f);
+                setup.Authoring.BoundsMinCell = new Vector2Int(-2, 5);
+                setup.Authoring.BoundsSize = new Vector2Int(4, 3);
+
+                var grid = setup.Authoring.BuildRuntimeGridSpec();
+                Vector3 world = StageRuntimeGridUtility.GetAnchorWorldPosition(
+                    in grid,
+                    new int2(1, 2),
+                    new float2(0f, 0f),
+                    setup.Authoring.Grid.transform.position.y);
+
+                Assert.That(world.x, Is.EqualTo(9.5f));
+                Assert.That(world.z, Is.EqualTo(3.5f));
+                Assert.That(world.y, Is.EqualTo(2f));
             }
             finally
             {
@@ -195,15 +255,17 @@ namespace SweepNDodge.DotsBullets.Tests
             authoring.MovementTilemap = tilemap;
             authoring.SourceRegionPaint = sourcePaint;
             authoring.DepositRegionPaint = depositPaint;
+            authoring.BoundsMinCell = new Vector2Int(0, 0);
+            authoring.BoundsSize = new Vector2Int(2, 2);
 
-            return new StageTestSetup(rootGo, stageGo, root, layout, sourcePaint, depositPaint, tilemap);
+            return new StageTestSetup(rootGo, stageGo, root, layout, sourcePaint, depositPaint, tilemap, authoring);
         }
 
         private sealed class StageTestSetup
         {
             private readonly Object[] _ownedObjects;
 
-            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint, Tilemap movementTilemap)
+            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint, Tilemap movementTilemap, StageGridAuthoring authoring)
             {
                 _ownedObjects = new Object[] { layout, sourcePaint, depositPaint, rootGo };
                 StageGo = stageGo;
@@ -212,6 +274,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SourcePaint = sourcePaint;
                 DepositPaint = depositPaint;
                 MovementTilemap = movementTilemap;
+                Authoring = authoring;
             }
 
             public GameObject StageGo { get; }
@@ -220,6 +283,7 @@ namespace SweepNDodge.DotsBullets.Tests
             public StageRegionPaintAsset SourcePaint { get; }
             public StageRegionPaintAsset DepositPaint { get; }
             public Tilemap MovementTilemap { get; }
+            public StageGridAuthoring Authoring { get; }
 
             public void Dispose()
             {

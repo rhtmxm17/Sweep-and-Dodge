@@ -44,13 +44,7 @@ namespace SweepNDodge.DotsBullets.Editor
             if (stageNode == null || !stageNode.TryGetComponent(out StageGridAuthoring authoring) || authoring == null || authoring.Grid == null)
                 return false;
 
-            var grid = new StageGridSpec
-            {
-                Width = authoring.SourceRegionPaint != null ? authoring.SourceRegionPaint.Width : 1,
-                Height = authoring.SourceRegionPaint != null ? authoring.SourceRegionPaint.Height : 1,
-                CellSize = authoring.Grid.cellSize.x,
-                Origin = new Vector3(authoring.Grid.transform.position.x, authoring.Grid.transform.position.y, authoring.Grid.transform.position.z),
-            };
+            var grid = authoring.BuildRuntimeGridSpec();
             world = StageRuntimeGridUtility.GetAnchorWorldPosition(
                 in grid,
                 new Unity.Mathematics.int2(marker.AnchorCell.x, marker.AnchorCell.y),

@@ -56,12 +56,11 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void ResizeToGridAuthoring()
         {
-            if (_gridAuthoring == null || _gridAuthoring.MovementTilemap == null)
+            if (_gridAuthoring == null)
                 return;
 
-            var bounds = _gridAuthoring.MovementTilemap.cellBounds;
             Undo.RecordObject(_targetAsset, "Resize Stage Region Paint To Grid");
-            _targetAsset.Resize(bounds.size.x, bounds.size.y);
+            _targetAsset.Resize(Mathf.Max(1, _gridAuthoring.BoundsSize.x), Mathf.Max(1, _gridAuthoring.BoundsSize.y));
             EditorUtility.SetDirty(_targetAsset);
         }
 
@@ -94,11 +93,21 @@ namespace SweepNDodge.DotsBullets.Editor
                     {
                         uint current = _targetAsset.GetCell(x, y);
                         string label = current == 0 ? "." : current.ToString();
-                        if (GUILayout.Button(label, GUILayout.Width(38f), GUILayout.Height(24f)))
+                        Vector2Int tileCoord = ResolveTileCoord(x, y);
+                        var content = new GUIContent(label, $"Local ({x}, {y}) / Tile ({tileCoord.x}, {tileCoord.y})");
+                        if (GUILayout.Button(content, GUILayout.Width(38f), GUILayout.Height(24f)))
                             PaintCell(x, y);
                     }
                 }
             }
+        }
+
+        private Vector2Int ResolveTileCoord(int localX, int localY)
+        {
+            if (_gridAuthoring == null)
+                return new Vector2Int(localX, localY);
+
+            return new Vector2Int(_gridAuthoring.BoundsMinCell.x + localX, _gridAuthoring.BoundsMinCell.y + localY);
         }
 
         private void PaintCell(int x, int y)

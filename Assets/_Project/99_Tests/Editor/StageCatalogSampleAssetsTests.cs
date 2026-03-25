@@ -14,6 +14,12 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string StageLayout1Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_1.asset";
         private const string StageLayout2Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_2.asset";
         private const string StageLayout3Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_3.asset";
+        private const string Stage1SourcePaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage1_source.asset";
+        private const string Stage1DepositPaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage1_deposit.asset";
+        private const string Stage2SourcePaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage2_source.asset";
+        private const string Stage2DepositPaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage2_deposit.asset";
+        private const string Stage3SourcePaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage3_source.asset";
+        private const string Stage3DepositPaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage3_deposit.asset";
 
         [Test]
         public void DemoStageCatalog_ContainsThreeEnabledEntriesInOrder()
@@ -58,6 +64,19 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertLayoutPopulated(layout1);
             AssertLayoutPopulated(layout2);
             AssertLayoutPopulated(layout3);
+
+            AssertLayoutMatchesPaint(
+                layout1,
+                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage1SourcePaintPath),
+                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage1DepositPaintPath));
+            AssertLayoutMatchesPaint(
+                layout2,
+                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage2SourcePaintPath),
+                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage2DepositPaintPath));
+            AssertLayoutMatchesPaint(
+                layout3,
+                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage3SourcePaintPath),
+                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage3DepositPaintPath));
         }
 
         [Test]
@@ -88,6 +107,22 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(layout.Sources == null || layout.Sources.Length == 0, Is.True);
             Assert.That(layout.Deposits == null || layout.Deposits.Length == 0, Is.True);
             Assert.That(layout.Obstacles == null || layout.Obstacles.Length == 0, Is.True);
+        }
+
+        private static void AssertLayoutMatchesPaint(StageLayoutSO layout, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint)
+        {
+            Assert.That(sourcePaint, Is.Not.Null);
+            Assert.That(depositPaint, Is.Not.Null);
+            Assert.That(layout.Grid.Width, Is.EqualTo(sourcePaint.Width));
+            Assert.That(layout.Grid.Height, Is.EqualTo(sourcePaint.Height));
+            Assert.That(layout.Grid.Width, Is.EqualTo(depositPaint.Width));
+            Assert.That(layout.Grid.Height, Is.EqualTo(depositPaint.Height));
+
+            for (int i = 0; i < layout.Cells.Length; i++)
+            {
+                Assert.That(layout.Cells[i].SourceRegionId, Is.EqualTo(sourcePaint.Cells[i]), $"Source paint mismatch at cell[{i}].");
+                Assert.That(layout.Cells[i].DepositRegionId, Is.EqualTo(depositPaint.Cells[i]), $"Deposit paint mismatch at cell[{i}].");
+            }
         }
     }
 }

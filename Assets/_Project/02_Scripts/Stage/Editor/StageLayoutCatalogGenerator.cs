@@ -116,22 +116,13 @@ namespace SweepNDodge.DotsBullets.Editor
         private static StageLayoutSO BuildStageLayout(StageLayoutStageMarker stageNode, StageGridAuthoring authoring)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
-            int width = authoring.SourceRegionPaint.Width;
-            int height = authoring.SourceRegionPaint.Height;
-            var bounds = authoring.MovementTilemap.cellBounds;
+            var gridSpec = authoring.BuildRuntimeGridSpec();
+            int width = gridSpec.Width;
+            int height = gridSpec.Height;
 
             layout.SchemaVersion = 2;
             layout.StageId = stageNode.StageId;
-            layout.Grid = new StageGridSpec
-            {
-                Width = width,
-                Height = height,
-                CellSize = authoring.Grid.cellSize.x,
-                Origin = new Vector3(
-                    authoring.Grid.transform.position.x,
-                    authoring.Grid.transform.position.y,
-                    authoring.Grid.transform.position.z),
-            };
+            layout.Grid = gridSpec;
 
             layout.Cells = new StageCellLayoutData[width * height];
             for (int y = 0; y < height; y++)
@@ -139,7 +130,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 for (int x = 0; x < width; x++)
                 {
                     int index = (y * width) + x;
-                    var tile = authoring.MovementTilemap.GetTile(bounds.min + new Vector3Int(x, y, 0)) as StageMovementTile;
+                    var tile = authoring.MovementTilemap.GetTile(authoring.GetTilemapCell(x, y)) as StageMovementTile;
                     layout.Cells[index] = new StageCellLayoutData
                     {
                         MovementFlags = tile != null ? tile.MovementFlags : StageCellMovementFlags.None,

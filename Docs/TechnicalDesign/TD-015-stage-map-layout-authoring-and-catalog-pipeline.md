@@ -203,11 +203,13 @@
 ## 7. 에디터 파이프라인
 ### 7.1 채택 authoring 경로
 - 1순위: Unity Tilemap 기반 authoring + generator
-  - `StageGridAuthoring`
+- `StageGridAuthoring`
     - `Grid`
     - `MovementTilemap`
     - `SourceRegionPaintAsset`
     - `DepositRegionPaintAsset`
+    - `BoundsMinCell`
+    - `BoundsSize`
   - `StageRegionAnchorMarker`
   - `StagePresentationMarker`
 - 2순위: 외부 툴(`LDtk`, `Tiled` 등) -> importer -> `StageLayoutSO`
@@ -220,10 +222,16 @@
 - `MovementTilemap`
   - `BlockPlayer`, `BlockBullet` 의미를 갖는 metadata tilemap이다.
   - visual tilemap과 분리한다.
+  - tilemap `cellBounds`는 참고값일 뿐 authoring bounds authority가 아니다.
 - `SourceRegionPaintAsset`, `DepositRegionPaintAsset`
   - `Width`, `Height`, `uint[] Cells`를 갖는 dense row-major backing store다.
   - paint 시 explicit `StableId` 선택을 강제한다.
   - `RegionId별 Tile asset` 방식은 채택하지 않는다.
+- `BoundsMinCell`, `BoundsSize`
+  - `StageGridAuthoring`가 직접 편집 bounds를 소유한다.
+  - local paint cell `(0,0)`은 실제 tilemap cell `(BoundsMinCell.x, BoundsMinCell.y)`에 대응한다.
+  - 음수 tile 좌표를 허용한다.
+  - generator는 `BoundsMinCell + local cell`로 movement tile을 읽고, runtime layout는 normalized local grid로 저장한다.
 - `StageRegionAnchorMarker`
   - `RegionKind`, `StableId`, `AnchorCell`, `AnchorOffset`를 가진다.
   - source/deposit 대표점의 authoring SSOT다.
@@ -241,7 +249,9 @@
   - region marker가 있는데 paint된 셀이 없음
   - source/deposit overlap 셀
 - validation warning:
+  - movement used tile이 authoring bounds 밖에 남아 있음
   - stage 전체에 source 또는 deposit region이 없음
+  - editor gizmo는 authoring bounds 범위 안의 grid / movement / source / deposit / anchor만 시각화한다.
 
 ### 7.4 패키지 기준
 - 필수
@@ -261,6 +271,10 @@
 4. `StageCatalogComposer`로 `StageCatalogSO`를 갱신한다.
 5. 생성 asset을 `StageGridLayoutValidationRules`와 catalog validation으로 검증한다.
 6. runtime migration 전까지 운영 샘플 asset은 필요 시 legacy compatibility bridge를 수동 유지한다.
+- 데모 샘플 운영 규칙:
+  - `StageLayoutEditingSampleV1` 씬 상태를 authoring SSOT로 본다.
+  - `sl_demo_*` layout asset은 임의 수치나 이전 샘플 메모보다, 해당 씬과 region paint asset 상태에 맞춰 다시 생성/동기화해야 한다.
+  - Stage2/3 sample source는 tiny region이 아니라 최소 `30` cells 이상을 갖는 authoring 예시로 유지한다.
 
 ## 8. 런타임 반영
 ### 8.1 Topology Layer
@@ -285,6 +299,17 @@
 - lifecycle 기본 정책은 `disable-to-pool`을 유지한다.
 - source aggregate는 `instantiate -> reuse -> mapped-active -> pooled-disabled`를 따른다.
 - grid cache는 stage entry마다 rebuild하며, mid-run mutation은 지원하지 않는다.
+
+### 8.4 Runtime Debug Gizmo
+- PlayMode in Editor에서는 `StageRuntimeGridDebugDrawer`가 runtime `StageRuntimeGridComponent`와 source anchor ECS 데이터를 읽어 scene gizmo를 그릴 수 있다.
+- 표시 범위:
+  - grid bounds / cell line
+  - movement overlay
+  - source region overlay
+  - deposit region overlay
+  - source anchor
+- deposit anchor는 현재 gameplay runtime authority가 아니므로 runtime gizmo 범위에서 제외한다.
+- 이 경로는 editor/debug 전용이며, 빌드용 debug overlay를 의미하지 않는다.
 
 ## 9. 작업 분해 / 진행 상태
 - P1. 문서/결정 고정

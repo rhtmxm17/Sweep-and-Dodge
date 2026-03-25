@@ -99,21 +99,22 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
             }
 
-            boundsMin = authoring.MovementTilemap.cellBounds.min;
-            boundsSize = authoring.MovementTilemap.cellBounds.size;
-            if (boundsMin.x != 0 || boundsMin.y != 0 || boundsMin.z != 0)
+            if (authoring.BoundsSize.x <= 0 || authoring.BoundsSize.y <= 0)
             {
-                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA010", location, $"MovementTilemap bounds min must be (0,0,0). current={boundsMin}"));
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA010", location, $"Authoring bounds size must be positive. current=({authoring.BoundsSize.x}, {authoring.BoundsSize.y})"));
                 valid = false;
             }
 
+            var authoringBounds = authoring.GetAuthoringBounds();
+            boundsMin = authoringBounds.min;
+            boundsSize = authoringBounds.size;
             if (boundsSize.x != authoring.SourceRegionPaint.Width || boundsSize.y != authoring.SourceRegionPaint.Height)
             {
                 issues?.Add(new ContentValidationIssue(
                     ContentValidationSeverity.Error,
                     "STA011",
                     location,
-                    $"MovementTilemap bounds size must match paint asset dimensions. tilemap=({boundsSize.x}, {boundsSize.y}), paint=({authoring.SourceRegionPaint.Width}, {authoring.SourceRegionPaint.Height})"));
+                    $"Authoring bounds size must match paint asset dimensions. bounds=({boundsSize.x}, {boundsSize.y}), paint=({authoring.SourceRegionPaint.Width}, {authoring.SourceRegionPaint.Height})"));
                 valid = false;
             }
 
@@ -123,6 +124,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
             }
 
+            WarnUsedTilesOutsideBounds(authoring.MovementTilemap, authoringBounds, location, issues);
             if (!ValidateMovementTiles(authoring.MovementTilemap, boundsMin, boundsSize, location, issues))
                 valid = false;
 
@@ -164,6 +166,28 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
 
             return valid;
+        }
+
+        private static void WarnUsedTilesOutsideBounds(Tilemap tilemap, BoundsInt authoringBounds, string location, List<ContentValidationIssue> issues)
+        {
+            if (tilemap == null)
+                return;
+
+            foreach (var cell in tilemap.cellBounds.allPositionsWithin)
+            {
+                if (tilemap.GetTile(cell) == null)
+                    continue;
+
+                if (authoringBounds.Contains(cell))
+                    continue;
+
+                issues?.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Warning,
+                    "STA022",
+                    location,
+                    $"MovementTilemap has a used tile outside authoring bounds at tile cell ({cell.x}, {cell.y})."));
+                return;
+            }
         }
 
         private static bool ValidateMovementTiles(Tilemap tilemap, Vector3Int boundsMin, Vector3Int boundsSize, string location, List<ContentValidationIssue> issues)

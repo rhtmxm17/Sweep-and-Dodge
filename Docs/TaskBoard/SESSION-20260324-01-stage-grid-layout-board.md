@@ -82,6 +82,12 @@
 - [x] D11. `P5 source region runtime migration`을 반영했다.
   - 검증 기준: `StageTopologyApplyPrepareSystem`가 `SourceRegions + Cells`로 source entity를 reconcile하고, source pressure/spawn/pollution runtime query가 region-derived local grid cache를 authoritative geometry로 사용한다.
   - 구현 메모: 운영 샘플 `sl_demo_*`는 `layout.Sources` bridge를 비웠고, pressure source는 player center cell membership으로 결정한다.
+- [x] D12. `P3 explicit authoring bounds + grid gizmo` 보정을 반영했다.
+  - 검증 기준: `StageGridAuthoring`가 `BoundsMinCell/BoundsSize`를 authoring SSOT로 소유하고, tilemap `cellBounds`는 reference only로 내려갔다.
+  - 구현 메모: `StageLayoutEditingSampleV1` 씬 상태를 authoring SSOT로 고정했고, Stage1은 `22x17 bounds / 50 source cells / 12 deposit cells`, Stage2/3는 `30+ source cells` sample로 layout 자산과 다시 동기화했다.
+- [x] D13. runtime stage grid playmode gizmo를 추가했다.
+  - 검증 기준: runtime `StageRuntimeGrid`와 source anchor ECS 데이터를 읽어 grid/movement/source/deposit/source-anchor gizmo를 PlayMode SceneView에서 표시한다.
+  - 구현 메모: deposit anchor는 현재 runtime authority 방향이 열려 있으므로 gizmo 범위에서 제외했다.
 
 ## End of Session
 - 결과: movement/deposit/source runtime query가 모두 grid authority 기준으로 정리됐다.
