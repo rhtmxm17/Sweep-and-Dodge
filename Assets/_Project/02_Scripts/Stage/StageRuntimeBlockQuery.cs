@@ -7,13 +7,34 @@ namespace SweepNDodge.DotsBullets
     internal static class StageRuntimeBlockQuery
     {
         /// <summary>
-        /// Bullet swept-path block query seam.
-        /// P4.1은 full-cell BlockBullet만 구현하고, 이후 partial-cell shape는 이 narrow-phase 경로에서 확장한다.
+        /// Runtime swept-path block query seam.
+        /// P4.x는 full-cell BlockPlayer/BlockBullet만 구현하고, 이후 partial-cell shape는 이 narrow-phase 경로에서 확장한다.
         /// </summary>
         public static bool HitsBulletFullCell(
             float2 prevXZ,
             float2 nextXZ,
             float radius,
+            in StageRuntimeGridComponent grid,
+            DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
+        {
+            return HitsFullCellMask(prevXZ, nextXZ, radius, StageCellMovementFlags.BlockBullet, in grid, cells);
+        }
+
+        public static bool BlocksPlayerFullCell(
+            float2 prevXZ,
+            float2 nextXZ,
+            float radius,
+            in StageRuntimeGridComponent grid,
+            DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
+        {
+            return HitsFullCellMask(prevXZ, nextXZ, radius, StageCellMovementFlags.BlockPlayer, in grid, cells);
+        }
+
+        private static bool HitsFullCellMask(
+            float2 prevXZ,
+            float2 nextXZ,
+            float radius,
+            StageCellMovementFlags requiredMask,
             in StageRuntimeGridComponent grid,
             DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
         {
@@ -27,7 +48,7 @@ namespace SweepNDodge.DotsBullets
                     if (index < 0)
                         continue;
 
-                    if ((cells[index].MovementFlags & StageCellMovementFlags.BlockBullet) != 0)
+                    if ((cells[index].MovementFlags & requiredMask) != 0)
                         return true;
                 }
 
@@ -45,7 +66,7 @@ namespace SweepNDodge.DotsBullets
                     if (index < 0)
                         continue;
 
-                    if ((cells[index].MovementFlags & StageCellMovementFlags.BlockBullet) == 0)
+                    if ((cells[index].MovementFlags & requiredMask) == 0)
                         continue;
 
                     if (StageRuntimeGridUtility.DoesSweptCircleIntersectCell(prevXZ, nextXZ, radius, x, y, in grid))

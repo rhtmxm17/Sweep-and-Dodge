@@ -72,14 +72,14 @@ namespace SweepNDodge.DotsBullets
                 float2 nextXZ = new float2(next.x, next.z);
                 float playerRadius = math.max(0f, radius.ValueRO.Value);
 
-                if (IsCandidateValid(nextXZ, playerRadius, in grid, cells))
+                if (IsCandidateValid(prevXZ, nextXZ, playerRadius, in grid, cells))
                     continue;
 
                 float2 delta = nextXZ - prevXZ;
                 float2 xOnly = new float2(nextXZ.x, prevXZ.y);
                 float2 zOnly = new float2(prevXZ.x, nextXZ.y);
-                bool xValid = IsCandidateValid(xOnly, playerRadius, in grid, cells);
-                bool zValid = IsCandidateValid(zOnly, playerRadius, in grid, cells);
+                bool xValid = IsCandidateValid(prevXZ, xOnly, playerRadius, in grid, cells);
+                bool zValid = IsCandidateValid(prevXZ, zOnly, playerRadius, in grid, cells);
 
                 float2 resolved = prevXZ;
                 if (xValid && zValid)
@@ -107,26 +107,13 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static bool IsCandidateValid(
-            float2 centerXZ,
+            float2 prevXZ,
+            float2 nextXZ,
             float radius,
             in StageRuntimeGridComponent grid,
             DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
         {
-            StageRuntimeGridUtility.ComputeCircleCellBounds(centerXZ, radius, in grid, out int2 minCell, out int2 maxCell);
-            for (int y = minCell.y; y <= maxCell.y; y++)
-            {
-                for (int x = minCell.x; x <= maxCell.x; x++)
-                {
-                    int index = StageRuntimeGridUtility.GetCellIndex(x, y, in grid);
-                    if (index < 0)
-                        continue;
-
-                    if ((cells[index].MovementFlags & StageCellMovementFlags.BlockPlayer) != 0)
-                        return false;
-                }
-            }
-
-            return true;
+            return !StageRuntimeBlockQuery.BlocksPlayerFullCell(prevXZ, nextXZ, radius, in grid, cells);
         }
     }
 

@@ -174,14 +174,20 @@
 - P4 기준으로 deposit gameplay runtime entity는 제거한다.
 - deposit 기준점은 authoring/presentation 기준점으로만 유지한다.
 - deposit anchor는 연출상 진입 불가능한 위치에 놓일 수 있지만, 여전히 해당 deposit region 셀 위에 있어야 한다.
+- 여러 deposit region이 동시에 닿는 경우에는 deterministic priority를 새로 정의하지 않는다.
+  - current bounds-hit 순회에서 먼저 만난 region을 선택해도 무방하다.
 
 ### 6.6 Obstacle / Movement 계약
 - obstacle gameplay는 `StageCellMovementFlags`가 단일 authoritative source다.
 - `Obstacle` standalone runtime entity와 `StageObstacleLayoutData`는 신규 설계에서 채택하지 않는다.
 - 플레이어 이동 차단과 bullet 차단은 동일 grid를 읽되, 소비 규칙은 각 owner가 가진다.
-  - player reader owner: `PlayerObstacleBlockSystem`의 후속 grid reader
+  - player reader owner: `PlayerObstacleBlockSystem`
+    - `prevXZ -> nextXZ` swept path broad phase로 traversed cells를 모으고, `BlockPlayer` full-cell narrow phase를 movement owner에서 처리한다.
+    - `xOnly / zOnly / rollback` slide resolution 규칙은 현재 movement owner가 계속 소유한다.
   - bullet reader owner: `BulletSimulationSystem`
     - `prevXZ -> nextXZ` swept path broad phase로 traversed cells를 모으고, `BlockBullet` full-cell narrow phase를 같은 simulation pass 안에서 처리한다.
+- deposit 접촉은 의도적으로 simple bounds-hit를 유지한다.
+  - movement와 달리 swept query나 partial-cell seam으로 올리지 않는다.
 - obstacle visual은 gameplay authority가 아니다.
   - visual tilemap 또는 auto-generated mesh/tile은 grid obstacle layer를 read-only로 소비한다.
   - visual 생성 실패는 gameplay hard gate가 아니다.
@@ -291,6 +297,9 @@
 - P4.1. bullet block owner 재정렬
   - `BulletObstacleHitRequestSystem`를 제거하고, bullet block를 `BulletSimulationSystem` owner로 옮긴다.
   - request 단계의 활성 bullet 전량 재순회를 금지하고, swept path broad phase seam만 남긴다.
+- P4.2. player block swept semantics 정리
+  - `PlayerObstacleBlockSystem`를 movement owner swept query로 전환하고, player tunneling을 blocked cell 기준으로 막는다.
+  - deposit touch는 bounds-hit semantics를 유지한다.
 - P5. source region runtime 이관
   - source sampling, pollution, progress를 region cell 집합 기준으로 옮긴다.
 - P6. visual/presentation 정리
@@ -309,7 +318,7 @@
   - grid coord / region id / explicit anchor validation 회귀
 - PlayMode
   - stage entry 시 grid cache build 성공
-  - player movement block은 local grid query로, bullet block은 simulation owner swept query로 동작
+  - player movement block은 movement owner swept query로, bullet block은 simulation owner swept query로 동작
   - deposit 접촉이 deposit region 기준으로 동작
   - source sampling / progress가 region cell 집합 기준으로 동작
   - obstacle visual rebuild 실패가 gameplay hard gate로 승격되지 않음

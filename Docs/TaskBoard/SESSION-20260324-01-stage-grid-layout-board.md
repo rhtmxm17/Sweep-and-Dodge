@@ -23,6 +23,9 @@
 - [x] P4.1 bullet block owner 재정렬
   - 기준: `BulletObstacleHitRequestSystem`를 제거하고, bullet block owner를 `BulletSimulationSystem`으로 옮긴다.
   - 산출물: swept path broad phase seam, simulation owner `BlockBullet` full-cell consume, request 단계 bullet-wide full scan 제거
+- [x] P4.2 player block swept semantics 정리
+  - 기준: `PlayerObstacleBlockSystem`를 movement owner swept query로 전환하고, player tunneling을 blocked cell 기준으로 막는다.
+  - 산출물: player `prevXZ -> nextXZ` swept query, shared `StageRuntimeBlockQuery` mask seam, deposit bounds-hit 유지 명시
 - [x] 검증 및 회귀 정리
   - 검증 결과: P4 기준 compile error 0, console error 0, EditMode `269/269` pass, PlayMode `38/38` pass
   - 구현 메모: source runtime migration은 비범위라 운영 샘플 asset의 `Sources` compatibility bridge는 유지했다. stage2 `9002` presentation은 deposit-link 대신 source-link로 정리했다.
@@ -76,8 +79,11 @@
   - 구현 메모: bullet block owner는 후속 P4.1에서 request 단계 full scan 제거 기준으로 재정렬했다.
 - [x] D9. `P4.1 bullet block owner realignment`를 반영했다.
   - 검증 기준: `BulletObstacleHitRequestSystem` 제거, `BulletSimulationSystem` owner 이동, `prevXZ -> nextXZ` swept path broad phase, `BlockBullet` full-cell narrow phase, 관련 EditMode/PlayMode 회귀 확인
+- [x] D10. `P4.2 player block swept semantics`를 반영했다.
+  - 검증 결과: EditMode `277/277` pass. PlayMode는 실행 중 Unity MCP 연결이 끊겨 최종 합격 여부를 회수하지 못했다.
+  - 구현 메모: `PlayerObstacleBlockSystem`가 movement owner swept query로 `BlockPlayer`를 판정하고, deposit touch는 bounds-hit semantics를 유지한다.
 
 ## End of Session
-- 결과: P4 코드 반영은 진행 중이며, runtime movement/deposit query는 grid authority 기준으로 정리됐다.
-- 남은 리스크: Unity compile/test 미검증 상태라 compile break 또는 PlayMode 회귀가 남아 있을 수 있다.
-- 다음 세션 시작점: Unity compile -> console -> EditMode -> PlayMode 결과를 보고 남은 회귀를 정리한다.
+- 결과: P4.2까지의 movement/deposit query는 grid authority 기준으로 정리됐고, player block도 swept query semantics로 맞췄다.
+- 남은 리스크: PlayMode 최종 결과는 Unity MCP disconnect로 미회수 상태다.
+- 다음 세션 시작점: PlayMode smoke를 1회 재실행해 최종 합격 여부를 회수하고, 이어서 P5 source region runtime migration으로 넘어간다.

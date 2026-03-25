@@ -103,6 +103,71 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(tx.Position.z, Is.EqualTo(0.5f).Within(0.001f));
         }
 
+        [Test]
+        public void PlayerObstacleBlock_RollsBack_WhenSweptPathCrossesBlockedCell()
+        {
+            using var world = new World("PlayerObstacle_SweptRollback");
+            var em = world.EntityManager;
+
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[]
+            {
+                StageCellMovementFlags.None,
+                StageCellMovementFlags.BlockPlayer,
+                StageCellMovementFlags.None,
+                StageCellMovementFlags.None,
+            }, width: 4, height: 1);
+            var player = CreatePlayer(em, prev: new float3(0.1f, 0f, 0.5f), current: new float3(3.2f, 0f, 0.5f), radius: 0.05f);
+
+            world.GetOrCreateSystem<PlayerObstacleBlockSystem>().Update(world.Unmanaged);
+
+            var tx = em.GetComponentData<LocalTransform>(player);
+            Assert.That(tx.Position.x, Is.EqualTo(0.1f).Within(0.001f));
+            Assert.That(tx.Position.z, Is.EqualTo(0.5f).Within(0.001f));
+        }
+
+        [Test]
+        public void PlayerObstacleBlock_RollsBack_WhenRadiusTouchesNeighborBlockedCell()
+        {
+            using var world = new World("PlayerObstacle_RadiusNeighbor");
+            var em = world.EntityManager;
+
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[]
+            {
+                StageCellMovementFlags.None,
+                StageCellMovementFlags.BlockPlayer,
+            }, width: 2, height: 1);
+            var player = CreatePlayer(em, prev: new float3(0.2f, 0f, 0.5f), current: new float3(0.75f, 0f, 0.5f), radius: 0.3f);
+
+            world.GetOrCreateSystem<PlayerObstacleBlockSystem>().Update(world.Unmanaged);
+
+            var tx = em.GetComponentData<LocalTransform>(player);
+            Assert.That(tx.Position.x, Is.EqualTo(0.2f).Within(0.001f));
+            Assert.That(tx.Position.z, Is.EqualTo(0.5f).Within(0.001f));
+        }
+
+        [Test]
+        public void PlayerObstacleBlock_IgnoresBlockBulletOnlyCell()
+        {
+            using var world = new World("PlayerObstacle_IgnoreBulletMask");
+            var em = world.EntityManager;
+
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[]
+            {
+                StageCellMovementFlags.None,
+                StageCellMovementFlags.BlockBullet,
+            }, width: 2, height: 1);
+            var player = CreatePlayer(em, prev: new float3(0.1f, 0f, 0.5f), current: new float3(1.1f, 0f, 0.5f), radius: 0.05f);
+
+            world.GetOrCreateSystem<PlayerObstacleBlockSystem>().Update(world.Unmanaged);
+
+            var tx = em.GetComponentData<LocalTransform>(player);
+            Assert.That(tx.Position.x, Is.EqualTo(1.1f).Within(0.001f));
+            Assert.That(tx.Position.z, Is.EqualTo(0.5f).Within(0.001f));
+        }
+
         private static void SetGameplayReadySingletons(EntityManager em)
         {
             SetSingleton(em, new StageTopologyStateComponent
