@@ -12,7 +12,40 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ded24860c6a0ae844a3e661c60e40647, type: 3}
   m_Name: sl_demo_2
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutSO
+  SchemaVersion: 2
   StageId: 2
+  Grid:
+    Width: 2
+    Height: 1
+    CellSize: 1
+    Origin: {x: -12, y: 0, z: 6}
+  Cells:
+  - MovementFlags: 0
+    SourceRegionId: 1002
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 2001
+  SourceRegions:
+  - StableId: 1002
+    Active: 1
+    AnchorCell: {x: 0, y: 0}
+    AnchorOffset: {x: 0, y: 0}
+  DepositRegions:
+  - StableId: 2001
+    Active: 1
+    AnchorCell: {x: 1, y: 0}
+    AnchorOffset: {x: 0, y: 0}
+  Presentations:
+  - StableId: 9002
+    Active: 1
+    PlacementMode: 1
+    LinkKind: 2
+    LinkedStableId: 2001
+    PresentationKey: preview_visual_02
+    Position: {x: 0, y: 1, z: 0}
+    Euler: {x: -0, y: 0, z: 0}
+    Scale: {x: 1, y: 1, z: 1}
   Sources:
   - StableId: 1002
     Active: 1
@@ -24,7 +57,7 @@ MonoBehaviour:
   Deposits:
   - StableId: 2001
     Active: 1
-    Position: {x: -8, y: 0, z: -9}
+    Position: {x: -10, y: 0, z: -2}
     YawDeg: 0
     Shape: 1
     Radius: 4
@@ -38,13 +71,3 @@ MonoBehaviour:
     Radius: 1
     Size: {x: 3.5, y: 2}
     CollisionMask: 255
-  Presentations:
-  - StableId: 9002
-    Active: 1
-    PlacementMode: 1
-    LinkKind: 3
-    LinkedStableId: 3004
-    PresentationKey: preview_visual_02
-    Position: {x: 0, y: 1, z: 0}
-    Euler: {x: -0, y: 0, z: 0}
-    Scale: {x: 1, y: 1, z: 1}

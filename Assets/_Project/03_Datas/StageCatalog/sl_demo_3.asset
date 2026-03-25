@@ -12,7 +12,40 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ded24860c6a0ae844a3e661c60e40647, type: 3}
   m_Name: sl_demo_3
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutSO
+  SchemaVersion: 2
   StageId: 3
+  Grid:
+    Width: 2
+    Height: 1
+    CellSize: 1
+    Origin: {x: 14, y: 0, z: -8}
+  Cells:
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 2001
+  SourceRegions:
+  - StableId: 1003
+    Active: 1
+    AnchorCell: {x: 0, y: 0}
+    AnchorOffset: {x: 0, y: 0}
+  DepositRegions:
+  - StableId: 2001
+    Active: 1
+    AnchorCell: {x: 1, y: 0}
+    AnchorOffset: {x: 0, y: 0}
+  Presentations:
+  - StableId: 9003
+    Active: 1
+    PlacementMode: 0
+    LinkKind: 0
+    LinkedStableId: 0
+    PresentationKey: preview_visual_03
+    Position: {x: 15, y: 2, z: 6}
+    Euler: {x: -0, y: 0, z: 0}
+    Scale: {x: 1, y: 1, z: 1}
   Sources:
   - StableId: 1003
     Active: 1
@@ -30,13 +63,3 @@ MonoBehaviour:
     Radius: 3.5
     Size: {x: 2, y: 2}
   Obstacles: []
-  Presentations:
-  - StableId: 9003
-    Active: 1
-    PlacementMode: 0
-    LinkKind: 0
-    LinkedStableId: 0
-    PresentationKey: preview_visual_03
-    Position: {x: 15, y: 2, z: 6}
-    Euler: {x: -0, y: 0, z: 0}
-    Scale: {x: 1, y: 1, z: 1}

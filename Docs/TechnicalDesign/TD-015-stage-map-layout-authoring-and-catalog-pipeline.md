@@ -22,7 +22,6 @@
   - `MovementFlags`: 플레이어/탄환 이동 가능 여부
   - `SourceRegionId`
   - `DepositRegionId`
-  - `TerrainTileId` 또는 이에 준하는 visual tile key
 - `SourceRegionId`, `DepositRegionId`는 paint 시 명시 입력을 강제한다.
 - `StageDefinitionSO.SourceBindings` 계약은 유지하되, key 의미를 `Source region stable id`로 고정한다.
 - obstacle gameplay authority를 `grid movement`로 이관하고, obstacle visual은 tilemap/presentation 계층에서 별도로 운영한다.
@@ -117,11 +116,9 @@
   - `float CellSize`
   - `Vector3 Origin`
 - `StageCellLayoutData`
-  - `Vector2Int Coord`
   - `StageCellMovementFlags MovementFlags`
   - `uint SourceRegionId`
   - `uint DepositRegionId`
-  - `int TerrainTileId`
 - `StageCellMovementFlags`
   - `None`
   - `BlockPlayer`
@@ -130,7 +127,10 @@
 - grid 좌표계 계약
   - 모든 gameplay query는 world position을 `GridSpec` 기준 cell coord로 변환한 뒤 판단한다.
   - cell 크기와 origin은 runtime/cache build 시 immutable 입력으로 본다.
-  - sparse 저장은 허용하지만 runtime cache는 O(1) lookup 가능한 밀집/청크 구조로 컴파일한다.
+  - `Cells`는 dense row-major 배열로 저장한다.
+  - 길이는 항상 `Width * Height`다.
+  - 인덱스는 `index = y * Width + x`다.
+  - runtime cache는 이 dense grid를 O(1) lookup 구조로 유지한다.
 
 ### 6.3 Region 계약
 - `SourceRegionId`, `DepositRegionId`는 셀 paint 시 명시 입력을 강제한다.
@@ -139,19 +139,23 @@
   - `uint StableId`
   - `bool Active`
   - `Vector2Int AnchorCell`
-  - `StageRegionAnchorMode AnchorMode`
+  - `Vector2 AnchorOffset`
 - `StageDepositRegionLayoutData`
   - `uint StableId`
   - `bool Active`
   - `Vector2Int AnchorCell`
-  - `StageRegionAnchorMode AnchorMode`
-- `StageRegionAnchorMode`
-  - `BoundsCenter`: region cell 집합의 bounds center를 anchor로 사용한다.
-  - `ExplicitAnchorCell`: `AnchorCell`을 anchor로 사용한다.
-- `AnchorCell`은 presentation/runtime anchor override에 사용한다.
+  - `Vector2 AnchorOffset`
+- 모든 source/deposit region은 anchor를 필수로 가진다.
+- anchor는 `AnchorCell + AnchorOffset`의 grid-relative 값으로 저장한다.
+- runtime entity 위치는 `GridSpec + AnchorCell + AnchorOffset`으로 world 좌표를 계산해 사용한다.
 - region table과 cell 데이터의 관계
-  - region table에 있는 `StableId`는 최소 한 개 이상의 셀에서 참조돼야 한다.
+  - source region table에 있는 `StableId`는 최소 한 개 이상의 셀에서 참조돼야 한다.
+  - deposit region table에 있는 `StableId`는 최소 한 개 이상의 `BlockPlayer`가 아닌 셀에서 참조돼야 한다.
   - 셀이 `SourceRegionId` 또는 `DepositRegionId`를 가질 때, 대응 region table entry가 반드시 존재해야 한다.
+  - `AnchorCell`은 grid 범위 안에 있어야 한다.
+  - `AnchorCell`은 해당 region을 참조하는 셀이어야 한다.
+  - deposit anchor는 `BlockPlayer` 여부와 무관하게 허용한다.
+  - 한 셀은 `SourceRegionId`와 `DepositRegionId`를 동시에 가질 수 없다.
   - `StableId == 0`은 `None`을 의미한다.
 
 ### 6.4 Source 정의 계약
@@ -168,7 +172,8 @@
 ### 6.5 Deposit 계약
 - deposit runtime entity는 region 단위 aggregate다.
 - 플레이어 deposit 접촉 판정은 `player circle -> current/neighbor cell -> DepositRegionId lookup` 기반으로 수행한다.
-- 필요 시 deposit anchor/center는 `AnchorCell` 또는 region cell 집합의 bounds center를 사용한다.
+- deposit 기준점은 anchor를 사용한다.
+- deposit anchor는 연출상 진입 불가능한 위치에 놓일 수 있지만, 여전히 해당 deposit region 셀 위에 있어야 한다.
 
 ### 6.6 Obstacle / Movement 계약
 - obstacle gameplay는 `StageCellMovementFlags`가 단일 authoritative source다.
@@ -191,32 +196,65 @@
 ## 7. 에디터 파이프라인
 ### 7.1 채택 authoring 경로
 - 1순위: Unity Tilemap 기반 authoring + generator
-  - `Ground/Decoration` visual tilemap
-  - `Movement` metadata tilemap
-  - `Gameplay` metadata tilemap
+  - `StageGridAuthoring`
+    - `Grid`
+    - `MovementTilemap`
+    - `SourceRegionPaintAsset`
+    - `DepositRegionPaintAsset`
+  - `StageRegionAnchorMarker`
+  - `StagePresentationMarker`
 - 2순위: 외부 툴(`LDtk`, `Tiled` 등) -> importer -> `StageLayoutSO`
 - 공통 원칙:
   - runtime은 tilemap scene 또는 외부 raw file을 직접 읽지 않는다.
   - 최종 입력은 항상 `StageLayoutSO` grid schema다.
+  - obstacle visual은 generator 입력이 아니라 별도 visual owner가 read-only로 rebuild한다.
 
-### 7.2 Paint/Validation 규칙
+### 7.2 Authoring 입력 모델
+- `MovementTilemap`
+  - `BlockPlayer`, `BlockBullet` 의미를 갖는 metadata tilemap이다.
+  - visual tilemap과 분리한다.
+- `SourceRegionPaintAsset`, `DepositRegionPaintAsset`
+  - `Width`, `Height`, `uint[] Cells`를 갖는 dense row-major backing store다.
+  - paint 시 explicit `StableId` 선택을 강제한다.
+  - `RegionId별 Tile asset` 방식은 채택하지 않는다.
+- `StageRegionAnchorMarker`
+  - `RegionKind`, `StableId`, `AnchorCell`, `AnchorOffset`를 가진다.
+  - source/deposit 대표점의 authoring SSOT다.
+- `StageGridLayoutGenerator`
+  - `StageGridAuthoring + StageRegionAnchorMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
+  - generator가 직접 생성하는 layout asset에서는 hidden legacy `Sources / Deposits / Obstacles`를 비워 두는 것을 기본값으로 본다.
+  - 단, 현재 runtime apply는 아직 legacy shape bridge를 소비하므로 운영 샘플 asset(`sl_demo_*`)은 grid schema와 함께 compatibility bridge를 임시 유지한다.
+
+### 7.3 Paint/Validation 규칙
 - paint 시 `SourceRegionId`, `DepositRegionId`를 명시적으로 선택하지 않으면 region cell을 칠할 수 없게 한다.
 - validation error:
-  - grid 범위 밖 coord
-  - 중복 cell record
+  - `MovementTilemap` bounds와 region paint asset 크기가 다름
   - region id가 있는데 대응 region table entry가 없음
-  - region table entry가 있는데 셀 참조가 없음
-  - movement / gameplay 조합상 금지된 셀 조합
+  - paint된 source/deposit region id에 대응 anchor marker가 없거나 2개 이상임
+  - anchor가 자기 region 셀 위에 있지 않음
+  - region marker가 있는데 paint된 셀이 없음
+  - source/deposit overlap 셀
 - validation warning:
-  - visual tile만 있고 gameplay 속성이 비어 있는 경우
   - stage 전체에 source 또는 deposit region이 없음
 
-### 7.3 샘플 갱신 루틴
+### 7.4 패키지 기준
+- 필수
+  - `com.unity.2d.tilemap`
+    - Unity Tilemap editor authoring, Tile Palette, Grid 기반 편집에 필요하다.
+- 선택
+  - `com.unity.2d.tilemap.extras`
+    - Rule Tile, Random Brush, Group Brush 등 visual/auxiliary workflow에 유용하다.
+    - explicit region id backing store를 대체하지는 않으므로 P3 필수 의존은 아니다.
+- 비범위
+  - 외부 importer 패키지는 Unity Tilemap 경로 안정화 후 별도 단계에서 검토한다.
+
+### 7.5 샘플 갱신 루틴
 1. stage authoring scene에서 tilemap 또는 importer source를 수정한다.
 2. `StageDefinitionGenerator`로 source binding 누락을 보강한다.
 3. `StageGridLayoutGenerator`로 `StageLayoutSO` grid 데이터를 갱신한다.
 4. `StageCatalogComposer`로 `StageCatalogSO`를 갱신한다.
 5. 생성 asset을 `StageGridLayoutValidationRules`와 catalog validation으로 검증한다.
+6. runtime migration 전까지 운영 샘플 asset은 필요 시 legacy compatibility bridge를 수동 유지한다.
 
 ## 8. 런타임 반영
 ### 8.1 Topology Layer
@@ -245,7 +283,8 @@
 - P2. 데이터 스키마 전환
   - `StageLayoutSO` grid schema와 validation/generator seam을 도입한다.
 - P3. authoring 경로 도입
-  - Unity Tilemap metadata paint workflow와 importer seam을 구현한다.
+  - `StageGridAuthoring`, region paint backing store, anchor marker, `StageGridLayoutGenerator`를 구현한다.
+  - generator는 legacy arrays를 비우되, runtime smoke 유지가 필요한 운영 샘플 asset은 compatibility bridge를 병행 유지한다.
 - P4. runtime movement/deposit 이관
   - obstacle/player/bullet/deposit query를 grid authoritative path로 옮긴다.
 - P5. source region runtime 이관

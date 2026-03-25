@@ -1,7 +1,7 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
 using UnityEditor;
-using System.Collections.Generic;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -55,10 +55,9 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(definition2.SourceBindings, Is.Not.Null.And.Length.GreaterThan(0));
             Assert.That(definition3.SourceBindings, Is.Not.Null.And.Length.GreaterThan(0));
 
-            Assert.That(layout1.Sources, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout2.Sources, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout3.Sources, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout2.Obstacles, Is.Not.Null.And.Length.GreaterThan(0));
+            AssertLayoutPopulated(layout1);
+            AssertLayoutPopulated(layout2);
+            AssertLayoutPopulated(layout3);
         }
 
         [Test]
@@ -76,6 +75,19 @@ namespace SweepNDodge.DotsBullets.Tests
                 issues);
 
             Assert.That(issues, Is.Empty, "sc_demo.asset must satisfy StageCatalog validation rules.");
+        }
+
+        private static void AssertLayoutPopulated(StageLayoutSO layout)
+        {
+            Assert.That(layout.SchemaVersion, Is.EqualTo(2));
+            Assert.That(layout.Grid.Width, Is.GreaterThan(0));
+            Assert.That(layout.Grid.Height, Is.GreaterThan(0));
+            Assert.That(layout.Cells, Is.Not.Null.And.Length.EqualTo(layout.Grid.Width * layout.Grid.Height));
+            Assert.That(layout.SourceRegions, Is.Not.Null.And.Length.GreaterThan(0));
+            Assert.That(layout.DepositRegions, Is.Not.Null.And.Length.GreaterThan(0));
+            Assert.That(layout.Sources, Is.Not.Null);
+            Assert.That(layout.Deposits, Is.Not.Null);
+            Assert.That(layout.Obstacles, Is.Not.Null);
         }
     }
 }

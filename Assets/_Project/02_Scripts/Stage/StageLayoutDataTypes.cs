@@ -26,6 +26,12 @@ namespace SweepNDodge.DotsBullets
         Obstacle = 3,
     }
 
+    public enum StageRegionKind : byte
+    {
+        Source = 0,
+        Deposit = 1,
+    }
+
     [Serializable]
     public struct StageGridSpec
     {

@@ -17,14 +17,11 @@
 - 이번 세션에서 하지 않을 것: runtime code 구현, tilemap brush 세부 UX 확정, visual auto-generation 세부 알고리즘 확정
 
 ## Now
-- [ ] P3. authoring generator 도입
-  - 기준: Unity Tilemap metadata authoring -> `StageLayoutSO`
-  - 산출물: `StageGridLayoutGenerator`, sample authoring scene 경로, explicit region paint guardrail
+- [ ] P4. runtime movement / deposit 이관 준비 정리
+  - 기준: P3 generator 이후 runtime owner 전환 범위를 분리하고 legacy bridge 제거 선행조건을 고정한다.
+  - 산출물: runtime apply 영향 구간, sample asset bridge 제거 조건, PlayMode 회귀 기준 재정리
 
 ## Next
-- [ ] P3. authoring generator 도입
-  - 기준: Unity Tilemap metadata authoring -> `StageLayoutSO`
-  - 산출물: `StageGridLayoutGenerator`, sample authoring scene 경로, explicit region paint guardrail
 - [ ] P4. runtime movement / deposit 이관
   - 기준: obstacle/player/bullet/deposit query가 grid authority를 읽는다.
   - 산출물: prepare cache build, movement/deposit reader 전환, 회귀 테스트
@@ -43,6 +40,10 @@
   - 검증 결과: stable id 의미와 diff/validation 명확성을 위해 explicit id가 더 적합하다는 결정이 고정됐다.
 - [x] I2. obstacle visual은 기존 `Presentation` linked topology 규칙과 분리한다.
   - 검증 결과: obstacle은 movement authority로 흡수하고, visual은 read-only tilemap/presentation owner가 소비하는 구조로 정리됐다.
+- [x] I3. P3 authoring 입력 모델은 `region id별 tile asset`이 아니라 `custom dense paint backing store + anchor marker`로 간다.
+  - 검증 결과: explicit stable id paint를 유지하면서 region 수 증가에 따른 authoring 비용 폭증을 피하는 방향으로 고정됐다.
+- [x] I4. P3 패키지 결론은 `com.unity.2d.tilemap` 필수, `com.unity.2d.tilemap.extras` 선택이다.
+  - 검증 결과: 현재 manifest에는 tilemap module은 있지만 editor package는 없고, extras는 visual/auxiliary workflow에만 필요하다는 결론을 반영했다.
 
 ## Parking Lot
 - [ ] P7. 외부 툴 importer(`LDtk`, `Tiled`)는 Unity Tilemap 경로가 안정화된 뒤 같은 grid schema로 추가 검토한다.
@@ -64,8 +65,11 @@
 - [x] D6. `P2 StageLayoutSO grid schema + validation seam`을 구현했다.
   - 검증 결과: `SchemaVersion=2`, `Grid/Cells/SourceRegions/DepositRegions` 스키마, `StageGridLayoutValidationRules`, catalog source-region cross-validation, definition generator의 source-region 수집이 반영됐다.
   - 구현 메모: runtime/generator 전환 전까지 hidden legacy layout 필드는 compatibility bridge로 임시 유지한다.
+- [x] D7. `P3 authoring generator`를 구현했다.
+  - 검증 결과: `StageGridAuthoring`, `StageRegionPaintAsset`, `StageRegionAnchorMarker`, `StageMovementTile`, grid-only `StageLayoutCatalogGenerator`, 기본 paint editor window, sample authoring scene 구조, `com.unity.2d.tilemap` 의존, grid authoring/editor tests가 반영됐다.
+  - 구현 메모: generator 출력은 legacy arrays를 비우지만, runtime migration 전까지 `sl_demo_*` 샘플 asset은 grid schema와 legacy compatibility bridge를 함께 유지한다.
 
 ## End of Session
-- 결과: `TD-015`, 신규 ADR, 이 TaskBoard를 기준으로 stage layout 전환의 실행 계약이 고정됐다.
-- 남은 리스크: PlayMode 운영 씬에서 stage topology apply timing 경고가 반복되며, 현재 P2 변경과 직접 무관한 `StagePlay`/topology 경계 회귀 가능성을 추적해야 한다. source runtime geometry 이관 범위도 여전히 넓다.
-- 다음 세션 시작점: `StageGridLayoutGenerator`와 sample authoring scene 경로를 구현하고, hidden legacy bridge 제거 전까지 generator/runtime 전환 순서를 정리한다.
+- 결과: P3까지의 editor authoring 경로와 generator cutover가 코드/샘플/검증까지 반영됐다.
+- 남은 리스크: runtime apply는 아직 legacy layout bridge를 소비하므로 generator 재생성 결과를 운영 샘플 asset에 바로 적용할 수 없다. stage topology apply timing 경고 추적도 계속 필요하다.
+- 다음 세션 시작점: `StageTopologyApplyPrepareSystem` 이후 movement/deposit reader를 grid authority로 옮기고, 샘플 asset의 legacy bridge 제거 조건을 고정한다.

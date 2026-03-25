@@ -9,8 +9,8 @@ namespace SweepNDodge.DotsBullets.Editor
         private static readonly GUIContent MissingCatalogContent = new GUIContent("Presentation Catalog is not assigned on the nearest StageLayoutRootMarker.");
         private static readonly GUIContent MissingKeyContent = new GUIContent("PresentationKey is empty.");
         private static readonly GUIContent MissingEntryContent = new GUIContent("PresentationKey is not present in the resolved StagePresentationCatalogSO.");
-        private static readonly GUIContent SameGoContent = new GUIContent("StagePresentationMarker must not share a GameObject with Source/Deposit/Obstacle marker.");
-        private static readonly GUIContent LinkedParentContent = new GUIContent("LinkedToParent presentation requires a parent Source/Deposit/Obstacle marker.");
+        private static readonly GUIContent SameGoContent = new GUIContent("StagePresentationMarker must not share a GameObject with Source/Deposit anchor marker.");
+        private static readonly GUIContent LinkedParentContent = new GUIContent("LinkedToParent presentation requires a parent Source/Deposit anchor marker.");
         private static readonly GUIContent StandaloneParentContent = new GUIContent("Standalone presentation must not be authored under a topology marker parent.");
 
         private SerializedProperty _stableId;
@@ -144,6 +144,12 @@ namespace SweepNDodge.DotsBullets.Editor
 
             using (new Handles.DrawingScope(color))
             {
+                if (linkedParent.TryGetComponent<StageRegionAnchorMarker>(out _))
+                {
+                    Handles.DrawWireDisc(linkedParent.position, Vector3.up, 0.35f);
+                    return;
+                }
+
                 if (linkedParent.TryGetComponent<StageSourceMarker>(out var source))
                 {
                     DrawShape(linkedParent, source.Shape, source.Radius, source.Size);

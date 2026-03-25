@@ -68,6 +68,25 @@ namespace SweepNDodge.DotsBullets.Editor
             var current = transform != null ? transform.parent : null;
             while (current != null)
             {
+                if (current.TryGetComponent<StageRegionAnchorMarker>(out var anchor))
+                {
+                    if (anchor.RegionKind == StageRegionKind.Source)
+                    {
+                        linkKind = StagePresentationLinkKind.Source;
+                        linkedStableId = anchor.StableId;
+                        linkedParent = current;
+                        return true;
+                    }
+
+                    if (anchor.RegionKind == StageRegionKind.Deposit)
+                    {
+                        linkKind = StagePresentationLinkKind.Deposit;
+                        linkedStableId = anchor.StableId;
+                        linkedParent = current;
+                        return true;
+                    }
+                }
+
                 if (current.TryGetComponent<StageSourceMarker>(out var source))
                 {
                     linkKind = StagePresentationLinkKind.Source;
@@ -150,7 +169,8 @@ namespace SweepNDodge.DotsBullets.Editor
             if (marker == null)
                 return false;
 
-            return marker.TryGetComponent<StageSourceMarker>(out _)
+            return marker.TryGetComponent<StageRegionAnchorMarker>(out _)
+                || marker.TryGetComponent<StageSourceMarker>(out _)
                 || marker.TryGetComponent<StageDepositMarker>(out _)
                 || marker.TryGetComponent<StageObstacleMarker>(out _);
         }
