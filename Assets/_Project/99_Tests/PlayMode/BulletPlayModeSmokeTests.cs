@@ -3621,12 +3621,12 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var area1 = em.GetComponentData<Shape2DComponent>(source1001);
+            var sourceCells1 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1001, isReadOnly: true);
             int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             return sourceState1.State == SourceStateId.Normal
                 && area1.Kind == Shape2DKind.Rectangle
-                && Mathf.Abs(area1.Size.x - 12f) <= 0.01f
-                && Mathf.Abs(area1.Size.y - 8f) <= 0.01f
+                && sourceCells1.Length > 0
                 && depositIndex >= 0
                 && cells[depositIndex].DepositRegionId == 2001u;
         }
@@ -3641,12 +3641,13 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
+            var sourceCells2 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1002, isReadOnly: true);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
             int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             return sourceState2.State == SourceStateId.Normal
-                && area2.Kind == Shape2DKind.Circle
-                && Mathf.Abs(area2.Radius - 6f) <= 0.01f
+                && area2.Kind == Shape2DKind.Rectangle
+                && sourceCells2.Length > 0
                 && depositIndex >= 0
                 && cells[depositIndex].DepositRegionId == 2001u
                 && clipPatterns2.Length > 0;
@@ -3734,12 +3735,12 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var area1 = em.GetComponentData<Shape2DComponent>(source1001);
+            var sourceCells1 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1001, isReadOnly: true);
             int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Normal));
             Assert.That(area1.Kind, Is.EqualTo(Shape2DKind.Rectangle));
-            Assert.That(area1.Size.x, Is.EqualTo(12f).Within(0.01f));
-            Assert.That(area1.Size.y, Is.EqualTo(8f).Within(0.01f));
+            Assert.That(sourceCells1.Length, Is.GreaterThan(0));
             Assert.That(depositIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(cells[depositIndex].DepositRegionId, Is.EqualTo(2001u));
         }
@@ -3752,12 +3753,13 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
+            var sourceCells2 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1002, isReadOnly: true);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
             int depositIndex = StageRuntimeGridUtility.GetCellIndex(1, 0, in grid);
 
             Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Normal));
-            Assert.That(area2.Kind, Is.EqualTo(Shape2DKind.Circle));
-            Assert.That(area2.Radius, Is.EqualTo(6f).Within(0.01f));
+            Assert.That(area2.Kind, Is.EqualTo(Shape2DKind.Rectangle));
+            Assert.That(sourceCells2.Length, Is.GreaterThan(0));
             Assert.That(cells[depositIndex].DepositRegionId, Is.EqualTo(2001u));
             Assert.That(clipPatterns2.Length, Is.GreaterThan(0));
         }

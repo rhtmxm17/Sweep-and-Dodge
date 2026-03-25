@@ -87,7 +87,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void StageTopologyApply_ReconcilesSourceTopology_AndKeepsGridReady()
+        public void StageTopologyApply_ReconcilesSourceTopologyFromRegionCells_AndKeepsGridReady()
         {
             using var world = CreatePreparedWorld("StageTopologyApply_SourceOnly", out var em, out var requestEntity, out var topologyStateEntity);
             var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
@@ -108,9 +108,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 using var entities = sourceQuery.ToEntityArray(Allocator.Temp);
                 Assert.That(entities.Length, Is.EqualTo(1));
                 Assert.That(em.GetComponentData<SourceStableIdComponent>(entities[0]).Value, Is.EqualTo(1001u));
+                Assert.That(em.GetBuffer<SourceRegionCellIndexBuffer>(entities[0]).Length, Is.EqualTo(2));
+                Assert.That(em.GetComponentData<SourceAnchorComponent>(entities[0]).Position.x, Is.EqualTo(0.75f).Within(0.001f));
+                Assert.That(em.GetComponentData<SourceAnchorComponent>(entities[0]).Position.z, Is.EqualTo(0.5f).Within(0.001f));
 
                 var gridEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()).GetSingletonEntity();
                 Assert.That(em.GetComponentData<StageRuntimeGridComponent>(gridEntity).Ready, Is.EqualTo(1));
+                var gridCells = em.GetBuffer<StageRuntimeGridCellBufferElement>(gridEntity);
+                Assert.That(gridCells[0].SourceRegionId, Is.EqualTo(1001u));
+                Assert.That(gridCells[2].SourceRegionId, Is.EqualTo(1001u));
             }
             finally
             {
@@ -172,12 +178,23 @@ namespace SweepNDodge.DotsBullets.Tests
             };
             layout.Cells = new[]
             {
-                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.None, DepositRegionId = 0u, SourceRegionId = 0u },
+                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.None, DepositRegionId = 0u, SourceRegionId = includeSourceLayout ? 1001u : 0u },
                 new StageCellLayoutData { MovementFlags = StageCellMovementFlags.BlockPlayer, DepositRegionId = 0u, SourceRegionId = 0u },
-                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.None, DepositRegionId = 0u, SourceRegionId = 0u },
+                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.None, DepositRegionId = 0u, SourceRegionId = includeSourceLayout ? 1001u : 0u },
                 new StageCellLayoutData { MovementFlags = StageCellMovementFlags.BlockBullet, DepositRegionId = 2001u, SourceRegionId = 0u },
             };
-            layout.SourceRegions = System.Array.Empty<StageSourceRegionLayoutData>();
+            layout.SourceRegions = includeSourceLayout
+                ? new[]
+                {
+                    new StageSourceRegionLayoutData
+                    {
+                        StableId = 1001u,
+                        Active = true,
+                        AnchorCell = new UnityEngine.Vector2Int(0, 0),
+                        AnchorOffset = new UnityEngine.Vector2(0.25f, 0f),
+                    }
+                }
+                : System.Array.Empty<StageSourceRegionLayoutData>();
             layout.DepositRegions = new[]
             {
                 new StageDepositRegionLayoutData
@@ -189,21 +206,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
             };
             layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
-            layout.Sources = includeSourceLayout
-                ? new[]
-                {
-                    new StageSourceLayoutData
-                    {
-                        StableId = 1001u,
-                        Active = true,
-                        Position = new UnityEngine.Vector3(2f, 0f, 2f),
-                        YawDeg = 0f,
-                        Shape = Shape2DKind.Circle,
-                        Radius = 2f,
-                        Size = UnityEngine.Vector2.zero,
-                    }
-                }
-                : System.Array.Empty<StageSourceLayoutData>();
+            layout.Sources = System.Array.Empty<StageSourceLayoutData>();
             layout.Deposits = System.Array.Empty<StageDepositLayoutData>();
             layout.Obstacles = System.Array.Empty<StageObstacleLayoutData>();
 
@@ -294,6 +297,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 CellSize = 1f,
                 InvCellSize = 1f,
                 HalfExtents = new float2(2f, 2f),
+                OriginX = -2f,
+                OriginZ = -2f,
                 Cols = 1,
                 Rows = 1,
             });
@@ -326,6 +331,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddBuffer<SourcePollutionCellBuffer>(entity);
             em.AddBuffer<SourcePollutionDropRequestBuffer>(entity);
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
+            em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
             return entity;
         }
     }

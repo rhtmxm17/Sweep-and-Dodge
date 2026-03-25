@@ -82,7 +82,6 @@ namespace SweepNDodge.DotsBullets
             var renderPartsLookup = SystemAPI.GetBufferLookup<EntityRenderElementBuffer>(true);
             var parentLookup = SystemAPI.GetComponentLookup<Parent>(true);
             var sourceAnchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(true);
-            var sourceAreaLookup = SystemAPI.GetComponentLookup<Shape2DComponent>(true);
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
             var sourceRuntimeLookup = SystemAPI.GetComponentLookup<SourceSpawnRuntimeComponent>(false);
             var pollutionConfigLookup = SystemAPI.GetComponentLookup<SourcePollutionConfigComponent>(true);
@@ -107,7 +106,6 @@ namespace SweepNDodge.DotsBullets
             renderPartsLookup.Update(ref state);
             parentLookup.Update(ref state);
             sourceAnchorLookup.Update(ref state);
-            sourceAreaLookup.Update(ref state);
             stableIdLookup.Update(ref state);
             sourceRuntimeLookup.Update(ref state);
             pollutionConfigLookup.Update(ref state);
@@ -194,7 +192,6 @@ namespace SweepNDodge.DotsBullets
                         ref requestItem,
                         ref sourceRuntimeLookup,
                         ref sourceAnchorLookup,
-                        ref sourceAreaLookup,
                         ref pollutionConfigLookup,
                         ref pollutionGridLookup,
                         ref pollutionCellsLookup,
@@ -460,7 +457,6 @@ namespace SweepNDodge.DotsBullets
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
-            ref ComponentLookup<Shape2DComponent> sourceAreaLookup,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
@@ -498,7 +494,6 @@ namespace SweepNDodge.DotsBullets
                     ref request,
                     ref sourceRuntimeLookup,
                     ref sourceAnchorLookup,
-                    ref sourceAreaLookup,
                     ref pollutionConfigLookup,
                     ref pollutionGridLookup,
                     ref pollutionCellsLookup,
@@ -540,7 +535,6 @@ namespace SweepNDodge.DotsBullets
                     ref request,
                     ref sourceRuntimeLookup,
                     ref sourceAnchorLookup,
-                    ref sourceAreaLookup,
                     ref pollutionConfigLookup,
                     ref pollutionGridLookup,
                     ref pollutionCellsLookup,
@@ -578,17 +572,12 @@ namespace SweepNDodge.DotsBullets
                 request.DirectiveId,
                 sourceEntity,
                 ref sourceRuntimeLookup);
-            var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
-                ? sourceAreaLookup[sourceEntity]
-                : default;
-
             float3 pos = ResolveSpawnPositionForRequest(
                 ref random,
                 sourceEntity,
                 ref request,
                 ref sourceAnchorLookup,
                 ref txLookup,
-                in fieldArea,
                 hasPlayer,
                 playerPosition,
                 ref pollutionConfigLookup,
@@ -642,7 +631,6 @@ namespace SweepNDodge.DotsBullets
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceSpawnRuntimeComponent> sourceRuntimeLookup,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
-            ref ComponentLookup<Shape2DComponent> sourceAreaLookup,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
@@ -676,17 +664,12 @@ namespace SweepNDodge.DotsBullets
                 request.DirectiveId,
                 sourceEntity,
                 ref sourceRuntimeLookup);
-            var fieldArea = sourceAreaLookup.HasComponent(sourceEntity)
-                ? sourceAreaLookup[sourceEntity]
-                : default;
-
             float3 pos = ResolveSpawnPositionForRequest(
                 ref random,
                 sourceEntity,
                 ref request,
                 ref sourceAnchorLookup,
                 ref txLookup,
-                in fieldArea,
                 hasPlayer,
                 playerPosition,
                 ref pollutionConfigLookup,
@@ -849,7 +832,6 @@ namespace SweepNDodge.DotsBullets
             ref SourceSpawnRequestBuffer request,
             ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
             ref ComponentLookup<LocalTransform> sourceTransformLookup,
-            in Shape2DComponent fieldArea,
             bool hasPlayer,
             float3 playerPosition,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
@@ -864,9 +846,6 @@ namespace SweepNDodge.DotsBullets
                 ref sourceAnchorLookup,
                 hasPlayer,
                 playerPosition);
-            quaternion sourceRotation = sourceTransformLookup.HasComponent(sourceEntity)
-                ? sourceTransformLookup[sourceEntity].Rotation
-                : quaternion.identity;
 
             if (request.EventShotSchedule != SourceSpawnEventShotScheduleId.Timed)
             {
@@ -875,8 +854,6 @@ namespace SweepNDodge.DotsBullets
                     sourceEntity,
                     in request,
                     center,
-                    sourceRotation,
-                    in fieldArea,
                     hasPlayer,
                     playerPosition,
                     ref pollutionConfigLookup,
@@ -897,8 +874,6 @@ namespace SweepNDodge.DotsBullets
                         sourceEntity,
                         in request,
                         center,
-                        sourceRotation,
-                        in fieldArea,
                         hasPlayer,
                         playerPosition,
                         ref pollutionConfigLookup,
@@ -932,8 +907,6 @@ namespace SweepNDodge.DotsBullets
                 sourceEntity,
                 in request,
                 request.EventAnchorCenter,
-                sourceRotation,
-                in fieldArea,
                 false,
                 playerPosition,
                 ref pollutionConfigLookup,
@@ -1052,8 +1025,6 @@ namespace SweepNDodge.DotsBullets
             Entity sourceEntity,
             in SourceSpawnRequestBuffer request,
             float3 center,
-            quaternion sourceRotation,
-            in Shape2DComponent fieldArea,
             bool hasPlayer,
             float3 playerPosition,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
@@ -1074,14 +1045,13 @@ namespace SweepNDodge.DotsBullets
                 sampledSequence = sequence;
                 if (request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
                 {
-                        if (TrySampleSpawnPositionFromPollution(
-                                ref random,
-                                sourceEntity,
-                                center,
-                                sourceRotation,
-                                out var pollutionPos,
-                                ref pollutionConfigLookup,
-                                ref pollutionGridLookup,
+                    if (TrySampleSpawnPositionFromPollution(
+                            ref random,
+                            sourceEntity,
+                            center,
+                            out var pollutionPos,
+                            ref pollutionConfigLookup,
+                            ref pollutionGridLookup,
                             ref pollutionCellsLookup,
                             ref pollutionValidCellIndicesLookup))
                     {
@@ -1089,7 +1059,25 @@ namespace SweepNDodge.DotsBullets
                     }
                     else
                     {
-                        lastSample = SampleSpawnPositionUniform(ref random, center, sourceRotation, fieldArea);
+                        lastSample = center;
+                    }
+                }
+                else if (request.SamplingMode == SourceSpawnSamplingModeId.UniformField)
+                {
+                    if (TrySampleSpawnPositionUniform(
+                            ref random,
+                            sourceEntity,
+                            center,
+                            out var uniformPos,
+                            ref pollutionGridLookup,
+                            ref pollutionCellsLookup,
+                            ref pollutionValidCellIndicesLookup))
+                    {
+                        lastSample = uniformPos;
+                    }
+                    else
+                    {
+                        lastSample = center;
                     }
                 }
                 else if (request.SamplingMode == SourceSpawnSamplingModeId.LineEven)
@@ -1101,11 +1089,11 @@ namespace SweepNDodge.DotsBullets
                     if (TrySampleSpawnPositionPointSet(center, in request, sequence, out var pointSetPos))
                         lastSample = pointSetPos;
                     else
-                        lastSample = SampleSpawnPositionUniform(ref random, center, sourceRotation, fieldArea);
+                        lastSample = center;
                 }
                 else
                 {
-                    lastSample = SampleSpawnPositionUniform(ref random, center, sourceRotation, fieldArea);
+                    lastSample = center;
                 }
 
                 if (!hasPlayer || noSpawnRadius <= 0f)
@@ -1162,7 +1150,6 @@ namespace SweepNDodge.DotsBullets
             ref Unity.Mathematics.Random random,
             Entity sourceEntity,
             float3 center,
-            quaternion sourceRotation,
             out float3 position,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
@@ -1211,7 +1198,46 @@ namespace SweepNDodge.DotsBullets
 
             int cols = math.max(1, grid.Cols);
             int rows = math.max(1, grid.Rows);
-            position = SampleInsidePollutionCell(ref random, bestCellIndex, center, sourceRotation, cols, rows, in grid);
+            position = SampleInsidePollutionCell(ref random, bestCellIndex, center, cols, rows, in grid);
+            return true;
+        }
+
+        private static bool TrySampleSpawnPositionUniform(
+            ref Unity.Mathematics.Random random,
+            Entity sourceEntity,
+            float3 center,
+            out float3 position,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
+        {
+            position = center;
+            if (!pollutionGridLookup.HasComponent(sourceEntity))
+                return false;
+            if (!pollutionCellsLookup.HasBuffer(sourceEntity))
+                return false;
+            if (!pollutionValidCellIndicesLookup.HasBuffer(sourceEntity))
+                return false;
+
+            var grid = pollutionGridLookup[sourceEntity];
+            var cells = pollutionCellsLookup[sourceEntity];
+            var validIndices = pollutionValidCellIndicesLookup[sourceEntity];
+            int validCount = validIndices.Length;
+            if (validCount <= 0)
+                return false;
+
+            int sampledListIndex = random.NextInt(0, validCount);
+            int cellIndex = validIndices[sampledListIndex].Value;
+            if (GetValidCellWeight(cells, cellIndex) < 0f)
+                return false;
+
+            position = SampleInsidePollutionCell(
+                ref random,
+                cellIndex,
+                center,
+                math.max(1, grid.Cols),
+                math.max(1, grid.Rows),
+                in grid);
             return true;
         }
 
@@ -1231,7 +1257,6 @@ namespace SweepNDodge.DotsBullets
             ref Unity.Mathematics.Random random,
             int cellIndex,
             float3 center,
-            quaternion sourceRotation,
             int cols,
             int rows,
             in SourcePollutionGridComponent grid)
@@ -1248,7 +1273,7 @@ namespace SweepNDodge.DotsBullets
             float localZ = -halfExtents.y + (cellY + random.NextFloat(0f, 1f)) * cellSize;
             localX = math.clamp(localX, -halfExtents.x, halfExtents.x);
             localZ = math.clamp(localZ, -halfExtents.y, halfExtents.y);
-            return Shape2DUtility.LocalToWorldPositionXZ(new float2(localX, localZ), center, sourceRotation);
+            return new float3(center.x + localX, center.y, center.z + localZ);
         }
 
         private static float3 SampleSpawnPositionLineEven(
@@ -1279,15 +1304,6 @@ namespace SweepNDodge.DotsBullets
             float safeLength = math.max(0f, length);
             float safeSpacing = math.max(0.001f, spacing);
             return math.max(1, (int)math.floor(safeLength / safeSpacing) + 1);
-        }
-
-        private static float3 SampleSpawnPositionUniform(
-            ref Unity.Mathematics.Random random,
-            float3 center,
-            quaternion sourceRotation,
-            in Shape2DComponent fieldArea)
-        {
-            return Shape2DUtility.SampleUniformXZ(ref random, center, sourceRotation, in fieldArea);
         }
 
         private static bool TryDequeueByKey(

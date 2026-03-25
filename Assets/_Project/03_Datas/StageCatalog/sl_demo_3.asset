@@ -46,13 +46,6 @@ MonoBehaviour:
     Position: {x: 15, y: 2, z: 6}
     Euler: {x: -0, y: 0, z: 0}
     Scale: {x: 1, y: 1, z: 1}
-  Sources:
-  - StableId: 1003
-    Active: 1
-    Position: {x: 14, y: 0, z: -8}
-    YawDeg: 0
-    Shape: 0
-    Radius: 8
-    Size: {x: 12, y: 8}
+  Sources: []
   Deposits: []
   Obstacles: []

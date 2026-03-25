@@ -58,6 +58,8 @@ namespace SweepNDodge.DotsBullets
                 CellSize = 2f,
                 InvCellSize = 0.5f,
                 HalfExtents = sourceDerived.HalfExtents,
+                OriginX = -sourceDerived.HalfExtents.x,
+                OriginZ = -sourceDerived.HalfExtents.y,
                 Cols = 1,
                 Rows = 1,
             });
@@ -91,6 +93,7 @@ namespace SweepNDodge.DotsBullets
             em.AddBuffer<SourcePollutionCellBuffer>(entity).Clear();
             em.AddBuffer<SourcePollutionDropRequestBuffer>(entity).Clear();
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity).Clear();
+            em.AddBuffer<SourceRegionCellIndexBuffer>(entity).Clear();
             return entity;
         }
 

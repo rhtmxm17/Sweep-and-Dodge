@@ -15,25 +15,94 @@ MonoBehaviour:
   SchemaVersion: 2
   StageId: 1
   Grid:
-    Width: 4
-    Height: 4
+    Width: 14
+    Height: 8
     CellSize: 1
     Origin: {x: 0, y: 0, z: 0}
   Cells:
   - MovementFlags: 0
-    SourceRegionId: 1001
+    SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 2001
   - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 1
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
@@ -42,10 +111,40 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1001
     DepositRegionId: 0
-  - MovementFlags: 1
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
@@ -54,24 +153,213 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
     SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1001
     DepositRegionId: 0
   SourceRegions:
   - StableId: 1001
     Active: 1
-    AnchorCell: {x: 0, y: 0}
+    AnchorCell: {x: 7, y: 3}
     AnchorOffset: {x: 0, y: 0}
   DepositRegions:
   - StableId: 2001
@@ -88,13 +376,6 @@ MonoBehaviour:
     Position: {x: -1.5, y: 2.55, z: -0.22}
     Euler: {x: 338.75085, y: 10.463113, z: 30.917606}
     Scale: {x: 1, y: 1, z: 1}
-  Sources:
-  - StableId: 1001
-    Active: 1
-    Position: {x: 2.5, y: 0, z: 5.5}
-    YawDeg: 0
-    Shape: 1
-    Radius: 8
-    Size: {x: 12, y: 8}
+  Sources: []
   Deposits: []
   Obstacles: []

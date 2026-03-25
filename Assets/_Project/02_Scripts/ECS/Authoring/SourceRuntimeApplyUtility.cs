@@ -145,6 +145,8 @@ namespace SweepNDodge.DotsBullets
             grid.CellSize = cellSize;
             grid.InvCellSize = 1f / cellSize;
             grid.HalfExtents = halfExtents;
+            grid.OriginX = -halfExtents.x;
+            grid.OriginZ = -halfExtents.y;
 
             BakePollutionGrid(
                 pollutionCells,
@@ -156,6 +158,48 @@ namespace SweepNDodge.DotsBullets
                 halfExtents,
                 normalized.Kind,
                 normalized.Radius,
+                math.max(config.MinValue, config.MaxValue));
+        }
+
+        public static void RebuildPollutionGridFromRegionBounds(
+            int minCellX,
+            int minCellY,
+            int maxCellX,
+            int maxCellY,
+            int stageWidth,
+            float stageCellSize,
+            float stageOriginX,
+            float stageOriginZ,
+            in SourcePollutionConfigComponent config,
+            DynamicBuffer<SourceRegionCellIndexBuffer> ownedStageCells,
+            ref SourcePollutionGridComponent grid,
+            DynamicBuffer<SourcePollutionCellBuffer> pollutionCells,
+            DynamicBuffer<SourcePollutionDropRequestBuffer> pollutionDrops,
+            DynamicBuffer<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndices)
+        {
+            int cols = math.max(1, (maxCellX - minCellX) + 1);
+            int rows = math.max(1, (maxCellY - minCellY) + 1);
+            float cellSize = math.max(0.1f, stageCellSize);
+            float2 halfExtents = new float2(cols * cellSize * 0.5f, rows * cellSize * 0.5f);
+
+            grid.Cols = cols;
+            grid.Rows = rows;
+            grid.CellSize = cellSize;
+            grid.InvCellSize = 1f / cellSize;
+            grid.HalfExtents = halfExtents;
+            grid.OriginX = stageOriginX + (minCellX * cellSize);
+            grid.OriginZ = stageOriginZ + (minCellY * cellSize);
+
+            BakePollutionGridFromOwnedCells(
+                pollutionCells,
+                pollutionDrops,
+                pollutionValidCellIndices,
+                cols,
+                rows,
+                stageWidth,
+                minCellX,
+                minCellY,
+                in ownedStageCells,
                 math.max(config.MinValue, config.MaxValue));
         }
 
@@ -399,6 +443,76 @@ namespace SweepNDodge.DotsBullets
                     Value = centerIndex,
                 });
             }
+        }
+
+        private static void BakePollutionGridFromOwnedCells(
+            DynamicBuffer<SourcePollutionCellBuffer> pollutionCells,
+            DynamicBuffer<SourcePollutionDropRequestBuffer> pollutionDrops,
+            DynamicBuffer<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndices,
+            int cols,
+            int rows,
+            int stageWidth,
+            int minCellX,
+            int minCellY,
+            in DynamicBuffer<SourceRegionCellIndexBuffer> ownedStageCells,
+            float maxValue)
+        {
+            int cellCount = Mathf.Max(1, cols * rows);
+            pollutionCells.Clear();
+            if (pollutionCells.Capacity < cellCount)
+                pollutionCells.Capacity = cellCount;
+
+            pollutionDrops.Clear();
+            pollutionValidCellIndices.Clear();
+            if (pollutionValidCellIndices.Capacity < cellCount)
+                pollutionValidCellIndices.Capacity = cellCount;
+
+            for (int i = 0; i < cellCount; i++)
+            {
+                pollutionCells.Add(new SourcePollutionCellBuffer
+                {
+                    Value = maxValue,
+                    IsValid = 0,
+                });
+            }
+
+            for (int i = 0; i < ownedStageCells.Length; i++)
+            {
+                int globalIndex = ownedStageCells[i].Value;
+                if (globalIndex < 0 || stageWidth <= 0)
+                    continue;
+
+                int globalX = globalIndex % stageWidth;
+                int globalY = globalIndex / stageWidth;
+                int localX = globalX - minCellX;
+                int localY = globalY - minCellY;
+                if ((uint)localX >= (uint)cols || (uint)localY >= (uint)rows)
+                    continue;
+
+                int localIndex = localY * cols + localX;
+                if ((uint)localIndex >= (uint)pollutionCells.Length)
+                    continue;
+
+                var cell = pollutionCells[localIndex];
+                cell.IsValid = 1;
+                pollutionCells[localIndex] = cell;
+                pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
+                {
+                    Value = localIndex,
+                });
+            }
+
+            if (pollutionValidCellIndices.Length > 0)
+                return;
+
+            int fallbackIndex = Mathf.Clamp((rows / 2) * cols + (cols / 2), 0, cellCount - 1);
+            var fallbackCell = pollutionCells[fallbackIndex];
+            fallbackCell.IsValid = 1;
+            pollutionCells[fallbackIndex] = fallbackCell;
+            pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
+            {
+                Value = fallbackIndex,
+            });
         }
     }
 }

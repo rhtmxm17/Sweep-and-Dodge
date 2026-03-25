@@ -123,7 +123,6 @@ namespace SweepNDodge.DotsBullets
             var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
             var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
-            var sourceAnchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(isReadOnly: true);
             var sourcePollutionGridLookup = SystemAPI.GetComponentLookup<SourcePollutionGridComponent>(isReadOnly: true);
             var sourcePollutionCellLookup = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(isReadOnly: true);
             var sourcePollutionDropRequestLookup = SystemAPI.GetBufferLookup<SourcePollutionDropRequestBuffer>(isReadOnly: false);
@@ -137,7 +136,6 @@ namespace SweepNDodge.DotsBullets
             bulletSourceLookup.Update(ref state);
             reqLookup.Update(ref state);
             sourceLookup.Update(ref state);
-            sourceAnchorLookup.Update(ref state);
             sourcePollutionGridLookup.Update(ref state);
             sourcePollutionCellLookup.Update(ref state);
             sourcePollutionDropRequestLookup.Update(ref state);
@@ -185,7 +183,6 @@ namespace SweepNDodge.DotsBullets
                 BulletSourceLookup = bulletSourceLookup,
                 RequestLookup = reqLookup,
                 SourceLookup = sourceLookup,
-                SourceAnchorLookup = sourceAnchorLookup,
                 SourcePollutionGridLookup = sourcePollutionGridLookup,
                 SourcePollutionCellLookup = sourcePollutionCellLookup,
                 SourcePollutionDropRequestLookup = sourcePollutionDropRequestLookup,
@@ -378,7 +375,6 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
             public ComponentLookup<SourceSpawnComponent> SourceLookup;
-            [ReadOnly] public ComponentLookup<SourceAnchorComponent> SourceAnchorLookup;
             [ReadOnly] public ComponentLookup<SourcePollutionGridComponent> SourcePollutionGridLookup;
             [ReadOnly] public BufferLookup<SourcePollutionCellBuffer> SourcePollutionCellLookup;
             public BufferLookup<SourcePollutionDropRequestBuffer> SourcePollutionDropRequestLookup;
@@ -591,8 +587,6 @@ namespace SweepNDodge.DotsBullets
             {
                 if (!SourcePollutionGridLookup.HasComponent(sourceEntity))
                     return;
-                if (!SourceAnchorLookup.HasComponent(sourceEntity))
-                    return;
                 if (!SourcePollutionCellLookup.HasBuffer(sourceEntity))
                     return;
                 if (!SourcePollutionDropRequestLookup.TryGetBuffer(sourceEntity, out var requests))
@@ -605,10 +599,9 @@ namespace SweepNDodge.DotsBullets
                 if (grid.InvCellSize <= 0f)
                     return;
 
-                float2 local = new float2(
-                    bulletPos.x - SourceAnchorLookup[sourceEntity].Position.x,
-                    bulletPos.z - SourceAnchorLookup[sourceEntity].Position.z);
-                float2 uv = (local + grid.HalfExtents) * grid.InvCellSize;
+                float2 uv = new float2(
+                    (bulletPos.x - grid.OriginX) * grid.InvCellSize,
+                    (bulletPos.z - grid.OriginZ) * grid.InvCellSize);
                 int cellX = (int)math.floor(uv.x);
                 int cellY = (int)math.floor(uv.y);
                 if ((uint)cellX >= (uint)cols || (uint)cellY >= (uint)rows)

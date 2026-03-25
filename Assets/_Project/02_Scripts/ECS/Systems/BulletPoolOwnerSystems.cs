@@ -391,10 +391,14 @@ namespace SweepNDodge.DotsBullets
 
         public void OnUpdate(ref SystemState state)
         {
-            foreach (var (shapeRW, derivedRW) in SystemAPI.Query<RefRW<Shape2DComponent>, RefRW<SourceShapeDerivedComponent>>().WithAll<BulletFieldAreaComponent>())
+            var sourceRegionCellsLookup = SystemAPI.GetBufferLookup<SourceRegionCellIndexBuffer>(true);
+            foreach (var (shapeRW, derivedRW, entity) in SystemAPI.Query<RefRW<Shape2DComponent>, RefRW<SourceShapeDerivedComponent>>().WithAll<BulletFieldAreaComponent>().WithEntityAccess())
             {
                 var shape = Shape2DUtility.Normalize(in shapeRW.ValueRO);
                 shapeRW.ValueRW = shape;
+                if (sourceRegionCellsLookup.HasBuffer(entity) && sourceRegionCellsLookup[entity].Length > 0)
+                    continue;
+
                 derivedRW.ValueRW = new SourceShapeDerivedComponent
                 {
                     ComputedArea = Shape2DUtility.ComputeArea(in shape),

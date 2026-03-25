@@ -85,9 +85,9 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(layout.Cells, Is.Not.Null.And.Length.EqualTo(layout.Grid.Width * layout.Grid.Height));
             Assert.That(layout.SourceRegions, Is.Not.Null.And.Length.GreaterThan(0));
             Assert.That(layout.DepositRegions, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout.Sources, Is.Not.Null);
-            Assert.That(layout.Deposits, Is.Not.Null);
-            Assert.That(layout.Obstacles, Is.Not.Null);
+            Assert.That(layout.Sources == null || layout.Sources.Length == 0, Is.True);
+            Assert.That(layout.Deposits == null || layout.Deposits.Length == 0, Is.True);
+            Assert.That(layout.Obstacles == null || layout.Obstacles.Length == 0, Is.True);
         }
     }
 }

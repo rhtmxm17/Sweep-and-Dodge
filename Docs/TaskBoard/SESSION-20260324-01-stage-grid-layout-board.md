@@ -31,9 +31,6 @@
   - 구현 메모: source runtime migration은 비범위라 운영 샘플 asset의 `Sources` compatibility bridge는 유지했다. stage2 `9002` presentation은 deposit-link 대신 source-link로 정리했다.
 
 ## Next
-- [ ] P5. source region runtime 이관
-  - 기준: source sampling, pollution, progress가 region cell 집합을 읽는다.
-  - 산출물: source runtime geometry 전환, definition binding 연결, 회귀 테스트
 - [ ] P6. obstacle visual / legacy path 정리
   - 기준: obstacle visual은 gameplay authority와 분리된 tilemap/presentation owner가 처리한다.
   - 산출물: visual rebuild 경로, legacy obstacle marker 제거 계획, 최종 migration 점검
@@ -82,8 +79,11 @@
 - [x] D10. `P4.2 player block swept semantics`를 반영했다.
   - 검증 결과: EditMode `277/277` pass. PlayMode는 실행 중 Unity MCP 연결이 끊겨 최종 합격 여부를 회수하지 못했다.
   - 구현 메모: `PlayerObstacleBlockSystem`가 movement owner swept query로 `BlockPlayer`를 판정하고, deposit touch는 bounds-hit semantics를 유지한다.
+- [x] D11. `P5 source region runtime migration`을 반영했다.
+  - 검증 기준: `StageTopologyApplyPrepareSystem`가 `SourceRegions + Cells`로 source entity를 reconcile하고, source pressure/spawn/pollution runtime query가 region-derived local grid cache를 authoritative geometry로 사용한다.
+  - 구현 메모: 운영 샘플 `sl_demo_*`는 `layout.Sources` bridge를 비웠고, pressure source는 player center cell membership으로 결정한다.
 
 ## End of Session
-- 결과: P4.2까지의 movement/deposit query는 grid authority 기준으로 정리됐고, player block도 swept query semantics로 맞췄다.
-- 남은 리스크: PlayMode 최종 결과는 Unity MCP disconnect로 미회수 상태다.
-- 다음 세션 시작점: PlayMode smoke를 1회 재실행해 최종 합격 여부를 회수하고, 이어서 P5 source region runtime migration으로 넘어간다.
+- 결과: movement/deposit/source runtime query가 모두 grid authority 기준으로 정리됐다.
+- 남은 리스크: source region local-grid semantics는 bounds-based rectangle cache를 사용하므로, 추후 irregular-region density/presentation 세부 보정이 필요할 수 있다.
+- 다음 세션 시작점: P6 obstacle visual / legacy path 정리로 넘어간다.

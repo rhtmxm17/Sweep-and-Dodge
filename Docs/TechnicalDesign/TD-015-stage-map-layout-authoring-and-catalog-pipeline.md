@@ -229,8 +229,7 @@
   - source/deposit 대표점의 authoring SSOT다.
 - `StageGridLayoutGenerator`
   - `StageGridAuthoring + StageRegionAnchorMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
-  - generator가 직접 생성하는 layout asset에서는 hidden legacy `Sources / Deposits / Obstacles`를 비워 두는 것을 기본값으로 본다.
-  - 단, 현재 runtime apply는 아직 legacy shape bridge를 소비하므로 운영 샘플 asset(`sl_demo_*`)은 grid schema와 함께 compatibility bridge를 임시 유지한다.
+  - generator가 직접 생성하는 layout asset에서는 hidden legacy `Sources / Deposits / Obstacles`를 비워 둔다.
 
 ### 7.3 Paint/Validation 규칙
 - paint 시 `SourceRegionId`, `DepositRegionId`를 명시적으로 선택하지 않으면 region cell을 칠할 수 없게 한다.
@@ -276,8 +275,11 @@
 - movement / obstacle 관련 query는 runtime grid cache를 직접 읽는다.
 - source runtime은 기존 aggregate entity를 유지한다.
 - deposit gameplay query는 grid -> region id lookup만 수행한다.
-- `RunProgressDirector`, source spawn, source pollution은 region cell 집합을 authoritative geometry로 사용한다.
-- shape-based compatibility path가 남아 있더라도 source 외 gameplay 의미는 grid가 우선이다.
+- `RunProgressDirector`는 player center의 `StageRuntimeGrid.SourceRegionId` membership으로 pressure source를 결정한다.
+- source spawn/pollution은 `region bounds local grid + valid cell mask`를 authoritative geometry로 사용한다.
+- `UniformField`는 valid local cell 균등 샘플 + cell 내부 jitter를 사용한다.
+- `PollutionTopK`는 valid local cell 집합 내부에서만 weight sampling을 수행한다.
+- `layout.Sources`와 `Shape2DComponent`는 source runtime geometry authority로 읽지 않는다.
 
 ### 8.3 Lifecycle
 - lifecycle 기본 정책은 `disable-to-pool`을 유지한다.
@@ -300,7 +302,7 @@
 - P4.2. player block swept semantics 정리
   - `PlayerObstacleBlockSystem`를 movement owner swept query로 전환하고, player tunneling을 blocked cell 기준으로 막는다.
   - deposit touch는 bounds-hit semantics를 유지한다.
-- P5. source region runtime 이관
+- [x] P5. source region runtime 이관
   - source sampling, pollution, progress를 region cell 집합 기준으로 옮긴다.
 - P6. visual/presentation 정리
   - obstacle visual auto-generation 또는 tilemap rebuild 경로를 정리하고 legacy marker path를 제거한다.

@@ -98,6 +98,7 @@ namespace SweepNDodge.DotsBullets
     public struct StageRuntimeGridCellBufferElement : IBufferElementData
     {
         public StageCellMovementFlags MovementFlags;
+        public uint SourceRegionId;
         public uint DepositRegionId;
     }
 

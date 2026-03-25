@@ -16,6 +16,12 @@ namespace SweepNDodge.DotsBullets
     [UpdateAfter(typeof(StageTopologyBootstrapSystem))]
     public partial struct StageTopologyApplyPrepareSystem : ISystem
     {
+        private struct SourceRegionRuntimeData
+        {
+            public StageSourceRegionLayoutData Region;
+            public NativeList<int> OwnedCellIndices;
+        }
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<StageTopologyRequestComponent>();
@@ -79,7 +85,7 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            bool needsSourceTemplate = entry.Layout.Sources != null && entry.Layout.Sources.Length > 0;
+            bool needsSourceTemplate = HasActiveSourceRegion(entry.Layout);
             if (needsSourceTemplate && prefabs.SourceTemplate == Entity.Null)
             {
                 Debug.LogWarning($"[StageTopologyApply] Source template prefab is missing. stageId={requestedStageId}");
@@ -140,6 +146,7 @@ namespace SweepNDodge.DotsBullets
                 buffer[i] = new StageRuntimeGridCellBufferElement
                 {
                     MovementFlags = layout.Cells[i].MovementFlags,
+                    SourceRegionId = layout.Cells[i].SourceRegionId,
                     DepositRegionId = layout.Cells[i].DepositRegionId,
                 };
             }
@@ -259,8 +266,8 @@ namespace SweepNDodge.DotsBullets
             uint currentApplyVersion)
         {
             var em = state.EntityManager;
-            var layoutById = BuildStageSourceMap(layout != null ? layout.Sources : null, out int layoutDuplicateCount);
-            var activeLayoutIds = BuildActiveSourceStableIdSet(layoutById.Values);
+            var layoutById = BuildSourceRegionMap(layout, out int layoutDuplicateCount);
+            var activeLayoutIds = BuildActiveSourceStableIdSet(layoutById.Keys);
             var definitionById = definition != null
                 ? BuildDefinitionSourceMap(definition.SourceBindings, out _, out _)
                 : new Dictionary<uint, StageSourceBinding>();
@@ -303,9 +310,6 @@ namespace SweepNDodge.DotsBullets
                 uint stableId = pair.Key;
                 var layoutData = pair.Value;
 
-                if (!layoutData.Active)
-                    continue;
-
                 if (duplicateActiveIds.Contains(stableId) || definitionDuplicateIds.Contains(stableId))
                     continue;
 
@@ -324,7 +328,7 @@ namespace SweepNDodge.DotsBullets
                 em.SetEnabled(sourceEntity, true);
                 EnsureSourceTags(em, sourceEntity);
                 em.SetComponentData(sourceEntity, new SourceStableIdComponent { Value = stableId });
-                ApplySourceLayout(em, sourceEntity, layoutData);
+                ApplySourceLayout(em, sourceEntity, in layout.Grid, layoutData);
 
                 if (definition == null)
                 {
@@ -355,6 +359,12 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 DisableSourceInstance(em, entity);
+            }
+
+            foreach (var value in layoutById.Values)
+            {
+                if (value.OwnedCellIndices.IsCreated)
+                    value.OwnedCellIndices.Dispose();
             }
         }
 
@@ -461,6 +471,8 @@ namespace SweepNDodge.DotsBullets
                 SourceRuntimeApplyUtility.RefreshSourceShapeDerived(in defaultShape, ref derived);
                 em.AddComponentData(entity, derived);
             }
+            if (!em.HasBuffer<SourceRegionCellIndexBuffer>(entity))
+                em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
         }
 
         private static void EnsureOwnedMetadata(EntityManager em, Entity entity, StageTopologyKind kind)
@@ -523,44 +535,75 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static Dictionary<uint, StageSourceLayoutData> BuildStageSourceMap(StageSourceLayoutData[] sources, out int duplicateCount)
+        private static bool HasActiveSourceRegion(StageLayoutSO layout)
+        {
+            if (layout?.SourceRegions == null)
+                return false;
+
+            for (int i = 0; i < layout.SourceRegions.Length; i++)
+            {
+                if (layout.SourceRegions[i].Active)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static Dictionary<uint, SourceRegionRuntimeData> BuildSourceRegionMap(StageLayoutSO layout, out int duplicateCount)
         {
             duplicateCount = 0;
-            var map = new Dictionary<uint, StageSourceLayoutData>();
+            var map = new Dictionary<uint, SourceRegionRuntimeData>();
             var duplicateIds = new HashSet<uint>();
 
-            if (sources == null)
+            if (layout == null || layout.SourceRegions == null || layout.Cells == null)
                 return map;
 
-            for (int i = 0; i < sources.Length; i++)
+            for (int i = 0; i < layout.SourceRegions.Length; i++)
             {
-                uint stableId = math.max(1u, sources[i].StableId);
+                var region = layout.SourceRegions[i];
+                uint stableId = math.max(1u, region.StableId);
+                if (!region.Active)
+                    continue;
                 if (duplicateIds.Contains(stableId))
                     continue;
 
                 if (map.ContainsKey(stableId))
                 {
+                    map[stableId].OwnedCellIndices.Dispose();
                     map.Remove(stableId);
                     duplicateIds.Add(stableId);
                     duplicateCount++;
                     continue;
                 }
 
-                map.Add(stableId, sources[i]);
+                map.Add(stableId, new SourceRegionRuntimeData
+                {
+                    Region = region,
+                    OwnedCellIndices = new NativeList<int>(Allocator.Temp),
+                });
+            }
+
+            int cellCount = layout.Cells.Length;
+            for (int i = 0; i < cellCount; i++)
+            {
+                uint stableId = layout.Cells[i].SourceRegionId;
+                if (stableId == 0u || duplicateIds.Contains(stableId))
+                    continue;
+                if (!map.TryGetValue(stableId, out var runtime))
+                    continue;
+
+                runtime.OwnedCellIndices.Add(i);
+                map[stableId] = runtime;
             }
 
             return map;
         }
 
-        private static HashSet<uint> BuildActiveSourceStableIdSet(Dictionary<uint, StageSourceLayoutData>.ValueCollection values)
+        private static HashSet<uint> BuildActiveSourceStableIdSet(Dictionary<uint, SourceRegionRuntimeData>.KeyCollection keys)
         {
             var result = new HashSet<uint>();
-            foreach (var value in values)
-            {
-                if (value.Active)
-                    result.Add(math.max(1u, value.StableId));
-            }
-
+            foreach (var key in keys)
+                result.Add(math.max(1u, key));
             return result;
         }
 
@@ -599,7 +642,7 @@ namespace SweepNDodge.DotsBullets
             return duplicateIds;
         }
 
-        private static void ApplySourceLayout(EntityManager em, Entity entity, StageSourceLayoutData sourceData)
+        private static void ApplySourceLayout(EntityManager em, Entity entity, in StageGridSpec gridSpec, SourceRegionRuntimeData sourceData)
         {
             var anchor = em.GetComponentData<SourceAnchorComponent>(entity);
             var shape = em.GetComponentData<Shape2DComponent>(entity);
@@ -607,21 +650,68 @@ namespace SweepNDodge.DotsBullets
             var tx = em.GetComponentData<LocalTransform>(entity);
             var pollutionConfig = em.GetComponentData<SourcePollutionConfigComponent>(entity);
             var pollutionGrid = em.GetComponentData<SourcePollutionGridComponent>(entity);
+            var regionCellIndices = em.GetBuffer<SourceRegionCellIndexBuffer>(entity);
+            regionCellIndices.Clear();
 
-            float3 position = new float3(sourceData.Position.x, sourceData.Position.y, sourceData.Position.z);
+            int ownedCount = sourceData.OwnedCellIndices.Length;
+            int stageWidth = math.max(1, gridSpec.Width);
+            int minCellX = int.MaxValue;
+            int minCellY = int.MaxValue;
+            int maxCellX = int.MinValue;
+            int maxCellY = int.MinValue;
+
+            for (int i = 0; i < ownedCount; i++)
+            {
+                int globalIndex = sourceData.OwnedCellIndices[i];
+                regionCellIndices.Add(new SourceRegionCellIndexBuffer { Value = globalIndex });
+                int cellX = globalIndex % stageWidth;
+                int cellY = globalIndex / stageWidth;
+                minCellX = math.min(minCellX, cellX);
+                minCellY = math.min(minCellY, cellY);
+                maxCellX = math.max(maxCellX, cellX);
+                maxCellY = math.max(maxCellY, cellY);
+            }
+
+            if (ownedCount <= 0)
+            {
+                minCellX = maxCellX = math.clamp(sourceData.Region.AnchorCell.x, 0, math.max(0, gridSpec.Width - 1));
+                minCellY = maxCellY = math.clamp(sourceData.Region.AnchorCell.y, 0, math.max(0, gridSpec.Height - 1));
+            }
+
+            float3 position = StageRuntimeGridUtility.GetAnchorWorldPosition(
+                in gridSpec,
+                new int2(sourceData.Region.AnchorCell.x, sourceData.Region.AnchorCell.y),
+                new float2(sourceData.Region.AnchorOffset.x, sourceData.Region.AnchorOffset.y),
+                gridSpec.Origin.y);
             anchor.Position = position;
             tx.Position = position;
-            tx.Rotation = quaternion.RotateY(math.radians(sourceData.YawDeg));
+            tx.Rotation = quaternion.identity;
 
-            shape.Kind = sourceData.Shape;
-            shape.Radius = math.max(0f, sourceData.Radius);
-            shape.Size = math.max(float2.zero, new float2(sourceData.Size.x, sourceData.Size.y));
-            SourceRuntimeApplyUtility.RefreshSourceShapeDerived(in shape, ref derived);
+            float boundsMinX = gridSpec.Origin.x + (minCellX * gridSpec.CellSize);
+            float boundsMinZ = gridSpec.Origin.z + (minCellY * gridSpec.CellSize);
+            float boundsMaxX = gridSpec.Origin.x + ((maxCellX + 1) * gridSpec.CellSize);
+            float boundsMaxZ = gridSpec.Origin.z + ((maxCellY + 1) * gridSpec.CellSize);
+            float2 halfExtents = new float2(
+                math.max(math.abs(position.x - boundsMinX), math.abs(boundsMaxX - position.x)),
+                math.max(math.abs(position.z - boundsMinZ), math.abs(boundsMaxZ - position.z)));
 
-            SourceRuntimeApplyUtility.RebuildPollutionGrid(
-                in shape,
-                in derived,
+            shape.Kind = Shape2DKind.Rectangle;
+            shape.Radius = 0f;
+            shape.Size = math.max(float2.zero, halfExtents * 2f);
+            derived.ComputedArea = ownedCount * gridSpec.CellSize * gridSpec.CellSize;
+            derived.HalfExtents = halfExtents;
+
+            SourceRuntimeApplyUtility.RebuildPollutionGridFromRegionBounds(
+                minCellX,
+                minCellY,
+                maxCellX,
+                maxCellY,
+                stageWidth,
+                gridSpec.CellSize,
+                gridSpec.Origin.x,
+                gridSpec.Origin.z,
                 in pollutionConfig,
+                regionCellIndices,
                 ref pollutionGrid,
                 em.GetBuffer<SourcePollutionCellBuffer>(entity),
                 em.GetBuffer<SourcePollutionDropRequestBuffer>(entity),
