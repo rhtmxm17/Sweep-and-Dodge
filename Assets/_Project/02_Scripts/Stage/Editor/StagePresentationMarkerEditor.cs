@@ -138,7 +138,6 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 StagePresentationLinkKind.Source => new Color(0.15f, 0.9f, 0.35f, 1f),
                 StagePresentationLinkKind.Deposit => new Color(0.2f, 0.7f, 1f, 1f),
-                StagePresentationLinkKind.Obstacle => new Color(1f, 0.55f, 0.2f, 1f),
                 _ => Color.white,
             };
 
@@ -149,21 +148,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     Handles.DrawWireDisc(linkedParent.position, Vector3.up, 0.35f);
                     return;
                 }
-
-                if (linkedParent.TryGetComponent<StageSourceMarker>(out var source))
-                {
-                    DrawShape(linkedParent, source.Shape, source.Radius, source.Size);
-                    return;
-                }
-
-                if (linkedParent.TryGetComponent<StageDepositMarker>(out var deposit))
-                {
-                    DrawShape(linkedParent, deposit.Shape, deposit.Radius, deposit.Size);
-                    return;
-                }
-
-                if (linkedParent.TryGetComponent<StageObstacleMarker>(out var obstacle))
-                    DrawShape(linkedParent, obstacle.Shape, obstacle.Radius, obstacle.Size);
             }
         }
 
@@ -178,7 +162,6 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 StagePresentationLinkKind.Source => new Color(0.15f, 0.9f, 0.35f, 1f),
                 StagePresentationLinkKind.Deposit => new Color(0.95f, 0.85f, 0.2f, 1f),
-                StagePresentationLinkKind.Obstacle => new Color(1f, 0.55f, 0.2f, 1f),
                 _ => Color.white,
             };
 
@@ -224,20 +207,6 @@ namespace SweepNDodge.DotsBullets.Editor
 
             if (!StagePresentationEditorUtility.TryResolveEntry(catalog, marker.PresentationKey, out _))
                 Handles.Label(marker.transform.position + Vector3.up * 0.5f, "PresentationKey not found");
-        }
-
-        private static void DrawShape(Transform transform, Shape2DKind shape, float radius, Vector2 size)
-        {
-            if (shape == Shape2DKind.Circle)
-            {
-                Handles.DrawWireDisc(transform.position, Vector3.up, Mathf.Max(0f, radius));
-                return;
-            }
-
-            var previousMatrix = Handles.matrix;
-            Handles.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
-            Handles.DrawWireCube(Vector3.zero, new Vector3(Mathf.Max(0f, size.x), 0f, Mathf.Max(0f, size.y)));
-            Handles.matrix = previousMatrix;
         }
     }
 }

@@ -6,7 +6,5 @@ namespace SweepNDodge.DotsBullets
     public class StageTopologyPrefabCatalogSO : ScriptableObject
     {
         public GameObject SourceTemplatePrefab;
-        public GameObject DepositTemplatePrefab;
-        public GameObject ObstacleTemplatePrefab;
     }
 }

@@ -23,7 +23,6 @@ namespace SweepNDodge.DotsBullets
         None = 0,
         Source = 1,
         Deposit = 2,
-        Obstacle = 3,
     }
 
     public enum StageRegionKind : byte
@@ -65,45 +64,6 @@ namespace SweepNDodge.DotsBullets
         public bool Active;
         public Vector2Int AnchorCell;
         public Vector2 AnchorOffset;
-    }
-
-    // Legacy layout entries remain temporarily for runtime/generator compatibility
-    // until the grid-authoritative apply/generator path lands in later phases.
-    [Serializable]
-    public struct StageSourceLayoutData
-    {
-        [Min(1)] public uint StableId;
-        public bool Active;
-        public Vector3 Position;
-        public float YawDeg;
-        public Shape2DKind Shape;
-        [Min(0f)] public float Radius;
-        public Vector2 Size;
-    }
-
-    [Serializable]
-    public struct StageDepositLayoutData
-    {
-        [Min(1)] public uint StableId;
-        public bool Active;
-        public Vector3 Position;
-        public float YawDeg;
-        public Shape2DKind Shape;
-        [Min(0f)] public float Radius;
-        public Vector2 Size;
-    }
-
-    [Serializable]
-    public struct StageObstacleLayoutData
-    {
-        [Min(1)] public uint StableId;
-        public bool Active;
-        public Vector3 Position;
-        public float YawDeg;
-        public Shape2DKind Shape;
-        [Min(0f)] public float Radius;
-        public Vector2 Size;
-        public ObstacleCollisionMask CollisionMask;
     }
 
     [Serializable]

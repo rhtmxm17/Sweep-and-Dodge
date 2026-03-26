@@ -105,9 +105,6 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(layout.Cells, Is.Not.Null.And.Length.EqualTo(layout.Grid.Width * layout.Grid.Height));
             Assert.That(layout.SourceRegions, Is.Not.Null.And.Length.GreaterThan(0));
             Assert.That(layout.DepositRegions, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout.Sources == null || layout.Sources.Length == 0, Is.True);
-            Assert.That(layout.Deposits == null || layout.Deposits.Length == 0, Is.True);
-            Assert.That(layout.Obstacles == null || layout.Obstacles.Length == 0, Is.True);
         }
 
         private static void AssertLayoutMatchesSceneAuthoring(StageLayoutSO layout, int stageId)
@@ -118,6 +115,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 .Single(x => x.StageId == stageId);
             Assert.That(stage.TryGetComponent(out StageGridAuthoring authoring), Is.True);
             Assert.That(authoring.RegionTilemap, Is.Not.Null, $"Stage {stageId} sample authoring must use unified RegionTilemap.");
+            Assert.That(stage.GetComponentsInChildren<StageRegionAnchorMarker>(true), Is.Not.Empty, $"Stage {stageId} must keep region anchor markers.");
 
             Assert.That(layout.Grid.Width, Is.EqualTo(authoring.BoundsSize.x));
             Assert.That(layout.Grid.Height, Is.EqualTo(authoring.BoundsSize.y));

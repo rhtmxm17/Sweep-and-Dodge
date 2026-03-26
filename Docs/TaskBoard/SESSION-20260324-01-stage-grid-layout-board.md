@@ -28,15 +28,12 @@
   - 산출물: player `prevXZ -> nextXZ` swept query, shared `StageRuntimeBlockQuery` mask seam, deposit bounds-hit 유지 명시
 - [x] 검증 및 회귀 정리
   - 검증 결과: P4 기준 compile error 0, console error 0, EditMode `269/269` pass, PlayMode `38/38` pass
-  - 구현 메모: source runtime migration은 비범위라 운영 샘플 asset의 `Sources` compatibility bridge는 유지했다. stage2 `9002` presentation은 deposit-link 대신 source-link로 정리했다.
+  - 구현 메모: stage2 `9002` presentation은 deposit-link 대신 source-link로 정리했다.
 
 ## Next
-- [ ] P6. obstacle visual / metadata tilemap 재편
-  - 기준: obstacle visual은 presentation owner에서 분리하고, ground / wall visual tilemap과 gameplay metadata tilemap(`Movement / Region`) 중심으로 재편한다.
-  - 산출물: visual owner 구조, `StageRegionTile.RegionKind + RegionSlotIndex + StageGridAuthoring slot mapping` 기반 단일 `RegionTilemap` authoring 경로, presentation obstacle 제외 계약, paint fallback deprecated 처리
-- [ ] P6.next-A. unified RegionTilemap authoring cleanup
-  - 기준: `RegionTilemap`가 sample SSOT로 올라온 상태를 전제로 split tilemap과 paint fallback을 제거한다.
-  - 산출물: `StageGridAuthoring` hard cutover, paint asset/tooling 삭제, sample scene/content paint 참조 제거, unified-only tests/content validation
+- [ ] P7. terrain visual polish / follow-up
+  - 기준: grid-only runtime/template cleanup 이후 남은 visual polish와 content-side 개선을 별도 단계에서 정리한다.
+  - 산출물: terrain visual authoring polish, content debt 정리, 필요 시 importer 후속 논의
 
 ## Blocked
 - 없음
@@ -52,8 +49,6 @@
   - 검증 결과: 현재 manifest에는 tilemap module은 있지만 editor package는 없고, extras는 visual/auxiliary workflow에만 필요하다는 결론을 반영했다.
 
 ## Parking Lot
-- [ ] P6.next. legacy path 정리
-  - 근거: obstacle visual / metadata tilemap 설계 범위가 충분히 커졌으므로, obstacle marker / obstacle-linked presentation / obstacle runtime template 제거는 별도 후속 작업으로 분리한다.
 - [ ] P7. 외부 툴 importer(`LDtk`, `Tiled`)는 Unity Tilemap 경로가 안정화된 뒤 같은 grid schema로 추가 검토한다.
   - 근거: 지금 우선순위는 SSOT와 runtime owner 전환이지 authoring 툴 확장이 아니다.
 - [ ] P8. obstacle visual auto-generation 세부 규칙은 gameplay migration 완료 후 별도 세션에서 정리한다.
@@ -86,15 +81,26 @@
   - 구현 메모: `PlayerObstacleBlockSystem`가 movement owner swept query로 `BlockPlayer`를 판정하고, deposit touch는 bounds-hit semantics를 유지한다.
 - [x] D11. `P5 source region runtime migration`을 반영했다.
   - 검증 기준: `StageTopologyApplyPrepareSystem`가 `SourceRegions + Cells`로 source entity를 reconcile하고, source pressure/spawn/pollution runtime query가 region-derived local grid cache를 authoritative geometry로 사용한다.
-  - 구현 메모: 운영 샘플 `sl_demo_*`는 `layout.Sources` bridge를 비웠고, pressure source는 player center cell membership으로 결정한다.
+  - 구현 메모: pressure source는 player center cell membership으로 결정한다.
 - [x] D12. `P3 explicit authoring bounds + grid gizmo` 보정을 반영했다.
   - 검증 기준: `StageGridAuthoring`가 `BoundsMinCell/BoundsSize`를 authoring SSOT로 소유하고, tilemap `cellBounds`는 reference only로 내려갔다.
   - 구현 메모: `StageLayoutEditingSampleV1` 씬 상태를 authoring SSOT로 고정했고, Stage1은 `22x17 bounds / 50 source cells / 12 deposit cells`, Stage2/3는 `30+ source cells` sample로 layout 자산과 다시 동기화했다.
 - [x] D13. runtime stage grid playmode gizmo를 추가했다.
   - 검증 기준: runtime `StageRuntimeGrid`와 source anchor ECS 데이터를 읽어 grid/movement/source/deposit/source-anchor gizmo를 PlayMode SceneView에서 표시한다.
   - 구현 메모: deposit anchor는 현재 runtime authority 방향이 열려 있으므로 gizmo 범위에서 제외했다.
+- [x] D14. `P6 obstacle visual / metadata tilemap 재편`을 반영했다.
+  - 검증 기준: obstacle visual을 presentation owner에서 분리하고, `MovementTilemap + RegionTilemap + Ground/Wall visual tilemap` 중심 authoring 경로를 도입했다.
+  - 구현 메모: `StagePresentation`은 source/deposit/standalone만 owner로 유지하고, `StageRegionTile.RegionKind + RegionSlotIndex + slot mapping` 기반으로 metadata tilemap을 사용한다.
+- [x] D15. `P6.next-A unified RegionTilemap authoring cleanup`을 반영했다.
+  - 검증 기준: split tilemap과 `StageRegionPaintAsset` fallback을 제거하고, repo-tracked authoring을 unified `RegionTilemap` only 경로로 고정했다.
+  - 구현 메모: sample scene/content의 paint 참조를 제거했고, generator/validation/editor/tests를 unified-only 계약으로 정리했다.
+- [x] D16. `P6.next-B obstacle-linked presentation removal`을 반영했다.
+  - 검증 기준: `StageObstacleMarker`를 sample scene과 editor authoring 경로에서 제거하고, presentation/editor validation은 source/deposit/standalone만 지원한다.
+- [x] D17. `P6.next-C runtime/template legacy path cleanup`을 반영했다.
+  - 검증 기준: `StageLayoutSO` hidden compatibility field, `StageSourceMarker / StageDepositMarker`, `StageLayoutValidationRules`, obstacle/deposit topology template를 제거하고 source-only runtime/template 계약으로 정리했다.
+  - 구현 메모: `StagePresentationLinkKind`는 `None / Source / Deposit`만 남기고, legacy numeric 값은 grid layout validation에서 unsupported error로 막는다.
 
 ## End of Session
 - 결과: movement/deposit/source runtime query가 모두 grid authority 기준으로 정리됐다.
 - 남은 리스크: source region local-grid semantics는 bounds-based rectangle cache를 사용하므로, 추후 irregular-region density/presentation 세부 보정이 필요할 수 있다.
-- 다음 세션 시작점: P6 obstacle visual / metadata tilemap 재편으로 넘어가고, legacy path 정리는 그 다음 작업으로 분리한다.
+- 다음 세션 시작점: terrain visual polish 또는 importer/content follow-up 중 우선순위가 높은 쪽으로 이어간다.

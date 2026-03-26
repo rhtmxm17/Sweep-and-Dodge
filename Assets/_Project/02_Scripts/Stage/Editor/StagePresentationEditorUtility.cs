@@ -93,22 +93,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     }
                 }
 
-                if (current.TryGetComponent<StageSourceMarker>(out var source))
-                {
-                    linkKind = StagePresentationLinkKind.Source;
-                    linkedStableId = source.StableId;
-                    linkedParent = current;
-                    return true;
-                }
-
-                if (current.TryGetComponent<StageDepositMarker>(out var deposit))
-                {
-                    linkKind = StagePresentationLinkKind.Deposit;
-                    linkedStableId = deposit.StableId;
-                    linkedParent = current;
-                    return true;
-                }
-
                 current = current.parent;
             }
 
@@ -167,9 +151,7 @@ namespace SweepNDodge.DotsBullets.Editor
             if (marker == null)
                 return false;
 
-            return marker.TryGetComponent<StageRegionAnchorMarker>(out _)
-                || marker.TryGetComponent<StageSourceMarker>(out _)
-                || marker.TryGetComponent<StageDepositMarker>(out _);
+            return marker.TryGetComponent<StageRegionAnchorMarker>(out _);
         }
 
         private static bool TryResolveAnchorStableId(StageRegionAnchorMarker anchor, out uint stableId)

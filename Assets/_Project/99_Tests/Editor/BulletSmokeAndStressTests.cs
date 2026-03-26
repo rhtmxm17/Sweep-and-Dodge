@@ -1571,6 +1571,89 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnExecution_PollutionFieldSampling_UsesPollutionGridOriginInsteadOfSourceAnchor()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPollutionGridOriginWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(4f, 2f));
+
+                em.SetComponentData(source, new SourcePollutionGridComponent
+                {
+                    CellSize = 1f,
+                    InvCellSize = 1f,
+                    HalfExtents = new float2(2f, 1f),
+                    OriginX = -4f,
+                    OriginZ = -1f,
+                    Cols = 4,
+                    Rows = 2,
+                });
+
+                var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(source);
+                pollutionCells.Clear();
+                for (int i = 0; i < 8; i++)
+                {
+                    pollutionCells.Add(new SourcePollutionCellBuffer
+                    {
+                        Value = 1f,
+                        IsValid = 0,
+                    });
+                }
+
+                pollutionCells[0] = new SourcePollutionCellBuffer
+                {
+                    Value = 1f,
+                    IsValid = 1,
+                };
+
+                var validCells = em.GetBuffer<SourcePollutionValidCellIndexBuffer>(source);
+                validCells.Clear();
+                validCells.Add(new SourcePollutionValidCellIndexBuffer { Value = 0 });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8003,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.PollutionTopK,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    SpawnSampleBudget = 1,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
+                    BaseAngleDeg = 0f,
+                    Count = 1,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(1));
+
+                float3 spawned = snapshots[0].Position;
+                Assert.That(spawned.x, Is.GreaterThanOrEqualTo(-4f).And.LessThan(-3f));
+                Assert.That(spawned.z, Is.GreaterThanOrEqualTo(-1f).And.LessThan(0f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnExecution_TimedLineEven_KeepsInitialCenterWhenSourceMoves()
         {
             try

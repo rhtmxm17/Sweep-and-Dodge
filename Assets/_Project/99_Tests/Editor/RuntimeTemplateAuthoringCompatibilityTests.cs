@@ -26,11 +26,31 @@ namespace SweepNDodge.DotsBullets.Tests
                 stage.TargetDefinition = definition;
                 stage.TargetLayout = layout;
 
+                layout.SchemaVersion = 2;
                 layout.StageId = 2;
-                layout.Sources = new[]
+                layout.Grid = new StageGridSpec
                 {
-                    new StageSourceLayoutData { StableId = 2001u, Active = true, Shape = Shape2DKind.Circle, Radius = 2f },
+                    Width = 1,
+                    Height = 1,
+                    CellSize = 1f,
+                    Origin = Vector3.zero,
                 };
+                layout.Cells = new[]
+                {
+                    new StageCellLayoutData { SourceRegionId = 2001u },
+                };
+                layout.SourceRegions = new[]
+                {
+                    new StageSourceRegionLayoutData
+                    {
+                        StableId = 2001u,
+                        Active = true,
+                        AnchorCell = Vector2Int.zero,
+                        AnchorOffset = Vector2.zero,
+                    },
+                };
+                layout.DepositRegions = System.Array.Empty<StageDepositRegionLayoutData>();
+                layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
 
                 definition.StageId = 2;
                 definition.SourceBindings = System.Array.Empty<StageSourceBinding>();

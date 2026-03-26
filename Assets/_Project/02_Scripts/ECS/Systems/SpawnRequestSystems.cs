@@ -854,6 +854,7 @@ namespace SweepNDodge.DotsBullets
                     sourceEntity,
                     in request,
                     center,
+                    sourceAnchorLookup.HasComponent(sourceEntity) ? sourceAnchorLookup[sourceEntity].Position : center,
                     hasPlayer,
                     playerPosition,
                     ref pollutionConfigLookup,
@@ -874,6 +875,7 @@ namespace SweepNDodge.DotsBullets
                         sourceEntity,
                         in request,
                         center,
+                        sourceAnchorLookup.HasComponent(sourceEntity) ? sourceAnchorLookup[sourceEntity].Position : center,
                         hasPlayer,
                         playerPosition,
                         ref pollutionConfigLookup,
@@ -907,6 +909,7 @@ namespace SweepNDodge.DotsBullets
                 sourceEntity,
                 in request,
                 request.EventAnchorCenter,
+                sourceAnchorLookup.HasComponent(sourceEntity) ? sourceAnchorLookup[sourceEntity].Position : request.EventAnchorCenter,
                 false,
                 playerPosition,
                 ref pollutionConfigLookup,
@@ -1025,6 +1028,7 @@ namespace SweepNDodge.DotsBullets
             Entity sourceEntity,
             in SourceSpawnRequestBuffer request,
             float3 center,
+            float3 sourceAnchor,
             bool hasPlayer,
             float3 playerPosition,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
@@ -1049,6 +1053,7 @@ namespace SweepNDodge.DotsBullets
                             ref random,
                             sourceEntity,
                             center,
+                            sourceAnchor,
                             out var pollutionPos,
                             ref pollutionConfigLookup,
                             ref pollutionGridLookup,
@@ -1068,6 +1073,7 @@ namespace SweepNDodge.DotsBullets
                             ref random,
                             sourceEntity,
                             center,
+                            sourceAnchor,
                             out var uniformPos,
                             ref pollutionGridLookup,
                             ref pollutionCellsLookup,
@@ -1150,6 +1156,7 @@ namespace SweepNDodge.DotsBullets
             ref Unity.Mathematics.Random random,
             Entity sourceEntity,
             float3 center,
+            float3 sourceAnchor,
             out float3 position,
             ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
@@ -1198,7 +1205,7 @@ namespace SweepNDodge.DotsBullets
 
             int cols = math.max(1, grid.Cols);
             int rows = math.max(1, grid.Rows);
-            position = SampleInsidePollutionCell(ref random, bestCellIndex, center, cols, rows, in grid);
+            position = SampleInsidePollutionCell(ref random, bestCellIndex, center, sourceAnchor, cols, rows, in grid);
             return true;
         }
 
@@ -1206,6 +1213,7 @@ namespace SweepNDodge.DotsBullets
             ref Unity.Mathematics.Random random,
             Entity sourceEntity,
             float3 center,
+            float3 sourceAnchor,
             out float3 position,
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
@@ -1235,6 +1243,7 @@ namespace SweepNDodge.DotsBullets
                 ref random,
                 cellIndex,
                 center,
+                sourceAnchor,
                 math.max(1, grid.Cols),
                 math.max(1, grid.Rows),
                 in grid);
@@ -1257,6 +1266,7 @@ namespace SweepNDodge.DotsBullets
             ref Unity.Mathematics.Random random,
             int cellIndex,
             float3 center,
+            float3 sourceAnchor,
             int cols,
             int rows,
             in SourcePollutionGridComponent grid)
@@ -1268,12 +1278,18 @@ namespace SweepNDodge.DotsBullets
             int cellY = math.clamp(clampedCellIndex / safeCols, 0, safeRows - 1);
 
             float cellSize = math.max(0.001f, grid.CellSize);
-            float2 halfExtents = math.max(0f, grid.HalfExtents);
-            float localX = -halfExtents.x + (cellX + random.NextFloat(0f, 1f)) * cellSize;
-            float localZ = -halfExtents.y + (cellY + random.NextFloat(0f, 1f)) * cellSize;
-            localX = math.clamp(localX, -halfExtents.x, halfExtents.x);
-            localZ = math.clamp(localZ, -halfExtents.y, halfExtents.y);
-            return new float3(center.x + localX, center.y, center.z + localZ);
+            float2 halfExtents = math.max(float2.zero, grid.HalfExtents);
+            float originOffsetX = center.x - sourceAnchor.x;
+            float originOffsetZ = center.z - sourceAnchor.z;
+            float worldMinX = grid.OriginX + originOffsetX;
+            float worldMinZ = grid.OriginZ + originOffsetZ;
+            float worldMaxX = worldMinX + (halfExtents.x * 2f);
+            float worldMaxZ = worldMinZ + (halfExtents.y * 2f);
+            float worldX = worldMinX + (cellX + random.NextFloat(0f, 1f)) * cellSize;
+            float worldZ = worldMinZ + (cellY + random.NextFloat(0f, 1f)) * cellSize;
+            worldX = math.clamp(worldX, worldMinX, worldMaxX);
+            worldZ = math.clamp(worldZ, worldMinZ, worldMaxZ);
+            return new float3(worldX, center.y, worldZ);
         }
 
         private static float3 SampleSpawnPositionLineEven(

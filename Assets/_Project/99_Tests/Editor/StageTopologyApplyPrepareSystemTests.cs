@@ -77,8 +77,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
                 Assert.That(topologyState.Ready, Is.EqualTo(1));
 
-                Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyDepositTag>()).CalculateEntityCount(), Is.EqualTo(0));
-                Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyObstacleTag>()).CalculateEntityCount(), Is.EqualTo(0));
             }
             finally
             {
@@ -144,8 +142,6 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(prefabCatalogEntity, new StageTopologyPrefabCatalogComponent
             {
                 SourceTemplate = CreateSourceTemplate(em),
-                DepositTemplate = Entity.Null,
-                ObstacleTemplate = Entity.Null,
             });
 
             return world;
@@ -206,9 +202,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
             };
             layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
-            layout.Sources = System.Array.Empty<StageSourceLayoutData>();
-            layout.Deposits = System.Array.Empty<StageDepositLayoutData>();
-            layout.Obstacles = System.Array.Empty<StageObstacleLayoutData>();
 
             var definition = UnityEngine.ScriptableObject.CreateInstance<StageDefinitionSO>();
             definition.StageId = 1;

@@ -18,7 +18,7 @@ MonoBehaviour:
     Width: 22
     Height: 17
     CellSize: 1
-    Origin: {x: 44.98452, y: 543.27563, z: -189.78618}
+    Origin: {x: -2, y: 0, z: -2}
   Cells:
   - MovementFlags: 255
     SourceRegionId: 0
@@ -1162,6 +1162,3 @@ MonoBehaviour:
     Position: {x: -1.5, y: 2.55, z: -0.22}
     Euler: {x: 338.75085, y: 10.463113, z: 30.917606}
     Scale: {x: 1, y: 1, z: 1}
-  Sources: []
-  Deposits: []
-  Obstacles: []

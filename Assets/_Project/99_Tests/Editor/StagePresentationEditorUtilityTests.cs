@@ -80,18 +80,16 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void TryFindLinkedParent_DoesNotResolveObstacleParent()
+        public void TryFindLinkedParent_DoesNotResolveNonTopologyParent()
         {
             var rootGo = new GameObject("root");
-            var obstacleGo = new GameObject("obstacle");
+            var helperGo = new GameObject("helper");
             var markerGo = new GameObject("presentation");
 
             try
             {
-                obstacleGo.transform.SetParent(rootGo.transform);
-                markerGo.transform.SetParent(obstacleGo.transform);
-                var obstacle = obstacleGo.AddComponent<StageObstacleMarker>();
-                obstacle.StableId = 3001;
+                helperGo.transform.SetParent(rootGo.transform);
+                markerGo.transform.SetParent(helperGo.transform);
 
                 Assert.That(StagePresentationEditorUtility.TryFindLinkedParent(markerGo.transform, out _, out _, out _), Is.False);
             }

@@ -79,8 +79,6 @@ namespace SweepNDodge.DotsBullets
     public struct StageTopologyPrefabCatalogComponent : IComponentData
     {
         public Entity SourceTemplate;
-        public Entity DepositTemplate;
-        public Entity ObstacleTemplate;
     }
 
     public struct StageRuntimeGridComponent : IComponentData
@@ -131,10 +129,6 @@ namespace SweepNDodge.DotsBullets
     }
 
     public struct StageTopologySourceTag : IComponentData
-    {
-    }
-
-    public struct StageTopologyDepositTag : IComponentData
     {
     }
 

@@ -413,9 +413,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL010", location, "StagePresentationMarker must not share a GameObject with Source/Deposit anchor marker."));
 
                 bool hasParentTopology = StagePresentationEditorUtility.TryFindLinkedParent(marker.transform, out _, out _, out _);
-                bool hasObstacleParent = marker.GetComponentInParent<StageObstacleMarker>() != null;
-                if (hasObstacleParent)
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STG014", location, "Obstacle-linked presentation is not supported for grid schema layouts."));
 
                 if (marker.PlacementMode == StagePresentationPlacementMode.LinkedToParent && !hasParentTopology)
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL011", location, "LinkedToParent presentation requires a parent Source/Deposit anchor marker."));

@@ -117,6 +117,9 @@ namespace SweepNDodge.DotsBullets.Editor
         [DrawGizmo(GizmoType.NonSelected | GizmoType.Selected)]
         private static void DrawGizmos(StageGridAuthoring authoring, GizmoType gizmoType)
         {
+            if (Application.isPlaying)
+                return;
+
             if (authoring == null || authoring.Grid == null)
                 return;
 
@@ -169,29 +172,20 @@ namespace SweepNDodge.DotsBullets.Editor
                 var tile = authoring.MovementTilemap.GetTile(new Vector3Int(tileX, tileY, 0)) as StageMovementTile;
                 if (tile != null && tile.MovementFlags != StageCellMovementFlags.None)
                 {
-                    Handles.DrawSolidRectangleWithOutline(
-                        BuildRectVerts(rect, z - 0.003f),
-                        ResolveMovementColor(tile.MovementFlags),
-                        Color.clear);
+                    DrawCellHatch(rect, z - 0.003f, ResolveMovementColor(tile.MovementFlags), StageGridHatchDirection.ForwardSlash);
                 }
             }
 
             uint sourceCell = ResolveRegionCell(authoring, StageRegionKind.Source, localX, localY);
             if (authoring.ShowSourceGizmo && sourceCell != 0u)
             {
-                Handles.DrawSolidRectangleWithOutline(
-                    BuildRectVerts(rect, z - 0.002f),
-                    new Color(0.1f, 0.75f, 1f, 0.2f),
-                    Color.clear);
+                DrawCellHatch(rect, z - 0.002f, new Color(0.1f, 0.75f, 1f, 0.55f), StageGridHatchDirection.BackSlash);
             }
 
             uint depositCell = ResolveRegionCell(authoring, StageRegionKind.Deposit, localX, localY);
             if (authoring.ShowDepositGizmo && depositCell != 0u)
             {
-                Handles.DrawSolidRectangleWithOutline(
-                    BuildRectVerts(rect, z - 0.001f),
-                    new Color(1f, 0.7f, 0.1f, 0.2f),
-                    Color.clear);
+                DrawCellHatch(rect, z - 0.001f, new Color(1f, 0.7f, 0.1f, 0.55f), StageGridHatchDirection.BackSlash);
             }
         }
 
@@ -254,6 +248,35 @@ namespace SweepNDodge.DotsBullets.Editor
             var rect = new Rect(bounds.xMin * cellWidth, bounds.yMin * cellHeight, bounds.size.x * cellWidth, bounds.size.y * cellHeight);
             Handles.DrawPolyLine(BuildRectVerts(rect, z));
             Handles.DrawLine(new Vector3(rect.xMin, rect.yMax, z), new Vector3(rect.xMin, rect.yMin, z));
+        }
+
+        private static void DrawCellHatch(Rect rect, float z, Color color, StageGridHatchDirection direction)
+        {
+            Handles.color = color;
+            float insetX = rect.width * 0.08f;
+            float insetY = rect.height * 0.08f;
+            float minX = rect.xMin + insetX;
+            float maxX = rect.xMax - insetX;
+            float minY = rect.yMin + insetY;
+            float maxY = rect.yMax - insetY;
+            const int lineCount = 2;
+
+            for (int i = 0; i < lineCount; i++)
+            {
+                float t = (i + 0.5f) / lineCount;
+                if (direction == StageGridHatchDirection.ForwardSlash)
+                {
+                    Handles.DrawLine(
+                        new Vector3(maxX, Mathf.Lerp(minY, maxY, t), z),
+                        new Vector3(Mathf.Lerp(minX, maxX, t), maxY, z));
+                }
+                else
+                {
+                    Handles.DrawLine(
+                        new Vector3(minX, Mathf.Lerp(maxY, minY, t), z),
+                        new Vector3(Mathf.Lerp(minX, maxX, t), maxY, z));
+                }
+            }
         }
 
         private static Color ResolveMovementColor(StageCellMovementFlags flags)
@@ -324,6 +347,12 @@ namespace SweepNDodge.DotsBullets.Editor
             minY = Mathf.Min(minY, y);
             maxX = Mathf.Max(maxX, x);
             maxY = Mathf.Max(maxY, y);
+        }
+
+        private enum StageGridHatchDirection : byte
+        {
+            ForwardSlash = 0,
+            BackSlash = 1,
         }
     }
 }

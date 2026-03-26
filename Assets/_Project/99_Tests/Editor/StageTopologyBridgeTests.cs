@@ -65,8 +65,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(topologyCatalogQuery.IsEmptyIgnoreFilter, Is.False);
                 var topologyPrefabs = em.GetComponentData<StageTopologyPrefabCatalogComponent>(topologyCatalogQuery.GetSingletonEntity());
                 Assert.That(topologyPrefabs.SourceTemplate, Is.Not.EqualTo(Entity.Null));
-                Assert.That(topologyPrefabs.DepositTemplate, Is.EqualTo(Entity.Null));
-                Assert.That(topologyPrefabs.ObstacleTemplate, Is.EqualTo(Entity.Null));
             }
             finally
             {

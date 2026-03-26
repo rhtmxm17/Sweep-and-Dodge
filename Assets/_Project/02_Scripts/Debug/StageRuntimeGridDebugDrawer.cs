@@ -1,5 +1,6 @@
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -24,6 +25,8 @@ namespace SweepNDodge.DotsBullets
         public float OverlayThickness = 0.04f;
         public float GridLineYOffset = 0.01f;
         public float AnchorSphereRadius = 0.16f;
+        public float HatchInset = 0.08f;
+        public int HatchLineCount = 2;
 
         private EntityManager _em;
         private EntityQuery _gridQuery;
@@ -114,9 +117,6 @@ namespace SweepNDodge.DotsBullets
 
         private void DrawCellOverlays(in StageRuntimeGridComponent grid, DynamicBuffer<StageRuntimeGridCellBufferElement> cells, float planeY)
         {
-            float size = grid.CellSize * 0.92f;
-            var cubeSize = new Vector3(size, OverlayThickness, size);
-
             for (int y = 0; y < grid.Height; y++)
             {
                 for (int x = 0; x < grid.Width; x++)
@@ -130,20 +130,32 @@ namespace SweepNDodge.DotsBullets
 
                     if (ShowMovement && cell.MovementFlags != StageCellMovementFlags.None)
                     {
-                        Gizmos.color = ResolveMovementColor(cell.MovementFlags);
-                        Gizmos.DrawCube(center, cubeSize);
+                        DrawCellHatch(
+                            center,
+                            grid.CellSize,
+                            planeY,
+                            ResolveMovementColor(cell.MovementFlags),
+                            StageGridHatchDirection.ForwardSlash);
                     }
 
                     if (ShowSource && cell.SourceRegionId != 0u)
                     {
-                        Gizmos.color = new Color(0.1f, 0.75f, 1f, 0.2f);
-                        Gizmos.DrawCube(center + new Vector3(0f, OverlayThickness * 0.3f, 0f), cubeSize);
+                        DrawCellHatch(
+                            center,
+                            grid.CellSize,
+                            planeY,
+                            new Color(0.1f, 0.75f, 1f, 0.55f),
+                            StageGridHatchDirection.BackSlash);
                     }
 
                     if (ShowDeposit && cell.DepositRegionId != 0u)
                     {
-                        Gizmos.color = new Color(1f, 0.7f, 0.1f, 0.2f);
-                        Gizmos.DrawCube(center + new Vector3(0f, OverlayThickness * 0.6f, 0f), cubeSize);
+                        DrawCellHatch(
+                            center,
+                            grid.CellSize,
+                            planeY,
+                            new Color(1f, 0.7f, 0.1f, 0.55f),
+                            StageGridHatchDirection.BackSlash);
                     }
                 }
             }
@@ -205,6 +217,32 @@ namespace SweepNDodge.DotsBullets
                 grid.OriginZ + ((y + 0.5f) * grid.CellSize));
         }
 
+        private void DrawCellHatch(Vector3 center, float cellSize, float planeY, Color color, StageGridHatchDirection direction)
+        {
+            Gizmos.color = color;
+            float extent = math.max(0.01f, (cellSize * 0.5f) - HatchInset);
+            int lineCount = math.max(1, HatchLineCount);
+            float step = (extent * 2f) / lineCount;
+            float y = planeY + GridLineYOffset;
+
+            for (int i = 0; i < lineCount; i++)
+            {
+                float offset = -extent + (i + 0.5f) * step;
+                if (direction == StageGridHatchDirection.ForwardSlash)
+                {
+                    Gizmos.DrawLine(
+                        new Vector3(center.x + extent, y, center.z - offset),
+                        new Vector3(center.x - offset, y, center.z + extent));
+                }
+                else
+                {
+                    Gizmos.DrawLine(
+                        new Vector3(center.x - extent, y, center.z - offset),
+                        new Vector3(center.x + offset, y, center.z + extent));
+                }
+            }
+        }
+
         private static Color ResolveMovementColor(StageCellMovementFlags flags)
         {
             bool blockPlayer = (flags & StageCellMovementFlags.BlockPlayer) != 0;
@@ -217,20 +255,37 @@ namespace SweepNDodge.DotsBullets
                 return new Color(0.9f, 0.1f, 0.85f, 0.22f);
             return Color.clear;
         }
+
+        private enum StageGridHatchDirection : byte
+        {
+            ForwardSlash = 0,
+            BackSlash = 1,
+        }
     }
 
     public static class StageRuntimeGridDebugDrawerBootstrap
     {
+        private static StageRuntimeGridDebugDrawer _runtimeInstance;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void EnsureRuntimeDrawer()
         {
-            if (Object.FindFirstObjectByType<StageRuntimeGridDebugDrawer>() != null)
+            if (_runtimeInstance != null)
+                return;
+
+            var existing = Object.FindFirstObjectByType<StageRuntimeGridDebugDrawer>(FindObjectsInactive.Include);
+            if (existing != null)
+            {
+                _runtimeInstance = existing;
+                return;
+            }
+
+            if (_runtimeInstance != null)
                 return;
 
             var go = new GameObject("[Runtime] StageGridDebugDrawer");
-            go.hideFlags = HideFlags.DontSave;
             Object.DontDestroyOnLoad(go);
-            go.AddComponent<StageRuntimeGridDebugDrawer>();
+            _runtimeInstance = go.AddComponent<StageRuntimeGridDebugDrawer>();
         }
     }
 }

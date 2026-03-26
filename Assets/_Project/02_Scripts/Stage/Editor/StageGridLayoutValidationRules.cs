@@ -26,12 +26,6 @@ namespace SweepNDodge.DotsBullets.Editor
             if (layout == null || issues == null)
                 return;
 
-            if (!UsesGridSchema(layout))
-            {
-                StageLayoutValidationRules.ValidateLayout(layout, locationPrefix, issues);
-                return;
-            }
-
             string stageLocation = BuildStageLocation(locationPrefix, layout.StageId);
             if (layout.StageId <= 0)
             {
@@ -369,8 +363,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 {
                     if (entry.LinkKind == StagePresentationLinkKind.None || entry.LinkedStableId == 0)
                         issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL013", location, "LinkedToParent presentation requires LinkKind and LinkedStableId."));
-                    if (entry.LinkKind == StagePresentationLinkKind.Obstacle)
-                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STG014", location, "Obstacle-linked presentation is not supported for grid schema layouts."));
+                    if (!IsSupportedLinkedParentKind(entry.LinkKind))
+                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STG014", location, $"Unsupported linked presentation kind for grid schema layouts. linkKind={(int)entry.LinkKind}"));
                 }
                 else if (entry.LinkKind != StagePresentationLinkKind.None || entry.LinkedStableId != 0)
                 {
@@ -421,6 +415,12 @@ namespace SweepNDodge.DotsBullets.Editor
         private static string BuildStageLocation(string prefix, int stageId)
         {
             return $"{prefix}::StageLayout(StageId={stageId})";
+        }
+
+        private static bool IsSupportedLinkedParentKind(StagePresentationLinkKind linkKind)
+        {
+            return linkKind == StagePresentationLinkKind.Source
+                || linkKind == StagePresentationLinkKind.Deposit;
         }
     }
 }

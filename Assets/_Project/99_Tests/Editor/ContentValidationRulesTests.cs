@@ -51,7 +51,6 @@ namespace SweepNDodge.DotsBullets.Tests
         public void StageTopologyPrefabCatalog_WithMissingSourceTemplate_IsError()
         {
             var catalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
-            catalog.DepositTemplatePrefab = new GameObject("deposit_template");
 
             try
             {
@@ -73,13 +72,12 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
-                Object.DestroyImmediate(catalog.DepositTemplatePrefab);
                 Object.DestroyImmediate(catalog);
             }
         }
 
         [Test]
-        public void StageTopologyPrefabCatalog_WithMissingDepositAndObstacleTemplate_IsAllowed()
+        public void StageTopologyPrefabCatalog_WithOnlySourceTemplate_IsAllowed()
         {
             var catalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
             catalog.SourceTemplatePrefab = new GameObject("source_template");
@@ -98,8 +96,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV031"), Is.False);
-                Assert.That(issues.Any(i => i.Code == "CV032"), Is.False);
+                Assert.That(issues.Any(i => i.Code == "CV030"), Is.False);
             }
             finally
             {

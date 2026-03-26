@@ -14,24 +14,16 @@ namespace SweepNDodge.DotsBullets
             {
                 var entity = GetEntity(TransformUsageFlags.None);
                 Entity sourceTemplate = Entity.Null;
-                Entity depositTemplate = Entity.Null;
-                Entity obstacleTemplate = Entity.Null;
 
                 if (authoring.Catalog != null)
                 {
                     if (authoring.Catalog.SourceTemplatePrefab != null)
                         sourceTemplate = GetEntity(authoring.Catalog.SourceTemplatePrefab, TransformUsageFlags.Dynamic);
-                    if (authoring.Catalog.DepositTemplatePrefab != null)
-                        depositTemplate = GetEntity(authoring.Catalog.DepositTemplatePrefab, TransformUsageFlags.Dynamic);
-                    if (authoring.Catalog.ObstacleTemplatePrefab != null)
-                        obstacleTemplate = GetEntity(authoring.Catalog.ObstacleTemplatePrefab, TransformUsageFlags.Dynamic);
                 }
 
                 AddComponent(entity, new StageTopologyPrefabCatalogComponent
                 {
                     SourceTemplate = sourceTemplate,
-                    DepositTemplate = depositTemplate,
-                    ObstacleTemplate = obstacleTemplate,
                 });
             }
         }

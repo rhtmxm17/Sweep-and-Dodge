@@ -104,9 +104,6 @@ namespace SweepNDodge.DotsBullets.Editor
             stageNode.TargetLayout.SourceRegions = layout.SourceRegions;
             stageNode.TargetLayout.DepositRegions = layout.DepositRegions;
             stageNode.TargetLayout.Presentations = layout.Presentations;
-            stageNode.TargetLayout.Sources = Array.Empty<StageSourceLayoutData>();
-            stageNode.TargetLayout.Deposits = Array.Empty<StageDepositLayoutData>();
-            stageNode.TargetLayout.Obstacles = Array.Empty<StageObstacleLayoutData>();
             EditorUtility.SetDirty(stageNode.TargetLayout);
             UnityEngine.Object.DestroyImmediate(layout);
             if (saveAssets)

@@ -254,10 +254,12 @@ namespace SweepNDodge.DotsBullets.Tests
         private static StageLayoutSO CreateLayout(List<ScriptableObject> created, int stageId)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.SchemaVersion = 2;
             layout.StageId = stageId;
-            layout.Sources = Array.Empty<StageSourceLayoutData>();
-            layout.Deposits = Array.Empty<StageDepositLayoutData>();
-            layout.Obstacles = Array.Empty<StageObstacleLayoutData>();
+            layout.Grid = new StageGridSpec { Width = 1, Height = 1, CellSize = 1f, Origin = Vector3.zero };
+            layout.Cells = new[] { new StageCellLayoutData() };
+            layout.SourceRegions = Array.Empty<StageSourceRegionLayoutData>();
+            layout.DepositRegions = Array.Empty<StageDepositRegionLayoutData>();
             layout.Presentations = Array.Empty<StagePresentationLayoutData>();
             created.Add(layout);
             return layout;

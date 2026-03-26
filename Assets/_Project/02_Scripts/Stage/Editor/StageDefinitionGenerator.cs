@@ -204,26 +204,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 return ids;
             }
 
-            if (stageNode.TargetLayout != null && stageNode.TargetLayout.Sources != null)
-            {
-                for (int i = 0; i < stageNode.TargetLayout.Sources.Length; i++)
-                {
-                    uint stableId = Math.Max(1u, stageNode.TargetLayout.Sources[i].StableId);
-                    if (unique.Add(stableId))
-                        ids.Add(stableId);
-                }
-
-                return ids;
-            }
-
-            var sourceMarkers = stageNode.GetComponentsInChildren<StageSourceMarker>(includeInactive: true);
-            for (int i = 0; i < sourceMarkers.Length; i++)
-            {
-                uint stableId = Math.Max(1u, sourceMarkers[i].StableId);
-                if (unique.Add(stableId))
-                    ids.Add(stableId);
-            }
-
             ids.Sort();
             return ids;
         }

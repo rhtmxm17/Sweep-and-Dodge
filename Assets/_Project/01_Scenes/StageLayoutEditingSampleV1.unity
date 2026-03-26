@@ -160,7 +160,7 @@ TilemapRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 198774019}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -903,10 +903,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 251002766}
-  - component: {fileID: 251002767}
   - component: {fileID: 251002768}
   m_Layer: 0
-  m_Name: Obstacle_3004
+  m_Name: DepositAnchor_2001
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -927,25 +926,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 691910919}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &251002767
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 251002765}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fef95454aaf98174bbe4dd7d8d8d3ff6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageObstacleMarker
-  StableId: 3004
-  Active: 1
-  Shape: 1
-  Radius: 1
-  Size: {x: 3.5, y: 2}
-  CollisionMask: 255
-  DrawGizmo: 1
 --- !u!114 &251002768
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1006,7 +986,7 @@ TilemapRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 406118956}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -1092,108 +1072,6 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
---- !u!1 &454641822
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 454641823}
-  - component: {fileID: 454641824}
-  m_Layer: 0
-  m_Name: Obstacle_3002
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &454641823
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 454641822}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 6, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 691910719}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &454641824
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 454641822}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fef95454aaf98174bbe4dd7d8d8d3ff6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageObstacleMarker
-  StableId: 3002
-  Active: 1
-  Shape: 1
-  Radius: 1
-  Size: {x: 2, y: 4}
-  CollisionMask: 1
-  DrawGizmo: 1
---- !u!1 &607284421
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 607284422}
-  - component: {fileID: 607284423}
-  m_Layer: 0
-  m_Name: Obstacle_3001
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &607284422
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 607284421}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 691910719}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &607284423
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 607284421}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fef95454aaf98174bbe4dd7d8d8d3ff6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageObstacleMarker
-  StableId: 3001
-  Active: 1
-  Shape: 1
-  Radius: 1
-  Size: {x: 8, y: 2}
-  CollisionMask: 255
-  DrawGizmo: 1
 --- !u!1 &691910718
 GameObject:
   m_ObjectHideFlags: 0
@@ -1227,8 +1105,6 @@ Transform:
   m_Children:
   - {fileID: 1042918358}
   - {fileID: 694074688}
-  - {fileID: 607284422}
-  - {fileID: 454641823}
   - {fileID: 1926940416}
   - {fileID: 1022781066}
   m_Father: {fileID: 1200092716}
@@ -1313,7 +1189,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1042919358}
-  - {fileID: 694074788}
   - {fileID: 251002766}
   - {fileID: 827958558}
   m_Father: {fileID: 1200092716}
@@ -1460,7 +1335,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 694074688}
-  - component: {fileID: 694074689}
   - component: {fileID: 694074690}
   m_Layer: 0
   m_Name: Deposit_2001
@@ -1484,24 +1358,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 691910719}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &694074689
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 694074687}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 213b3ddf546064647b37aee48f8965d2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDepositMarker
-  StableId: 2001
-  Active: 1
-  Shape: 0
-  Radius: 5
-  Size: {x: 2, y: 2}
-  DrawGizmo: 1
 --- !u!114 &694074690
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1521,56 +1377,6 @@ MonoBehaviour:
   AnchorCell: {x: 6, y: 11}
   AnchorOffset: {x: 0, y: 0}
   DrawGizmo: 1
---- !u!1 &694074787
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 694074788}
-  - component: {fileID: 694074789}
-  m_Layer: 0
-  m_Name: Deposit_2001
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &694074788
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 694074787}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 6.5, y: 0, z: 0.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 691910919}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &694074789
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 694074787}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 213b3ddf546064647b37aee48f8965d2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDepositMarker
-  StableId: 2001
-  Active: 1
-  Shape: 1
-  Radius: 4
-  Size: {x: 8, y: 8}
-  DrawGizmo: 1
 --- !u!1 &694074887
 GameObject:
   m_ObjectHideFlags: 0
@@ -1580,7 +1386,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 694074888}
-  - component: {fileID: 694074889}
   - component: {fileID: 694074890}
   m_Layer: 0
   m_Name: Deposit_2001
@@ -1604,24 +1409,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 691911119}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &694074889
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 694074887}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 213b3ddf546064647b37aee48f8965d2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageDepositMarker
-  StableId: 2001
-  Active: 1
-  Shape: 0
-  Radius: 3.5
-  Size: {x: 2, y: 2}
-  DrawGizmo: 1
 --- !u!114 &694074890
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1742,7 +1529,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1042918358}
-  - component: {fileID: 1042918359}
   - component: {fileID: 1042918360}
   m_Layer: 0
   m_Name: Source_1001
@@ -1766,24 +1552,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 691910719}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1042918359
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1042918357}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 58fd3787df5b0e8418bd73ed37885561, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageSourceMarker
-  StableId: 1001
-  Active: 1
-  Shape: 1
-  Radius: 8
-  Size: {x: 12, y: 8}
-  DrawGizmo: 1
 --- !u!114 &1042918360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1812,7 +1580,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1042919358}
-  - component: {fileID: 1042919359}
   - component: {fileID: 1042919360}
   m_Layer: 0
   m_Name: Source_1002
@@ -1837,24 +1604,6 @@ Transform:
   - {fileID: 1945980057}
   m_Father: {fileID: 691910919}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1042919359
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1042919357}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 58fd3787df5b0e8418bd73ed37885561, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageSourceMarker
-  StableId: 1002
-  Active: 1
-  Shape: 0
-  Radius: 6
-  Size: {x: 12, y: 8}
-  DrawGizmo: 1
 --- !u!114 &1042919360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1883,7 +1632,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1042920358}
-  - component: {fileID: 1042920359}
   - component: {fileID: 1042920360}
   m_Layer: 0
   m_Name: Source_1003
@@ -1907,24 +1655,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 691911119}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1042920359
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1042920357}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 58fd3787df5b0e8418bd73ed37885561, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageSourceMarker
-  StableId: 1003
-  Active: 1
-  Shape: 0
-  Radius: 8
-  Size: {x: 12, y: 8}
-  DrawGizmo: 1
 --- !u!114 &1042920360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2035,7 +1765,7 @@ TilemapRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1410123789}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -3674,7 +3404,7 @@ TilemapRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1510331692}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -4188,7 +3918,7 @@ TilemapRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1865102830}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -4653,7 +4383,7 @@ TilemapRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1878034355}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1

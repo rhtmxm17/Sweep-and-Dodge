@@ -356,16 +356,6 @@ namespace SweepNDodge.DotsBullets.Editor
                         layoutSet.Add(stableId);
                 }
             }
-            else
-            {
-                var sources = layout.Sources ?? Array.Empty<StageSourceLayoutData>();
-                for (int i = 0; i < sources.Length; i++)
-                {
-                    uint stableId = sources[i].StableId;
-                    if (sources[i].Active && stableId > 0)
-                        layoutSet.Add(stableId);
-                }
-            }
 
             foreach (uint stableId in definitionSet)
             {

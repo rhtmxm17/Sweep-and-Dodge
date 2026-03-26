@@ -34,11 +34,11 @@
 - 첫 단계에서 모든 legacy shape 기반 runtime system을 한 번에 제거하는 리라이트
 
 ## 2. 현재 상태(코드 기준)
-- 현재 `StageLayoutSO`는 `Sources / Deposits / Obstacles / Presentations` 배열을 직접 가진다.
-- editor pipeline은 scene marker(`StageSourceMarker`, `StageDepositMarker`, `StageObstacleMarker`)를 수집해 `StageLayoutSO`를 생성한다.
-- runtime apply는 layout 배열을 stableId map으로 바꿔 `Source / Deposit / Obstacle` topology entity를 reconcile한다.
-- 이 구조는 자유형 타일 지형/복합 경계를 편집하기 어렵고, 타일맵 기반 stage design과 runtime query 모델이 서로 다른 표현을 사용한다.
-- shape 중심 계약은 `Source` sampling, `Deposit` overlap, `Obstacle` block을 각각 다른 authoring 편의성과 validation 규칙으로 밀어내고 있다.
+- 현재 `StageLayoutSO`는 `Grid / Cells / SourceRegions / DepositRegions / Presentations`만을 authoritative layout schema로 가진다.
+- legacy editor pipeline의 scene marker fallback(`StageSourceMarker`, `StageDepositMarker`, `StageObstacleMarker`)는 제거됐고, sample/editor authoring은 `StageRegionAnchorMarker` 기준으로만 동작한다.
+- runtime apply는 layout의 grid/region 데이터를 stable id map으로 바꿔 `Source` aggregate runtime entity와 `StageRuntimeGrid` cache를 reconcile한다.
+- `Deposit` gameplay와 `Movement/Obstacle` gameplay는 standalone topology entity가 아니라 grid cache를 직접 읽는다.
+- 남아 있는 후속 범위는 terrain visual polish와 외부 importer 같은 authoring/content 확장이지, shape-centric runtime 계약 복구가 아니다.
 
 ## 3. 채택 구조 요약
 - `StageCatalogSO`의 dual catalog 구조는 유지한다.
@@ -106,8 +106,8 @@
   - `StageDepositRegionLayoutData[] DepositRegions`
   - `StagePresentationLayoutData[] Presentations`
   - 구현 전환기 메모:
-    - P2 시점에는 runtime/generator compile 호환을 위해 legacy `Sources / Deposits / Obstacles` 필드를 hidden compatibility bridge로 임시 유지할 수 있다.
-    - validation/catalog cross-mapping의 authoritative schema는 grid 쪽을 우선한다.
+    - grid schema만 유지한다.
+    - validation/catalog cross-mapping의 authoritative schema는 grid 쪽만 사용한다.
 
 ### 6.2 Grid 계약
 - `StageGridSpec`
@@ -198,6 +198,9 @@
   - obstacle tile/mesh 생성은 `PresentationKey` linked topology 규칙에 편입하지 않는다.
 - `StagePresentationLayoutData`는 `Source / Deposit` region stable id 또는 standalone anchor를 참조할 수 있다.
 - obstacle linked presentation은 신규 기본 경로에서 지원하지 않는다.
+  - P6.next-B 기준으로 editor/sample scene의 obstacle-linked authoring 경로와 `StageObstacleMarker`는 제거됐다.
+  - `StagePresentationLinkKind`는 `None / Source / Deposit`만 지원한다.
+  - legacy serialized numeric link kind 값은 layout validation에서 unsupported error로 막는다.
   - 필요 시 explicit presentation anchor marker 또는 tilemap visual owner 경로를 사용한다.
 
 ## 7. 에디터 파이프라인
@@ -232,13 +235,13 @@
   - local paint cell `(0,0)`은 실제 tilemap cell `(BoundsMinCell.x, BoundsMinCell.y)`에 대응한다.
   - 음수 tile 좌표를 허용한다.
   - generator는 `BoundsMinCell + local cell`로 movement tile을 읽고, runtime layout는 normalized local grid로 저장한다.
-- `StageRegionAnchorMarker`
-  - `RegionKind`, `StableId`, `AnchorCell`, `AnchorOffset`를 가진다.
+  - `StageRegionAnchorMarker`
+  - `RegionKind`, `RegionSlotIndex`, `StableId`, `AnchorCell`, `AnchorOffset`를 가진다.
   - source/deposit 대표점의 authoring SSOT다.
 - `StageGridLayoutGenerator`
   - `StageGridAuthoring + StageRegionAnchorMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
   - generator는 source/deposit region stable id를 항상 `RegionTilemap`에서만 resolve한다.
-  - generator가 직접 생성하는 layout asset에서는 hidden legacy `Sources / Deposits / Obstacles`를 비워 둔다.
+  - sample authoring scene에는 더 이상 `StageObstacleMarker`가 남아 있지 않으며, source/deposit anchor host만 dedicated GO로 유지한다.
 
 ### 7.3 Paint/Validation 규칙
 - paint 시 `StageRegionTile.RegionSlotIndex`를 명시적으로 선택하지 않으면 region cell을 칠할 수 없게 한다.
@@ -271,7 +274,6 @@
 3. `StageGridLayoutGenerator`로 `StageLayoutSO` grid 데이터를 갱신한다.
 4. `StageCatalogComposer`로 `StageCatalogSO`를 갱신한다.
 5. 생성 asset을 `StageGridLayoutValidationRules`와 catalog validation으로 검증한다.
-6. runtime migration 전까지 운영 샘플 asset은 필요 시 legacy compatibility bridge를 수동 유지한다.
 - 데모 샘플 운영 규칙:
   - `StageLayoutEditingSampleV1` 씬 상태를 authoring SSOT로 본다.
   - `sl_demo_*` layout asset은 임의 수치나 이전 샘플 메모보다, 해당 씬과 region paint asset 상태에 맞춰 다시 생성/동기화해야 한다.
@@ -294,7 +296,7 @@
 - source spawn/pollution은 `region bounds local grid + valid cell mask`를 authoritative geometry로 사용한다.
 - `UniformField`는 valid local cell 균등 샘플 + cell 내부 jitter를 사용한다.
 - `PollutionTopK`는 valid local cell 집합 내부에서만 weight sampling을 수행한다.
-- `layout.Sources`와 `Shape2DComponent`는 source runtime geometry authority로 읽지 않는다.
+- `Shape2DComponent`는 source runtime geometry authority로 읽지 않는다.
 
 ### 8.3 Lifecycle
 - lifecycle 기본 정책은 `disable-to-pool`을 유지한다.
@@ -335,8 +337,10 @@
   - `Source / Deposit` authoring은 단일 `RegionTilemap`에서 `StageRegionTile.RegionKind + RegionSlotIndex`와 `StageGridAuthoring`의 `slot -> stable id` mapping을 기준으로 한다.
 - P6.next-A. unified RegionTilemap authoring cleanup
   - split tilemap과 `StageRegionPaintAsset` fallback을 제거하고, repo-tracked authoring은 `MovementTilemap + RegionTilemap + mapping table + anchor marker`만 사용한다.
-- P6.next. legacy path 정리
-  - obstacle marker / obstacle-linked presentation / obstacle runtime template 등 남은 legacy path 제거는 별도 후속 작업으로 분리한다.
+- [x] P6.next-B. obstacle-linked presentation 제거
+  - presentation/editor/sample scene에서 obstacle-linked authoring 경로와 `StageObstacleMarker`를 제거했다.
+- [x] P6.next-C. runtime/template legacy path 정리
+  - hidden compatibility field, legacy marker fallback, obstacle/deposit topology template를 제거하고 source-only runtime/template 계약으로 정리했다.
 
 ## 10. 검증 계획 / 합격 기준
 - 공통

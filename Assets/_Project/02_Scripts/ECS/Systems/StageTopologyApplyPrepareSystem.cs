@@ -449,10 +449,6 @@ namespace SweepNDodge.DotsBullets
             EnsureOwnedMetadata(em, entity, StageTopologyKind.Source);
             if (!em.HasComponent<StageTopologySourceTag>(entity))
                 em.AddComponent<StageTopologySourceTag>(entity);
-            if (em.HasComponent<StageTopologyDepositTag>(entity))
-                em.RemoveComponent<StageTopologyDepositTag>(entity);
-            if (em.HasComponent<StageTopologyObstacleTag>(entity))
-                em.RemoveComponent<StageTopologyObstacleTag>(entity);
             if (!em.HasComponent<BulletFieldAreaComponent>(entity))
                 em.AddComponent<BulletFieldAreaComponent>(entity);
             if (!em.HasComponent<Shape2DComponent>(entity))

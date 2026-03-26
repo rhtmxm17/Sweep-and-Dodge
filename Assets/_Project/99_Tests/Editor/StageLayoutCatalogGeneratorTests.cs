@@ -10,7 +10,7 @@ namespace SweepNDodge.DotsBullets.Tests
     public class StageLayoutCatalogGeneratorTests
     {
         [Test]
-        public void GenerateLayoutsForRoot_BuildsDenseGridAndClearsLegacyArrays()
+        public void GenerateLayoutsForRoot_BuildsDenseGrid()
         {
             var setup = CreateStageSetup();
             StageRegionTile sourceTile = null;
@@ -35,9 +35,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(setup.Layout.Cells[3].DepositRegionId, Is.EqualTo(2001u));
                 Assert.That(setup.Layout.SourceRegions.Single().StableId, Is.EqualTo(1001u));
                 Assert.That(setup.Layout.DepositRegions.Single().StableId, Is.EqualTo(2001u));
-                Assert.That(setup.Layout.Sources, Is.Empty);
-                Assert.That(setup.Layout.Deposits, Is.Empty);
-                Assert.That(setup.Layout.Obstacles, Is.Empty);
             }
             finally
             {

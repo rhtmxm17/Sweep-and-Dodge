@@ -12,9 +12,5 @@ namespace SweepNDodge.DotsBullets
         public StageSourceRegionLayoutData[] SourceRegions;
         public StageDepositRegionLayoutData[] DepositRegions;
         public StagePresentationLayoutData[] Presentations;
-
-        [HideInInspector] public StageSourceLayoutData[] Sources;
-        [HideInInspector] public StageDepositLayoutData[] Deposits;
-        [HideInInspector] public StageObstacleLayoutData[] Obstacles;
     }
 }
