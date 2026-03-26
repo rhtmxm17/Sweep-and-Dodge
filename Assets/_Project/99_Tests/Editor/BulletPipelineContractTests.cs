@@ -108,8 +108,6 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             AssertUpdateBefore(typeof(PlayerCleanupActionSelectSystem), typeof(BulletVacuumRequestSystem));
             AssertUpdateAfter(typeof(SourcePollutionUpdateSystem), typeof(BulletVacuumRequestSystem));
-            AssertUpdateAfter(typeof(BulletObstacleHitRequestSystem), typeof(BulletVacuumRequestSystem));
-            AssertUpdateBefore(typeof(BulletObstacleHitRequestSystem), typeof(PlayerHazardCollisionRequestSystem));
             AssertUpdateBefore(typeof(SourcePollutionUpdateSystem), typeof(PlayerHazardCollisionRequestSystem));
             AssertUpdateAfter(typeof(PlayerHazardCollisionRequestSystem), typeof(BulletVacuumRequestSystem));
             AssertUpdateAfter(typeof(PlayerCarryBinDepositRequestSystem), typeof(PlayerHazardCollisionRequestSystem));
@@ -131,6 +129,12 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
             AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateAfter(typeof(SpawnBacklogWarningSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
+        }
+
+        [Test]
+        public void BulletBlock_OwnerRemainsInSimulationGroup()
+        {
+            AssertUpdateInGroup(typeof(BulletSimulationSystem), typeof(BulletSimulationGroup));
         }
 
         [Test]

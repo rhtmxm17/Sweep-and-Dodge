@@ -166,7 +166,7 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(e, new PlayerCarryBinDepositContextComponent
                 {
-                    DepositEntity = Entity.Null
+                    DepositRegionId = 0u
                 });
 
                 AddComponent<PlayerHazardHitRequestTag>(e);

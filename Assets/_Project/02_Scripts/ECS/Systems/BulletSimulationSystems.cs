@@ -8,7 +8,7 @@ using Unity.Transforms;
 namespace SweepNDodge.DotsBullets
 {
     // ----------------------------------------------------------------------
-    // Simulation: Move/Lifetime + SpatialHash Build (Owner)
+    // Simulation: Move/Lifetime + BulletBlock + SpatialHash Build (Owner)
     // ----------------------------------------------------------------------
 
     [BurstCompile]
@@ -34,12 +34,44 @@ namespace SweepNDodge.DotsBullets
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             var requestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
             requestLookup.Update(ref state);
+            var bulletRadiusLookup = SystemAPI.GetComponentLookup<BulletRadiusComponent>(isReadOnly: true);
+            bulletRadiusLookup.Update(ref state);
+            var runtimeGridCellLookup = SystemAPI.GetBufferLookup<StageRuntimeGridCellBufferElement>(isReadOnly: true);
+            runtimeGridCellLookup.Update(ref state);
+            bool hasTopologyState = SystemAPI.TryGetSingleton<StageTopologyStateComponent>(out var topologyState);
+            bool hasStageState = SystemAPI.TryGetSingleton<RunDirectorStageStateComponent>(out var stageState);
+            bool allowBulletBlock = !hasTopologyState
+                || (hasStageState && StageTopologyRuntimeGateUtility.ShouldRunGameplay(in topologyState, in stageState));
+            StageRuntimeGridComponent runtimeGrid = default;
+            Entity runtimeGridEntity = Entity.Null;
+            bool shouldEvaluateBulletBlock = allowBulletBlock
+                && SystemAPI.TryGetSingleton<StageRuntimeGridComponent>(out runtimeGrid)
+                && StageRuntimeGridUtility.IsReady(in runtimeGrid);
+            if (shouldEvaluateBulletBlock)
+            {
+                runtimeGridEntity = SystemAPI.GetSingletonEntity<StageRuntimeGridComponent>();
+                if (!state.EntityManager.HasBuffer<StageRuntimeGridCellBufferElement>(runtimeGridEntity))
+                {
+                    shouldEvaluateBulletBlock = false;
+                }
+                else
+                {
+                    var runtimeGridCells = state.EntityManager
+                        .GetBuffer<StageRuntimeGridCellBufferElement>(runtimeGridEntity, isReadOnly: true);
+                    shouldEvaluateBulletBlock = runtimeGridCells.Length == (runtimeGrid.Width * runtimeGrid.Height);
+                }
+            }
 
-            // 1) Move + Lifetime (활성 탄만). 만료 시 디스폰 요청 태그 enable
+            // 1) Move + Lifetime + BulletBlock (활성 탄만). 만료/차단 시 디스폰 요청 태그 enable
             state.Dependency = new BulletMoveAndLifetimeJob
             {
                 DeltaTime = dt,
-                RequestLookup = requestLookup
+                EvaluateBulletBlock = shouldEvaluateBulletBlock,
+                RuntimeGrid = runtimeGrid,
+                RuntimeGridEntity = runtimeGridEntity,
+                RuntimeGridCellLookup = runtimeGridCellLookup,
+                BulletRadiusLookup = bulletRadiusLookup,
+                RequestLookup = requestLookup,
             }.ScheduleParallel(state.Dependency);
 
             // 2) SpatialHash Build
@@ -78,6 +110,11 @@ namespace SweepNDodge.DotsBullets
         private partial struct BulletMoveAndLifetimeJob : IJobEntity
         {
             public float DeltaTime;
+            public bool EvaluateBulletBlock;
+            public StageRuntimeGridComponent RuntimeGrid;
+            public Entity RuntimeGridEntity;
+            [ReadOnly] public BufferLookup<StageRuntimeGridCellBufferElement> RuntimeGridCellLookup;
+            [ReadOnly] public ComponentLookup<BulletRadiusComponent> BulletRadiusLookup;
             // 주의: Enableable 토글을 위해 Lookup을 병렬 Job에서 사용.
             // 동일 엔티티에만 접근하므로 안전하지만, 교차 엔티티 write가 섞이면 레이스 위험이 있음.
             [NativeDisableParallelForRestriction] public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
@@ -89,6 +126,7 @@ namespace SweepNDodge.DotsBullets
                 in BulletVelocityComponent vel,
                 in BulletActiveTag _)
             {
+                float3 previousPosition = tx.Position;
                 tx.Position += new float3(vel.Value.x, 0f, vel.Value.y) * DeltaTime;
 
                 life.Value -= DeltaTime;
@@ -96,7 +134,26 @@ namespace SweepNDodge.DotsBullets
                 {
                     if (RequestLookup.HasComponent(e))
                         RequestLookup.SetComponentEnabled(e, true);
+                    return;
                 }
+
+                if (!EvaluateBulletBlock || !RequestLookup.HasComponent(e) || RequestLookup.IsComponentEnabled(e))
+                    return;
+
+                float bulletRadius = 0f;
+                if (BulletRadiusLookup.HasComponent(e))
+                    bulletRadius = math.max(0f, BulletRadiusLookup[e].Value);
+
+                float2 prevXZ = new float2(previousPosition.x, previousPosition.z);
+                float2 nextXZ = new float2(tx.Position.x, tx.Position.z);
+                if (!RuntimeGridCellLookup.HasBuffer(RuntimeGridEntity))
+                    return;
+
+                var runtimeGridCells = RuntimeGridCellLookup[RuntimeGridEntity];
+                if (!StageRuntimeBlockQuery.HitsBulletFullCell(prevXZ, nextXZ, bulletRadius, in RuntimeGrid, runtimeGridCells))
+                    return;
+
+                RequestLookup.SetComponentEnabled(e, true);
             }
         }
 

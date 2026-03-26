@@ -50,7 +50,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var input = new ContentValidationInput(definitions, waveClips, topologyPrefabCatalogs, visuals, sources, bullets);
             var issues = ContentValidationRules.Validate(input);
-            StageLayoutValidationRules.ValidateLayoutRecords(stageLayouts, issues);
+            StageGridLayoutValidationRules.ValidateLayoutRecords(stageLayouts, issues);
             StageCatalogValidationRules.ValidateCatalogRecords(stageCatalogs, issues);
             StagePresentationCatalogValidationRules.ValidateCatalogRecords(stagePresentationCatalogs, stageLayouts, issues);
             InWorldDialogueCatalogValidationRules.ValidateCatalogRecords(inWorldDialogueCatalogs, inWorldDialogueSpeakerCatalogs, issues);

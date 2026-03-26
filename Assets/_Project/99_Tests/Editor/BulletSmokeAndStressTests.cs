@@ -622,7 +622,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 10,
                     sourceEntity: captureSource);
-                CreateDepositPoint(em, float3.zero, 0.5f);
+                CreateDepositRegionGrid(em, depositRegionId: 2001u);
 
                 RequestVacuum(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
@@ -1571,6 +1571,89 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnExecution_PollutionFieldSampling_UsesPollutionGridOriginInsteadOfSourceAnchor()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPollutionGridOriginWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(4f, 2f));
+
+                em.SetComponentData(source, new SourcePollutionGridComponent
+                {
+                    CellSize = 1f,
+                    InvCellSize = 1f,
+                    HalfExtents = new float2(2f, 1f),
+                    OriginX = -4f,
+                    OriginZ = -1f,
+                    Cols = 4,
+                    Rows = 2,
+                });
+
+                var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(source);
+                pollutionCells.Clear();
+                for (int i = 0; i < 8; i++)
+                {
+                    pollutionCells.Add(new SourcePollutionCellBuffer
+                    {
+                        Value = 1f,
+                        IsValid = 0,
+                    });
+                }
+
+                pollutionCells[0] = new SourcePollutionCellBuffer
+                {
+                    Value = 1f,
+                    IsValid = 1,
+                };
+
+                var validCells = em.GetBuffer<SourcePollutionValidCellIndexBuffer>(source);
+                validCells.Clear();
+                validCells.Add(new SourcePollutionValidCellIndexBuffer { Value = 0 });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8003,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.PollutionTopK,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    SpawnSampleBudget = 1,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
+                    BaseAngleDeg = 0f,
+                    Count = 1,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(1));
+
+                float3 spawned = snapshots[0].Position;
+                Assert.That(spawned.x, Is.GreaterThanOrEqualTo(-4f).And.LessThan(-3f));
+                Assert.That(spawned.z, Is.GreaterThanOrEqualTo(-1f).And.LessThan(0f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnExecution_TimedLineEven_KeepsInitialCenterWhenSourceMoves()
         {
             try
@@ -2454,6 +2537,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     DensityScale = 0.4f,
                     Version = 1u,
                 });
+                CreateSourceRegionGrid(em, em.GetComponentData<SourceStableIdComponent>(source).Value);
 
                 SetPlayerPosition(em, float3.zero);
                 world.SetTime(new TimeData(0.1d, 0.1f));
@@ -2462,6 +2546,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var directorAfterEnter = em.GetComponentData<SourceRunDirectorStateComponent>(source);
                 Assert.That(directorAfterEnter.State, Is.EqualTo(RunDirectorSourceStateId.Pressure), "Player entering source area should switch to Pressure immediately");
 
+                CreateSourceRegionGrid(em, 0u);
                 SetPlayerPosition(em, new float3(30f, 0f, 0f));
                 world.SetTime(new TimeData(0.3d, 0.2f));
                 simGroup.Update();
@@ -3575,6 +3660,7 @@ namespace SweepNDodge.DotsBullets.Tests
             DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
             simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
             Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+            EnsureDefaultStageRuntimeGrid(world.EntityManager);
             return world;
         }
 
@@ -3589,7 +3675,38 @@ namespace SweepNDodge.DotsBullets.Tests
             DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
             simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
             Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+            EnsureDefaultStageRuntimeGrid(world.EntityManager);
             return world;
+        }
+
+        private static void EnsureDefaultStageRuntimeGrid(EntityManager em)
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>());
+            var gridEntity = query.IsEmptyIgnoreFilter
+                ? em.CreateEntity(typeof(StageRuntimeGridComponent))
+                : query.GetSingletonEntity();
+
+            em.SetComponentData(gridEntity, new StageRuntimeGridComponent
+            {
+                StageId = 1,
+                Width = 1,
+                Height = 1,
+                CellSize = 1f,
+                OriginX = -0.5f,
+                OriginZ = -0.5f,
+                Ready = 1,
+            });
+
+            var cells = em.HasBuffer<StageRuntimeGridCellBufferElement>(gridEntity)
+                ? em.GetBuffer<StageRuntimeGridCellBufferElement>(gridEntity)
+                : em.AddBuffer<StageRuntimeGridCellBufferElement>(gridEntity);
+            cells.Clear();
+            cells.Add(new StageRuntimeGridCellBufferElement
+            {
+                MovementFlags = StageCellMovementFlags.None,
+                SourceRegionId = 0u,
+                DepositRegionId = 0u,
+            });
         }
 
         private static void SetFixedTickEnabled(EntityManager em, bool enabled)
@@ -3743,7 +3860,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
             em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
             {
-                DepositEntity = Entity.Null,
+                DepositRegionId = 0u,
             });
             em.SetComponentEnabled<PlayerHazardHitRequestTag>(player, false);
             em.SetComponentData(player, new PlayerHazardHitContextComponent
@@ -4134,6 +4251,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(BulletFieldAreaComponent),
                 typeof(Shape2DComponent),
                 typeof(SourceShapeDerivedComponent),
+                typeof(SourcePollutionConfigComponent),
+                typeof(SourcePollutionGridComponent),
                 typeof(LocalTransform));
 
             em.SetComponentData(source, new SourceSpawnComponent
@@ -4146,10 +4265,45 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(source, new SourceSpawnRuntimeComponent { SpawnSequence = 1 });
             SetSourceAnchor(em, source, float3.zero);
             SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(20f, 20f));
+            em.SetComponentData(source, new SourcePollutionConfigComponent
+            {
+                MinValue = 0f,
+                MaxValue = 1f,
+                RegenPerSec = 0.1f,
+                DropPerCollect = 0.1f,
+                TopKSampleCount = 4,
+            });
+            em.SetComponentData(source, new SourcePollutionGridComponent
+            {
+                CellSize = 1f,
+                InvCellSize = 1f,
+                HalfExtents = new float2(10f, 10f),
+                OriginX = -10f,
+                OriginZ = -10f,
+                Cols = 1,
+                Rows = 1,
+            });
 
             em.AddBuffer<SourceSpawnRequestBuffer>(source);
             em.AddBuffer<SourceActiveBulletCountBuffer>(source);
+            em.AddBuffer<SourcePollutionCellBuffer>(source);
+            em.AddBuffer<SourcePollutionDropRequestBuffer>(source);
+            em.AddBuffer<SourcePollutionValidCellIndexBuffer>(source);
+            em.AddBuffer<SourceRegionCellIndexBuffer>(source);
             EnableV3Source(em, source, stableId: (uint)math.max(1, source.Index + 1), activeState: SourceStateId.Normal);
+            var pollutionGrid = em.GetComponentData<SourcePollutionGridComponent>(source);
+            var pollutionConfig = em.GetComponentData<SourcePollutionConfigComponent>(source);
+            var sourceShape = em.GetComponentData<Shape2DComponent>(source);
+            var sourceDerived = em.GetComponentData<SourceShapeDerivedComponent>(source);
+            SourceRuntimeApplyUtility.RebuildPollutionGrid(
+                in sourceShape,
+                in sourceDerived,
+                in pollutionConfig,
+                ref pollutionGrid,
+                em.GetBuffer<SourcePollutionCellBuffer>(source),
+                em.GetBuffer<SourcePollutionDropRequestBuffer>(source),
+                em.GetBuffer<SourcePollutionValidCellIndexBuffer>(source));
+            em.SetComponentData(source, pollutionGrid);
 
             const int defaultClipId = 1001;
             var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
@@ -4191,20 +4345,74 @@ namespace SweepNDodge.DotsBullets.Tests
             return source;
         }
 
-        private static Entity CreateDepositPoint(EntityManager em, float3 position, float radius)
+        private static Entity CreateDepositRegionGrid(EntityManager em, uint depositRegionId)
         {
-            var deposit = em.CreateEntity(
-                typeof(DepositPointComponent),
-                typeof(Shape2DComponent),
-                typeof(LocalTransform));
-            em.SetComponentData(deposit, new Shape2DComponent
+            Entity grid;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()))
             {
-                Kind = Shape2DKind.Circle,
-                Radius = math.max(0f, radius),
-                Size = float2.zero,
+                grid = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(StageRuntimeGridComponent))
+                    : query.GetSingletonEntity();
+            }
+
+            em.SetComponentData(grid, new StageRuntimeGridComponent
+            {
+                StageId = 1,
+                Width = 1,
+                Height = 1,
+                CellSize = 1f,
+                OriginX = -0.5f,
+                OriginZ = -0.5f,
+                Ready = 1,
             });
-            em.SetComponentData(deposit, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
-            return deposit;
+
+            var cells = em.HasBuffer<StageRuntimeGridCellBufferElement>(grid)
+                ? em.GetBuffer<StageRuntimeGridCellBufferElement>(grid)
+                : em.AddBuffer<StageRuntimeGridCellBufferElement>(grid);
+            cells.Clear();
+            cells.Add(new StageRuntimeGridCellBufferElement
+            {
+                MovementFlags = StageCellMovementFlags.None,
+                SourceRegionId = 0u,
+                DepositRegionId = depositRegionId,
+            });
+
+            return grid;
+        }
+
+        private static Entity CreateSourceRegionGrid(EntityManager em, uint sourceRegionId)
+        {
+            Entity grid;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()))
+            {
+                grid = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(StageRuntimeGridComponent))
+                    : query.GetSingletonEntity();
+            }
+
+            em.SetComponentData(grid, new StageRuntimeGridComponent
+            {
+                StageId = 1,
+                Width = 1,
+                Height = 1,
+                CellSize = 4f,
+                OriginX = -2f,
+                OriginZ = -2f,
+                Ready = 1,
+            });
+
+            var cells = em.HasBuffer<StageRuntimeGridCellBufferElement>(grid)
+                ? em.GetBuffer<StageRuntimeGridCellBufferElement>(grid)
+                : em.AddBuffer<StageRuntimeGridCellBufferElement>(grid);
+            cells.Clear();
+            cells.Add(new StageRuntimeGridCellBufferElement
+            {
+                MovementFlags = StageCellMovementFlags.None,
+                SourceRegionId = sourceRegionId,
+                DepositRegionId = 0u,
+            });
+
+            return grid;
         }
 
         private static void SetSourceShape(EntityManager em, Entity source, Shape2DKind kind, float radius, float2 size)
@@ -4217,11 +4425,34 @@ namespace SweepNDodge.DotsBullets.Tests
             };
 
             em.SetComponentData(source, shape);
-            em.SetComponentData(source, new SourceShapeDerivedComponent
+            var derived = new SourceShapeDerivedComponent
             {
                 ComputedArea = Shape2DUtility.ComputeArea(in shape),
                 HalfExtents = Shape2DUtility.ComputeHalfExtents(in shape),
-            });
+            };
+            em.SetComponentData(source, derived);
+
+            if (em.HasComponent<SourcePollutionConfigComponent>(source)
+                && em.HasComponent<SourcePollutionGridComponent>(source)
+                && em.HasBuffer<SourcePollutionCellBuffer>(source)
+                && em.HasBuffer<SourcePollutionDropRequestBuffer>(source)
+                && em.HasBuffer<SourcePollutionValidCellIndexBuffer>(source))
+            {
+                var pollutionConfig = em.GetComponentData<SourcePollutionConfigComponent>(source);
+                var pollutionGrid = em.GetComponentData<SourcePollutionGridComponent>(source);
+                SourceRuntimeApplyUtility.RebuildPollutionGrid(
+                    in shape,
+                    in derived,
+                    in pollutionConfig,
+                    ref pollutionGrid,
+                    em.GetBuffer<SourcePollutionCellBuffer>(source),
+                    em.GetBuffer<SourcePollutionDropRequestBuffer>(source),
+                    em.GetBuffer<SourcePollutionValidCellIndexBuffer>(source));
+                var anchor = em.GetComponentData<SourceAnchorComponent>(source).Position;
+                pollutionGrid.OriginX = anchor.x - pollutionGrid.HalfExtents.x;
+                pollutionGrid.OriginZ = anchor.z - pollutionGrid.HalfExtents.y;
+                em.SetComponentData(source, pollutionGrid);
+            }
         }
 
         private static void SetSourceAnchor(EntityManager em, Entity source, float3 position)
@@ -4229,6 +4460,13 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(source, new SourceAnchorComponent { Position = position });
             if (em.HasComponent<LocalTransform>(source))
                 em.SetComponentData(source, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
+            if (em.HasComponent<SourcePollutionGridComponent>(source))
+            {
+                var pollutionGrid = em.GetComponentData<SourcePollutionGridComponent>(source);
+                pollutionGrid.OriginX = position.x - pollutionGrid.HalfExtents.x;
+                pollutionGrid.OriginZ = position.z - pollutionGrid.HalfExtents.y;
+                em.SetComponentData(source, pollutionGrid);
+            }
         }
 
         private static int ComputeOldestBacklogAge(EntityManager em, uint frame)

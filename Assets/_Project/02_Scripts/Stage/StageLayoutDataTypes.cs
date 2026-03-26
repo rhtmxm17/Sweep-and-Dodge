@@ -4,6 +4,14 @@ using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
+    [Flags]
+    public enum StageCellMovementFlags : byte
+    {
+        None = 0,
+        BlockPlayer = 1 << 0,
+        BlockBullet = 1 << 1,
+    }
+
     public enum StagePresentationPlacementMode : byte
     {
         Standalone = 0,
@@ -15,44 +23,47 @@ namespace SweepNDodge.DotsBullets
         None = 0,
         Source = 1,
         Deposit = 2,
-        Obstacle = 3,
+    }
+
+    public enum StageRegionKind : byte
+    {
+        Source = 0,
+        Deposit = 1,
     }
 
     [Serializable]
-    public struct StageSourceLayoutData
+    public struct StageGridSpec
     {
-        [Min(1)] public uint StableId;
-        public bool Active;
-        public Vector3 Position;
-        public float YawDeg;
-        public Shape2DKind Shape;
-        [Min(0f)] public float Radius;
-        public Vector2 Size;
+        [Min(1)] public int Width;
+        [Min(1)] public int Height;
+        [Min(0.0001f)] public float CellSize;
+        public Vector3 Origin;
     }
 
     [Serializable]
-    public struct StageDepositLayoutData
+    public struct StageCellLayoutData
     {
-        [Min(1)] public uint StableId;
-        public bool Active;
-        public Vector3 Position;
-        public float YawDeg;
-        public Shape2DKind Shape;
-        [Min(0f)] public float Radius;
-        public Vector2 Size;
+        public StageCellMovementFlags MovementFlags;
+        [Min(0)] public uint SourceRegionId;
+        [Min(0)] public uint DepositRegionId;
     }
 
     [Serializable]
-    public struct StageObstacleLayoutData
+    public struct StageSourceRegionLayoutData
     {
         [Min(1)] public uint StableId;
         public bool Active;
-        public Vector3 Position;
-        public float YawDeg;
-        public Shape2DKind Shape;
-        [Min(0f)] public float Radius;
-        public Vector2 Size;
-        public ObstacleCollisionMask CollisionMask;
+        public Vector2Int AnchorCell;
+        public Vector2 AnchorOffset;
+    }
+
+    [Serializable]
+    public struct StageDepositRegionLayoutData
+    {
+        [Min(1)] public uint StableId;
+        public bool Active;
+        public Vector2Int AnchorCell;
+        public Vector2 AnchorOffset;
     }
 
     [Serializable]

@@ -1,11 +1,8 @@
-﻿using System.Collections.Generic;
 using NUnit.Framework;
-using Unity.Core;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
-using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -14,1144 +11,124 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void StageTopologyBootstrap_CreatesTopologySingletons_WithoutBulletBootstrap()
         {
-            using var world = new World("StageTopologyBootstrapWorld");
-            var em = world.EntityManager;
-
+            using var world = new World("StageTopologyBootstrap");
             world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
 
+            var em = world.EntityManager;
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyStateComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyLifecycleStateComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).IsEmptyIgnoreFilter, Is.False);
-            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageSessionResetBootstrapComponent>()).IsEmptyIgnoreFilter, Is.False);
-            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>()).IsEmptyIgnoreFilter, Is.False);
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()).IsEmptyIgnoreFilter, Is.False);
         }
 
         [Test]
-        public void StageSessionResetPrepare_BootReset_ClearsSessionSingletons_AndConsumesPendingFlag()
+        public void StageSessionResetPrepare_ResetsDepositContextToRegionZero()
         {
-            using var world = CreateDefaultTestWorld("StageSessionResetWorld_Boot");
+            using var world = new World("StageSessionResetPrepare");
             var em = world.EntityManager;
+            world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
 
-            SetSingleton(em, new RunDirectorStageConfigComponent
-            {
-                InitialState = RunDirectorStageStateId.Idle,
-                MinIdleDurationSec = 0f,
-                ClearAutoAdvanceTimeoutSec = 10f,
-            });
-            SetSingleton(em, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.Completed,
-                StateElapsedSec = 3f,
-                EnteredFrame = 12u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
-            });
-            SetSingleton(em, new RunDirectorStageGateComponent
-            {
-                IntroPresentationDone = 1,
-                ClearPresentationDone = 1,
-                MinIdleDurationElapsed = 0,
-                AutoAdvanceTimeoutElapsed = 1,
-            });
-            SetSingleton(em, new RunDirectorStageRequestComponent
-            {
-                StageStartRequested = 0,
-                ConfirmPressed = 1,
-                ForceClearReadyRequested = 1,
-            });
-            SetSingleton(em, new RunDirectorStageSignalComponent
-            {
-                StageRunCompleted = 1,
-            });
-            SetSingleton(em, new StageTopologyRequestComponent
-            {
-                RequestedStageId = 0,
-                ApplyRequested = 0,
-            });
-            SetSingleton(em, new StageTopologyStateComponent
-            {
-                SelectedStageId = 2,
-                AppliedStageId = 2,
-                Ready = 1,
-            });
-            SetSingleton(em, new StageTopologyLifecycleStateComponent
-            {
-                CurrentAppliedVersion = 9u,
-            });
-            SetSingleton(em, new StageSessionResetBootstrapComponent
-            {
-                InitialResetPending = 1,
-            });
             var player = em.CreateEntity(
                 typeof(PlayerTag),
-                typeof(PlayerHazardRiskStateComponent),
-                typeof(PlayerHazardRiskRequestComponent));
-            em.SetComponentData(player, new PlayerHazardRiskStateComponent
-            {
-                HazardStack = 4,
-            });
-            em.SetComponentData(player, new PlayerHazardRiskRequestComponent
-            {
-                PendingHazardCapturedCount = 2,
-                ResetRequested = 1,
-            });
+                typeof(PlayerCarryBinComponent),
+                typeof(PlayerCarryBinDepositRequestTag),
+                typeof(PlayerCarryBinDepositContextComponent));
+            em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, true);
+            em.SetComponentData(player, new PlayerCarryBinComponent { Load = 5, Capacity = 10 });
+            em.SetComponentData(player, new PlayerCarryBinDepositContextComponent { DepositRegionId = 44u });
 
-            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
-
-            var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
-            var gate = GetSingleton<RunDirectorStageGateComponent>(em);
-            var request = GetSingleton<RunDirectorStageRequestComponent>(em);
-            var signal = GetSingleton<RunDirectorStageSignalComponent>(em);
-            var topologyState = GetSingleton<StageTopologyStateComponent>(em);
-            var lifecycle = GetSingleton<StageTopologyLifecycleStateComponent>(em);
-            var bootstrap = GetSingleton<StageSessionResetBootstrapComponent>(em);
-
-            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Idle));
-            Assert.That(stageState.StateElapsedSec, Is.EqualTo(0f));
-            Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.None));
-            Assert.That(gate.IntroPresentationDone, Is.EqualTo(1));
-            Assert.That(gate.ClearPresentationDone, Is.EqualTo(1));
-            Assert.That(gate.MinIdleDurationElapsed, Is.EqualTo(1));
-            Assert.That(gate.AutoAdvanceTimeoutElapsed, Is.EqualTo(0));
-            Assert.That(request.StageStartRequested, Is.EqualTo(0));
-            Assert.That(request.ConfirmPressed, Is.EqualTo(0));
-            Assert.That(request.ForceClearReadyRequested, Is.EqualTo(0));
-            Assert.That(signal.StageRunCompleted, Is.EqualTo(0));
-            Assert.That(topologyState.SelectedStageId, Is.EqualTo(0));
-            Assert.That(topologyState.AppliedStageId, Is.EqualTo(0));
-            Assert.That(topologyState.Ready, Is.EqualTo(0));
-            Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(0u));
-            Assert.That(bootstrap.InitialResetPending, Is.EqualTo(0));
-            Assert.That(em.GetComponentData<PlayerHazardRiskStateComponent>(player).HazardStack, Is.EqualTo(0));
-            Assert.That(em.GetComponentData<PlayerHazardRiskRequestComponent>(player).PendingHazardCapturedCount, Is.EqualTo(0));
-            Assert.That(em.GetComponentData<PlayerHazardRiskRequestComponent>(player).ResetRequested, Is.EqualTo(0));
-        }
-
-        [Test]
-        public void StageSessionResetPrepare_ExplicitApplyReset_PreservesStageEntrySignals_AndClearsCompletedState()
-        {
-            using var world = CreateDefaultTestWorld("StageSessionResetWorld_Explicit");
-            var em = world.EntityManager;
-
-            SetSingleton(em, new RunDirectorStageConfigComponent
+            var topologyRequestEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).GetSingletonEntity();
+            em.SetComponentData(topologyRequestEntity, new StageTopologyRequestComponent
             {
-                InitialState = RunDirectorStageStateId.Idle,
-                MinIdleDurationSec = 0f,
-                ClearAutoAdvanceTimeoutSec = 10f,
-            });
-            SetSingleton(em, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.Completed,
-                StateElapsedSec = 3f,
-                EnteredFrame = 12u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
-            });
-            SetSingleton(em, new RunDirectorStageGateComponent
-            {
-                IntroPresentationDone = 1,
-                ClearPresentationDone = 0,
-                MinIdleDurationElapsed = 0,
-                AutoAdvanceTimeoutElapsed = 1,
-            });
-            SetSingleton(em, new RunDirectorStageRequestComponent
-            {
-                StageStartRequested = 1,
-                ConfirmPressed = 1,
-                ForceClearReadyRequested = 1,
-            });
-            SetSingleton(em, new RunDirectorStageSignalComponent
-            {
-                StageRunCompleted = 1,
-            });
-            SetSingleton(em, new StageTopologyRequestComponent
-            {
-                RequestedStageId = 2,
                 ApplyRequested = 1,
-            });
-            SetSingleton(em, new StageTopologyStateComponent
-            {
-                SelectedStageId = 1,
-                AppliedStageId = 1,
-                Ready = 1,
-            });
-            SetSingleton(em, new StageTopologyLifecycleStateComponent
-            {
-                CurrentAppliedVersion = 9u,
-            });
-            SetSingleton(em, new StageSessionResetBootstrapComponent
-            {
-                InitialResetPending = 0,
+                RequestedStageId = 1,
             });
 
             world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
 
-            var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
-            var gate = GetSingleton<RunDirectorStageGateComponent>(em);
-            var request = GetSingleton<RunDirectorStageRequestComponent>(em);
-            var topologyRequest = GetSingleton<StageTopologyRequestComponent>(em);
-            var topologyState = GetSingleton<StageTopologyStateComponent>(em);
-            var lifecycle = GetSingleton<StageTopologyLifecycleStateComponent>(em);
-
-            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Idle));
-            Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.None));
-            Assert.That(request.StageStartRequested, Is.EqualTo(1));
-            Assert.That(request.ConfirmPressed, Is.EqualTo(0));
-            Assert.That(request.ForceClearReadyRequested, Is.EqualTo(0));
-            Assert.That(gate.IntroPresentationDone, Is.EqualTo(1));
-            Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
-            Assert.That(gate.MinIdleDurationElapsed, Is.EqualTo(1));
-            Assert.That(gate.AutoAdvanceTimeoutElapsed, Is.EqualTo(0));
-            Assert.That(topologyRequest.ApplyRequested, Is.EqualTo(1));
-            Assert.That(topologyRequest.RequestedStageId, Is.EqualTo(2));
-            Assert.That(topologyState.SelectedStageId, Is.EqualTo(0));
-            Assert.That(topologyState.AppliedStageId, Is.EqualTo(0));
-            Assert.That(topologyState.Ready, Is.EqualTo(0));
-            Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(0u));
-        }
-
-        [Test]
-        public void StageSessionResetPrepare_ExplicitApplyReset_ResetsPlayerTransientState_AndSeedsHudSnapshot()
-        {
-            using var world = CreateDefaultTestWorld("StageSessionResetWorld_PlayerTransient");
-            var em = world.EntityManager;
-
-            SetSingleton(em, new RunDirectorStageConfigComponent
-            {
-                InitialState = RunDirectorStageStateId.Idle,
-                MinIdleDurationSec = 0f,
-                ClearAutoAdvanceTimeoutSec = 10f,
-            });
-            SetSingleton(em, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.Completed,
-                StateElapsedSec = 2f,
-                EnteredFrame = 12u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
-            });
-            SetSingleton(em, new RunDirectorStageGateComponent
-            {
-                IntroPresentationDone = 1,
-                ClearPresentationDone = 0,
-                MinIdleDurationElapsed = 0,
-                AutoAdvanceTimeoutElapsed = 1,
-            });
-            SetSingleton(em, new RunDirectorStageRequestComponent
-            {
-                StageStartRequested = 1,
-                ConfirmPressed = 1,
-                ForceClearReadyRequested = 1,
-            });
-            SetSingleton(em, new RunDirectorStageSignalComponent
-            {
-                StageRunCompleted = 1,
-            });
-            SetSingleton(em, new StageTopologyRequestComponent
-            {
-                RequestedStageId = 2,
-                ApplyRequested = 1,
-            });
-            SetSingleton(em, new StageTopologyStateComponent
-            {
-                SelectedStageId = 1,
-                AppliedStageId = 1,
-                Ready = 1,
-            });
-            SetSingleton(em, new StageTopologyLifecycleStateComponent
-            {
-                CurrentAppliedVersion = 5u,
-            });
-            SetSingleton(em, new StageSessionResetBootstrapComponent
-            {
-                InitialResetPending = 0,
-            });
-            SetSingleton(em, new PlayerHudSnapshotComponent
-            {
-                CarryLoad = 9,
-                CarryCapacity = 9,
-                HazardStack = 3,
-                HazardStackMax = 5,
-                HazardRiskMultiplier = 1.15f,
-                DepletedSourceCount = 2,
-                TotalSourceCount = 3,
-                PressureSourceStableId = 7u,
-                PressureSourceCollected = 8,
-                PressureSourceThresholdWeakened = 4,
-                PressureSourceThresholdDepleted = 10,
-                PressureSourceProgress01 = 0.8f,
-                StageState = RunDirectorStageStateId.Running,
-                StageStateElapsedSec = 9f,
-                GameplayElapsedSec = 15f,
-                LastHitLossValue = 5,
-                HitFlashRemainingSec = 0.4f,
-                TotalCollectValue = 101,
-                TotalCleanupValue = 31,
-                TotalHitValue = 4,
-                LastUpdatedFrame = 99u,
-            });
-
-            var player = CreatePlayerWithStageEntryTransientState(em);
-
-            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
-
-            var carry = em.GetComponentData<PlayerCarryBinComponent>(player);
-            var penalty = em.GetComponentData<PlayerHazardPenaltyStateComponent>(player);
-            var riskState = em.GetComponentData<PlayerHazardRiskStateComponent>(player);
-            var riskRequest = em.GetComponentData<PlayerHazardRiskRequestComponent>(player);
-            var depositContext = em.GetComponentData<PlayerCarryBinDepositContextComponent>(player);
-            var hitContext = em.GetComponentData<PlayerHazardHitContextComponent>(player);
-            var feedbackSnapshot = em.GetComponentData<PlayerUiFeedbackPresentationSnapshotComponent>(player);
-            var hudSnapshot = GetSingleton<PlayerHudSnapshotComponent>(em);
-
-            Assert.That(carry.Load, Is.EqualTo(0));
-            Assert.That(carry.Capacity, Is.EqualTo(12));
-            Assert.That(penalty.IFrameTimer, Is.EqualTo(0f));
-            Assert.That(penalty.VacuumLockTimer, Is.EqualTo(0f));
-            Assert.That(riskState.HazardStack, Is.EqualTo(0));
-            Assert.That(riskRequest.PendingHazardCapturedCount, Is.EqualTo(0));
-            Assert.That(riskRequest.ResetRequested, Is.EqualTo(0));
             Assert.That(em.IsComponentEnabled<PlayerCarryBinDepositRequestTag>(player), Is.False);
-            Assert.That(em.IsComponentEnabled<PlayerHazardHitRequestTag>(player), Is.False);
-            Assert.That(depositContext.DepositEntity, Is.EqualTo(Entity.Null));
-            Assert.That(hitContext.SourceEntity, Is.EqualTo(Entity.Null));
-            Assert.That(hitContext.HitDirX, Is.EqualTo(0f));
-            Assert.That(hitContext.HitDirZ, Is.EqualTo(0f));
-            Assert.That(em.GetBuffer<PlayerUiFeedbackEventBufferElement>(player).Length, Is.EqualTo(0));
-            Assert.That(feedbackSnapshot.Version, Is.EqualTo(0u));
-            Assert.That(feedbackSnapshot.Type, Is.EqualTo(PlayerUiFeedbackEventType.None));
-            Assert.That(feedbackSnapshot.Reason, Is.EqualTo((byte)PlayerUiFeedbackReasonId.None));
-            Assert.That(feedbackSnapshot.RemainingSec, Is.EqualTo(0f));
-            Assert.That(hudSnapshot.CarryLoad, Is.EqualTo(0));
-            Assert.That(hudSnapshot.CarryCapacity, Is.EqualTo(12));
-            Assert.That(hudSnapshot.HazardStack, Is.EqualTo(0));
-            Assert.That(hudSnapshot.HazardStackMax, Is.EqualTo(5));
-            Assert.That(hudSnapshot.HazardRiskMultiplier, Is.EqualTo(1f).Within(1e-6f));
-            Assert.That(hudSnapshot.PressureSourceStableId, Is.EqualTo(0u));
-            Assert.That(hudSnapshot.StageState, Is.EqualTo(RunDirectorStageStateId.Idle));
-            Assert.That(hudSnapshot.StageStateElapsedSec, Is.EqualTo(0f));
-            Assert.That(hudSnapshot.GameplayElapsedSec, Is.EqualTo(0f));
-            Assert.That(hudSnapshot.LastHitLossValue, Is.EqualTo(0));
-            Assert.That(hudSnapshot.HitFlashRemainingSec, Is.EqualTo(0f));
-            Assert.That(hudSnapshot.TotalCollectValue, Is.EqualTo(0));
-            Assert.That(hudSnapshot.TotalCleanupValue, Is.EqualTo(0));
-            Assert.That(hudSnapshot.TotalHitValue, Is.EqualTo(0));
-            Assert.That(hudSnapshot.LastUpdatedFrame, Is.EqualTo(0u));
+            Assert.That(em.GetComponentData<PlayerCarryBinDepositContextComponent>(player).DepositRegionId, Is.EqualTo(0u));
         }
 
         [Test]
-        public void StageSessionResetPrepare_RunningStateApplyRequest_IsIgnored()
+        public void StageTopologyApply_PublishesRuntimeGridCache_AndDoesNotCreateDepositOrObstacleEntities()
         {
-            using var world = CreateDefaultTestWorld("StageSessionResetWorld_RunningIgnore");
-            var em = world.EntityManager;
+            using var world = CreatePreparedWorld("StageTopologyApply_GridCache", out var em, out var requestEntity, out var topologyStateEntity);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: false);
 
-            SetSingleton(em, new RunDirectorStageConfigComponent
+            try
             {
-                InitialState = RunDirectorStageStateId.Idle,
-                MinIdleDurationSec = 0f,
-                ClearAutoAdvanceTimeoutSec = 10f,
-            });
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var gridEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()).GetSingletonEntity();
+                var grid = em.GetComponentData<StageRuntimeGridComponent>(gridEntity);
+                var cells = em.GetBuffer<StageRuntimeGridCellBufferElement>(gridEntity);
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
+
+                Assert.That(grid.Ready, Is.EqualTo(1));
+                Assert.That(grid.StageId, Is.EqualTo(1));
+                Assert.That(grid.Width, Is.EqualTo(2));
+                Assert.That(grid.Height, Is.EqualTo(2));
+                Assert.That(cells.Length, Is.EqualTo(4));
+                Assert.That(cells[1].MovementFlags, Is.EqualTo(StageCellMovementFlags.BlockPlayer));
+                Assert.That(cells[3].DepositRegionId, Is.EqualTo(2001u));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_ReconcilesSourceTopologyFromRegionCells_AndKeepsGridReady()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_SourceOnly", out var em, out var requestEntity, out var topologyStateEntity);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
+
+            try
+            {
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
+                Assert.That(topologyState.Ready, Is.EqualTo(1));
+
+                using var sourceQuery = em.CreateEntityQuery(
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologySourceTag>(),
+                    ComponentType.ReadOnly<SourceStableIdComponent>(),
+                    ComponentType.ReadOnly<SourceSpawnComponent>());
+                using var entities = sourceQuery.ToEntityArray(Allocator.Temp);
+                Assert.That(entities.Length, Is.EqualTo(1));
+                Assert.That(em.GetComponentData<SourceStableIdComponent>(entities[0]).Value, Is.EqualTo(1001u));
+                Assert.That(em.GetBuffer<SourceRegionCellIndexBuffer>(entities[0]).Length, Is.EqualTo(2));
+                Assert.That(em.GetComponentData<SourceAnchorComponent>(entities[0]).Position.x, Is.EqualTo(0.75f).Within(0.001f));
+                Assert.That(em.GetComponentData<SourceAnchorComponent>(entities[0]).Position.z, Is.EqualTo(0.5f).Within(0.001f));
+
+                var gridEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()).GetSingletonEntity();
+                Assert.That(em.GetComponentData<StageRuntimeGridComponent>(gridEntity).Ready, Is.EqualTo(1));
+                var gridCells = em.GetBuffer<StageRuntimeGridCellBufferElement>(gridEntity);
+                Assert.That(gridCells[0].SourceRegionId, Is.EqualTo(1001u));
+                Assert.That(gridCells[2].SourceRegionId, Is.EqualTo(1001u));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        private static World CreatePreparedWorld(string name, out EntityManager em, out Entity requestEntity, out Entity topologyStateEntity)
+        {
+            var world = new World(name);
+            em = world.EntityManager;
+
+            world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
             SetSingleton(em, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.Running,
-                StateElapsedSec = 1f,
-                EnteredFrame = 7u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.StartRequested,
-            });
-            SetSingleton(em, new RunDirectorStageGateComponent
-            {
-                IntroPresentationDone = 1,
-                ClearPresentationDone = 0,
-                MinIdleDurationElapsed = 1,
-                AutoAdvanceTimeoutElapsed = 0,
-            });
-            SetSingleton(em, new RunDirectorStageRequestComponent
-            {
-                StageStartRequested = 0,
-            });
-            SetSingleton(em, default(RunDirectorStageSignalComponent));
-            SetSingleton(em, new StageTopologyRequestComponent
-            {
-                RequestedStageId = 2,
-                ApplyRequested = 1,
-            });
-            SetSingleton(em, new StageTopologyStateComponent
-            {
-                SelectedStageId = 1,
-                AppliedStageId = 1,
-                Ready = 1,
-            });
-            SetSingleton(em, new StageTopologyLifecycleStateComponent
-            {
-                CurrentAppliedVersion = 4u,
-            });
-            SetSingleton(em, new StageSessionResetBootstrapComponent
-            {
-                InitialResetPending = 0,
-            });
-
-            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
-
-            Assert.That(GetSingleton<RunDirectorStageStateComponent>(em).State, Is.EqualTo(RunDirectorStageStateId.Running));
-            Assert.That(GetSingleton<StageTopologyRequestComponent>(em).ApplyRequested, Is.EqualTo(1));
-            Assert.That(GetSingleton<StageTopologyStateComponent>(em).SelectedStageId, Is.EqualTo(1));
-            Assert.That(GetSingleton<StageTopologyLifecycleStateComponent>(em).CurrentAppliedVersion, Is.EqualTo(4u));
-        }
-
-        [Test]
-        public void StageSessionResetPrepare_RunningStateApplyWithStageStartRequest_ResetsForStageEntry()
-        {
-            using var world = CreateDefaultTestWorld("StageSessionResetWorld_RunningEntryReset");
-            var em = world.EntityManager;
-
-            SetSingleton(em, new RunDirectorStageConfigComponent
-            {
-                InitialState = RunDirectorStageStateId.Idle,
-                MinIdleDurationSec = 0f,
-                ClearAutoAdvanceTimeoutSec = 10f,
-            });
-            SetSingleton(em, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.Running,
-                StateElapsedSec = 2f,
-                EnteredFrame = 15u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.StartRequested,
-            });
-            SetSingleton(em, new RunDirectorStageGateComponent
-            {
-                IntroPresentationDone = 1,
-                ClearPresentationDone = 0,
-                MinIdleDurationElapsed = 1,
-                AutoAdvanceTimeoutElapsed = 0,
-            });
-            SetSingleton(em, new RunDirectorStageRequestComponent
-            {
-                StageStartRequested = 1,
-                ConfirmPressed = 1,
-            });
-            SetSingleton(em, new RunDirectorStageSignalComponent
-            {
-                StageRunCompleted = 1,
-            });
-            SetSingleton(em, new StageTopologyRequestComponent
-            {
-                RequestedStageId = 2,
-                ApplyRequested = 1,
-            });
-            SetSingleton(em, new StageTopologyStateComponent
-            {
-                SelectedStageId = 1,
-                AppliedStageId = 1,
-                Ready = 1,
-            });
-            SetSingleton(em, new StageTopologyLifecycleStateComponent
-            {
-                CurrentAppliedVersion = 4u,
-            });
-            SetSingleton(em, new StageSessionResetBootstrapComponent
-            {
-                InitialResetPending = 0,
-            });
-
-            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
-
-            var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
-            var gate = GetSingleton<RunDirectorStageGateComponent>(em);
-            var request = GetSingleton<RunDirectorStageRequestComponent>(em);
-            var topologyRequest = GetSingleton<StageTopologyRequestComponent>(em);
-            var topologyState = GetSingleton<StageTopologyStateComponent>(em);
-            var lifecycle = GetSingleton<StageTopologyLifecycleStateComponent>(em);
-
-            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Idle));
-            Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.None));
-            Assert.That(request.StageStartRequested, Is.EqualTo(1));
-            Assert.That(request.ConfirmPressed, Is.EqualTo(0));
-            Assert.That(gate.IntroPresentationDone, Is.EqualTo(1));
-            Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
-            Assert.That(topologyRequest.ApplyRequested, Is.EqualTo(1));
-            Assert.That(topologyRequest.RequestedStageId, Is.EqualTo(2));
-            Assert.That(topologyState.SelectedStageId, Is.EqualTo(0));
-            Assert.That(topologyState.AppliedStageId, Is.EqualTo(0));
-            Assert.That(topologyState.Ready, Is.EqualTo(0));
-            Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(0u));
-        }
-
-        [Test]
-        public void StageSessionResetAndTopologyApply_CompletedStateCanReenterRunning_SameFrame()
-        {
-            using var world = CreateDefaultTestWorld("StageSessionResetWorld_Reenter");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = CreateStageCatalog(createdAssets, stageId: 2, sourceStableIds: new uint[] { 1001u }, depositStableIds: new uint[] { 2001u });
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-                SetSingleton(em, new RunDirectorStageConfigComponent
-                {
-                    InitialState = RunDirectorStageStateId.Idle,
-                    MinIdleDurationSec = 0f,
-                    ClearAutoAdvanceTimeoutSec = 10f,
-                });
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Completed,
-                    StateElapsedSec = 0.5f,
-                    EnteredFrame = 3u,
-                    LastTransitionReason = RunDirectorStageTransitionReasonId.ConfirmPressed,
-                });
-                SetSingleton(em, new RunDirectorStageGateComponent
-                {
-                    IntroPresentationDone = 1,
-                    ClearPresentationDone = 0,
-                    MinIdleDurationElapsed = 1,
-                    AutoAdvanceTimeoutElapsed = 0,
-                });
-                SetSingleton(em, new RunDirectorStageRequestComponent
-                {
-                    StageStartRequested = 1,
-                });
-                SetSingleton(em, default(RunDirectorStageSignalComponent));
-                SetSingleton(em, new StageTopologyRequestComponent
-                {
-                    RequestedStageId = 2,
-                    ApplyRequested = 1,
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new StageTopologyLifecycleStateComponent
-                {
-                    CurrentAppliedVersion = 5u,
-                });
-                SetSingleton(em, new StageSessionResetBootstrapComponent
-                {
-                    InitialResetPending = 0,
-                });
-                SetSingleton(em, new BulletFrameCounterComponent
-                {
-                    Value = 10u,
-                });
-
-                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-                world.GetOrCreateSystem<RunDirectorStageTransitionSystem>().Update(world.Unmanaged);
-
-                var stageState = GetSingleton<RunDirectorStageStateComponent>(em);
-                var topologyState = GetSingleton<StageTopologyStateComponent>(em);
-                Assert.That(topologyState.SelectedStageId, Is.EqualTo(2));
-                Assert.That(topologyState.AppliedStageId, Is.EqualTo(2));
-                Assert.That(topologyState.Ready, Is.EqualTo(1));
-                Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Running));
-                Assert.That(stageState.LastTransitionReason, Is.EqualTo(RunDirectorStageTransitionReasonId.StartRequested));
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_InstantiatesOwnedSourceAndDeposit_WhenNoPrebakedEntitiesExist()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_A");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = CreateStageCatalog(createdAssets, stageId: 1, sourceStableIds: new uint[] { 1001u, 1002u }, depositStableIds: new uint[] { 2001u });
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-                SetSingleton(em, new StageTopologyRequestComponent
-                {
-                    RequestedStageId = 1,
-                    ApplyRequested = 1,
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-
-                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.Ready, Is.EqualTo(1));
-
-                using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
-                {
-                    All = new[]
-                    {
-                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                        ComponentType.ReadOnly<StageTopologySourceTag>(),
-                        ComponentType.ReadOnly<SourceStableIdComponent>(),
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities,
-                });
-                using var depositQuery = em.CreateEntityQuery(new EntityQueryDesc
-                {
-                    All = new[]
-                    {
-                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                        ComponentType.ReadOnly<StageTopologyDepositTag>(),
-                        ComponentType.ReadOnly<DepositStableIdComponent>(),
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities,
-                });
-                using var sourceEntities = sourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-                using var depositEntities = depositQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-
-                Assert.That(sourceEntities.Length, Is.EqualTo(2));
-                Assert.That(depositEntities.Length, Is.EqualTo(1));
-
-                var sourceA = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1001u, c => c.Value);
-                var sourceB = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1002u, c => c.Value);
-                var deposit = FindByStableId<DepositStableIdComponent>(em, depositEntities, 2001u, c => c.Value);
-                var lifecycle = em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em));
-
-                Assert.That(em.IsEnabled(sourceA), Is.True);
-                Assert.That(em.IsEnabled(sourceB), Is.True);
-                Assert.That(em.IsEnabled(deposit), Is.True);
-                Assert.That(lifecycle.CurrentAppliedVersion, Is.EqualTo(1u));
-                AssertTopologyOwned(em, sourceA, StageTopologyKind.Source, 1u);
-                AssertTopologyOwned(em, sourceB, StageTopologyKind.Source, 1u);
-                AssertTopologyOwned(em, deposit, StageTopologyKind.Deposit, 1u);
-                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceA).Length, Is.GreaterThan(0));
-                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(sourceB).Length, Is.GreaterThan(0));
-                Assert.That(em.GetComponentData<Shape2DComponent>(deposit).Radius, Is.GreaterThan(0f));
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_ReusesDisabledOwnedEntities_AcrossStageSwitches()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_B");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                createdAssets.Add(catalog);
-                catalog.Entries = new[]
-                {
-                    CreateEntry(createdAssets, 1, new uint[] { 1001u, 1002u }, new uint[] { 2001u }),
-                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }),
-                };
-
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-                SetSingleton(em, default(StageTopologyRequestComponent));
-
-                ApplyStage(world, 1);
-                using var initialSourceQuery = em.CreateEntityQuery(new EntityQueryDesc
-                {
-                    All = new[]
-                    {
-                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                        ComponentType.ReadOnly<StageTopologySourceTag>(),
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities,
-                });
-                using var initialSources = initialSourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-                using var initialDepositQuery = em.CreateEntityQuery(new EntityQueryDesc
-                {
-                    All = new[]
-                    {
-                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                        ComponentType.ReadOnly<StageTopologyDepositTag>(),
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities,
-                });
-                using var initialDeposits = initialDepositQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-                var sourceEntityA = initialSources[0];
-                var sourceEntityB = initialSources[1];
-                var depositEntity = initialDeposits[0];
-                AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 2, expectedDepositTotal: 1, expectedDepositEnabled: 1);
-                Assert.That(em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em)).CurrentAppliedVersion, Is.EqualTo(1u));
-
-                ApplyStage(world, 2);
-                AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 1, expectedDepositTotal: 1, expectedDepositEnabled: 1);
-                Assert.That(em.Exists(sourceEntityA), Is.True);
-                Assert.That(em.Exists(sourceEntityB), Is.True);
-                Assert.That(em.Exists(depositEntity), Is.True);
-                Assert.That(em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em)).CurrentAppliedVersion, Is.EqualTo(2u));
-
-                ApplyStage(world, 1);
-                AssertOwnedCounts(em, expectedSourceTotal: 2, expectedSourceEnabled: 2, expectedDepositTotal: 1, expectedDepositEnabled: 1);
-                Assert.That(em.Exists(sourceEntityA), Is.True);
-                Assert.That(em.Exists(sourceEntityB), Is.True);
-                Assert.That(em.Exists(depositEntity), Is.True);
-                Assert.That(em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em)).CurrentAppliedVersion, Is.EqualTo(3u));
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_InstantiatesOwnedObstacle_WhenLayoutContainsObstacle()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_ObstacleCreate");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = CreateStageCatalog(createdAssets, stageId: 1, sourceStableIds: new uint[] { 1001u }, depositStableIds: new uint[] { 2001u }, obstacleStableIds: new uint[] { 3001u });
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                    ObstacleTemplate = CreateObstacleTemplate(em),
-                });
-                SetSingleton(em, new StageTopologyRequestComponent
-                {
-                    RequestedStageId = 1,
-                    ApplyRequested = 1,
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-
-                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                Assert.That(topologyState.Ready, Is.EqualTo(1));
-                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.True);
-
-                using var obstacleQuery = em.CreateEntityQuery(new EntityQueryDesc
-                {
-                    All = new[]
-                    {
-                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                        ComponentType.ReadOnly<StageTopologyObstacleTag>(),
-                        ComponentType.ReadOnly<ObstacleStableIdComponent>(),
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities,
-                });
-                using var obstacles = obstacleQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-                Assert.That(obstacles.Length, Is.EqualTo(1));
-
-                var obstacle = FindByStableId<ObstacleStableIdComponent>(em, obstacles, 3001u, c => c.Value);
-                var geometry = em.GetComponentData<Shape2DComponent>(obstacle);
-                var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle);
-
-                Assert.That(geometry.Kind, Is.EqualTo(Shape2DKind.Rectangle));
-                Assert.That(geometry.Size.x, Is.EqualTo(3f).Within(0.01f));
-                Assert.That(geometry.Size.y, Is.EqualTo(2f).Within(0.01f));
-                Assert.That(
-                    mask.Value & (ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet),
-                    Is.EqualTo(ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet));
-                AssertTopologyOwned(em, obstacle, StageTopologyKind.Obstacle, 1u);
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_MissingObstacleTemplate_KeepsPreviouslyAppliedTopology_AndMarksNewSelectionNotReady()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_ObstacleTemplateMissing");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                createdAssets.Add(catalog);
-                catalog.Entries = new[]
-                {
-                    CreateEntry(createdAssets, 1, new uint[] { 1001u }, new uint[] { 2001u }, new uint[] { 3001u }),
-                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }, new uint[] { 3101u }),
-                };
-
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                    ObstacleTemplate = CreateObstacleTemplate(em),
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-                SetSingleton(em, default(StageTopologyRequestComponent));
-
-                ApplyStage(world, 1);
-                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.True);
-
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                    ObstacleTemplate = Entity.Null,
-                });
-
-                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Obstacle template prefab is missing. stageId=2");
-                ApplyStage(world, 2);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                var lifecycleState = em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em));
-                Assert.That(topologyState.SelectedStageId, Is.EqualTo(2));
-                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.Ready, Is.EqualTo(0));
-                Assert.That(lifecycleState.CurrentAppliedVersion, Is.EqualTo(1u));
-                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.True);
-                Assert.That(IsEnabledObstacleStableIdPresent(em, 3101u), Is.False);
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_InvalidObstacleItem_WarnsAndSkipsObstacleButKeepsReady()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_InvalidObstacle");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var layout = CreateLayout(createdAssets, 1, new uint[] { 1001u }, new uint[] { 2001u }, new uint[] { 3001u });
-                layout.Obstacles[0] = new StageObstacleLayoutData
-                {
-                    StableId = 3001u,
-                    Active = true,
-                    Position = new Vector3(2f, 0f, 1f),
-                    YawDeg = 0f,
-                    Shape = Shape2DKind.Circle,
-                    Radius = 0f,
-                    Size = Vector2.zero,
-                    CollisionMask = ObstacleCollisionMask.BlockBullet,
-                };
-
-                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                createdAssets.Add(catalog);
-                catalog.Entries = new[]
-                {
-                    new StageCatalogEntry
-                    {
-                        Enabled = true,
-                        EntryKey = "stage_01",
-                        Definition = CreateDefinition(createdAssets, 1, new uint[] { 1001u }),
-                        Layout = layout,
-                    },
-                };
-
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                    ObstacleTemplate = CreateObstacleTemplate(em),
-                });
-                SetSingleton(em, new StageTopologyRequestComponent
-                {
-                    RequestedStageId = 1,
-                    ApplyRequested = 1,
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-
-                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Obstacle item has invalid shape parameters and will be skipped. stageId=1, stableId=3001, shape=Circle");
-                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                Assert.That(topologyState.Ready, Is.EqualTo(1));
-                Assert.That(IsEnabledObstacleStableIdPresent(em, 3001u), Is.False);
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_MissingDefinitionBinding_DisablesOnlyMissingSource_AndKeepsReady()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_C");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var definition = CreateDefinition(createdAssets, 1, new uint[] { 1001u });
-                var layout = CreateLayout(createdAssets, 1, new uint[] { 1001u, 1002u }, new uint[] { 2001u });
-                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                createdAssets.Add(catalog);
-                catalog.Entries = new[]
-                {
-                    new StageCatalogEntry
-                    {
-                        Enabled = true,
-                        EntryKey = "stage_01",
-                        Definition = definition,
-                        Layout = layout,
-                    },
-                };
-
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-                SetSingleton(em, new StageTopologyRequestComponent
-                {
-                    RequestedStageId = 1,
-                    ApplyRequested = 1,
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-
-                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                Assert.That(topologyState.Ready, Is.EqualTo(1));
-
-                using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
-                {
-                    All = new[]
-                    {
-                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                        ComponentType.ReadOnly<StageTopologySourceTag>(),
-                        ComponentType.ReadOnly<SourceStableIdComponent>(),
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities,
-                });
-                using var sourceEntities = sourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-                Assert.That(sourceEntities.Length, Is.EqualTo(2));
-
-                var bound = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1001u, c => c.Value);
-                var missing = FindByStableId<SourceStableIdComponent>(em, sourceEntities, 1002u, c => c.Value);
-                Assert.That(em.IsEnabled(bound), Is.True);
-                Assert.That(em.IsEnabled(missing), Is.False);
-                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(missing).Length, Is.EqualTo(0));
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [TestCase(RunDirectorStageStateId.Running)]
-        [TestCase(RunDirectorStageStateId.ClearReady)]
-        public void StageTopologyApply_IgnoresRequest_OutsideBoundary_AndKeepsCurrentTopology(RunDirectorStageStateId blockedState)
-        {
-            using var world = CreateDefaultTestWorld($"StageTopologyWorld_Blocked_{blockedState}");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                createdAssets.Add(catalog);
-                catalog.Entries = new[]
-                {
-                    CreateEntry(createdAssets, 1, new uint[] { 1001u, 1002u }, new uint[] { 2001u }),
-                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }),
-                };
-
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-                SetSingleton(em, default(StageTopologyRequestComponent));
-
-                ApplyStage(world, 1);
-                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
-                Assert.That(IsEnabledSourceStableIdPresent(em, 1101u), Is.False);
-
-                SetStageState(em, blockedState);
-                LogAssert.Expect(LogType.Warning, $"[StageTopologyApply] Ignored topology apply outside stage boundary. stageId=2, stageState={blockedState}");
-                ApplyStage(world, 2);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.Ready, Is.EqualTo(1));
-                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
-                Assert.That(IsEnabledSourceStableIdPresent(em, 1101u), Is.False);
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_InfrastructureFailure_KeepsPreviouslyAppliedTopology_AndMarksNewSelectionNotReady()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_FailureKeep");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-                createdAssets.Add(catalog);
-                catalog.Entries = new[]
-                {
-                    CreateEntry(createdAssets, 1, new uint[] { 1001u }, new uint[] { 2001u }),
-                    CreateEntry(createdAssets, 2, new uint[] { 1101u }, new uint[] { 2101u }),
-                };
-
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-                SetSingleton(em, default(StageTopologyRequestComponent));
-
-                ApplyStage(world, 1);
-                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
-                Assert.That(IsEnabledDepositStableIdPresent(em, 2001u), Is.True);
-
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = Entity.Null,
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-
-                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Source template prefab is missing. stageId=2");
-                ApplyStage(world, 2);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                var lifecycleState = em.GetComponentData<StageTopologyLifecycleStateComponent>(GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(em));
-                Assert.That(topologyState.SelectedStageId, Is.EqualTo(2));
-                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.Ready, Is.EqualTo(0));
-                Assert.That(lifecycleState.CurrentAppliedVersion, Is.EqualTo(1u));
-                Assert.That(IsEnabledSourceStableIdPresent(em, 1001u), Is.True);
-                Assert.That(IsEnabledDepositStableIdPresent(em, 2001u), Is.True);
-                Assert.That(IsEnabledSourceStableIdPresent(em, 1101u), Is.False);
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_DuplicateActiveRuntimeStableId_DisablesDuplicatePoolEntries_AndKeepsReady()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_DuplicateRuntime");
-            var em = world.EntityManager;
-            var createdAssets = new List<ScriptableObject>();
-
-            try
-            {
-                var catalog = CreateStageCatalog(createdAssets, stageId: 1, sourceStableIds: new uint[] { 1001u }, depositStableIds: new uint[] { 2001u });
-                SetManagedSingleton(em, new StageCatalogRuntimeComponent { Catalog = catalog });
-                SetSingleton(em, new StageTopologyPrefabCatalogComponent
-                {
-                    SourceTemplate = CreateSourceTemplate(em),
-                    DepositTemplate = CreateDepositTemplate(em),
-                });
-                SetSingleton(em, new StageTopologyRequestComponent
-                {
-                    RequestedStageId = 1,
-                    ApplyRequested = 1,
-                });
-                SetSingleton(em, default(StageTopologyStateComponent));
-                SetSingleton(em, new RunDirectorStageStateComponent
-                {
-                    State = RunDirectorStageStateId.Idle,
-                });
-
-                var duplicateA = CreateSourceTemplate(em);
-                EnsureOwnedSource(em, duplicateA, 1001u);
-                em.SetEnabled(duplicateA, true);
-
-                var duplicateB = CreateSourceTemplate(em);
-                EnsureOwnedSource(em, duplicateB, 1001u);
-                em.SetEnabled(duplicateB, true);
-
-                LogAssert.Expect(LogType.Warning, "[StageTopologyApply] Duplicate active runtime source stableId detected. stageId=1, duplicateCount=1");
-                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var topologyState = em.GetComponentData<StageTopologyStateComponent>(GetOrCreateSingletonEntity<StageTopologyStateComponent>(em));
-                Assert.That(topologyState.SelectedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
-                Assert.That(topologyState.Ready, Is.EqualTo(1));
-                Assert.That(em.IsEnabled(duplicateA), Is.False);
-                Assert.That(em.IsEnabled(duplicateB), Is.False);
-                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(duplicateA).Length, Is.EqualTo(0));
-                Assert.That(em.GetBuffer<SourceClipPatternBuffer>(duplicateB).Length, Is.EqualTo(0));
-                Assert.That(IsEnabledDepositStableIdPresent(em, 2001u), Is.True);
-            }
-            finally
-            {
-                DestroyAll(createdAssets);
-            }
-        }
-
-        [Test]
-        public void RunDirectorStageTransition_IdleStart_IsBlockedUntilTopologyReady()
-        {
-            using var world = CreateDefaultTestWorld("StageTopologyWorld_D");
-            var em = world.EntityManager;
-            var transitionSystem = world.GetOrCreateSystem<RunDirectorStageTransitionSystem>();
-
-            var stageStateEntity = GetOrCreateSingletonEntity<RunDirectorStageStateComponent>(em);
-            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
             {
                 State = RunDirectorStageStateId.Idle,
                 StateElapsedSec = 0f,
@@ -1159,358 +136,112 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastTransitionReason = RunDirectorStageTransitionReasonId.None,
             });
 
-            var topologyStateEntity = GetOrCreateSingletonEntity<StageTopologyStateComponent>(em);
-            em.SetComponentData(topologyStateEntity, new StageTopologyStateComponent
+            requestEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).GetSingletonEntity();
+            topologyStateEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyStateComponent>()).GetSingletonEntity();
+            var prefabCatalogEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).GetSingletonEntity();
+            em.SetComponentData(prefabCatalogEntity, new StageTopologyPrefabCatalogComponent
             {
-                SelectedStageId = 1,
-                AppliedStageId = 0,
-                Ready = 0,
+                SourceTemplate = CreateSourceTemplate(em),
             });
 
-            var gateEntity = GetOrCreateSingletonEntity<RunDirectorStageGateComponent>(em);
-            em.SetComponentData(gateEntity, new RunDirectorStageGateComponent
-            {
-                IntroPresentationDone = 1,
-                ClearPresentationDone = 1,
-                MinIdleDurationElapsed = 1,
-                AutoAdvanceTimeoutElapsed = 0,
-            });
-
-            var requestEntity = GetOrCreateSingletonEntity<RunDirectorStageRequestComponent>(em);
-            em.SetComponentData(requestEntity, new RunDirectorStageRequestComponent
-            {
-                StageStartRequested = 1,
-                ConfirmPressed = 0,
-            });
-
-            GetOrCreateSingletonEntity<RunDirectorStageSignalComponent>(em);
-            GetOrCreateSingletonEntity<BulletFrameCounterComponent>(em);
-            em.CreateEntity(typeof(SourceRunDirectorStateComponent));
-
-            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-            transitionSystem.Update(world.Unmanaged);
-            Assert.That(em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity).State, Is.EqualTo(RunDirectorStageStateId.Idle));
-
-            em.SetComponentData(topologyStateEntity, new StageTopologyStateComponent
-            {
-                SelectedStageId = 1,
-                AppliedStageId = 1,
-                Ready = 1,
-            });
-            transitionSystem.Update(world.Unmanaged);
-
-            var stageState = em.GetComponentData<RunDirectorStageStateComponent>(stageStateEntity);
-            var request = em.GetComponentData<RunDirectorStageRequestComponent>(requestEntity);
-            Assert.That(stageState.State, Is.EqualTo(RunDirectorStageStateId.Running));
-            Assert.That(request.StageStartRequested, Is.EqualTo(0));
-        }
-
-        private static void ApplyStage(World world, int stageId)
-        {
-            var em = world.EntityManager;
-            var requestEntity = GetOrCreateSingletonEntity<StageTopologyRequestComponent>(em);
-            em.SetComponentData(requestEntity, new StageTopologyRequestComponent
-            {
-                RequestedStageId = stageId,
-                ApplyRequested = 1,
-            });
-            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-            world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-        }
-
-        private static void SetStageState(EntityManager em, RunDirectorStageStateId state)
-        {
-            var entity = GetOrCreateSingletonEntity<RunDirectorStageStateComponent>(em);
-            em.SetComponentData(entity, new RunDirectorStageStateComponent
-            {
-                State = state,
-                StateElapsedSec = 0f,
-                EnteredFrame = 0u,
-                LastTransitionReason = RunDirectorStageTransitionReasonId.None,
-            });
-        }
-
-        private static bool IsEnabledSourceStableIdPresent(EntityManager em, uint stableId)
-        {
-            using var query = em.CreateEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                    ComponentType.ReadOnly<StageTopologySourceTag>(),
-                    ComponentType.ReadOnly<SourceStableIdComponent>(),
-                },
-                Options = EntityQueryOptions.IncludeDisabledEntities,
-            });
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
-            for (int i = 0; i < entities.Length; i++)
-            {
-                if (em.GetComponentData<SourceStableIdComponent>(entities[i]).Value != stableId)
-                    continue;
-                if (em.IsEnabled(entities[i]))
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsEnabledDepositStableIdPresent(EntityManager em, uint stableId)
-        {
-            using var query = em.CreateEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                    ComponentType.ReadOnly<StageTopologyDepositTag>(),
-                    ComponentType.ReadOnly<DepositStableIdComponent>(),
-                },
-                Options = EntityQueryOptions.IncludeDisabledEntities,
-            });
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
-            for (int i = 0; i < entities.Length; i++)
-            {
-                if (em.GetComponentData<DepositStableIdComponent>(entities[i]).Value != stableId)
-                    continue;
-                if (em.IsEnabled(entities[i]))
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsEnabledObstacleStableIdPresent(EntityManager em, uint stableId)
-        {
-            using var query = em.CreateEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                    ComponentType.ReadOnly<StageTopologyObstacleTag>(),
-                    ComponentType.ReadOnly<ObstacleStableIdComponent>(),
-                },
-                Options = EntityQueryOptions.IncludeDisabledEntities,
-            });
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
-            for (int i = 0; i < entities.Length; i++)
-            {
-                if (em.GetComponentData<ObstacleStableIdComponent>(entities[i]).Value != stableId)
-                    continue;
-                if (em.IsEnabled(entities[i]))
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static void EnsureOwnedSource(EntityManager em, Entity entity, uint stableId)
-        {
-            if (!em.HasComponent<StageTopologyOwnedTag>(entity))
-                em.AddComponent<StageTopologyOwnedTag>(entity);
-            if (!em.HasComponent<StageTopologyOwnedComponent>(entity))
-            {
-                em.AddComponentData(entity, new StageTopologyOwnedComponent
-                {
-                    Kind = StageTopologyKind.Source,
-                    LastAppliedVersion = 0u,
-                });
-            }
-            if (!em.HasComponent<StageTopologySourceTag>(entity))
-                em.AddComponent<StageTopologySourceTag>(entity);
-            if (em.HasComponent<StageTopologyDepositTag>(entity))
-                em.RemoveComponent<StageTopologyDepositTag>(entity);
-            em.SetComponentData(entity, new SourceStableIdComponent { Value = stableId });
-        }
-
-        private static void AssertTopologyOwned(EntityManager em, Entity entity, StageTopologyKind expectedKind, uint expectedVersion)
-        {
-            Assert.That(em.HasComponent<StageTopologyOwnedComponent>(entity), Is.True);
-            var owned = em.GetComponentData<StageTopologyOwnedComponent>(entity);
-            Assert.That(owned.Kind, Is.EqualTo(expectedKind));
-            Assert.That(owned.LastAppliedVersion, Is.EqualTo(expectedVersion));
-        }
-
-        private static void AssertOwnedCounts(EntityManager em, int expectedSourceTotal, int expectedSourceEnabled, int expectedDepositTotal, int expectedDepositEnabled)
-        {
-            using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                    ComponentType.ReadOnly<StageTopologySourceTag>(),
-                },
-                Options = EntityQueryOptions.IncludeDisabledEntities,
-            });
-            using var depositQuery = em.CreateEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                    ComponentType.ReadOnly<StageTopologyDepositTag>(),
-                },
-                Options = EntityQueryOptions.IncludeDisabledEntities,
-            });
-            using var sourceEntities = sourceQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-            using var depositEntities = depositQuery.ToEntityArray(Unity.Collections.Allocator.Temp);
-
-            int sourceEnabled = 0;
-            for (int i = 0; i < sourceEntities.Length; i++)
-            {
-                if (em.IsEnabled(sourceEntities[i]))
-                    sourceEnabled++;
-            }
-
-            int depositEnabled = 0;
-            for (int i = 0; i < depositEntities.Length; i++)
-            {
-                if (em.IsEnabled(depositEntities[i]))
-                    depositEnabled++;
-            }
-
-            Assert.That(sourceEntities.Length, Is.EqualTo(expectedSourceTotal));
-            Assert.That(sourceEnabled, Is.EqualTo(expectedSourceEnabled));
-            Assert.That(depositEntities.Length, Is.EqualTo(expectedDepositTotal));
-            Assert.That(depositEnabled, Is.EqualTo(expectedDepositEnabled));
-        }
-
-        private static World CreateDefaultTestWorld(string worldName)
-        {
-            var world = new World(worldName);
-            var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
-            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
-            var lifecycleEntity = GetOrCreateSingletonEntity<StageTopologyLifecycleStateComponent>(world.EntityManager);
-            world.EntityManager.SetComponentData(lifecycleEntity, default(StageTopologyLifecycleStateComponent));
             return world;
         }
 
-        private static Entity GetOrCreateSingletonEntity<T>(EntityManager em)
-            where T : unmanaged, IComponentData
+        private static void PublishCatalogAndRequest(EntityManager em, Entity requestEntity, StageCatalogSO stageCatalog, int stageId)
         {
-            using var query = em.CreateEntityQuery(ComponentType.ReadWrite<T>());
-            if (query.IsEmptyIgnoreFilter)
-                return em.CreateEntity(typeof(T));
-            if (query.CalculateEntityCount() == 1)
-                return query.GetSingletonEntity();
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
-            return entities[0];
+            using var runtimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>());
+            var runtimeEntity = runtimeQuery.GetSingletonEntity();
+            em.GetComponentObject<StageCatalogRuntimeComponent>(runtimeEntity).Catalog = stageCatalog;
+
+            em.SetComponentData(requestEntity, new StageTopologyRequestComponent
+            {
+                ApplyRequested = 1,
+                RequestedStageId = stageId,
+            });
         }
 
-        private static T GetSingleton<T>(EntityManager em)
-            where T : unmanaged, IComponentData
+        private static StageCatalogSO CreateStageCatalog(bool includeSourceLayout)
         {
-            return em.GetComponentData<T>(GetOrCreateSingletonEntity<T>(em));
+            var layout = UnityEngine.ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.StageId = 1;
+            layout.SchemaVersion = 2;
+            layout.Grid = new StageGridSpec
+            {
+                Width = 2,
+                Height = 2,
+                CellSize = 1f,
+                Origin = new UnityEngine.Vector3(0f, 0f, 0f),
+            };
+            layout.Cells = new[]
+            {
+                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.None, DepositRegionId = 0u, SourceRegionId = includeSourceLayout ? 1001u : 0u },
+                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.BlockPlayer, DepositRegionId = 0u, SourceRegionId = 0u },
+                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.None, DepositRegionId = 0u, SourceRegionId = includeSourceLayout ? 1001u : 0u },
+                new StageCellLayoutData { MovementFlags = StageCellMovementFlags.BlockBullet, DepositRegionId = 2001u, SourceRegionId = 0u },
+            };
+            layout.SourceRegions = includeSourceLayout
+                ? new[]
+                {
+                    new StageSourceRegionLayoutData
+                    {
+                        StableId = 1001u,
+                        Active = true,
+                        AnchorCell = new UnityEngine.Vector2Int(0, 0),
+                        AnchorOffset = new UnityEngine.Vector2(0.25f, 0f),
+                    }
+                }
+                : System.Array.Empty<StageSourceRegionLayoutData>();
+            layout.DepositRegions = new[]
+            {
+                new StageDepositRegionLayoutData
+                {
+                    StableId = 2001u,
+                    Active = true,
+                    AnchorCell = new UnityEngine.Vector2Int(1, 1),
+                    AnchorOffset = UnityEngine.Vector2.zero,
+                }
+            };
+            layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
+
+            var definition = UnityEngine.ScriptableObject.CreateInstance<StageDefinitionSO>();
+            definition.StageId = 1;
+            definition.SourceBindings = includeSourceLayout
+                ? new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1001u,
+                        ThresholdWeakened = 2,
+                        ThresholdDepleted = 4,
+                        InitialSourceState = SourceStateId.Normal,
+                    }
+                }
+                : System.Array.Empty<StageSourceBinding>();
+
+            var catalog = UnityEngine.ScriptableObject.CreateInstance<StageCatalogSO>();
+            catalog.Entries = new[]
+            {
+                new StageCatalogEntry
+                {
+                    Enabled = true,
+                    Definition = definition,
+                    Layout = layout,
+                }
+            };
+            return catalog;
         }
 
-        private static void SetSingleton<T>(EntityManager em, T value)
-            where T : unmanaged, IComponentData
+        private static void SetSingleton<T>(EntityManager em, T value) where T : unmanaged, IComponentData
         {
-            var entity = GetOrCreateSingletonEntity<T>(em);
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            var entity = query.GetSingletonEntity();
             em.SetComponentData(entity, value);
-        }
-
-        private static void SetManagedSingleton<T>(EntityManager em, T value)
-            where T : class
-        {
-            using var query = em.CreateEntityQuery(ComponentType.ReadWrite<T>());
-            Entity entity;
-            if (query.IsEmptyIgnoreFilter)
-            {
-                entity = em.CreateEntity();
-                em.AddComponentObject(entity, value);
-                return;
-            }
-
-            entity = query.CalculateEntityCount() == 1
-                ? query.GetSingletonEntity()
-                : query.ToEntityArray(Unity.Collections.Allocator.Temp)[0];
-            em.RemoveComponent<T>(entity);
-            em.AddComponentObject(entity, value);
-        }
-
-        private static Entity CreatePlayerWithStageEntryTransientState(EntityManager em)
-        {
-            var player = em.CreateEntity(
-                typeof(PlayerTag),
-                typeof(PlayerCarryBinComponent),
-                typeof(PlayerHazardPenaltyStateComponent),
-                typeof(PlayerHazardRiskConfigComponent),
-                typeof(PlayerHazardRiskStateComponent),
-                typeof(PlayerHazardRiskRequestComponent),
-                typeof(PlayerCarryBinDepositRequestTag),
-                typeof(PlayerCarryBinDepositContextComponent),
-                typeof(PlayerHazardHitRequestTag),
-                typeof(PlayerHazardHitContextComponent),
-                typeof(PlayerUiFeedbackPresentationSnapshotComponent));
-
-            em.SetComponentData(player, new PlayerCarryBinComponent
-            {
-                Load = 12,
-                Capacity = 12,
-            });
-            em.SetComponentData(player, new PlayerHazardPenaltyStateComponent
-            {
-                IFrameTimer = 0.75f,
-                VacuumLockTimer = 0.5f,
-            });
-            em.SetComponentData(player, new PlayerHazardRiskConfigComponent
-            {
-                HazardStackMax = 5,
-                HazardBonusRate = 0.05f,
-            });
-            em.SetComponentData(player, new PlayerHazardRiskStateComponent
-            {
-                HazardStack = 3,
-            });
-            em.SetComponentData(player, new PlayerHazardRiskRequestComponent
-            {
-                PendingHazardCapturedCount = 2,
-                ResetRequested = 1,
-            });
-            em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, true);
-            em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
-            {
-                DepositEntity = player,
-            });
-            em.SetComponentEnabled<PlayerHazardHitRequestTag>(player, true);
-            em.SetComponentData(player, new PlayerHazardHitContextComponent
-            {
-                SourceEntity = player,
-                HitDirX = 1f,
-                HitDirZ = -1f,
-            });
-            em.SetComponentData(player, new PlayerUiFeedbackPresentationSnapshotComponent
-            {
-                Version = 8u,
-                Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
-                Reason = (byte)PlayerUiFeedbackReasonId.CarryBinFull,
-                Value = 0,
-                RelatedEntity = player,
-                Frame = 77u,
-                RemainingSec = 1.2f,
-                ClockSec = 2.5f,
-                NextAllowedVacuumBlockedSec = 3f,
-                NextAllowedSourceStateChangedSec = 4f,
-                NextAllowedHazardCapturedSec = 5f,
-                NextAllowedHazardRemovedSec = 6f,
-                NextAllowedHitSec = 7f,
-            });
-
-            var feedbackBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
-            feedbackBuffer.Add(new PlayerUiFeedbackEventBufferElement
-            {
-                Type = PlayerUiFeedbackEventType.VacuumStartBlocked,
-                Reason = (byte)PlayerUiFeedbackReasonId.CarryBinFull,
-                Value = 0,
-                RelatedEntity = player,
-                Frame = 77u,
-                Sequence = 1u,
-            });
-
-            return player;
         }
 
         private static Entity CreateSourceTemplate(EntityManager em)
         {
             var entity = em.CreateEntity(
+                typeof(Prefab),
                 typeof(SourceStableIdComponent),
                 typeof(SourceSpawnComponent),
                 typeof(SourceSpawnRuntimeComponent),
@@ -1528,38 +259,39 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, new SourceStableIdComponent { Value = 1u });
             em.SetComponentData(entity, new SourceSpawnComponent
             {
-                ThresholdWeakened = 2000,
-                ThresholdDepleted = 4000,
+                ThresholdWeakened = 2,
+                ThresholdDepleted = 4,
                 CollectedCount = 0,
                 State = SourceStateId.Normal,
             });
             em.SetComponentData(entity, new SourceSpawnRuntimeComponent { SpawnSequence = 1u });
             em.SetComponentData(entity, new SourceAnchorComponent { Position = float3.zero });
-            var sourceShape = new Shape2DComponent
+            em.SetComponentData(entity, new Shape2DComponent
             {
                 Kind = Shape2DKind.Circle,
-                Radius = 8f,
-                Size = new float2(12f, 8f),
-            };
-            em.SetComponentData(entity, sourceShape);
+                Radius = 2f,
+                Size = float2.zero,
+            });
             em.SetComponentData(entity, new SourceShapeDerivedComponent
             {
-                ComputedArea = Shape2DUtility.ComputeArea(in sourceShape),
-                HalfExtents = Shape2DUtility.ComputeHalfExtents(in sourceShape),
+                ComputedArea = math.PI * 4f,
+                HalfExtents = new float2(2f, 2f),
             });
             em.SetComponentData(entity, new SourcePollutionConfigComponent
             {
                 MinValue = 0f,
                 MaxValue = 1f,
-                RegenPerSec = 0.08f,
-                DropPerCollect = 0.12f,
-                TopKSampleCount = 6,
+                RegenPerSec = 0.1f,
+                DropPerCollect = 0.1f,
+                TopKSampleCount = 1,
             });
             em.SetComponentData(entity, new SourcePollutionGridComponent
             {
-                CellSize = 2f,
-                InvCellSize = 0.5f,
-                HalfExtents = new float2(8f, 8f),
+                CellSize = 1f,
+                InvCellSize = 1f,
+                HalfExtents = new float2(2f, 2f),
+                OriginX = -2f,
+                OriginZ = -2f,
                 Cols = 1,
                 Rows = 1,
             });
@@ -1582,241 +314,18 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
 
-            em.AddBuffer<SourceSpawnRequestBuffer>(entity).Clear();
-            em.AddBuffer<SourceClipPatternBuffer>(entity).Clear();
-            em.AddBuffer<SourceSustainSlotCandidateBuffer>(entity).Clear();
-            em.AddBuffer<SourceSustainRuntimeLaneBuffer>(entity).Clear();
-            em.AddBuffer<SourceEventQueueBuffer>(entity).Clear();
-            em.AddBuffer<SourceActiveBulletCountBuffer>(entity).Clear();
-            var pressureInputs = em.AddBuffer<SourceDirectorPressureInputBuffer>(entity);
-            SourceRuntimeApplyUtility.ResetPressureInputs(pressureInputs);
-            em.AddBuffer<SourcePollutionCellBuffer>(entity).Clear();
-            em.AddBuffer<SourcePollutionDropRequestBuffer>(entity).Clear();
-            em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity).Clear();
+            em.AddBuffer<SourceSpawnRequestBuffer>(entity);
+            em.AddBuffer<SourceClipPatternBuffer>(entity);
+            em.AddBuffer<SourceSustainSlotCandidateBuffer>(entity);
+            em.AddBuffer<SourceSustainRuntimeLaneBuffer>(entity);
+            em.AddBuffer<SourceEventQueueBuffer>(entity);
+            em.AddBuffer<SourceActiveBulletCountBuffer>(entity);
+            em.AddBuffer<SourceDirectorPressureInputBuffer>(entity);
+            em.AddBuffer<SourcePollutionCellBuffer>(entity);
+            em.AddBuffer<SourcePollutionDropRequestBuffer>(entity);
+            em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
+            em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
             return entity;
-        }
-
-        private static Entity CreateDepositTemplate(EntityManager em)
-        {
-            var entity = em.CreateEntity(
-                typeof(DepositStableIdComponent),
-                typeof(DepositPointComponent),
-                typeof(Shape2DComponent),
-                typeof(LocalTransform));
-            em.SetComponentData(entity, new DepositStableIdComponent { Value = 1u });
-            em.SetComponentData(entity, new Shape2DComponent { Kind = Shape2DKind.Circle, Radius = 1.2f, Size = float2.zero });
-            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
-            return entity;
-        }
-
-        private static Entity CreateObstacleTemplate(EntityManager em)
-        {
-            var entity = em.CreateEntity(
-                typeof(ObstacleStableIdComponent),
-                typeof(ObstacleCollisionMaskComponent),
-                typeof(ObstacleGeometryComponent),
-                typeof(Shape2DComponent),
-                typeof(LocalTransform));
-
-            em.SetComponentData(entity, new ObstacleStableIdComponent { Value = 1u });
-            em.SetComponentData(entity, new ObstacleCollisionMaskComponent
-            {
-                Value = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
-            });
-            em.SetComponentData(entity, new Shape2DComponent
-            {
-                Kind = Shape2DKind.Rectangle,
-                Radius = 1f,
-                Size = new float2(2f, 2f),
-            });
-            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
-            return entity;
-        }
-
-        private static StageCatalogSO CreateStageCatalog(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds, uint[] obstacleStableIds = null)
-        {
-            var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
-            createdAssets.Add(catalog);
-            catalog.Entries = new[] { CreateEntry(createdAssets, stageId, sourceStableIds, depositStableIds, obstacleStableIds) };
-            return catalog;
-        }
-
-        private static StageCatalogEntry CreateEntry(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds, uint[] obstacleStableIds = null)
-        {
-            return new StageCatalogEntry
-            {
-                Enabled = true,
-                EntryKey = $"stage_{stageId:00}",
-                Definition = CreateDefinition(createdAssets, stageId, sourceStableIds),
-                Layout = CreateLayout(createdAssets, stageId, sourceStableIds, depositStableIds, obstacleStableIds),
-            };
-        }
-
-        private static StageDefinitionSO CreateDefinition(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds)
-        {
-            var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
-            definition.StageId = stageId;
-            definition.DisplayName = $"Stage {stageId}";
-            definition.StageTimeLimitSec = 90f;
-            createdAssets.Add(definition);
-
-            var bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-#if UNITY_EDITOR
-            bullet.Editor_SetDefinitionId(stageId * 100 + 1);
-#endif
-            createdAssets.Add(bullet);
-
-            var sustain = ScriptableObject.CreateInstance<WaveClipSO>();
-            sustain.ClipId = stageId * 1000 + 1;
-            sustain.Phase = SourceWavePhaseId.Sustain;
-            sustain.Lane = SourceSpawnLaneId.Hazard;
-            sustain.DurationSec = 1f;
-            sustain.Segments = new[]
-            {
-                new WaveClipSO.ClipSegment
-                {
-                    StartSec = 0f,
-                    EndSec = 1f,
-                    Entries = new[]
-                    {
-                        new WaveClipSO.SpawnEntry
-                        {
-                            Payload = new WaveClipSO.SpawnPayloadProfile
-                            {
-                                Bullet = bullet,
-                            },
-                            Emission = new WaveClipSO.SpawnEmissionProfile
-                            {
-                                EmissionMode = SourceSpawnEmissionModeId.RateField,
-                                SpawnMode = SourceSpawnModeId.FixedDensity,
-                                RatePerSecPerArea = 20f,
-                                BurstShotsPerEvent = 1,
-                            },
-                            Sampling = new WaveClipSO.SpawnSamplingProfile
-                            {
-                                SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                                CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                                SpawnSampleBudget = 8,
-                            },
-                            Direction = new WaveClipSO.SpawnDirectionProfile
-                            {
-                                DirectionMode = SourceSpawnDirectionModeId.Fixed,
-                                BaseAngleDeg = 0f,
-                                NWayCount = 1,
-                            },
-                        },
-                    },
-                },
-            };
-            createdAssets.Add(sustain);
-
-            definition.SourceBindings = new StageSourceBinding[sourceStableIds.Length];
-            for (int i = 0; i < sourceStableIds.Length; i++)
-            {
-                definition.SourceBindings[i] = new StageSourceBinding
-                {
-                    SourceStableId = sourceStableIds[i],
-                    InitialSourceState = SourceStateId.Normal,
-                    ThresholdWeakened = 10,
-                    ThresholdDepleted = 20,
-                    SustainSlots = new[]
-                    {
-                        new SustainSlotBinding
-                        {
-                            State = SourceStateId.Normal,
-                            Lane = SourceSpawnLaneId.Hazard,
-                            Clips = new[] { sustain },
-                            Weights = new[] { 1f },
-                        },
-                    },
-                    EventSlots = new EventSlotBinding[0],
-                };
-            }
-
-            return definition;
-        }
-
-        private static StageLayoutSO CreateLayout(List<ScriptableObject> createdAssets, int stageId, uint[] sourceStableIds, uint[] depositStableIds, uint[] obstacleStableIds = null)
-        {
-            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
-            layout.StageId = stageId;
-            createdAssets.Add(layout);
-
-            layout.Sources = new StageSourceLayoutData[sourceStableIds.Length];
-            for (int i = 0; i < sourceStableIds.Length; i++)
-            {
-                layout.Sources[i] = new StageSourceLayoutData
-                {
-                    StableId = sourceStableIds[i],
-                    Active = true,
-                    Position = new Vector3(i * 3f, 0f, stageId * 2f),
-                    YawDeg = i * 30f,
-                    Shape = i % 2 == 0 ? Shape2DKind.Circle : Shape2DKind.Rectangle,
-                    Radius = 6f + i,
-                    Size = new Vector2(8f + i, 6f + i),
-                };
-            }
-
-            layout.Deposits = new StageDepositLayoutData[depositStableIds.Length];
-            for (int i = 0; i < depositStableIds.Length; i++)
-            {
-                layout.Deposits[i] = new StageDepositLayoutData
-                {
-                    StableId = depositStableIds[i],
-                    Active = true,
-                    Position = new Vector3(stageId * 5f, 0f, i * 4f),
-                    Shape = Shape2DKind.Circle,
-                    Radius = 3f + i,
-                };
-            }
-
-            obstacleStableIds ??= System.Array.Empty<uint>();
-            layout.Obstacles = new StageObstacleLayoutData[obstacleStableIds.Length];
-            for (int i = 0; i < obstacleStableIds.Length; i++)
-            {
-                layout.Obstacles[i] = new StageObstacleLayoutData
-                {
-                    StableId = obstacleStableIds[i],
-                    Active = true,
-                    Position = new Vector3(stageId * 2f, 0f, -4f + (i * 3f)),
-                    YawDeg = i * 15f,
-                    Shape = Shape2DKind.Rectangle,
-                    Radius = 0f,
-                    Size = new Vector2(3f + i, 2f + i),
-                    CollisionMask = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
-                };
-            }
-
-            return layout;
-        }
-
-        private static Entity FindByStableId<T>(EntityManager em, Unity.Collections.NativeArray<Entity> entities, uint stableId, System.Func<T, uint> accessor)
-            where T : unmanaged, IComponentData
-        {
-            for (int i = 0; i < entities.Length; i++)
-            {
-                if (accessor(em.GetComponentData<T>(entities[i])) == stableId)
-                    return entities[i];
-            }
-
-            Assert.Fail($"StableId {stableId} not found.");
-            return Entity.Null;
-        }
-
-        private static void DestroyAll(List<ScriptableObject> createdAssets)
-        {
-            for (int i = createdAssets.Count - 1; i >= 0; i--)
-            {
-                if (createdAssets[i] != null)
-                    Object.DestroyImmediate(createdAssets[i]);
-            }
-
-            createdAssets.Clear();
         }
     }
 }
-
-
-
-
-

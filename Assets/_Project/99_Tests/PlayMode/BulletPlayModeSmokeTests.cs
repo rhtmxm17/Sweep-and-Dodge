@@ -638,89 +638,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [UnityTest]
-        public IEnumerator PlayMode_OperationalScene_DemoShellDialogueBridge_Stage2StartUsesPresentationRootFallback()
-        {
-            ClearDemoShellStaging();
-            yield return LoadSceneWithSettle(OperationalScenePath);
-
-            var world = World.DefaultGameObjectInjectionWorld;
-            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
-            var em = world.EntityManager;
-
-            DemoShellFlowController shell = null;
-            DemoShellDialogueBridge dialogueBridge = null;
-            RuntimeUiRoot uiRoot = null;
-            StagePresentationRuntimeController controller = null;
-            yield return WaitForCondition(
-                () =>
-                {
-                    shell = FindDemoShell();
-                    dialogueBridge = FindDialogueBridge();
-                    uiRoot = FindRuntimeUiRoot();
-                    controller = FindStagePresentationRuntimeController();
-                    return shell != null && dialogueBridge != null && uiRoot != null && controller != null && shell.CurrentScreen == DemoShellScreenId.Title;
-                },
-                240,
-                "Operational scene was not ready for stage2 dialogue anchor test.");
-
-            Assert.That(shell.RequestStartFromTitle(), Is.True);
-            yield return WaitForCondition(
-                () =>
-                {
-                    shell = FindDemoShell();
-                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
-                },
-                240,
-                "Stage2 dialogue anchor test did not reach Lobby.");
-
-            Assert.That(shell.RequestSelectStageById(2), Is.True);
-            yield return WaitForCondition(
-                () =>
-                {
-                    shell = FindDemoShell();
-                    controller = FindStagePresentationRuntimeController();
-                    return shell != null
-                        && controller != null
-                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
-                        && shell.CurrentStageId == 2
-                        && controller.LastAppliedStageId == 2
-                        && controller.SpawnedRootCount == 1;
-                },
-                360,
-                "Stage2 dialogue anchor test did not reach StagePlay.");
-
-            yield return WaitForCondition(
-                () => HasSingleton<RunDirectorStageStateComponent>(em)
-                    && GetSingleton<RunDirectorStageStateComponent>(em).State == RunDirectorStageStateId.Running,
-                360,
-                "RunDirector stage did not reach Running for stage2 dialogue anchor test.");
-
-            yield return WaitForCondition(
-                () =>
-                {
-                    dialogueBridge = FindDialogueBridge();
-                    uiRoot = FindRuntimeUiRoot();
-                    controller = FindStagePresentationRuntimeController();
-                    return dialogueBridge != null
-                        && uiRoot != null
-                        && controller != null
-                        && dialogueBridge.IsDialogueActive
-                        && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart
-                        && uiRoot.DialoguePresenter != null
-                        && uiRoot.DialoguePresenter.WorldBubbleRoot != null
-                        && uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf;
-                },
-                240,
-                "Stage2 overlay dialogue did not activate with root fallback bubble.");
-
-            Assert.That(controller.TryGetPresentationRoot(9002u, out var stage2Root), Is.True);
-            Assert.That(stage2Root, Is.Not.Null);
-            Assert.That(controller.TryGetPresentationAnchor(9002u, out var stage2Anchor), Is.True);
-            Assert.That(stage2Anchor, Is.EqualTo(stage2Root.transform));
-            Assert.That(uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
-        }
-
-        [UnityTest]
         public IEnumerator PlayMode_OperationalScene_StagePlayIntervention_CarryFull_ShowsDialogueAndSuppressesHintNotification()
         {
             ClearDemoShellStaging();
@@ -3699,18 +3616,17 @@ namespace SweepNDodge.DotsBullets.Tests
             CompleteTrackedJobs(em);
             if (!TryFindSourceByStableId(em, 1001u, out var source1001))
                 return false;
-            if (!TryFindDepositByStableId(em, 2001u, out var deposit2001))
+            if (!HasStageRuntimeGrid(em, expectedStageId: 1, out var grid, out var cells))
                 return false;
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var area1 = em.GetComponentData<Shape2DComponent>(source1001);
-            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
+            var sourceCells1 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1001, isReadOnly: true);
 
             return sourceState1.State == SourceStateId.Normal
                 && area1.Kind == Shape2DKind.Rectangle
-                && Mathf.Abs(area1.Size.x - 12f) <= 0.01f
-                && Mathf.Abs(area1.Size.y - 8f) <= 0.01f
-                && Mathf.Abs(deposit1.Radius - 5f) <= 0.01f;
+                && sourceCells1.Length > 0
+                && HasAnyDepositCell(cells);
         }
 
         private static bool IsStageMapAppliedForStage2(EntityManager em)
@@ -3718,28 +3634,18 @@ namespace SweepNDodge.DotsBullets.Tests
             CompleteTrackedJobs(em);
             if (!TryFindSourceByStableId(em, 1002u, out var source1002))
                 return false;
-            if (!TryFindDepositByStableId(em, 2001u, out var deposit2001))
-                return false;
-            if (!TryFindObstacleByStableId(em, 3004u, out var obstacle3004))
+            if (!HasStageRuntimeGrid(em, expectedStageId: 2, out var grid, out var cells))
                 return false;
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
-            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
+            var sourceCells2 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1002, isReadOnly: true);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3004);
-            var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3004);
 
             return sourceState2.State == SourceStateId.Normal
-                && area2.Kind == Shape2DKind.Circle
-                && Mathf.Abs(area2.Radius - 6f) <= 0.01f
-                && Mathf.Abs(deposit1.Radius - 4f) <= 0.01f
-                && obstacleGeometry.Kind == Shape2DKind.Rectangle
-                && Mathf.Abs(obstacleGeometry.Size.x - 3.5f) <= 0.01f
-                && Mathf.Abs(obstacleGeometry.Size.y - 2f) <= 0.01f
-                && HasRequiredObstacleMaskBits(
-                    obstacleMask.Value,
-                    ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet)
+                && area2.Kind == Shape2DKind.Rectangle
+                && sourceCells2.Length > 0
+                && HasAnyDepositCell(cells)
                 && clipPatterns2.Length > 0;
         }
 
@@ -3755,8 +3661,7 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             bool hasSource = TryFindSourceByStableId(em, 1002u, out var source1002);
-            bool hasDeposit = TryFindDepositByStableId(em, 2001u, out var deposit2001);
-            bool hasObstacle = TryFindObstacleByStableId(em, 3004u, out var obstacle3004);
+            bool hasGrid = HasStageRuntimeGrid(em, expectedStageId: 2, out var grid, out var cells);
 
             string sourceText = "source1002=missing";
             if (hasSource)
@@ -3768,23 +3673,14 @@ namespace SweepNDodge.DotsBullets.Tests
                     $"source1002(state={source.State}, shape={area.Kind}, radius={area.Radius:0.##}, size=({area.Size.x:0.##},{area.Size.y:0.##}), patterns={clipPatterns.Length})";
             }
 
-            string depositText = "deposit2001=missing";
-            if (hasDeposit)
+            string gridText = "grid=missing";
+            if (hasGrid)
             {
-                var deposit = em.GetComponentData<Shape2DComponent>(deposit2001);
-                depositText = $"deposit2001(radius={deposit.Radius:0.##})";
+                int depositCount = CountDepositCells(cells);
+                gridText = $"grid(stage={grid.StageId}, size={grid.Width}x{grid.Height}, depositCells={depositCount})";
             }
 
-            string obstacleText = "obstacle3004=missing";
-            if (hasObstacle)
-            {
-                var geometry = em.GetComponentData<Shape2DComponent>(obstacle3004);
-                var mask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3004);
-                obstacleText =
-                    $"obstacle3004(shape={geometry.Kind}, radius={geometry.Radius:0.##}, size=({geometry.Size.x:0.##},{geometry.Size.y:0.##}), mask={mask.Value})";
-            }
-
-            return $"{topologyText}, {sourceText}, {depositText}, {obstacleText}";
+            return $"{topologyText}, {sourceText}, {gridText}";
         }
 
         private static string DescribeStageRunState(EntityManager em)
@@ -3830,52 +3726,51 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             CompleteTrackedJobs(em);
             Assert.That(TryFindSourceByStableId(em, 1001u, out var source1001), Is.True);
-            Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
+            Assert.That(HasStageRuntimeGrid(em, expectedStageId: 1, out var grid, out var cells), Is.True);
 
             var sourceState1 = em.GetComponentData<SourceSpawnComponent>(source1001);
             var area1 = em.GetComponentData<Shape2DComponent>(source1001);
-            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
+            var sourceCells1 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1001, isReadOnly: true);
 
             Assert.That(sourceState1.State, Is.EqualTo(SourceStateId.Normal));
             Assert.That(area1.Kind, Is.EqualTo(Shape2DKind.Rectangle));
-            Assert.That(area1.Size.x, Is.EqualTo(12f).Within(0.01f));
-            Assert.That(area1.Size.y, Is.EqualTo(8f).Within(0.01f));
-            Assert.That(deposit1.Radius, Is.EqualTo(5f).Within(0.01f));
+            Assert.That(sourceCells1.Length, Is.GreaterThan(0));
+            Assert.That(HasAnyDepositCell(cells), Is.True);
         }
 
         private static void AssertStageMapAppliedForStage2(EntityManager em)
         {
             CompleteTrackedJobs(em);
             Assert.That(TryFindSourceByStableId(em, 1002u, out var source1002), Is.True);
-            Assert.That(TryFindDepositByStableId(em, 2001u, out var deposit2001), Is.True);
-            Assert.That(TryFindObstacleByStableId(em, 3004u, out var obstacle3004), Is.True);
+            Assert.That(HasStageRuntimeGrid(em, expectedStageId: 2, out var grid, out var cells), Is.True);
 
             var sourceState2 = em.GetComponentData<SourceSpawnComponent>(source1002);
             var area2 = em.GetComponentData<Shape2DComponent>(source1002);
-            var deposit1 = em.GetComponentData<Shape2DComponent>(deposit2001);
+            var sourceCells2 = em.GetBuffer<SourceRegionCellIndexBuffer>(source1002, isReadOnly: true);
             var clipPatterns2 = em.GetBuffer<SourceClipPatternBuffer>(source1002, isReadOnly: true);
-            var obstacleGeometry = em.GetComponentData<Shape2DComponent>(obstacle3004);
-            var obstacleMask = em.GetComponentData<ObstacleCollisionMaskComponent>(obstacle3004);
 
             Assert.That(sourceState2.State, Is.EqualTo(SourceStateId.Normal));
-            Assert.That(area2.Kind, Is.EqualTo(Shape2DKind.Circle));
-            Assert.That(area2.Radius, Is.EqualTo(6f).Within(0.01f));
-            Assert.That(deposit1.Radius, Is.EqualTo(4f).Within(0.01f));
-            Assert.That(obstacleGeometry.Kind, Is.EqualTo(Shape2DKind.Rectangle));
-            Assert.That(obstacleGeometry.Size.x, Is.EqualTo(3.5f).Within(0.01f));
-            Assert.That(obstacleGeometry.Size.y, Is.EqualTo(2f).Within(0.01f));
-            Assert.That(
-                HasRequiredObstacleMaskBits(
-                    obstacleMask.Value,
-                    ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet),
-                Is.True);
+            Assert.That(area2.Kind, Is.EqualTo(Shape2DKind.Rectangle));
+            Assert.That(sourceCells2.Length, Is.GreaterThan(0));
+            Assert.That(HasAnyDepositCell(cells), Is.True);
             Assert.That(clipPatterns2.Length, Is.GreaterThan(0));
         }
 
-        private static bool HasRequiredObstacleMaskBits(ObstacleCollisionMask actual, ObstacleCollisionMask required)
+        private static bool HasAnyDepositCell(DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
         {
-            return required != ObstacleCollisionMask.None
-                && (actual & required) == required;
+            return CountDepositCells(cells) > 0;
+        }
+
+        private static int CountDepositCells(DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
+        {
+            int count = 0;
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (cells[i].DepositRegionId != 0u)
+                    count++;
+            }
+
+            return count;
         }
 
         private static bool TryFindSourceByStableId(EntityManager em, uint stableId, out Entity sourceEntity)
@@ -3898,44 +3793,22 @@ namespace SweepNDodge.DotsBullets.Tests
             return false;
         }
 
-        private static bool TryFindDepositByStableId(EntityManager em, uint stableId, out Entity depositEntity)
+
+        private static bool HasStageRuntimeGrid(EntityManager em, int expectedStageId, out StageRuntimeGridComponent grid, out DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
         {
             CompleteTrackedJobs(em);
-            depositEntity = Entity.Null;
-            using var query = em.CreateEntityQuery(
-                ComponentType.ReadOnly<DepositStableIdComponent>(),
-                ComponentType.ReadOnly<DepositPointComponent>());
-            using var entities = query.ToEntityArray(Allocator.Temp);
-            for (int i = 0; i < entities.Length; i++)
-            {
-                if (em.GetComponentData<DepositStableIdComponent>(entities[i]).Value != stableId)
-                    continue;
+            grid = default;
+            cells = default;
+            if (!HasSingleton<StageRuntimeGridComponent>(em))
+                return false;
 
-                depositEntity = entities[i];
-                return true;
-            }
+            var entity = GetSingletonEntity<StageRuntimeGridComponent>(em);
+            grid = em.GetComponentData<StageRuntimeGridComponent>(entity);
+            if (grid.Ready == 0 || grid.StageId != expectedStageId || !em.HasBuffer<StageRuntimeGridCellBufferElement>(entity))
+                return false;
 
-            return false;
-        }
-
-        private static bool TryFindObstacleByStableId(EntityManager em, uint stableId, out Entity obstacleEntity)
-        {
-            CompleteTrackedJobs(em);
-            obstacleEntity = Entity.Null;
-            using var query = em.CreateEntityQuery(
-                ComponentType.ReadOnly<ObstacleStableIdComponent>(),
-                ComponentType.ReadOnly<ObstacleGeometryComponent>());
-            using var entities = query.ToEntityArray(Allocator.Temp);
-            for (int i = 0; i < entities.Length; i++)
-            {
-                if (em.GetComponentData<ObstacleStableIdComponent>(entities[i]).Value != stableId)
-                    continue;
-
-                obstacleEntity = entities[i];
-                return true;
-            }
-
-            return false;
+            cells = em.GetBuffer<StageRuntimeGridCellBufferElement>(entity, isReadOnly: true);
+            return cells.Length == grid.Width * grid.Height;
         }
 
         private static void CompleteTrackedJobs(EntityManager em)

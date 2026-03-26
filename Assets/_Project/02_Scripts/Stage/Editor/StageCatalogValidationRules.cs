@@ -346,12 +346,15 @@ namespace SweepNDodge.DotsBullets.Editor
                     definitionSet.Add(stableId);
             }
 
-            var sources = layout.Sources ?? Array.Empty<StageSourceLayoutData>();
-            for (int i = 0; i < sources.Length; i++)
+            if (StageGridLayoutValidationRules.UsesGridSchema(layout))
             {
-                uint stableId = sources[i].StableId;
-                if (stableId > 0)
-                    layoutSet.Add(stableId);
+                var sourceRegions = layout.SourceRegions ?? Array.Empty<StageSourceRegionLayoutData>();
+                for (int i = 0; i < sourceRegions.Length; i++)
+                {
+                    uint stableId = sourceRegions[i].StableId;
+                    if (sourceRegions[i].Active && stableId > 0)
+                        layoutSet.Add(stableId);
+                }
             }
 
             foreach (uint stableId in definitionSet)
@@ -363,7 +366,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     ContentValidationSeverity.Warning,
                     "STC021",
                     location,
-                    $"Definition SourceStableId is not present in Layout.Sources. stableId={stableId}"));
+                    $"Definition SourceStableId is not present in active Layout source regions. stableId={stableId}"));
             }
 
             foreach (uint stableId in layoutSet)
@@ -375,7 +378,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     ContentValidationSeverity.Warning,
                     "STC022",
                     location,
-                    $"Layout source StableId is not present in Definition.SourceBindings. stableId={stableId}"));
+                    $"Active Layout source region StableId is not present in Definition.SourceBindings. stableId={stableId}"));
             }
         }
 

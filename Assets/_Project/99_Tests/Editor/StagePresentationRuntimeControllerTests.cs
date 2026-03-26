@@ -244,7 +244,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Tick_LinkedObstacle_ResolvesRuntimeAnchor()
+        public void Tick_LinkedSource_ResolvesRuntimeAnchor()
         {
             var (controller, _, stageCatalog, presentationCatalog) = CreateControllerGraph();
             stageCatalog.Entries = new[]
@@ -260,8 +260,8 @@ namespace SweepNDodge.DotsBullets.Tests
                             StableId = 9002,
                             Active = true,
                             PlacementMode = StagePresentationPlacementMode.LinkedToParent,
-                            LinkKind = StagePresentationLinkKind.Obstacle,
-                            LinkedStableId = 3002,
+                            LinkKind = StagePresentationLinkKind.Source,
+                            LinkedStableId = 1002,
                             PresentationKey = "wall_basic",
                             Position = new Vector3(1f, 0f, 0f),
                             Euler = new Vector3(0f, 45f, 0f),
@@ -277,7 +277,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Prefab = CreatePresentationPrefab("wall_basic"),
                 },
             };
-            CreateObstacleEntity(3002u, new float3(10f, 0f, 0f), quaternion.RotateY(math.radians(90f)));
+            CreateSourceEntity(1002u, new float3(10f, 0f, 0f), quaternion.RotateY(math.radians(90f)));
 
             SetTopologyState(selected: 2, applied: 2, ready: 1);
             controller.Tick();
@@ -416,10 +416,12 @@ namespace SweepNDodge.DotsBullets.Tests
         private StageLayoutSO CreateLayout(int stageId, params StagePresentationLayoutData[] presentations)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.SchemaVersion = 2;
             layout.StageId = stageId;
-            layout.Sources = System.Array.Empty<StageSourceLayoutData>();
-            layout.Deposits = System.Array.Empty<StageDepositLayoutData>();
-            layout.Obstacles = System.Array.Empty<StageObstacleLayoutData>();
+            layout.Grid = new StageGridSpec { Width = 1, Height = 1, CellSize = 1f, Origin = Vector3.zero };
+            layout.Cells = new[] { new StageCellLayoutData() };
+            layout.SourceRegions = System.Array.Empty<StageSourceRegionLayoutData>();
+            layout.DepositRegions = System.Array.Empty<StageDepositRegionLayoutData>();
             layout.Presentations = presentations;
             _toDestroy.Add(layout);
             return layout;
@@ -440,13 +442,12 @@ namespace SweepNDodge.DotsBullets.Tests
             return prefab;
         }
 
-        private void CreateObstacleEntity(uint stableId, float3 position, quaternion rotation)
+        private void CreateSourceEntity(uint stableId, float3 position, quaternion rotation)
         {
             var entity = _em.CreateEntity(
-                typeof(ObstacleStableIdComponent),
-                typeof(LocalTransform),
-                typeof(ObstacleGeometryComponent));
-            _em.SetComponentData(entity, new ObstacleStableIdComponent { Value = stableId });
+                typeof(SourceStableIdComponent),
+                typeof(LocalTransform));
+            _em.SetComponentData(entity, new SourceStableIdComponent { Value = stableId });
             _em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(position, rotation, 1f));
         }
 

@@ -12,24 +12,129 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ded24860c6a0ae844a3e661c60e40647, type: 3}
   m_Name: sl_demo_3
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutSO
+  SchemaVersion: 2
   StageId: 3
-  Sources:
+  Grid:
+    Width: 7
+    Height: 5
+    CellSize: 1
+    Origin: {x: 0, y: 0, z: 0}
+  Cells:
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 2001
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  SourceRegions:
   - StableId: 1003
     Active: 1
-    Position: {x: 14, y: 0, z: -8}
-    YawDeg: 0
-    Shape: 0
-    Radius: 8
-    Size: {x: 12, y: 8}
-  Deposits:
+    AnchorCell: {x: 2, y: 2}
+    AnchorOffset: {x: 0, y: 0}
+  DepositRegions:
   - StableId: 2001
     Active: 1
-    Position: {x: 14, y: 0, z: 8}
-    YawDeg: 0
-    Shape: 0
-    Radius: 3.5
-    Size: {x: 2, y: 2}
-  Obstacles: []
+    AnchorCell: {x: 6, y: 0}
+    AnchorOffset: {x: 0, y: 0}
   Presentations:
   - StableId: 9003
     Active: 1

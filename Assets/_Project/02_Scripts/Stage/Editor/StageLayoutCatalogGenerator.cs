@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 namespace SweepNDodge.DotsBullets.Editor
 {
@@ -12,7 +13,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private static void GenerateStageLayoutsFromOpenScenesMenu()
         {
             int generated = GenerateStageLayoutsFromOpenScenes(saveAssets: true);
-            Debug.Log($"[StageLayout] StageLayoutSO generation complete. layouts={generated}");
+            Debug.Log($"[StageLayout] Grid StageLayoutSO generation complete. layouts={generated}");
         }
 
         public static int GenerateStageLayoutsFromOpenScenes(bool saveAssets)
@@ -78,10 +79,16 @@ namespace SweepNDodge.DotsBullets.Editor
                 return false;
             }
 
-            ValidatePresentationMarkers(stageNode, issues);
-            var layout = BuildStageLayout(stageNode);
+            StageGridAuthoringValidationRules.Validate(stageNode, issues);
+            if (HasError(issues))
+                return false;
+
+            if (!stageNode.TryGetComponent(out StageGridAuthoring authoring) || authoring == null)
+                return false;
+
+            var layout = BuildStageLayout(stageNode, authoring);
             var validation = new List<ContentValidationIssue>(8);
-            StageLayoutValidationRules.ValidateLayout(layout, location, validation);
+            StageGridLayoutValidationRules.ValidateLayout(layout, location, validation);
             issues.AddRange(validation);
             if (HasError(validation))
             {
@@ -90,10 +97,12 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             Undo.RecordObject(stageNode.TargetLayout, "Generate Stage Layout");
+            stageNode.TargetLayout.SchemaVersion = 2;
             stageNode.TargetLayout.StageId = layout.StageId;
-            stageNode.TargetLayout.Sources = layout.Sources;
-            stageNode.TargetLayout.Deposits = layout.Deposits;
-            stageNode.TargetLayout.Obstacles = layout.Obstacles;
+            stageNode.TargetLayout.Grid = layout.Grid;
+            stageNode.TargetLayout.Cells = layout.Cells;
+            stageNode.TargetLayout.SourceRegions = layout.SourceRegions;
+            stageNode.TargetLayout.DepositRegions = layout.DepositRegions;
             stageNode.TargetLayout.Presentations = layout.Presentations;
             EditorUtility.SetDirty(stageNode.TargetLayout);
             UnityEngine.Object.DestroyImmediate(layout);
@@ -102,24 +111,48 @@ namespace SweepNDodge.DotsBullets.Editor
             return true;
         }
 
-        private static StageLayoutSO BuildStageLayout(StageLayoutStageMarker stageNode)
+        private static StageLayoutSO BuildStageLayout(StageLayoutStageMarker stageNode, StageGridAuthoring authoring)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            var gridSpec = authoring.BuildRuntimeGridSpec();
+            int width = gridSpec.Width;
+            int height = gridSpec.Height;
+
+            layout.SchemaVersion = 2;
             layout.StageId = stageNode.StageId;
-            layout.Sources = stageNode.GetComponentsInChildren<StageSourceMarker>(includeInactive: true)
-                .OrderBy(x => x.StableId)
+            layout.Grid = gridSpec;
+
+            layout.Cells = new StageCellLayoutData[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width) + x;
+                    var tile = authoring.MovementTilemap.GetTile(authoring.GetTilemapCell(x, y)) as StageMovementTile;
+                    layout.Cells[index] = new StageCellLayoutData
+                    {
+                        MovementFlags = tile != null ? tile.MovementFlags : StageCellMovementFlags.None,
+                        SourceRegionId = ResolveRegionStableId(authoring, StageRegionKind.Source, x, y),
+                        DepositRegionId = ResolveRegionStableId(authoring, StageRegionKind.Deposit, x, y),
+                    };
+                }
+            }
+
+            var anchors = stageNode.GetComponentsInChildren<StageRegionAnchorMarker>(includeInactive: true)
+                .OrderBy(x => x.RegionKind)
+                .ThenBy(x => ResolveAnchorStableId(authoring, x))
                 .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                .Select(ToSourceData)
                 .ToArray();
-            layout.Deposits = stageNode.GetComponentsInChildren<StageDepositMarker>(includeInactive: true)
-                .OrderBy(x => x.StableId)
-                .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                .Select(ToDepositData)
+
+            layout.SourceRegions = anchors
+                .Where(x => x.RegionKind == StageRegionKind.Source)
+                .Select(x => ToSourceRegionData(authoring, x))
+                .Where(x => x.StableId > 0u)
                 .ToArray();
-            layout.Obstacles = stageNode.GetComponentsInChildren<StageObstacleMarker>(includeInactive: true)
-                .OrderBy(x => x.StableId)
-                .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                .Select(ToObstacleData)
+            layout.DepositRegions = anchors
+                .Where(x => x.RegionKind == StageRegionKind.Deposit)
+                .Select(x => ToDepositRegionData(authoring, x))
+                .Where(x => x.StableId > 0u)
                 .ToArray();
             layout.Presentations = stageNode.GetComponentsInChildren<StagePresentationMarker>(includeInactive: true)
                 .OrderBy(x => x.StableId)
@@ -145,52 +178,45 @@ namespace SweepNDodge.DotsBullets.Editor
             return count;
         }
 
-        private static StageSourceLayoutData ToSourceData(StageSourceMarker marker)
+        private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
         {
-            var transform = marker.transform;
-            var yawOnlyRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
-            return new StageSourceLayoutData
+            if (authoring == null || authoring.RegionTilemap == null)
+                return 0u;
+
+            var tile = authoring.RegionTilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
+            if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                return 0u;
+
+            return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
+        }
+
+        private static uint ResolveAnchorStableId(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
+        {
+            if (authoring != null && marker != null && authoring.TryResolveStableId(marker.RegionKind, marker.RegionSlotIndex, out uint stableId))
+                return stableId;
+
+            return marker != null ? marker.StableId : 0u;
+        }
+
+        private static StageSourceRegionLayoutData ToSourceRegionData(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
+        {
+            return new StageSourceRegionLayoutData
             {
-                StableId = marker.StableId,
+                StableId = ResolveAnchorStableId(authoring, marker),
                 Active = marker.Active,
-                Position = transform.position,
-                YawDeg = yawOnlyRotation.eulerAngles.y,
-                Shape = marker.Shape,
-                Radius = Mathf.Max(0f, marker.Radius),
-                Size = new Vector2(Mathf.Max(0f, marker.Size.x), Mathf.Max(0f, marker.Size.y)),
+                AnchorCell = marker.AnchorCell,
+                AnchorOffset = marker.AnchorOffset,
             };
         }
 
-        private static StageDepositLayoutData ToDepositData(StageDepositMarker marker)
+        private static StageDepositRegionLayoutData ToDepositRegionData(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
         {
-            var transform = marker.transform;
-            var yawOnlyRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
-            return new StageDepositLayoutData
+            return new StageDepositRegionLayoutData
             {
-                StableId = marker.StableId,
+                StableId = ResolveAnchorStableId(authoring, marker),
                 Active = marker.Active,
-                Position = transform.position,
-                YawDeg = yawOnlyRotation.eulerAngles.y,
-                Shape = marker.Shape,
-                Radius = Mathf.Max(0f, marker.Radius),
-                Size = new Vector2(Mathf.Max(0f, marker.Size.x), Mathf.Max(0f, marker.Size.y)),
-            };
-        }
-
-        private static StageObstacleLayoutData ToObstacleData(StageObstacleMarker marker)
-        {
-            var transform = marker.transform;
-            var yawOnlyRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
-            return new StageObstacleLayoutData
-            {
-                StableId = marker.StableId,
-                Active = marker.Active,
-                Position = transform.position,
-                YawDeg = yawOnlyRotation.eulerAngles.y,
-                Shape = marker.Shape,
-                Radius = Mathf.Max(0f, marker.Radius),
-                Size = new Vector2(Mathf.Max(0f, marker.Size.x), Mathf.Max(0f, marker.Size.y)),
-                CollisionMask = marker.CollisionMask,
+                AnchorCell = marker.AnchorCell,
+                AnchorOffset = marker.AnchorOffset,
             };
         }
 
@@ -224,39 +250,9 @@ namespace SweepNDodge.DotsBullets.Editor
             StagePresentationEditorUtility.TryFindLinkedParent(marker.transform, out linkKind, out linkedStableId, out _);
         }
 
-        private static bool TryFindLinkedParent(Transform transform, out StagePresentationLinkKind linkKind, out uint linkedStableId)
-        {
-            return StagePresentationEditorUtility.TryFindLinkedParent(transform, out linkKind, out linkedStableId, out _);
-        }
-
         private static int CompareRoots(StageLayoutRootMarker a, StageLayoutRootMarker b)
         {
             return string.CompareOrdinal(BuildHierarchyPath(a != null ? a.transform : null), BuildHierarchyPath(b != null ? b.transform : null));
-        }
-
-        private static void ValidatePresentationMarkers(StageLayoutStageMarker stageNode, List<ContentValidationIssue> issues)
-        {
-            var markers = stageNode.GetComponentsInChildren<StagePresentationMarker>(includeInactive: true);
-            for (int i = 0; i < markers.Length; i++)
-            {
-                var marker = markers[i];
-                if (marker == null)
-                    continue;
-
-                string location = BuildHierarchyPath(marker.transform);
-                bool hasTopologyOnSelf = marker.TryGetComponent<StageSourceMarker>(out _)
-                    || marker.TryGetComponent<StageDepositMarker>(out _)
-                    || marker.TryGetComponent<StageObstacleMarker>(out _);
-                if (hasTopologyOnSelf)
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL010", location, "StagePresentationMarker must not share a GameObject with Source/Deposit/Obstacle marker."));
-
-                bool hasParentTopology = TryFindLinkedParent(marker.transform, out _, out _);
-                if (marker.PlacementMode == StagePresentationPlacementMode.LinkedToParent && !hasParentTopology)
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL011", location, "LinkedToParent presentation requires a parent Source/Deposit/Obstacle marker."));
-
-                if (marker.PlacementMode == StagePresentationPlacementMode.Standalone && hasParentTopology)
-                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL012", location, "Standalone presentation must not be authored under a topology marker parent."));
-            }
         }
 
         private static bool HasError(IReadOnlyList<ContentValidationIssue> issues)

@@ -112,7 +112,7 @@ namespace SweepNDodge.DotsBullets
     // Deposit 요청 컨텍스트(payload).
     public struct PlayerCarryBinDepositContextComponent : IComponentData
     {
-        public Entity DepositEntity;
+        public uint DepositRegionId;
     }
 
     // 위험탄 충돌이 감지되었음을 알리는 요청 태그.

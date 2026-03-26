@@ -19,7 +19,7 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 bool generated = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(root, out var issues, saveAssets: true);
                 if (generated)
-                    Debug.Log($"[StageLayout] StageLayoutSO assets generated for {root.name}");
+                    Debug.Log($"[StageLayout] Grid StageLayoutSO assets generated for {root.name}");
 
                 ReportIssues(issues);
             }

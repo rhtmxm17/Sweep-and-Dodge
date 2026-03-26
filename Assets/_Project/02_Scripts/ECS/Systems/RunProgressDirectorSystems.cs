@@ -232,11 +232,11 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<SourceSpawnComponent>();
             state.RequireForUpdate<SourceStableIdComponent>();
-            state.RequireForUpdate<SourceAnchorComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
-            state.RequireForUpdate<Shape2DComponent>();
             state.RequireForUpdate<SourceRunDirectorStateComponent>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
+            state.RequireForUpdate<StageRuntimeGridComponent>();
+            state.RequireForUpdate<StageRuntimeGridCellBufferElement>();
             _directorConfigQuery = SystemAPI.QueryBuilder()
                 .WithAll<RunProgressDirectorConfigComponent>()
                 .Build();
@@ -288,18 +288,16 @@ namespace SweepNDodge.DotsBullets
             float3 playerPosition = hasPlayerSync
                 ? SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity).Position
                 : SystemAPI.GetComponent<LocalTransform>(playerEntity).Position;
+            var runtimeGrid = SystemAPI.GetSingleton<StageRuntimeGridComponent>();
+            var runtimeGridCells = SystemAPI.GetSingletonBuffer<StageRuntimeGridCellBufferElement>(isReadOnly: true);
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
-            var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
-            var shapeLookup = SystemAPI.GetComponentLookup<Shape2DComponent>(true);
             var directorLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(false);
             var pressureInputLookup = SystemAPI.GetBufferLookup<SourceDirectorPressureInputBuffer>(false);
 
             sourceLookup.Update(ref state);
             stableIdLookup.Update(ref state);
-            txLookup.Update(ref state);
-            shapeLookup.Update(ref state);
             directorLookup.Update(ref state);
             pressureInputLookup.Update(ref state);
 
@@ -307,8 +305,6 @@ namespace SweepNDodge.DotsBullets
                 .WithAll<SourceSpawnComponent>()
                 .WithAll<SourceStableIdComponent>()
                 .WithAll<BulletFieldAreaComponent>()
-                .WithAll<Shape2DComponent>()
-                .WithAll<LocalTransform>()
                 .WithAll<SourceRunDirectorStateComponent>()
                 .Build();
 
@@ -317,6 +313,12 @@ namespace SweepNDodge.DotsBullets
             bool bestPressureOccupied = false;
             float bestPressureScore = float.MinValue;
             uint bestStableId = uint.MaxValue;
+            uint occupiedStableId = 0u;
+            if (StageRuntimeGridUtility.TryGetCellIndex(new float2(playerPosition.x, playerPosition.z), in runtimeGrid, out int playerCellIndex)
+                && (uint)playerCellIndex < (uint)runtimeGridCells.Length)
+            {
+                occupiedStableId = runtimeGridCells[playerCellIndex].SourceRegionId;
+            }
 
             for (int i = 0; i < sourceEntities.Length; i++)
             {
@@ -336,10 +338,8 @@ namespace SweepNDodge.DotsBullets
                     continue;
                 }
 
-                bool isOccupied = IsPlayerInsideSourceArea(
-                    playerPosition,
-                    txLookup[sourceEntity],
-                    shapeLookup[sourceEntity]);
+                uint stableId = math.max(1u, stableIdLookup[sourceEntity].Value);
+                bool isOccupied = occupiedStableId != 0u && stableId == occupiedStableId;
                 director.PressureOccupancySec = isOccupied
                     ? holdSec
                     : math.max(0f, director.PressureOccupancySec - deltaTime);
@@ -362,7 +362,6 @@ namespace SweepNDodge.DotsBullets
                 if (!isPressureCandidate)
                     continue;
 
-                uint stableId = math.max(1u, stableIdLookup[sourceEntity].Value);
                 bool pick = false;
                 if (pressureEntity == Entity.Null)
                 {
@@ -421,17 +420,6 @@ namespace SweepNDodge.DotsBullets
                 director.DensityScale = nextDensityScale;
                 directorLookup[sourceEntity] = director;
             }
-        }
-
-        private static bool IsPlayerInsideSourceArea(
-            float3 playerPosition,
-            in LocalTransform sourceTx,
-            in Shape2DComponent shape)
-        {
-            return Shape2DUtility.ContainsPointXZ(
-                new float2(playerPosition.x, playerPosition.z),
-                in sourceTx,
-                in shape);
         }
 
         private static Entity ResolveFirstEntity(ref EntityQuery query)

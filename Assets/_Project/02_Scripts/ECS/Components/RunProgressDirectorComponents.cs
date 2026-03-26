@@ -79,8 +79,25 @@ namespace SweepNDodge.DotsBullets
     public struct StageTopologyPrefabCatalogComponent : IComponentData
     {
         public Entity SourceTemplate;
-        public Entity DepositTemplate;
-        public Entity ObstacleTemplate;
+    }
+
+    public struct StageRuntimeGridComponent : IComponentData
+    {
+        public int StageId;
+        public int Width;
+        public int Height;
+        public float CellSize;
+        public float OriginX;
+        public float OriginZ;
+        public byte Ready;
+    }
+
+    [InternalBufferCapacity(256)]
+    public struct StageRuntimeGridCellBufferElement : IBufferElementData
+    {
+        public StageCellMovementFlags MovementFlags;
+        public uint SourceRegionId;
+        public uint DepositRegionId;
     }
 
     public enum StageTopologyKind : byte
@@ -112,10 +129,6 @@ namespace SweepNDodge.DotsBullets
     }
 
     public struct StageTopologySourceTag : IComponentData
-    {
-    }
-
-    public struct StageTopologyDepositTag : IComponentData
     {
     }
 

@@ -137,6 +137,8 @@ namespace SweepNDodge.DotsBullets
         public float CellSize;
         public float InvCellSize;
         public float2 HalfExtents;
+        public float OriginX;
+        public float OriginZ;
     }
 
     [InternalBufferCapacity(8)]
@@ -248,6 +250,12 @@ namespace SweepNDodge.DotsBullets
 
     [InternalBufferCapacity(64)]
     public struct SourcePollutionValidCellIndexBuffer : IBufferElementData
+    {
+        public int Value;
+    }
+
+    [InternalBufferCapacity(64)]
+    public struct SourceRegionCellIndexBuffer : IBufferElementData
     {
         public int Value;
     }

@@ -58,6 +58,8 @@ namespace SweepNDodge.DotsBullets
                 CellSize = 2f,
                 InvCellSize = 0.5f,
                 HalfExtents = sourceDerived.HalfExtents,
+                OriginX = -sourceDerived.HalfExtents.x,
+                OriginZ = -sourceDerived.HalfExtents.y,
                 Cols = 1,
                 Rows = 1,
             });
@@ -91,52 +93,9 @@ namespace SweepNDodge.DotsBullets
             em.AddBuffer<SourcePollutionCellBuffer>(entity).Clear();
             em.AddBuffer<SourcePollutionDropRequestBuffer>(entity).Clear();
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity).Clear();
+            em.AddBuffer<SourceRegionCellIndexBuffer>(entity).Clear();
             return entity;
         }
 
-        public static Entity CreateDepositTemplate(EntityManager em)
-        {
-            var entity = em.CreateEntity(
-                typeof(Prefab),
-                typeof(DepositStableIdComponent),
-                typeof(DepositPointComponent),
-                typeof(Shape2DComponent),
-                typeof(LocalTransform));
-
-            em.SetComponentData(entity, new DepositStableIdComponent { Value = 1u });
-            em.SetComponentData(entity, new Shape2DComponent
-            {
-                Kind = Shape2DKind.Circle,
-                Radius = 1.2f,
-                Size = float2.zero,
-            });
-            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
-            return entity;
-        }
-
-        public static Entity CreateObstacleTemplate(EntityManager em)
-        {
-            var entity = em.CreateEntity(
-                typeof(Prefab),
-                typeof(ObstacleStableIdComponent),
-                typeof(ObstacleCollisionMaskComponent),
-                typeof(ObstacleGeometryComponent),
-                typeof(Shape2DComponent),
-                typeof(LocalTransform));
-
-            em.SetComponentData(entity, new ObstacleStableIdComponent { Value = 1u });
-            em.SetComponentData(entity, new ObstacleCollisionMaskComponent
-            {
-                Value = ObstacleCollisionMask.BlockPlayer | ObstacleCollisionMask.BlockBullet,
-            });
-            em.SetComponentData(entity, new Shape2DComponent
-            {
-                Kind = Shape2DKind.Rectangle,
-                Radius = 1f,
-                Size = new float2(2f, 2f),
-            });
-            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
-            return entity;
-        }
     }
 }

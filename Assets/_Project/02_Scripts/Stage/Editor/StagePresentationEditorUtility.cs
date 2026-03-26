@@ -68,28 +68,29 @@ namespace SweepNDodge.DotsBullets.Editor
             var current = transform != null ? transform.parent : null;
             while (current != null)
             {
-                if (current.TryGetComponent<StageSourceMarker>(out var source))
+                if (current.TryGetComponent<StageRegionAnchorMarker>(out var anchor))
                 {
-                    linkKind = StagePresentationLinkKind.Source;
-                    linkedStableId = source.StableId;
-                    linkedParent = current;
-                    return true;
-                }
+                    if (!TryResolveAnchorStableId(anchor, out uint resolvedStableId))
+                    {
+                        current = current.parent;
+                        continue;
+                    }
 
-                if (current.TryGetComponent<StageDepositMarker>(out var deposit))
-                {
-                    linkKind = StagePresentationLinkKind.Deposit;
-                    linkedStableId = deposit.StableId;
-                    linkedParent = current;
-                    return true;
-                }
+                    if (anchor.RegionKind == StageRegionKind.Source)
+                    {
+                        linkKind = StagePresentationLinkKind.Source;
+                        linkedStableId = resolvedStableId;
+                        linkedParent = current;
+                        return true;
+                    }
 
-                if (current.TryGetComponent<StageObstacleMarker>(out var obstacle))
-                {
-                    linkKind = StagePresentationLinkKind.Obstacle;
-                    linkedStableId = obstacle.StableId;
-                    linkedParent = current;
-                    return true;
+                    if (anchor.RegionKind == StageRegionKind.Deposit)
+                    {
+                        linkKind = StagePresentationLinkKind.Deposit;
+                        linkedStableId = resolvedStableId;
+                        linkedParent = current;
+                        return true;
+                    }
                 }
 
                 current = current.parent;
@@ -150,9 +151,20 @@ namespace SweepNDodge.DotsBullets.Editor
             if (marker == null)
                 return false;
 
-            return marker.TryGetComponent<StageSourceMarker>(out _)
-                || marker.TryGetComponent<StageDepositMarker>(out _)
-                || marker.TryGetComponent<StageObstacleMarker>(out _);
+            return marker.TryGetComponent<StageRegionAnchorMarker>(out _);
+        }
+
+        private static bool TryResolveAnchorStableId(StageRegionAnchorMarker anchor, out uint stableId)
+        {
+            stableId = 0u;
+            if (anchor == null || anchor.RegionSlotIndex <= 0)
+                return false;
+
+            var stage = anchor.GetComponentInParent<StageLayoutStageMarker>();
+            if (stage == null || !stage.TryGetComponent(out StageGridAuthoring authoring) || authoring == null)
+                return false;
+
+            return authoring.TryResolveStableId(anchor.RegionKind, anchor.RegionSlotIndex, out stableId);
         }
 
         private static void EncapsulateMeshBounds(ref Bounds aggregate, ref bool hasAny, Matrix4x4 localToRoot, Bounds localBounds)

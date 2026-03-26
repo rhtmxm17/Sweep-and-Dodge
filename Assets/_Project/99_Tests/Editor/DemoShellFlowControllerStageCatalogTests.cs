@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using Unity.Entities;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
@@ -141,6 +142,92 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void RequestSelectStageById_IssuesTopologyApplyAndStageStartInSameStep()
+        {
+            var oldDefault = World.DefaultGameObjectInjectionWorld;
+            World world = null;
+            GameObject go = null;
+            var created = new List<ScriptableObject>();
+            try
+            {
+                world = new World("DemoShellFlowController_StageEntryWorld");
+                World.DefaultGameObjectInjectionWorld = world;
+                var em = world.EntityManager;
+
+                em.CreateEntity(typeof(StageTopologyRequestComponent));
+                em.CreateEntity(typeof(StageTopologyStateComponent));
+                em.CreateEntity(typeof(StageTopologyPrefabCatalogComponent));
+                em.CreateEntity(typeof(RunDirectorStageRequestComponent));
+                var gateEntity = em.CreateEntity(typeof(RunDirectorStageGateComponent));
+                em.SetComponentData(gateEntity, default(RunDirectorStageGateComponent));
+                em.CreateEntity(typeof(RunDirectorStageSignalComponent));
+
+                var definition = CreateDefinition(created, stageId: 2, displayName: "Stage 2", isFinal: false, timeLimitSec: 60f);
+                var layout = CreateLayout(created, 2);
+                var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+                catalog.Entries = new[]
+                {
+                    new StageCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "stage_02",
+                        Definition = definition,
+                        Layout = layout,
+                    },
+                };
+                created.Add(catalog);
+
+                go = new GameObject("DemoShellFlowController_StageEntry");
+                go.SetActive(false);
+                var controller = go.AddComponent<DemoShellFlowController>();
+                controller.StageCatalog = catalog;
+                controller.StageProfiles = new[]
+                {
+                    new DemoShellStageProfile
+                    {
+                        StageId = 2,
+                        DisplayName = "Stage 2",
+                        IsFinalStage = false,
+                        StageTimeLimitSec = 60f,
+                    },
+                };
+
+                var stageBridge = go.GetComponent<RunDirectorStageBridge>();
+                var topologyBridge = go.GetComponent<StageTopologyBridge>();
+                stageBridge.LogBindWarnings = false;
+                topologyBridge.LogBindWarnings = false;
+
+                go.SetActive(true);
+
+                Assert.That(controller.RequestStartFromTitle(), Is.True);
+                Assert.That(controller.RequestSelectStageById(2), Is.True);
+
+                var topologyRequest = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>())
+                    .GetSingleton<StageTopologyRequestComponent>();
+                var stageRequest = em.CreateEntityQuery(ComponentType.ReadOnly<RunDirectorStageRequestComponent>())
+                    .GetSingleton<RunDirectorStageRequestComponent>();
+                var gate = em.GetComponentData<RunDirectorStageGateComponent>(gateEntity);
+
+                Assert.That(controller.CurrentScreen, Is.EqualTo(DemoShellScreenId.StagePlay));
+                Assert.That(controller.CurrentStageId, Is.EqualTo(2));
+                Assert.That(controller.CurrentStagePlayPhase, Is.EqualTo(DemoShellStagePlayPhaseId.Starting));
+                Assert.That(topologyRequest.RequestedStageId, Is.EqualTo(2));
+                Assert.That(topologyRequest.ApplyRequested, Is.EqualTo(1));
+                Assert.That(stageRequest.StageStartRequested, Is.EqualTo(1));
+                Assert.That(gate.IntroPresentationDone, Is.EqualTo(1));
+                Assert.That(gate.ClearPresentationDone, Is.EqualTo(0));
+            }
+            finally
+            {
+                if (go != null)
+                    UnityEngine.Object.DestroyImmediate(go);
+                DestroyAll(created);
+                world?.Dispose();
+                World.DefaultGameObjectInjectionWorld = oldDefault;
+            }
+        }
+
         private static void InvokeEnsureStageProfiles(DemoShellFlowController controller)
         {
             Assert.That(EnsureStageProfilesMethod, Is.Not.Null, "EnsureStageProfiles method not found.");
@@ -167,10 +254,12 @@ namespace SweepNDodge.DotsBullets.Tests
         private static StageLayoutSO CreateLayout(List<ScriptableObject> created, int stageId)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.SchemaVersion = 2;
             layout.StageId = stageId;
-            layout.Sources = Array.Empty<StageSourceLayoutData>();
-            layout.Deposits = Array.Empty<StageDepositLayoutData>();
-            layout.Obstacles = Array.Empty<StageObstacleLayoutData>();
+            layout.Grid = new StageGridSpec { Width = 1, Height = 1, CellSize = 1f, Origin = Vector3.zero };
+            layout.Cells = new[] { new StageCellLayoutData() };
+            layout.SourceRegions = Array.Empty<StageSourceRegionLayoutData>();
+            layout.DepositRegions = Array.Empty<StageDepositRegionLayoutData>();
             layout.Presentations = Array.Empty<StagePresentationLayoutData>();
             created.Add(layout);
             return layout;

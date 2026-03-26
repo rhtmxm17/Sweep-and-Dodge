@@ -101,6 +101,8 @@ namespace SweepNDodge.DotsBullets
             {
                 CellSize = cellSize,
                 HalfExtents = derived.HalfExtents,
+                OriginX = -derived.HalfExtents.x,
+                OriginZ = -derived.HalfExtents.y,
             };
 
             baker.AddBuffer<SourceActiveBulletCountBuffer>(e).Clear();
@@ -138,6 +140,7 @@ namespace SweepNDodge.DotsBullets
             var pollutionCells = baker.AddBuffer<SourcePollutionCellBuffer>(e);
             var pollutionDrops = baker.AddBuffer<SourcePollutionDropRequestBuffer>(e);
             var pollutionValidCellIndices = baker.AddBuffer<SourcePollutionValidCellIndexBuffer>(e);
+            baker.AddBuffer<SourceRegionCellIndexBuffer>(e).Clear();
             SourceRuntimeApplyUtility.RebuildPollutionGrid(
                 in fieldShape,
                 in derived,
@@ -146,6 +149,8 @@ namespace SweepNDodge.DotsBullets
                 pollutionCells,
                 pollutionDrops,
                 pollutionValidCellIndices);
+            pollutionGrid.OriginX = authoring.transform.position.x - pollutionGrid.HalfExtents.x;
+            pollutionGrid.OriginZ = authoring.transform.position.z - pollutionGrid.HalfExtents.y;
             baker.AddComponent(e, pollutionGrid);
 
             baker.AddComponent(e, new SourceAnchorComponent

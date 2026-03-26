@@ -1,7 +1,4 @@
-﻿using Unity.Burst;
-using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
@@ -10,10 +7,9 @@ namespace SweepNDodge.DotsBullets
 {
     /// <summary>
     /// Deposit 접촉 요청 생성.
-    /// - 접촉 즉시 비우기(MVP) 규칙을 Request 단계에서 요청으로 남긴다.
+    /// - grid authoritative DepositRegionId를 읽어 Request 단계에서 요청을 남긴다.
     /// - 실제 CarryBin 변경은 Execution 단계에서만 수행한다.
     /// </summary>
-    [BurstCompile]
     [UpdateInGroup(typeof(BulletRequestGroup))]
     [UpdateAfter(typeof(PlayerHazardCollisionRequestSystem))]
     public partial struct PlayerCarryBinDepositRequestSystem : ISystem
@@ -24,11 +20,12 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerCarryBinDepositRequestTag>();
             state.RequireForUpdate<PlayerCarryBinDepositContextComponent>();
-            state.RequireForUpdate<DepositPointComponent>();
-            state.RequireForUpdate<Shape2DComponent>();
+            state.RequireForUpdate<PlayerRadiusComponent>();
+            state.RequireForUpdate<LocalTransform>();
+            state.RequireForUpdate<StageRuntimeGridComponent>();
+            state.RequireForUpdate<StageRuntimeGridCellBufferElement>();
         }
 
-        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             bool hasTopologyState = SystemAPI.TryGetSingleton<StageTopologyStateComponent>(out var topologyState);
@@ -42,92 +39,48 @@ namespace SweepNDodge.DotsBullets
             if (math.max(0, carryBin.Load) <= 0)
                 return;
 
-            var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(isReadOnly: true);
-            var playerRadiusLookup = SystemAPI.GetComponentLookup<PlayerRadiusComponent>(isReadOnly: true);
-            var depositRequestLookup = SystemAPI.GetComponentLookup<PlayerCarryBinDepositRequestTag>(isReadOnly: false);
-            var depositContextLookup = SystemAPI.GetComponentLookup<PlayerCarryBinDepositContextComponent>(isReadOnly: false);
+            var grid = SystemAPI.GetSingleton<StageRuntimeGridComponent>();
+            if (!StageRuntimeGridUtility.IsReady(in grid))
+                return;
 
-            txLookup.Update(ref state);
-            playerRadiusLookup.Update(ref state);
-            depositRequestLookup.Update(ref state);
-            depositContextLookup.Update(ref state);
+            var cells = SystemAPI.GetSingletonBuffer<StageRuntimeGridCellBufferElement>(isReadOnly: true);
+            var tx = SystemAPI.GetComponent<LocalTransform>(playerEntity);
+            var radius = SystemAPI.GetComponent<PlayerRadiusComponent>(playerEntity);
+            uint touchedRegionId = FindTouchedDepositRegion(
+                new float2(tx.Position.x, tx.Position.z),
+                math.max(0f, radius.Value),
+                in grid,
+                cells);
+            if (touchedRegionId == 0)
+                return;
 
-            var touchedDeposit = new NativeReference<Entity>(Allocator.TempJob);
-            touchedDeposit.Value = Entity.Null;
-
-            state.Dependency = new FindTouchedDepositJob
-            {
-                PlayerEntity = playerEntity,
-                TxLookup = txLookup,
-                PlayerRadiusLookup = playerRadiusLookup,
-                TouchedDeposit = touchedDeposit,
-            }.Schedule(state.Dependency);
-
-            state.Dependency = new ApplyDepositRequestJob
-            {
-                PlayerEntity = playerEntity,
-                DepositRequestLookup = depositRequestLookup,
-                DepositContextLookup = depositContextLookup,
-                TouchedDeposit = touchedDeposit,
-            }.Schedule(state.Dependency);
-
-            state.Dependency = touchedDeposit.Dispose(state.Dependency);
+            var context = SystemAPI.GetComponentRW<PlayerCarryBinDepositContextComponent>(playerEntity);
+            context.ValueRW.DepositRegionId = touchedRegionId;
+            SystemAPI.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(playerEntity, true);
         }
 
-        [BurstCompile]
-        private partial struct FindTouchedDepositJob : IJobEntity
+        private static uint FindTouchedDepositRegion(
+            float2 centerXZ,
+            float radius,
+            in StageRuntimeGridComponent grid,
+            DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
         {
-            public Entity PlayerEntity;
-            [ReadOnly] public ComponentLookup<LocalTransform> TxLookup;
-            [ReadOnly] public ComponentLookup<PlayerRadiusComponent> PlayerRadiusLookup;
-            public NativeReference<Entity> TouchedDeposit;
-
-            private void Execute(Entity depositEntity, in DepositPointComponent deposit, in Shape2DComponent shape, in LocalTransform depositTx)
+            StageRuntimeGridUtility.ComputeCircleCellBounds(centerXZ, radius, in grid, out int2 minCell, out int2 maxCell);
+            for (int y = minCell.y; y <= maxCell.y; y++)
             {
-                if (TouchedDeposit.Value != Entity.Null)
-                    return;
-                if (!TxLookup.HasComponent(PlayerEntity))
-                    return;
-
-                float3 playerPos = TxLookup[PlayerEntity].Position;
-                float playerRadius = PlayerRadiusLookup.HasComponent(PlayerEntity)
-                    ? math.max(0f, PlayerRadiusLookup[PlayerEntity].Value)
-                    : 0f;
-
-                if (Shape2DUtility.OverlapsCircleXZ(
-                        new float2(playerPos.x, playerPos.z),
-                        playerRadius,
-                        in depositTx,
-                        in shape))
+                for (int x = minCell.x; x <= maxCell.x; x++)
                 {
-                    TouchedDeposit.Value = depositEntity;
+                    int index = StageRuntimeGridUtility.GetCellIndex(x, y, in grid);
+                    if (index < 0)
+                        continue;
+
+                    uint depositRegionId = cells[index].DepositRegionId;
+                    if (depositRegionId != 0)
+                        return depositRegionId;
                 }
             }
-        }
 
-        [BurstCompile]
-        private struct ApplyDepositRequestJob : IJob
-        {
-            public Entity PlayerEntity;
-            public ComponentLookup<PlayerCarryBinDepositRequestTag> DepositRequestLookup;
-            public ComponentLookup<PlayerCarryBinDepositContextComponent> DepositContextLookup;
-            [ReadOnly] public NativeReference<Entity> TouchedDeposit;
-
-            public void Execute()
-            {
-                Entity touched = TouchedDeposit.Value;
-                if (touched == Entity.Null)
-                    return;
-                if (!DepositRequestLookup.HasComponent(PlayerEntity))
-                    return;
-                if (!DepositContextLookup.HasComponent(PlayerEntity))
-                    return;
-
-                var context = DepositContextLookup[PlayerEntity];
-                context.DepositEntity = touched;
-                DepositContextLookup[PlayerEntity] = context;
-                DepositRequestLookup.SetComponentEnabled(PlayerEntity, true);
-            }
+            return 0u;
         }
     }
 
@@ -191,18 +144,19 @@ namespace SweepNDodge.DotsBullets
                         {
                             Type = CombatEventTypeId.Cleanup,
                             SourceEntity = Entity.Null,
-                            RelatedEntity = depositContext.ValueRO.DepositEntity,
+                            RelatedEntity = Entity.Null,
                             Count = 1,
                             Value = depositedLoad,
                             Frame = frame,
                             Sequence = (uint)combatBuffer.Length,
                         });
                     }
-                    Debug.Log($"[CarryBinDeposit] load={depositedLoad}, deposit={depositContext.ValueRO.DepositEntity}");
+
+                    Debug.Log($"[CarryBinDeposit] load={depositedLoad}, depositRegionId={depositContext.ValueRO.DepositRegionId}");
                 }
 
                 riskRequest.ValueRW.ResetRequested = 1;
-                depositContext.ValueRW.DepositEntity = Entity.Null;
+                depositContext.ValueRW.DepositRegionId = 0u;
                 depositRequest.ValueRW = false;
             }
         }
@@ -215,9 +169,8 @@ namespace SweepNDodge.DotsBullets
             if (count == 1)
                 return query.GetSingletonEntity();
 
-            using var entities = query.ToEntityArray(Allocator.Temp);
+            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
             return entities.Length > 0 ? entities[0] : Entity.Null;
         }
     }
 }
-

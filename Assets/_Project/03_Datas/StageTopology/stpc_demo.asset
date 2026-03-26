@@ -13,5 +13,3 @@ MonoBehaviour:
   m_Name: stpc_demo
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageTopologyPrefabCatalogSO
   SourceTemplatePrefab: {fileID: 100000, guid: 5b0fd92e5e04ccd49bf6647e4d074c51, type: 3}
-  DepositTemplatePrefab: {fileID: 100000, guid: a588fae0e347e8142813207d0a5f2374, type: 3}
-  ObstacleTemplatePrefab: {fileID: 100000, guid: f4f6a3c8641f4fd49a5f83cfefb9d321, type: 3}

@@ -1,7 +1,10 @@
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
 using UnityEditor;
-using System.Collections.Generic;
+using UnityEditor.SceneManagement;
+using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -14,6 +17,16 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string StageLayout1Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_1.asset";
         private const string StageLayout2Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_2.asset";
         private const string StageLayout3Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_3.asset";
+        private const string SampleScenePath = "Assets/_Project/01_Scenes/StageLayoutEditingSampleV1.unity";
+        private static readonly string[] DeprecatedPaintAssetPaths =
+        {
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage1_source.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage1_deposit.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage2_source.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage2_deposit.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage3_source.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage3_deposit.asset",
+        };
 
         [Test]
         public void DemoStageCatalog_ContainsThreeEnabledEntriesInOrder()
@@ -55,10 +68,16 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(definition2.SourceBindings, Is.Not.Null.And.Length.GreaterThan(0));
             Assert.That(definition3.SourceBindings, Is.Not.Null.And.Length.GreaterThan(0));
 
-            Assert.That(layout1.Sources, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout2.Sources, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout3.Sources, Is.Not.Null.And.Length.GreaterThan(0));
-            Assert.That(layout2.Obstacles, Is.Not.Null.And.Length.GreaterThan(0));
+            AssertLayoutPopulated(layout1);
+            AssertLayoutPopulated(layout2);
+            AssertLayoutPopulated(layout3);
+
+            AssertLayoutMatchesSceneAuthoring(layout1, 1);
+            AssertLayoutMatchesSceneAuthoring(layout2, 2);
+            AssertLayoutMatchesSceneAuthoring(layout3, 3);
+
+            for (int i = 0; i < DeprecatedPaintAssetPaths.Length; i++)
+                Assert.That(AssetDatabase.LoadMainAssetAtPath(DeprecatedPaintAssetPaths[i]), Is.Null, $"Deprecated paint asset must be removed: {DeprecatedPaintAssetPaths[i]}");
         }
 
         [Test]
@@ -76,6 +95,47 @@ namespace SweepNDodge.DotsBullets.Tests
                 issues);
 
             Assert.That(issues, Is.Empty, "sc_demo.asset must satisfy StageCatalog validation rules.");
+        }
+
+        private static void AssertLayoutPopulated(StageLayoutSO layout)
+        {
+            Assert.That(layout.SchemaVersion, Is.EqualTo(2));
+            Assert.That(layout.Grid.Width, Is.GreaterThan(0));
+            Assert.That(layout.Grid.Height, Is.GreaterThan(0));
+            Assert.That(layout.Cells, Is.Not.Null.And.Length.EqualTo(layout.Grid.Width * layout.Grid.Height));
+            Assert.That(layout.SourceRegions, Is.Not.Null.And.Length.GreaterThan(0));
+            Assert.That(layout.DepositRegions, Is.Not.Null.And.Length.GreaterThan(0));
+        }
+
+        private static void AssertLayoutMatchesSceneAuthoring(StageLayoutSO layout, int stageId)
+        {
+            Assert.That(EditorSceneManager.OpenScene(SampleScenePath, OpenSceneMode.Single).IsValid(), Is.True);
+
+            var stage = Object.FindObjectsByType<StageLayoutStageMarker>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Single(x => x.StageId == stageId);
+            Assert.That(stage.TryGetComponent(out StageGridAuthoring authoring), Is.True);
+            Assert.That(authoring.RegionTilemap, Is.Not.Null, $"Stage {stageId} sample authoring must use unified RegionTilemap.");
+            Assert.That(stage.GetComponentsInChildren<StageRegionAnchorMarker>(true), Is.Not.Empty, $"Stage {stageId} must keep region anchor markers.");
+
+            Assert.That(layout.Grid.Width, Is.EqualTo(authoring.BoundsSize.x));
+            Assert.That(layout.Grid.Height, Is.EqualTo(authoring.BoundsSize.y));
+
+            for (int i = 0; i < layout.Cells.Length; i++)
+            {
+                int x = i % layout.Grid.Width;
+                int y = i / layout.Grid.Width;
+                Assert.That(layout.Cells[i].SourceRegionId, Is.EqualTo(ResolveRegionStableId(authoring, StageRegionKind.Source, x, y)), $"Source mismatch at cell[{i}] / ({x}, {y}).");
+                Assert.That(layout.Cells[i].DepositRegionId, Is.EqualTo(ResolveRegionStableId(authoring, StageRegionKind.Deposit, x, y)), $"Deposit mismatch at cell[{i}] / ({x}, {y}).");
+            }
+        }
+
+        private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
+        {
+            var tile = authoring.RegionTilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
+            if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                return 0u;
+
+            return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
         }
     }
 }
