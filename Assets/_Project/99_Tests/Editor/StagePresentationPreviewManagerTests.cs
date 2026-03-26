@@ -170,13 +170,25 @@ namespace SweepNDodge.DotsBullets.Tests
                 Stage1.StageId = 1;
                 Stage2.StageId = 2;
 
-                var obstacleGo = new GameObject("Obstacle");
-                obstacleGo.transform.SetParent(Stage1Go.transform);
-                var obstacle = obstacleGo.AddComponent<StageObstacleMarker>();
-                obstacle.StableId = 3001;
+                var authoringGo = new GameObject("AuthoringGrid");
+                authoringGo.transform.SetParent(Stage1Go.transform);
+                var grid = authoringGo.AddComponent<Grid>();
+                var authoring = Stage1Go.AddComponent<StageGridAuthoring>();
+                authoring.Grid = grid;
+                authoring.SourceRegionMappings = new[]
+                {
+                    new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1001u },
+                };
+
+                var sourceAnchorGo = new GameObject("SourceAnchor");
+                sourceAnchorGo.transform.SetParent(Stage1Go.transform);
+                sourceAnchorGo.transform.localPosition = new Vector3(1f, 0f, 2f);
+                var sourceAnchor = sourceAnchorGo.AddComponent<StageRegionAnchorMarker>();
+                sourceAnchor.RegionKind = StageRegionKind.Source;
+                sourceAnchor.RegionSlotIndex = 1;
 
                 var linkedGo = new GameObject("LinkedPresentation");
-                linkedGo.transform.SetParent(obstacleGo.transform);
+                linkedGo.transform.SetParent(sourceAnchorGo.transform);
                 Stage1Marker = linkedGo.AddComponent<StagePresentationMarker>();
                 Stage1Marker.StableId = 1001;
                 Stage1Marker.PlacementMode = StagePresentationPlacementMode.LinkedToParent;

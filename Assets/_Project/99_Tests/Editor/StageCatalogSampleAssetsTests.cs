@@ -1,7 +1,10 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
 using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -14,12 +17,7 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string StageLayout1Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_1.asset";
         private const string StageLayout2Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_2.asset";
         private const string StageLayout3Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_3.asset";
-        private const string Stage1SourcePaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage1_source.asset";
-        private const string Stage1DepositPaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage1_deposit.asset";
-        private const string Stage2SourcePaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage2_source.asset";
-        private const string Stage2DepositPaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage2_deposit.asset";
-        private const string Stage3SourcePaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage3_source.asset";
-        private const string Stage3DepositPaintPath = "Assets/_Project/03_Datas/StageCatalog/srp_stage3_deposit.asset";
+        private const string SampleScenePath = "Assets/_Project/01_Scenes/StageLayoutEditingSampleV1.unity";
 
         [Test]
         public void DemoStageCatalog_ContainsThreeEnabledEntriesInOrder()
@@ -65,18 +63,9 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertLayoutPopulated(layout2);
             AssertLayoutPopulated(layout3);
 
-            AssertLayoutMatchesPaint(
-                layout1,
-                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage1SourcePaintPath),
-                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage1DepositPaintPath));
-            AssertLayoutMatchesPaint(
-                layout2,
-                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage2SourcePaintPath),
-                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage2DepositPaintPath));
-            AssertLayoutMatchesPaint(
-                layout3,
-                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage3SourcePaintPath),
-                AssetDatabase.LoadAssetAtPath<StageRegionPaintAsset>(Stage3DepositPaintPath));
+            AssertLayoutMatchesSceneAuthoring(layout1, 1);
+            AssertLayoutMatchesSceneAuthoring(layout2, 2);
+            AssertLayoutMatchesSceneAuthoring(layout3, 3);
         }
 
         [Test]
@@ -109,20 +98,41 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(layout.Obstacles == null || layout.Obstacles.Length == 0, Is.True);
         }
 
-        private static void AssertLayoutMatchesPaint(StageLayoutSO layout, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint)
+        private static void AssertLayoutMatchesSceneAuthoring(StageLayoutSO layout, int stageId)
         {
-            Assert.That(sourcePaint, Is.Not.Null);
-            Assert.That(depositPaint, Is.Not.Null);
-            Assert.That(layout.Grid.Width, Is.EqualTo(sourcePaint.Width));
-            Assert.That(layout.Grid.Height, Is.EqualTo(sourcePaint.Height));
-            Assert.That(layout.Grid.Width, Is.EqualTo(depositPaint.Width));
-            Assert.That(layout.Grid.Height, Is.EqualTo(depositPaint.Height));
+            Assert.That(EditorSceneManager.OpenScene(SampleScenePath, OpenSceneMode.Single).IsValid(), Is.True);
+
+            var stage = Object.FindObjectsByType<StageLayoutStageMarker>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Single(x => x.StageId == stageId);
+            Assert.That(stage.TryGetComponent(out StageGridAuthoring authoring), Is.True);
+            Assert.That(authoring.RegionTilemap, Is.Not.Null, $"Stage {stageId} sample authoring must use unified RegionTilemap.");
+
+            Assert.That(layout.Grid.Width, Is.EqualTo(authoring.BoundsSize.x));
+            Assert.That(layout.Grid.Height, Is.EqualTo(authoring.BoundsSize.y));
 
             for (int i = 0; i < layout.Cells.Length; i++)
             {
-                Assert.That(layout.Cells[i].SourceRegionId, Is.EqualTo(sourcePaint.Cells[i]), $"Source paint mismatch at cell[{i}].");
-                Assert.That(layout.Cells[i].DepositRegionId, Is.EqualTo(depositPaint.Cells[i]), $"Deposit paint mismatch at cell[{i}].");
+                int x = i % layout.Grid.Width;
+                int y = i / layout.Grid.Width;
+                Assert.That(layout.Cells[i].SourceRegionId, Is.EqualTo(ResolveRegionStableId(authoring, StageRegionKind.Source, x, y)), $"Source mismatch at cell[{i}] / ({x}, {y}).");
+                Assert.That(layout.Cells[i].DepositRegionId, Is.EqualTo(ResolveRegionStableId(authoring, StageRegionKind.Deposit, x, y)), $"Deposit mismatch at cell[{i}] / ({x}, {y}).");
             }
+        }
+
+        private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
+        {
+            var tilemap = authoring.GetRegionTilemap(kind);
+            if (tilemap != null)
+            {
+                var tile = tilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
+                if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                    return 0u;
+
+                return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
+            }
+
+            var paint = kind == StageRegionKind.Source ? authoring.SourceRegionPaint : authoring.DepositRegionPaint;
+            return paint != null ? paint.GetCell(localX, localY) : 0u;
         }
     }
 }

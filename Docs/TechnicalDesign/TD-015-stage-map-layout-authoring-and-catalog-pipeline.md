@@ -329,8 +329,12 @@
   - deposit touch는 bounds-hit semantics를 유지한다.
 - [x] P5. source region runtime 이관
   - source sampling, pollution, progress를 region cell 집합 기준으로 옮긴다.
-- P6. visual/presentation 정리
-  - obstacle visual auto-generation 또는 tilemap rebuild 경로를 정리하고 legacy marker path를 제거한다.
+- P6. obstacle visual / metadata tilemap 재편
+  - obstacle visual을 presentation owner에서 분리하고, ground / wall visual tilemap과 gameplay metadata tilemap(`Movement / Region`) 중심 경로를 정리한다.
+  - `Source / Deposit` authoring은 단일 `RegionTilemap`에서 `StageRegionTile.RegionKind + RegionSlotIndex`와 `StageGridAuthoring`의 `slot -> stable id` mapping을 기준으로 한다.
+  - `StageRegionPaintAsset`는 deprecated fallback으로만 유지한다.
+- P6.next. legacy path 정리
+  - obstacle marker / obstacle-linked presentation / obstacle runtime template 등 남은 legacy path 제거는 별도 후속 작업으로 분리한다.
 
 ## 10. 검증 계획 / 합격 기준
 - 공통

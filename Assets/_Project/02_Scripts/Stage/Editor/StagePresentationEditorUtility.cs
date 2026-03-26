@@ -70,10 +70,16 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 if (current.TryGetComponent<StageRegionAnchorMarker>(out var anchor))
                 {
+                    if (!TryResolveAnchorStableId(anchor, out uint resolvedStableId))
+                    {
+                        current = current.parent;
+                        continue;
+                    }
+
                     if (anchor.RegionKind == StageRegionKind.Source)
                     {
                         linkKind = StagePresentationLinkKind.Source;
-                        linkedStableId = anchor.StableId;
+                        linkedStableId = resolvedStableId;
                         linkedParent = current;
                         return true;
                     }
@@ -81,7 +87,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     if (anchor.RegionKind == StageRegionKind.Deposit)
                     {
                         linkKind = StagePresentationLinkKind.Deposit;
-                        linkedStableId = anchor.StableId;
+                        linkedStableId = resolvedStableId;
                         linkedParent = current;
                         return true;
                     }
@@ -99,14 +105,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 {
                     linkKind = StagePresentationLinkKind.Deposit;
                     linkedStableId = deposit.StableId;
-                    linkedParent = current;
-                    return true;
-                }
-
-                if (current.TryGetComponent<StageObstacleMarker>(out var obstacle))
-                {
-                    linkKind = StagePresentationLinkKind.Obstacle;
-                    linkedStableId = obstacle.StableId;
                     linkedParent = current;
                     return true;
                 }
@@ -171,8 +169,20 @@ namespace SweepNDodge.DotsBullets.Editor
 
             return marker.TryGetComponent<StageRegionAnchorMarker>(out _)
                 || marker.TryGetComponent<StageSourceMarker>(out _)
-                || marker.TryGetComponent<StageDepositMarker>(out _)
-                || marker.TryGetComponent<StageObstacleMarker>(out _);
+                || marker.TryGetComponent<StageDepositMarker>(out _);
+        }
+
+        private static bool TryResolveAnchorStableId(StageRegionAnchorMarker anchor, out uint stableId)
+        {
+            stableId = 0u;
+            if (anchor == null || anchor.RegionSlotIndex <= 0)
+                return false;
+
+            var stage = anchor.GetComponentInParent<StageLayoutStageMarker>();
+            if (stage == null || !stage.TryGetComponent(out StageGridAuthoring authoring) || authoring == null)
+                return false;
+
+            return authoring.TryResolveStableId(anchor.RegionKind, anchor.RegionSlotIndex, out stableId);
         }
 
         private static void EncapsulateMeshBounds(ref Bounds aggregate, ref bool hasAny, Matrix4x4 localToRoot, Bounds localBounds)

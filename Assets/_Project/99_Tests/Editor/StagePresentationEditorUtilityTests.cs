@@ -80,7 +80,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void TryFindLinkedParent_FindsObstacleParent()
+        public void TryFindLinkedParent_DoesNotResolveObstacleParent()
         {
             var rootGo = new GameObject("root");
             var obstacleGo = new GameObject("obstacle");
@@ -93,10 +93,48 @@ namespace SweepNDodge.DotsBullets.Tests
                 var obstacle = obstacleGo.AddComponent<StageObstacleMarker>();
                 obstacle.StableId = 3001;
 
+                Assert.That(StagePresentationEditorUtility.TryFindLinkedParent(markerGo.transform, out _, out _, out _), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(rootGo);
+            }
+        }
+
+        [Test]
+        public void TryFindLinkedParent_ResolvesRegionAnchorViaSlotMapping()
+        {
+            var rootGo = new GameObject("root");
+            var stageGo = new GameObject("stage");
+            var gridGo = new GameObject("grid");
+            var markerGo = new GameObject("presentation");
+
+            try
+            {
+                stageGo.transform.SetParent(rootGo.transform);
+                gridGo.transform.SetParent(stageGo.transform);
+
+                stageGo.AddComponent<StageLayoutStageMarker>();
+                var grid = gridGo.AddComponent<Grid>();
+                var authoring = stageGo.AddComponent<StageGridAuthoring>();
+                authoring.Grid = grid;
+                authoring.SourceRegionMappings = new[]
+                {
+                    new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1001u },
+                };
+
+                var anchorGo = new GameObject("source_anchor");
+                anchorGo.transform.SetParent(stageGo.transform);
+                var anchor = anchorGo.AddComponent<StageRegionAnchorMarker>();
+                anchor.RegionKind = StageRegionKind.Source;
+                anchor.RegionSlotIndex = 1;
+
+                markerGo.transform.SetParent(anchorGo.transform);
+
                 Assert.That(StagePresentationEditorUtility.TryFindLinkedParent(markerGo.transform, out var kind, out var stableId, out var parent), Is.True);
-                Assert.That(kind, Is.EqualTo(StagePresentationLinkKind.Obstacle));
-                Assert.That(stableId, Is.EqualTo(3001u));
-                Assert.That(parent, Is.EqualTo(obstacleGo.transform));
+                Assert.That(kind, Is.EqualTo(StagePresentationLinkKind.Source));
+                Assert.That(stableId, Is.EqualTo(1001u));
+                Assert.That(parent, Is.EqualTo(anchorGo.transform));
             }
             finally
             {

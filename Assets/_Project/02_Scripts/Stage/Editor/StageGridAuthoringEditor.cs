@@ -17,21 +17,23 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
 
             EditorGUILayout.Space(6f);
-            if (authoring.Grid == null || authoring.MovementTilemap == null || authoring.SourceRegionPaint == null || authoring.DepositRegionPaint == null)
-            {
-                EditorGUILayout.HelpBox("Grid, MovementTilemap, SourceRegionPaint, DepositRegionPaint must all be assigned.", MessageType.Warning);
-            }
+            if (authoring.Grid == null || authoring.MovementTilemap == null)
+                EditorGUILayout.HelpBox("Grid and MovementTilemap must be assigned.", MessageType.Warning);
+
+            if (authoring.RegionTilemap == null)
+                EditorGUILayout.HelpBox("RegionTilemap is the primary metadata workflow. Split SourceTilemap/DepositTilemap and paint assets remain available as deprecated fallback only.", MessageType.Info);
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Open Source Paint") && authoring.SourceRegionPaint != null)
+                if (GUILayout.Button("Open Source Paint (Deprecated Fallback)") && authoring.SourceRegionPaint != null)
                     StageRegionPaintEditorWindow.Open(authoring.SourceRegionPaint);
-                if (GUILayout.Button("Open Deposit Paint") && authoring.DepositRegionPaint != null)
+                if (GUILayout.Button("Open Deposit Paint (Deprecated Fallback)") && authoring.DepositRegionPaint != null)
                     StageRegionPaintEditorWindow.Open(authoring.DepositRegionPaint);
             }
 
             if (GUILayout.Button("Sync Paint Asset Size From Authoring Bounds"))
                 SyncPaintAssets(authoring);
+
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Fit Bounds From Used Tiles"))
@@ -68,15 +70,25 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static void FitBoundsFromUsedTiles(StageGridAuthoring authoring)
         {
-            if (authoring == null || authoring.MovementTilemap == null)
+            if (authoring == null)
                 return;
 
-            if (!TryComputeUsedTileBounds(authoring.MovementTilemap, out var usedBounds))
+            bool hasAny = false;
+            int minX = int.MaxValue;
+            int minY = int.MaxValue;
+            int maxX = int.MinValue;
+            int maxY = int.MinValue;
+
+            IncludeTilemapBounds(authoring.MovementTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.RegionTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.SourceTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.DepositTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            if (!hasAny)
                 return;
 
             Undo.RecordObject(authoring, "Fit Stage Authoring Bounds From Used Tiles");
-            authoring.BoundsMinCell = new Vector2Int(usedBounds.xMin, usedBounds.yMin);
-            authoring.BoundsSize = new Vector2Int(Mathf.Max(1, usedBounds.size.x), Mathf.Max(1, usedBounds.size.y));
+            authoring.BoundsMinCell = new Vector2Int(minX, minY);
+            authoring.BoundsSize = new Vector2Int((maxX - minX) + 1, (maxY - minY) + 1);
             EditorUtility.SetDirty(authoring);
         }
 
@@ -91,10 +103,10 @@ namespace SweepNDodge.DotsBullets.Editor
             int maxX = int.MinValue;
             int maxY = int.MinValue;
 
-            if (authoring.MovementTilemap != null && TryComputeUsedTileBounds(authoring.MovementTilemap, out var usedBounds))
-            {
-                IncludeBounds(usedBounds, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
-            }
+            IncludeTilemapBounds(authoring.MovementTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.RegionTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.SourceTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.DepositTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
 
             var stageNode = authoring.GetComponent<StageLayoutStageMarker>();
             var anchors = stageNode != null
@@ -201,7 +213,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 }
             }
 
-            if (authoring.ShowSourceGizmo && authoring.SourceRegionPaint != null && authoring.SourceRegionPaint.GetCell(localX, localY) != 0u)
+            uint sourceCell = ResolveRegionCell(authoring, StageRegionKind.Source, localX, localY);
+            if (authoring.ShowSourceGizmo && sourceCell != 0u)
             {
                 Handles.DrawSolidRectangleWithOutline(
                     BuildRectVerts(rect, z - 0.002f),
@@ -209,7 +222,8 @@ namespace SweepNDodge.DotsBullets.Editor
                     Color.clear);
             }
 
-            if (authoring.ShowDepositGizmo && authoring.DepositRegionPaint != null && authoring.DepositRegionPaint.GetCell(localX, localY) != 0u)
+            uint depositCell = ResolveRegionCell(authoring, StageRegionKind.Deposit, localX, localY);
+            if (authoring.ShowDepositGizmo && depositCell != 0u)
             {
                 Handles.DrawSolidRectangleWithOutline(
                     BuildRectVerts(rect, z - 0.001f),
@@ -240,8 +254,30 @@ namespace SweepNDodge.DotsBullets.Editor
                     ? new Color(0.1f, 0.85f, 1f, 1f)
                     : new Color(1f, 0.75f, 0.1f, 1f);
                 Handles.DrawSolidDisc(pos, Vector3.forward, 0.12f * Mathf.Min(cellWidth, cellHeight));
-                Handles.Label(pos, $"{anchor.RegionKind}:{anchor.StableId}");
+                string label = authoring.TryResolveStableId(anchor.RegionKind, anchor.RegionSlotIndex, out uint stableId)
+                    ? $"{anchor.RegionKind}:slot{anchor.RegionSlotIndex}->{stableId}"
+                    : $"{anchor.RegionKind}:slot{anchor.RegionSlotIndex}";
+                Handles.Label(pos, label);
             }
+        }
+
+        private static uint ResolveRegionCell(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
+        {
+            if (authoring == null)
+                return 0u;
+
+            var tilemap = authoring.GetRegionTilemap(kind);
+            if (tilemap != null)
+            {
+                var tile = tilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
+                if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                    return 0u;
+
+                return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
+            }
+
+            var paint = kind == StageRegionKind.Source ? authoring.SourceRegionPaint : authoring.DepositRegionPaint;
+            return paint != null ? paint.GetCell(localX, localY) : 0u;
         }
 
         private static Vector3[] BuildRectVerts(Rect rect, float z)
@@ -259,9 +295,7 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             var rect = new Rect(bounds.xMin * cellWidth, bounds.yMin * cellHeight, bounds.size.x * cellWidth, bounds.size.y * cellHeight);
             Handles.DrawPolyLine(BuildRectVerts(rect, z));
-            Handles.DrawLine(
-                new Vector3(rect.xMin, rect.yMax, z),
-                new Vector3(rect.xMin, rect.yMin, z));
+            Handles.DrawLine(new Vector3(rect.xMin, rect.yMax, z), new Vector3(rect.xMin, rect.yMin, z));
         }
 
         private static Color ResolveMovementColor(StageCellMovementFlags flags)
@@ -275,6 +309,14 @@ namespace SweepNDodge.DotsBullets.Editor
             if (blockBullet)
                 return new Color(0.9f, 0.1f, 0.85f, 0.22f);
             return Color.clear;
+        }
+
+        private static void IncludeTilemapBounds(Tilemap tilemap, ref bool hasAny, ref int minX, ref int minY, ref int maxX, ref int maxY)
+        {
+            if (!TryComputeUsedTileBounds(tilemap, out var bounds))
+                return;
+
+            IncludeBounds(bounds, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
         }
 
         private static bool TryComputeUsedTileBounds(Tilemap tilemap, out BoundsInt bounds)

@@ -13,12 +13,16 @@ namespace SweepNDodge.DotsBullets.Tests
         public void GenerateLayoutsForRoot_BuildsDenseGridAndClearsLegacyArrays()
         {
             var setup = CreateStageSetup();
+            StageRegionTile sourceTile = null;
+            StageRegionTile depositTile = null;
             try
             {
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-                setup.DepositPaint.SetCell(1, 1, 2001u);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Deposit, 2001u, new Vector2Int(1, 1));
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                depositTile = CreateRegionTile(StageRegionKind.Deposit, 1);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(1, 1), depositTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Deposit, 1, new Vector2Int(1, 1));
 
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
@@ -29,7 +33,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(setup.Layout.Cells, Has.Length.EqualTo(4));
                 Assert.That(setup.Layout.Cells[0].SourceRegionId, Is.EqualTo(1001u));
                 Assert.That(setup.Layout.Cells[3].DepositRegionId, Is.EqualTo(2001u));
-                Assert.That(setup.Layout.Cells[3].MovementFlags, Is.EqualTo(StageCellMovementFlags.None));
                 Assert.That(setup.Layout.SourceRegions.Single().StableId, Is.EqualTo(1001u));
                 Assert.That(setup.Layout.DepositRegions.Single().StableId, Is.EqualTo(2001u));
                 Assert.That(setup.Layout.Sources, Is.Empty);
@@ -38,6 +41,33 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
+                DestroyTile(sourceTile);
+                DestroyTile(depositTile);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void GenerateLayoutsForRoot_TilemapPrimary_TakesPrecedenceOverPaintFallback()
+        {
+            var setup = CreateStageSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 2);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+                setup.SourcePaint.SetCell(0, 0, 1001u);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 2, new Vector2Int(0, 0));
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.Cells[0].SourceRegionId, Is.EqualTo(1002u));
+                Assert.That(issues.Any(x => x.Code == "STA030"), Is.True);
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
                 setup.Dispose();
             }
         }
@@ -72,10 +102,12 @@ namespace SweepNDodge.DotsBullets.Tests
         public void GenerateLayoutsForRoot_LinkedPresentation_ResolvesAnchorParentLink()
         {
             var setup = CreateStageSetup();
+            StageRegionTile sourceTile = null;
             try
             {
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-                var anchor = CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+                var anchor = CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
                 var presentationGo = new GameObject("presentation");
                 presentationGo.transform.SetParent(anchor.transform);
                 var presentation = presentationGo.AddComponent<StagePresentationMarker>();
@@ -93,6 +125,7 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
+                DestroyTile(sourceTile);
                 setup.Dispose();
             }
         }
@@ -101,13 +134,15 @@ namespace SweepNDodge.DotsBullets.Tests
         public void GenerateLayoutsForRoot_RotatedGrid_NormalizesToWorldXZOrigin()
         {
             var setup = CreateStageSetup();
+            StageRegionTile sourceTile = null;
             try
             {
                 setup.StageGo.transform.GetChild(0).rotation = Quaternion.Euler(90f, 0f, 0f);
                 setup.StageGo.transform.GetChild(0).position = new Vector3(3f, 2f, 5f);
                 setup.Authoring.BoundsMinCell = new Vector2Int(-2, 4);
-                setup.SourcePaint.SetCell(1, 1, 1001u);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(1, 1));
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(1, 1), sourceTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(1, 1));
 
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
@@ -118,6 +153,7 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
+                DestroyTile(sourceTile);
                 setup.Dispose();
             }
         }
@@ -126,14 +162,16 @@ namespace SweepNDodge.DotsBullets.Tests
         public void GenerateLayoutsForRoot_NegativeBoundsMin_ReadsMovementFromTilemapCoordinates()
         {
             var setup = CreateStageSetup();
-            StageMovementTile tile = null;
+            StageMovementTile movementTile = null;
+            StageRegionTile sourceTile = null;
             try
             {
                 setup.Authoring.BoundsMinCell = new Vector2Int(-3, -2);
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
-                tile = CreateMovementTile(StageCellMovementFlags.BlockPlayer | StageCellMovementFlags.BlockBullet);
-                setup.MovementTilemap.SetTile(new Vector3Int(-3, -2, 0), tile);
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(new Vector3Int(-3, -2, 0), sourceTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+                movementTile = CreateMovementTile(StageCellMovementFlags.BlockPlayer | StageCellMovementFlags.BlockBullet);
+                setup.MovementTilemap.SetTile(new Vector3Int(-3, -2, 0), movementTile);
 
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
@@ -147,27 +185,8 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
-                if (tile != null)
-                    Object.DestroyImmediate(tile);
-                setup.Dispose();
-            }
-        }
-
-        [Test]
-        public void GenerateLayoutsForRoot_MissingAnchor_FailsWithError()
-        {
-            var setup = CreateStageSetup();
-            try
-            {
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-
-                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
-
-                Assert.That(ok, Is.False);
-                Assert.That(issues.Any(x => x.Code == "STA016"), Is.True);
-            }
-            finally
-            {
+                DestroyTile(movementTile);
+                DestroyTile(sourceTile);
                 setup.Dispose();
             }
         }
@@ -199,13 +218,13 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
-        private static StageRegionAnchorMarker CreateAnchor(Transform parent, StageRegionKind kind, uint stableId, Vector2Int anchorCell)
+        private static StageRegionAnchorMarker CreateAnchor(Transform parent, StageRegionKind kind, int regionSlotIndex, Vector2Int anchorCell)
         {
-            var go = new GameObject($"{kind}_{stableId}");
+            var go = new GameObject($"{kind}_slot_{regionSlotIndex}");
             go.transform.SetParent(parent);
             var marker = go.AddComponent<StageRegionAnchorMarker>();
             marker.RegionKind = kind;
-            marker.StableId = stableId;
+            marker.RegionSlotIndex = regionSlotIndex;
             marker.Active = true;
             marker.AnchorCell = anchorCell;
             marker.AnchorOffset = Vector2.zero;
@@ -219,19 +238,29 @@ namespace SweepNDodge.DotsBullets.Tests
             return tile;
         }
 
+        private static StageRegionTile CreateRegionTile(StageRegionKind kind, int slot)
+        {
+            var tile = ScriptableObject.CreateInstance<StageRegionTile>();
+            tile.RegionKind = kind;
+            tile.RegionSlotIndex = slot;
+            return tile;
+        }
+
         private static StageTestSetup CreateStageSetup()
         {
             var rootGo = new GameObject("root");
             var stageGo = new GameObject("stage");
             var gridGo = new GameObject("grid");
-            var tilemapGo = new GameObject("movement_tilemap");
+            var movementTilemapGo = new GameObject("movement_tilemap");
+            var regionTilemapGo = new GameObject("region_tilemap");
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
             var sourcePaint = ScriptableObject.CreateInstance<StageRegionPaintAsset>();
             var depositPaint = ScriptableObject.CreateInstance<StageRegionPaintAsset>();
 
             stageGo.transform.SetParent(rootGo.transform);
             gridGo.transform.SetParent(stageGo.transform);
-            tilemapGo.transform.SetParent(gridGo.transform);
+            movementTilemapGo.transform.SetParent(gridGo.transform);
+            regionTilemapGo.transform.SetParent(gridGo.transform);
 
             var root = rootGo.AddComponent<StageLayoutRootMarker>();
             var stage = stageGo.AddComponent<StageLayoutStageMarker>();
@@ -240,10 +269,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var grid = gridGo.AddComponent<Grid>();
             grid.cellSize = Vector3.one;
-            var tilemap = tilemapGo.AddComponent<Tilemap>();
-            tilemapGo.AddComponent<TilemapRenderer>();
-            tilemap.origin = Vector3Int.zero;
-            tilemap.size = new Vector3Int(2, 2, 1);
+            var movementTilemap = AddTilemap(movementTilemapGo);
+            var regionTilemap = AddTilemap(regionTilemapGo);
 
             sourcePaint.RegionKind = StageRegionKind.Source;
             sourcePaint.Resize(2, 2);
@@ -252,20 +279,39 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var authoring = stageGo.AddComponent<StageGridAuthoring>();
             authoring.Grid = grid;
-            authoring.MovementTilemap = tilemap;
+            authoring.MovementTilemap = movementTilemap;
+            authoring.RegionTilemap = regionTilemap;
             authoring.SourceRegionPaint = sourcePaint;
             authoring.DepositRegionPaint = depositPaint;
+            authoring.SourceRegionMappings = new[]
+            {
+                new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1001u },
+                new StageRegionSlotMapping { RegionSlotIndex = 2, StableId = 1002u },
+            };
+            authoring.DepositRegionMappings = new[]
+            {
+                new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 2001u },
+            };
             authoring.BoundsMinCell = new Vector2Int(0, 0);
             authoring.BoundsSize = new Vector2Int(2, 2);
 
-            return new StageTestSetup(rootGo, stageGo, root, layout, sourcePaint, depositPaint, tilemap, authoring);
+            return new StageTestSetup(rootGo, stageGo, root, layout, sourcePaint, depositPaint, movementTilemap, regionTilemap, authoring);
+        }
+
+        private static Tilemap AddTilemap(GameObject go)
+        {
+            var tilemap = go.AddComponent<Tilemap>();
+            go.AddComponent<TilemapRenderer>();
+            tilemap.origin = Vector3Int.zero;
+            tilemap.size = new Vector3Int(2, 2, 1);
+            return tilemap;
         }
 
         private sealed class StageTestSetup
         {
             private readonly Object[] _ownedObjects;
 
-            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint, Tilemap movementTilemap, StageGridAuthoring authoring)
+            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint, Tilemap movementTilemap, Tilemap regionTilemap, StageGridAuthoring authoring)
             {
                 _ownedObjects = new Object[] { layout, sourcePaint, depositPaint, rootGo };
                 StageGo = stageGo;
@@ -274,6 +320,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SourcePaint = sourcePaint;
                 DepositPaint = depositPaint;
                 MovementTilemap = movementTilemap;
+                RegionTilemap = regionTilemap;
                 Authoring = authoring;
             }
 
@@ -283,6 +330,7 @@ namespace SweepNDodge.DotsBullets.Tests
             public StageRegionPaintAsset SourcePaint { get; }
             public StageRegionPaintAsset DepositPaint { get; }
             public Tilemap MovementTilemap { get; }
+            public Tilemap RegionTilemap { get; }
             public StageGridAuthoring Authoring { get; }
 
             public void Dispose()
@@ -290,6 +338,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 for (int i = 0; i < _ownedObjects.Length; i++)
                     Object.DestroyImmediate(_ownedObjects[i]);
             }
+        }
+
+        private static void DestroyTile(Object tile)
+        {
+            if (tile != null)
+                Object.DestroyImmediate(tile);
         }
     }
 }

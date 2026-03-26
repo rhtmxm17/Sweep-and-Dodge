@@ -3,11 +3,25 @@ using UnityEngine.Tilemaps;
 
 namespace SweepNDodge.DotsBullets
 {
+    [System.Serializable]
+    public struct StageRegionSlotMapping
+    {
+        [Min(0)] public int RegionSlotIndex;
+        [Min(1)] public uint StableId;
+    }
+
     [DisallowMultipleComponent]
     public sealed class StageGridAuthoring : MonoBehaviour
     {
         public Grid Grid;
         public Tilemap MovementTilemap;
+        public Tilemap RegionTilemap;
+        [HideInInspector] public Tilemap SourceTilemap;
+        [HideInInspector] public Tilemap DepositTilemap;
+        public Tilemap GroundVisualTilemap;
+        public Tilemap WallVisualTilemap;
+        public StageRegionSlotMapping[] SourceRegionMappings;
+        public StageRegionSlotMapping[] DepositRegionMappings;
         public StageRegionPaintAsset SourceRegionPaint;
         public StageRegionPaintAsset DepositRegionPaint;
         public Vector2Int BoundsMinCell = Vector2Int.zero;
@@ -37,6 +51,41 @@ namespace SweepNDodge.DotsBullets
         public Vector2Int GetLocalCell(Vector3Int tileCell)
         {
             return new Vector2Int(tileCell.x - BoundsMinCell.x, tileCell.y - BoundsMinCell.y);
+        }
+
+        public bool TryResolveStableId(StageRegionKind kind, int regionSlotIndex, out uint stableId)
+        {
+            stableId = 0u;
+            if (regionSlotIndex <= 0)
+                return false;
+
+            var mappings = kind == StageRegionKind.Source ? SourceRegionMappings : DepositRegionMappings;
+            if (mappings == null)
+                return false;
+
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                if (mappings[i].RegionSlotIndex != regionSlotIndex)
+                    continue;
+
+                stableId = mappings[i].StableId;
+                return stableId > 0u;
+            }
+
+            return false;
+        }
+
+        public StageRegionSlotMapping[] GetMappings(StageRegionKind kind)
+        {
+            return kind == StageRegionKind.Source ? SourceRegionMappings : DepositRegionMappings;
+        }
+
+        public Tilemap GetRegionTilemap(StageRegionKind kind)
+        {
+            if (RegionTilemap != null)
+                return RegionTilemap;
+
+            return kind == StageRegionKind.Source ? SourceTilemap : DepositTilemap;
         }
 
         public StageGridSpec BuildRuntimeGridSpec()

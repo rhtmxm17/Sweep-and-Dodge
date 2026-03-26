@@ -28,6 +28,7 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             _targetAsset = (StageRegionPaintAsset)EditorGUILayout.ObjectField("Target Asset", _targetAsset, typeof(StageRegionPaintAsset), false);
             _gridAuthoring = (StageGridAuthoring)EditorGUILayout.ObjectField("Grid Authoring", _gridAuthoring, typeof(StageGridAuthoring), true);
+            EditorGUILayout.HelpBox("StageRegionPaintAsset is a deprecated migration fallback. Primary authoring now uses RegionTilemap with slot-index mappings and per-tile StageRegionKind.", MessageType.Warning);
             _selectedStableId = (uint)Mathf.Max(1, EditorGUILayout.IntField("Selected StableId", (int)_selectedStableId));
             _mode = (PaintMode)EditorGUILayout.EnumPopup("Mode", _mode);
 

@@ -31,9 +31,9 @@
   - 구현 메모: source runtime migration은 비범위라 운영 샘플 asset의 `Sources` compatibility bridge는 유지했다. stage2 `9002` presentation은 deposit-link 대신 source-link로 정리했다.
 
 ## Next
-- [ ] P6. obstacle visual / legacy path 정리
-  - 기준: obstacle visual은 gameplay authority와 분리된 tilemap/presentation owner가 처리한다.
-  - 산출물: visual rebuild 경로, legacy obstacle marker 제거 계획, 최종 migration 점검
+- [ ] P6. obstacle visual / metadata tilemap 재편
+  - 기준: obstacle visual은 presentation owner에서 분리하고, ground / wall visual tilemap과 gameplay metadata tilemap(`Movement / Region`) 중심으로 재편한다.
+  - 산출물: visual owner 구조, `StageRegionTile.RegionKind + RegionSlotIndex + StageGridAuthoring slot mapping` 기반 단일 `RegionTilemap` authoring 경로, presentation obstacle 제외 계약, paint fallback deprecated 처리
 
 ## Blocked
 - 없음
@@ -49,6 +49,8 @@
   - 검증 결과: 현재 manifest에는 tilemap module은 있지만 editor package는 없고, extras는 visual/auxiliary workflow에만 필요하다는 결론을 반영했다.
 
 ## Parking Lot
+- [ ] P6.next. legacy path 정리
+  - 근거: obstacle visual / metadata tilemap 설계 범위가 충분히 커졌으므로, obstacle marker / obstacle-linked presentation / obstacle runtime template 제거는 별도 후속 작업으로 분리한다.
 - [ ] P7. 외부 툴 importer(`LDtk`, `Tiled`)는 Unity Tilemap 경로가 안정화된 뒤 같은 grid schema로 추가 검토한다.
   - 근거: 지금 우선순위는 SSOT와 runtime owner 전환이지 authoring 툴 확장이 아니다.
 - [ ] P8. obstacle visual auto-generation 세부 규칙은 gameplay migration 완료 후 별도 세션에서 정리한다.
@@ -92,4 +94,4 @@
 ## End of Session
 - 결과: movement/deposit/source runtime query가 모두 grid authority 기준으로 정리됐다.
 - 남은 리스크: source region local-grid semantics는 bounds-based rectangle cache를 사용하므로, 추후 irregular-region density/presentation 세부 보정이 필요할 수 있다.
-- 다음 세션 시작점: P6 obstacle visual / legacy path 정리로 넘어간다.
+- 다음 세션 시작점: P6 obstacle visual / metadata tilemap 재편으로 넘어가고, legacy path 정리는 그 다음 작업으로 분리한다.

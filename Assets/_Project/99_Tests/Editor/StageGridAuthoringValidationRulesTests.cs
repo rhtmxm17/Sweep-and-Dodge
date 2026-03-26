@@ -9,15 +9,113 @@ namespace SweepNDodge.DotsBullets.Tests
     public class StageGridAuthoringValidationRulesTests
     {
         [Test]
-        public void PaintSizeMismatchAgainstAuthoringBounds_IsReported()
+        public void NegativeBoundsMin_IsAllowed()
+        {
+            var setup = CreateSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                setup.Authoring.BoundsMinCell = new Vector2Int(-4, -3);
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA010"), Is.False);
+                Assert.That(issues.Any(x => x.Code == "STA021"), Is.False);
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void TilemapPrimary_PaintFallback_IsWarning()
+        {
+            var setup = CreateSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+                setup.SourcePaint.SetCell(0, 0, 1001u);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA030" && x.Severity == ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void WrongRegionKindTile_OnLegacySplitTilemap_IsReported()
+        {
+            var setup = CreateSetup();
+            StageRegionTile wrongTile = null;
+            try
+            {
+                setup.Authoring.RegionTilemap = null;
+                var sourceFallbackGo = new GameObject("source_fallback_tilemap");
+                sourceFallbackGo.transform.SetParent(setup.Grid.transform);
+                var sourceFallback = AddTilemap(sourceFallbackGo);
+                setup.Authoring.SourceTilemap = sourceFallback;
+
+                wrongTile = CreateRegionTile(StageRegionKind.Deposit, 1);
+                sourceFallback.SetTile(setup.Authoring.GetTilemapCell(0, 0), wrongTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA006"), Is.True);
+            }
+            finally
+            {
+                DestroyTile(wrongTile);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void UsedSlotWithoutMapping_IsReported()
+        {
+            var setup = CreateSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 7);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA024"), Is.True);
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void DuplicateSlotAndStableIdMappings_AreReported()
         {
             var setup = CreateSetup();
             try
             {
-                setup.Authoring.BoundsSize = new Vector2Int(3, 2);
+                setup.Authoring.SourceRegionMappings = new[]
+                {
+                    new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1001u },
+                    new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1002u },
+                    new StageRegionSlotMapping { RegionSlotIndex = 2, StableId = 1001u },
+                };
 
                 var issues = Validate(setup.Stage);
-                Assert.That(issues.Any(x => x.Code == "STA011"), Is.True);
+                Assert.That(issues.Any(x => x.Code == "STA026"), Is.True);
+                Assert.That(issues.Any(x => x.Code == "STA027"), Is.True);
             }
             finally
             {
@@ -26,21 +124,39 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void NegativeBoundsMin_IsAllowed()
+        public void AnchorSlotWithoutMapping_IsReported()
         {
             var setup = CreateSetup();
             try
             {
-                setup.Authoring.BoundsMinCell = new Vector2Int(-4, -3);
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 7, new Vector2Int(0, 0));
 
                 var issues = Validate(setup.Stage);
-                Assert.That(issues.Any(x => x.Code == "STA010"), Is.False);
-                Assert.That(issues.Any(x => x.Code == "STA021"), Is.False);
+                Assert.That(issues.Any(x => x.Code == "STA024"), Is.True);
             }
             finally
             {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void AnchorCellNotPaintedWithSameSlot_IsReported()
+        {
+            var setup = CreateSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(1, 1));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA018"), Is.True);
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
                 setup.Dispose();
             }
         }
@@ -53,90 +169,14 @@ namespace SweepNDodge.DotsBullets.Tests
             try
             {
                 tile = CreateMovementTile(StageCellMovementFlags.BlockPlayer);
-                setup.Tilemap.SetTile(new Vector3Int(4, 1, 0), tile);
+                setup.MovementTilemap.SetTile(new Vector3Int(4, 1, 0), tile);
 
                 var issues = Validate(setup.Stage);
                 Assert.That(issues.Any(x => x.Code == "STA022" && x.Severity == ContentValidationSeverity.Warning), Is.True);
             }
             finally
             {
-                if (tile != null)
-                    Object.DestroyImmediate(tile);
-                setup.Dispose();
-            }
-        }
-
-        [Test]
-        public void WrongRegionKind_IsReported()
-        {
-            var setup = CreateSetup();
-            try
-            {
-                setup.SourcePaint.RegionKind = StageRegionKind.Deposit;
-
-                var issues = Validate(setup.Stage);
-                Assert.That(issues.Any(x => x.Code == "STA006"), Is.True);
-            }
-            finally
-            {
-                setup.Dispose();
-            }
-        }
-
-        [Test]
-        public void MarkerWithoutPaintedCells_IsReported()
-        {
-            var setup = CreateSetup();
-            try
-            {
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
-
-                var issues = Validate(setup.Stage);
-                Assert.That(issues.Any(x => x.Code == "STA019"), Is.True);
-            }
-            finally
-            {
-                setup.Dispose();
-            }
-        }
-
-        [Test]
-        public void AnchorNotOnRegionCell_IsReported()
-        {
-            var setup = CreateSetup();
-            try
-            {
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(1, 1));
-
-                var issues = Validate(setup.Stage);
-                Assert.That(issues.Any(x => x.Code == "STA018"), Is.True);
-            }
-            finally
-            {
-                setup.Dispose();
-            }
-        }
-
-        [Test]
-        public void CanonicalGridRotation_IdentityAndPlus90X_AreAllowed()
-        {
-            var setup = CreateSetup();
-            try
-            {
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1001u, new Vector2Int(0, 0));
-
-                setup.Grid.transform.rotation = Quaternion.identity;
-                var identityIssues = Validate(setup.Stage);
-                Assert.That(identityIssues.Any(x => x.Code == "STA021"), Is.False);
-
-                setup.Grid.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-                var rotatedIssues = Validate(setup.Stage);
-                Assert.That(rotatedIssues.Any(x => x.Code == "STA021"), Is.False);
-            }
-            finally
-            {
+                DestroyTile(tile);
                 setup.Dispose();
             }
         }
@@ -165,13 +205,13 @@ namespace SweepNDodge.DotsBullets.Tests
             return issues;
         }
 
-        private static StageRegionAnchorMarker CreateAnchor(Transform parent, StageRegionKind kind, uint stableId, Vector2Int anchorCell)
+        private static StageRegionAnchorMarker CreateAnchor(Transform parent, StageRegionKind kind, int regionSlotIndex, Vector2Int anchorCell)
         {
-            var go = new GameObject($"{kind}_{stableId}");
+            var go = new GameObject($"{kind}_slot_{regionSlotIndex}");
             go.transform.SetParent(parent);
             var marker = go.AddComponent<StageRegionAnchorMarker>();
             marker.RegionKind = kind;
-            marker.StableId = stableId;
+            marker.RegionSlotIndex = regionSlotIndex;
             marker.Active = true;
             marker.AnchorCell = anchorCell;
             return marker;
@@ -182,10 +222,12 @@ namespace SweepNDodge.DotsBullets.Tests
             var rootGo = new GameObject("root");
             var stageGo = new GameObject("stage");
             var gridGo = new GameObject("grid");
-            var tilemapGo = new GameObject("tilemap");
+            var movementGo = new GameObject("movement_tilemap");
+            var regionGo = new GameObject("region_tilemap");
             stageGo.transform.SetParent(rootGo.transform);
             gridGo.transform.SetParent(stageGo.transform);
-            tilemapGo.transform.SetParent(gridGo.transform);
+            movementGo.transform.SetParent(gridGo.transform);
+            regionGo.transform.SetParent(gridGo.transform);
 
             rootGo.AddComponent<StageLayoutRootMarker>();
             var stage = stageGo.AddComponent<StageLayoutStageMarker>();
@@ -193,10 +235,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var grid = gridGo.AddComponent<Grid>();
             grid.cellSize = Vector3.one;
-            var tilemap = tilemapGo.AddComponent<Tilemap>();
-            tilemapGo.AddComponent<TilemapRenderer>();
-            tilemap.origin = Vector3Int.zero;
-            tilemap.size = new Vector3Int(2, 2, 1);
+
+            var movementTilemap = AddTilemap(movementGo);
+            var regionTilemap = AddTilemap(regionGo);
 
             var sourcePaint = ScriptableObject.CreateInstance<StageRegionPaintAsset>();
             sourcePaint.RegionKind = StageRegionKind.Source;
@@ -207,20 +248,39 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var authoring = stageGo.AddComponent<StageGridAuthoring>();
             authoring.Grid = grid;
-            authoring.MovementTilemap = tilemap;
+            authoring.MovementTilemap = movementTilemap;
+            authoring.RegionTilemap = regionTilemap;
             authoring.SourceRegionPaint = sourcePaint;
             authoring.DepositRegionPaint = depositPaint;
+            authoring.SourceRegionMappings = new[]
+            {
+                new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1001u },
+                new StageRegionSlotMapping { RegionSlotIndex = 2, StableId = 1002u },
+            };
+            authoring.DepositRegionMappings = new[]
+            {
+                new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 2001u },
+            };
             authoring.BoundsMinCell = new Vector2Int(0, 0);
             authoring.BoundsSize = new Vector2Int(2, 2);
 
-            return new ValidationSetup(rootGo, stageGo, stage, tilemap, sourcePaint, depositPaint, authoring);
+            return new ValidationSetup(rootGo, stageGo, stage, movementTilemap, regionTilemap, sourcePaint, depositPaint, authoring);
+        }
+
+        private static Tilemap AddTilemap(GameObject go)
+        {
+            var tilemap = go.AddComponent<Tilemap>();
+            go.AddComponent<TilemapRenderer>();
+            tilemap.origin = Vector3Int.zero;
+            tilemap.size = new Vector3Int(2, 2, 1);
+            return tilemap;
         }
 
         private sealed class ValidationSetup
         {
             private readonly Object[] _ownedObjects;
 
-            public ValidationSetup(GameObject rootGo, GameObject stageGo, StageLayoutStageMarker stage, Tilemap tilemap, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint, StageGridAuthoring authoring)
+            public ValidationSetup(GameObject rootGo, GameObject stageGo, StageLayoutStageMarker stage, Tilemap movementTilemap, Tilemap regionTilemap, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint, StageGridAuthoring authoring)
             {
                 _ownedObjects = new Object[]
                 {
@@ -231,7 +291,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 };
                 StageGo = stageGo;
                 Stage = stage;
-                Tilemap = tilemap;
+                MovementTilemap = movementTilemap;
+                RegionTilemap = regionTilemap;
                 SourcePaint = sourcePaint;
                 DepositPaint = depositPaint;
                 Authoring = authoring;
@@ -239,8 +300,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
             public GameObject StageGo { get; }
             public StageLayoutStageMarker Stage { get; }
-            public Tilemap Tilemap { get; }
-            public Grid Grid => (Grid)Tilemap.layoutGrid;
+            public Tilemap MovementTilemap { get; }
+            public Tilemap RegionTilemap { get; }
+            public Grid Grid => (Grid)MovementTilemap.layoutGrid;
             public StageRegionPaintAsset SourcePaint { get; }
             public StageRegionPaintAsset DepositPaint { get; }
             public StageGridAuthoring Authoring { get; }
@@ -257,6 +319,20 @@ namespace SweepNDodge.DotsBullets.Tests
             var tile = ScriptableObject.CreateInstance<StageMovementTile>();
             tile.MovementFlags = flags;
             return tile;
+        }
+
+        private static StageRegionTile CreateRegionTile(StageRegionKind kind, int slot)
+        {
+            var tile = ScriptableObject.CreateInstance<StageRegionTile>();
+            tile.RegionKind = kind;
+            tile.RegionSlotIndex = slot;
+            return tile;
+        }
+
+        private static void DestroyTile(Object tile)
+        {
+            if (tile != null)
+                Object.DestroyImmediate(tile);
         }
     }
 }

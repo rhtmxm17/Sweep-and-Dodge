@@ -28,7 +28,6 @@ namespace SweepNDodge.DotsBullets
         private EntityManager _em;
         private EntityQuery _sourceQuery;
         private EntityQuery _depositQuery;
-        private EntityQuery _obstacleQuery;
         private bool _isBound;
 
         private int _lastAppliedStageId;
@@ -311,7 +310,6 @@ namespace SweepNDodge.DotsBullets
             {
                 StagePresentationLinkKind.Source => _sourceQuery,
                 StagePresentationLinkKind.Deposit => _depositQuery,
-                StagePresentationLinkKind.Obstacle => _obstacleQuery,
                 _ => default,
             };
 
@@ -326,7 +324,6 @@ namespace SweepNDodge.DotsBullets
                 {
                     StagePresentationLinkKind.Source => _em.GetComponentData<SourceStableIdComponent>(entity).Value,
                     StagePresentationLinkKind.Deposit => _em.GetComponentData<DepositStableIdComponent>(entity).Value,
-                    StagePresentationLinkKind.Obstacle => _em.GetComponentData<ObstacleStableIdComponent>(entity).Value,
                     _ => 0u,
                 };
                 if (candidateStableId != stableId)
@@ -356,9 +353,6 @@ namespace SweepNDodge.DotsBullets
                 ComponentType.ReadOnly<LocalTransform>());
             _depositQuery = _em.CreateEntityQuery(
                 ComponentType.ReadOnly<DepositStableIdComponent>(),
-                ComponentType.ReadOnly<LocalTransform>());
-            _obstacleQuery = _em.CreateEntityQuery(
-                ComponentType.ReadOnly<ObstacleStableIdComponent>(),
                 ComponentType.ReadOnly<LocalTransform>());
             _isBound = true;
             return true;

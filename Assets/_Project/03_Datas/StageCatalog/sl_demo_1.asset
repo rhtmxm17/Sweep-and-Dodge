@@ -18,7 +18,7 @@ MonoBehaviour:
     Width: 22
     Height: 17
     CellSize: 1
-    Origin: {x: -2, y: 0, z: -2}
+    Origin: {x: 44.98452, y: 543.27563, z: -189.78618}
   Cells:
   - MovementFlags: 255
     SourceRegionId: 0

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -6,13 +7,21 @@ namespace SweepNDodge.DotsBullets
     public sealed class StageRegionAnchorMarker : MonoBehaviour
     {
         public StageRegionKind RegionKind;
-        [Min(1)] public uint StableId = 1;
+        [FormerlySerializedAs("StableId")]
+        [HideInInspector] public uint StableId;
+        [Min(1)] public int RegionSlotIndex = 1;
         public bool Active = true;
         public Vector2Int AnchorCell;
         public Vector2 AnchorOffset;
 
         [Header("Debug")]
         public bool DrawGizmo = true;
+
+        private void OnValidate()
+        {
+            if (RegionSlotIndex <= 0 && StableId > 0u)
+                RegionSlotIndex = Mathf.Max(1, (int)StableId);
+        }
 
         private void OnDrawGizmosSelected()
         {

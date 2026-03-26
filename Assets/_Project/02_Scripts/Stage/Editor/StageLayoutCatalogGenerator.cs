@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 namespace SweepNDodge.DotsBullets.Editor
 {
@@ -119,6 +120,8 @@ namespace SweepNDodge.DotsBullets.Editor
             var gridSpec = authoring.BuildRuntimeGridSpec();
             int width = gridSpec.Width;
             int height = gridSpec.Height;
+            bool sourceUsesTilemap = authoring.GetRegionTilemap(StageRegionKind.Source) != null;
+            bool depositUsesTilemap = authoring.GetRegionTilemap(StageRegionKind.Deposit) != null;
 
             layout.SchemaVersion = 2;
             layout.StageId = stageNode.StageId;
@@ -134,25 +137,27 @@ namespace SweepNDodge.DotsBullets.Editor
                     layout.Cells[index] = new StageCellLayoutData
                     {
                         MovementFlags = tile != null ? tile.MovementFlags : StageCellMovementFlags.None,
-                        SourceRegionId = authoring.SourceRegionPaint.GetCell(x, y),
-                        DepositRegionId = authoring.DepositRegionPaint.GetCell(x, y),
+                        SourceRegionId = ResolveRegionStableId(authoring, StageRegionKind.Source, x, y, sourceUsesTilemap),
+                        DepositRegionId = ResolveRegionStableId(authoring, StageRegionKind.Deposit, x, y, depositUsesTilemap),
                     };
                 }
             }
 
             var anchors = stageNode.GetComponentsInChildren<StageRegionAnchorMarker>(includeInactive: true)
                 .OrderBy(x => x.RegionKind)
-                .ThenBy(x => x.StableId)
+                .ThenBy(x => ResolveAnchorStableId(authoring, x))
                 .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
                 .ToArray();
 
             layout.SourceRegions = anchors
                 .Where(x => x.RegionKind == StageRegionKind.Source)
-                .Select(ToSourceRegionData)
+                .Select(x => ToSourceRegionData(authoring, x))
+                .Where(x => x.StableId > 0u)
                 .ToArray();
             layout.DepositRegions = anchors
                 .Where(x => x.RegionKind == StageRegionKind.Deposit)
-                .Select(ToDepositRegionData)
+                .Select(x => ToDepositRegionData(authoring, x))
+                .Where(x => x.StableId > 0u)
                 .ToArray();
             layout.Presentations = stageNode.GetComponentsInChildren<StagePresentationMarker>(includeInactive: true)
                 .OrderBy(x => x.StableId)
@@ -178,22 +183,49 @@ namespace SweepNDodge.DotsBullets.Editor
             return count;
         }
 
-        private static StageSourceRegionLayoutData ToSourceRegionData(StageRegionAnchorMarker marker)
+        private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY, bool useTilemap)
+        {
+            if (authoring == null)
+                return 0u;
+
+            if (useTilemap)
+            {
+                var tilemap = authoring.GetRegionTilemap(kind);
+                var tile = tilemap != null ? tilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile : null;
+                if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                    return 0u;
+
+                return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
+            }
+
+            var paint = kind == StageRegionKind.Source ? authoring.SourceRegionPaint : authoring.DepositRegionPaint;
+            return paint != null ? paint.GetCell(localX, localY) : 0u;
+        }
+
+        private static uint ResolveAnchorStableId(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
+        {
+            if (authoring != null && marker != null && authoring.TryResolveStableId(marker.RegionKind, marker.RegionSlotIndex, out uint stableId))
+                return stableId;
+
+            return marker != null ? marker.StableId : 0u;
+        }
+
+        private static StageSourceRegionLayoutData ToSourceRegionData(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
         {
             return new StageSourceRegionLayoutData
             {
-                StableId = marker.StableId,
+                StableId = ResolveAnchorStableId(authoring, marker),
                 Active = marker.Active,
                 AnchorCell = marker.AnchorCell,
                 AnchorOffset = marker.AnchorOffset,
             };
         }
 
-        private static StageDepositRegionLayoutData ToDepositRegionData(StageRegionAnchorMarker marker)
+        private static StageDepositRegionLayoutData ToDepositRegionData(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
         {
             return new StageDepositRegionLayoutData
             {
-                StableId = marker.StableId,
+                StableId = ResolveAnchorStableId(authoring, marker),
                 Active = marker.Active,
                 AnchorCell = marker.AnchorCell,
                 AnchorOffset = marker.AnchorOffset,
