@@ -18,6 +18,15 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string StageLayout2Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_2.asset";
         private const string StageLayout3Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_3.asset";
         private const string SampleScenePath = "Assets/_Project/01_Scenes/StageLayoutEditingSampleV1.unity";
+        private static readonly string[] DeprecatedPaintAssetPaths =
+        {
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage1_source.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage1_deposit.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage2_source.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage2_deposit.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage3_source.asset",
+            "Assets/_Project/03_Datas/StageCatalog/srp_stage3_deposit.asset",
+        };
 
         [Test]
         public void DemoStageCatalog_ContainsThreeEnabledEntriesInOrder()
@@ -66,6 +75,9 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertLayoutMatchesSceneAuthoring(layout1, 1);
             AssertLayoutMatchesSceneAuthoring(layout2, 2);
             AssertLayoutMatchesSceneAuthoring(layout3, 3);
+
+            for (int i = 0; i < DeprecatedPaintAssetPaths.Length; i++)
+                Assert.That(AssetDatabase.LoadMainAssetAtPath(DeprecatedPaintAssetPaths[i]), Is.Null, $"Deprecated paint asset must be removed: {DeprecatedPaintAssetPaths[i]}");
         }
 
         [Test]
@@ -121,18 +133,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
         {
-            var tilemap = authoring.GetRegionTilemap(kind);
-            if (tilemap != null)
-            {
-                var tile = tilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
-                if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
-                    return 0u;
+            var tile = authoring.RegionTilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
+            if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                return 0u;
 
-                return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
-            }
-
-            var paint = kind == StageRegionKind.Source ? authoring.SourceRegionPaint : authoring.DepositRegionPaint;
-            return paint != null ? paint.GetCell(localX, localY) : 0u;
+            return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
         }
     }
 }

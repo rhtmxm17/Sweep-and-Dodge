@@ -120,8 +120,6 @@ namespace SweepNDodge.DotsBullets.Editor
             var gridSpec = authoring.BuildRuntimeGridSpec();
             int width = gridSpec.Width;
             int height = gridSpec.Height;
-            bool sourceUsesTilemap = authoring.GetRegionTilemap(StageRegionKind.Source) != null;
-            bool depositUsesTilemap = authoring.GetRegionTilemap(StageRegionKind.Deposit) != null;
 
             layout.SchemaVersion = 2;
             layout.StageId = stageNode.StageId;
@@ -137,8 +135,8 @@ namespace SweepNDodge.DotsBullets.Editor
                     layout.Cells[index] = new StageCellLayoutData
                     {
                         MovementFlags = tile != null ? tile.MovementFlags : StageCellMovementFlags.None,
-                        SourceRegionId = ResolveRegionStableId(authoring, StageRegionKind.Source, x, y, sourceUsesTilemap),
-                        DepositRegionId = ResolveRegionStableId(authoring, StageRegionKind.Deposit, x, y, depositUsesTilemap),
+                        SourceRegionId = ResolveRegionStableId(authoring, StageRegionKind.Source, x, y),
+                        DepositRegionId = ResolveRegionStableId(authoring, StageRegionKind.Deposit, x, y),
                     };
                 }
             }
@@ -183,23 +181,16 @@ namespace SweepNDodge.DotsBullets.Editor
             return count;
         }
 
-        private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY, bool useTilemap)
+        private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
         {
-            if (authoring == null)
+            if (authoring == null || authoring.RegionTilemap == null)
                 return 0u;
 
-            if (useTilemap)
-            {
-                var tilemap = authoring.GetRegionTilemap(kind);
-                var tile = tilemap != null ? tilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile : null;
-                if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
-                    return 0u;
+            var tile = authoring.RegionTilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
+            if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                return 0u;
 
-                return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
-            }
-
-            var paint = kind == StageRegionKind.Source ? authoring.SourceRegionPaint : authoring.DepositRegionPaint;
-            return paint != null ? paint.GetCell(localX, localY) : 0u;
+            return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
         }
 
         private static uint ResolveAnchorStableId(StageGridAuthoring authoring, StageRegionAnchorMarker marker)

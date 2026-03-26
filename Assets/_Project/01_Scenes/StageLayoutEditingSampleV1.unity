@@ -1266,8 +1266,6 @@ MonoBehaviour:
   Grid: {fileID: 1022781067}
   MovementTilemap: {fileID: 1410123792}
   RegionTilemap: {fileID: 198774022}
-  SourceTilemap: {fileID: 0}
-  DepositTilemap: {fileID: 0}
   GroundVisualTilemap: {fileID: 0}
   WallVisualTilemap: {fileID: 0}
   SourceRegionMappings:
@@ -1276,8 +1274,6 @@ MonoBehaviour:
   DepositRegionMappings:
   - RegionSlotIndex: 1
     StableId: 2001
-  SourceRegionPaint: {fileID: 11400000, guid: 6dcf0eb7cabd0644faa80563204cc140, type: 2}
-  DepositRegionPaint: {fileID: 11400000, guid: 80dffb70364be0446820cde8628aa139, type: 2}
   BoundsMinCell: {x: -2, y: -2}
   BoundsSize: {x: 22, y: 17}
   ShowGridGizmo: 1
@@ -1355,8 +1351,6 @@ MonoBehaviour:
   Grid: {fileID: 827958559}
   MovementTilemap: {fileID: 1878034358}
   RegionTilemap: {fileID: 1865102833}
-  SourceTilemap: {fileID: 0}
-  DepositTilemap: {fileID: 0}
   GroundVisualTilemap: {fileID: 0}
   WallVisualTilemap: {fileID: 0}
   SourceRegionMappings:
@@ -1365,8 +1359,6 @@ MonoBehaviour:
   DepositRegionMappings:
   - RegionSlotIndex: 1
     StableId: 2001
-  SourceRegionPaint: {fileID: 11400000, guid: 0ca7022a032bea5429565b2970a4a26b, type: 2}
-  DepositRegionPaint: {fileID: 11400000, guid: 043aa3e33724e9e4a8345001ceece924, type: 2}
   BoundsMinCell: {x: 0, y: 0}
   BoundsSize: {x: 7, y: 5}
   ShowGridGizmo: 1
@@ -1444,8 +1436,6 @@ MonoBehaviour:
   Grid: {fileID: 2026997581}
   MovementTilemap: {fileID: 406118959}
   RegionTilemap: {fileID: 1510331695}
-  SourceTilemap: {fileID: 0}
-  DepositTilemap: {fileID: 0}
   GroundVisualTilemap: {fileID: 0}
   WallVisualTilemap: {fileID: 0}
   SourceRegionMappings:
@@ -1454,8 +1444,6 @@ MonoBehaviour:
   DepositRegionMappings:
   - RegionSlotIndex: 1
     StableId: 2001
-  SourceRegionPaint: {fileID: 11400000, guid: 1a4052e84bdcb384a92c621b3e8e3597, type: 2}
-  DepositRegionPaint: {fileID: 11400000, guid: b0cd35599bc7f394cbeb533ac8ca8a80, type: 2}
   BoundsMinCell: {x: 0, y: 0}
   BoundsSize: {x: 7, y: 5}
   ShowGridGizmo: 1

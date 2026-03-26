@@ -66,6 +66,12 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
             }
 
+            if (authoring.RegionTilemap == null)
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA005", location, "RegionTilemap reference is missing."));
+                valid = false;
+            }
+
             if (!valid)
                 return false;
 
@@ -97,10 +103,17 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
             }
 
+            if (authoring.RegionTilemap.layoutGrid != authoring.Grid)
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA028", location, "RegionTilemap must be authored under the assigned Grid."));
+                valid = false;
+            }
+
             valid &= ValidateVisualTilemap(authoring.GroundVisualTilemap, authoring.Grid, "GroundVisualTilemap", location, issues);
             valid &= ValidateVisualTilemap(authoring.WallVisualTilemap, authoring.Grid, "WallVisualTilemap", location, issues);
 
             WarnUsedTilesOutsideBounds(authoring.MovementTilemap, authoringBounds, location, "MovementTilemap", issues);
+            WarnUsedTilesOutsideBounds(authoring.RegionTilemap, authoringBounds, location, "RegionTilemap", issues);
             WarnUsedTilesOutsideBounds(authoring.GroundVisualTilemap, authoringBounds, location, "GroundVisualTilemap", issues);
             WarnUsedTilesOutsideBounds(authoring.WallVisualTilemap, authoringBounds, location, "WallVisualTilemap", issues);
 
@@ -208,114 +221,53 @@ namespace SweepNDodge.DotsBullets.Editor
             ref bool valid)
         {
             int cellCount = boundsSize.x * boundsSize.y;
-            var tilemap = authoring.GetRegionTilemap(kind);
-            var paint = kind == StageRegionKind.Source ? authoring.SourceRegionPaint : authoring.DepositRegionPaint;
-            bool usesUnifiedTilemap = authoring.RegionTilemap != null;
-
-            if (tilemap != null)
+            var tilemap = authoring.RegionTilemap;
+            var cells = new uint[cellCount];
+            for (int y = 0; y < boundsSize.y; y++)
             {
-                if (tilemap.layoutGrid != authoring.Grid)
+                for (int x = 0; x < boundsSize.x; x++)
                 {
-                    issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, kind == StageRegionKind.Source ? "STA028" : "STA029", location, $"{kind}Tilemap must be authored under the assigned Grid."));
-                    valid = false;
-                }
-
-                WarnUsedTilesOutsideBounds(tilemap, authoring.GetAuthoringBounds(), location, usesUnifiedTilemap ? "RegionTilemap" : $"{kind}Tilemap", issues);
-
-                if (paint != null)
-                {
-                    issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STA030", location, $"{(usesUnifiedTilemap ? "RegionTilemap" : $"{kind}Tilemap")} is authoritative. {kind}RegionPaint is treated as deprecated fallback only."));
-                }
-
-                if (usesUnifiedTilemap)
-                {
-                    if ((kind == StageRegionKind.Source && authoring.SourceTilemap != null)
-                        || (kind == StageRegionKind.Deposit && authoring.DepositTilemap != null))
+                    int index = (y * boundsSize.x) + x;
+                    var tile = tilemap.GetTile(authoring.GetTilemapCell(x, y));
+                    if (tile == null)
                     {
-                        issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STA033", location, $"RegionTilemap is authoritative. Legacy split {(kind == StageRegionKind.Source ? "SourceTilemap" : "DepositTilemap")} is ignored."));
+                        cells[index] = 0u;
+                        continue;
                     }
-                }
 
-                var cells = new uint[cellCount];
-                for (int y = 0; y < boundsSize.y; y++)
-                {
-                    for (int x = 0; x < boundsSize.x; x++)
+                    if (tile is not StageRegionTile regionTile)
                     {
-                        int index = (y * boundsSize.x) + x;
-                        var tile = tilemap.GetTile(authoring.GetTilemapCell(x, y));
-                        if (tile == null)
-                        {
-                            cells[index] = 0u;
-                            continue;
-                        }
-
-                        if (tile is not StageRegionTile regionTile)
-                        {
-                            issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA015", location, $"{kind}Tilemap contains non-StageRegionTile at local cell ({x}, {y})."));
-                            valid = false;
-                            cells[index] = 0u;
-                            continue;
-                        }
-
-                        if (usesUnifiedTilemap && regionTile.RegionKind != kind)
-                        {
-                            cells[index] = 0u;
-                            continue;
-                        }
-
-                        if (!usesUnifiedTilemap && regionTile.RegionKind != kind)
-                        {
-                            issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA006", location, $"{kind}Tilemap contains tile with RegionKind={regionTile.RegionKind} at local cell ({x}, {y})."));
-                            valid = false;
-                            cells[index] = 0u;
-                            continue;
-                        }
-
-                        if (regionTile.RegionSlotIndex <= 0)
-                        {
-                            cells[index] = 0u;
-                            continue;
-                        }
-
-                        if (!authoring.TryResolveStableId(kind, regionTile.RegionSlotIndex, out uint stableId))
-                        {
-                            issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA024", location, $"{kind}Tilemap uses an unmapped slot at local cell ({x}, {y}). slot={regionTile.RegionSlotIndex}"));
-                            valid = false;
-                            cells[index] = 0u;
-                            continue;
-                        }
-
-                        cells[index] = stableId;
+                        issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA015", location, $"RegionTilemap contains non-StageRegionTile at local cell ({x}, {y})."));
+                        valid = false;
+                        cells[index] = 0u;
+                        continue;
                     }
+
+                    if (regionTile.RegionKind != kind)
+                    {
+                        cells[index] = 0u;
+                        continue;
+                    }
+
+                    if (regionTile.RegionSlotIndex <= 0)
+                    {
+                        cells[index] = 0u;
+                        continue;
+                    }
+
+                    if (!authoring.TryResolveStableId(kind, regionTile.RegionSlotIndex, out uint stableId))
+                    {
+                        issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA024", location, $"RegionTilemap uses an unmapped {kind} slot at local cell ({x}, {y}). slot={regionTile.RegionSlotIndex}"));
+                        valid = false;
+                        cells[index] = 0u;
+                        continue;
+                    }
+
+                    cells[index] = stableId;
                 }
-
-                return new ResolvedRegionData(true, cells);
             }
 
-            if (paint == null)
-            {
-                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA005", location, $"{kind}Tilemap is missing and deprecated fallback paint is not assigned."));
-                valid = false;
-                return new ResolvedRegionData(false, new uint[cellCount]);
-            }
-
-            issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STA031", location, $"{kind}Tilemap is not assigned. Deprecated {kind}RegionPaint fallback is being used."));
-            if (paint.RegionKind != kind)
-            {
-                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA006", location, $"{kind}RegionPaint must have RegionKind={kind}."));
-                valid = false;
-            }
-
-            paint.EnsureShape();
-            if (paint.Width != boundsSize.x || paint.Height != boundsSize.y)
-            {
-                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA011", location, $"{kind}RegionPaint dimensions must match authoring bounds. bounds=({boundsSize.x}, {boundsSize.y}), paint=({paint.Width}, {paint.Height})"));
-                valid = false;
-            }
-
-            var paintCells = new uint[cellCount];
-            Array.Copy(paint.Cells ?? Array.Empty<uint>(), paintCells, Math.Min(paintCells.Length, paint.Cells?.Length ?? 0));
-            return new ResolvedRegionData(false, paintCells);
+            return new ResolvedRegionData(true, cells);
         }
 
         private static bool ValidateAnchors(

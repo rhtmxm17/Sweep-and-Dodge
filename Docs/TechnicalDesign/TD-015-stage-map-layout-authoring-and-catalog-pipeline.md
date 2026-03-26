@@ -4,7 +4,7 @@
 - doc_id: `TD-015`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-25`
+- last_updated: `2026-03-26`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
@@ -203,11 +203,10 @@
 ## 7. 에디터 파이프라인
 ### 7.1 채택 authoring 경로
 - 1순위: Unity Tilemap 기반 authoring + generator
-- `StageGridAuthoring`
+  - `StageGridAuthoring`
     - `Grid`
     - `MovementTilemap`
-    - `SourceRegionPaintAsset`
-    - `DepositRegionPaintAsset`
+    - `RegionTilemap`
     - `BoundsMinCell`
     - `BoundsSize`
   - `StageRegionAnchorMarker`
@@ -223,10 +222,11 @@
   - `BlockPlayer`, `BlockBullet` 의미를 갖는 metadata tilemap이다.
   - visual tilemap과 분리한다.
   - tilemap `cellBounds`는 참고값일 뿐 authoring bounds authority가 아니다.
-- `SourceRegionPaintAsset`, `DepositRegionPaintAsset`
-  - `Width`, `Height`, `uint[] Cells`를 갖는 dense row-major backing store다.
-  - paint 시 explicit `StableId` 선택을 강제한다.
-  - `RegionId별 Tile asset` 방식은 채택하지 않는다.
+- `RegionTilemap`
+  - `StageRegionTile.RegionKind + RegionSlotIndex`를 갖는 metadata tilemap이다.
+  - source/deposit는 separate tilemap이 아니라 같은 tilemap 안에서 `RegionKind`로 구분한다.
+  - `StableId`는 tile asset이 직접 소유하지 않고, `StageGridAuthoring.SourceRegionMappings / DepositRegionMappings`가 `slot -> stable id`를 소유한다.
+  - authoring 입력은 `RegionTilemap + mapping table + anchor marker`만 사용한다.
 - `BoundsMinCell`, `BoundsSize`
   - `StageGridAuthoring`가 직접 편집 bounds를 소유한다.
   - local paint cell `(0,0)`은 실제 tilemap cell `(BoundsMinCell.x, BoundsMinCell.y)`에 대응한다.
@@ -237,16 +237,17 @@
   - source/deposit 대표점의 authoring SSOT다.
 - `StageGridLayoutGenerator`
   - `StageGridAuthoring + StageRegionAnchorMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
+  - generator는 source/deposit region stable id를 항상 `RegionTilemap`에서만 resolve한다.
   - generator가 직접 생성하는 layout asset에서는 hidden legacy `Sources / Deposits / Obstacles`를 비워 둔다.
 
 ### 7.3 Paint/Validation 규칙
-- paint 시 `SourceRegionId`, `DepositRegionId`를 명시적으로 선택하지 않으면 region cell을 칠할 수 없게 한다.
+- paint 시 `StageRegionTile.RegionSlotIndex`를 명시적으로 선택하지 않으면 region cell을 칠할 수 없게 한다.
 - validation error:
-  - `MovementTilemap` bounds와 region paint asset 크기가 다름
-  - region id가 있는데 대응 region table entry가 없음
-  - paint된 source/deposit region id에 대응 anchor marker가 없거나 2개 이상임
+  - `RegionTilemap` 미할당
+  - region slot이 있는데 대응 mapping entry가 없음
+  - paint된 source/deposit stable id에 대응 anchor marker가 없거나 2개 이상임
   - anchor가 자기 region 셀 위에 있지 않음
-  - region marker가 있는데 paint된 셀이 없음
+  - region marker가 있는데 `RegionTilemap`에 칠해진 셀이 없음
   - source/deposit overlap 셀
 - validation warning:
   - movement used tile이 authoring bounds 밖에 남아 있음
@@ -332,7 +333,8 @@
 - P6. obstacle visual / metadata tilemap 재편
   - obstacle visual을 presentation owner에서 분리하고, ground / wall visual tilemap과 gameplay metadata tilemap(`Movement / Region`) 중심 경로를 정리한다.
   - `Source / Deposit` authoring은 단일 `RegionTilemap`에서 `StageRegionTile.RegionKind + RegionSlotIndex`와 `StageGridAuthoring`의 `slot -> stable id` mapping을 기준으로 한다.
-  - `StageRegionPaintAsset`는 deprecated fallback으로만 유지한다.
+- P6.next-A. unified RegionTilemap authoring cleanup
+  - split tilemap과 `StageRegionPaintAsset` fallback을 제거하고, repo-tracked authoring은 `MovementTilemap + RegionTilemap + mapping table + anchor marker`만 사용한다.
 - P6.next. legacy path 정리
   - obstacle marker / obstacle-linked presentation / obstacle runtime template 등 남은 legacy path 제거는 별도 후속 작업으로 분리한다.
 

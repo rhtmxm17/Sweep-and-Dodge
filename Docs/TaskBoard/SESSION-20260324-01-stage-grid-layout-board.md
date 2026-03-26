@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260324-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-03-25`
+- last_updated: `2026-03-26`
 - related_docs:
   - [../TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](../TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
   - [../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md)
@@ -34,6 +34,9 @@
 - [ ] P6. obstacle visual / metadata tilemap 재편
   - 기준: obstacle visual은 presentation owner에서 분리하고, ground / wall visual tilemap과 gameplay metadata tilemap(`Movement / Region`) 중심으로 재편한다.
   - 산출물: visual owner 구조, `StageRegionTile.RegionKind + RegionSlotIndex + StageGridAuthoring slot mapping` 기반 단일 `RegionTilemap` authoring 경로, presentation obstacle 제외 계약, paint fallback deprecated 처리
+- [ ] P6.next-A. unified RegionTilemap authoring cleanup
+  - 기준: `RegionTilemap`가 sample SSOT로 올라온 상태를 전제로 split tilemap과 paint fallback을 제거한다.
+  - 산출물: `StageGridAuthoring` hard cutover, paint asset/tooling 삭제, sample scene/content paint 참조 제거, unified-only tests/content validation
 
 ## Blocked
 - 없음
@@ -71,7 +74,7 @@
   - 검증 결과: `SchemaVersion=2`, `Grid/Cells/SourceRegions/DepositRegions` 스키마, `StageGridLayoutValidationRules`, catalog source-region cross-validation, definition generator의 source-region 수집이 반영됐다.
   - 구현 메모: runtime/generator 전환 전까지 hidden legacy layout 필드는 compatibility bridge로 임시 유지한다.
 - [x] D7. `P3 authoring generator`를 구현했다.
-  - 검증 결과: `StageGridAuthoring`, `StageRegionPaintAsset`, `StageRegionAnchorMarker`, `StageMovementTile`, grid-only `StageLayoutCatalogGenerator`, 기본 paint editor window, sample authoring scene 구조, `com.unity.2d.tilemap` 의존, grid authoring/editor tests가 반영됐다.
+  - 검증 결과: `StageGridAuthoring`, `StageRegionAnchorMarker`, `StageMovementTile`, grid-only `StageLayoutCatalogGenerator`, sample authoring scene 구조, `com.unity.2d.tilemap` 의존, grid authoring/editor tests가 반영됐다.
   - 구현 메모: generator 출력은 legacy arrays를 비우지만, runtime migration 전까지 `sl_demo_*` 샘플 asset은 grid schema와 legacy compatibility bridge를 함께 유지한다.
 - [x] D8. `P4 runtime movement / deposit migration` 구현을 시작했다.
   - 검증 결과: `StageRuntimeGridComponent`/buffer cache, source-only `StageTopologyApplyPrepareSystem`, grid 기반 `PlayerObstacleBlockSystem`, `PlayerCarryBinDeposit*`, canonical grid rotation validation, stage2 presentation fallback PlayMode 의존 제거가 코드 기준으로 반영됐다.

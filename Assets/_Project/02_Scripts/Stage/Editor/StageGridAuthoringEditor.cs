@@ -17,22 +17,10 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
 
             EditorGUILayout.Space(6f);
-            if (authoring.Grid == null || authoring.MovementTilemap == null)
-                EditorGUILayout.HelpBox("Grid and MovementTilemap must be assigned.", MessageType.Warning);
+            if (authoring.Grid == null || authoring.MovementTilemap == null || authoring.RegionTilemap == null)
+                EditorGUILayout.HelpBox("Grid, MovementTilemap, and RegionTilemap must be assigned.", MessageType.Warning);
 
-            if (authoring.RegionTilemap == null)
-                EditorGUILayout.HelpBox("RegionTilemap is the primary metadata workflow. Split SourceTilemap/DepositTilemap and paint assets remain available as deprecated fallback only.", MessageType.Info);
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("Open Source Paint (Deprecated Fallback)") && authoring.SourceRegionPaint != null)
-                    StageRegionPaintEditorWindow.Open(authoring.SourceRegionPaint);
-                if (GUILayout.Button("Open Deposit Paint (Deprecated Fallback)") && authoring.DepositRegionPaint != null)
-                    StageRegionPaintEditorWindow.Open(authoring.DepositRegionPaint);
-            }
-
-            if (GUILayout.Button("Sync Paint Asset Size From Authoring Bounds"))
-                SyncPaintAssets(authoring);
+            EditorGUILayout.HelpBox("RegionTilemap is the only region metadata workflow. Source/Deposit are distinguished by StageRegionTile.RegionKind and resolved through slot mappings.", MessageType.Info);
 
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -44,28 +32,6 @@ namespace SweepNDodge.DotsBullets.Editor
 
             if (GUILayout.Button("Validate Authoring Inputs"))
                 ValidateAuthoring(authoring);
-        }
-
-        private static void SyncPaintAssets(StageGridAuthoring authoring)
-        {
-            if (authoring == null)
-                return;
-
-            int width = Mathf.Max(1, authoring.BoundsSize.x);
-            int height = Mathf.Max(1, authoring.BoundsSize.y);
-            if (authoring.SourceRegionPaint != null)
-            {
-                Undo.RecordObject(authoring.SourceRegionPaint, "Resize Source Region Paint");
-                authoring.SourceRegionPaint.Resize(width, height);
-                EditorUtility.SetDirty(authoring.SourceRegionPaint);
-            }
-
-            if (authoring.DepositRegionPaint != null)
-            {
-                Undo.RecordObject(authoring.DepositRegionPaint, "Resize Deposit Region Paint");
-                authoring.DepositRegionPaint.Resize(width, height);
-                EditorUtility.SetDirty(authoring.DepositRegionPaint);
-            }
         }
 
         private static void FitBoundsFromUsedTiles(StageGridAuthoring authoring)
@@ -81,8 +47,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
             IncludeTilemapBounds(authoring.MovementTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
             IncludeTilemapBounds(authoring.RegionTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
-            IncludeTilemapBounds(authoring.SourceTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
-            IncludeTilemapBounds(authoring.DepositTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.GroundVisualTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.WallVisualTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
             if (!hasAny)
                 return;
 
@@ -105,8 +71,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
             IncludeTilemapBounds(authoring.MovementTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
             IncludeTilemapBounds(authoring.RegionTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
-            IncludeTilemapBounds(authoring.SourceTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
-            IncludeTilemapBounds(authoring.DepositTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.GroundVisualTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            IncludeTilemapBounds(authoring.WallVisualTilemap, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
 
             var stageNode = authoring.GetComponent<StageLayoutStageMarker>();
             var anchors = stageNode != null
@@ -121,9 +87,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 var tileCell = authoring.GetTilemapCell(anchor.AnchorCell.x, anchor.AnchorCell.y);
                 IncludeCell(tileCell.x, tileCell.y, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
             }
-
-            IncludePaintBounds(authoring, authoring.SourceRegionPaint, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
-            IncludePaintBounds(authoring, authoring.DepositRegionPaint, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
 
             if (!hasAny)
                 return;
@@ -266,18 +229,13 @@ namespace SweepNDodge.DotsBullets.Editor
             if (authoring == null)
                 return 0u;
 
-            var tilemap = authoring.GetRegionTilemap(kind);
-            if (tilemap != null)
-            {
-                var tile = tilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile;
-                if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
-                    return 0u;
+            var tile = authoring.RegionTilemap != null
+                ? authoring.RegionTilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile
+                : null;
+            if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
+                return 0u;
 
-                return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
-            }
-
-            var paint = kind == StageRegionKind.Source ? authoring.SourceRegionPaint : authoring.DepositRegionPaint;
-            return paint != null ? paint.GetCell(localX, localY) : 0u;
+            return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
         }
 
         private static Vector3[] BuildRectVerts(Rect rect, float z)
@@ -344,25 +302,6 @@ namespace SweepNDodge.DotsBullets.Editor
 
             bounds = new BoundsInt(minX, minY, 0, (maxX - minX) + 1, (maxY - minY) + 1, 1);
             return true;
-        }
-
-        private static void IncludePaintBounds(StageGridAuthoring authoring, StageRegionPaintAsset paint, ref bool hasAny, ref int minX, ref int minY, ref int maxX, ref int maxY)
-        {
-            if (authoring == null || paint == null)
-                return;
-
-            paint.EnsureShape();
-            for (int y = 0; y < paint.Height; y++)
-            {
-                for (int x = 0; x < paint.Width; x++)
-                {
-                    if (paint.GetCell(x, y) == 0u)
-                        continue;
-
-                    var tileCell = authoring.GetTilemapCell(x, y);
-                    IncludeCell(tileCell.x, tileCell.y, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
-                }
-            }
         }
 
         private static void IncludeBounds(BoundsInt bounds, ref bool hasAny, ref int minX, ref int minY, ref int maxX, ref int maxY)

@@ -48,26 +48,20 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void GenerateLayoutsForRoot_TilemapPrimary_TakesPrecedenceOverPaintFallback()
+        public void GenerateLayoutsForRoot_WithoutRegionTilemap_FailsWithError()
         {
             var setup = CreateStageSetup();
-            StageRegionTile sourceTile = null;
             try
             {
-                sourceTile = CreateRegionTile(StageRegionKind.Source, 2);
-                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
-                setup.SourcePaint.SetCell(0, 0, 1001u);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 2, new Vector2Int(0, 0));
+                setup.Authoring.RegionTilemap = null;
 
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
-                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
-                Assert.That(setup.Layout.Cells[0].SourceRegionId, Is.EqualTo(1002u));
-                Assert.That(issues.Any(x => x.Code == "STA030"), Is.True);
+                Assert.That(ok, Is.False);
+                Assert.That(issues.Any(x => x.Code == "STA005"), Is.True);
             }
             finally
             {
-                DestroyTile(sourceTile);
                 setup.Dispose();
             }
         }
@@ -254,9 +248,6 @@ namespace SweepNDodge.DotsBullets.Tests
             var movementTilemapGo = new GameObject("movement_tilemap");
             var regionTilemapGo = new GameObject("region_tilemap");
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
-            var sourcePaint = ScriptableObject.CreateInstance<StageRegionPaintAsset>();
-            var depositPaint = ScriptableObject.CreateInstance<StageRegionPaintAsset>();
-
             stageGo.transform.SetParent(rootGo.transform);
             gridGo.transform.SetParent(stageGo.transform);
             movementTilemapGo.transform.SetParent(gridGo.transform);
@@ -272,17 +263,10 @@ namespace SweepNDodge.DotsBullets.Tests
             var movementTilemap = AddTilemap(movementTilemapGo);
             var regionTilemap = AddTilemap(regionTilemapGo);
 
-            sourcePaint.RegionKind = StageRegionKind.Source;
-            sourcePaint.Resize(2, 2);
-            depositPaint.RegionKind = StageRegionKind.Deposit;
-            depositPaint.Resize(2, 2);
-
             var authoring = stageGo.AddComponent<StageGridAuthoring>();
             authoring.Grid = grid;
             authoring.MovementTilemap = movementTilemap;
             authoring.RegionTilemap = regionTilemap;
-            authoring.SourceRegionPaint = sourcePaint;
-            authoring.DepositRegionPaint = depositPaint;
             authoring.SourceRegionMappings = new[]
             {
                 new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1001u },
@@ -295,7 +279,7 @@ namespace SweepNDodge.DotsBullets.Tests
             authoring.BoundsMinCell = new Vector2Int(0, 0);
             authoring.BoundsSize = new Vector2Int(2, 2);
 
-            return new StageTestSetup(rootGo, stageGo, root, layout, sourcePaint, depositPaint, movementTilemap, regionTilemap, authoring);
+            return new StageTestSetup(rootGo, stageGo, root, layout, movementTilemap, regionTilemap, authoring);
         }
 
         private static Tilemap AddTilemap(GameObject go)
@@ -311,14 +295,12 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             private readonly Object[] _ownedObjects;
 
-            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, StageRegionPaintAsset sourcePaint, StageRegionPaintAsset depositPaint, Tilemap movementTilemap, Tilemap regionTilemap, StageGridAuthoring authoring)
+            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, Tilemap movementTilemap, Tilemap regionTilemap, StageGridAuthoring authoring)
             {
-                _ownedObjects = new Object[] { layout, sourcePaint, depositPaint, rootGo };
+                _ownedObjects = new Object[] { layout, rootGo };
                 StageGo = stageGo;
                 Root = root;
                 Layout = layout;
-                SourcePaint = sourcePaint;
-                DepositPaint = depositPaint;
                 MovementTilemap = movementTilemap;
                 RegionTilemap = regionTilemap;
                 Authoring = authoring;
@@ -327,8 +309,6 @@ namespace SweepNDodge.DotsBullets.Tests
             public GameObject StageGo { get; }
             public StageLayoutRootMarker Root { get; }
             public StageLayoutSO Layout { get; }
-            public StageRegionPaintAsset SourcePaint { get; }
-            public StageRegionPaintAsset DepositPaint { get; }
             public Tilemap MovementTilemap { get; }
             public Tilemap RegionTilemap { get; }
             public StageGridAuthoring Authoring { get; }

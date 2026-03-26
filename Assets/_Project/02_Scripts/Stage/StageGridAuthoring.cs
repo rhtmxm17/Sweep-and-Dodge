@@ -16,14 +16,10 @@ namespace SweepNDodge.DotsBullets
         public Grid Grid;
         public Tilemap MovementTilemap;
         public Tilemap RegionTilemap;
-        [HideInInspector] public Tilemap SourceTilemap;
-        [HideInInspector] public Tilemap DepositTilemap;
         public Tilemap GroundVisualTilemap;
         public Tilemap WallVisualTilemap;
         public StageRegionSlotMapping[] SourceRegionMappings;
         public StageRegionSlotMapping[] DepositRegionMappings;
-        public StageRegionPaintAsset SourceRegionPaint;
-        public StageRegionPaintAsset DepositRegionPaint;
         public Vector2Int BoundsMinCell = Vector2Int.zero;
         public Vector2Int BoundsSize = Vector2Int.one;
         public bool ShowGridGizmo = true;
@@ -78,14 +74,6 @@ namespace SweepNDodge.DotsBullets
         public StageRegionSlotMapping[] GetMappings(StageRegionKind kind)
         {
             return kind == StageRegionKind.Source ? SourceRegionMappings : DepositRegionMappings;
-        }
-
-        public Tilemap GetRegionTilemap(StageRegionKind kind)
-        {
-            if (RegionTilemap != null)
-                return RegionTilemap;
-
-            return kind == StageRegionKind.Source ? SourceTilemap : DepositTilemap;
         }
 
         public StageGridSpec BuildRuntimeGridSpec()
