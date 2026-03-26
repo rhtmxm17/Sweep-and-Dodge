@@ -248,11 +248,11 @@ namespace SweepNDodge.DotsBullets
             bool blockPlayer = (flags & StageCellMovementFlags.BlockPlayer) != 0;
             bool blockBullet = (flags & StageCellMovementFlags.BlockBullet) != 0;
             if (blockPlayer && blockBullet)
-                return new Color(0.55f, 0.05f, 0.05f, 0.26f);
+                return new Color(0.55f, 0.05f, 0.05f, 0.55f);
             if (blockPlayer)
-                return new Color(0.95f, 0.15f, 0.15f, 0.22f);
+                return new Color(0.95f, 0.15f, 0.15f, 0.55f);
             if (blockBullet)
-                return new Color(0.9f, 0.1f, 0.85f, 0.22f);
+                return new Color(0.9f, 0.1f, 0.85f, 0.55f);
             return Color.clear;
         }
 

@@ -44,12 +44,12 @@ namespace SweepNDodge.DotsBullets.Editor
             if (stageNode == null || !stageNode.TryGetComponent(out StageGridAuthoring authoring) || authoring == null || authoring.Grid == null)
                 return false;
 
-            var grid = authoring.BuildRuntimeGridSpec();
+            var grid = authoring.BuildEditorPreviewGridSpec();
             world = StageRuntimeGridUtility.GetAnchorWorldPosition(
                 in grid,
                 new Unity.Mathematics.int2(marker.AnchorCell.x, marker.AnchorCell.y),
                 new Unity.Mathematics.float2(marker.AnchorOffset.x, marker.AnchorOffset.y),
-                authoring.Grid.transform.position.y);
+                authoring.GetEditorPreviewPlaneY());
             return true;
         }
     }

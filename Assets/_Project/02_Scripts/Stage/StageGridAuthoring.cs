@@ -76,19 +76,43 @@ namespace SweepNDodge.DotsBullets
             return kind == StageRegionKind.Source ? SourceRegionMappings : DepositRegionMappings;
         }
 
+        public StageGridSpec BuildEditorPreviewGridSpec()
+        {
+            float cellSize = GetCellSize();
+            Vector3 gridPosition = Grid != null ? Grid.transform.position : Vector3.zero;
+            return CreateGridSpec(
+                cellSize,
+                gridPosition.x + (BoundsMinCell.x * cellSize),
+                gridPosition.z + (BoundsMinCell.y * cellSize));
+        }
+
         public StageGridSpec BuildRuntimeGridSpec()
         {
-            float cellSize = Grid != null ? Mathf.Max(0.0001f, Grid.cellSize.x) : 1f;
-            Vector3 gridPosition = Grid != null ? Grid.transform.position : Vector3.zero;
+            float cellSize = GetCellSize();
+            return CreateGridSpec(
+                cellSize,
+                BoundsMinCell.x * cellSize,
+                BoundsMinCell.y * cellSize);
+        }
+
+        public float GetEditorPreviewPlaneY()
+        {
+            return Grid != null ? Grid.transform.position.y : 0f;
+        }
+
+        private float GetCellSize()
+        {
+            return Grid != null ? Mathf.Max(0.0001f, Grid.cellSize.x) : 1f;
+        }
+
+        private StageGridSpec CreateGridSpec(float cellSize, float originX, float originZ)
+        {
             return new StageGridSpec
             {
                 Width = Mathf.Max(1, BoundsSize.x),
                 Height = Mathf.Max(1, BoundsSize.y),
                 CellSize = cellSize,
-                Origin = new Vector3(
-                    gridPosition.x + (BoundsMinCell.x * cellSize),
-                    gridPosition.y,
-                    gridPosition.z + (BoundsMinCell.y * cellSize)),
+                Origin = new Vector3(originX, 0f, originZ),
             };
         }
     }

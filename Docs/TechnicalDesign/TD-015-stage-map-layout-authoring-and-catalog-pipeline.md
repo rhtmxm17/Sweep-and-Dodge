@@ -7,6 +7,7 @@
 - last_updated: `2026-03-26`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
+  - [TD-025-stage-player-start-position-contract.md](./TD-025-stage-player-start-position-contract.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
   - [../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md](../ADR/ADR-20260306-01-stage-map-runtime-owner-and-bridge-input-path.md)
   - [../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
@@ -34,7 +35,7 @@
 - 첫 단계에서 모든 legacy shape 기반 runtime system을 한 번에 제거하는 리라이트
 
 ## 2. 현재 상태(코드 기준)
-- 현재 `StageLayoutSO`는 `Grid / Cells / SourceRegions / DepositRegions / Presentations`만을 authoritative layout schema로 가진다.
+- 현재 `StageLayoutSO`는 `Grid / Cells / SourceRegions / DepositRegions / PlayerStart / Presentations`를 authoritative layout schema로 가진다.
 - legacy editor pipeline의 scene marker fallback(`StageSourceMarker`, `StageDepositMarker`, `StageObstacleMarker`)는 제거됐고, sample/editor authoring은 `StageRegionAnchorMarker` 기준으로만 동작한다.
 - runtime apply는 layout의 grid/region 데이터를 stable id map으로 바꿔 `Source` aggregate runtime entity와 `StageRuntimeGrid` cache를 reconcile한다.
 - `Deposit` gameplay와 `Movement/Obstacle` gameplay는 standalone topology entity가 아니라 grid cache를 직접 읽는다.
@@ -104,6 +105,7 @@
   - `StageCellLayoutData[] Cells`
   - `StageSourceRegionLayoutData[] SourceRegions`
   - `StageDepositRegionLayoutData[] DepositRegions`
+  - `StagePlayerStartLayoutData PlayerStart`
   - `StagePresentationLayoutData[] Presentations`
   - 구현 전환기 메모:
     - grid schema만 유지한다.
@@ -203,6 +205,23 @@
   - legacy serialized numeric link kind 값은 layout validation에서 unsupported error로 막는다.
   - 필요 시 explicit presentation anchor marker 또는 tilemap visual owner 경로를 사용한다.
 
+### 6.8 PlayerStart 계약
+- player start는 stage-level spatial data이므로 `StageLayoutSO`가 소유한다.
+- 첫 범위는 단일 player start만 지원한다.
+- `StagePlayerStartLayoutData`
+  - `bool Active`
+  - `Vector2Int AnchorCell`
+  - `Vector2 AnchorOffset`
+  - `float YawDeg`
+- start는 grid-relative `XZ + yaw`만 저장한다.
+  - `Y`는 현재 `Grid.Origin.y`를 따른다.
+- start cell 제약
+  - bounds 안이어야 한다.
+  - `BlockPlayer` 셀은 허용하지 않는다.
+  - `SourceRegionId` / `DepositRegionId`와 겹치는 경우는 첫 단계에서 warning으로만 취급한다.
+- runtime write owner는 layout apply owner와 분리된 `PlayerStageEntryApplyPrepareSystem`이다.
+  - stage entry 시 `LocalTransform`, `PlayerGoSyncComponent`, `PlayerPreviousPositionComponent`를 함께 맞춘다.
+
 ## 7. 에디터 파이프라인
 ### 7.1 채택 authoring 경로
 - 1순위: Unity Tilemap 기반 authoring + generator
@@ -213,6 +232,7 @@
     - `BoundsMinCell`
     - `BoundsSize`
   - `StageRegionAnchorMarker`
+  - `StagePlayerStartMarker`
   - `StagePresentationMarker`
 - 2순위: 외부 툴(`LDtk`, `Tiled` 등) -> importer -> `StageLayoutSO`
 - 공통 원칙:
@@ -235,11 +255,17 @@
   - local paint cell `(0,0)`은 실제 tilemap cell `(BoundsMinCell.x, BoundsMinCell.y)`에 대응한다.
   - 음수 tile 좌표를 허용한다.
   - generator는 `BoundsMinCell + local cell`로 movement tile을 읽고, runtime layout는 normalized local grid로 저장한다.
-  - `StageRegionAnchorMarker`
+  - `StageGridAuthoring` transform과 `Grid.transform.position`은 editor workspace offset으로만 취급한다.
+  - 생성되는 runtime `Grid.Origin`은 world transform이 아니라 `BoundsMinCell * CellSize`로 고정한다.
+  - anchor preview/gizmo는 별도의 editor preview 계산으로 workspace offset을 반영한다.
+- `StageRegionAnchorMarker`
   - `RegionKind`, `RegionSlotIndex`, `StableId`, `AnchorCell`, `AnchorOffset`를 가진다.
   - source/deposit 대표점의 authoring SSOT다.
+- `StagePlayerStartMarker`
+  - `AnchorCell`, `AnchorOffset`, `YawDeg`를 가진다.
+  - stage player start의 authoring SSOT다.
 - `StageGridLayoutGenerator`
-  - `StageGridAuthoring + StageRegionAnchorMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
+  - `StageGridAuthoring + StageRegionAnchorMarker + StagePlayerStartMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
   - generator는 source/deposit region stable id를 항상 `RegionTilemap`에서만 resolve한다.
   - sample authoring scene에는 더 이상 `StageObstacleMarker`가 남아 있지 않으며, source/deposit anchor host만 dedicated GO로 유지한다.
 
@@ -252,9 +278,12 @@
   - anchor가 자기 region 셀 위에 있지 않음
   - region marker가 있는데 `RegionTilemap`에 칠해진 셀이 없음
   - source/deposit overlap 셀
+  - player start marker가 없거나 2개 이상임
+  - player start가 bounds 밖이거나 `BlockPlayer` 셀 위에 있음
 - validation warning:
   - movement used tile이 authoring bounds 밖에 남아 있음
   - stage 전체에 source 또는 deposit region이 없음
+  - player start cell이 source/deposit region과 겹침
   - editor gizmo는 authoring bounds 범위 안의 grid / movement / source / deposit / anchor만 시각화한다.
 
 ### 7.4 패키지 기준
@@ -285,6 +314,7 @@
 - 입력 경로는 기존과 동일하게 `StageTopologyBridge.RequestTopologyApply(stageId)`다.
 - apply 성공 시 prepare owner는 아래를 publish한다.
   - `StageRuntimeGridComponent`
+  - `StagePlayerStartRuntimeComponent`
   - source region aggregate runtime set
 - apply 실패 정책은 기존 `Ready=0 + 이전 topology 유지`를 따른다.
 

@@ -122,7 +122,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void GenerateLayoutsForRoot_RotatedGrid_NormalizesToWorldXZOrigin()
+        public void GenerateLayoutsForRoot_RotatedGrid_IgnoresWorkspaceTransformForRuntimeOrigin()
         {
             var setup = CreateStageSetup();
             StageRegionTile sourceTile = null;
@@ -138,8 +138,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
                 Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
-                Assert.That(setup.Layout.Grid.Origin.x, Is.EqualTo(1f));
-                Assert.That(setup.Layout.Grid.Origin.z, Is.EqualTo(9f));
+                Assert.That(setup.Layout.Grid.Origin.x, Is.EqualTo(-2f));
+                Assert.That(setup.Layout.Grid.Origin.z, Is.EqualTo(4f));
                 Assert.That(setup.Layout.SourceRegions.Single().AnchorCell, Is.EqualTo(new Vector2Int(1, 1)));
             }
             finally
@@ -183,7 +183,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void BuildRuntimeGridSpec_AnchorPreviewMath_RespectsBoundsMin()
+        public void BuildRuntimeGridSpec_IgnoresWorkspaceTransform()
         {
             var setup = CreateStageSetup();
             try
@@ -193,11 +193,31 @@ namespace SweepNDodge.DotsBullets.Tests
                 setup.Authoring.BoundsSize = new Vector2Int(4, 3);
 
                 var grid = setup.Authoring.BuildRuntimeGridSpec();
+                Assert.That(grid.Origin.x, Is.EqualTo(-2f));
+                Assert.That(grid.Origin.z, Is.EqualTo(5f));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void BuildEditorPreviewGridSpec_AnchorPreviewMath_UsesWorkspaceTransformAndBoundsMin()
+        {
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.StageGo.transform.GetChild(0).position = new Vector3(10f, 2f, -4f);
+                setup.Authoring.BoundsMinCell = new Vector2Int(-2, 5);
+                setup.Authoring.BoundsSize = new Vector2Int(4, 3);
+
+                var grid = setup.Authoring.BuildEditorPreviewGridSpec();
                 Vector3 world = StageRuntimeGridUtility.GetAnchorWorldPosition(
                     in grid,
                     new int2(1, 2),
                     new float2(0f, 0f),
-                    setup.Authoring.Grid.transform.position.y);
+                    setup.Authoring.GetEditorPreviewPlaneY());
 
                 Assert.That(world.x, Is.EqualTo(9.5f));
                 Assert.That(world.z, Is.EqualTo(3.5f));
