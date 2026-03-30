@@ -145,7 +145,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             if (authoring.ShowGridGizmo)
             {
-                Handles.color = new Color(0.6f, 0.6f, 0.6f, 0.9f);
+                Handles.color = new Color(0.6f, 0.6f, 0.6f, 0.5f);
                 DrawBoundsOutline(bounds, cellWidth, cellHeight, z);
                 for (int x = 0; x <= bounds.size.x; x++)
                 {
@@ -297,7 +297,7 @@ namespace SweepNDodge.DotsBullets.Editor
             if (blockPlayer && blockBullet)
                 return new Color(0.55f, 0.05f, 0.05f, 0.26f);
             if (blockPlayer)
-                return new Color(0.95f, 0.15f, 0.15f, 0.22f);
+                return new Color(0.95f, 0.55f, 0.15f, 0.22f);
             if (blockBullet)
                 return new Color(0.9f, 0.1f, 0.85f, 0.22f);
             return Color.clear;

@@ -1298,8 +1298,8 @@ MonoBehaviour:
   DepositRegionMappings:
   - RegionSlotIndex: 1
     StableId: 2001
-  BoundsMinCell: {x: -2, y: -2}
-  BoundsSize: {x: 22, y: 17}
+  BoundsMinCell: {x: -9, y: -8}
+  BoundsSize: {x: 35, y: 35}
   ShowGridGizmo: 1
   ShowMovementGizmo: 1
   ShowSourceGizmo: 1
