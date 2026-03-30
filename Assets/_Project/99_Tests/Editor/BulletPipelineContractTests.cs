@@ -122,6 +122,7 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertUpdateAfter(typeof(RunProgressDirectorSystem), typeof(PlayerCarryBinDepositRequestSystem));
             AssertUpdateBefore(typeof(RunProgressDirectorSystem), typeof(SourceClipRequestBuildSystem));
             AssertUpdateAfter(typeof(SourceClipRequestBuildSystem), typeof(PlayerCarryBinDepositRequestSystem));
+            AssertUpdateAfter(typeof(SourceClipRequestBuildSystem), typeof(SourcePollutionUpdateSystem));
             AssertUpdateBefore(typeof(SourceClipRequestBuildSystem), typeof(BulletRequestFencePublishSystem));
         }
 

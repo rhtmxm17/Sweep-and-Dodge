@@ -8,6 +8,7 @@ namespace SweepNDodge.DotsBullets
 {
     [UpdateInGroup(typeof(BulletRequestGroup))]
     [UpdateAfter(typeof(PlayerCarryBinDepositRequestSystem))]
+    [UpdateAfter(typeof(SourcePollutionUpdateSystem))]
     [UpdateBefore(typeof(BulletRequestFencePublishSystem))]
     public partial struct SourceClipRequestBuildSystem : ISystem
     {
@@ -76,6 +77,7 @@ namespace SweepNDodge.DotsBullets
             var eventQueueLookup = SystemAPI.GetBufferLookup<SourceEventQueueBuffer>(false);
             var activeCountLookup = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(false);
             var requestLookup = SystemAPI.GetBufferLookup<SourceSpawnRequestBuffer>(false);
+            var pollutionCellsLookup = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(true);
 
             stableIdLookup.Update(ref state);
             derivedLookup.Update(ref state);
@@ -88,6 +90,7 @@ namespace SweepNDodge.DotsBullets
             eventQueueLookup.Update(ref state);
             activeCountLookup.Update(ref state);
             requestLookup.Update(ref state);
+            pollutionCellsLookup.Update(ref state);
 
             var sourceQuery = SystemAPI.QueryBuilder()
                 .WithAll<SourceSpawnComponent>()
@@ -127,6 +130,7 @@ namespace SweepNDodge.DotsBullets
                 uint sourceStableId = math.max(1u, stableId.Value);
                 var clipState = ResolveClipSelectionState(in directorState);
                 float densityScale = ResolveDensityScale(in directorState);
+                float fieldSamplingAreaScale = ResolveFieldSamplingAreaScale(sourceEntity, ref pollutionCellsLookup);
                 bool restrictFinishToTrashLane = directorState.State == RunDirectorSourceStateId.Finish;
                 var sustainLanesRW = sustainLanes;
                 var eventQueueRW = eventQueue;
@@ -163,6 +167,7 @@ namespace SweepNDodge.DotsBullets
                         frame,
                         deltaTime,
                         derived.ComputedArea,
+                        fieldSamplingAreaScale,
                         densityScale,
                         ref clipPatternsRW,
                         ref activeCounts,
@@ -182,6 +187,7 @@ namespace SweepNDodge.DotsBullets
                         frame,
                         deltaTime,
                         derived.ComputedArea,
+                        fieldSamplingAreaScale,
                         densityScale,
                         restrictFinishToTrashLane,
                         ref clipPatternsRW,
@@ -356,7 +362,8 @@ namespace SweepNDodge.DotsBullets
             uint sourceStableId,
             uint frame,
             float deltaTime,
-            float area,
+            float fullArea,
+            float fieldSamplingAreaScale,
             float densityScale,
             ref DynamicBuffer<SourceClipPatternBuffer> patterns,
             ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
@@ -397,7 +404,8 @@ namespace SweepNDodge.DotsBullets
                     frame,
                     activeCounts,
                     requests,
-                    area,
+                    fullArea,
+                    fieldSamplingAreaScale,
                     deltaTime,
                     densityScale);
                 patterns[i] = pattern;
@@ -433,7 +441,8 @@ namespace SweepNDodge.DotsBullets
             uint stableId,
             uint frame,
             float deltaTime,
-            float area,
+            float fullArea,
+            float fieldSamplingAreaScale,
             float densityScale,
             bool restrictToTrashLane,
             ref DynamicBuffer<SourceClipPatternBuffer> patterns,
@@ -517,7 +526,8 @@ namespace SweepNDodge.DotsBullets
                         frame,
                         activeCounts,
                         requests,
-                        area,
+                        fullArea,
+                        fieldSamplingAreaScale,
                         deltaTime,
                         densityScale);
                     patterns[p] = pattern;
@@ -650,7 +660,8 @@ namespace SweepNDodge.DotsBullets
             uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            float area,
+            float fullArea,
+            float fieldSamplingAreaScale,
             float deltaTime,
             float densityScale)
         {
@@ -662,6 +673,7 @@ namespace SweepNDodge.DotsBullets
                 spawnDensityPerSecPerArea *= math.max(0f, densityScale);
             }
 
+            float effectiveArea = ResolveEffectiveSpawnArea(pattern.SamplingMode, fullArea, fieldSamplingAreaScale);
             return SpawnRequestCommonUtility.ResolveSpawnCountCore(
                 ref pattern.SpawnAccumulator,
                 ref pattern.BurstEventsEmitted,
@@ -680,9 +692,53 @@ namespace SweepNDodge.DotsBullets
                 frame,
                 activeCounts,
                 requests,
-                area,
+                effectiveArea,
                 deltaTime,
                 0xD8A89AF5u);
+        }
+
+        private static float ResolveFieldSamplingAreaScale(
+            Entity sourceEntity,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup)
+        {
+            if (!pollutionCellsLookup.HasBuffer(sourceEntity))
+                return 1f;
+
+            var cells = pollutionCellsLookup[sourceEntity];
+            int validCount = 0;
+            int activeValidCount = 0;
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var cell = cells[i];
+                if (cell.IsValid == 0)
+                    continue;
+
+                validCount++;
+                if (cell.IsActive != 0)
+                    activeValidCount++;
+            }
+
+            if (validCount <= 0)
+                return 1f;
+
+            return math.clamp((float)activeValidCount / validCount, 0f, 1f);
+        }
+
+        private static float ResolveEffectiveSpawnArea(
+            SourceSpawnSamplingModeId samplingMode,
+            float fullArea,
+            float fieldSamplingAreaScale)
+        {
+            if (!UsesFieldSamplingAreaScale(samplingMode))
+                return math.max(0f, fullArea);
+
+            return math.max(0f, fullArea) * math.clamp(fieldSamplingAreaScale, 0f, 1f);
+        }
+
+        private static bool UsesFieldSamplingAreaScale(SourceSpawnSamplingModeId samplingMode)
+        {
+            return samplingMode == SourceSpawnSamplingModeId.UniformField
+                || samplingMode == SourceSpawnSamplingModeId.PollutionTopK;
         }
 
         private static int RemoveSustainPendingRequests(ref DynamicBuffer<SourceSpawnRequestBuffer> requests)

@@ -14,6 +14,7 @@
 - related_adr:
   - [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](../ADR/ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md)
   - [ADR-20260330-01-source-pollution-recovery-wave-and-active-cell-contract.md](../ADR/ADR-20260330-01-source-pollution-recovery-wave-and-active-cell-contract.md)
+  - [ADR-20260330-02-active-area-density-scaling-for-field-sampling.md](../ADR/ADR-20260330-02-active-area-density-scaling-for-field-sampling.md)
 
 > `GD-014`의 공간 순환형 청소 흔적 복구를 DOTS runtime 계약으로 내리고, 1차 구현 범위를 `recent clean bias + active ratio recovery wave`로 고정한다.
 
@@ -95,6 +96,10 @@
   - active valid 셀이 0개라면 fallback 정책은 recovery wave 이후에도 0개인 예외 상황에서만 제한적으로 둔다.
   - fallback이 필요하면 docs와 테스트에 명시된 방식으로만 허용한다.
 - sampling은 계속 `region bounds local grid + valid cell mask`를 geometry authority로 사용한다.
+- field sampling directive(`UniformField`, `PollutionTopK`)의 request 생성량과 `CapAndMaxDensity` 상한은 `active valid cell count / valid cell count` 비율만큼 축소된 effective area를 사용한다.
+  - 목적은 active 셀이 줄었을 때 총량도 함께 줄여 cell당 기대 밀도가 과도하게 증가하지 않게 하는 것이다.
+  - `LineEven`, `PointSet`은 full area 해석을 유지한다.
+  - `Poisson` / `EventBurst`는 사건량 자체는 유지하고, cap 계산만 effective area를 사용한다.
 
 ### 3.6 최근 체류 편향 범위
 - `GD-014`는 최근 체류 구역 회피를 권장하지만, 이번 단계는 source 내부 `recent clean bias`까지만 채택한다.

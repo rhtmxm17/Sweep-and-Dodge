@@ -56,6 +56,9 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 후보 중 오염도 상위 셀을 우선 선택한다.
   - 선택된 셀 내부에서 최종 스폰 좌표를 결정한다.
 - Top-K의 목표는 확률 정확도 최대화가 아니라, 대량 엔티티에서도 동선 유도 체감을 안정적으로 유지하는 것이다.
+- `GD-014` active-area density 규칙 이후, `PollutionTopK`와 `UniformField`는 source pollution runtime이 존재할 때 request 생성량과 `CapAndMaxDensity` 상한도 active-area 비율을 사용한다.
+  - authoritative ratio는 `active valid cell / valid cell`.
+  - `LineEven` / `PointSet`은 이 규칙의 대상이 아니다.
 
 ### 4.2 오염도 갱신 흐름 (요청 누적 -> 단일 writer 소비)
 - 오염도 값(`SourcePollutionCellBuffer`)은 Request 단계 단일 writer가 최종 갱신한다.
@@ -151,6 +154,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - `WaveClipSO`는 `Segments[].Entries[]` 내부에 `Payload/Emission/Sampling/Direction` 인라인 프로필을 기본 구조로 사용한다.
 - 프레임 예산(`BudgetPerFrame`)은 요청 전체(탄 종류 공용)에서 공유한다.
   - 우선순위 규칙: Lane 우선순위(`특수 > Hazard > Trash`)를 적용한다.
+- field sampling directive(`UniformField`, `PollutionTopK`)는 pollution runtime state가 존재할 때 full source area가 아니라 active-area 비율이 반영된 effective area로 density/cap을 계산한다.
 
 ## 10. MVP 데이터 과잉 방지
 - EmissionMode는 `RateField` / `Poisson` / `EventBurst` 세 가지로 제한한다.

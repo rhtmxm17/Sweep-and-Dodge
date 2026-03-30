@@ -15,6 +15,185 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
             var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
 
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Idle, deltaTime: 1f / 60f);
+            var source = CreateSourceWithPattern(em);
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            buildSystem.Update(world.Unmanaged);
+            Assert.That(em.GetBuffer<SourceSpawnRequestBuffer>(source).Length, Is.EqualTo(0));
+
+            SetStageState(em, RunDirectorStageStateId.Running);
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            buildSystem.Update(world.Unmanaged);
+
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            Assert.That(requests.Length, Is.GreaterThan(0));
+            Assert.That(requests[0].Count, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_UniformFieldRateField_ScalesByActiveAreaRatio()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_UniformScale", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                emissionMode: SourceSpawnEmissionModeId.RateField,
+                spawnMode: SourceSpawnModeId.FixedDensity,
+                shapeSize: new float2(2f, 2f),
+                spawnDensityPerSecPerArea: 4f);
+            AttachPollutionCells(em, source, 2, 2, activeValidCount: 1);
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+
+            AssertRequestCount(em, source, 4);
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_PollutionTopKRateField_ScalesByActiveAreaRatio()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_PollutionTopKScale", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                samplingMode: SourceSpawnSamplingModeId.PollutionTopK,
+                emissionMode: SourceSpawnEmissionModeId.RateField,
+                spawnMode: SourceSpawnModeId.FixedDensity,
+                shapeSize: new float2(2f, 2f),
+                spawnDensityPerSecPerArea: 4f);
+            AttachPollutionCells(em, source, 2, 2, activeValidCount: 1);
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+
+            AssertRequestCount(em, source, 4);
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_LineEvenRateField_IgnoresActiveAreaScaling()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_LineEvenFullArea", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                samplingMode: SourceSpawnSamplingModeId.LineEven,
+                emissionMode: SourceSpawnEmissionModeId.RateField,
+                spawnMode: SourceSpawnModeId.FixedDensity,
+                shapeSize: new float2(2f, 2f),
+                spawnDensityPerSecPerArea: 4f);
+            AttachPollutionCells(em, source, 2, 2, activeValidCount: 1);
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+
+            AssertRequestCount(em, source, 16);
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_FieldSamplingWithoutPollution_UsesFullArea()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_NoPollutionFallback", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                emissionMode: SourceSpawnEmissionModeId.RateField,
+                spawnMode: SourceSpawnModeId.FixedDensity,
+                shapeSize: new float2(2f, 2f),
+                spawnDensityPerSecPerArea: 4f);
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+
+            AssertRequestCount(em, source, 16);
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_FieldSamplingCap_UsesEffectiveAreaForEventBurst()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_CapScale", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 4f);
+            var source = CreateSourceWithPattern(
+                em,
+                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                emissionMode: SourceSpawnEmissionModeId.EventBurst,
+                spawnMode: SourceSpawnModeId.CapAndMaxDensity,
+                shapeSize: new float2(2f, 2f),
+                spawnDensityPerSecPerArea: 0f,
+                burstIntervalSec: 1f,
+                burstShotsPerEvent: 1,
+                burstRepeatCount: -1,
+                maxActiveDensityPerArea: 2f);
+            AttachPollutionCells(em, source, 2, 2, activeValidCount: 1);
+
+            world.SetTime(new TimeData(4d, 4f));
+            buildSystem.Update(world.Unmanaged);
+
+            AssertRequestCount(em, source, 2);
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_ReadsPollutionStateUpdatedEarlierInSameRequestFrame()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_RequestOrder", out _);
+            var em = world.EntityManager;
+            var pollutionSystem = world.GetOrCreateSystem<SourcePollutionUpdateSystem>();
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                emissionMode: SourceSpawnEmissionModeId.RateField,
+                spawnMode: SourceSpawnModeId.FixedDensity,
+                shapeSize: new float2(2f, 2f),
+                spawnDensityPerSecPerArea: 4f);
+            AttachPollutionRuntime(em, source, 2, 2, activeValidCount: 4, initialValue: 1f, activeRatioThreshold: 0f);
+
+            var drops = em.GetBuffer<SourcePollutionDropRequestBuffer>(source);
+            drops.Add(new SourcePollutionDropRequestBuffer { CellIndex = 1, Count = 1 });
+            drops.Add(new SourcePollutionDropRequestBuffer { CellIndex = 2, Count = 1 });
+            drops.Add(new SourcePollutionDropRequestBuffer { CellIndex = 3, Count = 1 });
+
+            world.SetTime(new TimeData(1d, 1f));
+            pollutionSystem.Update(world.Unmanaged);
+            buildSystem.Update(world.Unmanaged);
+
+            AssertRequestCount(em, source, 4);
+        }
+
+        private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
+        {
+            var world = new World(worldName);
+            var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
+            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
+            simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
+            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
+            return world;
+        }
+
+        private static void InitializeBuildWorld(
+            EntityManager em,
+            RunDirectorStageStateId stageState,
+            float deltaTime)
+        {
             var frameEntity = GetOrCreateSingletonEntity<BulletFrameCounterComponent>(em);
             em.SetComponentData(frameEntity, new BulletFrameCounterComponent
             {
@@ -41,47 +220,24 @@ namespace SweepNDodge.DotsBullets.Tests
             var tickEntity = GetOrCreateSingletonEntity<FixedTickStepRuntimeComponent>(em);
             em.SetComponentData(tickEntity, new FixedTickStepRuntimeComponent
             {
-                FrameDeltaTime = 1f / 60f,
-                LogicDeltaTime = 1f / 60f,
+                FrameDeltaTime = deltaTime,
+                LogicDeltaTime = deltaTime,
                 LogicStepCount = 1,
                 HasStep = 1,
                 UsingFixedTick = 0,
             });
 
+            SetStageState(em, stageState);
+        }
+
+        private static void SetStageState(EntityManager em, RunDirectorStageStateId state)
+        {
             var stageStateEntity = GetOrCreateSingletonEntity<RunDirectorStageStateComponent>(em);
             em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
             {
-                State = RunDirectorStageStateId.Idle,
+                State = state,
                 StateElapsedSec = 0f,
             });
-
-            var source = CreateSourceWithPattern(em);
-
-            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-            buildSystem.Update(world.Unmanaged);
-            Assert.That(em.GetBuffer<SourceSpawnRequestBuffer>(source).Length, Is.EqualTo(0));
-
-            em.SetComponentData(stageStateEntity, new RunDirectorStageStateComponent
-            {
-                State = RunDirectorStageStateId.Running,
-                StateElapsedSec = 0f,
-            });
-            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
-            buildSystem.Update(world.Unmanaged);
-
-            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
-            Assert.That(requests.Length, Is.GreaterThan(0));
-            Assert.That(requests[0].Count, Is.GreaterThan(0));
-        }
-
-        private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
-        {
-            var world = new World(worldName);
-            var systems = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default);
-            DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
-            simGroup = world.GetExistingSystemManaged<SimulationSystemGroup>();
-            Assert.That(simGroup, Is.Not.Null, "SimulationSystemGroup must exist");
-            return world;
         }
 
         private static Entity GetOrCreateSingletonEntity<T>(EntityManager em)
@@ -93,11 +249,22 @@ namespace SweepNDodge.DotsBullets.Tests
             if (query.CalculateEntityCount() == 1)
                 return query.GetSingletonEntity();
 
-            using var entities = query.ToEntityArray(Unity.Collections.Allocator.Temp);
+            using var entities = query.ToEntityArray(Allocator.Temp);
             return entities[0];
         }
 
-        private static Entity CreateSourceWithPattern(EntityManager em)
+        private static Entity CreateSourceWithPattern(
+            EntityManager em,
+            SourceSpawnSamplingModeId samplingMode = SourceSpawnSamplingModeId.UniformField,
+            SourceSpawnEmissionModeId emissionMode = SourceSpawnEmissionModeId.RateField,
+            SourceSpawnModeId spawnMode = SourceSpawnModeId.FixedDensity,
+            float2? shapeSize = null,
+            float spawnDensityPerSecPerArea = 60f,
+            float meanEventsPerSec = 0f,
+            float burstIntervalSec = 1f,
+            int burstShotsPerEvent = 1,
+            int burstRepeatCount = 0,
+            float maxActiveDensityPerArea = 0f)
         {
             var entity = em.CreateEntity(
                 typeof(SourceSpawnComponent),
@@ -124,11 +291,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 DensityScale = 1f,
                 Version = 1u,
             });
+
+            float2 resolvedSize = shapeSize ?? new float2(1f, 1f);
             var shape = new Shape2DComponent
             {
-                Kind = Shape2DKind.Circle,
-                Radius = 1f,
-                Size = new float2(2f, 2f),
+                Kind = Shape2DKind.Rectangle,
+                Radius = 0f,
+                Size = resolvedSize,
             };
             em.SetComponentData(entity, shape);
             em.SetComponentData(entity, new SourceShapeDerivedComponent
@@ -164,15 +333,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 LocalStartSec = 0f,
                 LocalEndSec = 10f,
                 BulletTypeKey = 101,
-                EmissionMode = SourceSpawnEmissionModeId.RateField,
-                SpawnMode = SourceSpawnModeId.FixedDensity,
-                SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                EmissionMode = emissionMode,
+                SpawnMode = spawnMode,
+                SamplingMode = samplingMode,
                 CenterMode = SourceSpawnCenterModeId.SourceCenter,
                 DirectionMode = SourceSpawnDirectionModeId.Fixed,
                 SampleSpacing = 1f,
+                LineStart = new float2(-0.5f, 0f),
+                LineEnd = new float2(0.5f, 0f),
                 SpawnSampleBudget = 16,
-                SpawnDensityPerSecPerArea = 60f,
-                BurstShotsPerEvent = 1,
+                SpawnDensityPerSecPerArea = spawnDensityPerSecPerArea,
+                MeanEventsPerSec = meanEventsPerSec,
+                BurstIntervalSec = burstIntervalSec,
+                BurstShotsPerEvent = burstShotsPerEvent,
+                BurstRepeatCount = burstRepeatCount,
+                MaxActiveDensityPerArea = maxActiveDensityPerArea,
                 LanePriority = 1,
                 SpawnAccumulator = 0f,
             });
@@ -208,6 +383,115 @@ namespace SweepNDodge.DotsBullets.Tests
 
             em.AddBuffer<SourceSpawnRequestBuffer>(entity);
             return entity;
+        }
+
+        private static void AttachPollutionCells(
+            EntityManager em,
+            Entity source,
+            int cols,
+            int rows,
+            int activeValidCount,
+            float activeValue = 1f,
+            float inactiveValue = 0f)
+        {
+            if (!em.HasBuffer<SourcePollutionCellBuffer>(source))
+                em.AddBuffer<SourcePollutionCellBuffer>(source);
+
+            var cells = em.GetBuffer<SourcePollutionCellBuffer>(source);
+            cells.Clear();
+
+            int total = math.max(1, cols * rows);
+            int clampedActiveCount = math.clamp(activeValidCount, 0, total);
+            for (int i = 0; i < total; i++)
+            {
+                bool isActive = i < clampedActiveCount;
+                cells.Add(new SourcePollutionCellBuffer
+                {
+                    Value = isActive ? activeValue : inactiveValue,
+                    IsValid = 1,
+                    IsActive = isActive ? (byte)1 : (byte)0,
+                    LastDropFrame = 0u,
+                    CooldownUntilFrame = 0u,
+                });
+            }
+        }
+
+        private static void AttachPollutionRuntime(
+            EntityManager em,
+            Entity source,
+            int cols,
+            int rows,
+            int activeValidCount,
+            float initialValue,
+            float activeRatioThreshold)
+        {
+            if (!em.HasComponent<SourcePollutionConfigComponent>(source))
+            {
+                em.AddComponentData(source, new SourcePollutionConfigComponent
+                {
+                    MinValue = 0f,
+                    MaxValue = 1f,
+                    RegenPerSec = 0f,
+                    DropPerCollect = 1f,
+                    TopKSampleCount = 1,
+                    ActiveRatioThreshold = activeRatioThreshold,
+                    RecoveryCooldownFrames = 10u,
+                    RecoveryWaveSeedCount = 1,
+                    RecoveryWaveClusterSize = 1,
+                    RecoveryWaveRestoreValue = 0.5f,
+                    RecoveryRecentCleanBiasFrames = 10u,
+                });
+            }
+            else
+            {
+                em.SetComponentData(source, new SourcePollutionConfigComponent
+                {
+                    MinValue = 0f,
+                    MaxValue = 1f,
+                    RegenPerSec = 0f,
+                    DropPerCollect = 1f,
+                    TopKSampleCount = 1,
+                    ActiveRatioThreshold = activeRatioThreshold,
+                    RecoveryCooldownFrames = 10u,
+                    RecoveryWaveSeedCount = 1,
+                    RecoveryWaveClusterSize = 1,
+                    RecoveryWaveRestoreValue = 0.5f,
+                    RecoveryRecentCleanBiasFrames = 10u,
+                });
+            }
+
+            if (!em.HasComponent<SourcePollutionGridComponent>(source))
+            {
+                em.AddComponentData(source, new SourcePollutionGridComponent
+                {
+                    Cols = cols,
+                    Rows = rows,
+                    CellSize = 1f,
+                    InvCellSize = 1f,
+                });
+            }
+            else
+            {
+                em.SetComponentData(source, new SourcePollutionGridComponent
+                {
+                    Cols = cols,
+                    Rows = rows,
+                    CellSize = 1f,
+                    InvCellSize = 1f,
+                });
+            }
+
+            if (!em.HasBuffer<SourcePollutionDropRequestBuffer>(source))
+                em.AddBuffer<SourcePollutionDropRequestBuffer>(source);
+
+            AttachPollutionCells(em, source, cols, rows, activeValidCount, activeValue: initialValue, inactiveValue: 0f);
+        }
+
+        private static void AssertRequestCount(EntityManager em, Entity source, int expectedCount)
+        {
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            Assert.That(requests.Length, Is.GreaterThan(0));
+            Assert.That(requests[0].Count, Is.EqualTo(expectedCount));
         }
     }
 }

@@ -62,6 +62,7 @@
 - 요청 생성은 Request 단계에서 누적된다.
 - 실행은 ExecutionBegin에서 예산 기반으로 소비된다.
 - 프레임에 다 못 쓴 샷은 버리지 않고 다음 프레임으로 이월(carry)된다.
+- `SamplingMode=UniformField` 또는 `PollutionTopK`이고 pollution runtime state가 존재하면, `CapAndMaxDensity` 상한 계산은 full area 대신 active-area 비율이 반영된 effective area를 사용한다.
 
 ### 3.4 사건형 이벤트 모드 지속 확장
 - 이벤트 내부 타임라인은 `Emission` 책임으로 정의한다.
@@ -95,6 +96,14 @@
 | `PollutionTopK` | 1 | Pollution 가중치 상위 후보 중심 샘플링 | 밀도 기반 분포 강화 |
 | `LineEven` | 2 | `LineStart~LineEnd` 선분에서 등간격 샘플링 | 라인/벽 발사 표현에 사용 |
 | `PointSet` | 4 | 사전 정의 포인트셋 기반 샘플링 | 최대 4포인트, round-robin |
+
+### 4.1.1 active-area effective area 규칙
+- `UniformField` / `PollutionTopK`
+  - pollution runtime state가 있으면 request 생성량(`RateField`)과 `CapAndMaxDensity` 상한이 active-area 비율을 사용한다.
+  - ratio는 `active valid cell / valid cell`.
+- `LineEven` / `PointSet`
+  - active-area density 스케일 대상이 아니다.
+  - full source area 해석을 유지한다.
 
 ### 4.2 CenterMode
 | 값 | enum 값(byte) | 의미 | 비고 |
