@@ -833,7 +833,9 @@ namespace SweepNDodge.DotsBullets
             var eventQueue = em.GetBuffer<SourceEventQueueBuffer>(entity);
             var activeCounts = em.GetBuffer<SourceActiveBulletCountBuffer>(entity);
             var pressureInputs = em.GetBuffer<SourceDirectorPressureInputBuffer>(entity);
+            var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(entity);
             var pollutionDrops = em.GetBuffer<SourcePollutionDropRequestBuffer>(entity);
+            var pollutionConfig = em.GetComponentData<SourcePollutionConfigComponent>(entity);
 
             source.State = SourceStateId.Normal;
             source.CollectedCount = 0;
@@ -859,6 +861,7 @@ namespace SweepNDodge.DotsBullets
             eventQueue.Clear();
             pollutionDrops.Clear();
             SourceRuntimeApplyUtility.ResetPressureInputs(pressureInputs);
+            SourceRuntimeApplyUtility.ResetPollutionRuntimeState(in pollutionConfig, pollutionCells, pollutionDrops);
 
             for (int i = 0; i < activeCounts.Length; i++)
             {
@@ -892,7 +895,9 @@ namespace SweepNDodge.DotsBullets
             var eventQueue = em.GetBuffer<SourceEventQueueBuffer>(entity);
             var activeCounts = em.GetBuffer<SourceActiveBulletCountBuffer>(entity);
             var pressureInputs = em.GetBuffer<SourceDirectorPressureInputBuffer>(entity);
+            var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(entity);
             var pollutionDrops = em.GetBuffer<SourcePollutionDropRequestBuffer>(entity);
+            var pollutionConfig = em.GetComponentData<SourcePollutionConfigComponent>(entity);
 
             source.ThresholdWeakened = thresholdWeakened;
             source.ThresholdDepleted = thresholdDepleted;
@@ -917,6 +922,7 @@ namespace SweepNDodge.DotsBullets
             spawnRequests.Clear();
             pollutionDrops.Clear();
             SourceRuntimeApplyUtility.ResetPressureInputs(pressureInputs);
+            SourceRuntimeApplyUtility.ResetPollutionRuntimeState(in pollutionConfig, pollutionCells, pollutionDrops);
             SourceRuntimeApplyUtility.RebuildClipBindingsFromStageDefinition(in binding, clipPatterns, sustainCandidates, sustainRuntimeLanes, eventQueue, activeCounts);
 
             em.SetComponentData(entity, source);
@@ -949,7 +955,9 @@ namespace SweepNDodge.DotsBullets
             var eventQueue = em.GetBuffer<SourceEventQueueBuffer>(entity);
             var activeCounts = em.GetBuffer<SourceActiveBulletCountBuffer>(entity);
             var pressureInputs = em.GetBuffer<SourceDirectorPressureInputBuffer>(entity);
+            var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(entity);
             var pollutionDrops = em.GetBuffer<SourcePollutionDropRequestBuffer>(entity);
+            var pollutionConfig = em.GetComponentData<SourcePollutionConfigComponent>(entity);
 
             source.CollectedCount = math.max(math.max(0, source.ThresholdWeakened), source.ThresholdDepleted);
             source.State = SourceStateId.Depleted;
@@ -976,6 +984,7 @@ namespace SweepNDodge.DotsBullets
             activeCounts.Clear();
             pollutionDrops.Clear();
             SourceRuntimeApplyUtility.ResetPressureInputs(pressureInputs);
+            SourceRuntimeApplyUtility.ResetPollutionRuntimeState(in pollutionConfig, pollutionCells, pollutionDrops);
 
             em.SetComponentData(entity, source);
             em.SetComponentData(entity, sourceRuntime);

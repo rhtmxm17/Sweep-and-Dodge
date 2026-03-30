@@ -46,6 +46,12 @@ namespace SweepNDodge.DotsBullets
         public float PollutionRegenPerSec = 0.08f;
         public float PollutionDropPerCollect = 0.12f;
         public int PollutionTopKSampleCount = 6;
+        [Range(0f, 1f)] public float PollutionActiveRatioThreshold = 0.35f;
+        [Min(0)] public int PollutionRecoveryCooldownFrames = 45;
+        [Min(1)] public int PollutionRecoveryWaveSeedCount = 2;
+        [Min(1)] public int PollutionRecoveryWaveClusterSize = 4;
+        public float PollutionRecoveryRestoreValue = 0.4f;
+        [Min(0)] public int PollutionRecoveryRecentCleanBiasFrames = 90;
 
         [Header("Debug")]
         public bool DrawGizmo = true;
@@ -94,6 +100,12 @@ namespace SweepNDodge.DotsBullets
                 RegenPerSec = Mathf.Max(0f, authoring.PollutionRegenPerSec),
                 DropPerCollect = Mathf.Max(0f, authoring.PollutionDropPerCollect),
                 TopKSampleCount = Mathf.Max(1, authoring.PollutionTopKSampleCount),
+                ActiveRatioThreshold = Mathf.Clamp01(authoring.PollutionActiveRatioThreshold),
+                RecoveryCooldownFrames = (uint)Mathf.Max(0, authoring.PollutionRecoveryCooldownFrames),
+                RecoveryWaveSeedCount = Mathf.Max(1, authoring.PollutionRecoveryWaveSeedCount),
+                RecoveryWaveClusterSize = Mathf.Max(1, authoring.PollutionRecoveryWaveClusterSize),
+                RecoveryWaveRestoreValue = Mathf.Clamp(authoring.PollutionRecoveryRestoreValue, minValue, maxValue),
+                RecoveryRecentCleanBiasFrames = (uint)Mathf.Max(0, authoring.PollutionRecoveryRecentCleanBiasFrames),
             };
             baker.AddComponent(e, pollutionConfig);
 

@@ -30,6 +30,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 HasStep = 1,
                 UsingFixedTick = 0,
             });
+            SetSingleton(em, new BulletFrameCounterComponent { Value = 10u });
 
             var source = em.CreateEntity(typeof(SourcePollutionConfigComponent));
             em.SetComponentData(source, new SourcePollutionConfigComponent
@@ -39,12 +40,26 @@ namespace SweepNDodge.DotsBullets.Tests
                 RegenPerSec = 1f,
                 DropPerCollect = 1f,
                 TopKSampleCount = 1,
+                ActiveRatioThreshold = 0.5f,
+                RecoveryCooldownFrames = 5u,
+                RecoveryWaveSeedCount = 1,
+                RecoveryWaveClusterSize = 1,
+                RecoveryWaveRestoreValue = 2f,
+                RecoveryRecentCleanBiasFrames = 10u,
+            });
+            em.AddComponentData(source, new SourcePollutionGridComponent
+            {
+                Cols = 1,
+                Rows = 1,
+                CellSize = 1f,
+                InvCellSize = 1f,
             });
             var cells = em.AddBuffer<SourcePollutionCellBuffer>(source);
             cells.Add(new SourcePollutionCellBuffer
             {
                 Value = 3f,
                 IsValid = 1,
+                IsActive = 1,
             });
             var drops = em.AddBuffer<SourcePollutionDropRequestBuffer>(source);
             drops.Add(new SourcePollutionDropRequestBuffer

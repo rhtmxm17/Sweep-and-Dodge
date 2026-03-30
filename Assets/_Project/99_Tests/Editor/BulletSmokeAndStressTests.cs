@@ -1607,6 +1607,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         Value = 1f,
                         IsValid = 0,
+                        IsActive = 0,
                     });
                 }
 
@@ -1614,6 +1615,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     Value = 1f,
                     IsValid = 1,
+                    IsActive = 1,
                 };
 
                 var validCells = em.GetBuffer<SourcePollutionValidCellIndexBuffer>(source);
@@ -1646,6 +1648,88 @@ namespace SweepNDodge.DotsBullets.Tests
                 float3 spawned = snapshots[0].Position;
                 Assert.That(spawned.x, Is.GreaterThanOrEqualTo(-4f).And.LessThan(-3f));
                 Assert.That(spawned.z, Is.GreaterThanOrEqualTo(-1f).And.LessThan(0f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_UniformFieldSampling_SkipsInactiveCells()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnUniformSkipsInactiveWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, new float2(2f, 1f));
+
+                em.SetComponentData(source, new SourcePollutionGridComponent
+                {
+                    CellSize = 1f,
+                    InvCellSize = 1f,
+                    HalfExtents = new float2(1f, 0.5f),
+                    OriginX = -1f,
+                    OriginZ = -0.5f,
+                    Cols = 2,
+                    Rows = 1,
+                });
+
+                var pollutionCells = em.GetBuffer<SourcePollutionCellBuffer>(source);
+                pollutionCells.Clear();
+                pollutionCells.Add(new SourcePollutionCellBuffer
+                {
+                    Value = 1f,
+                    IsValid = 1,
+                    IsActive = 0,
+                });
+                pollutionCells.Add(new SourcePollutionCellBuffer
+                {
+                    Value = 1f,
+                    IsValid = 1,
+                    IsActive = 1,
+                });
+
+                var validCells = em.GetBuffer<SourcePollutionValidCellIndexBuffer>(source);
+                validCells.Clear();
+                validCells.Add(new SourcePollutionValidCellIndexBuffer { Value = 0 });
+                validCells.Add(new SourcePollutionValidCellIndexBuffer { Value = 1 });
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8004,
+                    BulletTypeKey = 1,
+                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    SpawnSampleBudget = 1,
+                    PlayerNoSpawnRadius = 0f,
+                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
+                    BaseAngleDeg = 0f,
+                    Count = 1,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(1));
+
+                float3 spawned = snapshots[0].Position;
+                Assert.That(spawned.x, Is.GreaterThanOrEqualTo(0f).And.LessThan(1f));
+                Assert.That(spawned.z, Is.GreaterThanOrEqualTo(-0.5f).And.LessThan(0.5f));
             }
             finally
             {
@@ -4272,6 +4356,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 RegenPerSec = 0.1f,
                 DropPerCollect = 0.1f,
                 TopKSampleCount = 4,
+                ActiveRatioThreshold = 0.35f,
+                RecoveryCooldownFrames = 45u,
+                RecoveryWaveSeedCount = 2,
+                RecoveryWaveClusterSize = 4,
+                RecoveryWaveRestoreValue = 0.4f,
+                RecoveryRecentCleanBiasFrames = 90u,
             });
             em.SetComponentData(source, new SourcePollutionGridComponent
             {

@@ -161,6 +161,25 @@ namespace SweepNDodge.DotsBullets
                 math.max(config.MinValue, config.MaxValue));
         }
 
+        public static void ResetPollutionRuntimeState(
+            in SourcePollutionConfigComponent config,
+            DynamicBuffer<SourcePollutionCellBuffer> pollutionCells,
+            DynamicBuffer<SourcePollutionDropRequestBuffer> pollutionDrops)
+        {
+            float maxValue = math.max(config.MinValue, config.MaxValue);
+            for (int i = 0; i < pollutionCells.Length; i++)
+            {
+                var cell = pollutionCells[i];
+                cell.Value = maxValue;
+                cell.IsActive = cell.IsValid != 0 ? (byte)1 : (byte)0;
+                cell.LastDropFrame = 0u;
+                cell.CooldownUntilFrame = 0u;
+                pollutionCells[i] = cell;
+            }
+
+            pollutionDrops.Clear();
+        }
+
         public static void RebuildPollutionGridFromRegionBounds(
             int minCellX,
             int minCellY,
@@ -420,6 +439,9 @@ namespace SweepNDodge.DotsBullets
                     {
                         Value = maxValue,
                         IsValid = isValid ? (byte)1 : (byte)0,
+                        IsActive = isValid ? (byte)1 : (byte)0,
+                        LastDropFrame = 0u,
+                        CooldownUntilFrame = 0u,
                     });
 
                     if (isValid)
@@ -437,6 +459,7 @@ namespace SweepNDodge.DotsBullets
                 int centerIndex = Mathf.Clamp((rows / 2) * cols + (cols / 2), 0, cellCount - 1);
                 var cell = pollutionCells[centerIndex];
                 cell.IsValid = 1;
+                cell.IsActive = 1;
                 pollutionCells[centerIndex] = cell;
                 pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
                 {
@@ -473,6 +496,9 @@ namespace SweepNDodge.DotsBullets
                 {
                     Value = maxValue,
                     IsValid = 0,
+                    IsActive = 0,
+                    LastDropFrame = 0u,
+                    CooldownUntilFrame = 0u,
                 });
             }
 
@@ -495,6 +521,7 @@ namespace SweepNDodge.DotsBullets
 
                 var cell = pollutionCells[localIndex];
                 cell.IsValid = 1;
+                cell.IsActive = 1;
                 pollutionCells[localIndex] = cell;
                 pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
                 {
@@ -508,6 +535,7 @@ namespace SweepNDodge.DotsBullets
             int fallbackIndex = Mathf.Clamp((rows / 2) * cols + (cols / 2), 0, cellCount - 1);
             var fallbackCell = pollutionCells[fallbackIndex];
             fallbackCell.IsValid = 1;
+            fallbackCell.IsActive = 1;
             pollutionCells[fallbackIndex] = fallbackCell;
             pollutionValidCellIndices.Add(new SourcePollutionValidCellIndexBuffer
             {

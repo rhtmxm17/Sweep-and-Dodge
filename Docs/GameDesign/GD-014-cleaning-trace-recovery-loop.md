@@ -10,6 +10,7 @@
   - [GD-003-stage-cleaning-route-mvp.md](./GD-003-stage-cleaning-route-mvp.md)
   - [GD-009-in-game-ui-screen-blueprint.md](./GD-009-in-game-ui-screen-blueprint.md)
   - [GD-012-characterized-hud-toast-direction.md](./GD-012-characterized-hud-toast-direction.md)
+  - [TD-026-source-pollution-recovery-wave-contract.md](../TechnicalDesign/TD-026-source-pollution-recovery-wave-contract.md)
 
 > `GD-003`의 청소 흔적 기반 동선 유도 규칙을 확장해, 복구를 "개별 셀의 시간 경과 원복"이 아니라 "한쪽만 오래 정리하면 다른 쪽이 다시 관리 대상으로 떠오르는 공간 순환 규칙"으로 다루기 위한 방향 문서.
 
@@ -180,7 +181,9 @@
 - Source, Deposit, Hazard 동선과 복구 리듬이 충돌하지 않게 하려면 어떤 우선순위가 필요한가
 - 캠페인형 / 점수형 / 생존형 규칙에서 동일 복구 모델을 그대로 유지할 수 있는가
 - `GD-003`의 현재 청소 흔적 회복 규칙을 이 방향으로 대체할지, 선택형 확장안으로 둘지 결정이 필요한가
+- 구현 계약과 1차 범위 분리는 [TD-026-source-pollution-recovery-wave-contract.md](../TechnicalDesign/TD-026-source-pollution-recovery-wave-contract.md)에서 관리한다.
 
 ## 13. 변경 이력
+- 2026-03-30: `GD-014` 구현 전개를 위한 기술 계약 문서 `TD-026` 링크를 추가했다.
 - 2026-03-30: 문서 번호를 `GD-014`로 확정하고 파일명을 GD 규칙에 맞게 정리했다. `GD-003`과의 관계를 명시하는 방향 문서로 위치를 고정했다.
 - 2026-03-30: 초안 내용을 다른 GD 문서 형식에 맞춰 재구성했다. 메타데이터, 적용 범위, 경험 목표, 현재 기준안, 리스크, 후속 논점을 정리하고 중복 서술을 줄였다.

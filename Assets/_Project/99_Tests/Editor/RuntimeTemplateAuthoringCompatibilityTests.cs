@@ -105,6 +105,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 sourceAuthoring.PollutionRegenPerSec = -3f;
                 sourceAuthoring.PollutionDropPerCollect = -4f;
                 sourceAuthoring.PollutionTopKSampleCount = 0;
+                sourceAuthoring.PollutionActiveRatioThreshold = 2f;
+                sourceAuthoring.PollutionRecoveryCooldownFrames = -1;
+                sourceAuthoring.PollutionRecoveryWaveSeedCount = 0;
+                sourceAuthoring.PollutionRecoveryWaveClusterSize = 0;
+                sourceAuthoring.PollutionRecoveryRestoreValue = -1f;
+                sourceAuthoring.PollutionRecoveryRecentCleanBiasFrames = -1;
 
                 var input = new ContentValidationInput(
                     null,

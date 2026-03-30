@@ -537,6 +537,12 @@ namespace SweepNDodge.DotsBullets.Editor
                 WarnIf(authoring.PollutionRegenPerSec < 0f, "CVW029", location, "PollutionRegenPerSec < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.PollutionDropPerCollect < 0f, "CVW030", location, "PollutionDropPerCollect < 0 will be clamped to 0.", issues);
                 WarnIf(authoring.PollutionTopKSampleCount < 1, "CVW031", location, "PollutionTopKSampleCount < 1 will be clamped to 1.", issues);
+                WarnIf(authoring.PollutionActiveRatioThreshold < 0f || authoring.PollutionActiveRatioThreshold > 1f, "CVW034", location, "PollutionActiveRatioThreshold will be clamped to [0, 1].", issues);
+                WarnIf(authoring.PollutionRecoveryCooldownFrames < 0, "CVW035", location, "PollutionRecoveryCooldownFrames < 0 will be clamped to 0.", issues);
+                WarnIf(authoring.PollutionRecoveryWaveSeedCount < 1, "CVW036", location, "PollutionRecoveryWaveSeedCount < 1 will be clamped to 1.", issues);
+                WarnIf(authoring.PollutionRecoveryWaveClusterSize < 1, "CVW037", location, "PollutionRecoveryWaveClusterSize < 1 will be clamped to 1.", issues);
+                WarnIf(authoring.PollutionRecoveryRestoreValue < authoring.PollutionMin || authoring.PollutionRecoveryRestoreValue > authoring.PollutionMax, "CVW038", location, "PollutionRecoveryRestoreValue will be clamped to [PollutionMin, PollutionMax].", issues);
+                WarnIf(authoring.PollutionRecoveryRecentCleanBiasFrames < 0, "CVW039", location, "PollutionRecoveryRecentCleanBiasFrames < 0 will be clamped to 0.", issues);
             }
         }
 

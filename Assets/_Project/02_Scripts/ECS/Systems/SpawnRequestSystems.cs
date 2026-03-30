@@ -1181,14 +1181,19 @@ namespace SweepNDodge.DotsBullets
             if (validCount <= 0)
                 return false;
 
-            int topK = math.clamp(config.TopKSampleCount, 1, validCount);
+            int activeCount = CountActiveValidCells(cells, validIndices);
+            if (activeCount <= 0)
+                return false;
+
+            int topK = math.clamp(config.TopKSampleCount, 1, activeCount);
             int bestCellIndex = -1;
             float bestWeight = -1f;
 
             for (int i = 0; i < topK; i++)
             {
-                int sampledListIndex = random.NextInt(0, validCount);
-                int cellIndex = validIndices[sampledListIndex].Value;
+                int cellIndex = SelectNthActiveValidCell(validIndices, cells, random.NextInt(0, activeCount));
+                if (cellIndex < 0)
+                    continue;
                 float weight = GetValidCellWeight(cells, cellIndex);
                 if (weight < 0f)
                     continue;
@@ -1234,8 +1239,13 @@ namespace SweepNDodge.DotsBullets
             if (validCount <= 0)
                 return false;
 
-            int sampledListIndex = random.NextInt(0, validCount);
-            int cellIndex = validIndices[sampledListIndex].Value;
+            int activeCount = CountActiveValidCells(cells, validIndices);
+            if (activeCount <= 0)
+                return false;
+
+            int cellIndex = SelectNthActiveValidCell(validIndices, cells, random.NextInt(0, activeCount));
+            if (cellIndex < 0)
+                return false;
             if (GetValidCellWeight(cells, cellIndex) < 0f)
                 return false;
 
@@ -1256,10 +1266,45 @@ namespace SweepNDodge.DotsBullets
                 return -1f;
 
             var cell = cells[cellIndex];
-            if (cell.IsValid == 0)
+            if (cell.IsValid == 0 || cell.IsActive == 0)
                 return -1f;
 
             return math.max(0f, cell.Value);
+        }
+
+        private static int CountActiveValidCells(
+            DynamicBuffer<SourcePollutionCellBuffer> cells,
+            DynamicBuffer<SourcePollutionValidCellIndexBuffer> validIndices)
+        {
+            int activeCount = 0;
+            for (int i = 0; i < validIndices.Length; i++)
+            {
+                if (GetValidCellWeight(cells, validIndices[i].Value) >= 0f)
+                    activeCount++;
+            }
+
+            return activeCount;
+        }
+
+        private static int SelectNthActiveValidCell(
+            DynamicBuffer<SourcePollutionValidCellIndexBuffer> validIndices,
+            DynamicBuffer<SourcePollutionCellBuffer> cells,
+            int activeOrdinal)
+        {
+            int current = 0;
+            for (int i = 0; i < validIndices.Length; i++)
+            {
+                int cellIndex = validIndices[i].Value;
+                if (GetValidCellWeight(cells, cellIndex) < 0f)
+                    continue;
+
+                if (current == activeOrdinal)
+                    return cellIndex;
+
+                current++;
+            }
+
+            return -1;
         }
 
         private static float3 SampleInsidePollutionCell(

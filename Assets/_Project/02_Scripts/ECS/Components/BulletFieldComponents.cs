@@ -126,6 +126,12 @@ namespace SweepNDodge.DotsBullets
         public float RegenPerSec;
         public float DropPerCollect;
         public int TopKSampleCount;
+        public float ActiveRatioThreshold;
+        public uint RecoveryCooldownFrames;
+        public int RecoveryWaveSeedCount;
+        public int RecoveryWaveClusterSize;
+        public float RecoveryWaveRestoreValue;
+        public uint RecoveryRecentCleanBiasFrames;
     }
 
     // Source별 청소 흔적 격자 메타데이터.
@@ -239,6 +245,9 @@ namespace SweepNDodge.DotsBullets
     {
         public float Value;
         public byte IsValid;
+        public byte IsActive;
+        public uint LastDropFrame;
+        public uint CooldownUntilFrame;
     }
 
     [InternalBufferCapacity(32)]

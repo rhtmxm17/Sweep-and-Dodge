@@ -4,7 +4,9 @@
 - doc_id: `TD-003`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-30`
+- related_docs:
+  - [TD-026-source-pollution-recovery-wave-contract.md](./TD-026-source-pollution-recovery-wave-contract.md)
 - related_adr:
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
   - [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](../ADR/ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md)
@@ -63,6 +65,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 소유권 규칙:
   - 수거 쪽은 오염도 값을 직접 수정하지 않는다.
   - 오염도 실제 값 수정은 단일 writer 책임으로 고정한다.
+- `GD-014` 반영 이후의 specialized recovery contract(`active/inactive + recovery wave`)는 [TD-026-source-pollution-recovery-wave-contract.md](./TD-026-source-pollution-recovery-wave-contract.md)를 우선 기준으로 본다.
 
 ### 4.3 원형 Source valid 셀 마스크 규약
 - 원형 Source는 사각 격자 기반 계산을 유지하되 `valid` 셀 마스크로 경계 오차를 줄인다.
@@ -181,6 +184,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 14. 변경 이력
+- 2026-03-30: `GD-014` 구현 준비를 위해 pollution recovery specialized contract를 `TD-026`으로 분리하고 본 문서에서 우선 참조 링크를 추가했다.
 - 2026-03-05: `Poisson/EventBurst Timed`와 이벤트 기준점 고정 항목을 구현 반영 상태로 동기화했다.
 - 2026-03-05: 요청 소비 우선순위를 `LanePriority + OldestFrame` 단일 규칙으로 확정하고, 레거시 `SpawnPriority` 제거 완료 상태를 반영했다.
 - 2026-03-05: `PollutionTopK` 운영 계약, 오염도 갱신 흐름(요청 누적 -> 단일 writer 소비), 원형 Source valid 셀 마스크 규약을 추가해 GD-003 기술 상세 이관을 반영했다.

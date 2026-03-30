@@ -52,6 +52,12 @@ namespace SweepNDodge.DotsBullets
                 RegenPerSec = 0.08f,
                 DropPerCollect = 0.12f,
                 TopKSampleCount = 6,
+                ActiveRatioThreshold = 0.35f,
+                RecoveryCooldownFrames = 45u,
+                RecoveryWaveSeedCount = 2,
+                RecoveryWaveClusterSize = 4,
+                RecoveryWaveRestoreValue = 0.4f,
+                RecoveryRecentCleanBiasFrames = 90u,
             });
             em.SetComponentData(entity, new SourcePollutionGridComponent
             {
