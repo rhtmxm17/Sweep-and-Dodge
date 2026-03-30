@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260326-01-stage-player-start-owned-by-layout-and-prepare-owner.md](ADR-20260326-01-stage-player-start-owned-by-layout-and-prepare-owner.md): 플레이어 시작 위치를 `StageLayoutSO`가 소유하고 stage entry spatial apply를 prepare 계층 단일 writer로 고정
 - [ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md): 스테이지 layout authority를 grid cell로 전환하고 `Source / Deposit`를 explicit region id 기반 aggregate로 운영
 - [ADR-20260317-01-fixed-tick-authoritative-stageplay-and-common-gameplay-pause.md](ADR-20260317-01-fixed-tick-authoritative-stageplay-and-common-gameplay-pause.md): `StagePlay` gameplay 시간을 fixed tick authority로 고정하고, `Acquire/Release` 기반 공통 gameplay pause owner를 채택
 - [ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md](ADR-20260316-02-in-world-dialogue-start-overlay-and-pre-result-clear-gate.md): 인월드 연출 대화를 GO 전용 계층으로 두고, 시작 overlay 기본값과 `Result` 전 clear gate 정책을 채택
@@ -44,5 +45,3 @@
 - [ADR-20260210-01-bullet-active-filtering-and-despawn-request.md](ADR-20260210-01-bullet-active-filtering-and-despawn-request.md): 비활성 탄환 시뮬레이션 필터링 + 디스폰 요청 파이프라인 결정
 - [ADR-20260209-01-bullet-render-parts-buffe.md](ADR-20260209-01-bullet-render-parts-buffe.md): 다중 렌더 파츠 버퍼 기반 토글 구조 결정
 - [ADR-20260206-01-bullet-pipeline-ownership.md](ADR-20260206-01-bullet-pipeline-ownership.md): 탄환 파이프라인 소유권/업데이트 순서 기준 결정
-
-

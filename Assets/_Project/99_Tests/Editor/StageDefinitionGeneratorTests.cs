@@ -46,6 +46,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     new StageSourceRegionLayoutData { StableId = 1002u, Active = true, AnchorCell = new Vector2Int(1, 0) },
                 };
                 layout.DepositRegions = System.Array.Empty<StageDepositRegionLayoutData>();
+                layout.PlayerStart = new StagePlayerStartLayoutData
+                {
+                    Active = true,
+                    AnchorCell = new Vector2Int(0, 0),
+                    AnchorOffset = Vector2.zero,
+                    YawDeg = 0f,
+                };
 
                 definition.StageId = 1;
                 definition.SourceBindings = new[]

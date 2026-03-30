@@ -135,6 +135,11 @@ MonoBehaviour:
     Active: 1
     AnchorCell: {x: 6, y: 0}
     AnchorOffset: {x: 0, y: 0}
+  PlayerStart:
+    Active: 1
+    AnchorCell: {x: 6, y: 0}
+    AnchorOffset: {x: 0, y: 0}
+    YawDeg: 180
   Presentations:
   - StableId: 9003
     Active: 1
@@ -142,6 +147,6 @@ MonoBehaviour:
     LinkKind: 0
     LinkedStableId: 0
     PresentationKey: preview_visual_03
-    Position: {x: 15, y: 2, z: 6}
+    Position: {x: 115, y: 2, z: 6}
     Euler: {x: -0, y: 0, z: 0}
     Scale: {x: 1, y: 1, z: 1}

@@ -26,3 +26,4 @@
 - [TD-022-in-world-dialogue-runtime-contract.md](TD-022-in-world-dialogue-runtime-contract.md): 인월드 연출 대화의 shell owner, `StageStart=overlay`, `StageClear=pre-result clear gate`, `PresentationLayer`/anchor 재사용 계약
 - [TD-023-common-gameplay-pause-contract.md](TD-023-common-gameplay-pause-contract.md): `StagePlay` fixed tick authority, `Acquire/Release` 기반 공통 gameplay pause owner, simulation/input/presentation 분리 계약
 - [TD-024-stageplay-intervention-dialogue-contract.md](TD-024-stageplay-intervention-dialogue-contract.md): `StagePlay` 도중 특수 조건에서 끼어드는 개입형 인월드 대화의 owner, trigger 우선순위, seen-state, hint/pause 정합성 계약
+- [TD-025-stage-player-start-position-contract.md](TD-025-stage-player-start-position-contract.md): 스테이지별 플레이어 시작 위치의 layout 소유, prepare owner, authoring/runtime 적용 계약

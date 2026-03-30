@@ -105,6 +105,11 @@ namespace SweepNDodge.DotsBullets
                     Sequence = 0u,
                 });
 
+                AddComponent(e, new PlayerStageEntryApplyStateComponent
+                {
+                    LastAppliedVersion = 0u,
+                });
+
                 AddComponent(e, new PlayerCleanupActionStateComponent
                 {
                     SelectedActionId = ResolveInitialSelectedAction(authoring),

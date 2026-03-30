@@ -20,6 +20,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyLifecycleStateComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).IsEmptyIgnoreFilter, Is.False);
             Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StageRuntimeGridComponent>()).IsEmptyIgnoreFilter, Is.False);
+            Assert.That(em.CreateEntityQuery(ComponentType.ReadOnly<StagePlayerStartRuntimeComponent>()).IsEmptyIgnoreFilter, Is.False);
         }
 
         [Test]
@@ -52,6 +53,81 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageSessionResetPrepare_ResetsPlayerStageEntryTransientFields()
+        {
+            using var world = new World("StageSessionResetPrepare_PlayerEntry");
+            var em = world.EntityManager;
+            world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
+
+            var player = em.CreateEntity(
+                typeof(PlayerTag),
+                typeof(PlayerInputIntentComponent),
+                typeof(PlayerResolvedInputSnapshotComponent),
+                typeof(PlayerGoSyncComponent),
+                typeof(PlayerStageEntryApplyStateComponent));
+            em.SetComponentData(player, new PlayerInputIntentComponent
+            {
+                MoveAxis = new float2(1f, 0f),
+                AimWorldXZ = new float2(2f, 3f),
+                HasAimWorldPoint = 1,
+                VacuumRequested = 1,
+                CleanupActionRequested = 1,
+                RequestedCleanupActionSlot = 2,
+                Sequence = 9u,
+            });
+            em.SetComponentData(player, new PlayerResolvedInputSnapshotComponent
+            {
+                MoveAxis = new float2(1f, 1f),
+                AimWorldXZ = new float2(4f, 5f),
+                HasAimWorldPoint = 1,
+                VacuumRequested = 1,
+                CleanupActionRequested = 1,
+                RequestedCleanupActionSlot = 2,
+                Sequence = 10u,
+            });
+            em.SetComponentData(player, new PlayerGoSyncComponent
+            {
+                Position = new float3(5f, 0f, 6f),
+                Rotation = quaternion.identity,
+                SyncRotation = 1,
+                VacuumRequested = 1,
+                CleanupActionRequested = 1,
+                RequestedCleanupActionSlot = 2,
+            });
+            em.SetComponentData(player, new PlayerStageEntryApplyStateComponent
+            {
+                LastAppliedVersion = 9u,
+            });
+
+            var topologyRequestEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).GetSingletonEntity();
+            em.SetComponentData(topologyRequestEntity, new StageTopologyRequestComponent
+            {
+                ApplyRequested = 1,
+                RequestedStageId = 1,
+            });
+
+            world.GetOrCreateSystem<StageSessionResetPrepareSystem>().Update(world.Unmanaged);
+
+            var intent = em.GetComponentData<PlayerInputIntentComponent>(player);
+            var snapshot = em.GetComponentData<PlayerResolvedInputSnapshotComponent>(player);
+            var sync = em.GetComponentData<PlayerGoSyncComponent>(player);
+            var applyState = em.GetComponentData<PlayerStageEntryApplyStateComponent>(player);
+
+            Assert.That(intent.VacuumRequested, Is.EqualTo(0));
+            Assert.That(intent.CleanupActionRequested, Is.EqualTo(0));
+            Assert.That(intent.RequestedCleanupActionSlot, Is.EqualTo(0));
+            Assert.That(intent.Sequence, Is.EqualTo(0u));
+            Assert.That(snapshot.VacuumRequested, Is.EqualTo(0));
+            Assert.That(snapshot.CleanupActionRequested, Is.EqualTo(0));
+            Assert.That(snapshot.RequestedCleanupActionSlot, Is.EqualTo(0));
+            Assert.That(snapshot.Sequence, Is.EqualTo(0u));
+            Assert.That(sync.VacuumRequested, Is.EqualTo(0));
+            Assert.That(sync.CleanupActionRequested, Is.EqualTo(0));
+            Assert.That(sync.RequestedCleanupActionSlot, Is.EqualTo(0));
+            Assert.That(applyState.LastAppliedVersion, Is.EqualTo(0u));
+        }
+
+        [Test]
         public void StageTopologyApply_PublishesRuntimeGridCache_AndDoesNotCreateDepositOrObstacleEntities()
         {
             using var world = CreatePreparedWorld("StageTopologyApply_GridCache", out var em, out var requestEntity, out var topologyStateEntity);
@@ -76,6 +152,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(cells[3].DepositRegionId, Is.EqualTo(2001u));
                 Assert.That(topologyState.AppliedStageId, Is.EqualTo(1));
                 Assert.That(topologyState.Ready, Is.EqualTo(1));
+
+                var playerStartEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StagePlayerStartRuntimeComponent>()).GetSingletonEntity();
+                var playerStart = em.GetComponentData<StagePlayerStartRuntimeComponent>(playerStartEntity);
+                Assert.That(playerStart.Ready, Is.EqualTo(1));
+                Assert.That(playerStart.StageId, Is.EqualTo(1));
+                Assert.That(playerStart.PositionX, Is.EqualTo(0.5f).Within(0.001f));
+                Assert.That(playerStart.PositionZ, Is.EqualTo(1.5f).Within(0.001f));
+                Assert.That(playerStart.YawDeg, Is.EqualTo(45f).Within(0.001f));
 
             }
             finally
@@ -115,6 +199,39 @@ namespace SweepNDodge.DotsBullets.Tests
                 var gridCells = em.GetBuffer<StageRuntimeGridCellBufferElement>(gridEntity);
                 Assert.That(gridCells[0].SourceRegionId, Is.EqualTo(1001u));
                 Assert.That(gridCells[2].SourceRegionId, Is.EqualTo(1001u));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_InvalidPlayerStart_KeepsTopologyNotReady()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_InvalidPlayerStart", out var em, out var requestEntity, out var topologyStateEntity);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: false);
+
+            try
+            {
+                stageCatalog.Entries[0].Layout.PlayerStart = new StagePlayerStartLayoutData
+                {
+                    Active = true,
+                    AnchorCell = new UnityEngine.Vector2Int(1, 0),
+                    AnchorOffset = UnityEngine.Vector2.zero,
+                    YawDeg = 15f,
+                };
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var topologyState = em.GetComponentData<StageTopologyStateComponent>(topologyStateEntity);
+                var playerStartEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StagePlayerStartRuntimeComponent>()).GetSingletonEntity();
+                var playerStart = em.GetComponentData<StagePlayerStartRuntimeComponent>(playerStartEntity);
+
+                Assert.That(topologyState.Ready, Is.EqualTo(0));
+                Assert.That(topologyState.AppliedStageId, Is.EqualTo(0));
+                Assert.That(playerStart.Ready, Is.EqualTo(0));
+                Assert.That(playerStart.AppliedVersion, Is.EqualTo(1u));
             }
             finally
             {
@@ -200,6 +317,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     AnchorCell = new UnityEngine.Vector2Int(1, 1),
                     AnchorOffset = UnityEngine.Vector2.zero,
                 }
+            };
+            layout.PlayerStart = new StagePlayerStartLayoutData
+            {
+                Active = true,
+                AnchorCell = new UnityEngine.Vector2Int(0, 1),
+                AnchorOffset = UnityEngine.Vector2.zero,
+                YawDeg = 45f,
             };
             layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
 

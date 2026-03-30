@@ -31,6 +31,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<StageCatalogRuntimeComponent>();
             state.RequireForUpdate<StageTopologyPrefabCatalogComponent>();
             state.RequireForUpdate<StageRuntimeGridComponent>();
+            state.RequireForUpdate<StagePlayerStartRuntimeComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -104,6 +105,12 @@ namespace SweepNDodge.DotsBullets
             if (currentApplyVersion == 0u)
                 currentApplyVersion = 1u;
 
+            if (!ApplyPlayerStartRuntime(ref state, requestedStageId, entry.Layout, currentApplyVersion))
+            {
+                Debug.LogWarning($"[StageTopologyApply] Player start runtime apply failed. stageId={requestedStageId}");
+                return;
+            }
+
             ApplySourceTopology(ref state, requestedStageId, prefabs.SourceTemplate, entry.Layout, entry.Definition, currentApplyVersion);
             CleanupUnmappedOwnedEntities(em, currentApplyVersion);
 
@@ -161,6 +168,98 @@ namespace SweepNDodge.DotsBullets
                 OriginZ = gridSpec.Origin.z,
                 Ready = 1,
             });
+            return true;
+        }
+
+        private static bool ApplyPlayerStartRuntime(ref SystemState state, int stageId, StageLayoutSO layout, uint currentApplyVersion)
+        {
+            var em = state.EntityManager;
+            using var query = em.CreateEntityQuery(ComponentType.ReadWrite<StagePlayerStartRuntimeComponent>());
+            if (query.IsEmptyIgnoreFilter)
+                return false;
+
+            Entity entity = ResolveFirstEntity(query);
+            if (entity == Entity.Null || !em.Exists(entity))
+                return false;
+
+            var runtime = default(StagePlayerStartRuntimeComponent);
+            if (layout == null)
+            {
+                em.SetComponentData(entity, runtime);
+                return false;
+            }
+
+            runtime.StageId = stageId;
+            runtime.YawDeg = layout.PlayerStart.YawDeg;
+            runtime.AppliedVersion = currentApplyVersion;
+
+            if (!TryResolvePlayerStartPose(layout, out float3 position, out float yawDeg))
+            {
+                em.SetComponentData(entity, runtime);
+                return false;
+            }
+
+            runtime.PositionX = position.x;
+            runtime.PositionY = position.y;
+            runtime.PositionZ = position.z;
+            runtime.YawDeg = yawDeg;
+            runtime.Ready = 1;
+            em.SetComponentData(entity, runtime);
+            return true;
+        }
+
+        private static bool TryResolvePlayerStartPose(StageLayoutSO layout, out float3 position, out float yawDeg)
+        {
+            position = float3.zero;
+            yawDeg = 0f;
+
+            if (layout == null)
+                return false;
+
+            var playerStart = layout.PlayerStart;
+            if (!playerStart.Active)
+            {
+                Debug.LogWarning($"[StageTopologyApply] PlayerStart is missing or inactive. stageId={layout.StageId}");
+                return false;
+            }
+
+            var grid = layout.Grid;
+            if (grid.Width <= 0 || grid.Height <= 0 || grid.CellSize <= 0f)
+            {
+                Debug.LogWarning($"[StageTopologyApply] Grid spec is invalid while resolving PlayerStart. stageId={layout.StageId}");
+                return false;
+            }
+
+            if (playerStart.AnchorCell.x < 0
+                || playerStart.AnchorCell.y < 0
+                || playerStart.AnchorCell.x >= grid.Width
+                || playerStart.AnchorCell.y >= grid.Height)
+            {
+                Debug.LogWarning($"[StageTopologyApply] PlayerStart AnchorCell is out of bounds. stageId={layout.StageId}, anchor={playerStart.AnchorCell}");
+                return false;
+            }
+
+            int expectedCellCount = grid.Width * grid.Height;
+            if (layout.Cells == null || layout.Cells.Length != expectedCellCount)
+            {
+                Debug.LogWarning($"[StageTopologyApply] Cells are invalid while resolving PlayerStart. stageId={layout.StageId}");
+                return false;
+            }
+
+            int index = (playerStart.AnchorCell.y * grid.Width) + playerStart.AnchorCell.x;
+            var cell = layout.Cells[index];
+            if ((cell.MovementFlags & StageCellMovementFlags.BlockPlayer) != 0)
+            {
+                Debug.LogWarning($"[StageTopologyApply] PlayerStart cell is blocked. stageId={layout.StageId}, anchor={playerStart.AnchorCell}");
+                return false;
+            }
+
+            position = StageRuntimeGridUtility.GetAnchorWorldPosition(
+                in grid,
+                new int2(playerStart.AnchorCell.x, playerStart.AnchorCell.y),
+                new float2(playerStart.AnchorOffset.x, playerStart.AnchorOffset.y),
+                grid.Origin.y);
+            yawDeg = playerStart.YawDeg;
             return true;
         }
 

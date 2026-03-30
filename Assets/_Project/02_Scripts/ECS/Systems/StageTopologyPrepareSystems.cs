@@ -15,6 +15,7 @@ namespace SweepNDodge.DotsBullets
             EnsureSingleton(em, default(StageTopologyLifecycleStateComponent));
             EnsureSingleton(em, default(StageTopologyPrefabCatalogComponent));
             EnsureSingleton(em, default(StageRuntimeGridComponent));
+            EnsureSingleton(em, default(StagePlayerStartRuntimeComponent));
             EnsureSingleton(em, default(StageGameplayClockComponent));
             EnsureSingleton(em, new StageSessionResetBootstrapComponent
             {
@@ -319,9 +320,23 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(stageGameplayClockEntity, gameplayClock);
 
             em.SetComponentData(topologyStateEntity, default(StageTopologyStateComponent));
+            ResetStagePlayerStartRuntime(em);
 
             em.SetComponentData(lifecycleEntity, default(StageTopologyLifecycleStateComponent));
             ResetPlayerStageEntryTransientState(em, in resetStageState);
+        }
+
+        private static void ResetStagePlayerStartRuntime(EntityManager em)
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadWrite<StagePlayerStartRuntimeComponent>());
+            if (query.IsEmptyIgnoreFilter)
+                return;
+
+            Entity entity = ResolveFirstEntity(query);
+            if (entity == Entity.Null || !em.Exists(entity))
+                return;
+
+            em.SetComponentData(entity, default(StagePlayerStartRuntimeComponent));
         }
 
         private static void ResetPlayerStageEntryTransientState(
@@ -389,6 +404,51 @@ namespace SweepNDodge.DotsBullets
                     {
                         PendingHazardCapturedCount = 0,
                         ResetRequested = 0,
+                    });
+                }
+
+                if (em.HasComponent<PlayerInputIntentComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerInputIntentComponent
+                    {
+                        MoveAxis = Unity.Mathematics.float2.zero,
+                        AimWorldXZ = Unity.Mathematics.float2.zero,
+                        HasAimWorldPoint = 0,
+                        VacuumRequested = 0,
+                        CleanupActionRequested = 0,
+                        RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
+                        Sequence = 0u,
+                    });
+                }
+
+                if (em.HasComponent<PlayerResolvedInputSnapshotComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerResolvedInputSnapshotComponent
+                    {
+                        MoveAxis = Unity.Mathematics.float2.zero,
+                        AimWorldXZ = Unity.Mathematics.float2.zero,
+                        HasAimWorldPoint = 0,
+                        VacuumRequested = 0,
+                        CleanupActionRequested = 0,
+                        RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
+                        Sequence = 0u,
+                    });
+                }
+
+                if (em.HasComponent<PlayerGoSyncComponent>(player))
+                {
+                    var sync = em.GetComponentData<PlayerGoSyncComponent>(player);
+                    sync.VacuumRequested = 0;
+                    sync.CleanupActionRequested = 0;
+                    sync.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None;
+                    em.SetComponentData(player, sync);
+                }
+
+                if (em.HasComponent<PlayerStageEntryApplyStateComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerStageEntryApplyStateComponent
+                    {
+                        LastAppliedVersion = 0u,
                     });
                 }
 

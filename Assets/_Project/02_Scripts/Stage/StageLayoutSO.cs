@@ -11,6 +11,7 @@ namespace SweepNDodge.DotsBullets
         public StageCellLayoutData[] Cells;
         public StageSourceRegionLayoutData[] SourceRegions;
         public StageDepositRegionLayoutData[] DepositRegions;
+        public StagePlayerStartLayoutData PlayerStart;
         public StagePresentationLayoutData[] Presentations;
     }
 }

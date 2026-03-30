@@ -187,6 +187,99 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void MissingPlayerStartMarker_IsReported()
+        {
+            var setup = CreateSetup();
+            try
+            {
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA033"), Is.True);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void DuplicatePlayerStartMarker_IsReported()
+        {
+            var setup = CreateSetup();
+            try
+            {
+                CreatePlayerStart(setup.StageGo.transform, new Vector2Int(0, 0));
+                CreatePlayerStart(setup.StageGo.transform, new Vector2Int(1, 1));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA034"), Is.True);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void PlayerStartOutsideBounds_IsReported()
+        {
+            var setup = CreateSetup();
+            try
+            {
+                CreatePlayerStart(setup.StageGo.transform, new Vector2Int(8, 8));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA036"), Is.True);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void PlayerStartOnBlockedCell_IsReported()
+        {
+            var setup = CreateSetup();
+            StageMovementTile blocked = null;
+            try
+            {
+                blocked = CreateMovementTile(StageCellMovementFlags.BlockPlayer);
+                setup.MovementTilemap.SetTile(setup.Authoring.GetTilemapCell(1, 0), blocked);
+                CreatePlayerStart(setup.StageGo.transform, new Vector2Int(1, 0));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA037"), Is.True);
+            }
+            finally
+            {
+                DestroyTile(blocked);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void PlayerStartOverlappingSourceOrDeposit_IsWarning()
+        {
+            var setup = CreateSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+                CreatePlayerStart(setup.StageGo.transform, new Vector2Int(0, 0));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA038" && x.Severity == ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
+                setup.Dispose();
+            }
+        }
+
         private static System.Collections.Generic.List<ContentValidationIssue> Validate(StageLayoutStageMarker stage)
         {
             var issues = new System.Collections.Generic.List<ContentValidationIssue>();
@@ -203,6 +296,18 @@ namespace SweepNDodge.DotsBullets.Tests
             marker.RegionSlotIndex = regionSlotIndex;
             marker.Active = true;
             marker.AnchorCell = anchorCell;
+            return marker;
+        }
+
+        private static StagePlayerStartMarker CreatePlayerStart(Transform parent, Vector2Int anchorCell)
+        {
+            var go = new GameObject("player_start");
+            go.transform.SetParent(parent);
+            var marker = go.AddComponent<StagePlayerStartMarker>();
+            marker.Active = true;
+            marker.AnchorCell = anchorCell;
+            marker.AnchorOffset = Vector2.zero;
+            marker.YawDeg = 0f;
             return marker;
         }
 

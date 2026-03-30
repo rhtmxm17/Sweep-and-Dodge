@@ -183,6 +183,30 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GenerateLayoutsForRoot_PlayerStartMarker_ExportsAnchorOffsetAndYaw()
+        {
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.PlayerStart.AnchorCell = new Vector2Int(1, 0);
+                setup.PlayerStart.AnchorOffset = new Vector2(0.25f, -0.1f);
+                setup.PlayerStart.YawDeg = 135f;
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.PlayerStart.Active, Is.True);
+                Assert.That(setup.Layout.PlayerStart.AnchorCell, Is.EqualTo(new Vector2Int(1, 0)));
+                Assert.That(setup.Layout.PlayerStart.AnchorOffset, Is.EqualTo(new Vector2(0.25f, -0.1f)));
+                Assert.That(setup.Layout.PlayerStart.YawDeg, Is.EqualTo(135f).Within(0.001f));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void BuildRuntimeGridSpec_IgnoresWorkspaceTransform()
         {
             var setup = CreateStageSetup();
@@ -249,6 +273,18 @@ namespace SweepNDodge.DotsBullets.Tests
             return tile;
         }
 
+        private static StagePlayerStartMarker CreatePlayerStart(Transform parent, Vector2Int anchorCell, Vector2 anchorOffset, float yawDeg)
+        {
+            var go = new GameObject("player_start");
+            go.transform.SetParent(parent);
+            var marker = go.AddComponent<StagePlayerStartMarker>();
+            marker.Active = true;
+            marker.AnchorCell = anchorCell;
+            marker.AnchorOffset = anchorOffset;
+            marker.YawDeg = yawDeg;
+            return marker;
+        }
+
         private static StageRegionTile CreateRegionTile(StageRegionKind kind, int slot)
         {
             var tile = ScriptableObject.CreateInstance<StageRegionTile>();
@@ -296,7 +332,8 @@ namespace SweepNDodge.DotsBullets.Tests
             authoring.BoundsMinCell = new Vector2Int(0, 0);
             authoring.BoundsSize = new Vector2Int(2, 2);
 
-            return new StageTestSetup(rootGo, stageGo, root, layout, movementTilemap, regionTilemap, authoring);
+            var playerStart = CreatePlayerStart(stageGo.transform, new Vector2Int(0, 1), Vector2.zero, 0f);
+            return new StageTestSetup(rootGo, stageGo, root, layout, movementTilemap, regionTilemap, authoring, playerStart);
         }
 
         private static Tilemap AddTilemap(GameObject go)
@@ -312,7 +349,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             private readonly Object[] _ownedObjects;
 
-            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, Tilemap movementTilemap, Tilemap regionTilemap, StageGridAuthoring authoring)
+            public StageTestSetup(GameObject rootGo, GameObject stageGo, StageLayoutRootMarker root, StageLayoutSO layout, Tilemap movementTilemap, Tilemap regionTilemap, StageGridAuthoring authoring, StagePlayerStartMarker playerStart)
             {
                 _ownedObjects = new Object[] { layout, rootGo };
                 StageGo = stageGo;
@@ -321,6 +358,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 MovementTilemap = movementTilemap;
                 RegionTilemap = regionTilemap;
                 Authoring = authoring;
+                PlayerStart = playerStart;
             }
 
             public GameObject StageGo { get; }
@@ -329,6 +367,7 @@ namespace SweepNDodge.DotsBullets.Tests
             public Tilemap MovementTilemap { get; }
             public Tilemap RegionTilemap { get; }
             public StageGridAuthoring Authoring { get; }
+            public StagePlayerStartMarker PlayerStart { get; }
 
             public void Dispose()
             {

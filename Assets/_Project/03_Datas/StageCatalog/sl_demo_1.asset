@@ -1152,6 +1152,11 @@ MonoBehaviour:
     Active: 1
     AnchorCell: {x: 6, y: 11}
     AnchorOffset: {x: 0, y: 0}
+  PlayerStart:
+    Active: 1
+    AnchorCell: {x: 7, y: 5}
+    AnchorOffset: {x: 0, y: 0}
+    YawDeg: 90
   Presentations:
   - StableId: 9001
     Active: 1

@@ -422,6 +422,13 @@ namespace SweepNDodge.DotsBullets.Tests
             layout.Cells = new[] { new StageCellLayoutData() };
             layout.SourceRegions = System.Array.Empty<StageSourceRegionLayoutData>();
             layout.DepositRegions = System.Array.Empty<StageDepositRegionLayoutData>();
+            layout.PlayerStart = new StagePlayerStartLayoutData
+            {
+                Active = true,
+                AnchorCell = Vector2Int.zero,
+                AnchorOffset = Vector2.zero,
+                YawDeg = 0f,
+            };
             layout.Presentations = presentations;
             _toDestroy.Add(layout);
             return layout;

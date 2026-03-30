@@ -50,6 +50,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     },
                 };
                 layout.DepositRegions = System.Array.Empty<StageDepositRegionLayoutData>();
+                layout.PlayerStart = new StagePlayerStartLayoutData
+                {
+                    Active = true,
+                    AnchorCell = Vector2Int.zero,
+                    AnchorOffset = Vector2.zero,
+                    YawDeg = 0f,
+                };
                 layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
 
                 definition.StageId = 2;

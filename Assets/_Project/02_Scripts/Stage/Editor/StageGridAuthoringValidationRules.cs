@@ -31,7 +31,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
             }
 
-            TryValidateAndResolve(authoring, stageLocation, issues, out _, out _, out _);
+            TryValidateAndResolve(authoring, stageLocation, issues, out _, out _, out _, out _, out _);
             ValidatePresentationMarkers(stageNode, issues);
         }
 
@@ -41,11 +41,15 @@ namespace SweepNDodge.DotsBullets.Editor
             List<ContentValidationIssue> issues,
             out Vector3Int boundsMin,
             out Vector3Int boundsSize,
-            out Dictionary<(StageRegionKind Kind, uint StableId), StageRegionAnchorMarker> anchorByRegion)
+            out Dictionary<(StageRegionKind Kind, uint StableId), StageRegionAnchorMarker> anchorByRegion,
+            out uint[] sourceRegionCells,
+            out uint[] depositRegionCells)
         {
             boundsMin = default;
             boundsSize = default;
             anchorByRegion = new Dictionary<(StageRegionKind Kind, uint StableId), StageRegionAnchorMarker>();
+            sourceRegionCells = Array.Empty<uint>();
+            depositRegionCells = Array.Empty<uint>();
 
             if (authoring == null)
             {
@@ -125,6 +129,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var sourceData = ResolveRegionData(authoring, StageRegionKind.Source, boundsSize, location, issues, ref valid);
             var depositData = ResolveRegionData(authoring, StageRegionKind.Deposit, boundsSize, location, issues, ref valid);
+            sourceRegionCells = sourceData.Cells ?? Array.Empty<uint>();
+            depositRegionCells = depositData.Cells ?? Array.Empty<uint>();
 
             var stageNode = authoring.GetComponent<StageLayoutStageMarker>();
             var anchors = stageNode != null
@@ -167,6 +173,85 @@ namespace SweepNDodge.DotsBullets.Editor
             valid &= ValidateAnchors(authoring, StageRegionKind.Source, sourceData.Cells, boundsSize, anchorByRegion, location, issues);
             valid &= ValidateAnchors(authoring, StageRegionKind.Deposit, depositData.Cells, boundsSize, anchorByRegion, location, issues);
             valid &= ValidateOverlap(sourceData.Cells, depositData.Cells, boundsSize, location, issues);
+            if (stageNode != null)
+            {
+                valid &= ValidatePlayerStartMarker(
+                    stageNode,
+                    authoring,
+                    sourceRegionCells,
+                    depositRegionCells,
+                    boundsSize,
+                    location,
+                    issues);
+            }
+
+            return valid;
+        }
+
+        private static bool ValidatePlayerStartMarker(
+            StageLayoutStageMarker stageNode,
+            StageGridAuthoring authoring,
+            uint[] sourceRegionCells,
+            uint[] depositRegionCells,
+            Vector3Int boundsSize,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            bool valid = true;
+            var markers = stageNode.GetComponentsInChildren<StagePlayerStartMarker>(includeInactive: true);
+            if (markers == null || markers.Length == 0)
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA033", location, "StagePlayerStartMarker is required exactly once."));
+                return false;
+            }
+
+            if (markers.Length > 1)
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA034", location, $"StagePlayerStartMarker must be unique. count={markers.Length}"));
+                valid = false;
+            }
+
+            var marker = markers[0];
+            if (marker == null)
+                return false;
+
+            string markerLocation = $"{location}/{BuildHierarchyPath(marker.transform)}";
+            if (!marker.Active)
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA035", markerLocation, "StagePlayerStartMarker must stay active."));
+                valid = false;
+            }
+
+            if (marker.AnchorCell.x < 0
+                || marker.AnchorCell.y < 0
+                || marker.AnchorCell.x >= boundsSize.x
+                || marker.AnchorCell.y >= boundsSize.y)
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA036", markerLocation, $"Player start AnchorCell is out of bounds. anchor={marker.AnchorCell}"));
+                return false;
+            }
+
+            var movementTile = authoring.MovementTilemap != null
+                ? authoring.MovementTilemap.GetTile(authoring.GetTilemapCell(marker.AnchorCell.x, marker.AnchorCell.y)) as StageMovementTile
+                : null;
+            var movementFlags = movementTile != null ? movementTile.MovementFlags : StageCellMovementFlags.None;
+            if ((movementFlags & StageCellMovementFlags.BlockPlayer) != 0)
+            {
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA037", markerLocation, "Player start cell must not be BlockPlayer."));
+                valid = false;
+            }
+
+            int index = (marker.AnchorCell.y * boundsSize.x) + marker.AnchorCell.x;
+            bool overlapsSource = index >= 0 && index < sourceRegionCells.Length && sourceRegionCells[index] != 0u;
+            bool overlapsDeposit = index >= 0 && index < depositRegionCells.Length && depositRegionCells[index] != 0u;
+            if (overlapsSource || overlapsDeposit)
+            {
+                string overlapKinds = overlapsSource && overlapsDeposit
+                    ? "SourceRegion and DepositRegion"
+                    : overlapsSource ? "SourceRegion" : "DepositRegion";
+                issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STA038", markerLocation, $"Player start overlaps {overlapKinds}."));
+            }
+
             return valid;
         }
 

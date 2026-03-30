@@ -92,6 +92,17 @@ namespace SweepNDodge.DotsBullets
         public byte Ready;
     }
 
+    public struct StagePlayerStartRuntimeComponent : IComponentData
+    {
+        public int StageId;
+        public float PositionX;
+        public float PositionY;
+        public float PositionZ;
+        public float YawDeg;
+        public byte Ready;
+        public uint AppliedVersion;
+    }
+
     [InternalBufferCapacity(256)]
     public struct StageRuntimeGridCellBufferElement : IBufferElementData
     {
@@ -111,6 +122,11 @@ namespace SweepNDodge.DotsBullets
     public struct StageTopologyLifecycleStateComponent : IComponentData
     {
         public uint CurrentAppliedVersion;
+    }
+
+    public struct PlayerStageEntryApplyStateComponent : IComponentData
+    {
+        public uint LastAppliedVersion;
     }
 
     public struct StageSessionResetBootstrapComponent : IComponentData

@@ -37,6 +37,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
             AssertUpdateInGroup(typeof(StageTopologyApplyPrepareSystem), typeof(StageTopologyPrepareGroup));
             AssertUpdateAfter(typeof(StageTopologyApplyPrepareSystem), typeof(StageTopologyBootstrapSystem));
+            AssertUpdateInGroup(typeof(PlayerStageEntryApplyPrepareSystem), typeof(StageTopologyPrepareGroup));
+            AssertUpdateAfter(typeof(PlayerStageEntryApplyPrepareSystem), typeof(StageTopologyApplyPrepareSystem));
         }
 
         [Test]

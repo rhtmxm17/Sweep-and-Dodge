@@ -119,6 +119,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             ValidateSourceRegions(layout.SourceRegions, sourceRefCounts, cells, width, height, stageLocation, issues);
             ValidateDepositRegions(layout.DepositRegions, depositAccessibleCounts, cells, width, height, stageLocation, issues);
+            ValidatePlayerStart(layout.PlayerStart, cells, width, height, stageLocation, issues);
 
             if (!hasAnySourceRegion || !hasAnyDepositRegion)
             {
@@ -402,6 +403,52 @@ namespace SweepNDodge.DotsBullets.Editor
                 {
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL003", pair.Value[i], $"Duplicate Presentation StableId detected: {pair.Key}. Owners: {joined}"));
                 }
+            }
+        }
+
+        private static void ValidatePlayerStart(
+            StagePlayerStartLayoutData playerStart,
+            StageCellLayoutData[] cells,
+            int width,
+            int height,
+            string stageLocation,
+            List<ContentValidationIssue> issues)
+        {
+            string location = $"{stageLocation}/PlayerStart";
+            if (!playerStart.Active)
+            {
+                issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STG015", location, "PlayerStart is required and must stay Active."));
+                return;
+            }
+
+            if (playerStart.AnchorCell.x < 0
+                || playerStart.AnchorCell.y < 0
+                || playerStart.AnchorCell.x >= width
+                || playerStart.AnchorCell.y >= height)
+            {
+                issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STG016", location, $"PlayerStart AnchorCell must be within grid bounds. anchor=({playerStart.AnchorCell.x}, {playerStart.AnchorCell.y}), bounds=({width}, {height})"));
+                return;
+            }
+
+            int index = playerStart.AnchorCell.y * width + playerStart.AnchorCell.x;
+            if (index < 0 || index >= cells.Length)
+            {
+                issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STG016", location, $"PlayerStart AnchorCell index is invalid. anchor=({playerStart.AnchorCell.x}, {playerStart.AnchorCell.y})"));
+                return;
+            }
+
+            var cell = cells[index];
+            if ((cell.MovementFlags & StageCellMovementFlags.BlockPlayer) != 0)
+            {
+                issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STG017", location, "PlayerStart cell must not be BlockPlayer."));
+            }
+
+            if (cell.SourceRegionId != 0u || cell.DepositRegionId != 0u)
+            {
+                string overlapKinds = cell.SourceRegionId != 0u && cell.DepositRegionId != 0u
+                    ? "SourceRegion and DepositRegion"
+                    : cell.SourceRegionId != 0u ? "SourceRegion" : "DepositRegion";
+                issues.Add(new ContentValidationIssue(ContentValidationSeverity.Warning, "STG018", location, $"PlayerStart overlaps {overlapKinds}."));
             }
         }
 

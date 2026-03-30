@@ -103,6 +103,7 @@ namespace SweepNDodge.DotsBullets.Editor
             stageNode.TargetLayout.Cells = layout.Cells;
             stageNode.TargetLayout.SourceRegions = layout.SourceRegions;
             stageNode.TargetLayout.DepositRegions = layout.DepositRegions;
+            stageNode.TargetLayout.PlayerStart = layout.PlayerStart;
             stageNode.TargetLayout.Presentations = layout.Presentations;
             EditorUtility.SetDirty(stageNode.TargetLayout);
             UnityEngine.Object.DestroyImmediate(layout);
@@ -154,6 +155,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 .Select(x => ToDepositRegionData(authoring, x))
                 .Where(x => x.StableId > 0u)
                 .ToArray();
+            layout.PlayerStart = ToPlayerStartData(stageNode);
             layout.Presentations = stageNode.GetComponentsInChildren<StagePresentationMarker>(includeInactive: true)
                 .OrderBy(x => x.StableId)
                 .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
@@ -217,6 +219,27 @@ namespace SweepNDodge.DotsBullets.Editor
                 Active = marker.Active,
                 AnchorCell = marker.AnchorCell,
                 AnchorOffset = marker.AnchorOffset,
+            };
+        }
+
+        private static StagePlayerStartLayoutData ToPlayerStartData(StageLayoutStageMarker stageNode)
+        {
+            if (stageNode == null)
+                return default;
+
+            var markers = stageNode.GetComponentsInChildren<StagePlayerStartMarker>(includeInactive: true)
+                .OrderBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
+                .ToArray();
+            if (markers.Length <= 0 || markers[0] == null)
+                return default;
+
+            var marker = markers[0];
+            return new StagePlayerStartLayoutData
+            {
+                Active = marker.Active,
+                AnchorCell = marker.AnchorCell,
+                AnchorOffset = marker.AnchorOffset,
+                YawDeg = marker.YawDeg,
             };
         }
 

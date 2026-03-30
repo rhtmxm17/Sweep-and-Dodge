@@ -205,6 +205,57 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void PlayerStartOnBlockedCell_IsReportedAsError()
+        {
+            var layout = CreateValidGridLayout();
+            try
+            {
+                layout.PlayerStart = new StagePlayerStartLayoutData
+                {
+                    Active = true,
+                    AnchorCell = new Vector2Int(1, 1),
+                    AnchorOffset = Vector2.zero,
+                    YawDeg = 90f,
+                };
+                layout.Cells[3] = new StageCellLayoutData
+                {
+                    MovementFlags = StageCellMovementFlags.BlockPlayer,
+                    DepositRegionId = 200u,
+                };
+
+                var issues = Validate(layout);
+                Assert.That(issues.Any(x => x.Code == "STG017" && x.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(layout);
+            }
+        }
+
+        [Test]
+        public void PlayerStartOutOfBounds_IsReportedAsError()
+        {
+            var layout = CreateValidGridLayout();
+            try
+            {
+                layout.PlayerStart = new StagePlayerStartLayoutData
+                {
+                    Active = true,
+                    AnchorCell = new Vector2Int(9, 9),
+                    AnchorOffset = Vector2.zero,
+                    YawDeg = 0f,
+                };
+
+                var issues = Validate(layout);
+                Assert.That(issues.Any(x => x.Code == "STG016" && x.Severity == ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(layout);
+            }
+        }
+
+        [Test]
         public void DepositAnchorOnBlockedCell_IsAllowed()
         {
             var layout = CreateValidGridLayout();
@@ -269,6 +320,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     AnchorCell = new Vector2Int(1, 1),
                     AnchorOffset = Vector2.zero,
                 }
+            };
+            layout.PlayerStart = new StagePlayerStartLayoutData
+            {
+                Active = true,
+                AnchorCell = new Vector2Int(1, 0),
+                AnchorOffset = Vector2.zero,
+                YawDeg = 0f,
             };
             layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
             return layout;

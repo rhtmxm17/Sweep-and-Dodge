@@ -67,6 +67,15 @@ namespace SweepNDodge.DotsBullets
     }
 
     [Serializable]
+    public struct StagePlayerStartLayoutData
+    {
+        public bool Active;
+        public Vector2Int AnchorCell;
+        public Vector2 AnchorOffset;
+        public float YawDeg;
+    }
+
+    [Serializable]
     public struct StagePresentationLayoutData
     {
         [Min(1)] public uint StableId;
