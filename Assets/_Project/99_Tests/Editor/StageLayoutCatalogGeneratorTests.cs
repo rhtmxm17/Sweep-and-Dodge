@@ -133,7 +133,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 setup.Authoring.BoundsMinCell = new Vector2Int(-2, 4);
                 sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
                 setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(1, 1), sourceTile);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(1, 1));
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(-1, 5));
+                setup.PlayerStart.AnchorCell = new Vector2Int(-2, 5);
 
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
@@ -160,9 +161,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 setup.Authoring.BoundsMinCell = new Vector2Int(-3, -2);
                 sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
                 setup.RegionTilemap.SetTile(new Vector3Int(-3, -2, 0), sourceTile);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(-3, -2));
                 movementTile = CreateMovementTile(StageCellMovementFlags.BlockPlayer | StageCellMovementFlags.BlockBullet);
                 setup.MovementTilemap.SetTile(new Vector3Int(-3, -2, 0), movementTile);
+                setup.PlayerStart.AnchorCell = new Vector2Int(-3, -1);
 
                 bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
 
@@ -207,6 +209,33 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GenerateLayoutsForRoot_TileCellMarkers_AreNormalizedByBoundsMin()
+        {
+            var setup = CreateStageSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                setup.Authoring.BoundsMinCell = new Vector2Int(-2, -2);
+                setup.Authoring.BoundsSize = new Vector2Int(4, 4);
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.RegionTilemap.SetTile(new Vector3Int(0, 1, 0), sourceTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 1));
+                setup.PlayerStart.AnchorCell = new Vector2Int(-1, 0);
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.SourceRegions.Single().AnchorCell, Is.EqualTo(new Vector2Int(2, 3)));
+                Assert.That(setup.Layout.PlayerStart.AnchorCell, Is.EqualTo(new Vector2Int(1, 2)));
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void BuildRuntimeGridSpec_IgnoresWorkspaceTransform()
         {
             var setup = CreateStageSetup();
@@ -227,7 +256,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void BuildEditorPreviewGridSpec_AnchorPreviewMath_UsesWorkspaceTransformAndBoundsMin()
+        public void BuildEditorPreviewGridSpec_AnchorPreviewMath_UsesWorkspaceTransformAndTileCell()
         {
             var setup = CreateStageSetup();
             try
@@ -239,13 +268,43 @@ namespace SweepNDodge.DotsBullets.Tests
                 var grid = setup.Authoring.BuildEditorPreviewGridSpec();
                 Vector3 world = StageRuntimeGridUtility.GetAnchorWorldPosition(
                     in grid,
-                    new int2(1, 2),
+                    new int2(-1, 7),
                     new float2(0f, 0f),
                     setup.Authoring.GetEditorPreviewPlaneY());
 
                 Assert.That(world.x, Is.EqualTo(9.5f));
                 Assert.That(world.z, Is.EqualTo(3.5f));
                 Assert.That(world.y, Is.EqualTo(2f));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void BuildEditorPreviewGridSpec_BoundsShift_DoesNotMoveSameTileCellPreview()
+        {
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.StageGo.transform.GetChild(0).position = new Vector3(10f, 2f, -4f);
+                var baselineGrid = setup.Authoring.BuildEditorPreviewGridSpec();
+                Vector3 baseline = StageRuntimeGridUtility.GetAnchorWorldPosition(
+                    in baselineGrid,
+                    new int2(1, 2),
+                    float2.zero,
+                    setup.Authoring.GetEditorPreviewPlaneY());
+
+                setup.Authoring.BoundsMinCell = new Vector2Int(-5, 7);
+                var shiftedGrid = setup.Authoring.BuildEditorPreviewGridSpec();
+                Vector3 shifted = StageRuntimeGridUtility.GetAnchorWorldPosition(
+                    in shiftedGrid,
+                    new int2(1, 2),
+                    float2.zero,
+                    setup.Authoring.GetEditorPreviewPlaneY());
+
+                Assert.That(shifted, Is.EqualTo(baseline));
             }
             finally
             {

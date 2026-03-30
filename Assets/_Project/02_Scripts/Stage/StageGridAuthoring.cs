@@ -49,6 +49,16 @@ namespace SweepNDodge.DotsBullets
             return new Vector2Int(tileCell.x - BoundsMinCell.x, tileCell.y - BoundsMinCell.y);
         }
 
+        public Vector2Int GetLocalCell(Vector2Int tileCell)
+        {
+            return new Vector2Int(tileCell.x - BoundsMinCell.x, tileCell.y - BoundsMinCell.y);
+        }
+
+        public bool IsTileCellInBounds(Vector2Int tileCell)
+        {
+            return GetAuthoringBounds().Contains(new Vector3Int(tileCell.x, tileCell.y, 0));
+        }
+
         public bool TryResolveStableId(StageRegionKind kind, int regionSlotIndex, out uint stableId)
         {
             stableId = 0u;
@@ -82,8 +92,8 @@ namespace SweepNDodge.DotsBullets
             Vector3 gridPosition = Grid != null ? Grid.transform.position : Vector3.zero;
             return CreateGridSpec(
                 cellSize,
-                gridPosition.x + (BoundsMinCell.x * cellSize),
-                gridPosition.z + (BoundsMinCell.y * cellSize));
+                gridPosition.x,
+                gridPosition.z);
         }
 
         public StageGridSpec BuildRuntimeGridSpec()

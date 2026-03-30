@@ -206,7 +206,7 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 StableId = ResolveAnchorStableId(authoring, marker),
                 Active = marker.Active,
-                AnchorCell = marker.AnchorCell,
+                AnchorCell = NormalizeAnchorCell(authoring, marker.AnchorCell),
                 AnchorOffset = marker.AnchorOffset,
             };
         }
@@ -217,7 +217,7 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 StableId = ResolveAnchorStableId(authoring, marker),
                 Active = marker.Active,
-                AnchorCell = marker.AnchorCell,
+                AnchorCell = NormalizeAnchorCell(authoring, marker.AnchorCell),
                 AnchorOffset = marker.AnchorOffset,
             };
         }
@@ -237,10 +237,15 @@ namespace SweepNDodge.DotsBullets.Editor
             return new StagePlayerStartLayoutData
             {
                 Active = marker.Active,
-                AnchorCell = marker.AnchorCell,
+                AnchorCell = NormalizeAnchorCell(stageNode.TryGetComponent(out StageGridAuthoring authoring) ? authoring : null, marker.AnchorCell),
                 AnchorOffset = marker.AnchorOffset,
                 YawDeg = marker.YawDeg,
             };
+        }
+
+        private static Vector2Int NormalizeAnchorCell(StageGridAuthoring authoring, Vector2Int tileCell)
+        {
+            return authoring != null ? authoring.GetLocalCell(tileCell) : tileCell;
         }
 
         private static StagePresentationLayoutData ToPresentationData(StagePresentationMarker marker)

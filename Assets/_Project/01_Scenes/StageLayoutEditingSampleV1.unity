@@ -991,7 +991,7 @@ MonoBehaviour:
   StableId: 2001
   RegionSlotIndex: 1
   Active: 1
-  AnchorCell: {x: 16, y: 10}
+  AnchorCell: {x: 6, y: 0}
   AnchorOffset: {x: 0, y: 0}
   DrawGizmo: 1
 --- !u!1 &406118956
@@ -1166,7 +1166,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePlayerStartMarker
   Active: 1
-  AnchorCell: {x: 7, y: 5}
+  AnchorCell: {x: 4, y: 4}
   AnchorOffset: {x: 0, y: 0}
   YawDeg: 90
   DrawGizmo: 1
@@ -1215,7 +1215,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePlayerStartMarker
   Active: 1
-  AnchorCell: {x: 12, y: 11}
+  AnchorCell: {x: 2, y: 1}
   AnchorOffset: {x: 0, y: 0}
   YawDeg: 0
   DrawGizmo: 1
@@ -1524,7 +1524,7 @@ MonoBehaviour:
   StableId: 2001
   RegionSlotIndex: 1
   Active: 1
-  AnchorCell: {x: 6, y: 11}
+  AnchorCell: {x: 4, y: 9}
   AnchorOffset: {x: 0, y: 0}
   DrawGizmo: 1
 --- !u!1 &694074887
@@ -1718,7 +1718,7 @@ MonoBehaviour:
   StableId: 1001
   RegionSlotIndex: 1
   Active: 1
-  AnchorCell: {x: 7, y: 5}
+  AnchorCell: {x: 5, y: 3}
   AnchorOffset: {x: 0, y: 0}
   DrawGizmo: 1
 --- !u!1 &1042919357
@@ -1770,7 +1770,7 @@ MonoBehaviour:
   StableId: 1002
   RegionSlotIndex: 1
   Active: 1
-  AnchorCell: {x: 12, y: 12}
+  AnchorCell: {x: 2, y: 2}
   AnchorOffset: {x: 0, y: 0}
   DrawGizmo: 1
 --- !u!1 &1042920357

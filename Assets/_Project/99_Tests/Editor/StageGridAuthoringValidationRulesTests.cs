@@ -18,7 +18,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 setup.Authoring.BoundsMinCell = new Vector2Int(-4, -3);
                 sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
                 setup.RegionTilemap.SetTile(setup.Authoring.GetTilemapCell(0, 0), sourceTile);
-                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(0, 0));
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(-4, -3));
 
                 var issues = Validate(setup.Stage);
                 Assert.That(issues.Any(x => x.Code == "STA010"), Is.False);
@@ -233,6 +233,29 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void BoundsShift_KeepsTileCellMarkerValid()
+        {
+            var setup = CreateSetup();
+            StageRegionTile sourceTile = null;
+            try
+            {
+                sourceTile = CreateRegionTile(StageRegionKind.Source, 1);
+                setup.Authoring.BoundsMinCell = new Vector2Int(-4, -3);
+                setup.RegionTilemap.SetTile(new Vector3Int(-3, -2, 0), sourceTile);
+                CreateAnchor(setup.StageGo.transform, StageRegionKind.Source, 1, new Vector2Int(-3, -2));
+                CreatePlayerStart(setup.StageGo.transform, new Vector2Int(-4, -2));
+
+                var issues = Validate(setup.Stage);
+                Assert.That(issues.Any(x => x.Code == "STA017" || x.Code == "STA018" || x.Code == "STA036"), Is.False);
+            }
+            finally
+            {
+                DestroyTile(sourceTile);
                 setup.Dispose();
             }
         }

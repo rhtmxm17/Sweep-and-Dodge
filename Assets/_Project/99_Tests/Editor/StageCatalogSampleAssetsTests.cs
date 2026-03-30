@@ -127,6 +127,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(layout.Cells[i].SourceRegionId, Is.EqualTo(ResolveRegionStableId(authoring, StageRegionKind.Source, x, y)), $"Source mismatch at cell[{i}] / ({x}, {y}).");
                 Assert.That(layout.Cells[i].DepositRegionId, Is.EqualTo(ResolveRegionStableId(authoring, StageRegionKind.Deposit, x, y)), $"Deposit mismatch at cell[{i}] / ({x}, {y}).");
             }
+
+            AssertSourceAndDepositAnchorsMatchScene(authoring, stage, layout);
+            AssertPlayerStartMatchesScene(authoring, stage, layout);
         }
 
         private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
@@ -136,6 +139,51 @@ namespace SweepNDodge.DotsBullets.Tests
                 return 0u;
 
             return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
+        }
+
+        private static void AssertSourceAndDepositAnchorsMatchScene(StageGridAuthoring authoring, StageLayoutStageMarker stage, StageLayoutSO layout)
+        {
+            var expectedSources = stage.GetComponentsInChildren<StageRegionAnchorMarker>(true)
+                .Where(x => x.RegionKind == StageRegionKind.Source)
+                .ToDictionary(
+                    x => ResolveStableId(authoring, x),
+                    x => authoring.GetLocalCell(x.AnchorCell));
+            var expectedDeposits = stage.GetComponentsInChildren<StageRegionAnchorMarker>(true)
+                .Where(x => x.RegionKind == StageRegionKind.Deposit)
+                .ToDictionary(
+                    x => ResolveStableId(authoring, x),
+                    x => authoring.GetLocalCell(x.AnchorCell));
+
+            Assert.That(layout.SourceRegions.Length, Is.EqualTo(expectedSources.Count));
+            Assert.That(layout.DepositRegions.Length, Is.EqualTo(expectedDeposits.Count));
+
+            for (int i = 0; i < layout.SourceRegions.Length; i++)
+            {
+                var region = layout.SourceRegions[i];
+                Assert.That(expectedSources.TryGetValue(region.StableId, out var anchorCell), Is.True, $"Missing source anchor for stableId={region.StableId}.");
+                Assert.That(region.AnchorCell, Is.EqualTo(anchorCell), $"Source anchor mismatch for stableId={region.StableId}.");
+            }
+
+            for (int i = 0; i < layout.DepositRegions.Length; i++)
+            {
+                var region = layout.DepositRegions[i];
+                Assert.That(expectedDeposits.TryGetValue(region.StableId, out var anchorCell), Is.True, $"Missing deposit anchor for stableId={region.StableId}.");
+                Assert.That(region.AnchorCell, Is.EqualTo(anchorCell), $"Deposit anchor mismatch for stableId={region.StableId}.");
+            }
+        }
+
+        private static void AssertPlayerStartMatchesScene(StageGridAuthoring authoring, StageLayoutStageMarker stage, StageLayoutSO layout)
+        {
+            var marker = stage.GetComponentsInChildren<StagePlayerStartMarker>(true).Single();
+            Assert.That(layout.PlayerStart.Active, Is.EqualTo(marker.Active));
+            Assert.That(layout.PlayerStart.AnchorCell, Is.EqualTo(authoring.GetLocalCell(marker.AnchorCell)));
+            Assert.That(layout.PlayerStart.AnchorOffset, Is.EqualTo(marker.AnchorOffset));
+            Assert.That(layout.PlayerStart.YawDeg, Is.EqualTo(marker.YawDeg).Within(0.001f));
+        }
+
+        private static uint ResolveStableId(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
+        {
+            return authoring.TryResolveStableId(marker.RegionKind, marker.RegionSlotIndex, out uint stableId) ? stableId : 0u;
         }
     }
 }

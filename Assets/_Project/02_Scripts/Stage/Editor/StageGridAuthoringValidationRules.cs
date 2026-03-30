@@ -222,17 +222,14 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
             }
 
-            if (marker.AnchorCell.x < 0
-                || marker.AnchorCell.y < 0
-                || marker.AnchorCell.x >= boundsSize.x
-                || marker.AnchorCell.y >= boundsSize.y)
+            if (!authoring.IsTileCellInBounds(marker.AnchorCell))
             {
                 issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA036", markerLocation, $"Player start AnchorCell is out of bounds. anchor={marker.AnchorCell}"));
                 return false;
             }
 
             var movementTile = authoring.MovementTilemap != null
-                ? authoring.MovementTilemap.GetTile(authoring.GetTilemapCell(marker.AnchorCell.x, marker.AnchorCell.y)) as StageMovementTile
+                ? authoring.MovementTilemap.GetTile(new Vector3Int(marker.AnchorCell.x, marker.AnchorCell.y, 0)) as StageMovementTile
                 : null;
             var movementFlags = movementTile != null ? movementTile.MovementFlags : StageCellMovementFlags.None;
             if ((movementFlags & StageCellMovementFlags.BlockPlayer) != 0)
@@ -241,7 +238,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 valid = false;
             }
 
-            int index = (marker.AnchorCell.y * boundsSize.x) + marker.AnchorCell.x;
+            Vector2Int localCell = authoring.GetLocalCell(marker.AnchorCell);
+            int index = (localCell.y * boundsSize.x) + localCell.x;
             bool overlapsSource = index >= 0 && index < sourceRegionCells.Length && sourceRegionCells[index] != 0u;
             bool overlapsDeposit = index >= 0 && index < depositRegionCells.Length && depositRegionCells[index] != 0u;
             if (overlapsSource || overlapsDeposit)
@@ -388,18 +386,15 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 var anchor = pair.Value;
                 string anchorLocation = $"{location}/{BuildHierarchyPath(anchor.transform)}";
-                bool inBounds = anchor.AnchorCell.x >= 0
-                    && anchor.AnchorCell.y >= 0
-                    && anchor.AnchorCell.x < boundsSize.x
-                    && anchor.AnchorCell.y < boundsSize.y;
-                if (!inBounds)
+                if (!authoring.IsTileCellInBounds(anchor.AnchorCell))
                 {
                     issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA017", anchorLocation, $"AnchorCell is out of bounds for {kind}. anchor={anchor.AnchorCell}"));
                     valid = false;
                     continue;
                 }
 
-                int index = (anchor.AnchorCell.y * boundsSize.x) + anchor.AnchorCell.x;
+                Vector2Int localCell = authoring.GetLocalCell(anchor.AnchorCell);
+                int index = (localCell.y * boundsSize.x) + localCell.x;
                 if (index < 0 || index >= cells.Length || cells[index] != pair.Key.StableId)
                 {
                     issues?.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA018", anchorLocation, $"AnchorCell must point to a painted {kind} cell with the same stableId={pair.Key.StableId}."));

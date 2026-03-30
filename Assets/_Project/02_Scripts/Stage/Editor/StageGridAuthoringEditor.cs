@@ -84,8 +84,19 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (anchor == null)
                     continue;
 
-                var tileCell = authoring.GetTilemapCell(anchor.AnchorCell.x, anchor.AnchorCell.y);
-                IncludeCell(tileCell.x, tileCell.y, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+                IncludeCell(anchor.AnchorCell.x, anchor.AnchorCell.y, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
+            }
+
+            var playerStarts = stageNode != null
+                ? stageNode.GetComponentsInChildren<StagePlayerStartMarker>(includeInactive: true)
+                : authoring.GetComponentsInChildren<StagePlayerStartMarker>(includeInactive: true);
+            for (int i = 0; i < playerStarts.Length; i++)
+            {
+                var marker = playerStarts[i];
+                if (marker == null)
+                    continue;
+
+                IncludeCell(marker.AnchorCell.x, marker.AnchorCell.y, ref hasAny, ref minX, ref minY, ref maxX, ref maxY);
             }
 
             if (!hasAny)
@@ -201,8 +212,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (anchor == null)
                     continue;
 
-                int tileX = authoring.BoundsMinCell.x + anchor.AnchorCell.x;
-                int tileY = authoring.BoundsMinCell.y + anchor.AnchorCell.y;
+                int tileX = anchor.AnchorCell.x;
+                int tileY = anchor.AnchorCell.y;
                 var pos = new Vector3(
                     (tileX + anchor.AnchorOffset.x + 0.5f) * cellWidth,
                     (tileY + anchor.AnchorOffset.y + 0.5f) * cellHeight,

@@ -148,7 +148,7 @@
   - `Vector2Int AnchorCell`
   - `Vector2 AnchorOffset`
 - 모든 source/deposit region은 anchor를 필수로 가진다.
-- anchor는 `AnchorCell + AnchorOffset`의 grid-relative 값으로 저장한다.
+- runtime layout의 anchor는 `AnchorCell + AnchorOffset`의 grid-relative(normalized local) 값으로 저장한다.
 - runtime entity 위치는 `GridSpec + AnchorCell + AnchorOffset`으로 world 좌표를 계산해 사용한다.
 - region table과 cell 데이터의 관계
   - source region table에 있는 `StableId`는 최소 한 개 이상의 셀에서 참조돼야 한다.
@@ -258,11 +258,15 @@
   - `StageGridAuthoring` transform과 `Grid.transform.position`은 editor workspace offset으로만 취급한다.
   - 생성되는 runtime `Grid.Origin`은 world transform이 아니라 `BoundsMinCell * CellSize`로 고정한다.
   - anchor preview/gizmo는 별도의 editor preview 계산으로 workspace offset을 반영한다.
-- `StageRegionAnchorMarker`
+  - `StageRegionAnchorMarker`
   - `RegionKind`, `RegionSlotIndex`, `StableId`, `AnchorCell`, `AnchorOffset`를 가진다.
+  - `AnchorCell`은 `BoundsMinCell` 기준 normalized 좌표가 아니라 실제 authoring tile cell 좌표다.
+  - generator가 export 시점에만 `AnchorCell - BoundsMinCell`로 정규화해 layout에 기록한다.
   - source/deposit 대표점의 authoring SSOT다.
 - `StagePlayerStartMarker`
   - `AnchorCell`, `AnchorOffset`, `YawDeg`를 가진다.
+  - `AnchorCell`은 실제 authoring tile cell 좌표다.
+  - generator가 export 시점에만 `AnchorCell - BoundsMinCell`로 정규화해 layout에 기록한다.
   - stage player start의 authoring SSOT다.
 - `StageGridLayoutGenerator`
   - `StageGridAuthoring + StageRegionAnchorMarker + StagePlayerStartMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
