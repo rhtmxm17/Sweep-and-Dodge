@@ -28,3 +28,4 @@
 - [TD-024-stageplay-intervention-dialogue-contract.md](TD-024-stageplay-intervention-dialogue-contract.md): `StagePlay` 도중 특수 조건에서 끼어드는 개입형 인월드 대화의 owner, trigger 우선순위, seen-state, hint/pause 정합성 계약
 - [TD-025-stage-player-start-position-contract.md](TD-025-stage-player-start-position-contract.md): 스테이지별 플레이어 시작 위치의 layout 소유, prepare owner, authoring/runtime 적용 계약
 - [TD-026-source-pollution-recovery-wave-contract.md](TD-026-source-pollution-recovery-wave-contract.md): `GD-014` 청소 흔적 복구를 `active/inactive + recovery wave` runtime 계약으로 정리
+- [TD-027-hazard-bullet-extension-contract.md](TD-027-hazard-bullet-extension-contract.md): Hazard 확장을 `Movement + Reaction + LifecycleReason` 조합으로 분리하는 초안
