@@ -4,8 +4,10 @@
 - doc_id: `GD-003`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-30`
 - related_adr: [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](../ADR/ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md)
+- related_docs:
+  - [GD-014-cleaning-trace-recovery-loop.md](./GD-014-cleaning-trace-recovery-loop.md)
 
 > 적용 범위: 스테이지 공통 규칙 중 **동선/스폰 분포(체감)** 파트
 > 본 문서는 다음 2개 방안을 **우선 적용**한다.
@@ -97,6 +99,11 @@ Source 영역을 셀/섹터 단위로 분할하고, 각 단위는 "오염도(스
   - 스폰 분포는 "방금 청소한 자리보다 다음 더러운 자리"를 우선적으로 보여준다.
   - 원형 Source에서도 "경계 밖에서 뜬금없이 나오는 느낌"이 최소화되어야 한다.
 - 기술 계약(요청 누적/소비, 샘플링 방식, valid 셀 처리)은 [TD-003](../TechnicalDesign/TD-003-spawn-directive-model.md)에서 관리한다.
+
+### 3.7 GD-014와의 관계
+- 본 문서는 청소 흔적 도입의 MVP 기준과 최소 동선 목표를 다룬다.
+- 복구를 단순 시간 회복이 아니라 공간 순환 규칙으로 확장하는 방향과 판독 기준은 [GD-014-cleaning-trace-recovery-loop.md](./GD-014-cleaning-trace-recovery-loop.md)에서 관리한다.
+- 구현 우선순위는 여전히 본 문서의 MVP 기준이 먼저이며, `GD-014`는 후속 고도화 기준으로 본다.
 
 ---
 

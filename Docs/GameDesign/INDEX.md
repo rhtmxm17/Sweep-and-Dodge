@@ -17,3 +17,4 @@
 - [GD-011-in-world-dialogue-direction.md](GD-011-in-world-dialogue-direction.md): 스테이지 전환성 순간의 인월드 연출 대화 방향
 - [GD-012-characterized-hud-toast-direction.md](GD-012-characterized-hud-toast-direction.md): 플레이 도중 비차단형 캐릭터형 HUD 토스트 방향
 - [GD-013-visual-tone-keyword-board.md](GD-013-visual-tone-keyword-board.md): 세션 레퍼런스 이미지 기반 비주얼 톤 키워드와 적용 힌트
+- [GD-014-cleaning-trace-recovery-loop.md](GD-014-cleaning-trace-recovery-loop.md): 청소 흔적 복구를 공간 순환 규칙으로 확장하는 방향 문서
