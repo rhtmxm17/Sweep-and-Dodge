@@ -4,7 +4,7 @@
 - doc_id: `GD-007`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-03-30`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -15,6 +15,11 @@
 - 플레이어 경험 관점에서 Pattern/Wave/Progress의 역할 경계를 확정한다.
 - `OPS-001` 기준(스테이지 2~3분, 캠페인 15~20분)을 스케일 앵커로 사용한다.
 - 본 문서의 캠페인 시간은 무실패 클리어 기준이며 재도전 시간은 포함하지 않는다.
+
+### 1.1 장르 해석 기준
+- 본 프로젝트는 Bullet Hell의 긴장 구조를 버리는 것이 아니라, 이를 `Hazard 관리`와 `청소를 통한 영역 정복` 경험으로 재해석한다.
+- 플레이어가 기대해야 하는 핵심 체감은 `위험을 감수해 Hazard를 회피·수거하며 리턴을 얻는 감각`과 `Trash를 청소하며 구역 내부를 점차 정리하고 장악하는 감각`의 병행이다.
+- 따라서 경계해야 하는 것은 Bullet Hell성 자체가 아니라, 플레이 경험이 `단순 회피 게임` 또는 `단순 청소 게임`으로 기울어 두 축의 병행이 약화되는 해석이다.
 
 ## 2. 적용 범위
 - 패턴 철학, 감정 곡선, 리스크-보상 의도
@@ -119,6 +124,7 @@ Stage 권장 Progress 배율:
 - PlayerRelative 피크 Stage에서 공정성(SpawnSkipRate01) 악화를 막는 가드 값 확정 필요
 
 ## 8. 변경 이력
+- 2026-03-30: 장르 해석 기준을 `1.1`로 끌어올려, 본 프로젝트가 Bullet Hell의 긴장 구조를 `Hazard 관리 + 영역 정복` 경험으로 재해석한다는 방향을 명시했다.
 - 2026-03-05: 샘플 시나리오의 구현 계약(소비 정책/우선순위/연출 구현 방식) 문구를 축소하고, Source 강조 상태 체감 규칙(`Baseline/Pressure/Finish`)을 경험 언어로 보강했다.
 - 2026-02-26: 캠페인 시간 정의를 `OPS-001` 기준 문구(스테이지 2~3분, 무실패 캠페인 15~20분, 재도전 미포함)로 동기화
 - 2026-02-25: 샘플 시나리오 성립 기준(3구간 전환, `LineEven + Direction` 기반 벽 발사 표현, 공용 예산/Trash 최하 우선순위, EventBurst carry 체감)을 기획 규약으로 추가

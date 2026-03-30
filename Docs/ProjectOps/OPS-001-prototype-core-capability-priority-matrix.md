@@ -4,7 +4,7 @@
 - doc_id: `OPS-001`
 - type: `ProjectOps`
 - status: `active`
-- last_updated: `2026-03-04`
+- last_updated: `2026-03-30`
 - related_adr:
   - [ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md](../ADR/ADR-20260220-01-bullet-frame-pipeline-root-and-frame-counter.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
@@ -96,6 +96,10 @@
 - 실제 구현에서 순서/소요가 바뀌면 스냅샷/표를 함께 갱신하고 변경 이유를 1~2줄 남긴다.
 
 ## 10. 변경 메모
+### 2026-03-30
+- `#9 공통 전투 이벤트 채널`의 `회피` 제외 문구를 다듬었다.
+  - 범위 제외가 장르적 회피 플레이 제거로 읽히지 않도록, `특수 회피 액션`과 `이벤트 채널 집계 범위`를 구분해 명시했다.
+
 ### 2026-03-04
 - `#10 재현 가능한 시드/리플레이 최소 기반`을 `DONE`으로 전환했다.
   - replay 저장 계약을 `runSeed + tick 입력` 기준으로 확정했다.
@@ -113,7 +117,7 @@
 
 ### 2026-02-28
 - `#9 공통 전투 이벤트 채널`을 `WIP`로 전환했다.
-  - 범위를 `피격/수집/정리`로 고정하고, `회피`는 기획/설계 범위에서 제거했다.
+  - 범위를 `피격/수집/정리`로 고정하고, `회피`는 본 문맥에서 일반 이동과 구분되는 특수 회피 액션으로 한정해 범위에서 제외했다. 이는 장르적 회피 플레이의 제거가 아니라, 이벤트 채널 집계 항목에서 특수 회피 액션을 다루지 않는다는 의미다.
   - `수집량`은 프레임 총합 집계로 운영한다.
   - `PlayerHazardHit`는 기존 직접 소비 경로가 아니라 공통 전투 이벤트 채널 경유로 완전 이관한다.
 - `#8 런 진행도 디렉터` 상태를 `WIP`로 상향했다.
