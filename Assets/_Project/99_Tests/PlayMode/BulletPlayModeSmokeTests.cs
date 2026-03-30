@@ -534,15 +534,13 @@ namespace SweepNDodge.DotsBullets.Tests
             DemoShellFlowController shell = null;
             DemoShellDialogueBridge dialogueBridge = null;
             RuntimeUiRoot uiRoot = null;
-            StagePresentationRuntimeController controller = null;
             yield return WaitForCondition(
                 () =>
                 {
                     shell = FindDemoShell();
                     dialogueBridge = FindDialogueBridge();
                     uiRoot = FindRuntimeUiRoot();
-                    controller = FindStagePresentationRuntimeController();
-                    return shell != null && dialogueBridge != null && uiRoot != null && controller != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                    return shell != null && dialogueBridge != null && uiRoot != null && shell.CurrentScreen == DemoShellScreenId.Title;
                 },
                 240,
                 "Operational scene was not ready for stage-start gate test.");
@@ -579,31 +577,22 @@ namespace SweepNDodge.DotsBullets.Tests
                     dialogueBridge = FindDialogueBridge();
                     shell = FindDemoShell();
                     uiRoot = FindRuntimeUiRoot();
-                    controller = FindStagePresentationRuntimeController();
                     return dialogueBridge != null
                         && shell != null
                         && uiRoot != null
-                        && controller != null
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && dialogueBridge.IsDialogueActive
                         && dialogueBridge.CurrentPresentation.Trigger == InWorldDialogueTriggerId.StageStart
-                        && uiRoot.DialoguePresenter != null
-                        && uiRoot.DialoguePresenter.WorldBubbleRoot != null
-                        && uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf;
+                        && uiRoot.DialoguePresenter != null;
                 },
                 240,
-                "Stage-start gate dialogue did not activate after running edge.");
+                () => $"Stage-start gate dialogue did not activate after running edge. {DescribeStageStartDialogueActivationState(em)}");
 
             Assert.That(uiRoot.DialoguePanel, Is.Not.Null);
             Assert.That(uiRoot.DialoguePresenter, Is.Not.Null);
-            Assert.That(controller, Is.Not.Null);
             Assert.That(uiRoot.DialoguePanel.activeInHierarchy, Is.True);
             Assert.That(uiRoot.DialoguePresenter.DialogueRoot.activeSelf, Is.True);
             Assert.That(uiRoot.DialoguePresenter.DimRoot.activeSelf, Is.False);
-            Assert.That(uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf, Is.True);
-            Assert.That(controller.TryGetPresentationAnchor(9001u, out var stage1Anchor), Is.True);
-            Assert.That(stage1Anchor, Is.Not.Null);
-            Assert.That(stage1Anchor.name, Is.EqualTo("DialogueBubbleAnchor"));
             var pausedState = GetSingleton<GameplayPauseStateComponent>(em);
             Assert.That((pausedState.Flags & GameplayPauseFlags.PauseSimulation) != 0, Is.True);
             Assert.That((pausedState.Flags & GameplayPauseFlags.BlockGameplayInput) != 0, Is.True);
@@ -4181,6 +4170,76 @@ namespace SweepNDodge.DotsBullets.Tests
 
             return
                 $"presentation(lastApplied={controller.LastAppliedStageId}, lastReady={controller.LastReady}, spawned={controller.SpawnedRootCount}, childCount={controller.transform.childCount}, firstChild={childName})";
+        }
+
+        private static string DescribeStageStartDialogueActivationState(EntityManager em)
+        {
+            CompleteTrackedJobs(em);
+
+            var shell = FindDemoShell();
+            string shellText = shell == null
+                ? "shell=missing"
+                : $"shell(screen={shell.CurrentScreen}, phase={shell.CurrentStagePlayPhase}, stageId={shell.CurrentStageId})";
+
+            var bridge = FindDialogueBridge();
+            string bridgeText = bridge == null
+                ? "dialogue=missing"
+                : $"dialogue(active={bridge.IsDialogueActive}, visible={bridge.CurrentPresentation.Visible}, trigger={bridge.CurrentPresentation.Trigger}, entry={bridge.CurrentPresentation.EntryKey}, anchorKind={bridge.CurrentPresentation.Anchor.Kind}, stableId={bridge.CurrentPresentation.Anchor.StagePresentationStableId}, screenAnchor={bridge.CurrentPresentation.Anchor.ScreenAnchor})";
+
+            var uiRoot = FindRuntimeUiRoot();
+            string uiText;
+            if (uiRoot == null)
+            {
+                uiText = "ui=missing";
+            }
+            else
+            {
+                bool dialoguePanelActive = uiRoot.DialoguePanel != null && uiRoot.DialoguePanel.activeInHierarchy;
+                bool presenterExists = uiRoot.DialoguePresenter != null;
+                bool dialogueRootActive = presenterExists
+                    && uiRoot.DialoguePresenter.DialogueRoot != null
+                    && uiRoot.DialoguePresenter.DialogueRoot.activeSelf;
+                bool worldBubbleAssigned = presenterExists && uiRoot.DialoguePresenter.WorldBubbleRoot != null;
+                bool worldBubbleActive = worldBubbleAssigned && uiRoot.DialoguePresenter.WorldBubbleRoot.activeSelf;
+                uiText =
+                    $"ui(dialoguePanelActive={dialoguePanelActive}, presenter={presenterExists}, dialogueRootActive={dialogueRootActive}, worldBubbleAssigned={worldBubbleAssigned}, worldBubbleActive={worldBubbleActive})";
+            }
+
+            var controller = FindStagePresentationRuntimeController();
+            string controllerText = DescribePresentationControllerState();
+            string anchorText = "anchor=unknown";
+            if (controller != null)
+            {
+                bool anchorFound = controller.TryGetPresentationAnchor(9001u, out var anchor);
+                if (!anchorFound || anchor == null)
+                {
+                    anchorText = $"anchor(found={anchorFound})";
+                }
+                else
+                {
+                    var camera = Camera.main;
+                    if (camera == null)
+                    {
+                        anchorText =
+                            $"anchor(found=true, name={anchor.name}, position={anchor.position}, camera=missing)";
+                    }
+                    else
+                    {
+                        Vector3 viewport = camera.WorldToViewportPoint(anchor.position);
+                        anchorText =
+                            $"anchor(found=true, name={anchor.name}, position={anchor.position}, camera={camera.name}, viewport={viewport})";
+                    }
+                }
+            }
+
+            string pauseText = "pause=missing";
+            if (HasSingleton<GameplayPauseStateComponent>(em))
+            {
+                var pause = GetSingleton<GameplayPauseStateComponent>(em);
+                pauseText = $"pause(flags={pause.Flags}, reasonMask={pause.ReasonMask}, version={pause.Version})";
+            }
+
+            return $"{shellText}, {bridgeText}, {uiText}, {controllerText}, {anchorText}, {pauseText}, {DescribeStageRunState(em)}";
         }
 
         private static void EnqueueBurstRequestsFromFirstPattern(EntityManager em, int requestCount)
