@@ -45,9 +45,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f99a533747447b4cbad0aa386602c1c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweepnDodge.DotsBullets.BulletAuthoring
-  Radius: 0.05
-  TypeKey: 0
-  CaptureRule: 1
 --- !u!1 &9027213091263077305
 GameObject:
   m_ObjectHideFlags: 0

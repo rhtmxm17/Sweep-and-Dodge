@@ -60,6 +60,12 @@ namespace SweepNDodge.DotsBullets
         public float Value;
     }
 
+    public struct BulletDampedMotionComponent : IComponentData
+    {
+        public float DampingPerSec;
+        public float StopSpeedThreshold;
+    }
+
     public struct BulletLifecycleRequestComponent : IComponentData
     {
         public BulletLifecycleReasonId Reason;

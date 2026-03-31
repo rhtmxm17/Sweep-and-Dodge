@@ -69,8 +69,8 @@ namespace SweepNDodge.DotsBullets
             if (SystemAPI.TryGetSingleton<BulletFrameCounterComponent>(out var frameCounter))
                 currentFrame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
 
-            // 1) Move + Lifetime + BulletBlock (활성 탄만). 만료/차단 시 디스폰 요청 태그 enable
-            state.Dependency = new BulletMoveAndLifetimeJob
+            // 1) Move + Lifetime + BulletBlock (활성 탄만). 만료/차단/정지 완료 시 lifecycle request를 남긴다.
+            var linearHandle = new LinearMoveAndLifetimeJob
             {
                 DeltaTime = dt,
                 CurrentFrame = currentFrame,
@@ -83,6 +83,21 @@ namespace SweepNDodge.DotsBullets
                 LifecycleRequestLookup = lifecycleRequestLookup,
                 LifecycleContactLookup = lifecycleContactLookup,
             }.ScheduleParallel(state.Dependency);
+
+            var dampedHandle = new DampedMoveAndLifetimeJob
+            {
+                DeltaTime = dt,
+                CurrentFrame = currentFrame,
+                EvaluateBulletBlock = shouldEvaluateBulletBlock,
+                RuntimeGrid = runtimeGrid,
+                RuntimeGridEntity = runtimeGridEntity,
+                RuntimeGridCellLookup = runtimeGridCellLookup,
+                BulletRadiusLookup = bulletRadiusLookup,
+                RequestLookup = requestLookup,
+                LifecycleRequestLookup = lifecycleRequestLookup,
+                LifecycleContactLookup = lifecycleContactLookup,
+            }.ScheduleParallel(state.Dependency);
+            state.Dependency = JobHandle.CombineDependencies(linearHandle, dampedHandle);
 
             // 2) SpatialHash Build
             // - CellMap: 전체 활성 탄
@@ -117,7 +132,8 @@ namespace SweepNDodge.DotsBullets
         }
 
         [BurstCompile]
-        private partial struct BulletMoveAndLifetimeJob : IJobEntity
+        [WithNone(typeof(BulletDampedMotionComponent))]
+        private partial struct LinearMoveAndLifetimeJob : IJobEntity
         {
             public float DeltaTime;
             public uint CurrentFrame;
@@ -181,6 +197,102 @@ namespace SweepNDodge.DotsBullets
                     CurrentFrame,
                     nextXZ,
                     vel.Value,
+                    ref RequestLookup,
+                    ref LifecycleRequestLookup,
+                    ref LifecycleContactLookup);
+            }
+        }
+
+        [BurstCompile]
+        [WithAll(typeof(BulletDampedMotionComponent))]
+        private partial struct DampedMoveAndLifetimeJob : IJobEntity
+        {
+            public float DeltaTime;
+            public uint CurrentFrame;
+            public bool EvaluateBulletBlock;
+            public StageRuntimeGridComponent RuntimeGrid;
+            public Entity RuntimeGridEntity;
+            [ReadOnly] public BufferLookup<StageRuntimeGridCellBufferElement> RuntimeGridCellLookup;
+            [ReadOnly] public ComponentLookup<BulletRadiusComponent> BulletRadiusLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleRequestComponent> LifecycleRequestLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleContactComponent> LifecycleContactLookup;
+
+            private void Execute(
+                Entity e,
+                ref LocalTransform tx,
+                ref BulletVelocityComponent vel,
+                ref BulletLifetimeComponent life,
+                in BulletDampedMotionComponent dampedMotion,
+                in BulletActiveTag _)
+            {
+                float3 previousPosition = tx.Position;
+                float2 previousVelocity = vel.Value;
+                tx.Position += new float3(previousVelocity.x, 0f, previousVelocity.y) * DeltaTime;
+
+                life.Value -= DeltaTime;
+                if (life.Value <= 0f)
+                {
+                    BulletLifecycleRequestUtility.TryPromoteLifecycleRequest(
+                        e,
+                        BulletLifecycleReasonId.LifetimeExpired,
+                        Entity.Null,
+                        CurrentFrame,
+                        new float2(tx.Position.x, tx.Position.z),
+                        previousVelocity,
+                        ref RequestLookup,
+                        ref LifecycleRequestLookup,
+                        ref LifecycleContactLookup);
+                    return;
+                }
+
+                float dampingFactor = math.exp(-math.max(0f, dampedMotion.DampingPerSec) * DeltaTime);
+                float2 dampedVelocity = previousVelocity * dampingFactor;
+                vel.Value = dampedVelocity;
+
+                float stopThreshold = math.max(0f, dampedMotion.StopSpeedThreshold);
+                if (math.lengthsq(dampedVelocity) <= stopThreshold * stopThreshold)
+                {
+                    vel.Value = float2.zero;
+                    float2 motionDirection = math.lengthsq(dampedVelocity) > 1e-8f
+                        ? dampedVelocity
+                        : previousVelocity;
+                    BulletLifecycleRequestUtility.TryPromoteLifecycleRequest(
+                        e,
+                        BulletLifecycleReasonId.MotionCompleted,
+                        Entity.Null,
+                        CurrentFrame,
+                        new float2(tx.Position.x, tx.Position.z),
+                        motionDirection,
+                        ref RequestLookup,
+                        ref LifecycleRequestLookup,
+                        ref LifecycleContactLookup);
+                    return;
+                }
+
+                if (!EvaluateBulletBlock || !RequestLookup.HasComponent(e) || RequestLookup.IsComponentEnabled(e))
+                    return;
+
+                float bulletRadius = 0f;
+                if (BulletRadiusLookup.HasComponent(e))
+                    bulletRadius = math.max(0f, BulletRadiusLookup[e].Value);
+
+                float2 prevXZ = new float2(previousPosition.x, previousPosition.z);
+                float2 nextXZ = new float2(tx.Position.x, tx.Position.z);
+                if (!RuntimeGridCellLookup.HasBuffer(RuntimeGridEntity))
+                    return;
+
+                var runtimeGridCells = RuntimeGridCellLookup[RuntimeGridEntity];
+                if (!StageRuntimeBlockQuery.HitsBulletFullCell(prevXZ, nextXZ, bulletRadius, in RuntimeGrid, runtimeGridCells))
+                    return;
+
+                BulletLifecycleRequestUtility.TryPromoteLifecycleRequest(
+                    e,
+                    BulletLifecycleReasonId.StageBlocked,
+                    Entity.Null,
+                    CurrentFrame,
+                    nextXZ,
+                    dampedVelocity,
                     ref RequestLookup,
                     ref LifecycleRequestLookup,
                     ref LifecycleContactLookup);
