@@ -84,8 +84,7 @@ namespace SweepNDodge.DotsBullets
 
                     if (em.HasComponent<BulletActiveTag>(b))
                         em.SetComponentEnabled<BulletActiveTag>(b, false);
-                    if (em.HasComponent<BulletDespawnRequestTag>(b))
-                        em.SetComponentEnabled<BulletDespawnRequestTag>(b, false);
+                    BulletLifecycleRequestUtility.ResetLifecycleRequestState(em, b);
 
                     if (em.HasBuffer<EntityRenderElementBuffer>(b))
                     {

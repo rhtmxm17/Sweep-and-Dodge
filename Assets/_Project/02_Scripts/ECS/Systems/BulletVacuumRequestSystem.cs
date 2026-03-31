@@ -121,7 +121,10 @@ namespace SweepNDodge.DotsBullets
             var bulletRadiusLookup = SystemAPI.GetComponentLookup<BulletRadiusComponent>(isReadOnly: true);
             var scoreValueLookup = SystemAPI.GetComponentLookup<BulletScoreValueComponent>(isReadOnly: true);
             var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
+            var bulletVelocityLookup = SystemAPI.GetComponentLookup<BulletVelocityComponent>(isReadOnly: true);
             var reqLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
+            var lifecycleRequestLookup = SystemAPI.GetComponentLookup<BulletLifecycleRequestComponent>(isReadOnly: false);
+            var lifecycleContactLookup = SystemAPI.GetComponentLookup<BulletLifecycleContactComponent>(isReadOnly: false);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(isReadOnly: false);
             var sourcePollutionGridLookup = SystemAPI.GetComponentLookup<SourcePollutionGridComponent>(isReadOnly: true);
             var sourcePollutionCellLookup = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(isReadOnly: true);
@@ -134,7 +137,10 @@ namespace SweepNDodge.DotsBullets
             bulletRadiusLookup.Update(ref state);
             scoreValueLookup.Update(ref state);
             bulletSourceLookup.Update(ref state);
+            bulletVelocityLookup.Update(ref state);
             reqLookup.Update(ref state);
+            lifecycleRequestLookup.Update(ref state);
+            lifecycleContactLookup.Update(ref state);
             sourceLookup.Update(ref state);
             sourcePollutionGridLookup.Update(ref state);
             sourcePollutionCellLookup.Update(ref state);
@@ -181,7 +187,10 @@ namespace SweepNDodge.DotsBullets
                 BulletRadiusLookup = bulletRadiusLookup,
                 ScoreValueLookup = scoreValueLookup,
                 BulletSourceLookup = bulletSourceLookup,
+                BulletVelocityLookup = bulletVelocityLookup,
                 RequestLookup = reqLookup,
+                LifecycleRequestLookup = lifecycleRequestLookup,
+                LifecycleContactLookup = lifecycleContactLookup,
                 SourceLookup = sourceLookup,
                 SourcePollutionGridLookup = sourcePollutionGridLookup,
                 SourcePollutionCellLookup = sourcePollutionCellLookup,
@@ -373,7 +382,10 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public ComponentLookup<BulletRadiusComponent> BulletRadiusLookup;
             [ReadOnly] public ComponentLookup<BulletScoreValueComponent> ScoreValueLookup;
             [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
+            [ReadOnly] public ComponentLookup<BulletVelocityComponent> BulletVelocityLookup;
             public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
+            public ComponentLookup<BulletLifecycleRequestComponent> LifecycleRequestLookup;
+            public ComponentLookup<BulletLifecycleContactComponent> LifecycleContactLookup;
             public ComponentLookup<SourceSpawnComponent> SourceLookup;
             [ReadOnly] public ComponentLookup<SourcePollutionGridComponent> SourcePollutionGridLookup;
             [ReadOnly] public BufferLookup<SourcePollutionCellBuffer> SourcePollutionCellLookup;
@@ -439,7 +451,10 @@ namespace SweepNDodge.DotsBullets
                                 if (isFull)
                                     continue;
 
-                                RequestLookup.SetComponentEnabled(bullet, true);
+                                TryRequestBulletLifecycle(
+                                    bullet,
+                                    BulletLifecycleReasonId.VacuumCollected,
+                                    p);
                                 TryAccumulateDepletionAndPollution(bullet, p, progressDelta);
                                 add = SafeAddNonNegative(add, scoreValue);
                                 continue;
@@ -447,7 +462,12 @@ namespace SweepNDodge.DotsBullets
 
                             if (captureRule == BulletCaptureRuleId.RiskTimedResolve)
                             {
-                                RequestLookup.SetComponentEnabled(bullet, true);
+                                TryRequestBulletLifecycle(
+                                    bullet,
+                                    isFull
+                                        ? BulletLifecycleReasonId.CarryFullRemoved
+                                        : BulletLifecycleReasonId.VacuumCollected,
+                                    p);
                                 if (isFull)
                                 {
                                     EmitHazardCaptureResult(bullet, captured: false);
@@ -466,6 +486,23 @@ namespace SweepNDodge.DotsBullets
 
                 CarryAdd.Value = SafeAddNonNegative(CarryAdd.Value, add);
                 HazardCapturedCount.Value = SafeAddNonNegative(HazardCapturedCount.Value, capturedCount);
+            }
+
+            private void TryRequestBulletLifecycle(Entity bullet, BulletLifecycleReasonId reason, in float3 position)
+            {
+                float2 direction = BulletVelocityLookup.HasComponent(bullet)
+                    ? BulletVelocityLookup[bullet].Value
+                    : float2.zero;
+                BulletLifecycleRequestUtility.TryPromoteLifecycleRequest(
+                    bullet,
+                    reason,
+                    PlayerEntity,
+                    Frame,
+                    new float2(position.x, position.z),
+                    direction,
+                    ref RequestLookup,
+                    ref LifecycleRequestLookup,
+                    ref LifecycleContactLookup);
             }
 
             private bool EvaluateCapture(

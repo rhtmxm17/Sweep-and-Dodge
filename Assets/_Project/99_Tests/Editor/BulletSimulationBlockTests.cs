@@ -41,6 +41,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.CompleteAllTrackedJobs();
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.StageBlocked));
         }
 
         [Test]
@@ -107,6 +108,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.CompleteAllTrackedJobs();
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.StageBlocked));
         }
 
         [Test]
@@ -118,12 +120,20 @@ namespace SweepNDodge.DotsBullets.Tests
             SetSimulationPrerequisites(em);
             SetGameplayReadySingletons(em);
             SetRuntimeGrid(em, new[] { StageCellMovementFlags.BlockBullet });
-            var bullet = CreateBullet(em, new float3(0.2f, 0f, 0.2f), new float2(0.5f, 0f), radius: 0.05f, lifetime: 5f, despawnRequested: true);
+            var bullet = CreateBullet(
+                em,
+                new float3(0.2f, 0f, 0.2f),
+                new float2(0.5f, 0f),
+                radius: 0.05f,
+                lifetime: 5f,
+                despawnRequested: true,
+                existingReason: BulletLifecycleReasonId.PlayerHit);
 
             world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.PlayerHit));
         }
 
         [Test]
@@ -145,6 +155,27 @@ namespace SweepNDodge.DotsBullets.Tests
             em.CompleteAllTrackedJobs();
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.StageBlocked));
+        }
+
+        [Test]
+        public void BulletSimulation_EnableDespawn_WhenLifetimeExpires_StampsLifetimeReason()
+        {
+            using var world = new World("BulletSimulation_LifetimeExpired");
+            var em = world.EntityManager;
+
+            SetSimulationPrerequisites(em);
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[] { StageCellMovementFlags.None });
+            var bullet = CreateBullet(em, new float3(0.25f, 0f, 0.5f), new float2(0f, 0f), radius: 0.05f, lifetime: 0.25f);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            var request = em.GetComponentData<BulletLifecycleRequestComponent>(bullet);
+            Assert.That(request.Reason, Is.EqualTo(BulletLifecycleReasonId.LifetimeExpired));
+            Assert.That(request.Priority, Is.EqualTo(BulletLifecycleRequestUtility.ResolvePriority(BulletLifecycleReasonId.LifetimeExpired)));
         }
 
         private static void SetSimulationPrerequisites(EntityManager em)
@@ -210,19 +241,33 @@ namespace SweepNDodge.DotsBullets.Tests
             float2 velocity,
             float radius,
             float lifetime,
-            bool despawnRequested = false)
+            bool despawnRequested = false,
+            BulletLifecycleReasonId existingReason = BulletLifecycleReasonId.None)
         {
             var entity = em.CreateEntity(
                 typeof(LocalTransform),
                 typeof(BulletVelocityComponent),
                 typeof(BulletRadiusComponent),
                 typeof(BulletLifetimeComponent),
+                typeof(BulletLifecycleRequestComponent),
+                typeof(BulletLifecycleContactComponent),
                 typeof(BulletActiveTag),
                 typeof(BulletDespawnRequestTag));
             em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
             em.SetComponentData(entity, new BulletVelocityComponent { Value = velocity });
             em.SetComponentData(entity, new BulletRadiusComponent { Value = radius });
             em.SetComponentData(entity, new BulletLifetimeComponent { Value = lifetime });
+            byte priority = despawnRequested
+                ? BulletLifecycleRequestUtility.ResolvePriority(existingReason)
+                : (byte)0;
+            em.SetComponentData(entity, new BulletLifecycleRequestComponent
+            {
+                Reason = despawnRequested ? existingReason : BulletLifecycleReasonId.None,
+                Priority = priority,
+                RelatedEntity = Entity.Null,
+                Frame = 0u,
+            });
+            em.SetComponentData(entity, default(BulletLifecycleContactComponent));
             em.SetComponentEnabled<BulletActiveTag>(entity, true);
             em.SetComponentEnabled<BulletDespawnRequestTag>(entity, despawnRequested);
             return entity;

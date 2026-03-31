@@ -9,6 +9,17 @@ namespace SweepNDodge.DotsBullets
         RiskTimedResolve = 1
     }
 
+    public enum BulletLifecycleReasonId : byte
+    {
+        None = 0,
+        LifetimeExpired = 1,
+        StageBlocked = 2,
+        VacuumCollected = 3,
+        CarryFullRemoved = 4,
+        PlayerHit = 5,
+        MotionCompleted = 6,
+    }
+
     public struct BulletVelocityComponent : IComponentData
     {
         public float2 Value;
@@ -47,6 +58,20 @@ namespace SweepNDodge.DotsBullets
     public struct BulletLifetimeComponent : IComponentData
     {
         public float Value;
+    }
+
+    public struct BulletLifecycleRequestComponent : IComponentData
+    {
+        public BulletLifecycleReasonId Reason;
+        public byte Priority;
+        public Entity RelatedEntity;
+        public uint Frame;
+    }
+
+    public struct BulletLifecycleContactComponent : IComponentData
+    {
+        public float2 PositionXZ;
+        public float2 DirectionXZ;
     }
 
     // Source 기반 스폰/고갈 추적을 위한 출처 참조

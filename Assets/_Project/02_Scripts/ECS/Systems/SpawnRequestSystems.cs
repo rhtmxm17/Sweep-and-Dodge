@@ -73,6 +73,8 @@ namespace SweepNDodge.DotsBullets
             var lifeLookup = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
             var speedLookup = SystemAPI.GetComponentLookup<BulletSpeedComponent>(true);
             var lifeMaxLookup = SystemAPI.GetComponentLookup<BulletLifetimeMaxComponent>(true);
+            var lifecycleRequestLookup = SystemAPI.GetComponentLookup<BulletLifecycleRequestComponent>(false);
+            var lifecycleContactLookup = SystemAPI.GetComponentLookup<BulletLifecycleContactComponent>(false);
             var typeKeyLookup = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
             var sourceRefLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(false);
             var lifeCycleLookup = SystemAPI.GetComponentLookup<BulletLifecycleTraceComponent>(false);
@@ -97,6 +99,8 @@ namespace SweepNDodge.DotsBullets
             lifeLookup.Update(ref state);
             speedLookup.Update(ref state);
             lifeMaxLookup.Update(ref state);
+            lifecycleRequestLookup.Update(ref state);
+            lifecycleContactLookup.Update(ref state);
             typeKeyLookup.Update(ref state);
             sourceRefLookup.Update(ref state);
             lifeCycleLookup.Update(ref state);
@@ -202,6 +206,8 @@ namespace SweepNDodge.DotsBullets
                         ref lifeLookup,
                         ref speedLookup,
                         ref lifeMaxLookup,
+                        ref lifecycleRequestLookup,
+                        ref lifecycleContactLookup,
                         ref typeKeyLookup,
                         ref sourceRefLookup,
                         ref lifeCycleLookup,
@@ -467,6 +473,8 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
+            ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
             ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
             ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
@@ -504,6 +512,8 @@ namespace SweepNDodge.DotsBullets
                     ref lifeLookup,
                     ref speedLookup,
                     ref lifeMaxLookup,
+                    ref lifecycleRequestLookup,
+                    ref lifecycleContactLookup,
                     ref typeKeyLookup,
                     ref sourceRefLookup,
                     ref lifeCycleLookup,
@@ -545,6 +555,8 @@ namespace SweepNDodge.DotsBullets
                     ref lifeLookup,
                     ref speedLookup,
                     ref lifeMaxLookup,
+                    ref lifecycleRequestLookup,
+                    ref lifecycleContactLookup,
                     ref typeKeyLookup,
                     ref sourceRefLookup,
                     ref lifeCycleLookup,
@@ -605,6 +617,8 @@ namespace SweepNDodge.DotsBullets
                     ref lifeLookup,
                     ref speedLookup,
                     ref lifeMaxLookup,
+                    ref lifecycleRequestLookup,
+                    ref lifecycleContactLookup,
                     ref typeKeyLookup,
                     ref sourceRefLookup,
                     ref lifeCycleLookup,
@@ -641,6 +655,8 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
+            ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
             ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
             ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
@@ -692,6 +708,8 @@ namespace SweepNDodge.DotsBullets
                 ref lifeLookup,
                 ref speedLookup,
                 ref lifeMaxLookup,
+                ref lifecycleRequestLookup,
+                ref lifecycleContactLookup,
                 ref typeKeyLookup,
                 ref sourceRefLookup,
                 ref lifeCycleLookup,
@@ -720,6 +738,8 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
+            ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
             ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
             ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
@@ -759,8 +779,11 @@ namespace SweepNDodge.DotsBullets
                 lifeCycleLookup[bulletEntity] = trace;
             }
 
-            if (despawnRequestLookup.HasComponent(bulletEntity))
-                despawnRequestLookup.SetComponentEnabled(bulletEntity, false);
+            BulletLifecycleRequestUtility.ResetLifecycleRequestState(
+                bulletEntity,
+                ref despawnRequestLookup,
+                ref lifecycleRequestLookup,
+                ref lifecycleContactLookup);
             if (activeLookup.HasComponent(bulletEntity))
                 activeLookup.SetComponentEnabled(bulletEntity, true);
 

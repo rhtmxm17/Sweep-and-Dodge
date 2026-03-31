@@ -23,6 +23,18 @@ namespace SweepNDodge.DotsBullets
                 AddComponent(root, new BulletTypeKeyComponent { Value = 0 });
                 AddComponent(root, new BulletCaptureRuleComponent { Value = BulletCaptureRuleId.StandardCollectible });
                 AddComponent(root, new BulletLifetimeComponent { Value = 0f });
+                AddComponent(root, new BulletLifecycleRequestComponent
+                {
+                    Reason = BulletLifecycleReasonId.None,
+                    Priority = 0,
+                    RelatedEntity = Entity.Null,
+                    Frame = 0u,
+                });
+                AddComponent(root, new BulletLifecycleContactComponent
+                {
+                    PositionXZ = Unity.Mathematics.float2.zero,
+                    DirectionXZ = Unity.Mathematics.float2.zero,
+                });
                 AddComponent(root, new BulletSourceRefComponent { Value = Entity.Null });
                 AddComponent(root, new BulletLifecycleTraceComponent
                 {

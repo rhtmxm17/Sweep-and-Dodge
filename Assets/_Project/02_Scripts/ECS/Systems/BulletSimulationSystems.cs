@@ -33,7 +33,11 @@ namespace SweepNDodge.DotsBullets
                 return;
             var cfg = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             var requestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(false);
+            var lifecycleRequestLookup = SystemAPI.GetComponentLookup<BulletLifecycleRequestComponent>(false);
+            var lifecycleContactLookup = SystemAPI.GetComponentLookup<BulletLifecycleContactComponent>(false);
             requestLookup.Update(ref state);
+            lifecycleRequestLookup.Update(ref state);
+            lifecycleContactLookup.Update(ref state);
             var bulletRadiusLookup = SystemAPI.GetComponentLookup<BulletRadiusComponent>(isReadOnly: true);
             bulletRadiusLookup.Update(ref state);
             var runtimeGridCellLookup = SystemAPI.GetBufferLookup<StageRuntimeGridCellBufferElement>(isReadOnly: true);
@@ -61,17 +65,23 @@ namespace SweepNDodge.DotsBullets
                     shouldEvaluateBulletBlock = runtimeGridCells.Length == (runtimeGrid.Width * runtimeGrid.Height);
                 }
             }
+            uint currentFrame = 0u;
+            if (SystemAPI.TryGetSingleton<BulletFrameCounterComponent>(out var frameCounter))
+                currentFrame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
 
             // 1) Move + Lifetime + BulletBlock (활성 탄만). 만료/차단 시 디스폰 요청 태그 enable
             state.Dependency = new BulletMoveAndLifetimeJob
             {
                 DeltaTime = dt,
+                CurrentFrame = currentFrame,
                 EvaluateBulletBlock = shouldEvaluateBulletBlock,
                 RuntimeGrid = runtimeGrid,
                 RuntimeGridEntity = runtimeGridEntity,
                 RuntimeGridCellLookup = runtimeGridCellLookup,
                 BulletRadiusLookup = bulletRadiusLookup,
                 RequestLookup = requestLookup,
+                LifecycleRequestLookup = lifecycleRequestLookup,
+                LifecycleContactLookup = lifecycleContactLookup,
             }.ScheduleParallel(state.Dependency);
 
             // 2) SpatialHash Build
@@ -110,6 +120,7 @@ namespace SweepNDodge.DotsBullets
         private partial struct BulletMoveAndLifetimeJob : IJobEntity
         {
             public float DeltaTime;
+            public uint CurrentFrame;
             public bool EvaluateBulletBlock;
             public StageRuntimeGridComponent RuntimeGrid;
             public Entity RuntimeGridEntity;
@@ -118,6 +129,8 @@ namespace SweepNDodge.DotsBullets
             // 주의: Enableable 토글을 위해 Lookup을 병렬 Job에서 사용.
             // 동일 엔티티에만 접근하므로 안전하지만, 교차 엔티티 write가 섞이면 레이스 위험이 있음.
             [NativeDisableParallelForRestriction] public ComponentLookup<BulletDespawnRequestTag> RequestLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleRequestComponent> LifecycleRequestLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleContactComponent> LifecycleContactLookup;
 
             private void Execute(
                 Entity e,
@@ -132,8 +145,16 @@ namespace SweepNDodge.DotsBullets
                 life.Value -= DeltaTime;
                 if (life.Value <= 0f)
                 {
-                    if (RequestLookup.HasComponent(e))
-                        RequestLookup.SetComponentEnabled(e, true);
+                    BulletLifecycleRequestUtility.TryPromoteLifecycleRequest(
+                        e,
+                        BulletLifecycleReasonId.LifetimeExpired,
+                        Entity.Null,
+                        CurrentFrame,
+                        new float2(tx.Position.x, tx.Position.z),
+                        vel.Value,
+                        ref RequestLookup,
+                        ref LifecycleRequestLookup,
+                        ref LifecycleContactLookup);
                     return;
                 }
 
@@ -153,7 +174,16 @@ namespace SweepNDodge.DotsBullets
                 if (!StageRuntimeBlockQuery.HitsBulletFullCell(prevXZ, nextXZ, bulletRadius, in RuntimeGrid, runtimeGridCells))
                     return;
 
-                RequestLookup.SetComponentEnabled(e, true);
+                BulletLifecycleRequestUtility.TryPromoteLifecycleRequest(
+                    e,
+                    BulletLifecycleReasonId.StageBlocked,
+                    Entity.Null,
+                    CurrentFrame,
+                    nextXZ,
+                    vel.Value,
+                    ref RequestLookup,
+                    ref LifecycleRequestLookup,
+                    ref LifecycleContactLookup);
             }
         }
 

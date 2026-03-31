@@ -396,6 +396,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 Assert.That(em.IsComponentEnabled<BulletActiveTag>(hazard), Is.False, "FullBin Hazard 조건부 성공은 제거(디스폰)되어야 한다.");
+                var fullBinRemovalRequest = em.GetComponentData<BulletLifecycleRequestComponent>(hazard);
+                Assert.That(fullBinRemovalRequest.Reason, Is.EqualTo(BulletLifecycleReasonId.CarryFullRemoved));
+                Assert.That(fullBinRemovalRequest.Priority, Is.EqualTo(BulletLifecycleRequestUtility.ResolvePriority(BulletLifecycleReasonId.CarryFullRemoved)));
+                Assert.That(fullBinRemovalRequest.RelatedEntity, Is.EqualTo(playerEntity));
 
                 var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
                 Assert.That(carry.Load, Is.EqualTo(10), "FullBin 제거는 Carry를 변경하지 않아야 한다.");
@@ -455,6 +459,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 Assert.That(em.IsComponentEnabled<BulletActiveTag>(hazard), Is.False, "HazardCaptured 경로에서는 Hazard가 제거되어야 한다.");
+                var capturedRequest = em.GetComponentData<BulletLifecycleRequestComponent>(hazard);
+                Assert.That(capturedRequest.Reason, Is.EqualTo(BulletLifecycleReasonId.VacuumCollected));
+                Assert.That(capturedRequest.Priority, Is.EqualTo(BulletLifecycleRequestUtility.ResolvePriority(BulletLifecycleReasonId.VacuumCollected)));
+                Assert.That(capturedRequest.RelatedEntity, Is.EqualTo(playerEntity));
 
                 var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
                 Assert.That(carry.Load, Is.EqualTo(3), "HazardCaptured는 Carry 증가를 반영해야 한다.");
@@ -708,6 +716,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 int activeAfterFirstHit = (em.IsComponentEnabled<BulletActiveTag>(hazardA) ? 1 : 0)
                     + (em.IsComponentEnabled<BulletActiveTag>(hazardB) ? 1 : 0);
                 Assert.That(activeAfterFirstHit, Is.EqualTo(1), "첫 hit 프레임에서는 두 hazard 중 1개만 비활성화되어야 한다.");
+                var despawnedHazard = em.IsComponentEnabled<BulletActiveTag>(hazardA) ? hazardB : hazardA;
+                var hitRequest = em.GetComponentData<BulletLifecycleRequestComponent>(despawnedHazard);
+                Assert.That(hitRequest.Reason, Is.EqualTo(BulletLifecycleReasonId.PlayerHit));
+                Assert.That(hitRequest.Priority, Is.EqualTo(BulletLifecycleRequestUtility.ResolvePriority(BulletLifecycleReasonId.PlayerHit)));
+                Assert.That(hitRequest.RelatedEntity, Is.EqualTo(playerEntity));
 
                 var penaltyState = em.GetComponentData<PlayerHazardPenaltyStateComponent>(playerEntity);
                 Assert.That(penaltyState.IFrameTimer, Is.GreaterThan(0f), "첫 hit 이후 iFrame이 시작되어야 한다.");
@@ -4024,6 +4037,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(LocalTransform),
                 typeof(BulletVelocityComponent),
                 typeof(BulletLifetimeComponent),
+                typeof(BulletLifecycleRequestComponent),
+                typeof(BulletLifecycleContactComponent),
                 typeof(BulletTypeKeyComponent),
                 typeof(BulletSourceRefComponent),
                 typeof(BulletRadiusComponent),
@@ -4035,6 +4050,14 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(bullet, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
             em.SetComponentData(bullet, new BulletVelocityComponent { Value = float2.zero });
             em.SetComponentData(bullet, new BulletLifetimeComponent { Value = 8f });
+            em.SetComponentData(bullet, new BulletLifecycleRequestComponent
+            {
+                Reason = BulletLifecycleReasonId.None,
+                Priority = 0,
+                RelatedEntity = Entity.Null,
+                Frame = 0u,
+            });
+            em.SetComponentData(bullet, default(BulletLifecycleContactComponent));
             em.SetComponentData(bullet, new BulletTypeKeyComponent { Value = 1 });
             em.SetComponentData(bullet, new BulletSourceRefComponent { Value = sourceEntity });
             em.SetComponentData(bullet, new BulletRadiusComponent { Value = 0.2f });
@@ -4108,6 +4131,8 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddComponent<BulletSpeedComponent>(prefab);
             em.AddComponent<BulletLifetimeComponent>(prefab);
             em.AddComponent<BulletLifetimeMaxComponent>(prefab);
+            em.AddComponent<BulletLifecycleRequestComponent>(prefab);
+            em.AddComponent<BulletLifecycleContactComponent>(prefab);
             em.AddComponent<BulletTypeKeyComponent>(prefab);
             em.AddComponent<BulletSourceRefComponent>(prefab);
             em.AddComponent<BulletRadiusComponent>(prefab);
@@ -4122,6 +4147,14 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(prefab, new BulletSpeedComponent { Value = 0f });
             em.SetComponentData(prefab, new BulletLifetimeComponent { Value = lifetime });
             em.SetComponentData(prefab, new BulletLifetimeMaxComponent { Value = lifetime });
+            em.SetComponentData(prefab, new BulletLifecycleRequestComponent
+            {
+                Reason = BulletLifecycleReasonId.None,
+                Priority = 0,
+                RelatedEntity = Entity.Null,
+                Frame = 0u,
+            });
+            em.SetComponentData(prefab, default(BulletLifecycleContactComponent));
             em.SetComponentData(prefab, new BulletTypeKeyComponent { Value = typeKey });
             em.SetComponentData(prefab, new BulletSourceRefComponent { Value = Entity.Null });
             em.SetComponentData(prefab, new BulletRadiusComponent { Value = 0.2f });

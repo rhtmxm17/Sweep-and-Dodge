@@ -50,7 +50,10 @@ namespace SweepNDodge.DotsBullets
             var playerRadiusLookup = SystemAPI.GetComponentLookup<PlayerRadiusComponent>(isReadOnly: true);
             var bulletRadiusLookup = SystemAPI.GetComponentLookup<BulletRadiusComponent>(isReadOnly: true);
             var bulletSourceLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(isReadOnly: true);
+            var bulletVelocityLookup = SystemAPI.GetComponentLookup<BulletVelocityComponent>(isReadOnly: true);
             var despawnRequestLookup = SystemAPI.GetComponentLookup<BulletDespawnRequestTag>(isReadOnly: false);
+            var lifecycleRequestLookup = SystemAPI.GetComponentLookup<BulletLifecycleRequestComponent>(isReadOnly: false);
+            var lifecycleContactLookup = SystemAPI.GetComponentLookup<BulletLifecycleContactComponent>(isReadOnly: false);
             var playerHitRequestLookup = SystemAPI.GetComponentLookup<PlayerHazardHitRequestTag>(isReadOnly: false);
             var playerHitContextLookup = SystemAPI.GetComponentLookup<PlayerHazardHitContextComponent>(isReadOnly: false);
 
@@ -58,9 +61,15 @@ namespace SweepNDodge.DotsBullets
             playerRadiusLookup.Update(ref state);
             bulletRadiusLookup.Update(ref state);
             bulletSourceLookup.Update(ref state);
+            bulletVelocityLookup.Update(ref state);
             despawnRequestLookup.Update(ref state);
+            lifecycleRequestLookup.Update(ref state);
+            lifecycleContactLookup.Update(ref state);
             playerHitRequestLookup.Update(ref state);
             playerHitContextLookup.Update(ref state);
+            uint frame = 0u;
+            if (SystemAPI.TryGetSingleton<BulletFrameCounterComponent>(out var frameCounter))
+                frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
 
             if (!playerHitRequestLookup.HasComponent(playerEntity))
                 return;
@@ -81,9 +90,13 @@ namespace SweepNDodge.DotsBullets
                 PlayerRadiusLookup = playerRadiusLookup,
                 BulletRadiusLookup = bulletRadiusLookup,
                 BulletSourceLookup = bulletSourceLookup,
+                BulletVelocityLookup = bulletVelocityLookup,
                 DespawnRequestLookup = despawnRequestLookup,
+                LifecycleRequestLookup = lifecycleRequestLookup,
+                LifecycleContactLookup = lifecycleContactLookup,
                 PlayerHitRequestLookup = playerHitRequestLookup,
                 PlayerHitContextLookup = playerHitContextLookup,
+                Frame = frame,
             }.Schedule(deps);
         }
 
@@ -98,9 +111,13 @@ namespace SweepNDodge.DotsBullets
             [ReadOnly] public ComponentLookup<PlayerRadiusComponent> PlayerRadiusLookup;
             [ReadOnly] public ComponentLookup<BulletRadiusComponent> BulletRadiusLookup;
             [ReadOnly] public ComponentLookup<BulletSourceRefComponent> BulletSourceLookup;
+            [ReadOnly] public ComponentLookup<BulletVelocityComponent> BulletVelocityLookup;
             public ComponentLookup<BulletDespawnRequestTag> DespawnRequestLookup;
+            public ComponentLookup<BulletLifecycleRequestComponent> LifecycleRequestLookup;
+            public ComponentLookup<BulletLifecycleContactComponent> LifecycleContactLookup;
             public ComponentLookup<PlayerHazardHitRequestTag> PlayerHitRequestLookup;
             public ComponentLookup<PlayerHazardHitContextComponent> PlayerHitContextLookup;
+            public uint Frame;
 
             public void Execute()
             {
@@ -148,7 +165,19 @@ namespace SweepNDodge.DotsBullets
                             if (distSq > combined * combined) continue;
 
                             // 충돌 확인 단계에서도 즉시 제거 요청을 남겨 중복 충돌을 완화한다.
-                            DespawnRequestLookup.SetComponentEnabled(bullet, true);
+                            float2 bulletDirection = BulletVelocityLookup.HasComponent(bullet)
+                                ? BulletVelocityLookup[bullet].Value
+                                : float2.zero;
+                            BulletLifecycleRequestUtility.TryPromoteLifecycleRequest(
+                                bullet,
+                                BulletLifecycleReasonId.PlayerHit,
+                                PlayerEntity,
+                                Frame,
+                                new float2(bp.x, bp.z),
+                                bulletDirection,
+                                ref DespawnRequestLookup,
+                                ref LifecycleRequestLookup,
+                                ref LifecycleContactLookup);
                             var hitContext = PlayerHitContextLookup[PlayerEntity];
                             float2 away = new float2(playerPos.x - bp.x, playerPos.z - bp.z);
                             if (math.lengthsq(away) < 1e-8f)
