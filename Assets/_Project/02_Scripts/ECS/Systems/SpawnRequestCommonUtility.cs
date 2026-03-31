@@ -1,6 +1,8 @@
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Rendering;
+using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -311,6 +313,152 @@ namespace SweepNDodge.DotsBullets
             float u1 = math.max(1e-7f, random.NextFloat(0f, 1f));
             float u2 = random.NextFloat(0f, 1f);
             return math.sqrt(-2f * math.log(u1)) * math.cos(2f * math.PI * u2);
+        }
+
+        public static bool TryDequeueByKey(
+            ref NativeParallelMultiHashMap<int, Entity> freeByKey,
+            int key,
+            out Entity entity)
+        {
+            if (!freeByKey.TryGetFirstValue(key, out entity, out var iterator))
+                return false;
+
+            freeByKey.Remove(key, entity);
+            return true;
+        }
+
+        public static int CountFreeByKey(ref NativeParallelMultiHashMap<int, Entity> freeByKey, int key)
+        {
+            if (!freeByKey.TryGetFirstValue(key, out var _, out var iterator))
+                return 0;
+
+            int count = 1;
+            while (freeByKey.TryGetNextValue(out _, ref iterator))
+                count++;
+
+            return count;
+        }
+
+        public static void IncrementActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
+        {
+            IncrementActiveCount(activeCounts, typeKey, 1);
+        }
+
+        public static void IncrementActiveCount(
+            DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
+            int typeKey,
+            int amount)
+        {
+            for (int i = 0; i < activeCounts.Length; i++)
+            {
+                var item = activeCounts[i];
+                if (item.BulletTypeKey != typeKey)
+                    continue;
+
+                item.ActiveCount = SafeAdd(item.ActiveCount, amount);
+                activeCounts[i] = item;
+                return;
+            }
+
+            activeCounts.Add(new SourceActiveBulletCountBuffer
+            {
+                BulletTypeKey = typeKey,
+                ActiveCount = math.max(0, amount)
+            });
+        }
+
+        public static void ApplySpawnedBulletState(
+            Entity bulletEntity,
+            Entity sourceEntity,
+            int requestedTypeKey,
+            float3 pos,
+            float2 dir,
+            uint frame,
+            ref ComponentLookup<LocalTransform> txLookup,
+            ref ComponentLookup<LocalToWorld> localToWorldLookup,
+            ref ComponentLookup<BulletVelocityComponent> velLookup,
+            ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
+            ref ComponentLookup<BulletSpeedComponent> speedLookup,
+            ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
+            ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
+            ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
+            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
+            ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
+            ref ComponentLookup<BulletActiveTag> activeLookup,
+            ref ComponentLookup<BulletDespawnRequestTag> despawnRequestLookup,
+            ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
+            ref ComponentLookup<MaterialMeshInfo> renderLookup,
+            ref ComponentLookup<Parent> parentLookup)
+        {
+            float2 safeDir = math.normalizesafe(dir, new float2(1f, 0f));
+            var rot = quaternion.LookRotationSafe(new float3(safeDir.x, 0f, safeDir.y), math.up());
+            float bulletSpeed = speedLookup.HasComponent(bulletEntity)
+                ? math.max(0f, speedLookup[bulletEntity].Value)
+                : 0f;
+            float bulletLifetime = lifeMaxLookup.HasComponent(bulletEntity)
+                ? math.max(0f, lifeMaxLookup[bulletEntity].Value)
+                : 0f;
+
+            if (txLookup.HasComponent(bulletEntity))
+                txLookup[bulletEntity] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
+
+            var rootWorldMatrix = float4x4.TRS(pos, rot, new float3(1f, 1f, 1f));
+            if (localToWorldLookup.HasComponent(bulletEntity))
+                localToWorldLookup[bulletEntity] = new LocalToWorld { Value = rootWorldMatrix };
+
+            if (velLookup.HasComponent(bulletEntity))
+                velLookup[bulletEntity] = new BulletVelocityComponent { Value = safeDir * bulletSpeed };
+            if (lifeLookup.HasComponent(bulletEntity))
+                lifeLookup[bulletEntity] = new BulletLifetimeComponent { Value = bulletLifetime };
+            if (typeKeyLookup.HasComponent(bulletEntity))
+                typeKeyLookup[bulletEntity] = new BulletTypeKeyComponent { Value = requestedTypeKey };
+            if (sourceRefLookup.HasComponent(bulletEntity))
+                sourceRefLookup[bulletEntity] = new BulletSourceRefComponent { Value = sourceEntity };
+            if (lifeCycleLookup.HasComponent(bulletEntity))
+            {
+                var trace = lifeCycleLookup[bulletEntity];
+                trace.LastSpawnFrame = frame;
+                lifeCycleLookup[bulletEntity] = trace;
+            }
+
+            BulletLifecycleRequestUtility.ResetLifecycleRequestState(
+                bulletEntity,
+                ref despawnRequestLookup,
+                ref lifecycleRequestLookup,
+                ref lifecycleContactLookup);
+            if (activeLookup.HasComponent(bulletEntity))
+                activeLookup.SetComponentEnabled(bulletEntity, true);
+
+            if (renderPartsLookup.HasBuffer(bulletEntity))
+            {
+                var parts = renderPartsLookup[bulletEntity];
+                bool toggled = false;
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var partEntity = parts[i].Value;
+                    if (localToWorldLookup.HasComponent(partEntity))
+                    {
+                        float4x4 partWorldMatrix = rootWorldMatrix;
+                        if (parentLookup.HasComponent(partEntity) && txLookup.HasComponent(partEntity))
+                            partWorldMatrix = math.mul(rootWorldMatrix, txLookup[partEntity].ToMatrix());
+                        localToWorldLookup[partEntity] = new LocalToWorld { Value = partWorldMatrix };
+                    }
+
+                    if (renderLookup.HasComponent(partEntity))
+                    {
+                        renderLookup.SetComponentEnabled(partEntity, true);
+                        toggled = true;
+                    }
+                }
+
+                if (!toggled && renderLookup.HasComponent(bulletEntity))
+                    renderLookup.SetComponentEnabled(bulletEntity, true);
+            }
+            else if (renderLookup.HasComponent(bulletEntity))
+            {
+                renderLookup.SetComponentEnabled(bulletEntity, true);
+            }
         }
     }
 }

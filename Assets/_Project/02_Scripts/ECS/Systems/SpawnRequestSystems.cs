@@ -12,6 +12,7 @@ namespace SweepNDodge.DotsBullets
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
     [UpdateAfter(typeof(BulletFieldAreaUpdateSystem))]
+    [UpdateAfter(typeof(SecondarySpawnExecutionSystem))]
     public partial struct SpawnRequestRoundRobinExecutionSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
@@ -332,7 +333,7 @@ namespace SweepNDodge.DotsBullets
 
                     bool hasPoolCapacity = requiredCount <= 1
                         ? freeByKey.ContainsKey(item.BulletTypeKey)
-                        : CountFreeByKey(ref freeByKey, item.BulletTypeKey) >= requiredCount;
+                        : SpawnRequestCommonUtility.CountFreeByKey(ref freeByKey, item.BulletTypeKey) >= requiredCount;
                     if (!hasPoolCapacity)
                         continue;
 
@@ -419,7 +420,7 @@ namespace SweepNDodge.DotsBullets
                     if (!freeByKey.ContainsKey(item.BulletTypeKey))
                         continue;
                 }
-                else if (CountFreeByKey(ref freeByKey, item.BulletTypeKey) < requiredCount)
+                else if (SpawnRequestCommonUtility.CountFreeByKey(ref freeByKey, item.BulletTypeKey) < requiredCount)
                     continue;
 
                 if (bestIndex < 0
@@ -600,11 +601,11 @@ namespace SweepNDodge.DotsBullets
 
             for (int slotIndex = 0; slotIndex < slotCount; slotIndex++)
             {
-                if (!TryDequeueByKey(ref BulletFieldShared.FreeByKey, request.BulletTypeKey, out var bulletEntity))
+                if (!SpawnRequestCommonUtility.TryDequeueByKey(ref BulletFieldShared.FreeByKey, request.BulletTypeKey, out var bulletEntity))
                     return false;
 
                 float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence, slotIndex);
-                ApplySpawnedBulletState(
+                SpawnRequestCommonUtility.ApplySpawnedBulletState(
                     bulletEntity,
                     sourceEntity,
                     request.BulletTypeKey,
@@ -630,7 +631,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
-                IncrementActiveCount(activeCounts, request.BulletTypeKey, slotCount);
+                SpawnRequestCommonUtility.IncrementActiveCount(activeCounts, request.BulletTypeKey, slotCount);
 
             consumedCount = slotCount;
             sequenceAdvance = 1u;
@@ -671,7 +672,7 @@ namespace SweepNDodge.DotsBullets
             uint frame)
         {
             int requestedTypeKey = request.BulletTypeKey;
-            if (!TryDequeueByKey(ref BulletFieldShared.FreeByKey, requestedTypeKey, out var bulletEntity))
+            if (!SpawnRequestCommonUtility.TryDequeueByKey(ref BulletFieldShared.FreeByKey, requestedTypeKey, out var bulletEntity))
                 return false;
 
             var random = CreateSourceRandom(
@@ -695,7 +696,7 @@ namespace SweepNDodge.DotsBullets
                 out uint sampledSequence);
 
             float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence, -1);
-            ApplySpawnedBulletState(
+            SpawnRequestCommonUtility.ApplySpawnedBulletState(
                 bulletEntity,
                 sourceEntity,
                 requestedTypeKey,
@@ -720,103 +721,9 @@ namespace SweepNDodge.DotsBullets
                 ref parentLookup);
 
             if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
-                IncrementActiveCount(activeCounts, requestedTypeKey);
+                SpawnRequestCommonUtility.IncrementActiveCount(activeCounts, requestedTypeKey);
 
             return true;
-        }
-
-        private static void ApplySpawnedBulletState(
-            Entity bulletEntity,
-            Entity sourceEntity,
-            int requestedTypeKey,
-            float3 pos,
-            float2 dir,
-            uint frame,
-            ref ComponentLookup<LocalTransform> txLookup,
-            ref ComponentLookup<LocalToWorld> localToWorldLookup,
-            ref ComponentLookup<BulletVelocityComponent> velLookup,
-            ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
-            ref ComponentLookup<BulletSpeedComponent> speedLookup,
-            ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
-            ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
-            ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
-            ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
-            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
-            ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
-            ref ComponentLookup<BulletActiveTag> activeLookup,
-            ref ComponentLookup<BulletDespawnRequestTag> despawnRequestLookup,
-            ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
-            ref ComponentLookup<MaterialMeshInfo> renderLookup,
-            ref ComponentLookup<Parent> parentLookup)
-        {
-            var rot = quaternion.LookRotationSafe(new float3(dir.x, 0f, dir.y), math.up());
-            float bulletSpeed = speedLookup.HasComponent(bulletEntity)
-                ? math.max(0f, speedLookup[bulletEntity].Value)
-                : 0f;
-            float bulletLifetime = lifeMaxLookup.HasComponent(bulletEntity)
-                ? math.max(0f, lifeMaxLookup[bulletEntity].Value)
-                : 0f;
-
-            if (txLookup.HasComponent(bulletEntity))
-                txLookup[bulletEntity] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
-
-            var rootWorldMatrix = float4x4.TRS(pos, rot, new float3(1f, 1f, 1f));
-            if (localToWorldLookup.HasComponent(bulletEntity))
-                localToWorldLookup[bulletEntity] = new LocalToWorld { Value = rootWorldMatrix };
-
-            if (velLookup.HasComponent(bulletEntity))
-                velLookup[bulletEntity] = new BulletVelocityComponent { Value = dir * bulletSpeed };
-            if (lifeLookup.HasComponent(bulletEntity))
-                lifeLookup[bulletEntity] = new BulletLifetimeComponent { Value = bulletLifetime };
-            if (typeKeyLookup.HasComponent(bulletEntity))
-                typeKeyLookup[bulletEntity] = new BulletTypeKeyComponent { Value = requestedTypeKey };
-            if (sourceRefLookup.HasComponent(bulletEntity))
-                sourceRefLookup[bulletEntity] = new BulletSourceRefComponent { Value = sourceEntity };
-            if (lifeCycleLookup.HasComponent(bulletEntity))
-            {
-                var trace = lifeCycleLookup[bulletEntity];
-                trace.LastSpawnFrame = frame;
-                lifeCycleLookup[bulletEntity] = trace;
-            }
-
-            BulletLifecycleRequestUtility.ResetLifecycleRequestState(
-                bulletEntity,
-                ref despawnRequestLookup,
-                ref lifecycleRequestLookup,
-                ref lifecycleContactLookup);
-            if (activeLookup.HasComponent(bulletEntity))
-                activeLookup.SetComponentEnabled(bulletEntity, true);
-
-            if (renderPartsLookup.HasBuffer(bulletEntity))
-            {
-                var parts = renderPartsLookup[bulletEntity];
-                bool toggled = false;
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    var partEntity = parts[i].Value;
-                    if (localToWorldLookup.HasComponent(partEntity))
-                    {
-                        float4x4 partWorldMatrix = rootWorldMatrix;
-                        if (parentLookup.HasComponent(partEntity) && txLookup.HasComponent(partEntity))
-                            partWorldMatrix = math.mul(rootWorldMatrix, txLookup[partEntity].ToMatrix());
-                        localToWorldLookup[partEntity] = new LocalToWorld { Value = partWorldMatrix };
-                    }
-
-                    if (renderLookup.HasComponent(partEntity))
-                    {
-                        renderLookup.SetComponentEnabled(partEntity, true);
-                        toggled = true;
-                    }
-                }
-
-                // Guard: render-parts buffer exists but no valid render entity in it.
-                if (!toggled && renderLookup.HasComponent(bulletEntity))
-                    renderLookup.SetComponentEnabled(bulletEntity, true);
-            }
-            else if (renderLookup.HasComponent(bulletEntity))
-            {
-                renderLookup.SetComponentEnabled(bulletEntity, true);
-            }
         }
 
         private static float3 ResolveSpawnCenter(
@@ -1388,55 +1295,6 @@ namespace SweepNDodge.DotsBullets
             float safeLength = math.max(0f, length);
             float safeSpacing = math.max(0.001f, spacing);
             return math.max(1, (int)math.floor(safeLength / safeSpacing) + 1);
-        }
-
-        private static bool TryDequeueByKey(
-            ref NativeParallelMultiHashMap<int, Entity> freeByKey,
-            int key,
-            out Entity entity)
-        {
-            if (!freeByKey.TryGetFirstValue(key, out entity, out var iterator))
-                return false;
-
-            freeByKey.Remove(key, entity);
-            return true;
-        }
-
-        private static int CountFreeByKey(ref NativeParallelMultiHashMap<int, Entity> freeByKey, int key)
-        {
-            if (!freeByKey.TryGetFirstValue(key, out var _, out var iterator))
-                return 0;
-
-            int count = 1;
-            while (freeByKey.TryGetNextValue(out _, ref iterator))
-                count++;
-
-            return count;
-        }
-
-        private static void IncrementActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)
-        {
-            IncrementActiveCount(activeCounts, typeKey, 1);
-        }
-
-        private static void IncrementActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey, int amount)
-        {
-            for (int i = 0; i < activeCounts.Length; i++)
-            {
-                var item = activeCounts[i];
-                if (item.BulletTypeKey != typeKey)
-                    continue;
-
-                item.ActiveCount = SpawnRequestCommonUtility.SafeAdd(item.ActiveCount, amount);
-                activeCounts[i] = item;
-                return;
-            }
-
-            activeCounts.Add(new SourceActiveBulletCountBuffer
-            {
-                BulletTypeKey = typeKey,
-                ActiveCount = math.max(0, amount)
-            });
         }
 
     }

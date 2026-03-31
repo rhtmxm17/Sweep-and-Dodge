@@ -29,7 +29,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var files = FindFilesContaining("BulletFieldShared.PoolFence = state.Dependency;");
             CollectionAssert.AreEquivalent(
-                new[] { "SpawnRequestSystems.cs", "BulletPoolOwnerSystems.cs" },
+                new[] { "SpawnRequestSystems.cs", "SecondarySpawnExecutionSystems.cs", "BulletPoolOwnerSystems.cs" },
                 files);
         }
 
@@ -57,6 +57,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 "var poolDeps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);",
                 spawn);
             StringAssert.Contains("poolDeps.Complete();", spawn);
+
+            var secondarySpawn = ReadSystemFile("SecondarySpawnExecutionSystems.cs");
+            StringAssert.Contains(
+                "var poolDeps = JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence);",
+                secondarySpawn);
+            StringAssert.Contains("poolDeps.Complete();", secondarySpawn);
         }
 
         private static string ReadSystemFile(string fileName)

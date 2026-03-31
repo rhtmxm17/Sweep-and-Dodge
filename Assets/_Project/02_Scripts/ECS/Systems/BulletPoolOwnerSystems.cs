@@ -204,6 +204,8 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
+            EnsureSecondarySpawnRuntimeSingleton(em);
+
             if (!HasSingleton<RunProgressDirectorConfigComponent>(em))
             {
                 var e = em.CreateEntity(typeof(RunProgressDirectorConfigComponent));
@@ -368,6 +370,36 @@ namespace SweepNDodge.DotsBullets
             using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return !query.IsEmptyIgnoreFilter;
         }
+
+        private static void EnsureSecondarySpawnRuntimeSingleton(EntityManager em)
+        {
+            Entity singletonEntity;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<BulletSecondarySpawnChannelSingletonTag>()))
+            {
+                singletonEntity = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(BulletSecondarySpawnChannelSingletonTag))
+                    : query.GetSingletonEntity();
+            }
+
+            if (!em.HasBuffer<BulletSecondarySpawnRequestBuffer>(singletonEntity))
+            {
+                var buffer = em.AddBuffer<BulletSecondarySpawnRequestBuffer>(singletonEntity);
+                buffer.EnsureCapacity(32);
+            }
+
+            if (!em.HasComponent<SecondarySpawnPolicyComponent>(singletonEntity))
+            {
+                em.AddComponentData(singletonEntity, new SecondarySpawnPolicyComponent
+                {
+                    BudgetPerFrame = 256,
+                    MaxPendingCount = 8192,
+                    MaxPendingAgeFrames = 120,
+                });
+            }
+
+            if (!em.HasComponent<SecondarySpawnBacklogMetricsComponent>(singletonEntity))
+                em.AddComponentData(singletonEntity, default(SecondarySpawnBacklogMetricsComponent));
+        }
     }
 
     // ----------------------------------------------------------------------
@@ -377,6 +409,7 @@ namespace SweepNDodge.DotsBullets
     [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
+    [UpdateBefore(typeof(SecondarySpawnExecutionSystem))]
     [UpdateBefore(typeof(SpawnRequestRoundRobinExecutionSystem))]
     public partial struct BulletFieldAreaUpdateSystem : ISystem
     {

@@ -951,6 +951,35 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - compile / console error 0
   - EditMode: channel bootstrap test, budget/age test, ExecutionBegin 순서 test
 
+#### Slice 4 구현 반영 상태
+- 구현 완료 기준으로 아래 타입/owner가 현재 코드에 반영되었다.
+  - `BulletSecondarySpawnChannelSingletonTag`
+  - `BulletSecondarySpawnShapeId`
+  - `BulletSecondarySpawnRequestBuffer`
+  - `SecondarySpawnPolicyComponent`
+  - `SecondarySpawnBacklogMetricsComponent`
+  - `SecondarySpawnExecutionSystem`
+- `BulletPoolOwnerBootstrapSystem`은 secondary channel singleton을 함께 생성한다.
+  - secondary buffer, policy, metrics를 같은 singleton entity에 둔다.
+- `ExecutionBegin` 순서는 현재 아래로 고정된다.
+  - `BulletFieldAreaUpdateSystem`
+  - `SecondarySpawnExecutionSystem`
+  - `SpawnRequestRoundRobinExecutionSystem`
+- secondary spawn 실행은 기존 source spawn과 같은 spawn-state reset을 사용한다.
+  - lifecycle request/contact reset
+  - active on
+  - render on
+  - velocity/lifetime/source ref 갱신
+- 1차 shape 소비는 아래만 구현했다.
+  - `SingleForward`
+  - `ForwardSpread`
+  - `PointBurst`
+- 검증 결과:
+  - compile 성공
+  - console error 0
+  - EditMode `338 passed`
+  - PlayMode smoke `38 passed`
+
 ### 7.6 Slice 5. `OnMotionCompletedExplode`를 secondary channel에 연결
 - 목표:
   - `DampedLinear` 종료가 실제 reaction projectile spawn으로 이어지는 첫 end-to-end 경로를 만든다.

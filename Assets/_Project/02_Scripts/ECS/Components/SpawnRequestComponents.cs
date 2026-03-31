@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -83,5 +84,50 @@ namespace SweepNDodge.DotsBullets
     public struct SourceStableIdComponent : IComponentData
     {
         public uint Value;
+    }
+
+    public struct BulletSecondarySpawnChannelSingletonTag : IComponentData { }
+
+    public enum BulletSecondarySpawnShapeId : byte
+    {
+        SingleForward = 0,
+        ForwardSpread = 1,
+        PointBurst = 2,
+    }
+
+    [InternalBufferCapacity(32)]
+    public struct BulletSecondarySpawnRequestBuffer : IBufferElementData
+    {
+        public int BulletTypeKey;
+        public int Count;
+        public byte Priority;
+        public Entity SourceEntity;
+        public Entity CauserEntity;
+        public float3 OriginPosition;
+        public float2 BaseDirection;
+        public float SpreadAngleDeg;
+        public float SpawnRadius;
+        public BulletSecondarySpawnShapeId Shape;
+        public uint OldestFrame;
+        public uint Sequence;
+    }
+
+    public struct SecondarySpawnPolicyComponent : IComponentData
+    {
+        public int BudgetPerFrame;
+        public int MaxPendingCount;
+        public uint MaxPendingAgeFrames;
+    }
+
+    public struct SecondarySpawnBacklogMetricsComponent : IComponentData
+    {
+        public int PendingCount;
+        public int DeferredByBudget;
+        public int DeferredByPool;
+        public int DroppedByCapacity;
+        public int ExpiredByAge;
+        public int LastFrameDroppedByCapacity;
+        public int LastFrameExpiredByAge;
+        public int LastFrameBudgetUsed;
     }
 }
