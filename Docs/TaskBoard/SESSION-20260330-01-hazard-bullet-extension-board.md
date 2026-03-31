@@ -16,17 +16,16 @@
 ## Session Goal
 - 한 줄 목표: 다양한 Hazard 이동/반응 확장을 기존 bullet pipeline owner를 유지한 채 구현 가능한 작업 흐름으로 분해한다.
 - 완료 기준: movement/reaction/lifecycle 확장 축과 slice별 구현이 문서와 작업 보드 기준으로 흔들리지 않게 유지된다.
-- 이번 세션에서 하지 않을 것: Slice 범위를 벗어나는 reaction/secondary spawn/HomingLite 구현
 
 ## Now
-- [ ] I5. Slice 5 `OnMotionCompletedExplode` 구현
-  - 완료 기준: `MotionCompleted` reaction이 secondary spawn으로 연결된다.
-  - 검증: compile / console error 0 / motion-completed explosion EditMode 테스트
+- [ ] I7. Slice 7 `OnCollectedSpawnSecondary` 또는 `PeriodicTrailEmitter` 구현
+  - 완료 기준: collect-trigger 또는 non-terminal reaction 1종이 secondary channel 경유로 연결된다.
+  - 검증: compile / console error 0 / 선택 reaction EditMode 테스트
 
 ## Next
-- [ ] I6. Slice 6 `HomingLite` 구현
-  - 완료 기준: 플레이어 위치 read-only 기반 steering family가 추가되고 직진 fallback 규칙이 유지된다.
-  - 검증: compile / console error 0 / homing steering EditMode 테스트
+- [ ] I8. movement profile schema를 `DefinitionSO`까지 끌어올릴지 재평가
+  - 완료 기준: optional authoring에서 profile schema 승격 여부와 범위를 문서 기준으로 확정한다.
+  - 검증: TD/ADR 정합성 확인
 
 ## Blocked
 - 없음
@@ -66,8 +65,16 @@
   - 검증 결과: `BulletSecondarySpawnChannelSingletonTag`, `BulletSecondarySpawnRequestBuffer`, `SecondarySpawnPolicyComponent`, `SecondarySpawnBacklogMetricsComponent`, `SecondarySpawnExecutionSystem`이 추가되었고 source spawn과 backlog/metrics가 분리되었다.
   - 검증 결과: `ExecutionBegin` 순서가 `BulletFieldAreaUpdate -> SecondarySpawnExecution -> SpawnRequestRoundRobinExecution`로 고정되었다.
   - 검증 결과: compile 성공 / console error 0 / EditMode 338 passed / PlayMode 38 passed
+- [x] I5. Slice 5 `OnMotionCompletedExplode` 구현을 완료했다.
+  - 검증 결과: `BulletOnMotionCompletedExplodeReactionComponent`와 optional authoring이 추가되었고, `BulletLifecycleReactionExecutionSystem`이 `MotionCompleted`를 읽어 secondary channel에 explode request를 append하도록 확장되었다.
+  - 검증 결과: `DampedLinear -> MotionCompleted -> reaction append -> despawn -> next ExecutionBegin secondary spawn` 경로가 end-to-end로 닫혔다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode 341 passed / PlayMode 39 passed
+- [x] I6. Slice 6 `HomingLite` 구현을 완료했다.
+  - 검증 결과: `BulletHomingLiteMotionComponent`와 optional authoring이 추가되었고, `BulletSimulationSystem`이 `Linear / Damped / HomingLite` 3-family query로 분리되었다.
+  - 검증 결과: `HomingLite`는 player 위치를 read-only로 읽어 제한 각속도로만 방향을 보정하고, acquire/min distance 가드 밖에서는 직진 fallback을 유지한다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode 348 passed / PlayMode 39 passed
 
 ## End of Session
-- 결과: Hazard 확장 논의를 기준으로 `Slice 1`, `Slice 2`, `Slice 3`, `Slice 4` 구현과 검증을 마쳤고, 다음 시작점은 `OnMotionCompletedExplode`를 secondary channel에 연결하는 작업이다.
+- 결과: Hazard 확장 논의를 기준으로 `Slice 1`부터 `Slice 6`까지 구현과 검증을 마쳤고, 다음 시작점은 collect-trigger 또는 non-terminal secondary reaction 1종 연결이다.
 - 남은 리스크: `StageBlocked`/폭발 이벤트 채널 통합 범위와 secondary spawn merge/count attribution 세부 규칙이 아직 남아 있다.
-- 다음 세션 시작점: `I5. Slice 5 OnMotionCompletedExplode 구현`
+- 다음 세션 시작점: `I7. Slice 7 OnCollectedSpawnSecondary 또는 PeriodicTrailEmitter 구현`

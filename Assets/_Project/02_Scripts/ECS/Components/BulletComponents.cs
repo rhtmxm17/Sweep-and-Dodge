@@ -66,6 +66,22 @@ namespace SweepNDodge.DotsBullets
         public float StopSpeedThreshold;
     }
 
+    public struct BulletHomingLiteMotionComponent : IComponentData
+    {
+        public float TurnRateDegPerSec;
+        public float MaxAcquireDistance;
+        public float MinRetargetDistance;
+    }
+
+    public struct BulletOnMotionCompletedExplodeReactionComponent : IComponentData
+    {
+        public int SecondaryBulletTypeKey;
+        public int SpawnCount;
+        public BulletSecondarySpawnShapeId Shape;
+        public float SpreadAngleDeg;
+        public float SpawnRadius;
+    }
+
     public struct BulletLifecycleRequestComponent : IComponentData
     {
         public BulletLifecycleReasonId Reason;

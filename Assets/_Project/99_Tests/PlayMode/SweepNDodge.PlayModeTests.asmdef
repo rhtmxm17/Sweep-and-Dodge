@@ -4,8 +4,10 @@
     "SweepNDodge.Runtime",
     "Unity.Entities",
     "Unity.Collections",
+    "Unity.Entities.Graphics",
     "Unity.InputSystem",
     "Unity.Mathematics",
+    "Unity.Transforms",
     "Unity.TextMeshPro"
   ],
   "optionalUnityReferences": [

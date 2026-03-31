@@ -998,6 +998,31 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - EditMode: explode path end-to-end test
   - PlayMode: 정지 폭발 스모크
 
+#### Slice 5 구현 반영 상태
+- 구현 완료 기준으로 아래 타입/owner가 현재 코드에 반영되었다.
+  - `BulletOnMotionCompletedExplodeReactionComponent`
+  - `BulletOnMotionCompletedExplodeReactionAuthoring`
+- `BulletLifecycleReactionExecutionSystem`은 더 이상 parallel no-op job이 아니다.
+  - `ExecutionEnd` main-thread consume owner로 `MotionCompleted`를 직접 읽는다.
+  - `MotionCompleted + BulletOnMotionCompletedExplodeReactionComponent` 조합일 때만 secondary channel에 request를 append한다.
+  - 다른 lifecycle reason은 계속 no-op 유지다.
+- append 계약은 현재 아래로 고정된다.
+  - `Count = SpawnCount`
+  - `BulletTypeKey = SecondaryBulletTypeKey`
+  - `SourceEntity = BulletSourceRefComponent.Value`
+  - `CauserEntity = source bullet entity`
+  - `OriginPosition = lifecycle contact xz + bullet y`
+  - `BaseDirection = lifecycle contact direction normalized`
+  - `Shape/SpreadAngleDeg/SpawnRadius`는 reaction component 값 사용
+- `SecondarySpawnExecutionSystem`은 producer 추가 없이 기존 consumer 계약을 그대로 재사용한다.
+- production prefab에는 새 authoring을 자동 부착하지 않았다.
+  - 기능 노출은 테스트 경로와 후속 content wiring 단계로 미뤘다.
+- 검증 결과:
+  - compile 성공
+  - console error 0
+  - EditMode `341 passed`
+  - PlayMode smoke `39 passed`
+
 ### 7.7 Slice 6. `HomingLite` movement family 도입
 - 목표:
   - 외부 상태(플레이어 위치) 기반 movement family 1종을 추가한다.
@@ -1015,6 +1040,12 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 검증:
   - compile / console error 0
   - EditMode: homing steering test, fallback test
+  - PlayMode smoke `39 passed`
+- 구현 결과:
+  - `BulletSimulationSystem`은 `Linear / Damped / HomingLite` 3-family query로 분리되었다.
+  - `HomingLite`는 player 위치를 main-thread에서 read-only로 캡처한 뒤 job에는 값으로 전달해 `LocalTransform` alias 충돌 없이 steering을 수행한다.
+  - speed 크기는 `BulletSpeedComponent.Value`를 기준으로 유지하고, `MinRetargetDistance`/`MaxAcquireDistance` 가드 밖에서는 기존 velocity 기준 직진 fallback을 유지한다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode `348 passed` / PlayMode smoke `39 passed`
 
 ### 7.8 Slice 7. `OnCollectedSpawnSecondary` 또는 `PeriodicTrailEmitter` 1종 연결
 - 목표:
