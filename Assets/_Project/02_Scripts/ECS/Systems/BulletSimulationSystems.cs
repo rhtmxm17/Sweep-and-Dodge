@@ -84,6 +84,9 @@ namespace SweepNDodge.DotsBullets
                 LifecycleContactLookup = lifecycleContactLookup,
             }.ScheduleParallel(state.Dependency);
 
+            // NOTE:
+            // linear/damped queries are disjoint, but both jobs write the same lifecycle lookups.
+            // Schedule damped after linear to satisfy ECS safety for shared ComponentLookup writers.
             var dampedHandle = new DampedMoveAndLifetimeJob
             {
                 DeltaTime = dt,
@@ -96,8 +99,8 @@ namespace SweepNDodge.DotsBullets
                 RequestLookup = requestLookup,
                 LifecycleRequestLookup = lifecycleRequestLookup,
                 LifecycleContactLookup = lifecycleContactLookup,
-            }.ScheduleParallel(state.Dependency);
-            state.Dependency = JobHandle.CombineDependencies(linearHandle, dampedHandle);
+            }.ScheduleParallel(linearHandle);
+            state.Dependency = dampedHandle;
 
             // 2) SpatialHash Build
             // - CellMap: 전체 활성 탄

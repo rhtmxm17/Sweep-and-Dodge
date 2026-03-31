@@ -53,6 +53,44 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void BulletSimulation_LinearAndDampedBullets_CanUpdateInSameFrame()
+        {
+            using var world = new World("BulletSimulation_LinearAndDampedMixed");
+            var em = world.EntityManager;
+
+            SetSimulationPrerequisites(em);
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[] { StageCellMovementFlags.None });
+
+            var linearBullet = CreateBullet(
+                em,
+                new float3(0f, 0f, 0f),
+                new float2(1f, 0f),
+                radius: 0.05f,
+                lifetime: 5f);
+            var dampedBullet = CreateBullet(
+                em,
+                new float3(0f, 0f, 1f),
+                new float2(2f, 0f),
+                radius: 0.05f,
+                lifetime: 5f,
+                dampedMotion: new BulletDampedMotionComponent
+                {
+                    DampingPerSec = 1f,
+                    StopSpeedThreshold = 0.1f,
+                });
+
+            Assert.DoesNotThrow(() =>
+            {
+                world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+            });
+
+            Assert.That(em.GetComponentData<BulletVelocityComponent>(linearBullet).Value, Is.EqualTo(new float2(1f, 0f)).Using(Float2Comparer.Within(1e-5f)));
+            Assert.That(em.GetComponentData<BulletVelocityComponent>(dampedBullet).Value.x, Is.LessThan(2f));
+        }
+
+        [Test]
         public void BulletSimulation_DampedBullet_EmitsMotionCompleted_AndClampsVelocityToZero()
         {
             using var world = new World("BulletSimulation_MotionCompleted");

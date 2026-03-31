@@ -146,7 +146,12 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertUpdateAfter(typeof(PlayerCarryBinDepositExecutionSystem), typeof(PlayerHazardCollisionExecutionSystem));
             AssertUpdateAfter(typeof(PlayerHazardRiskResolveSystem), typeof(PlayerCarryBinDepositExecutionSystem));
             AssertUpdateBefore(typeof(PlayerHazardRiskResolveSystem), typeof(BulletDespawnExecutionSystem));
+            AssertUpdateInGroup(typeof(BulletLifecycleReactionExecutionSystem), typeof(BulletExecutionEndGroup));
+            AssertUpdateAfter(typeof(BulletLifecycleReactionExecutionSystem), typeof(PlayerHazardRiskResolveSystem));
+            AssertUpdateBefore(typeof(BulletLifecycleReactionExecutionSystem), typeof(BulletDespawnExecutionSystem));
+            AssertUpdateBefore(typeof(BulletLifecycleReactionExecutionSystem), typeof(CombatEventChannelConsumeSystem));
             AssertUpdateAfter(typeof(CombatEventChannelConsumeSystem), typeof(PlayerCarryBinDepositExecutionSystem));
+            AssertUpdateAfter(typeof(CombatEventChannelConsumeSystem), typeof(BulletLifecycleReactionExecutionSystem));
             AssertUpdateAfter(typeof(PlayerHudSnapshotCollectSystem), typeof(CombatEventChannelConsumeSystem));
             AssertUpdateBefore(typeof(PlayerHudSnapshotCollectSystem), typeof(PlayerUiFeedbackConsumeSystem));
             AssertUpdateBefore(typeof(CombatEventChannelConsumeSystem), typeof(PlayerUiFeedbackConsumeSystem));

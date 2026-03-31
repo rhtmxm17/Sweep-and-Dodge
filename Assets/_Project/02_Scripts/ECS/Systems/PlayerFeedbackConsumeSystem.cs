@@ -11,6 +11,7 @@ namespace SweepNDodge.DotsBullets
     /// </summary>
     [UpdateInGroup(typeof(BulletExecutionEndGroup))]
     [UpdateAfter(typeof(PlayerCarryBinDepositExecutionSystem))]
+    [UpdateAfter(typeof(BulletLifecycleReactionExecutionSystem))]
     [UpdateBefore(typeof(PlayerUiFeedbackConsumeSystem))]
     public partial struct CombatEventChannelConsumeSystem : ISystem
     {

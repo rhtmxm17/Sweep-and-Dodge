@@ -19,17 +19,17 @@
 - 이번 세션에서 하지 않을 것: Slice 범위를 벗어나는 reaction/secondary spawn/HomingLite 구현
 
 ## Now
-- [ ] I3. Slice 3 lifecycle reaction consume owner 구현
-  - 완료 기준: `BulletLifecycleReactionExecutionSystem`이 `BulletDespawnExecutionSystem` 앞에서 consume를 중계한다.
-  - 검증: compile / console error 0 / ExecutionEnd 순서 EditMode 테스트
-
-## Next
 - [ ] I4. Slice 4 secondary spawn channel 인프라 구현
   - 완료 기준: `BulletSecondarySpawnChannel`과 `SecondarySpawnExecutionSystem` 뼈대가 붙고 source spawn과 backlog/metrics가 분리된다.
   - 검증: compile / console error 0 / secondary channel EditMode 테스트
+
+## Next
 - [ ] I5. Slice 5 `OnMotionCompletedExplode` 구현
   - 완료 기준: `MotionCompleted` reaction이 secondary spawn으로 연결된다.
   - 검증: compile / console error 0 / motion-completed explosion EditMode 테스트
+- [ ] I6. Slice 6 `HomingLite` 구현
+  - 완료 기준: 플레이어 위치 read-only 기반 steering family가 추가되고 직진 fallback 규칙이 유지된다.
+  - 검증: compile / console error 0 / homing steering EditMode 테스트
 
 ## Blocked
 - 없음
@@ -62,8 +62,11 @@
 - [x] I2. Slice 2 `DampedLinear + MotionCompleted` 구현을 완료했다.
   - 검증 결과: `BulletDampedMotionComponent`, optional authoring, linear/damped family simulation 분리, `MotionCompleted` request 생성, damping 전용 EditMode 테스트가 추가되었다.
   - 검증 결과: compile 성공 / console error 0 / EditMode 323 passed / PlayMode 38 passed
+- [x] I3. Slice 3 lifecycle reaction consume owner 구현을 완료했다.
+  - 검증 결과: `BulletLifecycleReactionExecutionSystem`이 no-op intermediate owner로 추가되었고, `ExecutionEnd` 순서가 `PlayerHazardRiskResolve -> BulletLifecycleReactionExecution -> BulletDespawnExecution -> CombatEventChannelConsume`로 고정되었다.
+  - 검증 결과: compile / console error 0 / ExecutionEnd 순서 및 consume 회귀 테스트 통과 / PlayMode smoke 통과
 
 ## End of Session
-- 결과: Hazard 확장 논의를 기준으로 `Slice 1`, `Slice 2` 구현과 검증을 마쳤고, 다음 시작점은 ExecutionEnd consume owner 분리다.
+- 결과: Hazard 확장 논의를 기준으로 `Slice 1`, `Slice 2`, `Slice 3` 구현과 검증을 마쳤고, 다음 시작점은 secondary spawn channel 인프라 도입이다.
 - 남은 리스크: `StageBlocked`/폭발 이벤트 채널 통합 범위와 secondary spawn merge/count attribution 세부 규칙이 아직 남아 있다.
-- 다음 세션 시작점: `I3. Slice 3 lifecycle reaction consume owner 구현`
+- 다음 세션 시작점: `I4. Slice 4 secondary spawn channel 인프라 구현`

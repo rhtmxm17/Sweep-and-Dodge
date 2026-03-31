@@ -6,7 +6,7 @@
 - doc_id: `TD-027`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-03-30`
+- last_updated: `2026-03-31`
 - related_docs:
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
   - [GD-007-data-driven-bullet-pattern-definition.md](../GameDesign/GD-007-data-driven-bullet-pattern-definition.md)
@@ -775,6 +775,18 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 4. `BulletLifecycleReactionExecutionSystem`이 reason/context를 읽어 secondary effect를 실행한다.
 5. `BulletDespawnExecutionSystem`이 최종 active/render/pool consume를 수행한다.
 
+### 4.2.1.1 Slice 3 기준 ExecutionEnd 순서 고정
+- `Slice 3`에서 `ExecutionEnd`의 lifecycle 관련 서브시퀀스는 아래 순서로 고정한다.
+  1. `PlayerHazardRiskResolveSystem`
+  2. `BulletLifecycleReactionExecutionSystem`
+  3. `BulletDespawnExecutionSystem`
+  4. `CombatEventChannelConsumeSystem`
+- 의도:
+  - player state owner들이 먼저 현재 프레임의 플레이어 상태를 확정한다.
+  - lifecycle reaction owner는 final despawn 전에 pending request를 읽는다.
+  - final pool owner는 reaction owner 뒤에서만 실행된다.
+  - combat/ui consume owner는 future reaction output을 같은 frame에 읽을 수 있도록 reaction owner 뒤에 위치한다.
+
 ### 4.2.3 T4 기준 secondary spawn 흐름
 1. `ExecutionEnd`의 reaction owner가 `BulletSecondarySpawnRequestBuffer`에 aggregated request를 append한다.
 2. request는 channel singleton buffer에 프레임 간 유지된다.
@@ -907,6 +919,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - `BulletLifecycleReactionExecutionSystem` 골격
   - reason dispatch 기본 경로
   - `BulletDespawnExecutionSystem`과의 순서 고정
+  - `CombatEventChannelConsumeSystem`보다 앞선 위치 고정
 - 비포함:
   - 실제 secondary projectile spawn
   - reward dust
@@ -914,6 +927,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 완료 기준:
   - pending lifecycle request가 ExecutionEnd에서 reaction owner를 거친 뒤 기존 despawn owner로 이어진다.
   - reaction이 없어도 기존 despawn 동작은 유지된다.
+  - `ExecutionEnd`의 실제 order가 `PlayerHazardRiskResolve -> BulletLifecycleReactionExecution -> BulletDespawnExecution -> CombatEventChannelConsume`로 고정된다.
 - 검증:
   - compile / console error 0
   - EditMode: ExecutionEnd 순서/consume 회귀 테스트
@@ -1019,3 +1033,4 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 2026-03-30: 초안 작성. Hazard 확장을 `Movement + Reaction + LifecycleReason` 조합으로 분리하는 방향과 owner 경계를 정리했다.
 - 2026-03-30: `T2` 구체화. terminal lifecycle을 `BulletDespawnRequestTag + BulletLifecycleRequestComponent + BulletLifecycleContactComponent` 조합으로 두고, producer helper / priority / consumer owner 규칙을 추가했다.
 - 2026-03-31: `T4` 확정. secondary spawn을 source spawn과 채널/예산/metrics는 분리하고, 같은 `ExecutionBegin` 계층의 별도 consumer owner가 처리하는 구조로 고정했다.
+- 2026-03-31: `I3` 구현 기준 확정. `BulletLifecycleReactionExecutionSystem`을 no-op reaction owner로 추가하고, `ExecutionEnd`의 실제 순서를 `PlayerHazardRiskResolve -> BulletLifecycleReactionExecution -> BulletDespawnExecution -> CombatEventChannelConsume`로 고정했다.

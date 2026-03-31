@@ -418,6 +418,7 @@ namespace SweepNDodge.DotsBullets
     /// </summary>
     [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionEndGroup))]
+    [UpdateAfter(typeof(BulletLifecycleReactionExecutionSystem))]
     public partial struct BulletDespawnExecutionSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
