@@ -82,6 +82,15 @@ namespace SweepNDodge.DotsBullets
         public float SpawnRadius;
     }
 
+    public struct BulletOnCollectedSpawnSecondaryReactionComponent : IComponentData
+    {
+        public int SecondaryBulletTypeKey;
+        public int SpawnCount;
+        public BulletSecondarySpawnShapeId Shape;
+        public float SpreadAngleDeg;
+        public float SpawnRadius;
+    }
+
     public struct BulletLifecycleRequestComponent : IComponentData
     {
         public BulletLifecycleReasonId Reason;

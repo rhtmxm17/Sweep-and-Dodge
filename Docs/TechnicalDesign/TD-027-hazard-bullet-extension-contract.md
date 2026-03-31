@@ -1047,21 +1047,24 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - speed 크기는 `BulletSpeedComponent.Value`를 기준으로 유지하고, `MinRetargetDistance`/`MaxAcquireDistance` 가드 밖에서는 기존 velocity 기준 직진 fallback을 유지한다.
   - 검증 결과: compile 성공 / console error 0 / EditMode `348 passed` / PlayMode smoke `39 passed`
 
-### 7.8 Slice 7. `OnCollectedSpawnSecondary` 또는 `PeriodicTrailEmitter` 1종 연결
+### 7.8 Slice 7. `OnCollectedSpawnSecondary` 연결
 - 목표:
-  - non-terminal 또는 collect-trigger reaction 중 1종을 secondary channel 경유로 연결한다.
-- 우선순위 권장:
-  - 1순위: `OnCollectedSpawnSecondary`
-  - 2순위: `PeriodicTrailEmitter`
-- 이유:
-  - collect-trigger reaction은 lifecycle reason과 연결이 명확하고, source/reward attribution 테스트가 쉽다.
-  - trail emitter는 non-terminal producer라 append 시점 논의가 더 필요하다.
+  - collect-trigger reaction 1종을 secondary channel 경유로 연결한다.
+- 채택안:
+  - `OnCollectedSpawnSecondary`
+  - trigger는 `VacuumCollected`만 연결한다.
+  - `CarryFullRemoved`는 이번 slice에서 no-op로 유지한다.
 - 완료 기준:
-  - 선택한 reaction 1종이 source spawn과 분리된 channel을 통해 정상 spawn된다.
+  - `VacuumCollected` bullet이 `ExecutionEnd`에서 collect secondary request를 append하고, 다음 `ExecutionBegin`에 secondary bullet이 spawn된다.
 - 검증:
   - compile / console error 0
-  - EditMode: collect 또는 trail request test
-  - PlayMode: 수거 보상 드롭 또는 경로 trail 스모크
+  - EditMode: collect request test, vacuum end-to-end test
+  - PlayMode: 수거 보상 드롭 스모크
+- 구현 결과:
+  - `BulletOnCollectedSpawnSecondaryReactionComponent`와 optional authoring이 추가되었다.
+  - `BulletLifecycleReactionExecutionSystem`은 `VacuumCollected` reason에서만 collect secondary append를 수행하고, `CarryFullRemoved`는 그대로 no-op를 유지한다.
+  - collect secondary spawn은 `BulletSourceRefComponent`를 그대로 계승한다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode `354 passed` / PlayMode `40 passed`
 
 ### 7.9 Slice 우선순위와 시작점
 - 구현 시작 순서는 아래로 고정한다.

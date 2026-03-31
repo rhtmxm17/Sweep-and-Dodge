@@ -18,14 +18,14 @@
 - 완료 기준: movement/reaction/lifecycle 확장 축과 slice별 구현이 문서와 작업 보드 기준으로 흔들리지 않게 유지된다.
 
 ## Now
-- [ ] I7. Slice 7 `OnCollectedSpawnSecondary` 또는 `PeriodicTrailEmitter` 구현
-  - 완료 기준: collect-trigger 또는 non-terminal reaction 1종이 secondary channel 경유로 연결된다.
-  - 검증: compile / console error 0 / 선택 reaction EditMode 테스트
-
-## Next
 - [ ] I8. movement profile schema를 `DefinitionSO`까지 끌어올릴지 재평가
   - 완료 기준: optional authoring에서 profile schema 승격 여부와 범위를 문서 기준으로 확정한다.
   - 검증: TD/ADR 정합성 확인
+
+## Next
+- [ ] I9. `PeriodicTrailEmitter`를 별도 slice로 분리 설계
+  - 완료 기준: non-terminal secondary producer의 append 시점, accumulator runtime state, budget/drop 정책을 문서 기준으로 확정한다.
+  - 검증: TD 정합성 확인
 
 ## Blocked
 - 없음
@@ -73,8 +73,12 @@
   - 검증 결과: `BulletHomingLiteMotionComponent`와 optional authoring이 추가되었고, `BulletSimulationSystem`이 `Linear / Damped / HomingLite` 3-family query로 분리되었다.
   - 검증 결과: `HomingLite`는 player 위치를 read-only로 읽어 제한 각속도로만 방향을 보정하고, acquire/min distance 가드 밖에서는 직진 fallback을 유지한다.
   - 검증 결과: compile 성공 / console error 0 / EditMode 348 passed / PlayMode 39 passed
+- [x] I7. Slice 7 `OnCollectedSpawnSecondary` 구현을 완료했다.
+  - 검증 결과: `BulletOnCollectedSpawnSecondaryReactionComponent`와 optional authoring이 추가되었고, `BulletLifecycleReactionExecutionSystem`이 `VacuumCollected` reason에서만 secondary channel append를 수행하도록 확장되었다.
+  - 검증 결과: `CarryFullRemoved`는 collect reaction component가 있어도 no-op로 유지되고, source attribution은 `BulletSourceRefComponent`를 그대로 계승한다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode 354 passed / PlayMode 40 passed
 
 ## End of Session
-- 결과: Hazard 확장 논의를 기준으로 `Slice 1`부터 `Slice 6`까지 구현과 검증을 마쳤고, 다음 시작점은 collect-trigger 또는 non-terminal secondary reaction 1종 연결이다.
+- 결과: Hazard 확장 논의를 기준으로 `Slice 1`부터 `Slice 7`까지 구현과 검증을 마쳤고, 다음 시작점은 movement profile schema 승격 재평가 또는 non-terminal producer 분리 설계다.
 - 남은 리스크: `StageBlocked`/폭발 이벤트 채널 통합 범위와 secondary spawn merge/count attribution 세부 규칙이 아직 남아 있다.
-- 다음 세션 시작점: `I7. Slice 7 OnCollectedSpawnSecondary 또는 PeriodicTrailEmitter 구현`
+- 다음 세션 시작점: `I8. movement profile schema를 DefinitionSO까지 끌어올릴지 재평가`

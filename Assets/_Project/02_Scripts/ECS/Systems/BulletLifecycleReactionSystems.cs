@@ -33,9 +33,11 @@ namespace SweepNDodge.DotsBullets
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             var sourceRefLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(true);
             var explodeReactionLookup = SystemAPI.GetComponentLookup<BulletOnMotionCompletedExplodeReactionComponent>(true);
+            var collectReactionLookup = SystemAPI.GetComponentLookup<BulletOnCollectedSpawnSecondaryReactionComponent>(true);
             txLookup.Update(ref state);
             sourceRefLookup.Update(ref state);
             explodeReactionLookup.Update(ref state);
+            collectReactionLookup.Update(ref state);
 
             foreach (var (despawnRequest, lifecycleRequest, lifecycleContact, entity) in SystemAPI
                          .Query<EnabledRefRO<BulletDespawnRequestTag>, RefRO<BulletLifecycleRequestComponent>, RefRO<BulletLifecycleContactComponent>>()
@@ -53,7 +55,8 @@ namespace SweepNDodge.DotsBullets
                     secondaryRequests,
                     ref txLookup,
                     ref sourceRefLookup,
-                    ref explodeReactionLookup);
+                    ref explodeReactionLookup,
+                    ref collectReactionLookup);
             }
         }
 
@@ -66,15 +69,26 @@ namespace SweepNDodge.DotsBullets
             DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
             ref ComponentLookup<LocalTransform> txLookup,
             ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
-            ref ComponentLookup<BulletOnMotionCompletedExplodeReactionComponent> explodeReactionLookup)
+            ref ComponentLookup<BulletOnMotionCompletedExplodeReactionComponent> explodeReactionLookup,
+            ref ComponentLookup<BulletOnCollectedSpawnSecondaryReactionComponent> collectReactionLookup)
         {
             switch (lifecycleRequest.Reason)
             {
                 case BulletLifecycleReasonId.LifetimeExpired:
                 case BulletLifecycleReasonId.StageBlocked:
-                case BulletLifecycleReasonId.VacuumCollected:
                 case BulletLifecycleReasonId.CarryFullRemoved:
                 case BulletLifecycleReasonId.PlayerHit:
+                    break;
+                case BulletLifecycleReasonId.VacuumCollected:
+                    TryAppendCollectedSecondarySpawnRequest(
+                        bullet,
+                        in lifecycleContact,
+                        currentFrame,
+                        hasSecondaryChannel,
+                        secondaryRequests,
+                        ref txLookup,
+                        ref sourceRefLookup,
+                        ref collectReactionLookup);
                     break;
                 case BulletLifecycleReasonId.MotionCompleted:
                     TryAppendMotionCompletedExplodeRequest(
@@ -107,7 +121,62 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var reaction = explodeReactionLookup[bullet];
-            if (reaction.SecondaryBulletTypeKey < 0 || reaction.SpawnCount <= 0)
+            TryAppendSecondarySpawnRequest(
+                bullet,
+                reaction.SecondaryBulletTypeKey,
+                reaction.SpawnCount,
+                reaction.Shape,
+                reaction.SpreadAngleDeg,
+                reaction.SpawnRadius,
+                in lifecycleContact,
+                currentFrame,
+                secondaryRequests,
+                ref txLookup,
+                ref sourceRefLookup);
+        }
+
+        private static void TryAppendCollectedSecondarySpawnRequest(
+            Entity bullet,
+            in BulletLifecycleContactComponent lifecycleContact,
+            uint currentFrame,
+            bool hasSecondaryChannel,
+            DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
+            ref ComponentLookup<LocalTransform> txLookup,
+            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
+            ref ComponentLookup<BulletOnCollectedSpawnSecondaryReactionComponent> collectReactionLookup)
+        {
+            if (!hasSecondaryChannel || !collectReactionLookup.HasComponent(bullet))
+                return;
+
+            var reaction = collectReactionLookup[bullet];
+            TryAppendSecondarySpawnRequest(
+                bullet,
+                reaction.SecondaryBulletTypeKey,
+                reaction.SpawnCount,
+                reaction.Shape,
+                reaction.SpreadAngleDeg,
+                reaction.SpawnRadius,
+                in lifecycleContact,
+                currentFrame,
+                secondaryRequests,
+                ref txLookup,
+                ref sourceRefLookup);
+        }
+
+        private static void TryAppendSecondarySpawnRequest(
+            Entity bullet,
+            int secondaryBulletTypeKey,
+            int spawnCount,
+            BulletSecondarySpawnShapeId shape,
+            float spreadAngleDeg,
+            float spawnRadius,
+            in BulletLifecycleContactComponent lifecycleContact,
+            uint currentFrame,
+            DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
+            ref ComponentLookup<LocalTransform> txLookup,
+            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup)
+        {
+            if (secondaryBulletTypeKey < 0 || spawnCount <= 0)
                 return;
 
             Entity sourceEntity = sourceRefLookup.HasComponent(bullet)
@@ -119,16 +188,16 @@ namespace SweepNDodge.DotsBullets
 
             secondaryRequests.Add(new BulletSecondarySpawnRequestBuffer
             {
-                BulletTypeKey = reaction.SecondaryBulletTypeKey,
-                Count = reaction.SpawnCount,
+                BulletTypeKey = secondaryBulletTypeKey,
+                Count = spawnCount,
                 Priority = 0,
                 SourceEntity = sourceEntity,
                 CauserEntity = bullet,
                 OriginPosition = new float3(lifecycleContact.PositionXZ.x, originY, lifecycleContact.PositionXZ.y),
                 BaseDirection = math.normalizesafe(lifecycleContact.DirectionXZ, new float2(1f, 0f)),
-                SpreadAngleDeg = reaction.SpreadAngleDeg,
-                SpawnRadius = reaction.SpawnRadius,
-                Shape = reaction.Shape,
+                SpreadAngleDeg = spreadAngleDeg,
+                SpawnRadius = spawnRadius,
+                Shape = shape,
                 OldestFrame = currentFrame,
                 Sequence = 0u,
             });

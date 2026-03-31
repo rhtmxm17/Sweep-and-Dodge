@@ -48,7 +48,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeKey: 7,
                 sourceRef: Entity.Null,
                 addTransform: false,
-                explodeReaction: null);
+                explodeReaction: null,
+                collectReaction: null);
 
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
@@ -81,7 +82,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeKey: 9,
                 sourceRef: Entity.Null,
                 addTransform: true,
-                explodeReaction: null);
+                explodeReaction: null,
+                collectReaction: null);
 
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
@@ -120,6 +122,77 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 45f,
                     SpawnRadius = 1f,
+                },
+                collectReaction: null);
+
+            world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity).Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ReactionOwner_VacuumCollectedWithoutReaction_DoesNotAppendSecondarySpawn()
+        {
+            using var world = new World("BulletLifecycleReaction_VacuumCollectedNoReaction");
+            var em = world.EntityManager;
+
+            SetExecutionEndPrerequisites(em, frame: 10u);
+            var channelEntity = CreateSecondaryChannel(em);
+            var bullet = CreatePendingBullet(
+                em,
+                BulletLifecycleReasonId.VacuumCollected,
+                new BulletLifecycleContactComponent
+                {
+                    PositionXZ = new float2(1f, 2f),
+                    DirectionXZ = new float2(0f, 1f),
+                },
+                active: true,
+                despawnRequested: true,
+                typeKey: 9,
+                sourceRef: Entity.Null,
+                addTransform: true,
+                explodeReaction: null,
+                collectReaction: null);
+
+            world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity).Length, Is.EqualTo(0));
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            Assert.That(em.IsComponentEnabled<BulletActiveTag>(bullet), Is.True);
+        }
+
+        [TestCase(-1, 2)]
+        [TestCase(5, 0)]
+        public void ReactionOwner_InvalidCollectConfig_DoesNotAppendSecondarySpawn(int secondaryBulletTypeKey, int spawnCount)
+        {
+            using var world = new World("BulletLifecycleReaction_InvalidCollect");
+            var em = world.EntityManager;
+
+            SetExecutionEndPrerequisites(em, frame: 10u);
+            var channelEntity = CreateSecondaryChannel(em);
+            CreatePendingBullet(
+                em,
+                BulletLifecycleReasonId.VacuumCollected,
+                new BulletLifecycleContactComponent
+                {
+                    PositionXZ = new float2(1f, 2f),
+                    DirectionXZ = new float2(0f, 1f),
+                },
+                active: true,
+                despawnRequested: true,
+                typeKey: 9,
+                sourceRef: Entity.Null,
+                addTransform: true,
+                explodeReaction: null,
+                collectReaction: new BulletOnCollectedSpawnSecondaryReactionComponent
+                {
+                    SecondaryBulletTypeKey = secondaryBulletTypeKey,
+                    SpawnCount = spawnCount,
+                    Shape = BulletSecondarySpawnShapeId.PointBurst,
+                    SpreadAngleDeg = 30f,
+                    SpawnRadius = 0.5f,
                 });
 
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
@@ -157,7 +230,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.ForwardSpread,
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 1.5f,
-                });
+                },
+                collectReaction: null);
 
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
@@ -182,6 +256,101 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.IsComponentEnabled<BulletActiveTag>(bullet), Is.True);
             Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.MotionCompleted));
             Assert.That(em.GetComponentData<BulletLifecycleContactComponent>(bullet).PositionXZ, Is.EqualTo(new float2(4f, 6f)).Using(Float2Comparer.Within(1e-5f)));
+        }
+
+        [Test]
+        public void ReactionOwner_VacuumCollectedWithCollectReaction_AppendsSecondarySpawnRequest_AndKeepsSourcePending()
+        {
+            using var world = new World("BulletLifecycleReaction_VacuumCollectedAppend");
+            var em = world.EntityManager;
+
+            SetExecutionEndPrerequisites(em, frame: 14u);
+            var channelEntity = CreateSecondaryChannel(em);
+            var source = em.CreateEntity();
+            var bullet = CreatePendingBullet(
+                em,
+                BulletLifecycleReasonId.VacuumCollected,
+                new BulletLifecycleContactComponent
+                {
+                    PositionXZ = new float2(2f, 3f),
+                    DirectionXZ = new float2(2f, 0f),
+                },
+                active: true,
+                despawnRequested: true,
+                typeKey: 11,
+                sourceRef: source,
+                addTransform: true,
+                explodeReaction: null,
+                collectReaction: new BulletOnCollectedSpawnSecondaryReactionComponent
+                {
+                    SecondaryBulletTypeKey = 33,
+                    SpawnCount = 2,
+                    Shape = BulletSecondarySpawnShapeId.SingleForward,
+                    SpreadAngleDeg = 15f,
+                    SpawnRadius = 0.25f,
+                });
+
+            world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            var requests = em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity);
+            Assert.That(requests.Length, Is.EqualTo(1));
+
+            var request = requests[0];
+            Assert.That(request.BulletTypeKey, Is.EqualTo(33));
+            Assert.That(request.Count, Is.EqualTo(2));
+            Assert.That(request.SourceEntity, Is.EqualTo(source));
+            Assert.That(request.CauserEntity, Is.EqualTo(bullet));
+            Assert.That(request.OriginPosition, Is.EqualTo(new float3(2f, 0f, 3f)).Using(Float3Comparer.Within(1e-5f)));
+            Assert.That(request.BaseDirection, Is.EqualTo(new float2(1f, 0f)).Using(Float2Comparer.Within(1e-5f)));
+            Assert.That(request.SpreadAngleDeg, Is.EqualTo(15f));
+            Assert.That(request.SpawnRadius, Is.EqualTo(0.25f));
+            Assert.That(request.Shape, Is.EqualTo(BulletSecondarySpawnShapeId.SingleForward));
+            Assert.That(request.OldestFrame, Is.EqualTo(14u));
+            Assert.That(request.Sequence, Is.EqualTo(0u));
+
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            Assert.That(em.IsComponentEnabled<BulletActiveTag>(bullet), Is.True);
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.VacuumCollected));
+            Assert.That(em.GetComponentData<BulletLifecycleContactComponent>(bullet).PositionXZ, Is.EqualTo(new float2(2f, 3f)).Using(Float2Comparer.Within(1e-5f)));
+        }
+
+        [Test]
+        public void ReactionOwner_CarryFullRemovedWithCollectReaction_DoesNotAppendSecondarySpawn()
+        {
+            using var world = new World("BulletLifecycleReaction_CarryFullRemovedNoAppend");
+            var em = world.EntityManager;
+
+            SetExecutionEndPrerequisites(em, frame: 14u);
+            var channelEntity = CreateSecondaryChannel(em);
+            var bullet = CreatePendingBullet(
+                em,
+                BulletLifecycleReasonId.CarryFullRemoved,
+                new BulletLifecycleContactComponent
+                {
+                    PositionXZ = new float2(2f, 3f),
+                    DirectionXZ = new float2(1f, 0f),
+                },
+                active: true,
+                despawnRequested: true,
+                typeKey: 11,
+                sourceRef: Entity.Null,
+                addTransform: true,
+                explodeReaction: null,
+                collectReaction: new BulletOnCollectedSpawnSecondaryReactionComponent
+                {
+                    SecondaryBulletTypeKey = 33,
+                    SpawnCount = 2,
+                    Shape = BulletSecondarySpawnShapeId.SingleForward,
+                    SpreadAngleDeg = 15f,
+                    SpawnRadius = 0.25f,
+                });
+
+            world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity).Length, Is.EqualTo(0));
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
         }
 
         [Test]
@@ -355,7 +524,8 @@ namespace SweepNDodge.DotsBullets.Tests
             int typeKey,
             Entity sourceRef,
             bool addTransform,
-            BulletOnMotionCompletedExplodeReactionComponent? explodeReaction)
+            BulletOnMotionCompletedExplodeReactionComponent? explodeReaction,
+            BulletOnCollectedSpawnSecondaryReactionComponent? collectReaction)
         {
             var entity = em.CreateEntity(
                 typeof(BulletLifetimeComponent),
@@ -370,6 +540,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 em.AddComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
             if (explodeReaction.HasValue)
                 em.AddComponentData(entity, explodeReaction.Value);
+            if (collectReaction.HasValue)
+                em.AddComponentData(entity, collectReaction.Value);
 
             em.SetComponentData(entity, new BulletLifetimeComponent { Value = 4f });
             em.SetComponentData(entity, new BulletTypeKeyComponent { Value = typeKey });
