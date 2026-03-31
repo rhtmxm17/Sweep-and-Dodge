@@ -537,26 +537,187 @@ Motion Family Jobs -> BulletMotionOutputComponent 계산 -> MotionApplyJob -> Lo
   - secondary effect는 별도 request buffer로 전달
   - reaction이 carry/hazard stack/combat event에 영향을 주면 기존 owner 시스템과 충돌하지 않도록 기존 request 채널 또는 전용 request를 통해 합류한다
 
-### 3.6 2차 스폰(owner 분리) 초안
-- Source 기반 스폰과 Bullet 반응 기반 스폰은 owner를 분리한다.
-- 이유:
+### 3.6 T4 확정안: secondary spawn channel / owner / budget 분리
+- Source 기반 스폰과 Bullet 반응 기반 스폰은 **채널과 예산은 분리하고, 소비 owner는 같은 `ExecutionBegin` 계층에 둔다**.
+- 확정 이유:
   - source wave pressure와 reaction burst는 기원과 튜닝 축이 다르다.
-  - source request buffer에 reaction spawn을 직접 섞으면 lane/budget 의미가 흐려진다.
+  - `SourceSpawnRequestBuffer`는 `State + Phase + Lane` 기반 source clip 계약을 전제로 한다.
+  - reaction spawn을 source request buffer에 직접 섞으면 lane priority, backlog, starvation 관측 의미가 흐려진다.
 
-- 초안 구조:
-  - `SecondaryHazardSpawnRequestBuffer` 또는 동등 singleton/buffer를 별도 운용
-  - producer:
-    - trail emitter
-    - explode reaction
-    - collect reward reaction
-  - consumer:
-    - `BulletExecutionBeginGroup`의 별도 owner system
-  - shared rule:
-    - 같은 pool/fence 규칙 사용
-    - frame budget 및 cap 정책은 별도 필드로 관리
+- 채택 구조:
+  - source spawn
+    - request channel: 기존 `SourceSpawnRequestBuffer`
+    - build owner: `SourceClipRequestBuildSystem`
+    - consume owner: `SpawnRequestRoundRobinExecutionSystem`
+  - reaction/secondary spawn
+    - request channel: 신규 `BulletSecondarySpawnChannel`
+    - build owner: `BulletLifecycleReactionExecutionSystem` 및 필요 시 non-terminal reaction producer
+    - consume owner: 신규 `SecondarySpawnExecutionSystem`
 
-- 상세 budget 공유 방식은 이번 초안에서 확정하지 않는다.
-  - 최소한 source spawn backlog와 reaction spawn backlog를 구분 관측할 수 있어야 한다.
+- 공유 규칙:
+  - pool은 기존 `FreeByKey`와 `PoolFence`를 공유한다.
+  - backlog, budget, policy, metrics는 source spawn과 분리한다.
+  - request channel은 SharedStatic이 아니라 ECS singleton + dynamic buffer를 우선 사용한다.
+
+### 3.6.1 secondary spawn channel 데이터 계약
+- 1차 payload는 reaction spawn에 필요한 최소 필드만 가진다.
+
+```csharp
+public struct BulletSecondarySpawnChannelSingletonTag : IComponentData { }
+
+[InternalBufferCapacity(32)]
+public struct BulletSecondarySpawnRequestBuffer : IBufferElementData
+{
+    public int BulletTypeKey;
+    public int Count;
+    public byte Priority;
+    public Entity SourceEntity;
+    public Entity CauserEntity;
+    public float3 OriginPosition;
+    public float2 BaseDirection;
+    public float SpreadAngleDeg;
+    public float SpawnRadius;
+    public uint OldestFrame;
+    public uint Sequence;
+}
+```
+
+- 필드 의미:
+  - `BulletTypeKey`
+    - spawn할 탄 타입
+  - `Count`
+    - 집계된 request 수량
+  - `Priority`
+    - reaction channel 내부 우선순위
+  - `SourceEntity`
+    - source attribution이 필요한 경우 계승할 source
+  - `CauserEntity`
+    - trail / explode / reward를 일으킨 원 bullet
+  - `OriginPosition`
+    - spawn 기준 위치
+  - `BaseDirection`
+    - 기본 발사 방향
+  - `SpreadAngleDeg`
+    - burst/fan 계열 확산 폭
+  - `SpawnRadius`
+    - origin 주변 반경 산포
+  - `OldestFrame`
+    - age 만료/경고 판단용
+  - `Sequence`
+    - 결정론/디버그 추적용
+
+- 1차 payload 비범위:
+  - source clip의 `Phase`, `Lane`, `SamplingMode`를 그대로 재사용하지 않는다.
+  - reaction spawn에 clip/timeline 의미를 억지로 투영하지 않는다.
+
+### 3.6.2 producer / consumer owner
+- producer:
+  - `BulletLifecycleReactionExecutionSystem`
+    - `OnMotionCompletedExplode`
+    - `OnCollectedSpawnSecondary`
+    - `OnStageBlockedSpawnSecondary`
+  - 필요 시 별도 non-terminal reaction producer
+    - `PeriodicTrailEmitter`
+
+- consumer:
+  - `SecondarySpawnExecutionSystem`
+    - `BulletExecutionBeginGroup`
+    - `UpdateAfter(BulletPoolOwnerBootstrapSystem)`
+    - `UpdateAfter(BulletFieldAreaUpdateSystem)`
+    - `UpdateBefore(SpawnRequestRoundRobinExecutionSystem)`
+
+- 순서 의도:
+  - reaction spawn은 이미 1프레임 늦은 요청이므로, source spawn보다 먼저 소비해 체감 지연을 줄인다.
+  - 단, source spawn을 굶기지 않도록 별도 budget을 사용한다.
+
+### 3.6.3 budget / backlog / metrics 분리
+- `T4`에서는 source budget과 secondary spawn budget을 분리한다.
+- 확정 구조:
+  - source spawn
+    - `SpawnRequestPolicyComponent`
+    - `SpawnBacklogMetricsComponent`
+  - secondary spawn
+    - `SecondarySpawnPolicyComponent`
+    - `SecondarySpawnBacklogMetricsComponent`
+
+- `SecondarySpawnPolicyComponent` 1차 초안:
+
+```csharp
+public struct SecondarySpawnPolicyComponent : IComponentData
+{
+    public int BudgetPerFrame;
+    public int MaxPendingCount;
+    public uint MaxPendingAgeFrames;
+}
+```
+
+- `SecondarySpawnBacklogMetricsComponent` 1차 초안:
+
+```csharp
+public struct SecondarySpawnBacklogMetricsComponent : IComponentData
+{
+    public int PendingCount;
+    public int DeferredByBudget;
+    public int DeferredByPool;
+    public int DroppedByCapacity;
+    public int ExpiredByAge;
+    public int LastFrameBudgetUsed;
+}
+```
+
+- 이유:
+  - source backlog는 source pressure 문제로 관측해야 한다.
+  - reaction backlog는 explode/trail/reward burst 문제로 관측해야 한다.
+  - 두 backlog를 합치면 starvation 원인을 구분하기 어렵다.
+
+### 3.6.4 pool 공유 / budget 분리 원칙
+- 확정 원칙:
+  - pool capacity는 공유한다.
+  - dequeue/return fence는 공유한다.
+  - request channel, backlog, budget은 분리한다.
+
+- 의미:
+  - source spawn과 reaction spawn은 같은 탄 풀 자원을 사용한다.
+  - 그러나 "누가 frame budget을 얼마나 썼는가"는 별도 경로로 관측한다.
+
+- 기대 효과:
+  - 풀 부족은 전역 자원 문제로 본다.
+  - backlog 과다는 채널별 운영 문제로 본다.
+
+### 3.6.5 source attribution 규칙
+- 1차 attribution 규칙:
+  - hazard 파생 탄(trail fragment, explode fragment)은 원 bullet의 `SourceEntity`를 계승할 수 있다.
+  - pure reward dust는 기본값으로 `SourceEntity = Entity.Null`을 허용한다.
+
+- 이유:
+  - source 진행도/오염도/active count에 연결할 수 있는 파생 탄과
+  - 단순 보상 연출/수거용 파생 탄을 구분하기 위함이다.
+
+- 후속 설계 범위:
+  - 어떤 secondary spawn이 source attribution을 반드시 계승해야 하는지는 reaction profile별로 별도 고정한다.
+
+### 3.6.6 1차 secondary spawn shape 제한
+- 1차 구현에서는 아래 shape만 허용한다.
+  - `SingleForward`
+  - `ForwardSpread`
+  - `PointBurst`
+
+- 이번 단계에서 보류:
+  - `Ring`
+  - `Arc`
+  - curve/bezier 기반 trail
+  - source clip 수준 sampling 재사용
+
+- 이유:
+  - `T4`의 목적은 owner와 budget 분리이지 reaction projectile catalog 확장이 아니다.
+
+### 3.6.7 비채택안
+- `SourceSpawnRequestBuffer` 재사용
+  - 비채택 이유: source clip/lane 의미가 reaction spawn에 맞지 않고 backlog 관측이 오염된다.
+- ExecutionEnd 즉시 spawn
+  - 비채택 이유: pool owner 경계를 침범하고 frame spike 위험이 커진다.
+- source와 reaction의 완전 단일 budget
+  - 비채택 이유: starvation과 backlog 원인 구분이 어려워진다.
 
 ### 3.7 기존 예시 매핑
 - 작은 유성 같은 조각을 뿌림
@@ -614,6 +775,13 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 4. `BulletLifecycleReactionExecutionSystem`이 reason/context를 읽어 secondary effect를 실행한다.
 5. `BulletDespawnExecutionSystem`이 최종 active/render/pool consume를 수행한다.
 
+### 4.2.3 T4 기준 secondary spawn 흐름
+1. `ExecutionEnd`의 reaction owner가 `BulletSecondarySpawnRequestBuffer`에 aggregated request를 append한다.
+2. request는 channel singleton buffer에 프레임 간 유지된다.
+3. `ExecutionBegin`의 `SecondarySpawnExecutionSystem`이 own budget/cap/pool 상태를 기준으로 request를 소비한다.
+4. 같은 `FreeByKey` pool을 사용해 bullet를 dequeue하고 spawn state를 초기화한다.
+5. source spawn owner인 `SpawnRequestRoundRobinExecutionSystem`은 그 다음 순서에서 기존 source request를 소비한다.
+
 ### 4.2.2 기존 시스템 치환 기준
 - 기존 `BulletDespawnRequestTag` 직접 write 경로는 아래 원칙으로 치환한다.
   - Simulation 수명 만료/정지 완료:
@@ -653,12 +821,17 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - periodic trail/emitter는 반드시 frequency guard를 가진다.
   - 매 프레임 무조건 spawn 금지
   - 시간/거리 누적 기준으로 샘플링
+- reaction spawn도 aggregated request를 우선한다.
+  - terminal bullet 1개당 즉시 spawn 호출을 반복하지 않는다.
+  - 가능하면 같은 frame / same shape / same type request를 merge해 buffer 수를 제한한다.
 
 ### 5.2 주요 리스크
 - `MovementProfile`을 giant switch로 구현하면 Simulation이 다시 monolithic system이 된다.
 - `LifecycleReason` 없이 reaction만 늘리면 같은 프레임 다중 이벤트 우선순위가 불명확해진다.
 - secondary spawn을 source spawn backlog와 섞으면 pressure/budget 진단이 어려워진다.
 - 폭발/꼬리 spawn이 frame burst를 만들 수 있으므로 reaction 전용 budget/cap이 필요할 가능성이 높다.
+- source와 reaction이 같은 pool을 공유하므로, pool starvation은 채널 분리만으로 해결되지 않는다.
+  - 따라서 `DeferredByPool`은 channel별 metrics로 별도 기록되어야 한다.
 
 ## 6. 검증 계획
 - EditMode
@@ -668,26 +841,181 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - `OnCollectedSpawnSecondary`가 source despawn owner를 침범하지 않는지
   - `PeriodicTrailEmitter`가 frequency guard 없이 과도한 request를 만들지 않는지
   - secondary spawn queue가 source spawn backlog 계측과 분리되는지
+  - `SecondarySpawnExecutionSystem`이 source spawn 이전 순서에서 own budget으로만 소비되는지
+  - source와 reaction이 같은 pool을 공유하되 backlog/metrics가 분리 집계되는지
 - PlayMode
   - 전용 씬에서 정지 폭발/경로 trail/수거 보상 드롭 3종 스모크
   - peak active bullets와 frame 안정성 관찰
 - 공통 게이트
   - 문서 단계 이후 구현 시 `compile -> console error 0 -> EditMode -> PlayMode smoke`
 
-## 7. 작업 분해 초안
-1. `TD-027` 기준으로 movement/reaction/lifecycle 용어와 축을 고정한다.
-2. reason-aware lifecycle request 데이터 구조를 추가한다.
-3. `DampedLinear + MotionCompleted` 1종을 먼저 구현한다.
-4. `OnMotionCompletedExplode` 반응 1종을 구현한다.
-5. `OnCollectedSpawnSecondary` 또는 `PeriodicTrailEmitter` 중 1종을 추가한다.
-6. reaction 전용 budget/metrics가 필요하면 별도 TD 또는 ADR로 승격한다.
+## 7. 구현 분해 확정안 (T5)
+### 7.1 분해 원칙
+- 구현은 큰 리팩터 1회가 아니라 compile 가능한 vertical slice 단위로 진행한다.
+- 각 slice는 가능하면 아래 게이트를 닫는다.
+  - `compile`
+  - console `error 0`
+  - 관련 EditMode 테스트
+  - 필요 시 PlayMode smoke
+- 각 slice는 owner 경계 하나만 새로 도입하거나, 이미 도입된 경계를 한 단계만 확장한다.
+- 한 slice에서 아래를 동시에 열지 않는다.
+  - movement family 신규 2종 이상
+  - terminal lifecycle request와 secondary spawn channel을 동시에 최초 도입
+  - source spawn path와 reaction spawn path 동시 리팩터
+
+### 7.2 Slice 1. lifecycle request 인프라 도입
+- 목표:
+  - 기존 `BulletDespawnRequestTag` 단독 경로를 `BulletLifecycleRequestComponent + BulletLifecycleContactComponent` 조합으로 확장한다.
+- 포함:
+  - lifecycle enum / component 추가
+  - `TryPromoteLifecycleRequest` helper 추가
+  - bootstrap/spawn 초기화 경로 추가
+  - 기존 direct tag enable 지점 치환 준비
+- 비포함:
+  - 신규 movement family
+  - 신규 reaction 실행
+  - secondary spawn channel
+- 완료 기준:
+  - 기존 bullet가 동작을 깨지 않고 lifecycle request 필드를 가진 상태로 기동한다.
+  - 기존 direct tag enable 경로 중 최소 1개 이상이 helper 기반으로 치환된다.
+- 검증:
+  - compile / console error 0
+  - EditMode: priority helper 단위 테스트, 초기화/리셋 테스트
+
+### 7.3 Slice 2. `DampedLinear + MotionCompleted` 도입
+- 목표:
+  - 자기 상태 기반 movement family 1종을 Simulation에 추가한다.
+- 포함:
+  - `BulletDampedMotionComponent`
+  - `DampedMotionJob`
+  - 임계 속도 이하 `MotionCompleted` request 생성
+- 비포함:
+  - 폭발 reaction
+  - secondary spawn
+  - HomingLite
+- 완료 기준:
+  - damping bullet가 감속하고, 조건 충족 시 `MotionCompleted` reason을 남긴다.
+  - 기존 linear bullet는 회귀하지 않는다.
+- 검증:
+  - compile / console error 0
+  - EditMode: damping motion test, `MotionCompleted` request test
+
+### 7.4 Slice 3. lifecycle reaction consume owner 도입
+- 목표:
+  - `BulletLifecycleReactionExecutionSystem`을 추가해 terminal lifecycle consume을 `reaction execute -> final despawn` 2단으로 분리한다.
+- 포함:
+  - `BulletLifecycleReactionExecutionSystem` 골격
+  - reason dispatch 기본 경로
+  - `BulletDespawnExecutionSystem`과의 순서 고정
+- 비포함:
+  - 실제 secondary projectile spawn
+  - reward dust
+  - trail
+- 완료 기준:
+  - pending lifecycle request가 ExecutionEnd에서 reaction owner를 거친 뒤 기존 despawn owner로 이어진다.
+  - reaction이 없어도 기존 despawn 동작은 유지된다.
+- 검증:
+  - compile / console error 0
+  - EditMode: ExecutionEnd 순서/consume 회귀 테스트
+
+### 7.5 Slice 4. secondary spawn channel 인프라 도입
+- 목표:
+  - source spawn과 분리된 reaction spawn channel과 전용 budget path를 도입한다.
+- 포함:
+  - `BulletSecondarySpawnChannelSingletonTag`
+  - `BulletSecondarySpawnRequestBuffer`
+  - `SecondarySpawnPolicyComponent`
+  - `SecondarySpawnBacklogMetricsComponent`
+  - `SecondarySpawnExecutionSystem`
+- 비포함:
+  - 특정 reaction profile 연결
+  - HomingLite
+- 완료 기준:
+  - 빈 channel 상태에서도 시스템이 안전하게 동작한다.
+  - secondary spawn budget/metrics가 source backlog와 분리 집계된다.
+- 검증:
+  - compile / console error 0
+  - EditMode: channel bootstrap test, budget/age test, ExecutionBegin 순서 test
+
+### 7.6 Slice 5. `OnMotionCompletedExplode`를 secondary channel에 연결
+- 목표:
+  - `DampedLinear` 종료가 실제 reaction projectile spawn으로 이어지는 첫 end-to-end 경로를 만든다.
+- 포함:
+  - `OnMotionCompletedExplode` reaction component
+  - `BulletLifecycleReactionExecutionSystem`에서 explode request append
+  - `SecondarySpawnExecutionSystem`에서 `PointBurst` 또는 `ForwardSpread` 소비
+- 비포함:
+  - collect reward
+  - trail emitter
+  - HomingLite
+- 완료 기준:
+  - damping bullet 정지 -> `MotionCompleted` -> explode reaction -> secondary projectile spawn이 1프레임 지연 규칙 안에서 닫힌다.
+- 검증:
+  - compile / console error 0
+  - EditMode: explode path end-to-end test
+  - PlayMode: 정지 폭발 스모크
+
+### 7.7 Slice 6. `HomingLite` movement family 도입
+- 목표:
+  - 외부 상태(플레이어 위치) 기반 movement family 1종을 추가한다.
+- 포함:
+  - `BulletHomingLiteMotionComponent`
+  - `HomingLiteMotionJob`
+  - acquire/min distance 가드
+  - speed 유지 / 직진 fallback 규칙
+- 비포함:
+  - collect reward
+  - trail emitter
+- 완료 기준:
+  - homing bullet가 player 위치를 read-only로 읽어 방향만 제한 각속도로 굽힌다.
+  - 유효 target이 없으면 직진 fallback을 유지한다.
+- 검증:
+  - compile / console error 0
+  - EditMode: homing steering test, fallback test
+
+### 7.8 Slice 7. `OnCollectedSpawnSecondary` 또는 `PeriodicTrailEmitter` 1종 연결
+- 목표:
+  - non-terminal 또는 collect-trigger reaction 중 1종을 secondary channel 경유로 연결한다.
+- 우선순위 권장:
+  - 1순위: `OnCollectedSpawnSecondary`
+  - 2순위: `PeriodicTrailEmitter`
+- 이유:
+  - collect-trigger reaction은 lifecycle reason과 연결이 명확하고, source/reward attribution 테스트가 쉽다.
+  - trail emitter는 non-terminal producer라 append 시점 논의가 더 필요하다.
+- 완료 기준:
+  - 선택한 reaction 1종이 source spawn과 분리된 channel을 통해 정상 spawn된다.
+- 검증:
+  - compile / console error 0
+  - EditMode: collect 또는 trail request test
+  - PlayMode: 수거 보상 드롭 또는 경로 trail 스모크
+
+### 7.9 Slice 우선순위와 시작점
+- 구현 시작 순서는 아래로 고정한다.
+  1. Slice 1
+  2. Slice 2
+  3. Slice 3
+  4. Slice 4
+  5. Slice 5
+  6. Slice 6
+  7. Slice 7
+
+- 시작점 근거:
+  - lifecycle request와 damping family가 먼저 있어야 end-to-end explode path를 만들 수 있다.
+  - secondary channel은 reaction 실행 지점이 생긴 뒤 도입하는 편이 구현 책임이 분명하다.
+  - HomingLite는 구조 검증 후에 추가해도 owner 경계를 흐리지 않는다.
 
 ## 8. 오픈 이슈
-- secondary spawn budget을 source spawn과 완전 분리할지, 동일 전역 예산에서 slice를 나눌지
 - `StageBlocked`를 단순 despawn reason으로만 볼지, bounce/fragment의 전처리 reason으로 볼지
 - 폭발이 공통 전투 이벤트 채널(`Hit/Collect/Cleanup`)에 포함되어야 하는지, 별도 채널을 둘지
 - movement sub-step을 시스템 분할로 표현할지, 단일 simulation owner 내부 ordered job으로 유지할지
+- secondary spawn request merge key를 어디까지 묶을지
+  - `TypeKey + Shape + SourceEntity` 수준인지
+  - `CauserEntity` 단위까지 보존할지
+- reaction spawn active count를 source active count에 어떤 규칙으로 반영할지
+  - source attribution 계승 탄만 count 대상에 넣을지 여부
+- `PeriodicTrailEmitter`를 terminal lifecycle owner가 아니라 Simulation side producer로 둘 때, 어느 시점에 channel append를 허용할지
 
 ## 9. 변경 이력
 - 2026-03-30: 초안 작성. Hazard 확장을 `Movement + Reaction + LifecycleReason` 조합으로 분리하는 방향과 owner 경계를 정리했다.
 - 2026-03-30: `T2` 구체화. terminal lifecycle을 `BulletDespawnRequestTag + BulletLifecycleRequestComponent + BulletLifecycleContactComponent` 조합으로 두고, producer helper / priority / consumer owner 규칙을 추가했다.
+- 2026-03-31: `T4` 확정. secondary spawn을 source spawn과 채널/예산/metrics는 분리하고, 같은 `ExecutionBegin` 계층의 별도 consumer owner가 처리하는 구조로 고정했다.
