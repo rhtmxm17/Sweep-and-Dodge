@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -111,7 +112,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             Assert.That(EditorSceneManager.OpenScene(SampleScenePath, OpenSceneMode.Single).IsValid(), Is.True);
 
-            var stage = Object.FindObjectsByType<StageLayoutStageMarker>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+            var stage = UnityEngine.Object.FindObjectsByType<StageLayoutStageMarker>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .Single(x => x.StageId == stageId);
             Assert.That(stage.TryGetComponent(out StageGridAuthoring authoring), Is.True);
             Assert.That(authoring.RegionTilemap, Is.Not.Null, $"Stage {stageId} sample authoring must use unified RegionTilemap.");
@@ -130,6 +131,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             AssertSourceAndDepositAnchorsMatchScene(authoring, stage, layout);
             AssertPlayerStartMatchesScene(authoring, stage, layout);
+            AssertPresentationsMatchScene(stage, layout);
         }
 
         private static uint ResolveRegionStableId(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
@@ -181,9 +183,85 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(layout.PlayerStart.YawDeg, Is.EqualTo(marker.YawDeg).Within(0.001f));
         }
 
+        private static void AssertPresentationsMatchScene(StageLayoutStageMarker stage, StageLayoutSO layout)
+        {
+            var expected = StagePresentationEditorUtility.GetPresentationMarkers(stage)
+                .OrderBy(x => x.StableId)
+                .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
+                .Select(ToPresentationData)
+                .ToArray();
+            var actual = layout.Presentations ?? Array.Empty<StagePresentationLayoutData>();
+
+            Assert.That(actual.Length, Is.EqualTo(expected.Length), $"Stage {stage.StageId} presentation count mismatch.");
+            for (int i = 0; i < actual.Length; i++)
+            {
+                AssertPresentationEquals(expected[i], actual[i], stage.StageId, i);
+            }
+        }
+
+        private static StagePresentationLayoutData ToPresentationData(StagePresentationMarker marker)
+        {
+            var transform = marker.transform;
+            bool linked = marker.PlacementMode == StagePresentationPlacementMode.LinkedToParent;
+            var linkKind = StagePresentationLinkKind.None;
+            uint linkedStableId = 0u;
+            if (linked)
+                StagePresentationEditorUtility.TryFindLinkedParent(transform, out linkKind, out linkedStableId, out _);
+
+            return new StagePresentationLayoutData
+            {
+                StableId = marker.StableId,
+                Active = marker.Active,
+                PlacementMode = marker.PlacementMode,
+                LinkKind = linked ? linkKind : StagePresentationLinkKind.None,
+                LinkedStableId = linked ? linkedStableId : 0u,
+                PresentationKey = marker.PresentationKey != null ? marker.PresentationKey.Trim() : string.Empty,
+                Position = linked ? transform.localPosition : transform.position,
+                Euler = linked ? transform.localEulerAngles : transform.eulerAngles,
+                Scale = transform.localScale,
+            };
+        }
+
+        private static void AssertPresentationEquals(StagePresentationLayoutData expected, StagePresentationLayoutData actual, int stageId, int index)
+        {
+            string prefix = $"Stage {stageId} presentation[{index}]";
+            Assert.That(actual.StableId, Is.EqualTo(expected.StableId), $"{prefix} stable id mismatch.");
+            Assert.That(actual.Active, Is.EqualTo(expected.Active), $"{prefix} active flag mismatch.");
+            Assert.That(actual.PlacementMode, Is.EqualTo(expected.PlacementMode), $"{prefix} placement mode mismatch.");
+            Assert.That(actual.LinkKind, Is.EqualTo(expected.LinkKind), $"{prefix} link kind mismatch.");
+            Assert.That(actual.LinkedStableId, Is.EqualTo(expected.LinkedStableId), $"{prefix} linked stable id mismatch.");
+            Assert.That(actual.PresentationKey, Is.EqualTo(expected.PresentationKey), $"{prefix} presentation key mismatch.");
+            AssertVector3(actual.Position, expected.Position, $"{prefix} position mismatch.");
+            AssertVector3(actual.Euler, expected.Euler, $"{prefix} euler mismatch.");
+            AssertVector3(actual.Scale, expected.Scale, $"{prefix} scale mismatch.");
+        }
+
+        private static void AssertVector3(Vector3 actual, Vector3 expected, string message)
+        {
+            Assert.That(actual.x, Is.EqualTo(expected.x).Within(0.001f), $"{message} (x)");
+            Assert.That(actual.y, Is.EqualTo(expected.y).Within(0.001f), $"{message} (y)");
+            Assert.That(actual.z, Is.EqualTo(expected.z).Within(0.001f), $"{message} (z)");
+        }
+
         private static uint ResolveStableId(StageGridAuthoring authoring, StageRegionAnchorMarker marker)
         {
             return authoring.TryResolveStableId(marker.RegionKind, marker.RegionSlotIndex, out uint stableId) ? stableId : 0u;
+        }
+
+        private static string BuildHierarchyPath(Transform transform)
+        {
+            if (transform == null)
+                return "(null)";
+
+            string path = transform.name;
+            var current = transform.parent;
+            while (current != null)
+            {
+                path = $"{current.name}/{path}";
+                current = current.parent;
+            }
+
+            return path;
         }
     }
 }

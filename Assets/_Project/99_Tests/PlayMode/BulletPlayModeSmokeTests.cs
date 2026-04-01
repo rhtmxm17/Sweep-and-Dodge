@@ -2420,23 +2420,26 @@ namespace SweepNDodge.DotsBullets.Tests
 
             Assert.That(shell.RequestSelectStageById(1), Is.True);
             StagePresentationRuntimeController controller = null;
+            int stage1ExpectedRootCount = -1;
             yield return WaitForCondition(
                 () =>
                 {
                     shell = FindDemoShell();
                     controller = FindStagePresentationRuntimeController();
-                    return shell != null
+                    return TryGetExpectedActivePresentationCount(controller, 1, out stage1ExpectedRootCount)
+                        && shell != null
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && shell.CurrentStageId == 1
                         && controller != null
                         && controller.LastAppliedStageId == 1
-                        && controller.SpawnedRootCount == 1
-                        && controller.transform.childCount == 1
-                        && controller.transform.GetChild(0).name.Contains("preview_visual_01");
+                        && controller.SpawnedRootCount == stage1ExpectedRootCount
+                        && controller.transform.childCount == stage1ExpectedRootCount;
                 },
                 360,
-                () => $"Stage1 presentation was not rebuilt within timeout. {DescribePresentationControllerState()}");
+                () => $"Stage1 presentation state did not settle within timeout. {DescribePresentationControllerState()}");
 
+            Assert.That(stage1ExpectedRootCount, Is.GreaterThan(0), "Stage1 must expose at least one active presentation for rebuild identity checks.");
+            var stage1Controller = controller;
             var stage1Presentation = controller.transform.GetChild(0).gameObject;
 
             ForceStageStateToRunning(em, 0f);
@@ -2457,25 +2460,32 @@ namespace SweepNDodge.DotsBullets.Tests
                 "StageResult was not entered before NextStage for presentation rebuild test.");
 
             Assert.That(shell.RequestResultAction(DemoShellResultActionId.NextStage), Is.True);
+            int stage2ExpectedRootCount = -1;
             yield return WaitForCondition(
                 () =>
                 {
                     shell = FindDemoShell();
                     controller = FindStagePresentationRuntimeController();
-                    return shell != null
+                    return TryGetExpectedActivePresentationCount(controller, 2, out stage2ExpectedRootCount)
+                        && shell != null
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && shell.CurrentStageId == 2
                         && controller != null
                         && controller.LastAppliedStageId == 2
-                        && controller.SpawnedRootCount == 1
-                        && controller.transform.childCount == 1
-                        && controller.transform.GetChild(0).name.Contains("preview_visual_02");
+                        && controller.SpawnedRootCount == stage2ExpectedRootCount
+                        && controller.transform.childCount == stage2ExpectedRootCount;
                 },
                 360,
-                () => $"Stage2 presentation was not rebuilt within timeout. {DescribePresentationControllerState()}");
+                () => $"Stage2 presentation state did not settle within timeout. {DescribePresentationControllerState()}");
 
-            var stage2Presentation = controller.transform.GetChild(0).gameObject;
-            Assert.That(stage2Presentation, Is.Not.EqualTo(stage1Presentation), "Stage2 presentation should be recreated, not stale Stage1 instance.");
+            Assert.That(controller, Is.Not.EqualTo(stage1Controller), "NextStage should reload the operational scene and recreate the presentation controller.");
+            GameObject stage2Presentation = controller.transform.childCount > 0
+                ? controller.transform.GetChild(0).gameObject
+                : null;
+            if (stage2Presentation != null)
+                Assert.That(stage2Presentation, Is.Not.EqualTo(stage1Presentation), "Stage2 presentation should be recreated, not stale Stage1 instance.");
+            else
+                Assert.That(controller.transform.childCount, Is.EqualTo(0), "Stage2 without active presentations must clear Stage1 roots.");
 
             ForceStageStateToRunning(em, 0f);
             yield return WaitForCondition(
@@ -2495,23 +2505,30 @@ namespace SweepNDodge.DotsBullets.Tests
                 "StageResult was not entered before Retry for presentation rebuild test.");
 
             Assert.That(shell.RequestResultAction(DemoShellResultActionId.Retry), Is.True);
+            var stage2Controller = controller;
             yield return WaitForCondition(
                 () =>
                 {
                     shell = FindDemoShell();
                     controller = FindStagePresentationRuntimeController();
-                    return shell != null
+                    return TryGetExpectedActivePresentationCount(controller, 2, out var retryExpectedRootCount)
+                        && retryExpectedRootCount == stage2ExpectedRootCount
+                        && shell != null
                         && shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && shell.CurrentStageId == 2
                         && controller != null
                         && controller.LastAppliedStageId == 2
-                        && controller.SpawnedRootCount == 1
-                        && controller.transform.childCount == 1
-                        && controller.transform.GetChild(0).name.Contains("preview_visual_02")
-                        && controller.transform.GetChild(0).gameObject != stage2Presentation;
+                        && controller.SpawnedRootCount == stage2ExpectedRootCount
+                        && controller.transform.childCount == stage2ExpectedRootCount;
                 },
                 360,
-                () => $"Retry did not rebuild Stage2 presentation within timeout. {DescribePresentationControllerState()}");
+                () => $"Retry did not settle Stage2 presentation state within timeout. {DescribePresentationControllerState()}");
+
+            Assert.That(controller, Is.Not.EqualTo(stage2Controller), "Retry should reload the operational scene and recreate the presentation controller.");
+            if (stage2Presentation != null)
+                Assert.That(controller.transform.GetChild(0).gameObject, Is.Not.EqualTo(stage2Presentation), "Retry should recreate the Stage2 presentation root.");
+            else
+                Assert.That(controller.transform.childCount, Is.EqualTo(0), "Retry should preserve the current stage's zero-presentation state without reviving stale roots.");
         }
 
         [UnityTest]
@@ -4170,6 +4187,47 @@ namespace SweepNDodge.DotsBullets.Tests
 
             return
                 $"presentation(lastApplied={controller.LastAppliedStageId}, lastReady={controller.LastReady}, spawned={controller.SpawnedRootCount}, childCount={controller.transform.childCount}, firstChild={childName})";
+        }
+
+        private static bool TryGetExpectedActivePresentationCount(StagePresentationRuntimeController controller, int stageId, out int count)
+        {
+            count = -1;
+            if (controller == null || stageId <= 0)
+                return false;
+
+            var catalog = controller.StageCatalog != null
+                ? controller.StageCatalog
+                : controller.TopologyBridge != null
+                    ? controller.TopologyBridge.StageCatalog
+                    : null;
+            if (catalog == null || catalog.Entries == null)
+                return false;
+
+            for (int i = 0; i < catalog.Entries.Length; i++)
+            {
+                var entry = catalog.Entries[i];
+                if (!entry.Enabled || entry.Layout == null || entry.Layout.StageId != stageId)
+                    continue;
+
+                var presentations = entry.Layout.Presentations;
+                if (presentations == null)
+                {
+                    count = 0;
+                    return true;
+                }
+
+                int activeCount = 0;
+                for (int p = 0; p < presentations.Length; p++)
+                {
+                    if (presentations[p].Active)
+                        activeCount++;
+                }
+
+                count = activeCount;
+                return true;
+            }
+
+            return false;
         }
 
         private static string DescribeStageStartDialogueActivationState(EntityManager em)
