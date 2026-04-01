@@ -186,7 +186,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 sourceRef: Entity.Null,
                 addTransform: true,
                 explodeReaction: null,
-                collectReaction: new BulletOnCollectedSpawnSecondaryReactionComponent
+                collectReaction: new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
                 {
                     SecondaryBulletTypeKey = secondaryBulletTypeKey,
                     SpawnCount = spawnCount,
@@ -259,7 +259,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void ReactionOwner_VacuumCollectedWithCollectReaction_AppendsSecondarySpawnRequest_AndKeepsSourcePending()
+        public void ReactionOwner_VacuumCollectedWithCleanupRemovedReaction_AppendsSecondarySpawnRequest_AndKeepsSourcePending()
         {
             using var world = new World("BulletLifecycleReaction_VacuumCollectedAppend");
             var em = world.EntityManager;
@@ -281,7 +281,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 sourceRef: source,
                 addTransform: true,
                 explodeReaction: null,
-                collectReaction: new BulletOnCollectedSpawnSecondaryReactionComponent
+                collectReaction: new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
                 {
                     SecondaryBulletTypeKey = 33,
                     SpawnCount = 2,
@@ -316,13 +316,14 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void ReactionOwner_CarryFullRemovedWithCollectReaction_DoesNotAppendSecondarySpawn()
+        public void ReactionOwner_CarryFullRemovedWithCleanupRemovedReaction_AppendsSecondarySpawnRequest_AndKeepsSourcePending()
         {
-            using var world = new World("BulletLifecycleReaction_CarryFullRemovedNoAppend");
+            using var world = new World("BulletLifecycleReaction_CarryFullRemovedAppend");
             var em = world.EntityManager;
 
             SetExecutionEndPrerequisites(em, frame: 14u);
             var channelEntity = CreateSecondaryChannel(em);
+            var source = em.CreateEntity();
             var bullet = CreatePendingBullet(
                 em,
                 BulletLifecycleReasonId.CarryFullRemoved,
@@ -334,10 +335,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 active: true,
                 despawnRequested: true,
                 typeKey: 11,
-                sourceRef: Entity.Null,
+                sourceRef: source,
                 addTransform: true,
                 explodeReaction: null,
-                collectReaction: new BulletOnCollectedSpawnSecondaryReactionComponent
+                collectReaction: new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
                 {
                     SecondaryBulletTypeKey = 33,
                     SpawnCount = 2,
@@ -349,8 +350,15 @@ namespace SweepNDodge.DotsBullets.Tests
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
 
-            Assert.That(em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity).Length, Is.EqualTo(0));
+            var requests = em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity);
+            Assert.That(requests.Length, Is.EqualTo(1));
+            Assert.That(requests[0].BulletTypeKey, Is.EqualTo(33));
+            Assert.That(requests[0].Count, Is.EqualTo(2));
+            Assert.That(requests[0].SourceEntity, Is.EqualTo(source));
+            Assert.That(requests[0].CauserEntity, Is.EqualTo(bullet));
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            Assert.That(em.IsComponentEnabled<BulletActiveTag>(bullet), Is.True);
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.CarryFullRemoved));
         }
 
         [Test]
@@ -525,7 +533,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Entity sourceRef,
             bool addTransform,
             BulletOnMotionCompletedExplodeReactionComponent? explodeReaction,
-            BulletOnCollectedSpawnSecondaryReactionComponent? collectReaction)
+            BulletOnCleanupRemovedSpawnSecondaryReactionComponent? collectReaction)
         {
             var entity = em.CreateEntity(
                 typeof(BulletLifetimeComponent),

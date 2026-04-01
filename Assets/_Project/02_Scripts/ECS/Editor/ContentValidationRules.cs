@@ -171,7 +171,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 string location = definitions[i].Location;
                 ValidateMovementDefinition(def, location, issues);
                 ValidateReactionDefinition(def.OnMotionCompletedExplode, knownKeys, location, "OnMotionCompletedExplode", issues);
-                ValidateReactionDefinition(def.OnCollectedSpawnSecondary, knownKeys, location, "OnCollectedSpawnSecondary", issues);
+                ValidateReactionDefinition(def.OnCleanupRemovedSpawnSecondary, knownKeys, location, "OnCleanupRemovedSpawnSecondary", issues);
                 ValidateForbiddenOptionalAuthorings(def, location, issues);
             }
         }
@@ -683,6 +683,7 @@ namespace SweepNDodge.DotsBullets.Editor
             if (prefab.GetComponent<BulletDampedMotionAuthoring>() != null
                 || prefab.GetComponent<BulletHomingLiteMotionAuthoring>() != null
                 || prefab.GetComponent<BulletOnMotionCompletedExplodeReactionAuthoring>() != null
+                || prefab.GetComponent<BulletOnCleanupRemovedSpawnSecondaryReactionAuthoring>() != null
                 || prefab.GetComponent<BulletOnCollectedSpawnSecondaryReactionAuthoring>() != null)
             {
                 issues.Add(new ContentValidationIssue(

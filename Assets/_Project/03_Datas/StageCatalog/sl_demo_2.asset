@@ -4835,4 +4835,13 @@ MonoBehaviour:
     AnchorCell: {x: 12, y: 15}
     AnchorOffset: {x: 0, y: 0}
     YawDeg: 0
-  Presentations: []
+  Presentations:
+  - StableId: 9002
+    Active: 1
+    PlacementMode: 1
+    LinkKind: 1
+    LinkedStableId: 1002
+    PresentationKey: preview_visual_02
+    Position: {x: 0, y: 0, z: 0}
+    Euler: {x: 0, y: 0, z: 0}
+    Scale: {x: 1, y: 1, z: 1}

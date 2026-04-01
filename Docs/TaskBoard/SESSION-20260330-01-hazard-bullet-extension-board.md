@@ -71,15 +71,15 @@
   - 검증 결과: `BulletHomingLiteMotionComponent`와 optional authoring이 추가되었고, `BulletSimulationSystem`이 `Linear / Damped / HomingLite` 3-family query로 분리되었다.
   - 검증 결과: `HomingLite`는 player 위치를 read-only로 읽어 제한 각속도로만 방향을 보정하고, acquire/min distance 가드 밖에서는 직진 fallback을 유지한다.
   - 검증 결과: compile 성공 / console error 0 / EditMode 348 passed / PlayMode 39 passed
-- [x] I7. Slice 7 `OnCollectedSpawnSecondary` 구현을 완료했다.
-  - 검증 결과: `BulletOnCollectedSpawnSecondaryReactionComponent`와 optional authoring이 추가되었고, `BulletLifecycleReactionExecutionSystem`이 `VacuumCollected` reason에서만 secondary channel append를 수행하도록 확장되었다.
-  - 검증 결과: `CarryFullRemoved`는 collect reaction component가 있어도 no-op로 유지되고, source attribution은 `BulletSourceRefComponent`를 그대로 계승한다.
+- [x] I7. Slice 7 `OnCleanupRemovedSpawnSecondary` 구현을 완료했다.
+  - 검증 결과: `BulletOnCleanupRemovedSpawnSecondaryReactionComponent`와 optional authoring이 추가되었고, `BulletLifecycleReactionExecutionSystem`이 cleanup removal trigger에서 secondary channel append를 수행하도록 확장되었다.
+  - 검증 결과: 현재 trigger는 `VacuumCollected`, `CarryFullRemoved`이며, source attribution은 `BulletSourceRefComponent`를 그대로 계승한다.
   - 검증 결과: compile 성공 / console error 0 / EditMode 354 passed / PlayMode 40 passed
 - [x] I8. `BulletDefinitionSO` schema uplift를 구현했다.
 - [x] I10. DefinitionSO 기반 샘플 bullet asset/prefab 세트를 추가했다.
   - 검증 결과: `LinearHazard`, `Bubble StopBurst`, `BubbleFragment`, `Candy CollectedReward`, `MagicDust`, `HomingHazard` 샘플 definition/prefab/material이 별도 sample 폴더에 추가되었고, 두 entities 씬의 `BulletVisualPrefabAuthoring.Definitions`에 등록되었다.
   - 검증 결과: compile / console error 0 / EditMode / PlayMode smoke 통과
-  - 검증 결과: `BulletDefinitionSO`와 `BulletPoolDefinitionBuffer`가 `Linear/DampedLinear/HomingLite` movement와 `OnMotionCompletedExplode/OnCollectedSpawnSecondary` reaction metadata를 정식 필드로 가진다.
+  - 검증 결과: `BulletDefinitionSO`와 `BulletPoolDefinitionBuffer`가 `Linear/DampedLinear/HomingLite` movement와 `OnMotionCompletedExplode/OnCleanupRemovedSpawnSecondary` reaction metadata를 정식 필드로 가진다.
   - 검증 결과: bootstrap은 definition buffer 기준으로 sparse movement/reaction component를 pooled bullet에 적용하고, 금지된 optional behavior authoring은 content validation error로 처리된다.
   - 검증 결과: compile 성공 / console error 0 / EditMode/PlayMode smoke 통과
 - [x] I8.1. `SecondaryBullet` editor reference 전환을 구현했다.

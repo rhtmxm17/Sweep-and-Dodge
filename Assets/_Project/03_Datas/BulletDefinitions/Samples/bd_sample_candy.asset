@@ -35,7 +35,7 @@ MonoBehaviour:
     Shape: 2
     SpreadAngleDeg: 90
     SpawnRadius: 0
-  OnCollectedSpawnSecondary:
+  OnCleanupRemovedSpawnSecondary:
     Enabled: 1
     SecondaryBullet: {fileID: 11400000, guid: a08f5eee2d994de4b093c3c3076d493e, type: 2}
     SpawnCount: 6

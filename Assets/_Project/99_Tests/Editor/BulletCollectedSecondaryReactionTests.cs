@@ -7,7 +7,7 @@ using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class BulletCollectedSecondaryReactionTests
+    public class BulletCleanupRemovedSecondaryReactionTests
     {
         [SetUp]
         public void SetUp()
@@ -23,9 +23,9 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void VacuumCollectedSecondary_EndToEnd_AppendsDespawnsAndSpawnsSecondaryBullets()
+        public void VacuumCleanupRemovedSecondary_EndToEnd_AppendsDespawnsAndSpawnsSecondaryBullets()
         {
-            using var world = new World("VacuumCollectedSecondary_EndToEnd");
+            using var world = new World("VacuumCleanupRemovedSecondary_EndToEnd");
             var em = world.EntityManager;
 
             SetSimulationAndVacuumPrerequisites(em, frame: 1u);
@@ -43,7 +43,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 position: new float3(1f, 0f, 0f),
                 scoreValue: 2,
                 sourceEntity: source,
-                collectReaction: new BulletOnCollectedSpawnSecondaryReactionComponent
+                collectReaction: new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
                 {
                     SecondaryBulletTypeKey = 21,
                     SpawnCount = 2,
@@ -96,6 +96,83 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(activeCounts.Length, Is.EqualTo(1));
                 Assert.That(activeCounts[0].BulletTypeKey, Is.EqualTo(21));
                 Assert.That(activeCounts[0].ActiveCount, Is.EqualTo(2));
+            }
+            finally
+            {
+                secondaryBullets.Dispose();
+            }
+        }
+
+        [Test]
+        public void CarryFullRemovedCleanupRemoved_EndToEnd_AppendsDespawnsAndSpawnsSecondaryBullets_WithoutProgressGain()
+        {
+            using var world = new World("CarryFullRemovedCleanupRemoved_EndToEnd");
+            var em = world.EntityManager;
+
+            SetSimulationAndVacuumPrerequisites(em, frame: 1u);
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[] { StageCellMovementFlags.None });
+            CreateCombatChannel(em);
+            CreateSecondaryChannel(em);
+            var player = CreateVacuumContractPlayer(em, carryLoad: 10, carryCapacity: 10);
+
+            var source = em.CreateEntity();
+            em.AddBuffer<SourceActiveBulletCountBuffer>(source);
+
+            var removedBullet = CreateCleanupRemovableHazardBullet(
+                em,
+                position: new float3(2.88f, 0f, 0f),
+                scoreValue: 2,
+                sourceEntity: source,
+                cleanupRemovedReaction: new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
+                {
+                    SecondaryBulletTypeKey = 21,
+                    SpawnCount = 2,
+                    Shape = BulletSecondarySpawnShapeId.PointBurst,
+                    SpreadAngleDeg = 0f,
+                    SpawnRadius = 1f,
+                });
+
+            var secondaryBullets = new NativeArray<Entity>(2, Allocator.Temp);
+            try
+            {
+                for (int i = 0; i < secondaryBullets.Length; i++)
+                {
+                    secondaryBullets[i] = CreatePooledSecondaryBullet(em, typeKey: 21, speed: 2f, lifetime: 6f);
+                    BulletFieldShared.FreeByKey.Add(21, secondaryBullets[i]);
+                }
+
+                ActivateVacuum(em, player);
+
+                world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                var lifecycleRequest = em.GetComponentData<BulletLifecycleRequestComponent>(removedBullet);
+                Assert.That(lifecycleRequest.Reason, Is.EqualTo(BulletLifecycleReasonId.CarryFullRemoved));
+
+                world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletDespawnExecutionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                Assert.That(em.IsComponentEnabled<BulletActiveTag>(removedBullet), Is.False);
+                Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(removedBullet), Is.False);
+                Assert.That(em.GetComponentData<PlayerCarryBinComponent>(player).Load, Is.EqualTo(10));
+
+                world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                int activeSecondaryCount = 0;
+                for (int i = 0; i < secondaryBullets.Length; i++)
+                {
+                    if (!em.IsComponentEnabled<BulletActiveTag>(secondaryBullets[i]))
+                        continue;
+
+                    activeSecondaryCount++;
+                    Assert.That(em.GetComponentData<BulletSourceRefComponent>(secondaryBullets[i]).Value, Is.EqualTo(source));
+                }
+
+                Assert.That(activeSecondaryCount, Is.EqualTo(2));
             }
             finally
             {
@@ -361,7 +438,7 @@ namespace SweepNDodge.DotsBullets.Tests
             float3 position,
             int scoreValue,
             Entity sourceEntity,
-            BulletOnCollectedSpawnSecondaryReactionComponent collectReaction)
+            BulletOnCleanupRemovedSpawnSecondaryReactionComponent collectReaction)
         {
             var bullet = em.CreateEntity(
                 typeof(LocalTransform),
@@ -374,7 +451,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(BulletRadiusComponent),
                 typeof(BulletScoreValueComponent),
                 typeof(BulletCaptureRuleComponent),
-                typeof(BulletOnCollectedSpawnSecondaryReactionComponent),
+                typeof(BulletOnCleanupRemovedSpawnSecondaryReactionComponent),
                 typeof(BulletActiveTag),
                 typeof(BulletDespawnRequestTag));
 
@@ -397,6 +474,18 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(bullet, collectReaction);
             em.SetComponentEnabled<BulletActiveTag>(bullet, true);
             em.SetComponentEnabled<BulletDespawnRequestTag>(bullet, false);
+            return bullet;
+        }
+
+        private static Entity CreateCleanupRemovableHazardBullet(
+            EntityManager em,
+            float3 position,
+            int scoreValue,
+            Entity sourceEntity,
+            BulletOnCleanupRemovedSpawnSecondaryReactionComponent cleanupRemovedReaction)
+        {
+            var bullet = CreateCollectibleBullet(em, position, scoreValue, sourceEntity, cleanupRemovedReaction);
+            em.SetComponentData(bullet, new BulletCaptureRuleComponent { Value = BulletCaptureRuleId.RiskTimedResolve });
             return bullet;
         }
 

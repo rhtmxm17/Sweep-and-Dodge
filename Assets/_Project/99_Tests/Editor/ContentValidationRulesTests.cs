@@ -257,7 +257,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
                 secondary.Editor_SetDefinitionId(9999);
                 secondary.Prefab = secondaryPrefab;
-                def.OnCollectedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
                 {
                     Enabled = true,
                     SecondaryBullet = secondary,
@@ -299,7 +299,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(2205);
                 def.Prefab = prefab;
-                def.OnCollectedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
                 {
                     Enabled = true,
                     SecondaryBullet = null,

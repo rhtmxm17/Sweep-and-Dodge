@@ -106,7 +106,7 @@ BulletDefinition = TypeKey(시각/풀) × CaptureRule(플레이어 상호작용)
     - `HomingLite`
   - reaction
     - `OnMotionCompletedExplode`
-    - `OnCollectedSpawnSecondary`
+    - `OnCleanupRemovedSpawnSecondary`
 - `BulletPoolDefinitionBuffer`는 새 buffer를 추가하지 않고 같은 definition buffer 안에서 위 메타데이터를 함께 운반한다.
 - `BulletVisualPrefabAuthoring`는 `BulletDefinitionSO -> BulletPoolDefinitionBuffer` bake의 단일 진입점으로 유지한다.
 - `BulletPoolOwnerBootstrapSystem`은 확장된 definition buffer를 기준으로 pooled bullet의 sparse motion/reaction component를 구성한다.
@@ -114,7 +114,7 @@ BulletDefinition = TypeKey(시각/풀) × CaptureRule(플레이어 상호작용)
   - `BulletDampedMotionAuthoring`
   - `BulletHomingLiteMotionAuthoring`
   - `BulletOnMotionCompletedExplodeReactionAuthoring`
-  - `BulletOnCollectedSpawnSecondaryReactionAuthoring`
+  - `BulletOnCleanupRemovedSpawnSecondaryReactionAuthoring`
 - 위 authoring들은 스크립트 자산으로는 남아 있을 수 있지만, 정식 prefab content에 붙어 있으면 validation error로 처리한다.
 
 ### 3.2.1 motion family component와 modifier component 구분
@@ -545,8 +545,8 @@ Motion Family Jobs -> BulletMotionOutputComponent 계산 -> MotionApplyJob -> Lo
     - secondary spawn, area effect, carry 변화, feedback append, combat event append 수행
 
 - 반응 프로파일 초안:
-  - `OnCollectedSpawnSecondary`
-    - 수거 시 보상용 먼지/소형 Hazard 생성
+  - `OnCleanupRemovedSpawnSecondary`
+    - cleanup action으로 bullet이 제거될 때 보상용 먼지/소형 Hazard 생성
   - `OnMotionCompletedExplode`
     - 감속 종료 시 폭발
   - `OnStageBlockedSpawnSecondary`
@@ -636,7 +636,7 @@ public struct BulletSecondarySpawnRequestBuffer : IBufferElementData
 - producer:
   - `BulletLifecycleReactionExecutionSystem`
     - `OnMotionCompletedExplode`
-    - `OnCollectedSpawnSecondary`
+    - `OnCleanupRemovedSpawnSecondary`
     - `OnStageBlockedSpawnSecondary`
   - 필요 시 별도 non-terminal reaction producer
     - `PeriodicTrailEmitter`
@@ -752,10 +752,10 @@ public struct SecondarySpawnBacklogMetricsComponent : IComponentData
   - `ReactionProfile = OnMotionCompletedExplode`
   - 결과: 감속 후 임계 속도 도달 시 `MotionCompleted` -> 폭발 실행
 
-- 수거하면 고가치 마법 먼지를 남기는 사탕
+  - cleanup으로 제거하면 고가치 마법 먼지를 남기는 사탕형 Hazard
   - `CaptureRule = StandardCollectible` 또는 별도 reward collectible 해석
-  - `ReactionProfile = OnCollectedSpawnSecondary`
-  - 결과: 수거 시 carry/collect와 별개로 보상 드롭 spawn request 생성
+  - `ReactionProfile = OnCleanupRemovedSpawnSecondary`
+    - 결과: cleanup으로 제거될 때 carry/progress와 별개로 보상 드롭 spawn request 생성
   - 필요 시 `OnStageBlockedSpawnSecondary`도 같은 탄에 추가 가능
 
 ## 4. 업데이트 순서/소유권
@@ -872,7 +872,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - 기본 직선 탄이 기존과 동일하게 이동/디스폰하는지
   - `DampedLinear`가 임계 속도 도달 시 `MotionCompleted` reason을 남기는지
   - 같은 프레임 `MotionCompleted + PlayerHit` 충돌 시 primary reason 우선순위가 고정되는지
-  - `OnCollectedSpawnSecondary`가 source despawn owner를 침범하지 않는지
+  - `OnCleanupRemovedSpawnSecondary`가 source despawn owner를 침범하지 않는지
   - `PeriodicTrailEmitter`가 frequency guard 없이 과도한 request를 만들지 않는지
   - secondary spawn queue가 source spawn backlog 계측과 분리되는지
   - `SecondarySpawnExecutionSystem`이 source spawn 이전 순서에서 own budget으로만 소비되는지
@@ -1069,23 +1069,22 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - speed 크기는 `BulletSpeedComponent.Value`를 기준으로 유지하고, `MinRetargetDistance`/`MaxAcquireDistance` 가드 밖에서는 기존 velocity 기준 직진 fallback을 유지한다.
   - 검증 결과: compile 성공 / console error 0 / EditMode `348 passed` / PlayMode smoke `39 passed`
 
-### 7.8 Slice 7. `OnCollectedSpawnSecondary` 연결
+### 7.8 Slice 7. `OnCleanupRemovedSpawnSecondary` 연결
 - 목표:
   - collect-trigger reaction 1종을 secondary channel 경유로 연결한다.
 - 채택안:
-  - `OnCollectedSpawnSecondary`
-  - trigger는 `VacuumCollected`만 연결한다.
-  - `CarryFullRemoved`는 이번 slice에서 no-op로 유지한다.
+  - `OnCleanupRemovedSpawnSecondary`
+  - trigger는 `VacuumCollected`, `CarryFullRemoved`를 둘 다 연결한다.
 - 완료 기준:
-  - `VacuumCollected` bullet이 `ExecutionEnd`에서 collect secondary request를 append하고, 다음 `ExecutionBegin`에 secondary bullet이 spawn된다.
+  - cleanup removal bullet이 `ExecutionEnd`에서 secondary request를 append하고, 다음 `ExecutionBegin`에 secondary bullet이 spawn된다.
 - 검증:
   - compile / console error 0
-  - EditMode: collect request test, vacuum end-to-end test
-  - PlayMode: 수거 보상 드롭 스모크
+  - EditMode: cleanup removal request test, vacuum/carry-full end-to-end test
+  - PlayMode: cleanup removal 보상 드롭 스모크
 - 구현 결과:
-  - `BulletOnCollectedSpawnSecondaryReactionComponent`와 optional authoring이 추가되었다.
-  - `BulletLifecycleReactionExecutionSystem`은 `VacuumCollected` reason에서만 collect secondary append를 수행하고, `CarryFullRemoved`는 그대로 no-op를 유지한다.
-  - collect secondary spawn은 `BulletSourceRefComponent`를 그대로 계승한다.
+  - `BulletOnCleanupRemovedSpawnSecondaryReactionComponent`와 optional authoring이 추가되었다.
+  - `BulletLifecycleReactionExecutionSystem`은 `VacuumCollected`와 `CarryFullRemoved` reason에서 cleanup-removed secondary append를 수행한다.
+  - cleanup-removed secondary spawn은 `BulletSourceRefComponent`를 그대로 계승한다.
   - 검증 결과: compile 성공 / console error 0 / EditMode `354 passed` / PlayMode `40 passed`
 
 ### 7.9 Slice 우선순위와 시작점
@@ -1119,5 +1118,5 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 2026-03-30: `T2` 구체화. terminal lifecycle을 `BulletDespawnRequestTag + BulletLifecycleRequestComponent + BulletLifecycleContactComponent` 조합으로 두고, producer helper / priority / consumer owner 규칙을 추가했다.
 - 2026-03-31: `T4` 확정. secondary spawn을 source spawn과 채널/예산/metrics는 분리하고, 같은 `ExecutionBegin` 계층의 별도 consumer owner가 처리하는 구조로 고정했다.
 - 2026-03-31: `I3` 구현 기준 확정. `BulletLifecycleReactionExecutionSystem`을 no-op reaction owner로 추가하고, `ExecutionEnd`의 실제 순서를 `PlayerHazardRiskResolve -> BulletLifecycleReactionExecution -> BulletDespawnExecution -> CombatEventChannelConsume`로 고정했다.
-- 2026-03-31: `I8` 구현 반영. `BulletDefinitionSO`와 `BulletPoolDefinitionBuffer`가 `Linear/DampedLinear/HomingLite` movement와 `OnMotionCompletedExplode/OnCollectedSpawnSecondary` reaction metadata를 정식 schema로 가지며, 정식 content에서는 optional behavior authoring을 validation error로 금지한다.
+- 2026-03-31: `I8` 구현 반영. `BulletDefinitionSO`와 `BulletPoolDefinitionBuffer`가 `Linear/DampedLinear/HomingLite` movement와 `OnMotionCompletedExplode/OnCleanupRemovedSpawnSecondary` reaction metadata를 정식 schema로 가지며, 정식 content에서는 optional behavior authoring을 validation error로 금지한다.
 - 2026-03-31: `I8.1` 구현 반영. `BulletDefinitionSO` reaction 입력은 `BulletDefinitionSO` 참조 기반으로 바뀌고, bake 단계가 이를 runtime `SecondaryBulletTypeKey`로 변환한다.

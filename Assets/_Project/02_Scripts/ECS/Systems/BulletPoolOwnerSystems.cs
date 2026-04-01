@@ -453,8 +453,8 @@ namespace SweepNDodge.DotsBullets
             ApplyReactionComponent(
                 em,
                 bullet,
-                def.OnCollectedSpawnSecondary,
-                static reaction => new BulletOnCollectedSpawnSecondaryReactionComponent
+                def.OnCleanupRemovedSpawnSecondary,
+                static reaction => new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
                 {
                     SecondaryBulletTypeKey = reaction.SecondaryBulletTypeKey,
                     SpawnCount = reaction.SpawnCount,

@@ -113,7 +113,7 @@ namespace SweepNDodge.DotsBullets
         public float SpawnRadius;
     }
 
-    public struct BulletOnCollectedSpawnSecondaryReactionComponent : IComponentData
+    public struct BulletOnCleanupRemovedSpawnSecondaryReactionComponent : IComponentData
     {
         public int SecondaryBulletTypeKey;
         public int SpawnCount;
@@ -176,7 +176,7 @@ namespace SweepNDodge.DotsBullets
         public BulletDampedLinearDefinition DampedLinear;
         public BulletHomingLiteDefinition HomingLite;
         public BulletSecondarySpawnReactionRuntimeDefinition OnMotionCompletedExplode;
-        public BulletSecondarySpawnReactionRuntimeDefinition OnCollectedSpawnSecondary;
+        public BulletSecondarySpawnReactionRuntimeDefinition OnCleanupRemovedSpawnSecondary;
     }
 
     // 프레임 파이프라인 기준 단조 증가 프레임 ID.

@@ -55,7 +55,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 1.5f,
                 },
-                OnCollectedSpawnSecondary = new BulletSecondarySpawnReactionRuntimeDefinition
+                OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionRuntimeDefinition
                 {
                     SecondaryBulletTypeKey = 778,
                     SpawnCount = 2,
@@ -72,7 +72,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.HasComponent<BulletDampedMotionComponent>(bullet), Is.True);
             Assert.That(em.HasComponent<BulletHomingLiteMotionComponent>(bullet), Is.False);
             Assert.That(em.HasComponent<BulletOnMotionCompletedExplodeReactionComponent>(bullet), Is.True);
-            Assert.That(em.HasComponent<BulletOnCollectedSpawnSecondaryReactionComponent>(bullet), Is.True);
+            Assert.That(em.HasComponent<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(bullet), Is.True);
 
             var damped = em.GetComponentData<BulletDampedMotionComponent>(bullet);
             Assert.That(damped.DampingPerSec, Is.EqualTo(4f));
@@ -82,7 +82,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(explode.SecondaryBulletTypeKey, Is.EqualTo(777));
             Assert.That(explode.SpawnCount, Is.EqualTo(4));
 
-            var collect = em.GetComponentData<BulletOnCollectedSpawnSecondaryReactionComponent>(bullet);
+            var collect = em.GetComponentData<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(bullet);
             Assert.That(collect.SecondaryBulletTypeKey, Is.EqualTo(778));
             Assert.That(collect.SpawnCount, Is.EqualTo(2));
         }
@@ -111,7 +111,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DampedLinear = default,
                 HomingLite = default,
                 OnMotionCompletedExplode = default,
-                OnCollectedSpawnSecondary = default,
+                OnCleanupRemovedSpawnSecondary = default,
             });
 
             world.GetOrCreateSystem<BulletPoolOwnerBootstrapSystem>().Update(world.Unmanaged);
@@ -121,7 +121,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.HasComponent<BulletDampedMotionComponent>(bullet), Is.False);
             Assert.That(em.HasComponent<BulletHomingLiteMotionComponent>(bullet), Is.False);
             Assert.That(em.HasComponent<BulletOnMotionCompletedExplodeReactionComponent>(bullet), Is.False);
-            Assert.That(em.HasComponent<BulletOnCollectedSpawnSecondaryReactionComponent>(bullet), Is.False);
+            Assert.That(em.HasComponent<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(bullet), Is.False);
         }
 
         [Test]
@@ -226,7 +226,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 0f,
                 });
-                em.AddComponentData(prefab, new BulletOnCollectedSpawnSecondaryReactionComponent
+                em.AddComponentData(prefab, new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
                 {
                     SecondaryBulletTypeKey = 2,
                     SpawnCount = 1,

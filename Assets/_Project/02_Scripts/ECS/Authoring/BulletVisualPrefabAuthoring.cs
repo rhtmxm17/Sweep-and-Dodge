@@ -49,7 +49,7 @@ namespace SweepNDodge.DotsBullets
                         DampedLinear = def.DampedLinear,
                         HomingLite = def.HomingLite,
                         OnMotionCompletedExplode = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(def.OnMotionCompletedExplode),
-                        OnCollectedSpawnSecondary = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(def.OnCollectedSpawnSecondary),
+                        OnCleanupRemovedSpawnSecondary = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(def.OnCleanupRemovedSpawnSecondary),
                     });
                 }
             }

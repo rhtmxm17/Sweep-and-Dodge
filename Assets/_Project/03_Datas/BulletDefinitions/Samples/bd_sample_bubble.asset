@@ -35,7 +35,7 @@ MonoBehaviour:
     Shape: 2
     SpreadAngleDeg: 360
     SpawnRadius: 0.08
-  OnCollectedSpawnSecondary:
+  OnCleanupRemovedSpawnSecondary:
     Enabled: 0
     SecondaryBullet: {fileID: 0}
     SpawnCount: 0

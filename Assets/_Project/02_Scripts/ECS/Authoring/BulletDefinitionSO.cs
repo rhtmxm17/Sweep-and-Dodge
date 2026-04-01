@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -55,7 +56,8 @@ namespace SweepNDodge.DotsBullets
             SpreadAngleDeg = 90f,
             SpawnRadius = 0f,
         };
-        public BulletSecondarySpawnReactionDefinition OnCollectedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+        [FormerlySerializedAs("OnCollectedSpawnSecondary")]
+        public BulletSecondarySpawnReactionDefinition OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
         {
             Enabled = false,
             SecondaryBullet = null,
