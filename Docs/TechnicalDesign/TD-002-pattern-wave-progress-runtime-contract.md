@@ -4,7 +4,7 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-16`
+- last_updated: `2026-04-01`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -129,6 +129,8 @@ Hit:
   - 요청은 사건 단위 예약으로 해석한다.
   - ExecutionBegin에서 사건을 샘플/방향 슬롯으로 확장해 실제 엔티티를 소비한다.
   - `NWay`는 샘플 지점별 `NWay 1세트`를 원자 단위로 소비한다.
+  - `EventBurst`의 첫 burst는 segment `StartSec`와 같은 시점에 발생한다.
+    - 예: `StartSec=1`, `BurstIntervalSec=2`, `BurstRepeatCount=3`이면 burst 시점은 `1, 3, 5초`다.
   - (확장 합의) `EventShotSchedule=Timed`는 이벤트 1회 내부에서 샷을 시간 간격으로 분할 소비한다.
   - (확장 합의) 샘플링 기준점은 이벤트 시작 시 1회 확정하고 이벤트 종료까지 고정한다(월드 고정).
 
@@ -233,6 +235,7 @@ Hit:
   - `OnStateEnterOnce` 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)
   - 이벤트 중복 트리거는 큐잉한다.
   - `Sustain`도 `StartSec/EndSec` 시간축 적용
+  - clip 재생 종료 판정은 마지막 segment end가 아니라 `WaveClipSO.DurationSec`을 사용한다.
   - 디렉터가 클립을 선택/교체할 때 `Sustain` 로컬 시간은 0으로 리셋한다.
   - 클립 선택/교체의 상세 시점 규칙은 기존 Source Clip 선택/전환 규칙 형태를 재사용한다.
   - `Baseline <-> Pressure` 전환에서는 Clip을 교체하지 않는다.
@@ -268,6 +271,7 @@ Hit:
   - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
 
 ## 10. 변경 이력
+- 2026-04-01: `EventBurst` 첫 burst를 `StartSec` 시점에 맞추고, clip 종료 판정을 `WaveClipSO.DurationSec` 기준으로 동기화했다.
 - 2026-03-16: `RiskMultiplier` 범위를 `1 + HazardStack × HazardBonusRate`로 축소해 현행 구현 계획과 동기화하고, `HazardStack` 다음 프레임 반영 규칙을 `TD-018` 참조로 분리했다.
 - 2026-03-05: `EventShotSchedule/Interval` 및 관련 검증 문구를 구현 반영 상태로 동기화했다.
 - 2026-02-27: `TD-006` active 전환과 함께, Clip 선택 주체(디렉터), `Baseline/Pressure` Clip 유지+배율 규칙, `Finish` 강제 교체 규칙을 반영해 소유권 문구를 갱신했다.

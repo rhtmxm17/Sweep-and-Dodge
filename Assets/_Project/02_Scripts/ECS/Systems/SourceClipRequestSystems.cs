@@ -378,6 +378,7 @@ namespace SweepNDodge.DotsBullets
 
             float elapsed = eventRuntime.ElapsedSec;
             float maxEnd = 0f;
+            float clipDurationSec = 0f;
             bool hasAnySegment = false;
             for (int i = 0; i < patterns.Length; i++)
             {
@@ -391,6 +392,7 @@ namespace SweepNDodge.DotsBullets
 
                 hasAnySegment = true;
                 maxEnd = math.max(maxEnd, pattern.LocalEndSec);
+                clipDurationSec = math.max(clipDurationSec, pattern.ClipDurationSec);
                 if (elapsed < pattern.LocalStartSec || elapsed >= pattern.LocalEndSec)
                 {
                     patterns[i] = pattern;
@@ -426,7 +428,8 @@ namespace SweepNDodge.DotsBullets
             }
 
             eventRuntime.ElapsedSec += deltaTime;
-            if (!hasAnySegment || eventRuntime.ElapsedSec >= maxEnd || sourceState != eventRuntime.TriggerState)
+            float clipEndSec = clipDurationSec > 0f ? clipDurationSec : maxEnd;
+            if (!hasAnySegment || eventRuntime.ElapsedSec >= clipEndSec || sourceState != eventRuntime.TriggerState)
             {
                 eventRuntime.IsPlaying = 0;
                 eventRuntime.ActiveEventClipId = 0;
@@ -497,6 +500,7 @@ namespace SweepNDodge.DotsBullets
 
                 float elapsed = laneRuntime.ElapsedSec;
                 float maxEnd = 0f;
+                float clipDurationSec = 0f;
                 bool hasAnySegment = false;
 
                 for (int p = 0; p < patterns.Length; p++)
@@ -513,6 +517,7 @@ namespace SweepNDodge.DotsBullets
 
                     hasAnySegment = true;
                     maxEnd = math.max(maxEnd, pattern.LocalEndSec);
+                    clipDurationSec = math.max(clipDurationSec, pattern.ClipDurationSec);
                     if (elapsed < pattern.LocalStartSec || elapsed >= pattern.LocalEndSec)
                     {
                         patterns[p] = pattern;
@@ -548,7 +553,8 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 laneRuntime.ElapsedSec += deltaTime;
-                if (!hasAnySegment || laneRuntime.ElapsedSec >= maxEnd)
+                float clipEndSec = clipDurationSec > 0f ? clipDurationSec : maxEnd;
+                if (!hasAnySegment || laneRuntime.ElapsedSec >= clipEndSec)
                 {
                     laneRuntime.LastClipId = laneRuntime.ActiveClipId;
                     laneRuntime.ActiveClipId = 0;

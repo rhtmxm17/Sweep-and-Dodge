@@ -4,7 +4,7 @@
 - doc_id: `TD-005`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-05`
+- last_updated: `2026-04-01`
 - related_docs:
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
@@ -60,6 +60,8 @@
 
 ### 3.3 EventBurst 소비 해석
 - 요청 생성은 Request 단계에서 누적된다.
+- 첫 burst는 segment가 활성화되는 `StartSec` 시점에 즉시 발생한다.
+- 이후 burst는 `BurstIntervalSec` 간격으로 반복된다.
 - 실행은 ExecutionBegin에서 예산 기반으로 소비된다.
 - 프레임에 다 못 쓴 샷은 버리지 않고 다음 프레임으로 이월(carry)된다.
 - `SamplingMode=UniformField` 또는 `PollutionTopK`이고 pollution runtime state가 존재하면, `CapAndMaxDensity` 상한 계산은 full area 대신 active-area 비율이 반영된 effective area를 사용한다.
@@ -235,6 +237,7 @@
 1. 슬롯 키는 `State + Phase + Lane`으로 고정한다.
 2. Clip 선택 주체는 Source가 아니라 `런 진행도 디렉터`다.
 3. Source는 디렉터가 할당한 `단일 활성 클립`을 재생하고, 전환/재생의 상세 시점 규칙은 기존 Source Clip 선택/전환 규칙 형태를 재사용한다.
+   - clip 종료 판정은 마지막 segment end가 아니라 `DurationSec`을 기준으로 한다.
 4. `Baseline <-> Pressure` 전환에서는 Clip을 교체하지 않는다.
 5. `Baseline`은 밀도 기반 스폰만 곱셈 배율로 축소하고, `hazard/event`는 디렉터 배율로 조정하지 않는다.
 6. `Pressure` 기본 배율은 `1.0`을 사용한다(추가 요소 미적용 기준).
@@ -246,6 +249,7 @@
 12. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
 
 ## 10. 변경 이력
+- 2026-04-01: `EventBurst` 첫 burst 시점을 `StartSec` 기준으로 명시하고, clip 종료 판정을 `DurationSec` 기준으로 동기화했다.
 - 2026-03-05: `EventShotSchedule/Interval`, 이벤트 기준점 고정 규약을 구현 반영 상태로 동기화했다.
 - 2026-02-27: 런 진행도 디렉터 책임 이관 기준에 맞춰 실행 규약을 갱신했다(Clip 선택 주체 디렉터, `Baseline/Pressure` Clip 유지+배율, `Finish` 강제 교체/Trash Lane 제약).
 - 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`)의 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 규약을 추가

@@ -8,6 +8,8 @@ namespace SweepNDodge.DotsBullets
 {
     internal static class SpawnRequestCommonUtility
     {
+        private const float BurstScheduleEpsilon = 1e-5f;
+
         public static int SafeAdd(int lhs, int rhs)
         {
             long v = (long)lhs + rhs;
@@ -67,24 +69,29 @@ namespace SweepNDodge.DotsBullets
             else if (emissionMode == SourceSpawnEmissionModeId.EventBurst)
             {
                 float interval = math.max(0.001f, burstIntervalSec);
-                spawnAccumulator += math.max(0f, deltaTime);
-                int eventCount = (int)math.floor(spawnAccumulator / interval);
+                float previousActiveSec = math.max(0f, spawnAccumulator);
+                float nextActiveSec = previousActiveSec + math.max(0f, deltaTime);
+                int previousEventCount = CountEventBurstTriggers(previousActiveSec, interval);
+                int eventCount = CountEventBurstTriggers(nextActiveSec, interval) - previousEventCount;
                 if (eventCount <= 0)
+                {
+                    spawnAccumulator = nextActiveSec;
                     return 0;
+                }
 
                 if (burstRepeatCount >= 0)
                 {
                     int remaining = math.max(0, burstRepeatCount - burstEventsEmitted);
                     if (remaining <= 0)
                     {
-                        spawnAccumulator = 0f;
+                        spawnAccumulator = nextActiveSec;
                         return 0;
                     }
 
                     eventCount = math.min(eventCount, remaining);
                 }
 
-                spawnAccumulator -= eventCount * interval;
+                spawnAccumulator = nextActiveSec;
                 burstEventsEmitted = SafeAdd(burstEventsEmitted, eventCount);
                 spawnCount = SafeAdd(0, eventCount * shotsPerEvent);
             }
@@ -123,6 +130,16 @@ namespace SweepNDodge.DotsBullets
             }
 
             return math.min(spawnCount, room);
+        }
+
+        private static int CountEventBurstTriggers(float activeDurationSec, float intervalSec)
+        {
+            float safeDuration = math.max(0f, activeDurationSec);
+            if (safeDuration <= 0f)
+                return 0;
+
+            float safeInterval = math.max(0.001f, intervalSec);
+            return 1 + (int)math.floor(math.max(0f, safeDuration - BurstScheduleEpsilon) / safeInterval);
         }
 
         public static SourceSpawnRequestBuffer CreateRequestTemplate(

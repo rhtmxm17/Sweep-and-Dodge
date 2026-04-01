@@ -1,0 +1,130 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c608244728cfad045b35ab2faff48819, type: 3}
+  m_Name: bwc_sus_samples_wave
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.WaveClipSO
+  ClipId: 1
+  Phase: 0
+  Lane: 1
+  DurationSec: 8
+  Segments:
+  - editorOnlyDescription: "\uC815\uC9C0\uC2DC \uD3ED\uBC1C\uD558\uB294 \uD0C4\uD658"
+    StartSec: 0
+    EndSec: 1
+    Entries:
+    - Payload:
+        Bullet: {fileID: 11400000, guid: d770120fbd6b4061836ce6a8b58441f3, type: 2}
+      Emission:
+        EmissionMode: 2
+        SpawnMode: 0
+        RatePerSecPerArea: 0
+        MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 3
+        EventShotSchedule: 1
+        EventShotIntervalSec: 0.15
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 4
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        PointCount: 1
+        Point0: {x: 0, y: 0}
+        Point1: {x: 0, y: 0}
+        Point2: {x: 0, y: 0}
+        Point3: {x: 0, y: 0}
+        SpawnSampleBudget: 0
+        PlayerNoSpawnRadius: 0
+      Direction:
+        DirectionMode: 2
+        BaseAngleDeg: 0
+        NWayCount: 1
+        SpiralStepDeg: 30
+  - editorOnlyDescription: 
+    StartSec: 2
+    EndSec: 3
+    Entries:
+    - Payload:
+        Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
+      Emission:
+        EmissionMode: 2
+        SpawnMode: 0
+        RatePerSecPerArea: 0
+        MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 3
+        EventShotSchedule: 1
+        EventShotIntervalSec: 0.15
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 4
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        PointCount: 1
+        Point0: {x: 0, y: 0}
+        Point1: {x: 0, y: 0}
+        Point2: {x: 0, y: 0}
+        Point3: {x: 0, y: 0}
+        SpawnSampleBudget: 0
+        PlayerNoSpawnRadius: 0
+      Direction:
+        DirectionMode: 2
+        BaseAngleDeg: 90
+        NWayCount: 1
+        SpiralStepDeg: 30
+  - editorOnlyDescription: 
+    StartSec: 4
+    EndSec: 5
+    Entries:
+    - Payload:
+        Bullet: {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
+      Emission:
+        EmissionMode: 2
+        SpawnMode: 0
+        RatePerSecPerArea: 0
+        MeanEventsPerSec: 0
+        BurstRepeatCount: 1
+        BurstIntervalSec: 1
+        BurstShotsPerEvent: 3
+        EventShotSchedule: 1
+        EventShotIntervalSec: 0.15
+        MaxActiveDensityPerArea: 0
+      Sampling:
+        SamplingMode: 4
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        LineStart: {x: 0, y: 0}
+        LineEnd: {x: 0, y: 0}
+        SampleSpacing: 1
+        PointCount: 1
+        Point0: {x: 0, y: 0}
+        Point1: {x: 0, y: 0}
+        Point2: {x: 0, y: 0}
+        Point3: {x: 0, y: 0}
+        SpawnSampleBudget: 0
+        PlayerNoSpawnRadius: 0
+      Direction:
+        DirectionMode: 2
+        BaseAngleDeg: 180
+        NWayCount: 1
+        SpiralStepDeg: 30

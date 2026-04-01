@@ -2,6 +2,17 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
+    [System.Serializable]
+    public struct BulletSecondarySpawnReactionDefinition
+    {
+        public bool Enabled;
+        public BulletDefinitionSO SecondaryBullet;
+        public int SpawnCount;
+        public BulletSecondarySpawnShapeId Shape;
+        public float SpreadAngleDeg;
+        public float SpawnRadius;
+    }
+
     [CreateAssetMenu(menuName = "SweepNDodge/Bullet/Bullet Definition", fileName = "bd_")]
     public class BulletDefinitionSO : ScriptableObject
     {
@@ -19,6 +30,40 @@ namespace SweepNDodge.DotsBullets
         public float Lifetime = 4.0f;
         public float Radius = 0.05f;
         public int ScoreValue = 1;
+
+        [Header("Movement")]
+        public BulletMovementFamilyId MovementFamily = BulletMovementFamilyId.Linear;
+        public BulletDampedLinearDefinition DampedLinear = new BulletDampedLinearDefinition
+        {
+            DampingPerSec = 1f,
+            StopSpeedThreshold = 0.1f,
+        };
+        public BulletHomingLiteDefinition HomingLite = new BulletHomingLiteDefinition
+        {
+            TurnRateDegPerSec = 90f,
+            MaxAcquireDistance = 10f,
+            MinRetargetDistance = 0.25f,
+        };
+
+        [Header("Reactions")]
+        public BulletSecondarySpawnReactionDefinition OnMotionCompletedExplode = new BulletSecondarySpawnReactionDefinition
+        {
+            Enabled = false,
+            SecondaryBullet = null,
+            SpawnCount = 0,
+            Shape = BulletSecondarySpawnShapeId.PointBurst,
+            SpreadAngleDeg = 90f,
+            SpawnRadius = 0f,
+        };
+        public BulletSecondarySpawnReactionDefinition OnCollectedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+        {
+            Enabled = false,
+            SecondaryBullet = null,
+            SpawnCount = 0,
+            Shape = BulletSecondarySpawnShapeId.PointBurst,
+            SpreadAngleDeg = 90f,
+            SpawnRadius = 0f,
+        };
 
 #if UNITY_EDITOR
         public void Editor_SetDefinitionId(int newId)

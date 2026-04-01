@@ -3,6 +3,13 @@ using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
+    public enum BulletMovementFamilyId : byte
+    {
+        Linear = 0,
+        DampedLinear = 1,
+        HomingLite = 2,
+    }
+
     public enum BulletCaptureRuleId : byte
     {
         StandardCollectible = 0,
@@ -58,6 +65,30 @@ namespace SweepNDodge.DotsBullets
     public struct BulletLifetimeComponent : IComponentData
     {
         public float Value;
+    }
+
+    [System.Serializable]
+    public struct BulletDampedLinearDefinition
+    {
+        public float DampingPerSec;
+        public float StopSpeedThreshold;
+    }
+
+    [System.Serializable]
+    public struct BulletHomingLiteDefinition
+    {
+        public float TurnRateDegPerSec;
+        public float MaxAcquireDistance;
+        public float MinRetargetDistance;
+    }
+
+    public struct BulletSecondarySpawnReactionRuntimeDefinition
+    {
+        public int SecondaryBulletTypeKey;
+        public int SpawnCount;
+        public BulletSecondarySpawnShapeId Shape;
+        public float SpreadAngleDeg;
+        public float SpawnRadius;
     }
 
     public struct BulletDampedMotionComponent : IComponentData
@@ -141,6 +172,11 @@ namespace SweepNDodge.DotsBullets
         public float Lifetime;
         public float Radius;
         public int ScoreValue;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
+        public BulletSecondarySpawnReactionRuntimeDefinition OnMotionCompletedExplode;
+        public BulletSecondarySpawnReactionRuntimeDefinition OnCollectedSpawnSecondary;
     }
 
     // 프레임 파이프라인 기준 단조 증가 프레임 ID.

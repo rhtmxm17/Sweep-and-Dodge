@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99571698488a7c647ba2b1c9bd414df3, type: 3}
+  m_Name: bd_sample_linear_hazard
+  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.BulletDefinitionSO
+  definitionId: 1435459723
+  Prefab: {fileID: 8586366626638814962, guid: 69118a661f574d089a3e1af111d7902e, type: 3}
+  PoolSize: 256
+  CaptureRule: 1
+  Speed: 1.8
+  Lifetime: 4
+  Radius: 0.05
+  ScoreValue: 5
+  MovementFamily: 0
+  DampedLinear:
+    DampingPerSec: 1
+    StopSpeedThreshold: 0.1
+  HomingLite:
+    TurnRateDegPerSec: 90
+    MaxAcquireDistance: 10
+    MinRetargetDistance: 0.25
+  OnMotionCompletedExplode:
+    Enabled: 0
+    SecondaryBullet: {fileID: 0}
+    SpawnCount: 0
+    Shape: 2
+    SpreadAngleDeg: 90
+    SpawnRadius: 0
+  OnCollectedSpawnSecondary:
+    Enabled: 0
+    SecondaryBullet: {fileID: 0}
+    SpawnCount: 0
+    Shape: 2
+    SpreadAngleDeg: 90
+    SpawnRadius: 0

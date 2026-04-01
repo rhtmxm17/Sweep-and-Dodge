@@ -4789,6 +4789,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 DirectiveId = directiveId,
                 ClipId = clipId,
+                ClipDurationSec = endSec,
                 Phase = phase,
                 Lane = lane,
                 TriggerState = triggerState,

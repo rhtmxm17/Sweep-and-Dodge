@@ -196,6 +196,12 @@ MonoBehaviour:
   Definitions:
   - {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
   - {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+  - {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
+  - {fileID: 11400000, guid: d770120fbd6b4061836ce6a8b58441f3, type: 2}
+  - {fileID: 11400000, guid: b49a0cbc667b4fb9880a39a1aefe5416, type: 2}
+  - {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
+  - {fileID: 11400000, guid: a08f5eee2d994de4b093c3c3076d493e, type: 2}
+  - {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
 --- !u!4 &1017874054
 Transform:
   m_ObjectHideFlags: 0

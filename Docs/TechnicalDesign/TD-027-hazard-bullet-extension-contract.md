@@ -95,6 +95,28 @@ BulletDefinition = TypeKey(시각/풀) × CaptureRule(플레이어 상호작용)
   - 특수 Hazard만 sparse component를 가진다.
   - "특수 기능을 가진 탄"을 위해 범용 giant enum + giant switch 하나로 몰아넣지 않는다.
 
+### 3.2.0 I8 채택안: `BulletDefinitionSO`를 정식 metadata SSOT로 승격
+- `I8` 기준으로 새 movement/reaction 축은 optional authoring이 아니라 `BulletDefinitionSO`의 정식 schema로 관리한다.
+- `I8.1` 기준으로 reaction editor 입력은 `SecondaryBulletTypeKey` 숫자 입력이 아니라 `BulletDefinitionSO SecondaryBullet` 참조로 관리한다.
+- bake 이후 runtime 표현은 계속 `DefinitionId` / `BulletTypeKey` 기반이며, conversion 책임은 `BulletVisualPrefabAuthoring` bake 단계가 단일 소유한다.
+- 1차 승격 범위:
+  - movement
+    - `Linear`
+    - `DampedLinear`
+    - `HomingLite`
+  - reaction
+    - `OnMotionCompletedExplode`
+    - `OnCollectedSpawnSecondary`
+- `BulletPoolDefinitionBuffer`는 새 buffer를 추가하지 않고 같은 definition buffer 안에서 위 메타데이터를 함께 운반한다.
+- `BulletVisualPrefabAuthoring`는 `BulletDefinitionSO -> BulletPoolDefinitionBuffer` bake의 단일 진입점으로 유지한다.
+- `BulletPoolOwnerBootstrapSystem`은 확장된 definition buffer를 기준으로 pooled bullet의 sparse motion/reaction component를 구성한다.
+- 정식 content에서는 아래 optional behavior authoring 사용을 금지한다.
+  - `BulletDampedMotionAuthoring`
+  - `BulletHomingLiteMotionAuthoring`
+  - `BulletOnMotionCompletedExplodeReactionAuthoring`
+  - `BulletOnCollectedSpawnSecondaryReactionAuthoring`
+- 위 authoring들은 스크립트 자산으로는 남아 있을 수 있지만, 정식 prefab content에 붙어 있으면 validation error로 처리한다.
+
 ### 3.2.1 motion family component와 modifier component 구분
 - motion component는 두 종류로 나눈다.
   - `family component`
@@ -1097,3 +1119,5 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 2026-03-30: `T2` 구체화. terminal lifecycle을 `BulletDespawnRequestTag + BulletLifecycleRequestComponent + BulletLifecycleContactComponent` 조합으로 두고, producer helper / priority / consumer owner 규칙을 추가했다.
 - 2026-03-31: `T4` 확정. secondary spawn을 source spawn과 채널/예산/metrics는 분리하고, 같은 `ExecutionBegin` 계층의 별도 consumer owner가 처리하는 구조로 고정했다.
 - 2026-03-31: `I3` 구현 기준 확정. `BulletLifecycleReactionExecutionSystem`을 no-op reaction owner로 추가하고, `ExecutionEnd`의 실제 순서를 `PlayerHazardRiskResolve -> BulletLifecycleReactionExecution -> BulletDespawnExecution -> CombatEventChannelConsume`로 고정했다.
+- 2026-03-31: `I8` 구현 반영. `BulletDefinitionSO`와 `BulletPoolDefinitionBuffer`가 `Linear/DampedLinear/HomingLite` movement와 `OnMotionCompletedExplode/OnCollectedSpawnSecondary` reaction metadata를 정식 schema로 가지며, 정식 content에서는 optional behavior authoring을 validation error로 금지한다.
+- 2026-03-31: `I8.1` 구현 반영. `BulletDefinitionSO` reaction 입력은 `BulletDefinitionSO` 참조 기반으로 바뀌고, bake 단계가 이를 runtime `SecondaryBulletTypeKey`로 변환한다.

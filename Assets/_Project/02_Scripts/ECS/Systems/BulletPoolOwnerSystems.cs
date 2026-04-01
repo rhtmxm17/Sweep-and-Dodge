@@ -53,10 +53,13 @@ namespace SweepNDodge.DotsBullets
 
             var poolRegistryEntity = SystemAPI.GetSingletonEntity<BulletPoolRegistryTag>();
             var poolDefs = SystemAPI.GetBuffer<BulletPoolDefinitionBuffer>(poolRegistryEntity);
+            var poolDefsSnapshot = new NativeArray<BulletPoolDefinitionBuffer>(poolDefs.Length, Allocator.Temp);
+            for (int i = 0; i < poolDefs.Length; i++)
+                poolDefsSnapshot[i] = poolDefs[i];
 
             int totalPoolSize = 0;
-            for (int i = 0; i < poolDefs.Length; i++)
-                totalPoolSize += math.max(0, poolDefs[i].PoolSize);
+            for (int i = 0; i < poolDefsSnapshot.Length; i++)
+                totalPoolSize += math.max(0, poolDefsSnapshot[i].PoolSize);
 
             var cfgSingleton = SystemAPI.GetSingleton<BulletFieldConfigComponent>();
             int poolCapacity = math.max(math.max(1, totalPoolSize), cfgSingleton.PoolSize);
@@ -69,9 +72,9 @@ namespace SweepNDodge.DotsBullets
             BulletFieldShared.CellMapFence = default;
 
             // Key-Pool 구성: 타입 정의별로 프리팹 인스턴스를 생성해 FreeByKey로 반납
-            for (int i = 0; i < poolDefs.Length; i++)
+            for (int i = 0; i < poolDefsSnapshot.Length; i++)
             {
-                var def = poolDefs[i];
+                var def = poolDefsSnapshot[i];
                 if (def.Prefab == Entity.Null || def.PoolSize <= 0)
                     continue;
 
@@ -140,9 +143,13 @@ namespace SweepNDodge.DotsBullets
                         });
                     }
 
+                    ApplyDefinitionBehaviorComponents(em, b, in def);
+
                     BulletFieldShared.FreeByKey.Add(def.TypeKey, b);
                 }
             }
+
+            poolDefsSnapshot.Dispose();
 
             BulletFieldShared.MarkInitialized();
         }
@@ -399,6 +406,95 @@ namespace SweepNDodge.DotsBullets
 
             if (!em.HasComponent<SecondarySpawnBacklogMetricsComponent>(singletonEntity))
                 em.AddComponentData(singletonEntity, default(SecondarySpawnBacklogMetricsComponent));
+        }
+
+        private static void ApplyDefinitionBehaviorComponents(EntityManager em, Entity bullet, in BulletPoolDefinitionBuffer def)
+        {
+            switch (def.MovementFamily)
+            {
+                case BulletMovementFamilyId.DampedLinear:
+                    SetOrAddComponent(em, bullet, new BulletDampedMotionComponent
+                    {
+                        DampingPerSec = def.DampedLinear.DampingPerSec,
+                        StopSpeedThreshold = def.DampedLinear.StopSpeedThreshold,
+                    });
+                    RemoveComponentIfPresent<BulletHomingLiteMotionComponent>(em, bullet);
+                    break;
+
+                case BulletMovementFamilyId.HomingLite:
+                    SetOrAddComponent(em, bullet, new BulletHomingLiteMotionComponent
+                    {
+                        TurnRateDegPerSec = def.HomingLite.TurnRateDegPerSec,
+                        MaxAcquireDistance = def.HomingLite.MaxAcquireDistance,
+                        MinRetargetDistance = def.HomingLite.MinRetargetDistance,
+                    });
+                    RemoveComponentIfPresent<BulletDampedMotionComponent>(em, bullet);
+                    break;
+
+                default:
+                    RemoveComponentIfPresent<BulletDampedMotionComponent>(em, bullet);
+                    RemoveComponentIfPresent<BulletHomingLiteMotionComponent>(em, bullet);
+                    break;
+            }
+
+            ApplyReactionComponent(
+                em,
+                bullet,
+                def.OnMotionCompletedExplode,
+                static reaction => new BulletOnMotionCompletedExplodeReactionComponent
+                {
+                    SecondaryBulletTypeKey = reaction.SecondaryBulletTypeKey,
+                    SpawnCount = reaction.SpawnCount,
+                    Shape = reaction.Shape,
+                    SpreadAngleDeg = reaction.SpreadAngleDeg,
+                    SpawnRadius = reaction.SpawnRadius,
+                });
+
+            ApplyReactionComponent(
+                em,
+                bullet,
+                def.OnCollectedSpawnSecondary,
+                static reaction => new BulletOnCollectedSpawnSecondaryReactionComponent
+                {
+                    SecondaryBulletTypeKey = reaction.SecondaryBulletTypeKey,
+                    SpawnCount = reaction.SpawnCount,
+                    Shape = reaction.Shape,
+                    SpreadAngleDeg = reaction.SpreadAngleDeg,
+                    SpawnRadius = reaction.SpawnRadius,
+                });
+        }
+
+        private static void ApplyReactionComponent<TComponent>(
+            EntityManager em,
+            Entity bullet,
+            in BulletSecondarySpawnReactionRuntimeDefinition reaction,
+            global::System.Func<BulletSecondarySpawnReactionRuntimeDefinition, TComponent> create)
+            where TComponent : unmanaged, IComponentData
+        {
+            if (reaction.SecondaryBulletTypeKey < 0 || reaction.SpawnCount <= 0)
+            {
+                RemoveComponentIfPresent<TComponent>(em, bullet);
+                return;
+            }
+
+            var component = create(reaction);
+            SetOrAddComponent(em, bullet, component);
+        }
+
+        private static void SetOrAddComponent<T>(EntityManager em, Entity entity, T value)
+            where T : unmanaged, IComponentData
+        {
+            if (em.HasComponent<T>(entity))
+                em.SetComponentData(entity, value);
+            else
+                em.AddComponentData(entity, value);
+        }
+
+        private static void RemoveComponentIfPresent<T>(EntityManager em, Entity entity)
+            where T : unmanaged, IComponentData
+        {
+            if (em.HasComponent<T>(entity))
+                em.RemoveComponent<T>(entity);
         }
     }
 

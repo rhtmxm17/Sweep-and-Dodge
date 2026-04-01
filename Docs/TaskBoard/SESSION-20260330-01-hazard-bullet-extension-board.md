@@ -18,14 +18,12 @@
 - 완료 기준: movement/reaction/lifecycle 확장 축과 slice별 구현이 문서와 작업 보드 기준으로 흔들리지 않게 유지된다.
 
 ## Now
-- [ ] I8. movement profile schema를 `DefinitionSO`까지 끌어올릴지 재평가
-  - 완료 기준: optional authoring에서 profile schema 승격 여부와 범위를 문서 기준으로 확정한다.
-  - 검증: TD/ADR 정합성 확인
-
-## Next
 - [ ] I9. `PeriodicTrailEmitter`를 별도 slice로 분리 설계
   - 완료 기준: non-terminal secondary producer의 append 시점, accumulator runtime state, budget/drop 정책을 문서 기준으로 확정한다.
   - 검증: TD 정합성 확인
+
+## Next
+- 없음
 
 ## Blocked
 - 없음
@@ -77,8 +75,19 @@
   - 검증 결과: `BulletOnCollectedSpawnSecondaryReactionComponent`와 optional authoring이 추가되었고, `BulletLifecycleReactionExecutionSystem`이 `VacuumCollected` reason에서만 secondary channel append를 수행하도록 확장되었다.
   - 검증 결과: `CarryFullRemoved`는 collect reaction component가 있어도 no-op로 유지되고, source attribution은 `BulletSourceRefComponent`를 그대로 계승한다.
   - 검증 결과: compile 성공 / console error 0 / EditMode 354 passed / PlayMode 40 passed
+- [x] I8. `BulletDefinitionSO` schema uplift를 구현했다.
+- [x] I10. DefinitionSO 기반 샘플 bullet asset/prefab 세트를 추가했다.
+  - 검증 결과: `LinearHazard`, `Bubble StopBurst`, `BubbleFragment`, `Candy CollectedReward`, `MagicDust`, `HomingHazard` 샘플 definition/prefab/material이 별도 sample 폴더에 추가되었고, 두 entities 씬의 `BulletVisualPrefabAuthoring.Definitions`에 등록되었다.
+  - 검증 결과: compile / console error 0 / EditMode / PlayMode smoke 통과
+  - 검증 결과: `BulletDefinitionSO`와 `BulletPoolDefinitionBuffer`가 `Linear/DampedLinear/HomingLite` movement와 `OnMotionCompletedExplode/OnCollectedSpawnSecondary` reaction metadata를 정식 필드로 가진다.
+  - 검증 결과: bootstrap은 definition buffer 기준으로 sparse movement/reaction component를 pooled bullet에 적용하고, 금지된 optional behavior authoring은 content validation error로 처리된다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode/PlayMode smoke 통과
+- [x] I8.1. `SecondaryBullet` editor reference 전환을 구현했다.
+  - 검증 결과: `BulletDefinitionSO` reaction 입력은 `BulletDefinitionSO SecondaryBullet` 참조를 사용하고, bake 단계가 runtime `SecondaryBulletTypeKey`로 변환한다.
+  - 검증 결과: validation은 null/invalid/unknown `SecondaryBullet` 참조를 error로 처리하고, bake/runtime regression은 유지된다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode/PlayMode smoke 통과
 
 ## End of Session
 - 결과: Hazard 확장 논의를 기준으로 `Slice 1`부터 `Slice 7`까지 구현과 검증을 마쳤고, 다음 시작점은 movement profile schema 승격 재평가 또는 non-terminal producer 분리 설계다.
 - 남은 리스크: `StageBlocked`/폭발 이벤트 채널 통합 범위와 secondary spawn merge/count attribution 세부 규칙이 아직 남아 있다.
-- 다음 세션 시작점: `I8. movement profile schema를 DefinitionSO까지 끌어올릴지 재평가`
+- 다음 세션 시작점: `I10. DefinitionSO 기반 샘플 bullet 추가 범위 확정` 또는 `I9. PeriodicTrailEmitter를 별도 slice로 분리 설계`

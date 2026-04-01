@@ -45,6 +45,11 @@ namespace SweepNDodge.DotsBullets
                         Lifetime = Mathf.Max(0f, def.Lifetime),
                         Radius = Mathf.Max(0f, def.Radius),
                         ScoreValue = Mathf.Max(0, def.ScoreValue),
+                        MovementFamily = def.MovementFamily,
+                        DampedLinear = def.DampedLinear,
+                        HomingLite = def.HomingLite,
+                        OnMotionCompletedExplode = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(def.OnMotionCompletedExplode),
+                        OnCollectedSpawnSecondary = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(def.OnCollectedSpawnSecondary),
                     });
                 }
             }

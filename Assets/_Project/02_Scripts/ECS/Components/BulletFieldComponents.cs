@@ -160,6 +160,7 @@ namespace SweepNDodge.DotsBullets
     {
         public int DirectiveId;
         public int ClipId;
+        public float ClipDurationSec;
         public SourceWavePhaseId Phase;
         public SourceSpawnLaneId Lane;
         public SourceStateId TriggerState;

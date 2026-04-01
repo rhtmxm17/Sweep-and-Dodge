@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99571698488a7c647ba2b1c9bd414df3, type: 3}
+  m_Name: bd_sample_bubble
+  m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.BulletDefinitionSO
+  definitionId: 2613000
+  Prefab: {fileID: 8586366626638814962, guid: 327971cc51f94ca4afb39ab02ccef65f, type: 3}
+  PoolSize: 128
+  CaptureRule: 1
+  Speed: 2.2
+  Lifetime: 10
+  Radius: 0.065
+  ScoreValue: 7
+  MovementFamily: 1
+  DampedLinear:
+    DampingPerSec: 0.8
+    StopSpeedThreshold: 0.18
+  HomingLite:
+    TurnRateDegPerSec: 90
+    MaxAcquireDistance: 10
+    MinRetargetDistance: 0.25
+  OnMotionCompletedExplode:
+    Enabled: 1
+    SecondaryBullet: {fileID: 11400000, guid: b49a0cbc667b4fb9880a39a1aefe5416, type: 2}
+    SpawnCount: 8
+    Shape: 2
+    SpreadAngleDeg: 360
+    SpawnRadius: 0.08
+  OnCollectedSpawnSecondary:
+    Enabled: 0
+    SecondaryBullet: {fileID: 0}
+    SpawnCount: 0
+    Shape: 2
+    SpreadAngleDeg: 90
+    SpawnRadius: 0

@@ -31,7 +31,7 @@ MonoBehaviour:
     - State: 0
       Lane: 1
       Clips:
-      - {fileID: 11400000, guid: 7cc14ff5ce5f4a488af830fda539f93d, type: 2}
+      - {fileID: 11400000, guid: 7ceff6e75b62bb04e8c37b227aa3cc16, type: 2}
       Weights:
       - 1
     - State: 1

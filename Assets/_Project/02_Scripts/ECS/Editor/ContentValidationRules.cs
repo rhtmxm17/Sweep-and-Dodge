@@ -82,6 +82,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             ValidateDefinitionUniqueness(input.Definitions, issues);
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
+            ValidateDefinitionBehaviorContracts(input.Definitions, issues);
             ValidateStageTopologyPrefabCatalogContracts(input.TopologyPrefabCatalogs, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateWaveClipContracts(input.Definitions, input.WaveClips, issues);
@@ -146,6 +147,32 @@ namespace SweepNDodge.DotsBullets.Editor
                         definitions[i].Location,
                         "BulletDefinitionSO.Prefab is null."));
                 }
+            }
+        }
+
+        private static void ValidateDefinitionBehaviorContracts(
+            IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
+            List<ContentValidationIssue> issues)
+        {
+            var knownKeys = new HashSet<int>();
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                var def = definitions[i].Value;
+                if (def != null && def.DefinitionId > 0)
+                    knownKeys.Add(def.DefinitionId);
+            }
+
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                var def = definitions[i].Value;
+                if (def == null)
+                    continue;
+
+                string location = definitions[i].Location;
+                ValidateMovementDefinition(def, location, issues);
+                ValidateReactionDefinition(def.OnMotionCompletedExplode, knownKeys, location, "OnMotionCompletedExplode", issues);
+                ValidateReactionDefinition(def.OnCollectedSpawnSecondary, knownKeys, location, "OnCollectedSpawnSecondary", issues);
+                ValidateForbiddenOptionalAuthorings(def, location, issues);
             }
         }
 
@@ -564,6 +591,105 @@ namespace SweepNDodge.DotsBullets.Editor
                         catalogs[i].Location,
                         "StageTopologyPrefabCatalogSO.SourceTemplatePrefab is null."));
                 }
+            }
+        }
+
+        private static void ValidateMovementDefinition(
+            BulletDefinitionSO definition,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            switch (definition.MovementFamily)
+            {
+                case BulletMovementFamilyId.DampedLinear:
+                    if (definition.DampedLinear.DampingPerSec < 0f || definition.DampedLinear.StopSpeedThreshold < 0f)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV031",
+                            location,
+                            "DampedLinear movement requires non-negative DampingPerSec and StopSpeedThreshold."));
+                    }
+                    break;
+
+                case BulletMovementFamilyId.HomingLite:
+                    if (definition.HomingLite.TurnRateDegPerSec < 0f
+                        || definition.HomingLite.MaxAcquireDistance < 0f
+                        || definition.HomingLite.MinRetargetDistance < 0f
+                        || definition.HomingLite.MinRetargetDistance > definition.HomingLite.MaxAcquireDistance)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV032",
+                            location,
+                            "HomingLite movement requires non-negative parameters and MinRetargetDistance <= MaxAcquireDistance."));
+                    }
+                    break;
+            }
+        }
+
+        private static void ValidateReactionDefinition(
+            in BulletSecondarySpawnReactionDefinition reaction,
+            HashSet<int> knownKeys,
+            string location,
+            string reactionName,
+            List<ContentValidationIssue> issues)
+        {
+            if (!reaction.Enabled)
+                return;
+
+            if (reaction.SpawnCount <= 0
+                || reaction.SpreadAngleDeg < 0f
+                || reaction.SpawnRadius < 0f
+                || reaction.SecondaryBullet == null)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV033",
+                    location,
+                    $"{reactionName} has invalid enabled reaction parameters."));
+                return;
+            }
+
+            if (reaction.SecondaryBullet.DefinitionId <= 0)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV035",
+                    location,
+                    $"{reactionName} references invalid SecondaryBullet definition id {reaction.SecondaryBullet.DefinitionId}."));
+                return;
+            }
+
+            if (!knownKeys.Contains(reaction.SecondaryBullet.DefinitionId))
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV035",
+                    location,
+                    $"{reactionName} references unknown SecondaryBullet definition id {reaction.SecondaryBullet.DefinitionId}."));
+            }
+        }
+
+        private static void ValidateForbiddenOptionalAuthorings(
+            BulletDefinitionSO definition,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            if (definition.Prefab == null)
+                return;
+
+            var prefab = definition.Prefab;
+            if (prefab.GetComponent<BulletDampedMotionAuthoring>() != null
+                || prefab.GetComponent<BulletHomingLiteMotionAuthoring>() != null
+                || prefab.GetComponent<BulletOnMotionCompletedExplodeReactionAuthoring>() != null
+                || prefab.GetComponent<BulletOnCollectedSpawnSecondaryReactionAuthoring>() != null)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV034",
+                    location,
+                    "BulletDefinitionSO.Prefab contains forbidden optional bullet behavior authoring. Use BulletDefinitionSO schema instead."));
             }
         }
 

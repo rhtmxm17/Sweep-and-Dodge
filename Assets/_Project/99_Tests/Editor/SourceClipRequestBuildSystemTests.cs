@@ -150,6 +150,86 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SourceClipRequestBuild_EventBurst_FiresImmediatelyWhenSegmentStarts()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_EventBurstStartAligned", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                emissionMode: SourceSpawnEmissionModeId.EventBurst,
+                spawnMode: SourceSpawnModeId.FixedDensity,
+                burstIntervalSec: 2f,
+                burstShotsPerEvent: 1,
+                burstRepeatCount: 3,
+                localStartSec: 1f,
+                localEndSec: 10f,
+                clipDurationSec: 10f);
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 0);
+
+            world.SetTime(new TimeData(2d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 1);
+            em.GetBuffer<SourceSpawnRequestBuffer>(source).Clear();
+
+            world.SetTime(new TimeData(3d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 0);
+
+            world.SetTime(new TimeData(4d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 1);
+            em.GetBuffer<SourceSpawnRequestBuffer>(source).Clear();
+
+            world.SetTime(new TimeData(5d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 0);
+
+            world.SetTime(new TimeData(6d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 1);
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_SustainLoop_UsesClipDurationSecInsteadOfLastSegmentEnd()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_SustainClipDuration", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                emissionMode: SourceSpawnEmissionModeId.RateField,
+                spawnMode: SourceSpawnModeId.FixedDensity,
+                spawnDensityPerSecPerArea: 1f,
+                localStartSec: 0f,
+                localEndSec: 1f,
+                clipDurationSec: 5f);
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 1);
+            em.GetBuffer<SourceSpawnRequestBuffer>(source).Clear();
+
+            for (int step = 2; step <= 5; step++)
+            {
+                world.SetTime(new TimeData(step, 1f));
+                buildSystem.Update(world.Unmanaged);
+                AssertPendingCount(em, source, 0);
+            }
+
+            world.SetTime(new TimeData(6d, 1f));
+            buildSystem.Update(world.Unmanaged);
+            AssertPendingCount(em, source, 1);
+        }
+
+        [Test]
         public void SourceClipRequestBuild_ReadsPollutionStateUpdatedEarlierInSameRequestFrame()
         {
             using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_RequestOrder", out _);
@@ -264,7 +344,10 @@ namespace SweepNDodge.DotsBullets.Tests
             float burstIntervalSec = 1f,
             int burstShotsPerEvent = 1,
             int burstRepeatCount = 0,
-            float maxActiveDensityPerArea = 0f)
+            float maxActiveDensityPerArea = 0f,
+            float localStartSec = 0f,
+            float localEndSec = 10f,
+            float clipDurationSec = 10f)
         {
             var entity = em.CreateEntity(
                 typeof(SourceSpawnComponent),
@@ -327,11 +410,12 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 DirectiveId = 1,
                 ClipId = 10,
+                ClipDurationSec = clipDurationSec,
                 Phase = SourceWavePhaseId.Sustain,
                 Lane = SourceSpawnLaneId.Hazard,
                 TriggerState = SourceStateId.Normal,
-                LocalStartSec = 0f,
-                LocalEndSec = 10f,
+                LocalStartSec = localStartSec,
+                LocalEndSec = localEndSec,
                 BulletTypeKey = 101,
                 EmissionMode = emissionMode,
                 SpawnMode = spawnMode,
@@ -492,6 +576,21 @@ namespace SweepNDodge.DotsBullets.Tests
             var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
             Assert.That(requests.Length, Is.GreaterThan(0));
             Assert.That(requests[0].Count, Is.EqualTo(expectedCount));
+        }
+
+        private static void AssertPendingCount(EntityManager em, Entity source, int expectedCount)
+        {
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            int pendingCount = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                if (requests[i].Count <= 0)
+                    continue;
+
+                pendingCount += requests[i].Count;
+            }
+
+            Assert.That(pendingCount, Is.EqualTo(expectedCount));
         }
     }
 }

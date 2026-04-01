@@ -169,6 +169,246 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void Definition_DampedLinearWithNegativeParameters_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2201);
+                def.Prefab = prefab;
+                def.MovementFamily = BulletMovementFamilyId.DampedLinear;
+                def.DampedLinear = new BulletDampedLinearDefinition
+                {
+                    DampingPerSec = -1f,
+                    StopSpeedThreshold = -0.1f,
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV031"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Definition_HomingLiteWithInvalidRange_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2202);
+                def.Prefab = prefab;
+                def.MovementFamily = BulletMovementFamilyId.HomingLite;
+                def.HomingLite = new BulletHomingLiteDefinition
+                {
+                    TurnRateDegPerSec = 45f,
+                    MaxAcquireDistance = 1f,
+                    MinRetargetDistance = 2f,
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV032"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Definition_ReactionWithUnknownSecondaryBulletReference_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2203);
+                def.Prefab = prefab;
+                secondary.Editor_SetDefinitionId(9999);
+                secondary.Prefab = secondaryPrefab;
+                def.OnCollectedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+                {
+                    Enabled = true,
+                    SecondaryBullet = secondary,
+                    SpawnCount = 1,
+                    Shape = BulletSecondarySpawnShapeId.PointBurst,
+                    SpreadAngleDeg = 45f,
+                    SpawnRadius = 1f,
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV035"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(secondary);
+                Object.DestroyImmediate(prefab);
+                Object.DestroyImmediate(secondaryPrefab);
+            }
+        }
+
+        [Test]
+        public void Definition_ReactionWithNullSecondaryBullet_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2205);
+                def.Prefab = prefab;
+                def.OnCollectedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+                {
+                    Enabled = true,
+                    SecondaryBullet = null,
+                    SpawnCount = 1,
+                    Shape = BulletSecondarySpawnShapeId.PointBurst,
+                    SpreadAngleDeg = 45f,
+                    SpawnRadius = 1f,
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV033"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Definition_PrefabWithForbiddenOptionalBehaviorAuthoring_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2204);
+                def.Prefab = prefab;
+                prefab.AddComponent<BulletDampedMotionAuthoring>();
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV034"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Definition_ReactionWithKnownSecondaryBulletReference_IsAllowed()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2206);
+                def.Prefab = prefab;
+                secondary.Editor_SetDefinitionId(2207);
+                secondary.Prefab = secondaryPrefab;
+                def.OnMotionCompletedExplode = new BulletSecondarySpawnReactionDefinition
+                {
+                    Enabled = true,
+                    SecondaryBullet = secondary,
+                    SpawnCount = 2,
+                    Shape = BulletSecondarySpawnShapeId.ForwardSpread,
+                    SpreadAngleDeg = 60f,
+                    SpawnRadius = 0.5f,
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                        new ContentValidationRecord<BulletDefinitionSO>(secondary, "secondary"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV033" || i.Code == "CV035"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(secondary);
+                Object.DestroyImmediate(prefab);
+                Object.DestroyImmediate(secondaryPrefab);
+            }
+        }
+
+        [Test]
         public void SourceAuthoring_WithoutAnyWaveClipBinding_IsNotAnError()
         {
             var sourceRoot = new GameObject("source_root");

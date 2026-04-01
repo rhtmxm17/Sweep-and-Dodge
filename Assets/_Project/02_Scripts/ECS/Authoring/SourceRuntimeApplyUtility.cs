@@ -310,6 +310,7 @@ namespace SweepNDodge.DotsBullets
                     {
                         DirectiveId = nextDirectiveId++,
                         ClipId = clip.ClipId,
+                        ClipDurationSec = clipDuration,
                         Phase = clip.Phase,
                         Lane = lane,
                         TriggerState = triggerState,
