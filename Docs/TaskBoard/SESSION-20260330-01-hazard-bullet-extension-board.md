@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260330-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-03-31`
+- last_updated: `2026-04-01`
 - related_docs:
   - [../TechnicalDesign/TD-027-hazard-bullet-extension-contract.md](../TechnicalDesign/TD-027-hazard-bullet-extension-contract.md)
   - [../TechnicalDesign/TD-003-spawn-directive-model.md](../TechnicalDesign/TD-003-spawn-directive-model.md)
@@ -18,12 +18,12 @@
 - 완료 기준: movement/reaction/lifecycle 확장 축과 slice별 구현이 문서와 작업 보드 기준으로 흔들리지 않게 유지된다.
 
 ## Now
+- 없음
+
+## Next
 - [ ] I9. `PeriodicTrailEmitter`를 별도 slice로 분리 설계
   - 완료 기준: non-terminal secondary producer의 append 시점, accumulator runtime state, budget/drop 정책을 문서 기준으로 확정한다.
   - 검증: TD 정합성 확인
-
-## Next
-- 없음
 
 ## Blocked
 - 없음
@@ -86,8 +86,13 @@
   - 검증 결과: `BulletDefinitionSO` reaction 입력은 `BulletDefinitionSO SecondaryBullet` 참조를 사용하고, bake 단계가 runtime `SecondaryBulletTypeKey`로 변환한다.
   - 검증 결과: validation은 null/invalid/unknown `SecondaryBullet` 참조를 error로 처리하고, bake/runtime regression은 유지된다.
   - 검증 결과: compile 성공 / console error 0 / EditMode/PlayMode smoke 통과
+- [x] I12. DefinitionSO 기반 샘플 검증 콘텐츠를 추가했다.
+  - 검증 결과: sample bullet definition/prefab은 일반 sample content로 유지하고, sample verification용 `WaveClip/StageDefinition/StageCatalog`는 `Assets/_Project/99_Tests/TestData` 아래 test-only asset로 분리했다.
+  - 검증 결과: `PlayModeSmoke_Dedicated`는 유지하고, 별도 `PlayModeSmoke_SampleVerification` 씬과 dedicated PlayMode smoke를 추가했다.
+  - 검증 결과: 운영 `StageCatalog`가 `99_Tests` 아래 test-only stage/wave asset을 참조하면 validation error가 발생하도록 규칙을 추가했다.
+  - 검증 결과: compile 성공 / console error 0 / EditMode / 기존 PlayMode smoke / sample verification PlayMode smoke 통과
 
 ## End of Session
-- 결과: Hazard 확장 논의를 기준으로 `Slice 1`부터 `Slice 7`까지 구현과 검증을 마쳤고, 다음 시작점은 movement profile schema 승격 재평가 또는 non-terminal producer 분리 설계다.
-- 남은 리스크: `StageBlocked`/폭발 이벤트 채널 통합 범위와 secondary spawn merge/count attribution 세부 규칙이 아직 남아 있다.
-- 다음 세션 시작점: `I10. DefinitionSO 기반 샘플 bullet 추가 범위 확정` 또는 `I9. PeriodicTrailEmitter를 별도 slice로 분리 설계`
+- 결과: Hazard 확장 논의를 기준으로 `Slice 1`부터 `Slice 7`, schema uplift, sample bullet, sample verification 콘텐츠까지 구현과 검증을 마쳤다.
+- 남은 리스크: `StageBlocked`/폭발 이벤트 채널 통합 범위와 `PeriodicTrailEmitter` 같은 non-terminal producer 규칙은 아직 미확정이다.
+- 다음 세션 시작점: `I9. PeriodicTrailEmitter를 별도 slice로 분리 설계`

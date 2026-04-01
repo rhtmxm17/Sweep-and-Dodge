@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Editor
 {
     public static class StageCatalogValidationRules
     {
+        private const string TestDataRootPath = "Assets/_Project/99_Tests/";
+
         public static void ValidateCatalogRecords(
             IReadOnlyList<ContentValidationRecord<StageCatalogSO>> catalogs,
             List<ContentValidationIssue> issues)
@@ -31,6 +34,10 @@ namespace SweepNDodge.DotsBullets.Editor
             if (catalog == null || issues == null)
                 return;
 
+            string catalogAssetPath = AssetDatabase.GetAssetPath(catalog);
+            bool enforceOperationalReferenceRestrictions =
+                !string.IsNullOrWhiteSpace(catalogAssetPath) &&
+                !IsTestOnlyPath(catalogAssetPath);
             var entries = catalog.Entries ?? Array.Empty<StageCatalogEntry>();
             var entryKeyOwners = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             var enabledStageOwners = new Dictionary<int, List<string>>();
@@ -121,11 +128,31 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 if (entry.Definition != null)
                 {
-                    ValidateDefinition(entry.Definition, location, issues);
+                    if (enforceOperationalReferenceRestrictions)
+                    {
+                        ValidateOperationalReference(
+                            entry.Definition,
+                            location,
+                            "STC023",
+                            "Operational StageCatalog cannot reference test-only StageDefinition assets.",
+                            issues);
+                    }
+
+                    ValidateDefinition(entry.Definition, location, issues, enforceOperationalReferenceRestrictions);
                 }
 
                 if (entry.Definition != null && entry.Layout != null)
                 {
+                    if (enforceOperationalReferenceRestrictions)
+                    {
+                        ValidateOperationalReference(
+                            entry.Layout,
+                            location,
+                            "STC024",
+                            "Operational StageCatalog cannot reference test-only StageLayout assets.",
+                            issues);
+                    }
+
                     ValidateSourceCrossMapping(entry.Definition, entry.Layout, location, issues);
                 }
             }
@@ -163,7 +190,11 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateDefinition(StageDefinitionSO definition, string location, List<ContentValidationIssue> issues)
+        private static void ValidateDefinition(
+            StageDefinitionSO definition,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
         {
             if (definition.StageTimeLimitSec <= 0f)
             {
@@ -206,8 +237,8 @@ namespace SweepNDodge.DotsBullets.Editor
                         $"Invalid thresholds. weakened={binding.ThresholdWeakened}, depleted={binding.ThresholdDepleted}"));
                 }
 
-                ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues);
-                ValidateEventSlots(binding.EventSlots, bindingLocation, issues);
+                ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
+                ValidateEventSlots(binding.EventSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
             }
 
             foreach (var pair in sourceOwners)
@@ -223,7 +254,11 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateSustainSlots(SustainSlotBinding[] slots, string location, List<ContentValidationIssue> issues)
+        private static void ValidateSustainSlots(
+            SustainSlotBinding[] slots,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
         {
             if (slots == null)
                 return;
@@ -273,6 +308,16 @@ namespace SweepNDodge.DotsBullets.Editor
                             $"Sustain slot references non-sustain clip. clipId={clip.ClipId}, phase={clip.Phase}"));
                     }
 
+                    if (enforceOperationalReferenceRestrictions)
+                    {
+                        ValidateOperationalReference(
+                            clip,
+                            slotLocation,
+                            "STC025",
+                            "Operational StageCatalog cannot reference test-only WaveClip assets.",
+                            issues);
+                    }
+
                     if (slot.Weights != null && c < slot.Weights.Length && slot.Weights[c] <= 0f)
                     {
                         issues.Add(new ContentValidationIssue(
@@ -285,7 +330,11 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateEventSlots(EventSlotBinding[] slots, string location, List<ContentValidationIssue> issues)
+        private static void ValidateEventSlots(
+            EventSlotBinding[] slots,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
         {
             if (slots == null)
                 return;
@@ -324,6 +373,16 @@ namespace SweepNDodge.DotsBullets.Editor
                             "STC020",
                             slotLocation,
                             $"Event slot references non-event clip. clipId={clip.ClipId}, phase={clip.Phase}"));
+                    }
+
+                    if (enforceOperationalReferenceRestrictions)
+                    {
+                        ValidateOperationalReference(
+                            clip,
+                            slotLocation,
+                            "STC025",
+                            "Operational StageCatalog cannot reference test-only WaveClip assets.",
+                            issues);
                     }
                 }
             }
@@ -380,6 +439,35 @@ namespace SweepNDodge.DotsBullets.Editor
                     location,
                     $"Active Layout source region StableId is not present in Definition.SourceBindings. stableId={stableId}"));
             }
+        }
+
+        private static void ValidateOperationalReference(
+            UnityEngine.Object asset,
+            string location,
+            string code,
+            string message,
+            List<ContentValidationIssue> issues)
+        {
+            if (asset == null)
+                return;
+
+            string assetPath = AssetDatabase.GetAssetPath(asset);
+            if (!IsTestOnlyPath(assetPath))
+                return;
+
+            issues.Add(new ContentValidationIssue(
+                ContentValidationSeverity.Error,
+                code,
+                location,
+                $"{message} asset={assetPath}"));
+        }
+
+        private static bool IsTestOnlyPath(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+                return false;
+
+            return assetPath.Replace('\\', '/').StartsWith(TestDataRootPath, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildEntryLocation(string prefix, int index, string entryKey)

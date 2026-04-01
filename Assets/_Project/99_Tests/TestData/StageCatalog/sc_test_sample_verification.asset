@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7807ce122f84cad4ba88effc99f7780c, type: 3}
+  m_Name: sc_test_sample_verification
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageCatalogSO
+  SchemaVersion: 1
+  Entries:
+  - Enabled: 1
+    EntryKey: stage_01
+    Definition: {fileID: 11400000, guid: 34a0d77baee24462a90a8786d97db986, type: 2}
+    Layout: {fileID: 11400000, guid: 2f4ee260d250cc947849ca730c9333c5, type: 2}

@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
+using UnityEditor;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
     public class StageCatalogValidationRulesTests
     {
+        private const string GeneratedOperationalRoot = "Assets/__GeneratedStageCatalogValidation";
+        private const string GeneratedTestRoot = "Assets/_Project/99_Tests/TestData/__GeneratedStageCatalogValidation";
+
         [Test]
         public void ValidateCatalog_NullReferences_AreReportedAsErrors()
         {
@@ -315,13 +319,131 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
-        private static List<ContentValidationIssue> ValidateCatalog(StageCatalogSO catalog)
+        [Test]
+        public void ValidateCatalog_OperationalCatalogReferencingTestOnlyDefinition_IsReportedAsError()
+        {
+            string scope = System.Guid.NewGuid().ToString("N");
+            string operationalRoot = EnsureFolder($"{GeneratedOperationalRoot}/{scope}");
+            string testRoot = EnsureFolder($"{GeneratedTestRoot}/{scope}");
+
+            try
+            {
+                var definition = CreateDefinitionAsset($"{testRoot}/sd_test.asset", stageId: 1);
+                var layout = CreateLayoutAsset($"{operationalRoot}/sl_operational.asset", stageId: 1);
+                var catalog = CreateCatalogAsset(
+                    $"{operationalRoot}/sc_operational.asset",
+                    new StageCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "stage_test",
+                        Definition = definition,
+                        Layout = layout,
+                    });
+
+                var issues = ValidateCatalog(catalog, operationalRoot);
+                Assert.That(HasIssue(issues, "STC023", ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                DeleteAssetFolder($"{GeneratedOperationalRoot}/{scope}");
+                DeleteAssetFolder($"{GeneratedTestRoot}/{scope}");
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_OperationalCatalogReferencingTestOnlyWaveClip_IsReportedAsError()
+        {
+            string scope = System.Guid.NewGuid().ToString("N");
+            string operationalRoot = EnsureFolder($"{GeneratedOperationalRoot}/{scope}");
+            string testRoot = EnsureFolder($"{GeneratedTestRoot}/{scope}");
+
+            try
+            {
+                var clip = CreateClipAsset($"{testRoot}/bwc_test.asset", clipId: 9101, phase: SourceWavePhaseId.Sustain);
+                var definition = CreateDefinitionAsset($"{operationalRoot}/sd_operational.asset", stageId: 2);
+                definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1001u,
+                        InitialSourceState = SourceStateId.Normal,
+                        ThresholdWeakened = 0,
+                        ThresholdDepleted = 0,
+                        SustainSlots = new[]
+                        {
+                            new SustainSlotBinding
+                            {
+                                State = SourceStateId.Normal,
+                                Lane = SourceSpawnLaneId.Hazard,
+                                Clips = new[] { clip },
+                                Weights = new[] { 1f },
+                            }
+                        },
+                        EventSlots = System.Array.Empty<EventSlotBinding>(),
+                    }
+                };
+                EditorUtility.SetDirty(definition);
+                AssetDatabase.SaveAssets();
+
+                var layout = CreateLayoutAsset($"{operationalRoot}/sl_operational.asset", stageId: 2);
+                var catalog = CreateCatalogAsset(
+                    $"{operationalRoot}/sc_operational.asset",
+                    new StageCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "stage_wave_test",
+                        Definition = definition,
+                        Layout = layout,
+                    });
+
+                var issues = ValidateCatalog(catalog, operationalRoot);
+                Assert.That(HasIssue(issues, "STC025", ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                DeleteAssetFolder($"{GeneratedOperationalRoot}/{scope}");
+                DeleteAssetFolder($"{GeneratedTestRoot}/{scope}");
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_TestOnlyCatalogMayReferenceOperationalAssets()
+        {
+            string scope = System.Guid.NewGuid().ToString("N");
+            string operationalRoot = EnsureFolder($"{GeneratedOperationalRoot}/{scope}");
+            string testRoot = EnsureFolder($"{GeneratedTestRoot}/{scope}");
+
+            try
+            {
+                var definition = CreateDefinitionAsset($"{operationalRoot}/sd_operational.asset", stageId: 3);
+                var layout = CreateLayoutAsset($"{operationalRoot}/sl_operational.asset", stageId: 3);
+                var catalog = CreateCatalogAsset(
+                    $"{testRoot}/sc_test.asset",
+                    new StageCatalogEntry
+                    {
+                        Enabled = true,
+                        EntryKey = "stage_test_only_catalog",
+                        Definition = definition,
+                        Layout = layout,
+                    });
+
+                var issues = ValidateCatalog(catalog, testRoot);
+                Assert.That(issues.Any(i => i.Code == "STC023" || i.Code == "STC024" || i.Code == "STC025"), Is.False);
+            }
+            finally
+            {
+                DeleteAssetFolder($"{GeneratedOperationalRoot}/{scope}");
+                DeleteAssetFolder($"{GeneratedTestRoot}/{scope}");
+            }
+        }
+
+        private static List<ContentValidationIssue> ValidateCatalog(StageCatalogSO catalog, string location = "catalog")
         {
             var issues = new List<ContentValidationIssue>();
             StageCatalogValidationRules.ValidateCatalogRecords(
                 new[]
                 {
-                    new ContentValidationRecord<StageCatalogSO>(catalog, "catalog")
+                    new ContentValidationRecord<StageCatalogSO>(catalog, location)
                 },
                 issues);
             return issues;
@@ -341,6 +463,16 @@ namespace SweepNDodge.DotsBullets.Tests
             return catalog;
         }
 
+        private static StageCatalogSO CreateCatalogAsset(string assetPath, params StageCatalogEntry[] entries)
+        {
+            var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+            catalog.SchemaVersion = 1;
+            catalog.Entries = entries;
+            AssetDatabase.CreateAsset(catalog, assetPath);
+            AssetDatabase.SaveAssets();
+            return AssetDatabase.LoadAssetAtPath<StageCatalogSO>(assetPath);
+        }
+
         private static StageDefinitionSO CreateDefinition(List<ScriptableObject> created, int stageId)
         {
             var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
@@ -350,6 +482,18 @@ namespace SweepNDodge.DotsBullets.Tests
             definition.SourceBindings = Array.Empty<StageSourceBinding>();
             created.Add(definition);
             return definition;
+        }
+
+        private static StageDefinitionSO CreateDefinitionAsset(string assetPath, int stageId)
+        {
+            var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
+            definition.StageId = stageId;
+            definition.DisplayName = $"Stage {stageId}";
+            definition.StageTimeLimitSec = 120f;
+            definition.SourceBindings = System.Array.Empty<StageSourceBinding>();
+            AssetDatabase.CreateAsset(definition, assetPath);
+            AssetDatabase.SaveAssets();
+            return AssetDatabase.LoadAssetAtPath<StageDefinitionSO>(assetPath);
         }
 
         private static StageLayoutSO CreateLayout(List<ScriptableObject> created, int stageId)
@@ -379,6 +523,34 @@ namespace SweepNDodge.DotsBullets.Tests
             return layout;
         }
 
+        private static StageLayoutSO CreateLayoutAsset(string assetPath, int stageId)
+        {
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.SchemaVersion = 2;
+            layout.StageId = stageId;
+            layout.Grid = new StageGridSpec
+            {
+                Width = 1,
+                Height = 1,
+                CellSize = 1f,
+                Origin = Vector3.zero,
+            };
+            layout.Cells = new StageCellLayoutData[1];
+            layout.SourceRegions = System.Array.Empty<StageSourceRegionLayoutData>();
+            layout.DepositRegions = System.Array.Empty<StageDepositRegionLayoutData>();
+            layout.PlayerStart = new StagePlayerStartLayoutData
+            {
+                Active = true,
+                AnchorCell = Vector2Int.zero,
+                AnchorOffset = Vector2.zero,
+                YawDeg = 0f,
+            };
+            layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
+            AssetDatabase.CreateAsset(layout, assetPath);
+            AssetDatabase.SaveAssets();
+            return AssetDatabase.LoadAssetAtPath<StageLayoutSO>(assetPath);
+        }
+
         private static WaveClipSO CreateClip(List<ScriptableObject> created, int clipId, SourceWavePhaseId phase)
         {
             var clip = ScriptableObject.CreateInstance<WaveClipSO>();
@@ -388,6 +560,47 @@ namespace SweepNDodge.DotsBullets.Tests
             clip.Segments = Array.Empty<WaveClipSO.ClipSegment>();
             created.Add(clip);
             return clip;
+        }
+
+        private static WaveClipSO CreateClipAsset(string assetPath, int clipId, SourceWavePhaseId phase)
+        {
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            clip.ClipId = clipId;
+            clip.Phase = phase;
+            clip.DurationSec = 1f;
+            clip.Segments = System.Array.Empty<WaveClipSO.ClipSegment>();
+            AssetDatabase.CreateAsset(clip, assetPath);
+            AssetDatabase.SaveAssets();
+            return AssetDatabase.LoadAssetAtPath<WaveClipSO>(assetPath);
+        }
+
+        private static string EnsureFolder(string assetPath)
+        {
+            string normalized = assetPath.Replace('\\', '/');
+            if (AssetDatabase.IsValidFolder(normalized))
+                return normalized;
+
+            string[] parts = normalized.Split('/');
+            string current = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string next = $"{current}/{parts[i]}";
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(current, parts[i]);
+                current = next;
+            }
+
+            return normalized;
+        }
+
+        private static void DeleteAssetFolder(string assetPath)
+        {
+            string normalized = assetPath.Replace('\\', '/');
+            if (!AssetDatabase.IsValidFolder(normalized))
+                return;
+
+            AssetDatabase.DeleteAsset(normalized);
+            AssetDatabase.Refresh();
         }
 
         private static void DestroyAll(List<ScriptableObject> created)

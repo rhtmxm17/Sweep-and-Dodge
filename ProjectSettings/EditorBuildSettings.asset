@@ -12,6 +12,9 @@ EditorBuildSettings:
     path: Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity
     guid: c3fd8d02e74cc40469e62628c7ebaadb
   - enabled: 1
+    path: Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_SampleVerification.unity
+    guid: e7dd0c6e5f1b4c4c8b53dbe7a1a92b44
+  - enabled: 1
     path: Assets/Scenes/Entity Prefab Build Registry.unity
     guid: 5ce94c8c1318d8641b21c5ce0c1ebd9f
   m_configObjects:

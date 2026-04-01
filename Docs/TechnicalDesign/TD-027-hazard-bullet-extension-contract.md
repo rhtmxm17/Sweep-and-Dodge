@@ -6,7 +6,7 @@
 - doc_id: `TD-027`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-03-31`
+- last_updated: `2026-04-01`
 - related_docs:
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
   - [GD-007-data-driven-bullet-pattern-definition.md](../GameDesign/GD-007-data-driven-bullet-pattern-definition.md)
@@ -1102,6 +1102,32 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - secondary channel은 reaction 실행 지점이 생긴 뒤 도입하는 편이 구현 책임이 분명하다.
   - HomingLite는 구조 검증 후에 추가해도 owner 경계를 흐리지 않는다.
 
+### 7.10 I12 sample verification content contract
+- sample bullet definition/prefab 자체는 일반 sample content로 유지한다.
+  - 위치:
+    - `Assets/_Project/03_Datas/BulletDefinitions/Samples`
+    - `Assets/_Project/04_Prefabs/Samples`
+- sample verification용 `WaveClip/StageDefinition/StageCatalog`는 test-only asset graph로 분리한다.
+  - 위치:
+    - `Assets/_Project/99_Tests/TestData/WaveClips`
+    - `Assets/_Project/99_Tests/TestData/StageCatalog`
+- dedicated sample verification scene을 별도로 둔다.
+  - 위치:
+    - `Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_SampleVerification.unity`
+  - 역할:
+    - `Linear Baseline`
+    - `Bubble StopBurst`
+    - `HomingLite`
+    - `CleanupRemoved Reward`
+    를 실제 stage play 경로에서 반복 검증하는 PlayMode 전용 씬
+- 기존 `PlayModeSmoke_Dedicated`는 공용 smoke 씬으로 유지한다.
+  - sample verification content로 전면 교체하지 않는다.
+- 운영 content는 test-only asset을 참조할 수 없다.
+  - 운영 `StageCatalog/StageDefinition/WaveClip`가 `Assets/_Project/99_Tests/` 아래 asset을 참조하면 validation error로 처리한다.
+  - 반대로 test-only catalog가 운영 layout/sample bullet definition을 참조하는 것은 허용한다.
+- sample verification stage는 `Stage 1` layout을 재사용하고, test-only `WaveClip`만 별도 연결한다.
+  - cleanup reward는 `VacuumCollected`와 `CarryFullRemoved`를 분리된 시퀀스로 검증한다.
+
 ## 8. 오픈 이슈
 - `StageBlocked`를 단순 despawn reason으로만 볼지, bounce/fragment의 전처리 reason으로 볼지
 - 폭발이 공통 전투 이벤트 채널(`Hit/Collect/Cleanup`)에 포함되어야 하는지, 별도 채널을 둘지
@@ -1120,3 +1146,4 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 2026-03-31: `I3` 구현 기준 확정. `BulletLifecycleReactionExecutionSystem`을 no-op reaction owner로 추가하고, `ExecutionEnd`의 실제 순서를 `PlayerHazardRiskResolve -> BulletLifecycleReactionExecution -> BulletDespawnExecution -> CombatEventChannelConsume`로 고정했다.
 - 2026-03-31: `I8` 구현 반영. `BulletDefinitionSO`와 `BulletPoolDefinitionBuffer`가 `Linear/DampedLinear/HomingLite` movement와 `OnMotionCompletedExplode/OnCleanupRemovedSpawnSecondary` reaction metadata를 정식 schema로 가지며, 정식 content에서는 optional behavior authoring을 validation error로 금지한다.
 - 2026-03-31: `I8.1` 구현 반영. `BulletDefinitionSO` reaction 입력은 `BulletDefinitionSO` 참조 기반으로 바뀌고, bake 단계가 이를 runtime `SecondaryBulletTypeKey`로 변환한다.
+- 2026-04-01: `I12` 구현 반영. sample bullet definition/prefab은 일반 sample content로 유지하고, sample verification용 `WaveClip/StageDefinition/StageCatalog`와 dedicated PlayMode scene을 `99_Tests/TestData` 및 `PlayModeTests` 경로로 분리했다. 운영 content의 test-only asset 참조는 validation error로 금지한다.
