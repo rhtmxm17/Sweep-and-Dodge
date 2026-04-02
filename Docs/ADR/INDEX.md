@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260402-01-broomsweep-default-cleanup-action.md](ADR-20260402-01-broomsweep-default-cleanup-action.md): 기본 청소 동작을 `BroomSweep` 1종으로 고정하고 `Trash`/`Hazard` 판정을 같은 액션 안의 분리된 서브 프로파일로 운영
 - [ADR-20260330-02-active-area-density-scaling-for-field-sampling.md](ADR-20260330-02-active-area-density-scaling-for-field-sampling.md): field sampling directive의 총 스폰량과 density cap을 active-area 비율에 연동
 - [ADR-20260330-01-source-pollution-recovery-wave-and-active-cell-contract.md](ADR-20260330-01-source-pollution-recovery-wave-and-active-cell-contract.md): `GD-014` 청소 흔적 복구를 `active/inactive + recovery wave` 계약으로 승격하고 1차 범위를 최근 청소 편향 중심으로 제한
 - [ADR-20260326-01-stage-player-start-owned-by-layout-and-prepare-owner.md](ADR-20260326-01-stage-player-start-owned-by-layout-and-prepare-owner.md): 플레이어 시작 위치를 `StageLayoutSO`가 소유하고 stage entry spatial apply를 prepare 계층 단일 writer로 고정
