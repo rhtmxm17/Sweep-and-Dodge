@@ -88,6 +88,195 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void BroomSweepGeometryUtility_ActivationFrame_UsesStartAngleAndSearchRadius()
+        {
+            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
+            var config = new VacuumActivationConfigComponent
+            {
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
+            };
+            var vacuum = new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 0.25f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 0.25f,
+                CooldownTimer = 0f,
+                IsActive = 1,
+                ActivateRequested = 0,
+            };
+            var sweep = new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = -1,
+                ActiveSweepDirectionSign = 1,
+                LockedFacingXZ = new float2(0f, 1f),
+                HasLockedFacing = 1,
+                ActivationFrame = 1u,
+            };
+
+            var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
+                PlayerCleanupActionId.BroomSweep,
+                in config,
+                in vacuum,
+                in sweep,
+                in profile);
+
+            float expectedSearchRadius = math.sqrt((3.2f * 3.2f) + (0.55f * 0.55f));
+            Assert.That(geometry.CaptureReady, Is.EqualTo(1));
+            Assert.That(geometry.Progress01, Is.EqualTo(0f).Within(0.0001f));
+            Assert.That(geometry.CurrentSweepCenterAngleDeg, Is.EqualTo(-20f).Within(0.001f));
+            Assert.That(geometry.HazardWindowActive, Is.EqualTo(0));
+            Assert.That(geometry.SearchRadius, Is.EqualTo(expectedSearchRadius).Within(0.001f));
+        }
+
+        [Test]
+        public void BroomSweepGeometryUtility_RightToLeft_MirrorsSweepAngle()
+        {
+            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
+            var config = new VacuumActivationConfigComponent
+            {
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
+            };
+            var vacuum = new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 0.25f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 0.25f,
+                CooldownTimer = 0f,
+                IsActive = 1,
+                ActivateRequested = 0,
+            };
+            var sweep = new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = 1,
+                ActiveSweepDirectionSign = -1,
+                LockedFacingXZ = new float2(0f, 1f),
+                HasLockedFacing = 1,
+                ActivationFrame = 1u,
+            };
+
+            var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
+                PlayerCleanupActionId.BroomSweep,
+                in config,
+                in vacuum,
+                in sweep,
+                in profile);
+
+            Assert.That(geometry.CaptureReady, Is.EqualTo(1));
+            Assert.That(geometry.CurrentSweepCenterAngleDeg, Is.EqualTo(20f).Within(0.001f));
+        }
+
+        [Test]
+        public void BroomSweepGeometryUtility_HazardWindowAndRectCapture_ActivateNearForward()
+        {
+            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
+            var config = new VacuumActivationConfigComponent
+            {
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
+            };
+            var vacuum = new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 12f / 60f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 12f / 60f,
+                CooldownTimer = 0f,
+                IsActive = 1,
+                ActivateRequested = 0,
+            };
+            var sweep = new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = -1,
+                ActiveSweepDirectionSign = 1,
+                LockedFacingXZ = new float2(0f, 1f),
+                HasLockedFacing = 1,
+                ActivationFrame = 1u,
+            };
+
+            var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
+                PlayerCleanupActionId.BroomSweep,
+                in config,
+                in vacuum,
+                in sweep,
+                in profile);
+
+            bool hazardHit = PlayerCleanupActionDebugGeometryUtility.EvaluateBroomHazardCapture(
+                dxp: 0f,
+                dzp: 2.88f,
+                bulletRadius: 0.2f,
+                in profile,
+                in geometry);
+
+            Assert.That(geometry.HazardWindowActive, Is.EqualTo(1));
+            Assert.That(geometry.CurrentSweepCenterAngleDeg, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(hazardHit, Is.True);
+        }
+
+        [Test]
+        public void BroomSweepGeometryUtility_TrashCapture_UsesCurrentBand()
+        {
+            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
+            var config = new VacuumActivationConfigComponent
+            {
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
+            };
+            var vacuum = new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 0.25f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 0.25f,
+                CooldownTimer = 0f,
+                IsActive = 1,
+                ActivateRequested = 0,
+            };
+            var sweep = new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = -1,
+                ActiveSweepDirectionSign = 1,
+                LockedFacingXZ = new float2(0f, 1f),
+                HasLockedFacing = 1,
+                ActivationFrame = 1u,
+            };
+
+            var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
+                PlayerCleanupActionId.BroomSweep,
+                in config,
+                in vacuum,
+                in sweep,
+                in profile);
+
+            float3 capturedPoint = BroomPolarPosition(1.2f, -20f);
+            float3 missedPoint = BroomPolarPosition(1.2f, 20f);
+            bool captured = PlayerCleanupActionDebugGeometryUtility.EvaluateBroomTrashCapture(
+                distSq: capturedPoint.x * capturedPoint.x + capturedPoint.z * capturedPoint.z,
+                dxp: capturedPoint.x,
+                dzp: capturedPoint.z,
+                bulletRadius: 0.2f,
+                in profile,
+                in geometry);
+            bool missed = PlayerCleanupActionDebugGeometryUtility.EvaluateBroomTrashCapture(
+                distSq: missedPoint.x * missedPoint.x + missedPoint.z * missedPoint.z,
+                dxp: missedPoint.x,
+                dzp: missedPoint.z,
+                bulletRadius: 0.2f,
+                in profile,
+                in geometry);
+
+            Assert.That(captured, Is.True);
+            Assert.That(missed, Is.False);
+        }
+
+        [Test]
         public void PlayerCleanupActionSelectSystem_NormalizesInvalidActionsToBroomSweep()
         {
             using var world = new World("PlayerCleanupActionSelectSystem_Normalize");

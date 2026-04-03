@@ -91,6 +91,17 @@
     - EditMode 전체 통과
     - PlayMode smoke 통과
     - 테스트 임시 산출물 정리 완료
+- [x] D7. `BroomSweep` 디버그/테스트 시인성용 Gizmo 세트를 추가했다.
+  - 변경 결과:
+    - `BulletVacuumRequestSystem`의 broom 진행률/각도/탐색 반경 해석을 공용 순수 유틸리티로 추출했다.
+    - `PlayerEcsBridge`에 `BroomSweep` 전용 Gizmo 토글과 Scene view 디버그 도형(`LockedFacing 축`, `Trash 현재 band`, `Trash 전체 path`, `Hazard 정면 rect`, `Search radius`, `State label`)을 추가했다.
+    - 선택 옵션으로 candidate bullet marker를 추가해 `Trash hit / Hazard hit / miss`를 색상으로 확인할 수 있게 했다.
+    - 공용 기하 유틸리티에 대한 EditMode 테스트를 추가해 runtime과 gizmo가 같은 수학을 재사용하도록 고정했다.
+  - 검증 결과:
+    - Unity compile 요청 후 console error 0
+    - EditMode 전체 391/391 통과
+    - PlayMode smoke 38/38 통과
+    - 테스트 임시 산출물 정리 완료
 
 ## End of Session
 - 결과: `BroomSweep` 기본 경로 고정, legacy compatibility fixture 구분, 문서/테스트 의미 정렬까지 완료했다.

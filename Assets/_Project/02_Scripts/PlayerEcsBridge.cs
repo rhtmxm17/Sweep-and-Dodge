@@ -1,5 +1,11 @@
-﻿using Unity.Entities;
+using Unity.Collections;
+using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Transforms;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace SweepNDodge.DotsBullets
 {
@@ -37,15 +43,22 @@ namespace SweepNDodge.DotsBullets
         public float ImpulseVisualPerFrameMax = 0.20f;
         public float ImpulseMaxOffset = 0.35f;
 
-        private const float VacuumGizmoDuration = 0.2f;
-        private const float VacuumGizmoRadius = 2.88f;
-        private const int VacuumGizmoSegments = 48;
+        [Header("BroomSweep Debug")]
+        public bool EnableBroomSweepGizmos = true;
+        public bool DrawOnlyWhenSelected = true;
+        public bool DrawSearchRadius = true;
+        public bool DrawStateLabel = true;
+        public bool DrawCandidateBullets = false;
+        [Min(1)] public int CandidateBulletMarkerLimit = 64;
+        public float GizmoHeightOffset = 0.05f;
+        [Min(4)] public int FullPathStepCount = 24;
+        [Min(4)] public int BandStepCount = 12;
 
         private EntityManager _em;
         private Entity _playerEntity;
         private bool _hasPlayerEntity;
         private EntityQuery _replayQuery;
-        private float _vacuumGizmoUntilTime;
+        private EntityQuery _bulletGizmoQuery;
         private Vector3 _visualImpulseOffset;
         private Vector3 _visualImpulseVelocity;
         private uint _lastUiFeedbackVersion;
@@ -83,7 +96,6 @@ namespace SweepNDodge.DotsBullets
                     intent.CleanupActionRequested = 1;
                     intent.RequestedCleanupActionSlot = (byte)(secondaryPressed ? SecondarySlot : PrimarySlot);
                     intent.Sequence += 1u;
-                    _vacuumGizmoUntilTime = Time.time + VacuumGizmoDuration;
                 }
 
                 _em.SetComponentData(_playerEntity, intent);
@@ -113,23 +125,15 @@ namespace SweepNDodge.DotsBullets
 
         private void OnDrawGizmos()
         {
-            bool isActiveWindow = Application.isPlaying && Time.time <= _vacuumGizmoUntilTime;
-            Gizmos.color = isActiveWindow ? new Color(1f, 0.35f, 0.35f) : Color.cyan;
-            DrawXZCircle(transform.position, VacuumGizmoRadius, VacuumGizmoSegments);
+            if (DrawOnlyWhenSelected)
+                return;
+
+            DrawCleanupGizmos();
         }
 
-        private static void DrawXZCircle(Vector3 center, float radius, int segments)
+        private void OnDrawGizmosSelected()
         {
-            float step = 2f * Mathf.PI / segments;
-            Vector3 prev = center + new Vector3(radius, 0f, 0f);
-
-            for (int i = 1; i <= segments; i++)
-            {
-                float angle = step * i;
-                Vector3 next = center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
-                Gizmos.DrawLine(prev, next);
-                prev = next;
-            }
+            DrawCleanupGizmos();
         }
 
         private void TryBind()
@@ -139,6 +143,10 @@ namespace SweepNDodge.DotsBullets
 
             _em = world.EntityManager;
             _replayQuery = _em.CreateEntityQuery(ComponentType.ReadOnly<ReplayInputControlComponent>());
+            _bulletGizmoQuery = _em.CreateEntityQuery(
+                ComponentType.ReadOnly<LocalTransform>(),
+                ComponentType.ReadOnly<BulletCaptureRuleComponent>(),
+                ComponentType.ReadOnly<BulletActiveTag>());
 
             // PlayerTag 싱글톤 찾기 (서브씬 로딩 지연 대비)
             using var q = _em.CreateEntityQuery(ComponentType.ReadOnly<PlayerTag>());
@@ -290,6 +298,397 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
+        private void DrawCleanupGizmos()
+        {
+            if (!EnableBroomSweepGizmos || !Application.isPlaying)
+                return;
+
+            if (!_hasPlayerEntity
+                || !_em.World.IsCreated
+                || !_em.Exists(_playerEntity))
+            {
+                _hasPlayerEntity = false;
+                TryBind();
+                if (!_hasPlayerEntity)
+                    return;
+            }
+
+            if (!TryBuildCleanupGizmoContext(out var context))
+                return;
+
+            if (DrawSearchRadius && context.Geometry.SearchRadius > 0f)
+            {
+                Gizmos.color = Color.white;
+                DrawXZCircle(context.Center, context.Geometry.SearchRadius, Mathf.Max(8, FullPathStepCount * 2));
+            }
+
+            if (context.ActionId != PlayerCleanupActionId.BroomSweep)
+            {
+                if (DrawStateLabel)
+                    DrawStateLabelAt(
+                        context.Center,
+                        $"Legacy Compatibility Action | Action={context.ActionId} | Active={context.VacuumState.IsActive}");
+                return;
+            }
+
+            bool hasValidSweepState = context.Geometry.CaptureReady != 0;
+            if (hasValidSweepState)
+                DrawLockedFacingAxes(context);
+
+            if (context.VacuumState.IsActive != 0 && !hasValidSweepState)
+            {
+                if (DrawStateLabel)
+                    DrawStateLabelAt(
+                        context.Center,
+                        $"INVALID SWEEP STATE | Active={context.VacuumState.IsActive} | Dir={context.SweepState.ActiveSweepDirectionSign} | Lock={context.SweepState.HasLockedFacing}");
+                return;
+            }
+
+            if (hasValidSweepState)
+            {
+                DrawTrashSweepFullPath(context);
+                DrawTrashSweepCurrentBand(context);
+                DrawHazardFocusRect(context);
+
+                if (DrawCandidateBullets)
+                    DrawCandidateBulletMarkers(context);
+            }
+
+            if (DrawStateLabel)
+                DrawStateLabelAt(context.Center, BuildStateLabel(context));
+        }
+
+        private bool TryBuildCleanupGizmoContext(out CleanupGizmoContext context)
+        {
+            context = default;
+
+            if (!_em.HasComponent<PlayerCleanupActionStateComponent>(_playerEntity)
+                || !_em.HasComponent<VacuumActivationConfigComponent>(_playerEntity)
+                || !_em.HasComponent<VacuumRuntimeStateComponent>(_playerEntity)
+                || !_em.HasComponent<PlayerCleanupSweepRuntimeStateComponent>(_playerEntity)
+                || !_em.HasComponent<PlayerGoSyncComponent>(_playerEntity)
+                || !_em.HasBuffer<PlayerCleanupActionProfileBufferElement>(_playerEntity))
+                return false;
+
+            var goSync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
+            var actionState = _em.GetComponentData<PlayerCleanupActionStateComponent>(_playerEntity);
+            var vacuumState = _em.GetComponentData<VacuumRuntimeStateComponent>(_playerEntity);
+            var vacuumConfig = _em.GetComponentData<VacuumActivationConfigComponent>(_playerEntity);
+            var sweepState = _em.GetComponentData<PlayerCleanupSweepRuntimeStateComponent>(_playerEntity);
+            var actionId = PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(actionState.SelectedActionId, allowNone: true);
+            var profiles = _em.GetBuffer<PlayerCleanupActionProfileBufferElement>(_playerEntity);
+            var profile = PlayerCleanupActionDebugGeometryUtility.ResolveActionProfile(profiles, actionId);
+            var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
+                actionId,
+                in vacuumConfig,
+                in vacuumState,
+                in sweepState,
+                in profile);
+
+            context = new CleanupGizmoContext
+            {
+                Center = new Vector3(goSync.Position.x, goSync.Position.y, goSync.Position.z) + (Vector3.up * GizmoHeightOffset),
+                ActionId = actionId,
+                Profile = profile,
+                VacuumState = vacuumState,
+                SweepState = sweepState,
+                Geometry = geometry,
+            };
+            return true;
+        }
+
+        private void DrawLockedFacingAxes(in CleanupGizmoContext context)
+        {
+            float axisLength = Mathf.Max(0.75f, context.Geometry.SearchRadius * 0.35f);
+            Vector3 center = context.Center;
+            Vector3 forward = ToVector3XZ(context.Geometry.LockedForwardXZ) * axisLength;
+            Vector3 right = ToVector3XZ(context.Geometry.LockedRightXZ) * axisLength;
+
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(center, center + forward);
+            Gizmos.color = Color.blue;
+            Gizmos.DrawLine(center, center + right);
+        }
+
+        private void DrawTrashSweepFullPath(in CleanupGizmoContext context)
+        {
+            ResolveSweepPathAngles(in context, out float startAngleDeg, out float endAngleDeg);
+            Color pathColor = context.SweepState.ActiveSweepDirectionSign >= 0
+                ? new Color(1f, 0.85f, 0.2f, 1f)
+                : new Color(1f, 0.55f, 0.2f, 1f);
+
+            Gizmos.color = pathColor;
+            DrawSweepArc(
+                context.Center,
+                context.Profile.TrashSweepInnerRadius,
+                startAngleDeg,
+                endAngleDeg,
+                Mathf.Max(4, FullPathStepCount),
+                in context.Geometry);
+            DrawSweepArc(
+                context.Center,
+                context.Profile.TrashSweepOuterRadius,
+                startAngleDeg,
+                endAngleDeg,
+                Mathf.Max(4, FullPathStepCount),
+                in context.Geometry);
+
+            Vector3 outerStart = GetSweepPoint(context.Center, context.Profile.TrashSweepOuterRadius, startAngleDeg, in context.Geometry);
+            Vector3 innerStart = GetSweepPoint(context.Center, context.Profile.TrashSweepInnerRadius, startAngleDeg, in context.Geometry);
+            Vector3 outerEnd = GetSweepPoint(context.Center, context.Profile.TrashSweepOuterRadius, endAngleDeg, in context.Geometry);
+            Vector3 innerEnd = GetSweepPoint(context.Center, context.Profile.TrashSweepInnerRadius, endAngleDeg, in context.Geometry);
+            Gizmos.DrawLine(innerStart, outerStart);
+            Gizmos.DrawLine(innerEnd, outerEnd);
+        }
+
+        private void DrawTrashSweepCurrentBand(in CleanupGizmoContext context)
+        {
+            float startAngleDeg = context.Geometry.CurrentSweepCenterAngleDeg - context.Profile.TrashSweepHalfAngleDeg;
+            float endAngleDeg = context.Geometry.CurrentSweepCenterAngleDeg + context.Profile.TrashSweepHalfAngleDeg;
+
+#if UNITY_EDITOR
+            DrawFilledSweepBand(
+                context.Center,
+                context.Profile.TrashSweepInnerRadius,
+                context.Profile.TrashSweepOuterRadius,
+                startAngleDeg,
+                endAngleDeg,
+                Mathf.Max(4, BandStepCount),
+                new Color(0.2f, 1f, 0.35f, 0.16f),
+                in context.Geometry);
+#endif
+
+            Gizmos.color = new Color(0.2f, 1f, 0.35f, 1f);
+            DrawSweepArc(
+                context.Center,
+                context.Profile.TrashSweepInnerRadius,
+                startAngleDeg,
+                endAngleDeg,
+                Mathf.Max(4, BandStepCount),
+                in context.Geometry);
+            DrawSweepArc(
+                context.Center,
+                context.Profile.TrashSweepOuterRadius,
+                startAngleDeg,
+                endAngleDeg,
+                Mathf.Max(4, BandStepCount),
+                in context.Geometry);
+            Gizmos.DrawLine(
+                GetSweepPoint(context.Center, context.Profile.TrashSweepInnerRadius, startAngleDeg, in context.Geometry),
+                GetSweepPoint(context.Center, context.Profile.TrashSweepOuterRadius, startAngleDeg, in context.Geometry));
+            Gizmos.DrawLine(
+                GetSweepPoint(context.Center, context.Profile.TrashSweepInnerRadius, endAngleDeg, in context.Geometry),
+                GetSweepPoint(context.Center, context.Profile.TrashSweepOuterRadius, endAngleDeg, in context.Geometry));
+        }
+
+        private void DrawHazardFocusRect(in CleanupGizmoContext context)
+        {
+            Vector3 forward = ToVector3XZ(context.Geometry.LockedForwardXZ);
+            Vector3 right = ToVector3XZ(context.Geometry.LockedRightXZ);
+            float length = Mathf.Max(0f, context.Profile.HazardRectLength);
+            float halfWidth = Mathf.Max(0f, context.Profile.HazardRectHalfWidth);
+
+            Vector3 backLeft = context.Center - (right * halfWidth);
+            Vector3 backRight = context.Center + (right * halfWidth);
+            Vector3 frontLeft = context.Center + (forward * length) - (right * halfWidth);
+            Vector3 frontRight = context.Center + (forward * length) + (right * halfWidth);
+
+#if UNITY_EDITOR
+            if (context.Geometry.HazardWindowActive != 0)
+                DrawFilledQuad(backLeft, backRight, frontRight, frontLeft, new Color(1f, 0.2f, 0.2f, 0.18f));
+#endif
+
+            Gizmos.color = context.Geometry.HazardWindowActive != 0
+                ? new Color(1f, 0.2f, 0.2f, 1f)
+                : new Color(0.55f, 0.15f, 0.15f, 1f);
+            Gizmos.DrawLine(backLeft, backRight);
+            Gizmos.DrawLine(backRight, frontRight);
+            Gizmos.DrawLine(frontRight, frontLeft);
+            Gizmos.DrawLine(frontLeft, backLeft);
+        }
+
+        private void DrawCandidateBulletMarkers(in CleanupGizmoContext context)
+        {
+            if (_bulletGizmoQuery == default || _bulletGizmoQuery.IsEmptyIgnoreFilter)
+                return;
+
+            using var bullets = _bulletGizmoQuery.ToEntityArray(Allocator.Temp);
+            int drawn = 0;
+            float searchRangeSq = context.Geometry.SearchRadius * context.Geometry.SearchRadius;
+
+            for (int i = 0; i < bullets.Length && drawn < Mathf.Max(1, CandidateBulletMarkerLimit); i++)
+            {
+                var bullet = bullets[i];
+                if (_em.HasComponent<BulletDespawnRequestTag>(bullet) && _em.IsComponentEnabled<BulletDespawnRequestTag>(bullet))
+                    continue;
+
+                var tx = _em.GetComponentData<LocalTransform>(bullet);
+                float dxp = tx.Position.x - context.Center.x;
+                float dzp = tx.Position.z - context.Center.z;
+                float distSq = dxp * dxp + dzp * dzp;
+                if (distSq > searchRangeSq)
+                    continue;
+
+                float bulletRadius = _em.HasComponent<BulletRadiusComponent>(bullet)
+                    ? math.max(0f, _em.GetComponentData<BulletRadiusComponent>(bullet).Value)
+                    : 0f;
+                var captureRule = _em.GetComponentData<BulletCaptureRuleComponent>(bullet).Value;
+
+                Color markerColor = new Color(0.45f, 0.45f, 0.45f, 1f);
+                if (captureRule == BulletCaptureRuleId.StandardCollectible)
+                {
+                    bool isTrashHit = PlayerCleanupActionDebugGeometryUtility.EvaluateBroomTrashCapture(
+                        distSq,
+                        dxp,
+                        dzp,
+                        bulletRadius,
+                        in context.Profile,
+                        in context.Geometry);
+                    if (isTrashHit)
+                        markerColor = new Color(0.2f, 1f, 0.35f, 1f);
+                }
+                else if (captureRule == BulletCaptureRuleId.RiskTimedResolve)
+                {
+                    bool isHazardHit = PlayerCleanupActionDebugGeometryUtility.EvaluateBroomHazardCapture(
+                        dxp,
+                        dzp,
+                        bulletRadius,
+                        in context.Profile,
+                        in context.Geometry);
+                    if (isHazardHit)
+                        markerColor = new Color(1f, 0.2f, 0.2f, 1f);
+                }
+
+                Gizmos.color = markerColor;
+                Gizmos.DrawSphere(new Vector3(tx.Position.x, tx.Position.y, tx.Position.z) + (Vector3.up * GizmoHeightOffset), 0.06f);
+                drawn++;
+            }
+        }
+
+        private string BuildStateLabel(in CleanupGizmoContext context)
+        {
+            if (context.ActionId != PlayerCleanupActionId.BroomSweep)
+                return $"Action={context.ActionId} | Active={context.VacuumState.IsActive}";
+
+            if (context.VacuumState.IsActive == 0)
+            {
+                int previewDirection = context.SweepState.NextSweepDirectionSign < 0 ? -1 : 1;
+                return $"BroomSweep | Active=0 | NextDir={previewDirection:+0;-0}";
+            }
+
+            if (context.Geometry.CaptureReady == 0)
+                return $"BroomSweep | Active=1 | INVALID SWEEP STATE";
+
+            return $"BroomSweep | Active=1 | Dir={context.SweepState.ActiveSweepDirectionSign:+0;-0} | Progress={context.Geometry.Progress01:0.00} | Angle={context.Geometry.CurrentSweepCenterAngleDeg:0.0} | HazardWindow={context.Geometry.HazardWindowActive}";
+        }
+
+        private void DrawStateLabelAt(Vector3 center, string label)
+        {
+#if UNITY_EDITOR
+            Handles.Label(center + (Vector3.up * 0.2f), label);
+#endif
+        }
+
+        private static void ResolveSweepPathAngles(in CleanupGizmoContext context, out float startAngleDeg, out float endAngleDeg)
+        {
+            int directionSign = context.SweepState.ActiveSweepDirectionSign;
+            if (directionSign == 0)
+                directionSign = context.SweepState.NextSweepDirectionSign < 0 ? -1 : 1;
+
+            if (directionSign > 0)
+            {
+                startAngleDeg = context.Profile.TrashSweepStartAngleDeg;
+                endAngleDeg = context.Profile.TrashSweepEndAngleDeg;
+            }
+            else
+            {
+                startAngleDeg = -context.Profile.TrashSweepStartAngleDeg;
+                endAngleDeg = -context.Profile.TrashSweepEndAngleDeg;
+            }
+        }
+
+        private static Vector3 GetSweepPoint(Vector3 center, float radius, float angleDeg, in BroomSweepFrameGeometry geometry)
+        {
+            float radians = angleDeg * Mathf.Deg2Rad;
+            float cos = Mathf.Cos(radians);
+            float sin = Mathf.Sin(radians);
+            float2 dir = (geometry.LockedForwardXZ * cos) + (geometry.LockedRightXZ * sin);
+            return center + new Vector3(dir.x, 0f, dir.y) * radius;
+        }
+
+        private static Vector3 ToVector3XZ(float2 vector)
+        {
+            return new Vector3(vector.x, 0f, vector.y);
+        }
+
+        private static void DrawSweepArc(
+            Vector3 center,
+            float radius,
+            float startAngleDeg,
+            float endAngleDeg,
+            int segments,
+            in BroomSweepFrameGeometry geometry)
+        {
+            segments = Mathf.Max(1, segments);
+            Vector3 prev = GetSweepPoint(center, radius, startAngleDeg, in geometry);
+            for (int i = 1; i <= segments; i++)
+            {
+                float t = i / (float)segments;
+                float angleDeg = Mathf.Lerp(startAngleDeg, endAngleDeg, t);
+                Vector3 next = GetSweepPoint(center, radius, angleDeg, in geometry);
+                Gizmos.DrawLine(prev, next);
+                prev = next;
+            }
+        }
+
+        private static void DrawXZCircle(Vector3 center, float radius, int segments)
+        {
+            float step = 2f * Mathf.PI / Mathf.Max(3, segments);
+            Vector3 prev = center + new Vector3(radius, 0f, 0f);
+
+            for (int i = 1; i <= segments; i++)
+            {
+                float angle = step * i;
+                Vector3 next = center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+                Gizmos.DrawLine(prev, next);
+                prev = next;
+            }
+        }
+
+#if UNITY_EDITOR
+        private static void DrawFilledSweepBand(
+            Vector3 center,
+            float innerRadius,
+            float outerRadius,
+            float startAngleDeg,
+            float endAngleDeg,
+            int segments,
+            Color color,
+            in BroomSweepFrameGeometry geometry)
+        {
+            segments = Mathf.Max(1, segments);
+            Handles.color = color;
+            for (int i = 0; i < segments; i++)
+            {
+                float t0 = i / (float)segments;
+                float t1 = (i + 1) / (float)segments;
+                float angle0 = Mathf.Lerp(startAngleDeg, endAngleDeg, t0);
+                float angle1 = Mathf.Lerp(startAngleDeg, endAngleDeg, t1);
+                Vector3 inner0 = GetSweepPoint(center, innerRadius, angle0, in geometry);
+                Vector3 outer0 = GetSweepPoint(center, outerRadius, angle0, in geometry);
+                Vector3 outer1 = GetSweepPoint(center, outerRadius, angle1, in geometry);
+                Vector3 inner1 = GetSweepPoint(center, innerRadius, angle1, in geometry);
+                Handles.DrawAAConvexPolygon(inner0, outer0, outer1, inner1);
+            }
+        }
+
+        private static void DrawFilledQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color color)
+        {
+            Handles.color = color;
+            Handles.DrawAAConvexPolygon(a, b, c, d);
+        }
+#endif
+
         private static DemoShellPauseBridge FindPauseBridge()
         {
 #if UNITY_2023_1_OR_NEWER
@@ -297,6 +696,16 @@ namespace SweepNDodge.DotsBullets
 #else
             return Object.FindObjectOfType<DemoShellPauseBridge>();
 #endif
+        }
+
+        private struct CleanupGizmoContext
+        {
+            public Vector3 Center;
+            public PlayerCleanupActionId ActionId;
+            public PlayerCleanupActionProfileBufferElement Profile;
+            public VacuumRuntimeStateComponent VacuumState;
+            public PlayerCleanupSweepRuntimeStateComponent SweepState;
+            public BroomSweepFrameGeometry Geometry;
         }
     }
 }

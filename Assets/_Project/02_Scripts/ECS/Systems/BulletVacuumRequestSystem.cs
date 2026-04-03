@@ -21,13 +21,6 @@ namespace SweepNDodge.DotsBullets
     [UpdateInGroup(typeof(BulletRequestGroup))]
     public partial struct BulletVacuumRequestSystem : ISystem
     {
-        private const float FallbackRadialTrashRange = 3.2f;
-        private const float FallbackRadialHazardRingRadius = 2.88f;
-        private const float FallbackRadialHazardRingWidth = 0.8f;
-        private const float FallbackForwardTrashRange = 3.2f;
-        private const float FallbackForwardTrashHalfAngleDeg = 40f;
-        private const float FallbackForwardHazardLineLength = 3.2f;
-        private const float FallbackForwardHazardLineHalfWidth = 0.5f;
         private EntityQuery _combatEventChannelQuery;
 
         public void OnCreate(ref SystemState state)
@@ -120,20 +113,15 @@ namespace SweepNDodge.DotsBullets
             if (!BulletFieldShared.IsInitialized)
                 return;
 
-            var actionProfile = ResolveActionProfile(actionProfiles, actionId);
-            ResolveBroomSweepFrameGeometry(
+            var actionProfile = PlayerCleanupActionDebugGeometryUtility.ResolveActionProfile(actionProfiles, actionId);
+            var broomGeometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 actionId,
                 in vacuumConfigRO,
                 in vacuumStateRW.ValueRO,
                 in sweepRuntimeStateRW.ValueRO,
-                in actionProfile,
-                out byte broomCaptureReady,
-                out float2 broomForwardXZ,
-                out float2 broomRightXZ,
-                out float broomCurrentSweepCenterAngleDeg,
-                out byte broomHazardWindowActive);
+                in actionProfile);
             float3 playerForward = GetPlayerForward(in goSyncRO);
-            float searchRange = ComputeSearchRange(actionId, in actionProfile);
+            float searchRange = broomGeometry.SearchRadius;
             float hazardRiskMultiplier = 1f
                 + math.max(0, hazardRiskStateRO.HazardStack) * math.max(0f, hazardRiskConfigRO.HazardBonusRate);
 
@@ -195,22 +183,14 @@ namespace SweepNDodge.DotsBullets
                 ActionId = actionId,
                 PlayerForward = playerForward,
                 RadialTrashRange = actionProfile.TrashRange,
-                RadialHazardRingInner = GetHazardRingInner(in actionProfile),
-                RadialHazardRingOuter = GetHazardRingOuter(in actionProfile),
+                RadialHazardRingInner = PlayerCleanupActionDebugGeometryUtility.GetHazardRingInner(in actionProfile),
+                RadialHazardRingOuter = PlayerCleanupActionDebugGeometryUtility.GetHazardRingOuter(in actionProfile),
                 ForwardTrashRange = actionProfile.TrashRange,
                 ForwardTrashCosHalfAngle = math.cos(math.radians(actionProfile.TrashFanHalfAngleDeg)),
                 ForwardHazardLineLength = actionProfile.HazardLineLength,
                 ForwardHazardLineHalfWidth = actionProfile.HazardLineHalfWidth,
-                BroomCaptureReady = broomCaptureReady,
-                BroomLockedForwardXZ = broomForwardXZ,
-                BroomLockedRightXZ = broomRightXZ,
-                BroomCurrentSweepCenterAngleDeg = broomCurrentSweepCenterAngleDeg,
-                BroomTrashInnerRadius = actionProfile.TrashSweepInnerRadius,
-                BroomTrashOuterRadius = actionProfile.TrashSweepOuterRadius,
-                BroomTrashHalfAngleDeg = actionProfile.TrashSweepHalfAngleDeg,
-                BroomHazardWindowActive = broomHazardWindowActive,
-                BroomHazardRectLength = actionProfile.HazardRectLength,
-                BroomHazardRectHalfWidth = actionProfile.HazardRectHalfWidth,
+                ActionProfile = actionProfile,
+                BroomGeometry = broomGeometry,
                 HazardRiskMultiplier = hazardRiskMultiplier,
 
                 CellMap = BulletFieldShared.CellMap,
@@ -347,109 +327,6 @@ namespace SweepNDodge.DotsBullets
             runtimeState.ActivationFrame = 0u;
         }
 
-        private static void ResolveBroomSweepFrameGeometry(
-            PlayerCleanupActionId actionId,
-            in VacuumActivationConfigComponent config,
-            in VacuumRuntimeStateComponent vacuumState,
-            in PlayerCleanupSweepRuntimeStateComponent sweepRuntimeState,
-            in PlayerCleanupActionProfileBufferElement profile,
-            out byte captureReady,
-            out float2 lockedForwardXZ,
-            out float2 lockedRightXZ,
-            out float currentSweepCenterAngleDeg,
-            out byte hazardWindowActive)
-        {
-            captureReady = 0;
-            lockedForwardXZ = float2.zero;
-            lockedRightXZ = float2.zero;
-            currentSweepCenterAngleDeg = 0f;
-            hazardWindowActive = 0;
-
-            if (actionId != PlayerCleanupActionId.BroomSweep)
-                return;
-
-            if (sweepRuntimeState.HasLockedFacing == 0)
-                return;
-
-            if (sweepRuntimeState.ActiveSweepDirectionSign == 0)
-                return;
-
-            float2 facingXZ = sweepRuntimeState.LockedFacingXZ;
-            if (math.lengthsq(facingXZ) <= 1e-8f)
-                return;
-
-            float safeActiveTime = math.max(1e-5f, config.ActiveTime);
-            float progress01 = math.saturate(1f - (math.max(0f, vacuumState.ActiveTimer) / safeActiveTime));
-
-            float startAngleDeg;
-            float endAngleDeg;
-            if (sweepRuntimeState.ActiveSweepDirectionSign > 0)
-            {
-                startAngleDeg = profile.TrashSweepStartAngleDeg;
-                endAngleDeg = profile.TrashSweepEndAngleDeg;
-            }
-            else
-            {
-                startAngleDeg = -profile.TrashSweepStartAngleDeg;
-                endAngleDeg = -profile.TrashSweepEndAngleDeg;
-            }
-
-            lockedForwardXZ = math.normalize(facingXZ);
-            lockedRightXZ = new float2(lockedForwardXZ.y, -lockedForwardXZ.x);
-            currentSweepCenterAngleDeg = math.lerp(startAngleDeg, endAngleDeg, progress01);
-            captureReady = 1;
-            hazardWindowActive = (byte)(vacuumState.CaptureActiveTimer > 0f
-                && math.abs(currentSweepCenterAngleDeg) <= math.max(0f, profile.HazardForwardWindowAngleDeg)
-                    ? 1
-                    : 0);
-        }
-
-        private static PlayerCleanupActionProfileBufferElement ResolveActionProfile(
-            DynamicBuffer<PlayerCleanupActionProfileBufferElement> profiles,
-            PlayerCleanupActionId actionId)
-        {
-            for (int i = 0; i < profiles.Length; i++)
-            {
-                if (profiles[i].ActionId == actionId)
-                {
-                    return PlayerCleanupActionContractUtility.SanitizeProfile(profiles[i]);
-                }
-            }
-
-            if (actionId == PlayerCleanupActionId.ForwardFanLine)
-            {
-                return PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
-                {
-                    ActionId = PlayerCleanupActionId.ForwardFanLine,
-                    TrashRange = FallbackForwardTrashRange,
-                    TrashFanHalfAngleDeg = FallbackForwardTrashHalfAngleDeg,
-                    HazardRingRadius = 0f,
-                    HazardRingWidth = 0f,
-                    HazardLineLength = FallbackForwardHazardLineLength,
-                    HazardLineHalfWidth = FallbackForwardHazardLineHalfWidth,
-                });
-            }
-
-            if (actionId == PlayerCleanupActionId.BroomSweep)
-            {
-                return PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
-                    FallbackRadialTrashRange,
-                    FallbackRadialHazardRingRadius,
-                    FallbackRadialHazardRingWidth);
-            }
-
-            return PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
-            {
-                ActionId = PlayerCleanupActionId.RadialRing,
-                TrashRange = FallbackRadialTrashRange,
-                TrashFanHalfAngleDeg = 180f,
-                HazardRingRadius = FallbackRadialHazardRingRadius,
-                HazardRingWidth = FallbackRadialHazardRingWidth,
-                HazardLineLength = 0f,
-                HazardLineHalfWidth = 0f,
-            });
-        }
-
         private static float3 GetPlayerForward(in PlayerGoSyncComponent sync)
         {
             float3 forward = math.forward(sync.Rotation);
@@ -463,34 +340,6 @@ namespace SweepNDodge.DotsBullets
         {
             float3 forward = GetPlayerForward(in sync);
             return new float2(forward.x, forward.z);
-        }
-
-        private static float ComputeSearchRange(PlayerCleanupActionId actionId, in PlayerCleanupActionProfileBufferElement profile)
-        {
-            if (actionId == PlayerCleanupActionId.BroomSweep)
-            {
-                float hazardDiagonal = math.sqrt(
-                    profile.HazardRectLength * profile.HazardRectLength
-                    + profile.HazardRectHalfWidth * profile.HazardRectHalfWidth);
-                return math.max(0f, math.max(profile.TrashSweepOuterRadius, hazardDiagonal));
-            }
-
-            float radialOuter = GetHazardRingOuter(in profile);
-            float forwardRange = math.max(profile.TrashRange, profile.HazardLineLength + profile.HazardLineHalfWidth);
-            return math.max(0f, math.max(radialOuter, forwardRange));
-        }
-
-        private static float GetHazardRingInner(in PlayerCleanupActionProfileBufferElement profile)
-        {
-            float halfWidth = math.max(0f, profile.HazardRingWidth * 0.5f);
-            return math.max(0f, profile.HazardRingRadius - halfWidth);
-        }
-
-        private static float GetHazardRingOuter(in PlayerCleanupActionProfileBufferElement profile)
-        {
-            float halfWidth = math.max(0f, profile.HazardRingWidth * 0.5f);
-            float inner = math.max(0f, profile.HazardRingRadius - halfWidth);
-            return math.max(inner, profile.HazardRingRadius + halfWidth);
         }
 
         [BurstCompile]
@@ -510,16 +359,8 @@ namespace SweepNDodge.DotsBullets
             public float ForwardTrashCosHalfAngle;
             public float ForwardHazardLineLength;
             public float ForwardHazardLineHalfWidth;
-            public byte BroomCaptureReady;
-            public float2 BroomLockedForwardXZ;
-            public float2 BroomLockedRightXZ;
-            public float BroomCurrentSweepCenterAngleDeg;
-            public float BroomTrashInnerRadius;
-            public float BroomTrashOuterRadius;
-            public float BroomTrashHalfAngleDeg;
-            public byte BroomHazardWindowActive;
-            public float BroomHazardRectLength;
-            public float BroomHazardRectHalfWidth;
+            public PlayerCleanupActionProfileBufferElement ActionProfile;
+            public BroomSweepFrameGeometry BroomGeometry;
             public float HazardRiskMultiplier;
 
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
@@ -685,19 +526,13 @@ namespace SweepNDodge.DotsBullets
             private bool EvaluateTrashCapture(float distSq, float dxp, float dzp, float bulletRadius)
             {
                 if (ActionId == PlayerCleanupActionId.BroomSweep)
-                {
-                    if (BroomCaptureReady == 0)
-                        return false;
-
-                    float innerRadius = math.max(0f, BroomTrashInnerRadius - bulletRadius);
-                    float outerRadius = math.max(innerRadius, BroomTrashOuterRadius + bulletRadius);
-                    if (distSq < innerRadius * innerRadius || distSq > outerRadius * outerRadius)
-                        return false;
-
-                    float relativeAngleDeg = ComputeSignedAngleDeg(dxp, dzp, BroomLockedForwardXZ, BroomLockedRightXZ);
-                    float deltaAngleDeg = ComputeDeltaAngleDeg(relativeAngleDeg, BroomCurrentSweepCenterAngleDeg);
-                    return math.abs(deltaAngleDeg) <= BroomTrashHalfAngleDeg;
-                }
+                    return PlayerCleanupActionDebugGeometryUtility.EvaluateBroomTrashCapture(
+                        distSq,
+                        dxp,
+                        dzp,
+                        bulletRadius,
+                        in ActionProfile,
+                        in BroomGeometry);
 
                 if (ActionId == PlayerCleanupActionId.ForwardFanLine)
                 {
@@ -719,22 +554,12 @@ namespace SweepNDodge.DotsBullets
             private bool EvaluateHazardCapture(float distSq, float dxp, float dzp, float bulletRadius)
             {
                 if (ActionId == PlayerCleanupActionId.BroomSweep)
-                {
-                    if (BroomCaptureReady == 0 || BroomHazardWindowActive == 0)
-                        return false;
-
-                    float forwardProjection = dxp * BroomLockedForwardXZ.x + dzp * BroomLockedForwardXZ.y;
-                    if (forwardProjection < -bulletRadius)
-                        return false;
-
-                    float maxForward = math.max(0f, BroomHazardRectLength + bulletRadius);
-                    if (forwardProjection > maxForward)
-                        return false;
-
-                    float lateral = math.abs(dxp * BroomLockedRightXZ.x + dzp * BroomLockedRightXZ.y);
-                    float maxLateral = math.max(0f, BroomHazardRectHalfWidth + bulletRadius);
-                    return lateral <= maxLateral;
-                }
+                    return PlayerCleanupActionDebugGeometryUtility.EvaluateBroomHazardCapture(
+                        dxp,
+                        dzp,
+                        bulletRadius,
+                        in ActionProfile,
+                        in BroomGeometry);
 
                 if (ActionId == PlayerCleanupActionId.ForwardFanLine)
                 {
@@ -756,25 +581,6 @@ namespace SweepNDodge.DotsBullets
                 float inner = math.max(0f, RadialHazardRingInner - bulletRadius);
                 float outer = math.max(inner, RadialHazardRingOuter + bulletRadius);
                 return distSq >= inner * inner && distSq <= outer * outer;
-            }
-
-            private static float ComputeSignedAngleDeg(
-                float dxp,
-                float dzp,
-                float2 forwardXZ,
-                float2 rightXZ)
-            {
-                float forwardProjection = dxp * forwardXZ.x + dzp * forwardXZ.y;
-                float rightProjection = dxp * rightXZ.x + dzp * rightXZ.y;
-                return math.degrees(math.atan2(rightProjection, forwardProjection));
-            }
-
-            private static float ComputeDeltaAngleDeg(float angleDeg, float referenceDeg)
-            {
-                float deltaRad = math.atan2(
-                    math.sin(math.radians(angleDeg - referenceDeg)),
-                    math.cos(math.radians(angleDeg - referenceDeg)));
-                return math.degrees(deltaRad);
             }
 
             private void TryAccumulateDepletionAndPollution(Entity bullet, in float3 bulletPos, int progressDelta)
