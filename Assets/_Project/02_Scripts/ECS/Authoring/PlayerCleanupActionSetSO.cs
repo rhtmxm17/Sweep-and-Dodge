@@ -10,7 +10,7 @@ namespace SweepNDodge.DotsBullets
         {
             public PlayerCleanupActionId ActionId;
 
-            // legacy compatibility for pre-BroomSweep runtime
+            // legacy compatibility fields for non-default compatibility actions
             public float TrashRange;
             public float TrashFanHalfAngleDeg;
             public float HazardRingRadius;

@@ -4,7 +4,7 @@
 - doc_id: `GD-006`
 - type: `GameDesign`
 - status: `active`
-- last_updated: `2026-04-02`
+- last_updated: `2026-04-03`
 - related_adr:
   - [ADR-20260219-03-player-cleanup-action-profile-so-externalization.md](../ADR/ADR-20260219-03-player-cleanup-action-profile-so-externalization.md)
   - [ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md](../ADR/ADR-20260219-04-player-input-action-slot-mapping-and-active-input-consume.md)
@@ -95,6 +95,7 @@
 ### 5.2 기본 청소 동작: BroomSweep
 - 현재 기본 청소 동작은 `BroomSweep` 1종으로 고정한다.
 - 레거시 후보였던 `RadialRing`, `ForwardFanLine`은 이번 기준에서 미사용으로 내린다.
+- 단, 런타임 호환 레이어와 일부 회귀 테스트 fixture에서는 explicit compatibility 용도로만 유지한다.
 - `BroomSweep`는 하나의 액션이지만, 내부적으로는 두 판정을 가진다.
   - `Trash` 수거: 스윕 궤적을 따라가는 판정
   - `Hazard` 수거: 스윕이 정면을 향하는 순간의 강한 판정

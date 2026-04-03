@@ -51,11 +51,11 @@ namespace SweepNDodge.DotsBullets
     {
         public PlayerCleanupActionId ActionId;
 
-        // legacy compatibility for pre-BroomSweep runtime
+        // legacy compatibility fields for non-default compatibility actions
         public float TrashRange;
         public float TrashFanHalfAngleDeg;
 
-        // legacy compatibility for pre-BroomSweep runtime
+        // legacy compatibility fields for non-default compatibility actions
         public float HazardRingRadius;
         public float HazardRingWidth;
         public float HazardLineLength;
@@ -124,7 +124,7 @@ namespace SweepNDodge.DotsBullets
             {
                 ActionId = PlayerCleanupActionId.BroomSweep,
 
-                // Temporary legacy compatibility until BroomSweep runtime geometry replaces radial handling.
+                // Legacy compatibility values retained for explicit RadialRing/ForwardFanLine fixtures.
                 TrashRange = safeRange,
                 TrashFanHalfAngleDeg = 180f,
                 HazardRingRadius = math.max(0f, captureRingRadius),

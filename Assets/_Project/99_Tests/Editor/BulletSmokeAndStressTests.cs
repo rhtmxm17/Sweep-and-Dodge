@@ -373,6 +373,31 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void VacuumContractDefaultFixture_UsesBroomSweepDefaults()
+        {
+            using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("VacuumContractDefaultFixtureWorld", out _);
+            try
+            {
+                var em = world.EntityManager;
+                SetupVacuumContractEnvironment(em, carryLoad: 0, carryCapacity: 10, out var playerEntity);
+
+                var actionState = em.GetComponentData<PlayerCleanupActionStateComponent>(playerEntity);
+                var slotMap = em.GetComponentData<PlayerCleanupActionSlotMapComponent>(playerEntity);
+                var profiles = em.GetBuffer<PlayerCleanupActionProfileBufferElement>(playerEntity);
+
+                Assert.That(actionState.SelectedActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+                Assert.That(slotMap.PrimaryActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+                Assert.That(slotMap.SecondaryActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+                Assert.That(profiles.Length, Is.EqualTo(1));
+                Assert.That(profiles[0].ActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void Vacuum_FullBin_HazardCapture_RemovesOnly_WithoutCarrySourceCollect()
         {
             using var world = CreateDefaultTestWorldWithoutFeedbackConsumers("VacuumFullBinHazardRemovedWorld", out var simGroup);
@@ -387,12 +412,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 var sourceEntity = CreateVacuumContractSource(em);
                 var hazard = CreateVacuumContractBullet(
                     em,
-                    position: new float3(2.88f, 0f, 0f),
+                    position: new float3(0f, 0f, 2.88f),
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 5,
                     sourceEntity: sourceEntity);
-
-                RequestVacuum(em, playerEntity);
+                PrimeBroomSweepForwardWindow(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 Assert.That(em.IsComponentEnabled<BulletActiveTag>(hazard), Is.False, "FullBin Hazard 조건부 성공은 제거(디스폰)되어야 한다.");
@@ -450,12 +474,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 var sourceEntity = CreateVacuumContractSource(em);
                 var hazard = CreateVacuumContractBullet(
                     em,
-                    position: new float3(2.88f, 0f, 0f),
+                    position: new float3(0f, 0f, 2.88f),
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 3,
                     sourceEntity: sourceEntity);
-
-                RequestVacuum(em, playerEntity);
+                PrimeBroomSweepForwardWindow(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 Assert.That(em.IsComponentEnabled<BulletActiveTag>(hazard), Is.False, "HazardCaptured 경로에서는 Hazard가 제거되어야 한다.");
@@ -520,18 +543,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 var sourceEntity = CreateVacuumContractSource(em);
                 CreateVacuumContractBullet(
                     em,
-                    position: new float3(2.88f, 0f, 0f),
+                    position: new float3(0f, 0f, 2.88f),
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 10,
                     sourceEntity: sourceEntity);
                 CreateVacuumContractBullet(
                     em,
-                    position: new float3(-2.88f, 0f, 0f),
+                    position: new float3(0f, 0f, 1.6f),
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 10,
                     sourceEntity: sourceEntity);
-
-                RequestVacuum(em, playerEntity);
+                PrimeBroomSweepForwardWindow(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 var sourceAfterHazards = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
@@ -540,12 +562,10 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 CreateVacuumContractBullet(
                     em,
-                    position: new float3(1.2f, 0f, 0f),
+                    position: BroomPolarPosition(1.2f, 0f),
                     captureRule: BulletCaptureRuleId.StandardCollectible,
                     scoreValue: 10,
                     sourceEntity: sourceEntity);
-
-                RequestVacuum(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 var sourceAfterTrash = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
@@ -580,13 +600,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 var hitSource = CreateVacuumContractSource(em);
                 CreateVacuumContractBullet(
                     em,
-                    position: new float3(2.88f, 0f, 0f),
+                    position: new float3(0f, 0f, 2.88f),
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 10,
                     sourceEntity: captureSource);
-                CreateHazardCollisionBullet(em, new float3(0.15f, 0f, 0f), hitSource);
-
-                RequestVacuum(em, playerEntity);
+                CreateHazardCollisionBullet(em, new float3(0.15f, 0f, -0.25f), hitSource);
+                PrimeBroomSweepForwardWindow(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
@@ -626,13 +645,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 var captureSource = CreateVacuumContractSource(em);
                 CreateVacuumContractBullet(
                     em,
-                    position: new float3(2.88f, 0f, 0f),
+                    position: new float3(0f, 0f, 2.88f),
                     captureRule: BulletCaptureRuleId.RiskTimedResolve,
                     scoreValue: 10,
                     sourceEntity: captureSource);
                 CreateDepositRegionGrid(em, depositRegionId: 2001u);
-
-                RequestVacuum(em, playerEntity);
+                PrimeBroomSweepForwardWindow(em, playerEntity);
                 StepSimulationFrame(world, simGroup, ref elapsed);
 
                 var carry = em.GetComponentData<PlayerCarryBinComponent>(playerEntity);
@@ -664,7 +682,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var trash = CreateVacuumContractBullet(
                     em,
-                    position: new float3(1.2f, 0f, 0f),
+                    position: BroomPolarPosition(1.2f, -20f),
                     captureRule: BulletCaptureRuleId.StandardCollectible,
                     scoreValue: 4,
                     sourceEntity: Entity.Null);
@@ -3947,14 +3965,14 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             em.SetComponentData(player, new PlayerCleanupActionStateComponent
             {
-                SelectedActionId = PlayerCleanupActionId.RadialRing,
+                SelectedActionId = PlayerCleanupActionId.BroomSweep,
                 PendingActionId = PlayerCleanupActionId.None,
                 Version = 0,
             });
             em.SetComponentData(player, new PlayerCleanupActionSlotMapComponent
             {
-                PrimaryActionId = PlayerCleanupActionId.RadialRing,
-                SecondaryActionId = PlayerCleanupActionId.ForwardFanLine,
+                PrimaryActionId = PlayerCleanupActionId.BroomSweep,
+                SecondaryActionId = PlayerCleanupActionId.BroomSweep,
             });
             em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
             {
@@ -3983,16 +4001,7 @@ namespace SweepNDodge.DotsBullets.Tests
             });
 
             var actionProfiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
-            actionProfiles.Add(new PlayerCleanupActionProfileBufferElement
-            {
-                ActionId = PlayerCleanupActionId.RadialRing,
-                TrashRange = 3.2f,
-                TrashFanHalfAngleDeg = 180f,
-                HazardRingRadius = 2.88f,
-                HazardRingWidth = 0.8f,
-                HazardLineLength = 0f,
-                HazardLineHalfWidth = 0f,
-            });
+            actionProfiles.Add(PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f));
 
             var uiBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
             uiBuffer.EnsureCapacity(64);
@@ -4108,6 +4117,39 @@ namespace SweepNDodge.DotsBullets.Tests
             var vacuum = em.GetComponentData<VacuumRuntimeStateComponent>(playerEntity);
             vacuum.ActivateRequested = 1;
             em.SetComponentData(playerEntity, vacuum);
+        }
+
+        private static void PrimeBroomSweepForwardWindow(
+            EntityManager em,
+            Entity playerEntity,
+            sbyte activeSweepDirectionSign = 1)
+        {
+            em.SetComponentData(playerEntity, new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 13f / 60f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 13f / 60f,
+                CooldownTimer = 0f,
+                IsActive = 1,
+                ActivateRequested = 0,
+            });
+            em.SetComponentData(playerEntity, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = (sbyte)(-activeSweepDirectionSign),
+                ActiveSweepDirectionSign = activeSweepDirectionSign,
+                LockedFacingXZ = new float2(0f, 1f),
+                HasLockedFacing = 1,
+                ActivationFrame = 1u,
+            });
+        }
+
+        private static float3 BroomPolarPosition(float radius, float angleDeg)
+        {
+            float rad = math.radians(angleDeg);
+            return new float3(
+                radius * math.sin(rad),
+                0f,
+                radius * math.cos(rad));
         }
 
         private static void StepSimulationFrame(World world, SimulationSystemGroup simGroup, ref double elapsed)

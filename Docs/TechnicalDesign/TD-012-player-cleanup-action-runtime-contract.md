@@ -4,7 +4,7 @@
 - doc_id: `TD-012`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-02`
+- last_updated: `2026-04-03`
 - related_docs:
   - [GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
   - [TD-001-player-feedback-event-channel.md](./TD-001-player-feedback-event-channel.md)
@@ -42,8 +42,8 @@
   - 런타임에 남아 있는 선택/슬롯 경로는 호환 레이어로만 취급한다.
 - 상태 컴포넌트:
   - `PlayerCleanupActionStateComponent`
-    - 현재 유효한 `SelectedActionId`는 `BroomSweep`만 허용한다.
-    - `PendingActionId` 경로는 유지하되, 기본 슬롯도 `BroomSweep`로 수렴시킨다.
+    - 기본 플레이 경로의 `SelectedActionId`는 `BroomSweep`로 수렴시킨다.
+    - `PendingActionId` 경로와 legacy action id 자체는 호환 레이어로 유지한다.
   - `PlayerCleanupSweepRuntimeStateComponent`(구현 예정)
     - `NextSweepDirection`
     - `ActiveSweepDirection`
@@ -66,6 +66,7 @@
   - Vacuum 활성 중(`IsActive != 0`) 전환 요청은 즉시 소비하고 전환하지 않는다.
   - Vacuum 비활성 상태에서만 `SelectedActionId = PendingActionId`를 확정하고 `Version`을 증가시킨다.
 - 현재 기준에서는 결과적으로 `SelectedActionId = BroomSweep`를 유지하는 경로가 기본이다.
+- `RadialRing`, `ForwardFanLine`은 명시적 compatibility fixture 또는 회귀 테스트에서만 사용한다.
 
 ### 3.4 프로파일 데이터 경로
 - Authoring 원본:
@@ -166,12 +167,13 @@
   - `BroomSweep`를 기본 청소 동작으로 채택하는 설계 방향 합의
   - `Trash`/`Hazard` 판정 메타데이터 분리 원칙 합의
   - 활성 중 방향 잠금/이동 제한 필요성 확인
-- 예정:
   - `PlayerCleanupActionId`/프로파일 구조를 `BroomSweep` 기준으로 정리
   - `PlayerCleanupSweepRuntimeStateComponent`와 활성 제약 config component 추가
   - `BulletVacuumRequestSystem`의 정적 기하 분기를 스윕 진행률 기반 판정으로 교체
   - `PlayerIntentMovementSystem`에 활성 중 회전 잠금/이동 감속 적용
-  - 기존 `RadialRing`/`ForwardFanLine` 기본값/테스트/샘플 자산 정리
+  - 기본 asset/fallback/기본 fixture를 `BroomSweep` 기준으로 정리
+- 유지:
+  - `RadialRing`/`ForwardFanLine` enum, normalize, 런타임 분기, explicit compatibility fixture는 삭제하지 않는다.
 
 ## 7. 성능/리스크
 - 리스크 1: 정면 직사각형 `Hazard` 판정이 지나치게 빡빡하면 체감 실패율이 급증한다.
@@ -209,6 +211,7 @@
 
 ## 10. 변경 이력
 - 2026-04-02: 기본 청소 동작을 `BroomSweep` 단일 액션으로 재정의하고, `Trash` 스윕 판정 / `Hazard` 정면 판정 / 활성 중 방향 잠금·이동 제한 계약을 추가했다.
+- 2026-04-03: 기본 경로는 `BroomSweep` 단일 액션으로 고정하고, `RadialRing`/`ForwardFanLine`은 compatibility layer로만 유지한다는 운영 기준을 문서에 반영했다.
 - 2026-03-16: `HazardCaptured` 결과를 `HazardStack` 직접 write가 아닌 증가 요청 생성으로 정리하고, 실제 상태 확정 owner를 `TD-018` 참조로 분리했다.
 - 2026-03-09: 액션 슬롯 해석 책임을 `PlayerGoSyncSystem`에서 `PlayerIntentConsumeSystem`으로 옮기고, fixed-tick player path 기준으로 문구를 갱신했다.
 - 2026-03-05: 문서 신규 작성. 액션 모델/슬롯 매핑/활성 중 입력 소비/판정 분기 책임 계약을 정식화했다.

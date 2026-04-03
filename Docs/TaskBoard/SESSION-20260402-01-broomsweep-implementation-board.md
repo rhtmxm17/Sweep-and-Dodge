@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260402-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-04-02`
+- last_updated: `2026-04-03`
 - related_docs:
   - [../TechnicalDesign/TD-012-player-cleanup-action-runtime-contract.md](../TechnicalDesign/TD-012-player-cleanup-action-runtime-contract.md)
   - [../GameDesign/GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
@@ -24,32 +24,10 @@
   - 스윕 easing, 정면 판정 지속형 여부 같은 밸런싱 확장 결정
 
 ## Now
-- [ ] T3. `BulletVacuumRequestSystem`를 `BroomSweep` 진행률 기반 판정으로 교체한다.
-  - 완료 기준:
-    - `Trash`는 스윕 부채꼴 띠 판정으로 처리된다.
-    - `Hazard`는 정면 타이밍 창의 직사각형 판정으로 처리된다.
-    - 좌->우, 우->좌 교대가 런타임 상태로 관리된다.
-    - 기존 후처리(`HazardCaptured`, `HazardRemovedWhenCarryFull`, FullBin block`)는 유지된다.
-  - 검증:
-    - compile
-    - EditMode 테스트: Trash/Hazard 판정 분리, 좌우 교대, FullBin 경로
-  - 근거:
-    - `GD-006`
-    - `TD-012` 3.5
+- 없음
 
 ## Next
-- [ ] T4. 레거시 기본 경로 정리와 회귀 검증을 수행한다.
-  - 완료 기준:
-    - 기본 asset/fallback/test fixture가 `BroomSweep` 기준으로 정리된다.
-    - 레거시 액션명 전제 테스트/샘플이 남아 있어도 기본 경로를 흔들지 않는다.
-    - 최종 검증 게이트를 통과한다.
-  - 검증:
-    - compile
-    - console error 0
-    - EditMode
-    - PlayMode smoke
-  - 근거:
-    - `TD-012` 6장 / 8장
+- 없음
 
 ## Blocked
 - 없음
@@ -90,8 +68,31 @@
     - Unity compile 요청 후 console error 0
     - EditMode 전체 383/383 통과
     - PlayMode smoke 1/1 통과
+- [x] D5. T3. `BulletVacuumRequestSystem`를 `BroomSweep` 진행률 기반 판정으로 교체했다.
+  - 변경 결과:
+    - `BroomSweep` 활성 진입 edge에서 `ActiveSweepDirectionSign`이 `NextSweepDirectionSign`을 소비하고, 다음 스윕 방향을 반전하도록 런타임 상태 소비를 확정했다.
+    - `BulletVacuumRequestSystem`가 `Linear` 진행률 기반 스윕 중심각을 계산하고, `Trash`를 환형 부채꼴 띠 판정으로 처리하도록 교체했다.
+    - `Hazard`를 정면 직사각형 + 짧은 각도 창 판정으로 교체했고, `HasLockedFacing` 또는 `ActiveSweepDirectionSign`이 유효하지 않으면 캡처를 실패시키도록 했다.
+    - vacuum 계약 테스트와 smoke/stress 테스트를 `BroomSweep` 기본 fixture와 기하 기준으로 갱신했다.
+  - 검증 결과:
+    - Unity compile 요청 후 console error 0
+    - EditMode 전체 386/386 통과
+    - PlayMode smoke 통과
+    - 테스트 임시 산출물 `__GeneratedStageCatalogValidation*.meta` 정리 완료
+- [x] D6. T4. 레거시 기본 경로 정리와 회귀 검증을 완료했다.
+  - 변경 결과:
+    - 기본 경로 보호용 smoke fixture에 `BroomSweep` 기본값 계약 테스트를 추가했다.
+    - `PlayerCleanupActionComponents`, `PlayerCleanupActionSetSO`의 legacy 주석을 현재 운영 기준에 맞게 정리했다.
+    - `BulletCollectedSecondaryReactionTests`와 대응 PlayMode fixture에 legacy compatibility 의도를 주석/헬퍼 이름으로 명시했다.
+    - legacy PlayMode fixture에도 `PlayerCleanupSweepRuntimeStateComponent`, `PlayerCleanupMotionConstraintConfigComponent`를 보강해 현재 vacuum 계약과 맞췄다.
+    - `TD-012`, `GD-006`을 "기본 경로는 BroomSweep, legacy는 compatibility layer" 기준으로 정렬했다.
+  - 검증 결과:
+    - Unity compile 요청 후 console error 0
+    - EditMode 전체 통과
+    - PlayMode smoke 통과
+    - 테스트 임시 산출물 정리 완료
 
 ## End of Session
-- 결과: `BroomSweep` 구현 범위를 유지한 상태로 T2 활성 중 방향 잠금/이동 감속과 activation-edge state 연결까지 완료했다.
-- 남은 리스크: 실제 broom 진행률 판정과 좌우 교대 소비는 아직 구현되지 않았다.
-- 다음 세션 시작점: `T3. BulletVacuumRequestSystem`를 `BroomSweep` 진행률 기반 판정으로 교체
+- 결과: `BroomSweep` 기본 경로 고정, legacy compatibility fixture 구분, 문서/테스트 의미 정렬까지 완료했다.
+- 남은 리스크: `RadialRing`/`ForwardFanLine` 완전 삭제 여부는 별도 범위로 다시 판단해야 한다.
+- 다음 세션 시작점: 후속 밸런싱 또는 legacy 삭제 여부 판단

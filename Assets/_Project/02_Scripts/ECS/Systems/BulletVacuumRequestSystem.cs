@@ -13,7 +13,7 @@ namespace SweepNDodge.DotsBullets
     /// - 기본 제공:
     ///   - RadialRing: 원형 흡입 + 외곽 링 위험탄 처리
     ///   - ForwardFanLine: 전방 부채꼴 + 전방 직선 위험탄 처리
-    ///   - BroomSweep(T1 shim): 새 기본 액션이지만, broom 전용 기하는 T3 전까지 radial-compatible legacy 필드를 사용한다.
+    ///   - BroomSweep: 진행률 기반 스윕 부채꼴 Trash + 정면 타이밍 직사각형 Hazard 처리
     /// - 실제 비활성/풀 반납은 BulletExecutionEndGroup의 BulletDespawnExecutionSystem이 단일 책임으로 수행
     /// - LocalTransform 타입 충돌 방지: 메인 스레드에서 LocalTransform을 직접 읽지 않고 Job으로 스케줄
     /// </summary>
@@ -121,8 +121,19 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var actionProfile = ResolveActionProfile(actionProfiles, actionId);
+            ResolveBroomSweepFrameGeometry(
+                actionId,
+                in vacuumConfigRO,
+                in vacuumStateRW.ValueRO,
+                in sweepRuntimeStateRW.ValueRO,
+                in actionProfile,
+                out byte broomCaptureReady,
+                out float2 broomForwardXZ,
+                out float2 broomRightXZ,
+                out float broomCurrentSweepCenterAngleDeg,
+                out byte broomHazardWindowActive);
             float3 playerForward = GetPlayerForward(in goSyncRO);
-            float searchRange = ComputeSearchRange(in actionProfile);
+            float searchRange = ComputeSearchRange(actionId, in actionProfile);
             float hazardRiskMultiplier = 1f
                 + math.max(0, hazardRiskStateRO.HazardStack) * math.max(0f, hazardRiskConfigRO.HazardBonusRate);
 
@@ -190,6 +201,16 @@ namespace SweepNDodge.DotsBullets
                 ForwardTrashCosHalfAngle = math.cos(math.radians(actionProfile.TrashFanHalfAngleDeg)),
                 ForwardHazardLineLength = actionProfile.HazardLineLength,
                 ForwardHazardLineHalfWidth = actionProfile.HazardLineHalfWidth,
+                BroomCaptureReady = broomCaptureReady,
+                BroomLockedForwardXZ = broomForwardXZ,
+                BroomLockedRightXZ = broomRightXZ,
+                BroomCurrentSweepCenterAngleDeg = broomCurrentSweepCenterAngleDeg,
+                BroomTrashInnerRadius = actionProfile.TrashSweepInnerRadius,
+                BroomTrashOuterRadius = actionProfile.TrashSweepOuterRadius,
+                BroomTrashHalfAngleDeg = actionProfile.TrashSweepHalfAngleDeg,
+                BroomHazardWindowActive = broomHazardWindowActive,
+                BroomHazardRectLength = actionProfile.HazardRectLength,
+                BroomHazardRectHalfWidth = actionProfile.HazardRectHalfWidth,
                 HazardRiskMultiplier = hazardRiskMultiplier,
 
                 CellMap = BulletFieldShared.CellMap,
@@ -302,6 +323,14 @@ namespace SweepNDodge.DotsBullets
             {
                 if (!wasVacuumActive && isVacuumActive)
                 {
+                    int consumedDirectionSign = runtimeState.NextSweepDirectionSign switch
+                    {
+                        < 0 => -1,
+                        > 0 => 1,
+                        _ => 1,
+                    };
+                    runtimeState.ActiveSweepDirectionSign = (sbyte)consumedDirectionSign;
+                    runtimeState.NextSweepDirectionSign = (sbyte)(-consumedDirectionSign);
                     runtimeState.LockedFacingXZ = GetPlayerForwardXZ(in sync);
                     runtimeState.HasLockedFacing = 1;
                     runtimeState.ActivationFrame = frame;
@@ -312,9 +341,67 @@ namespace SweepNDodge.DotsBullets
                     return;
             }
 
+            runtimeState.ActiveSweepDirectionSign = 0;
             runtimeState.LockedFacingXZ = float2.zero;
             runtimeState.HasLockedFacing = 0;
             runtimeState.ActivationFrame = 0u;
+        }
+
+        private static void ResolveBroomSweepFrameGeometry(
+            PlayerCleanupActionId actionId,
+            in VacuumActivationConfigComponent config,
+            in VacuumRuntimeStateComponent vacuumState,
+            in PlayerCleanupSweepRuntimeStateComponent sweepRuntimeState,
+            in PlayerCleanupActionProfileBufferElement profile,
+            out byte captureReady,
+            out float2 lockedForwardXZ,
+            out float2 lockedRightXZ,
+            out float currentSweepCenterAngleDeg,
+            out byte hazardWindowActive)
+        {
+            captureReady = 0;
+            lockedForwardXZ = float2.zero;
+            lockedRightXZ = float2.zero;
+            currentSweepCenterAngleDeg = 0f;
+            hazardWindowActive = 0;
+
+            if (actionId != PlayerCleanupActionId.BroomSweep)
+                return;
+
+            if (sweepRuntimeState.HasLockedFacing == 0)
+                return;
+
+            if (sweepRuntimeState.ActiveSweepDirectionSign == 0)
+                return;
+
+            float2 facingXZ = sweepRuntimeState.LockedFacingXZ;
+            if (math.lengthsq(facingXZ) <= 1e-8f)
+                return;
+
+            float safeActiveTime = math.max(1e-5f, config.ActiveTime);
+            float progress01 = math.saturate(1f - (math.max(0f, vacuumState.ActiveTimer) / safeActiveTime));
+
+            float startAngleDeg;
+            float endAngleDeg;
+            if (sweepRuntimeState.ActiveSweepDirectionSign > 0)
+            {
+                startAngleDeg = profile.TrashSweepStartAngleDeg;
+                endAngleDeg = profile.TrashSweepEndAngleDeg;
+            }
+            else
+            {
+                startAngleDeg = -profile.TrashSweepStartAngleDeg;
+                endAngleDeg = -profile.TrashSweepEndAngleDeg;
+            }
+
+            lockedForwardXZ = math.normalize(facingXZ);
+            lockedRightXZ = new float2(lockedForwardXZ.y, -lockedForwardXZ.x);
+            currentSweepCenterAngleDeg = math.lerp(startAngleDeg, endAngleDeg, progress01);
+            captureReady = 1;
+            hazardWindowActive = (byte)(vacuumState.CaptureActiveTimer > 0f
+                && math.abs(currentSweepCenterAngleDeg) <= math.max(0f, profile.HazardForwardWindowAngleDeg)
+                    ? 1
+                    : 0);
         }
 
         private static PlayerCleanupActionProfileBufferElement ResolveActionProfile(
@@ -378,8 +465,16 @@ namespace SweepNDodge.DotsBullets
             return new float2(forward.x, forward.z);
         }
 
-        private static float ComputeSearchRange(in PlayerCleanupActionProfileBufferElement profile)
+        private static float ComputeSearchRange(PlayerCleanupActionId actionId, in PlayerCleanupActionProfileBufferElement profile)
         {
+            if (actionId == PlayerCleanupActionId.BroomSweep)
+            {
+                float hazardDiagonal = math.sqrt(
+                    profile.HazardRectLength * profile.HazardRectLength
+                    + profile.HazardRectHalfWidth * profile.HazardRectHalfWidth);
+                return math.max(0f, math.max(profile.TrashSweepOuterRadius, hazardDiagonal));
+            }
+
             float radialOuter = GetHazardRingOuter(in profile);
             float forwardRange = math.max(profile.TrashRange, profile.HazardLineLength + profile.HazardLineHalfWidth);
             return math.max(0f, math.max(radialOuter, forwardRange));
@@ -415,6 +510,16 @@ namespace SweepNDodge.DotsBullets
             public float ForwardTrashCosHalfAngle;
             public float ForwardHazardLineLength;
             public float ForwardHazardLineHalfWidth;
+            public byte BroomCaptureReady;
+            public float2 BroomLockedForwardXZ;
+            public float2 BroomLockedRightXZ;
+            public float BroomCurrentSweepCenterAngleDeg;
+            public float BroomTrashInnerRadius;
+            public float BroomTrashOuterRadius;
+            public float BroomTrashHalfAngleDeg;
+            public byte BroomHazardWindowActive;
+            public float BroomHazardRectLength;
+            public float BroomHazardRectHalfWidth;
             public float HazardRiskMultiplier;
 
             [ReadOnly] public NativeParallelMultiHashMap<int, Entity> CellMap;
@@ -579,6 +684,21 @@ namespace SweepNDodge.DotsBullets
 
             private bool EvaluateTrashCapture(float distSq, float dxp, float dzp, float bulletRadius)
             {
+                if (ActionId == PlayerCleanupActionId.BroomSweep)
+                {
+                    if (BroomCaptureReady == 0)
+                        return false;
+
+                    float innerRadius = math.max(0f, BroomTrashInnerRadius - bulletRadius);
+                    float outerRadius = math.max(innerRadius, BroomTrashOuterRadius + bulletRadius);
+                    if (distSq < innerRadius * innerRadius || distSq > outerRadius * outerRadius)
+                        return false;
+
+                    float relativeAngleDeg = ComputeSignedAngleDeg(dxp, dzp, BroomLockedForwardXZ, BroomLockedRightXZ);
+                    float deltaAngleDeg = ComputeDeltaAngleDeg(relativeAngleDeg, BroomCurrentSweepCenterAngleDeg);
+                    return math.abs(deltaAngleDeg) <= BroomTrashHalfAngleDeg;
+                }
+
                 if (ActionId == PlayerCleanupActionId.ForwardFanLine)
                 {
                     float range = math.max(0f, ForwardTrashRange + bulletRadius);
@@ -598,6 +718,24 @@ namespace SweepNDodge.DotsBullets
 
             private bool EvaluateHazardCapture(float distSq, float dxp, float dzp, float bulletRadius)
             {
+                if (ActionId == PlayerCleanupActionId.BroomSweep)
+                {
+                    if (BroomCaptureReady == 0 || BroomHazardWindowActive == 0)
+                        return false;
+
+                    float forwardProjection = dxp * BroomLockedForwardXZ.x + dzp * BroomLockedForwardXZ.y;
+                    if (forwardProjection < -bulletRadius)
+                        return false;
+
+                    float maxForward = math.max(0f, BroomHazardRectLength + bulletRadius);
+                    if (forwardProjection > maxForward)
+                        return false;
+
+                    float lateral = math.abs(dxp * BroomLockedRightXZ.x + dzp * BroomLockedRightXZ.y);
+                    float maxLateral = math.max(0f, BroomHazardRectHalfWidth + bulletRadius);
+                    return lateral <= maxLateral;
+                }
+
                 if (ActionId == PlayerCleanupActionId.ForwardFanLine)
                 {
                     float forwardProjection = dxp * PlayerForward.x + dzp * PlayerForward.z;
@@ -618,6 +756,25 @@ namespace SweepNDodge.DotsBullets
                 float inner = math.max(0f, RadialHazardRingInner - bulletRadius);
                 float outer = math.max(inner, RadialHazardRingOuter + bulletRadius);
                 return distSq >= inner * inner && distSq <= outer * outer;
+            }
+
+            private static float ComputeSignedAngleDeg(
+                float dxp,
+                float dzp,
+                float2 forwardXZ,
+                float2 rightXZ)
+            {
+                float forwardProjection = dxp * forwardXZ.x + dzp * forwardXZ.y;
+                float rightProjection = dxp * rightXZ.x + dzp * rightXZ.y;
+                return math.degrees(math.atan2(rightProjection, forwardProjection));
+            }
+
+            private static float ComputeDeltaAngleDeg(float angleDeg, float referenceDeg)
+            {
+                float deltaRad = math.atan2(
+                    math.sin(math.radians(angleDeg - referenceDeg)),
+                    math.cos(math.radians(angleDeg - referenceDeg)));
+                return math.degrees(deltaRad);
             }
 
             private void TryAccumulateDepletionAndPollution(Entity bullet, in float3 bulletPos, int progressDelta)

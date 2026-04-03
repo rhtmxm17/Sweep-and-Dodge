@@ -9,6 +9,10 @@ using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
+    /// <summary>
+    /// Legacy compatibility coverage:
+    /// secondary reaction PlayMode fixture는 의도적으로 RadialRing 기반 경로를 유지한다.
+    /// </summary>
     public class BulletCleanupRemovedSecondarySpawnPlayModeTests
     {
         [UnityTest]
@@ -27,7 +31,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SetRuntimeGrid(em, new[] { StageCellMovementFlags.None });
                 CreateCombatChannel(em);
                 CreateSecondaryChannel(em);
-                var player = CreateVacuumContractPlayer(em, carryLoad: 0, carryCapacity: 10);
+                var player = CreateLegacyCompatibilityVacuumContractPlayer(em, carryLoad: 0, carryCapacity: 10);
 
                 var source = em.CreateEntity();
                 em.AddBuffer<SourceActiveBulletCountBuffer>(source);
@@ -53,7 +57,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     BulletFieldShared.FreeByKey.Add(21, secondaryBullets[i]);
                 }
 
-                ActivateVacuum(em, player);
+                ActivateLegacyCompatibilityVacuum(em, player);
 
                 world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
@@ -101,7 +105,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SetRuntimeGrid(em, new[] { StageCellMovementFlags.None });
                 CreateCombatChannel(em);
                 CreateSecondaryChannel(em);
-                var player = CreateVacuumContractPlayer(em, carryLoad: 10, carryCapacity: 10);
+                var player = CreateLegacyCompatibilityVacuumContractPlayer(em, carryLoad: 10, carryCapacity: 10);
 
                 var source = em.CreateEntity();
                 em.AddBuffer<SourceActiveBulletCountBuffer>(source);
@@ -127,7 +131,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     BulletFieldShared.FreeByKey.Add(21, secondaryBullets[i]);
                 }
 
-                ActivateVacuum(em, player);
+                ActivateLegacyCompatibilityVacuum(em, player);
 
                 world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
@@ -243,7 +247,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddBuffer<BulletSecondarySpawnRequestBuffer>(entity);
         }
 
-        private static Entity CreateVacuumContractPlayer(EntityManager em, int carryLoad, int carryCapacity)
+        private static Entity CreateLegacyCompatibilityVacuumContractPlayer(EntityManager em, int carryLoad, int carryCapacity)
         {
             var player = em.CreateEntity(
                 typeof(PlayerTag),
@@ -262,6 +266,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerHazardPenaltyStateComponent),
                 typeof(PlayerCleanupActionStateComponent),
                 typeof(PlayerCleanupActionSlotMapComponent),
+                typeof(PlayerCleanupSweepRuntimeStateComponent),
+                typeof(PlayerCleanupMotionConstraintConfigComponent),
                 typeof(PlayerCarryBinDepositRequestTag),
                 typeof(PlayerCarryBinDepositContextComponent),
                 typeof(PlayerHazardHitRequestTag),
@@ -358,6 +364,19 @@ namespace SweepNDodge.DotsBullets.Tests
                 PrimaryActionId = PlayerCleanupActionId.RadialRing,
                 SecondaryActionId = PlayerCleanupActionId.ForwardFanLine,
             });
+            em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = 1,
+                ActiveSweepDirectionSign = 0,
+                LockedFacingXZ = float2.zero,
+                HasLockedFacing = 0,
+                ActivationFrame = 0u,
+            });
+            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
+            {
+                LockFacingWhileActive = 1,
+                ActiveMoveSpeedScale = 0.5f,
+            });
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
             em.SetComponentData(player, new PlayerCarryBinDepositContextComponent());
             em.SetComponentEnabled<PlayerHazardHitRequestTag>(player, false);
@@ -401,7 +420,7 @@ namespace SweepNDodge.DotsBullets.Tests
             return player;
         }
 
-        private static void ActivateVacuum(EntityManager em, Entity player)
+        private static void ActivateLegacyCompatibilityVacuum(EntityManager em, Entity player)
         {
             var intent = em.GetComponentData<PlayerInputIntentComponent>(player);
             intent.VacuumRequested = 1;

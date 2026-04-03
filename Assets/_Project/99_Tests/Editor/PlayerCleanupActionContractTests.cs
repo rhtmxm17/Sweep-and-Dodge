@@ -123,34 +123,14 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void BulletVacuumRequestSystem_BroomSweepSelection_UsesLegacyRadialCompatibility()
-        {
-            using var world = new World("BulletVacuumRequestSystem_BroomSweepShim");
-            var em = world.EntityManager;
-
-            CreateVacuumSystemPrerequisites(em, frame: 1u);
-
-            var player = CreateVacuumContractPlayer(em);
-            var bullet = CreateCollectibleBullet(em, new float3(1f, 0f, 0f), scoreValue: 2);
-
-            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
-            world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
-            em.CompleteAllTrackedJobs();
-
-            Assert.That(em.GetComponentData<PlayerCarryBinComponent>(player).Load, Is.EqualTo(2));
-            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.VacuumCollected));
-            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
-        }
-
-        [Test]
-        public void BulletVacuumRequestSystem_BroomSweepActivationEdge_LocksFacingAndStoresActivationFrame()
+        public void BulletVacuumRequestSystem_BroomSweepActivationEdge_ConsumesDirectionAndFlipsNextSweep()
         {
             using var world = new World("BulletVacuumRequestSystem_BroomSweepActivationEdge");
             var em = world.EntityManager;
 
             CreateVacuumSystemPrerequisites(em, frame: 7u);
-            var player = CreateVacuumContractPlayer(em);
 
+            var player = CreateVacuumContractPlayer(em);
             em.SetComponentData(player, new PlayerGoSyncComponent
             {
                 Position = float3.zero,
@@ -169,6 +149,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 IsActive = 0,
                 ActivateRequested = 1,
             });
+            em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = -1,
+                ActiveSweepDirectionSign = 0,
+                LockedFacingXZ = float2.zero,
+                HasLockedFacing = 0,
+                ActivationFrame = 0u,
+            });
 
             world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
@@ -177,10 +165,106 @@ namespace SweepNDodge.DotsBullets.Tests
             var sweepRuntime = em.GetComponentData<PlayerCleanupSweepRuntimeStateComponent>(player);
 
             Assert.That(vacuum.IsActive, Is.EqualTo(1));
+            Assert.That(sweepRuntime.ActiveSweepDirectionSign, Is.EqualTo(-1));
+            Assert.That(sweepRuntime.NextSweepDirectionSign, Is.EqualTo(1));
             Assert.That(sweepRuntime.HasLockedFacing, Is.EqualTo(1));
             Assert.That(sweepRuntime.ActivationFrame, Is.EqualTo(7u));
             Assert.That(sweepRuntime.LockedFacingXZ.x, Is.EqualTo(1f).Within(0.001f));
             Assert.That(sweepRuntime.LockedFacingXZ.y, Is.EqualTo(0f).Within(0.001f));
+        }
+
+        [Test]
+        public void BulletVacuumRequestSystem_BroomSweepLeftToRight_TrashBandCapturesOnlyWithinCurrentSweep()
+        {
+            using var world = new World("BulletVacuumRequestSystem_BroomSweepLeftToRightTrash");
+            var em = world.EntityManager;
+
+            CreateVacuumSystemPrerequisites(em, frame: 1u);
+
+            var player = CreateVacuumContractPlayer(em);
+            SetBroomSweepActivationRequest(em, player, nextSweepDirectionSign: 1);
+            var capturedBullet = CreateCollectibleBullet(em, BroomPolarPosition(1.2f, -20f), scoreValue: 2);
+            var missedBullet = CreateCollectibleBullet(em, BroomPolarPosition(1.2f, 20f), scoreValue: 2);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            var sweepRuntime = em.GetComponentData<PlayerCleanupSweepRuntimeStateComponent>(player);
+            Assert.That(sweepRuntime.ActiveSweepDirectionSign, Is.EqualTo(1));
+            Assert.That(sweepRuntime.NextSweepDirectionSign, Is.EqualTo(-1));
+            Assert.That(em.GetComponentData<PlayerCarryBinComponent>(player).Load, Is.EqualTo(2));
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(capturedBullet).Reason, Is.EqualTo(BulletLifecycleReasonId.VacuumCollected));
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(capturedBullet), Is.True);
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(missedBullet), Is.False);
+        }
+
+        [Test]
+        public void BulletVacuumRequestSystem_BroomSweepRightToLeft_TrashBandMirrorsCapture()
+        {
+            using var world = new World("BulletVacuumRequestSystem_BroomSweepRightToLeftTrash");
+            var em = world.EntityManager;
+
+            CreateVacuumSystemPrerequisites(em, frame: 2u);
+
+            var player = CreateVacuumContractPlayer(em);
+            SetBroomSweepActivationRequest(em, player, nextSweepDirectionSign: -1);
+            var capturedBullet = CreateCollectibleBullet(em, BroomPolarPosition(1.2f, 20f), scoreValue: 3);
+            var missedBullet = CreateCollectibleBullet(em, BroomPolarPosition(1.2f, -20f), scoreValue: 3);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            var sweepRuntime = em.GetComponentData<PlayerCleanupSweepRuntimeStateComponent>(player);
+            Assert.That(sweepRuntime.ActiveSweepDirectionSign, Is.EqualTo(-1));
+            Assert.That(sweepRuntime.NextSweepDirectionSign, Is.EqualTo(1));
+            Assert.That(em.GetComponentData<PlayerCarryBinComponent>(player).Load, Is.EqualTo(3));
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(capturedBullet).Reason, Is.EqualTo(BulletLifecycleReasonId.VacuumCollected));
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(capturedBullet), Is.True);
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(missedBullet), Is.False);
+        }
+
+        [Test]
+        public void BulletVacuumRequestSystem_BroomSweepHazardRect_CapturesOnlyInsideForwardWindow()
+        {
+            using var world = new World("BulletVacuumRequestSystem_BroomSweepHazardWindow");
+            var em = world.EntityManager;
+
+            CreateVacuumSystemPrerequisites(em, frame: 9u);
+
+            var player = CreateVacuumContractPlayer(em);
+            var capturedHazard = CreateHazardBullet(em, new float3(0f, 0f, 2.88f), scoreValue: 4);
+            PrimeBroomSweepForwardWindow(em, player, activeSweepDirectionSign: 1);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetComponentData<PlayerCarryBinComponent>(player).Load, Is.EqualTo(4));
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(capturedHazard).Reason, Is.EqualTo(BulletLifecycleReasonId.VacuumCollected));
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(capturedHazard), Is.True);
+        }
+
+        [Test]
+        public void BulletVacuumRequestSystem_BroomSweepHazardRect_MissesOutsideForwardWindow()
+        {
+            using var world = new World("BulletVacuumRequestSystem_BroomSweepHazardWindowMiss");
+            var em = world.EntityManager;
+
+            CreateVacuumSystemPrerequisites(em, frame: 10u);
+
+            var player = CreateVacuumContractPlayer(em);
+            var missedHazard = CreateHazardBullet(em, new float3(0f, 0f, 2.88f), scoreValue: 4);
+            SetBroomSweepActivationRequest(em, player, nextSweepDirectionSign: 1);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetComponentData<PlayerCarryBinComponent>(player).Load, Is.EqualTo(0));
+            Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(missedHazard).Reason, Is.EqualTo(BulletLifecycleReasonId.None));
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(missedHazard), Is.False);
         }
 
         [Test]
@@ -361,6 +445,70 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentEnabled<BulletActiveTag>(bullet, true);
             em.SetComponentEnabled<BulletDespawnRequestTag>(bullet, false);
             return bullet;
+        }
+
+        private static Entity CreateHazardBullet(EntityManager em, float3 position, int scoreValue)
+        {
+            var bullet = CreateCollectibleBullet(em, position, scoreValue);
+            em.SetComponentData(bullet, new BulletCaptureRuleComponent { Value = BulletCaptureRuleId.RiskTimedResolve });
+            return bullet;
+        }
+
+        private static void SetBroomSweepActivationRequest(
+            EntityManager em,
+            Entity player,
+            sbyte nextSweepDirectionSign)
+        {
+            em.SetComponentData(player, new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 0f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 0f,
+                CooldownTimer = 0f,
+                IsActive = 0,
+                ActivateRequested = 1,
+            });
+            em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = nextSweepDirectionSign,
+                ActiveSweepDirectionSign = 0,
+                LockedFacingXZ = float2.zero,
+                HasLockedFacing = 0,
+                ActivationFrame = 0u,
+            });
+        }
+
+        private static void PrimeBroomSweepForwardWindow(
+            EntityManager em,
+            Entity player,
+            sbyte activeSweepDirectionSign)
+        {
+            em.SetComponentData(player, new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 13f / 60f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 13f / 60f,
+                CooldownTimer = 0f,
+                IsActive = 1,
+                ActivateRequested = 0,
+            });
+            em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = (sbyte)(-activeSweepDirectionSign),
+                ActiveSweepDirectionSign = activeSweepDirectionSign,
+                LockedFacingXZ = new float2(0f, 1f),
+                HasLockedFacing = 1,
+                ActivationFrame = 1u,
+            });
+        }
+
+        private static float3 BroomPolarPosition(float radius, float angleDeg)
+        {
+            float rad = math.radians(angleDeg);
+            return new float3(
+                radius * math.sin(rad),
+                0f,
+                radius * math.cos(rad));
         }
 
         private static void CreateSingleton<T>(EntityManager em, T value)
