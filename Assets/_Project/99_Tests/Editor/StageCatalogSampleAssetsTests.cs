@@ -22,6 +22,11 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string TestStageCatalogPath = "Assets/_Project/99_Tests/TestData/StageCatalog/sc_test_sample_verification.asset";
         private const string TestHazardWaveClipPath = "Assets/_Project/99_Tests/TestData/WaveClips/bwc_test_sample_hazard.asset";
         private const string TestCleanupWaveClipPath = "Assets/_Project/99_Tests/TestData/WaveClips/bwc_test_sample_cleanup.asset";
+        private static readonly string[] WaveClipSearchRoots =
+        {
+            "Assets/_Project/03_Datas/WaveClips",
+            "Assets/_Project/99_Tests/TestData/WaveClips",
+        };
         private static readonly string[] DeprecatedPaintAssetPaths =
         {
             "Assets/_Project/03_Datas/StageCatalog/srp_stage1_source.asset",
@@ -133,6 +138,32 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(hazardDefinitionIds.Contains(2613000), Is.True, "Hazard sample clip must include bubble sample.");
             Assert.That(hazardDefinitionIds.Contains(699804262), Is.True, "Hazard sample clip must include homing sample.");
             Assert.That(cleanupDefinitionIds.Contains(1653732613), Is.True, "Cleanup sample clip must include candy sample.");
+        }
+
+        [Test]
+        public void WaveClipAssets_UseTypedAuthoringWithoutLegacyEntries()
+        {
+            string[] guids = AssetDatabase.FindAssets($"t:{nameof(WaveClipSO)}", WaveClipSearchRoots);
+            Assert.That(guids.Length, Is.GreaterThan(0));
+
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                var clip = AssetDatabase.LoadAssetAtPath<WaveClipSO>(path);
+                Assert.That(clip, Is.Not.Null, path);
+
+                var segments = clip.Segments ?? Array.Empty<WaveClipSO.ClipSegment>();
+                for (int s = 0; s < segments.Length; s++)
+                {
+                    var segment = segments[s];
+                    int typedCount = segment.Directives?.Length ?? 0;
+                    int legacyCount = segment.LegacyEntries?.Length ?? 0;
+
+                    Assert.That(legacyCount, Is.EqualTo(0), $"{path} segment[{s}] must not keep legacy entries after migration.");
+                    if (typedCount > 0)
+                        Assert.That(WaveClipAuthoringResolver.UsesTypedEntries(in segment), Is.True, $"{path} segment[{s}] must resolve through typed authoring.");
+                }
+            }
         }
 
         private static void AssertLayoutPopulated(StageLayoutSO layout)
@@ -307,14 +338,32 @@ namespace SweepNDodge.DotsBullets.Tests
             var segments = clip.Segments ?? Array.Empty<WaveClipSO.ClipSegment>();
             for (int i = 0; i < segments.Length; i++)
             {
-                var entries = segments[i].Entries ?? Array.Empty<WaveClipSO.SpawnEntry>();
-                for (int e = 0; e < entries.Length; e++)
+                var segment = segments[i];
+                if (WaveClipAuthoringResolver.UsesTypedEntries(in segment))
                 {
-                    var bullet = entries[e].Payload.Bullet;
-                    if (bullet == null)
-                        continue;
+                    var directives = segment.Directives ?? Array.Empty<WaveSpawnEntryAuthoring>();
+                    for (int e = 0; e < directives.Length; e++)
+                    {
+                        if (!WaveClipAuthoringResolver.TryResolveTypedEntry(directives[e], out var snapshot, out _))
+                            continue;
 
-                    ids.Add(bullet.DefinitionId);
+                        if (snapshot.Bullet == null)
+                            continue;
+
+                        ids.Add(snapshot.Bullet.DefinitionId);
+                    }
+                }
+                else
+                {
+                    var entries = segment.LegacyEntries ?? Array.Empty<WaveClipSO.SpawnEntry>();
+                    for (int e = 0; e < entries.Length; e++)
+                    {
+                        var snapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in entries[e]);
+                        if (snapshot.Bullet == null)
+                            continue;
+
+                        ids.Add(snapshot.Bullet.DefinitionId);
+                    }
                 }
             }
 

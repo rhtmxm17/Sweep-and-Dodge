@@ -1,8 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -479,9 +481,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Editor_SetDefinitionId(3001);
                 def.Prefab = prefab;
 
-                var entry = CreateDefaultEntry(def);
-                entry.Emission.EmissionMode = SourceSpawnEmissionModeId.RateField;
-                entry.Emission.RatePerSecPerArea = -1f;
+                var entry = CreateDefaultTypedEntry(def);
+                ((RateFieldEmissionAuthoring)entry.Emission).RatePerSecPerArea = -1f;
 
                 clip.ClipId = 11;
                 clip.Segments = new[]
@@ -490,7 +491,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         StartSec = 0f,
                         EndSec = 1f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     }
                 };
 
@@ -530,7 +531,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(4001);
                 def.Prefab = prefab;
-                var entry = CreateDefaultEntry(def);
+                var entry = CreateDefaultTypedEntry(def);
 
                 clip.ClipId = 21;
                 clip.Segments = new[]
@@ -539,13 +540,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         StartSec = 0f,
                         EndSec = 5f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     },
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 4f,
                         EndSec = 8f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     }
                 };
 
@@ -585,7 +586,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(4002);
                 def.Prefab = prefab;
-                var entry = CreateDefaultEntry(def);
+                var entry = CreateDefaultTypedEntry(def);
 
                 clip.ClipId = 22;
                 clip.Segments = new[]
@@ -594,13 +595,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         StartSec = 0f,
                         EndSec = 5f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     },
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 5f,
                         EndSec = 9f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     }
                 };
 
@@ -667,8 +668,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 clipA.ClipId = 777;
                 clipB.ClipId = 777;
-                clipA.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Entries = new WaveClipSO.SpawnEntry[0] } };
-                clipB.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Entries = new WaveClipSO.SpawnEntry[0] } };
+                clipA.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
+                clipB.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
 
                 var input = new ContentValidationInput(
                     null,
@@ -703,7 +704,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(0);
                 def.Prefab = prefab;
-                var entry = CreateDefaultEntry(def);
+                var entry = CreateDefaultTypedEntry(def);
 
                 clip.ClipId = 91;
                 clip.Segments = new[]
@@ -712,7 +713,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         StartSec = 0f,
                         EndSec = 1f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     }
                 };
 
@@ -752,9 +753,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(9101);
                 def.Prefab = prefab;
-                var entry = CreateDefaultEntry(def);
-                entry.Sampling.SamplingMode = SourceSpawnSamplingModeId.PointSet;
-                entry.Sampling.PointCount = 0;
+                var entry = CreatePointSetTypedEntry(def, Array.Empty<Vector2>());
 
                 clip.ClipId = 191;
                 clip.Segments = new[]
@@ -763,7 +762,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         StartSec = 0f,
                         EndSec = 1f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     }
                 };
 
@@ -804,9 +803,16 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(9102);
                 def.Prefab = prefab;
-                var entry = CreateDefaultEntry(def);
-                entry.Sampling.SamplingMode = SourceSpawnSamplingModeId.PointSet;
-                entry.Sampling.PointCount = WaveClipSO.SpawnSamplingProfile.PointSetMaxCount + 1;
+                var entry = CreatePointSetTypedEntry(
+                    def,
+                    new[]
+                    {
+                        Vector2.zero,
+                        Vector2.right,
+                        Vector2.up,
+                        Vector2.one,
+                        new Vector2(-1f, 0f),
+                    });
 
                 clip.ClipId = 192;
                 clip.Segments = new[]
@@ -815,7 +821,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         StartSec = 0f,
                         EndSec = 1f,
-                        Entries = new[] { entry }
+                        Directives = new[] { entry }
                     }
                 };
 
@@ -845,7 +851,306 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
-        private static WaveClipSO.SpawnEntry CreateDefaultEntry(BulletDefinitionSO def)
+        [Test]
+        public void CleanupActionSet_DuplicateProfileKey_IsError()
+        {
+            var actionSet = ScriptableObject.CreateInstance<PlayerCleanupActionSetSO>();
+            PlayerCleanupActionProfileDefinitionSO[] cleanupProfiles = null;
+
+            try
+            {
+                actionSet.InitialSelectedProfileKey = "broom_default";
+                actionSet.PrimarySlotProfileKey = "broom_default";
+                actionSet.SecondarySlotProfileKey = "broom_default";
+                cleanupProfiles = new PlayerCleanupActionProfileDefinitionSO[]
+                {
+                    CreateCleanupProfile("broom_default", PlayerCleanupActionId.BroomSweep),
+                    CreateCleanupProfile("broom_default", PlayerCleanupActionId.BroomSweep),
+                };
+                actionSet.Profiles = cleanupProfiles;
+
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<PlayerCleanupActionSetSO>>
+                    {
+                        new ContentValidationRecord<PlayerCleanupActionSetSO>(actionSet, "cleanup_set"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV037"), Is.True);
+            }
+            finally
+            {
+                DestroyCleanupProfiles(cleanupProfiles);
+                Object.DestroyImmediate(actionSet);
+            }
+        }
+
+        [Test]
+        public void CleanupActionSet_InvalidProfileKey_IsError()
+        {
+            var actionSet = ScriptableObject.CreateInstance<PlayerCleanupActionSetSO>();
+            PlayerCleanupActionProfileDefinitionSO[] cleanupProfiles = null;
+
+            try
+            {
+                actionSet.InitialSelectedProfileKey = "broom_default";
+                actionSet.PrimarySlotProfileKey = "broom_default";
+                actionSet.SecondarySlotProfileKey = "broom_default";
+                cleanupProfiles = new PlayerCleanupActionProfileDefinitionSO[]
+                {
+                    CreateCleanupProfile("BROOM_DEFAULT", PlayerCleanupActionId.BroomSweep),
+                };
+                actionSet.Profiles = cleanupProfiles;
+
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<PlayerCleanupActionSetSO>>
+                    {
+                        new ContentValidationRecord<PlayerCleanupActionSetSO>(actionSet, "cleanup_set"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV037"), Is.True);
+            }
+            finally
+            {
+                DestroyCleanupProfiles(cleanupProfiles);
+                Object.DestroyImmediate(actionSet);
+            }
+        }
+
+        [Test]
+        public void CleanupActionSet_MissingInitialOrSlotProfileKey_IsError()
+        {
+            var actionSet = ScriptableObject.CreateInstance<PlayerCleanupActionSetSO>();
+            PlayerCleanupActionProfileDefinitionSO[] cleanupProfiles = null;
+
+            try
+            {
+                actionSet.InitialSelectedProfileKey = "missing_profile";
+                actionSet.PrimarySlotProfileKey = "broom_default";
+                actionSet.SecondarySlotProfileKey = "missing_profile";
+                cleanupProfiles = new PlayerCleanupActionProfileDefinitionSO[]
+                {
+                    CreateCleanupProfile("broom_default", PlayerCleanupActionId.BroomSweep),
+                };
+                actionSet.Profiles = cleanupProfiles;
+
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<PlayerCleanupActionSetSO>>
+                    {
+                        new ContentValidationRecord<PlayerCleanupActionSetSO>(actionSet, "cleanup_set"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV038"), Is.True);
+            }
+            finally
+            {
+                DestroyCleanupProfiles(cleanupProfiles);
+                Object.DestroyImmediate(actionSet);
+            }
+        }
+
+        [Test]
+        public void CleanupActionSet_InvalidProfilePayload_IsError()
+        {
+            var actionSet = ScriptableObject.CreateInstance<PlayerCleanupActionSetSO>();
+            PlayerCleanupActionProfileDefinitionSO[] cleanupProfiles = null;
+
+            try
+            {
+                var invalidProfile = CreateCleanupProfile("broom_default", PlayerCleanupActionId.BroomSweep) as BroomSweepCleanupActionProfileSO;
+                Assert.That(invalidProfile, Is.Not.Null);
+                invalidProfile.ActiveTime = -1f;
+                invalidProfile.TrashSweepOuterRadius = 0f;
+
+                actionSet.InitialSelectedProfileKey = "broom_default";
+                actionSet.PrimarySlotProfileKey = "broom_default";
+                actionSet.SecondarySlotProfileKey = "broom_default";
+                cleanupProfiles = new PlayerCleanupActionProfileDefinitionSO[] { invalidProfile };
+                actionSet.Profiles = cleanupProfiles;
+
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<PlayerCleanupActionSetSO>>
+                    {
+                        new ContentValidationRecord<PlayerCleanupActionSetSO>(actionSet, "cleanup_set"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV039"), Is.True);
+            }
+            finally
+            {
+                DestroyCleanupProfiles(cleanupProfiles);
+                Object.DestroyImmediate(actionSet);
+            }
+        }
+
+        [Test]
+        public void PlayerProxyAuthoring_WithoutCleanupActionSet_IsError()
+        {
+            var root = new GameObject("player_proxy");
+            var authoring = root.AddComponent<PlayerProxyAuthoring>();
+
+            try
+            {
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<PlayerProxyAuthoring>>
+                    {
+                        new ContentValidationRecord<PlayerProxyAuthoring>(authoring, "player_proxy"),
+                    });
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV036"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void WaveClip_TypedAndLegacyEntries_ProduceSameResolvedSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9301);
+                def.Prefab = prefab;
+
+                var legacyEntry = CreateDefaultLegacyEntry(def);
+                legacyEntry.Emission.EmissionMode = SourceSpawnEmissionModeId.EventBurst;
+                legacyEntry.Emission.SpawnMode = SourceSpawnModeId.CapAndMaxDensity;
+                legacyEntry.Emission.BurstRepeatCount = 3;
+                legacyEntry.Emission.BurstIntervalSec = 0.25f;
+                legacyEntry.Emission.BurstShotsPerEvent = 8;
+                legacyEntry.Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+                legacyEntry.Emission.EventShotIntervalSec = 0.2f;
+                legacyEntry.Emission.MaxActiveDensityPerArea = 2f;
+                legacyEntry.Sampling.SamplingMode = SourceSpawnSamplingModeId.PointSet;
+                legacyEntry.Sampling.PointCount = 4;
+                legacyEntry.Sampling.Point0 = Vector2.left;
+                legacyEntry.Sampling.Point1 = Vector2.right;
+                legacyEntry.Sampling.Point2 = Vector2.up;
+                legacyEntry.Sampling.Point3 = Vector2.down;
+                legacyEntry.Direction.DirectionMode = SourceSpawnDirectionModeId.Spiral;
+                legacyEntry.Direction.BaseAngleDeg = 15f;
+                legacyEntry.Direction.SpiralStepDeg = 20f;
+
+                var typedEntry = WaveClipAuthoringResolver.ConvertLegacyEntry(in legacyEntry);
+                bool ok = WaveClipAuthoringResolver.TryResolveTypedEntry(typedEntry, out var typedSnapshot, out string error);
+                Assert.That(ok, Is.True, error);
+
+                var legacySnapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in legacyEntry);
+                Assert.That(typedSnapshot.Bullet, Is.EqualTo(legacySnapshot.Bullet));
+                Assert.That(typedSnapshot.EmissionMode, Is.EqualTo(legacySnapshot.EmissionMode));
+                Assert.That(typedSnapshot.SpawnMode, Is.EqualTo(legacySnapshot.SpawnMode));
+                Assert.That(typedSnapshot.SamplingMode, Is.EqualTo(legacySnapshot.SamplingMode));
+                Assert.That(typedSnapshot.DirectionMode, Is.EqualTo(legacySnapshot.DirectionMode));
+                Assert.That(typedSnapshot.BurstRepeatCount, Is.EqualTo(legacySnapshot.BurstRepeatCount));
+                Assert.That(typedSnapshot.BurstIntervalSec, Is.EqualTo(legacySnapshot.BurstIntervalSec));
+                Assert.That(typedSnapshot.BurstShotsPerEvent, Is.EqualTo(legacySnapshot.BurstShotsPerEvent));
+                Assert.That(typedSnapshot.EventShotSchedule, Is.EqualTo(legacySnapshot.EventShotSchedule));
+                Assert.That(typedSnapshot.EventShotIntervalSec, Is.EqualTo(legacySnapshot.EventShotIntervalSec));
+                Assert.That(typedSnapshot.PointSetCount, Is.EqualTo(legacySnapshot.PointSetCount));
+                Assert.That(typedSnapshot.Point3, Is.EqualTo(legacySnapshot.Point3));
+                Assert.That(typedSnapshot.BaseAngleDeg, Is.EqualTo(legacySnapshot.BaseAngleDeg));
+                Assert.That(typedSnapshot.SpiralStepDeg, Is.EqualTo(legacySnapshot.SpiralStepDeg));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_TypedEntryMissingEmission_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9302);
+                def.Prefab = prefab;
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = null;
+
+                clip.ClipId = 193;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        EndSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV040"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        private static WaveClipSO.SpawnEntry CreateDefaultLegacyEntry(BulletDefinitionSO def)
         {
             return new WaveClipSO.SpawnEntry
             {
@@ -889,6 +1194,107 @@ namespace SweepNDodge.DotsBullets.Tests
                     SpiralStepDeg = 0f,
                 }
             };
+        }
+
+        private static WaveSpawnEntryAuthoring CreateDefaultTypedEntry(BulletDefinitionSO def)
+        {
+            return new WaveSpawnEntryAuthoring
+            {
+                Payload = new WaveClipSO.SpawnPayloadProfile
+                {
+                    Bullet = def,
+                },
+                Emission = new RateFieldEmissionAuthoring
+                {
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    MaxActiveDensityPerArea = 0f,
+                    RatePerSecPerArea = 1f,
+                },
+                Sampling = new UniformFieldSamplingAuthoring
+                {
+                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    FixedPoint = Vector2.zero,
+                    SpawnOffset = Vector2.zero,
+                    SpawnSampleBudget = 16,
+                    PlayerNoSpawnRadius = 0f,
+                },
+                Direction = new RandomDirectionAuthoring(),
+            };
+        }
+
+        private static WaveSpawnEntryAuthoring CreatePointSetTypedEntry(BulletDefinitionSO def, Vector2[] points)
+        {
+            var entry = CreateDefaultTypedEntry(def);
+            entry.Sampling = new PointSetSamplingAuthoring
+            {
+                CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                FixedPoint = Vector2.zero,
+                SpawnOffset = Vector2.zero,
+                SpawnSampleBudget = 16,
+                PlayerNoSpawnRadius = 0f,
+                Points = points,
+            };
+            return entry;
+        }
+
+        private static PlayerCleanupActionProfileDefinitionSO CreateCleanupProfile(
+            string profileKey,
+            PlayerCleanupActionId actionKind)
+        {
+            PlayerCleanupActionProfileDefinitionSO profile = actionKind switch
+            {
+                PlayerCleanupActionId.BroomSweep => ScriptableObject.CreateInstance<BroomSweepCleanupActionProfileSO>(),
+                PlayerCleanupActionId.RadialRing => ScriptableObject.CreateInstance<RadialRingCleanupActionProfileSO>(),
+                PlayerCleanupActionId.ForwardFanLine => ScriptableObject.CreateInstance<ForwardFanLineCleanupActionProfileSO>(),
+                _ => ScriptableObject.CreateInstance<BroomSweepCleanupActionProfileSO>(),
+            };
+
+            profile.ProfileKey = profileKey;
+            profile.CaptureActiveTime = 0.2f;
+            profile.CaptureCooldown = 0f;
+            profile.ActiveTime = 0.22f;
+            profile.Cooldown = 1.8f;
+            profile.LockFacingWhileActive = true;
+            profile.ActiveMoveSpeedScale = 0.5f;
+
+            if (profile is BroomSweepCleanupActionProfileSO broomProfile)
+            {
+                broomProfile.TrashSweepInnerRadius = 1f;
+                broomProfile.TrashSweepOuterRadius = 3.2f;
+                broomProfile.TrashSweepHalfAngleDeg = 12f;
+                broomProfile.TrashSweepStartAngleDeg = -20f;
+                broomProfile.TrashSweepEndAngleDeg = 80f;
+                broomProfile.HazardRectLength = 3.2f;
+                broomProfile.HazardRectHalfWidth = 0.55f;
+                broomProfile.HazardForwardWindowAngleDeg = 7f;
+            }
+            else if (profile is RadialRingCleanupActionProfileSO radialProfile)
+            {
+                radialProfile.TrashRange = 3.2f;
+                radialProfile.HazardRingRadius = 2.88f;
+                radialProfile.HazardRingWidth = 0.8f;
+            }
+            else if (profile is ForwardFanLineCleanupActionProfileSO forwardProfile)
+            {
+                forwardProfile.TrashRange = 3.2f;
+                forwardProfile.TrashFanHalfAngleDeg = 180f;
+                forwardProfile.HazardLineLength = 3.2f;
+                forwardProfile.HazardLineHalfWidth = 0.5f;
+            }
+
+            return profile;
+        }
+
+        private static void DestroyCleanupProfiles(PlayerCleanupActionProfileDefinitionSO[] profiles)
+        {
+            if (profiles == null)
+                return;
+
+            for (int i = 0; i < profiles.Length; i++)
+            {
+                if (profiles[i] != null)
+                    Object.DestroyImmediate(profiles[i]);
+            }
         }
     }
 }

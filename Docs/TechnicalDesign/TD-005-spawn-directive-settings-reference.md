@@ -4,7 +4,7 @@
 - doc_id: `TD-005`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-01`
+- last_updated: `2026-04-03`
 - related_docs:
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
@@ -14,17 +14,23 @@
   - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
   - [ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md)
 
-> 목적: `WaveClipSO.Segments[].Entries[]`(SpawnEntry)의 각 설정이 실제 런타임에서 무엇을 의미하는지 빠르게 확인하는 운영 레퍼런스.
+> 목적: `WaveClipSO.Segments[].Directives[]` typed authoring과 resolved runtime snapshot이 실제 런타임에서 무엇을 의미하는지 빠르게 확인하는 운영 레퍼런스.
 
 ## 1. 적용 범위
-- 대상: `WaveClipSO.Segments[].Entries[]` 인라인 프로필
+- 대상: `WaveClipSO.Segments[].Directives[]` typed authoring
   - `Payload`
-  - `Emission`
-  - `Sampling`
-  - `Direction`
+  - `Emission` subtype (`RateField` / `Poisson` / `EventBurst`)
+  - `Sampling` subtype (`UniformField` / `PollutionTopK` / `LineEven` / `PointSet`)
+  - `Direction` subtype (`Random` / `Fixed` / `NWay` / `Spiral` / `RadialBurst`)
 - 비대상:
-  - 레거시 fallback 경로(`UseDirectiveProfiles` 등, 제거됨)
+  - runtime flat buffer(`SourceClipPatternBuffer`)의 구조체 정의 상세
+  - `LegacyEntries[]` migration fallback의 authoring UX
   - `WallEven` 및 전용 데이터(`WallMask`, `WallInset`, 제거됨)
+
+### 1.1 해석 계층
+- authoring SSOT는 `Directives[]`다.
+- bake/validation은 `WaveClipAuthoringResolver`가 만든 resolved snapshot을 공통으로 사용한다.
+- `LegacyEntries[]`는 1차에서 읽기 전용 migration fallback으로만 유지한다.
 
 ## 2. Payload 설정
 | 필드 | 의미 | 운영 규칙 |
@@ -86,8 +92,7 @@
 | `Sampling.LineStart` | 선분 시작점(로컬 오프셋) | `LineEven`에서 사용 |
 | `Sampling.LineEnd` | 선분 끝점(로컬 오프셋) | `LineEven`에서 사용 |
 | `Sampling.SampleSpacing` | 등간격 샘플 간격 | `LineEven`에서 `> 0` |
-| `Sampling.PointCount` | PointSet 포인트 개수 | `PointSet`에서 `1..4` |
-| `Sampling.Point0..Point3` | PointSet 로컬 오프셋 포인트 | `Center + Point[i]` |
+| `Sampling.Points[]` | PointSet authored 로컬 오프셋 포인트 목록 | authoring 입력은 가변 길이 |
 | `Sampling.SpawnSampleBudget` | 샘플 재시도 예산 | 플레이어 안전거리 필터 재시도 횟수 |
 | `Sampling.PlayerNoSpawnRadius` | 플레이어 주변 금지 반경 | `>= 0` |
 
@@ -97,7 +102,7 @@
 | `UniformField` | 0 | 필드 내부 균등 무작위 샘플링 | 기본 무작위 분포 |
 | `PollutionTopK` | 1 | Pollution 가중치 상위 후보 중심 샘플링 | 밀도 기반 분포 강화 |
 | `LineEven` | 2 | `LineStart~LineEnd` 선분에서 등간격 샘플링 | 라인/벽 발사 표현에 사용 |
-| `PointSet` | 4 | 사전 정의 포인트셋 기반 샘플링 | 최대 4포인트, round-robin |
+| `PointSet` | 4 | 사전 정의 포인트셋 기반 샘플링 | authored `Points[]`, runtime은 최대 4포인트로 clamp |
 
 ### 4.1.1 active-area effective area 규칙
 - `UniformField` / `PollutionTopK`
@@ -120,9 +125,10 @@
 
 ### 4.4 PointSet 규약
 - 좌표계는 월드 절대값이 아니라 `CenterMode`로 계산된 중심 기준의 로컬 오프셋이다.
-- 샘플 선택은 `SpawnSequence % PointCount` round-robin을 사용한다.
+- authored `Points[]`가 4개를 초과하면 앞 4개만 runtime snapshot에 반영하고 `CVW033` warning으로 보고한다.
+- 샘플 선택은 `SpawnSequence % PointSetCount` round-robin을 사용한다.
 - `PointSet + Spiral/NWay/RadialBurst` 조합에서는 방향 시퀀스를 포인트별 로컬 시퀀스로 계산한다.
-  - `localSequence = SpawnSequence / PointCount`
+  - `localSequence = SpawnSequence / PointSetCount`
 - `PlayerNoSpawnRadius`로 거부될 경우 다음 포인트로 순환 재시도하며, `SpawnSampleBudget` 한도 내에서만 수행한다.
 
 ### 4.5 이벤트 기준점 고정 규약
@@ -221,7 +227,8 @@
 | `Lane` | 클립 Lane | 기본 운영 `Hazard` / `Trash`, `Special` 예약 + enum 확장 허용 |
 | `DurationSec` | 클립 총 길이 | `> 0` |
 | `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, overlap 허용 |
-| `Segments[].Entries[]` | SpawnDirective 인라인 프로필 | 현재 `Payload/Emission/Sampling/Direction` 규약 재사용 |
+| `Segments[].Directives[]` | typed SpawnDirective authoring | 기본 운영 경로. `Payload + Emission/Sampling/Direction subtype` |
+| `Segments[].LegacyEntries[]` | legacy inline fallback | 1차 migration fallback 전용. 신규 authoring 금지 |
 
 ### 9.2 BulletSourceAuthoring 직참조 필드(legacy authoring)
 | 필드 | 의미 | 운영 규칙 |
@@ -249,6 +256,7 @@
 12. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
 
 ## 10. 변경 이력
+- 2026-04-03: `Directives[]` typed authoring, resolver snapshot 공통 해석, `LegacyEntries[]` migration fallback, `PointSet Points[]` authored shape와 runtime max4 clamp 규약을 반영했다.
 - 2026-04-01: `EventBurst` 첫 burst 시점을 `StartSec` 기준으로 명시하고, clip 종료 판정을 `DurationSec` 기준으로 동기화했다.
 - 2026-03-05: `EventShotSchedule/Interval`, 이벤트 기준점 고정 규약을 구현 반영 상태로 동기화했다.
 - 2026-02-27: 런 진행도 디렉터 책임 이관 기준에 맞춰 실행 규약을 갱신했다(Clip 선택 주체 디렉터, `Baseline/Pressure` Clip 유지+배율, `Finish` 강제 교체/Trash Lane 제약).

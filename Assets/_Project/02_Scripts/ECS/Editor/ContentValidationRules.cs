@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Editor
@@ -43,24 +44,30 @@ namespace SweepNDodge.DotsBullets.Editor
         public readonly IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> Definitions;
         public readonly IReadOnlyList<ContentValidationRecord<WaveClipSO>> WaveClips;
         public readonly IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> TopologyPrefabCatalogs;
+        public readonly IReadOnlyList<ContentValidationRecord<PlayerCleanupActionSetSO>> CleanupActionSets;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> SourceAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletAuthoring>> BulletAuthorings;
+        public readonly IReadOnlyList<ContentValidationRecord<PlayerProxyAuthoring>> PlayerProxyAuthorings;
 
         public ContentValidationInput(
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
             IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> topologyPrefabCatalogs,
+            IReadOnlyList<ContentValidationRecord<PlayerCleanupActionSetSO>> cleanupActionSets,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
             IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
-            IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
+            IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings,
+            IReadOnlyList<ContentValidationRecord<PlayerProxyAuthoring>> playerProxyAuthorings)
         {
             Definitions = definitions ?? Array.Empty<ContentValidationRecord<BulletDefinitionSO>>();
             WaveClips = waveClips ?? Array.Empty<ContentValidationRecord<WaveClipSO>>();
             TopologyPrefabCatalogs = topologyPrefabCatalogs ?? Array.Empty<ContentValidationRecord<StageTopologyPrefabCatalogSO>>();
+            CleanupActionSets = cleanupActionSets ?? Array.Empty<ContentValidationRecord<PlayerCleanupActionSetSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
             BulletAuthorings = bulletAuthorings ?? Array.Empty<ContentValidationRecord<BulletAuthoring>>();
+            PlayerProxyAuthorings = playerProxyAuthorings ?? Array.Empty<ContentValidationRecord<PlayerProxyAuthoring>>();
         }
 
         public ContentValidationInput(
@@ -69,7 +76,18 @@ namespace SweepNDodge.DotsBullets.Editor
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
             IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
-            : this(definitions, waveClips, null, visualAuthorings, sourceAuthorings, bulletAuthorings)
+            : this(definitions, waveClips, null, null, visualAuthorings, sourceAuthorings, bulletAuthorings, null)
+        {
+        }
+
+        public ContentValidationInput(
+            IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
+            IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
+            IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> topologyPrefabCatalogs,
+            IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings)
+            : this(definitions, waveClips, topologyPrefabCatalogs, null, visualAuthorings, sourceAuthorings, bulletAuthorings, null)
         {
         }
     }
@@ -84,6 +102,8 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateDefinitionPrefabReferences(input.Definitions, issues);
             ValidateDefinitionBehaviorContracts(input.Definitions, issues);
             ValidateStageTopologyPrefabCatalogContracts(input.TopologyPrefabCatalogs, issues);
+            ValidateCleanupActionSetContracts(input.CleanupActionSets, issues);
+            ValidatePlayerProxyAuthoringContracts(input.PlayerProxyAuthorings, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateWaveClipContracts(input.Definitions, input.WaveClips, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
@@ -296,37 +316,54 @@ namespace SweepNDodge.DotsBullets.Editor
                 for (int s = 0; s < clip.Segments.Length; s++)
                 {
                     var seg = clip.Segments[s];
+                    string segmentLocation = $"{clips[i].Location}::Segments[{s}]";
                     if (seg.EndSec <= seg.StartSec)
                     {
                         issues.Add(new ContentValidationIssue(
                             ContentValidationSeverity.Error,
                             "CV010",
-                            clips[i].Location,
+                            segmentLocation,
                             $"Clip segment has invalid range at segmentIndex={s}. StartSec={seg.StartSec}, EndSec={seg.EndSec}."));
                         continue;
                     }
 
-                    var entries = seg.Entries;
-                    if (entries == null || entries.Length <= 0)
+                    int entryCount = WaveClipAuthoringResolver.GetPreferredEntryCount(in seg);
+                    bool usesTypedEntries = WaveClipAuthoringResolver.UsesTypedEntries(in seg);
+                    if (entryCount <= 0)
                     {
                         issues.Add(new ContentValidationIssue(
                             ContentValidationSeverity.Error,
                             "CV012",
-                            clips[i].Location,
+                            segmentLocation,
                             $"Clip segment has no entries at segmentIndex={s}."));
                     }
                     else
                     {
-                        for (int e = 0; e < entries.Length; e++)
+                        for (int e = 0; e < entryCount; e++)
                         {
-                            var entry = entries[e];
-                            var bullet = entry.ResolveBullet();
+                            if (!TryBuildWaveClipValidationEntry(
+                                    in seg,
+                                    usesTypedEntries,
+                                    e,
+                                    segmentLocation,
+                                    out var validationEntry,
+                                    out string authoringError))
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV040",
+                                    $"{segmentLocation}/{(usesTypedEntries ? "Directives" : "LegacyEntries")}[{e}]",
+                                    authoringError));
+                                continue;
+                            }
+
+                            var bullet = validationEntry.Snapshot.Bullet;
                             if (bullet == null)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV013",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment has null bullet entry at segmentIndex={s}, entryIndex={e}."));
                                 continue;
                             }
@@ -336,7 +373,7 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV027",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment references invalid DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
                                 continue;
                             }
@@ -346,160 +383,160 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV014",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment references unknown DefinitionId {bullet.DefinitionId} at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            var emissionMode = entry.ResolveEmissionMode();
-                            if (emissionMode == SourceSpawnEmissionModeId.RateField && entry.ResolveRatePerSecPerArea() < 0f)
+                            var snapshot = validationEntry.Snapshot;
+                            var emissionMode = snapshot.EmissionMode;
+                            if (emissionMode == SourceSpawnEmissionModeId.RateField && validationEntry.RawRatePerSecPerArea < 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV015",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment has negative RatePerSecPerArea at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (emissionMode == SourceSpawnEmissionModeId.Poisson && entry.ResolveMeanEventsPerSec() < 0f)
+                            if (emissionMode == SourceSpawnEmissionModeId.Poisson && validationEntry.RawMeanEventsPerSec < 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV017",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment has negative MeanEventsPerSec at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if ((emissionMode == SourceSpawnEmissionModeId.Poisson
-                                 || emissionMode == SourceSpawnEmissionModeId.EventBurst)
-                                && entry.Emission.BurstShotsPerEvent < 1)
+                                  || emissionMode == SourceSpawnEmissionModeId.EventBurst)
+                                && validationEntry.RawBurstShotsPerEvent < 1)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV022",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment has invalid BurstShotsPerEvent at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if ((emissionMode == SourceSpawnEmissionModeId.Poisson
-                                 || emissionMode == SourceSpawnEmissionModeId.EventBurst)
-                                && entry.ResolveEventShotSchedule() == SourceSpawnEventShotScheduleId.Timed
-                                && entry.Emission.EventShotIntervalSec <= 0f)
+                                  || emissionMode == SourceSpawnEmissionModeId.EventBurst)
+                                && snapshot.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
+                                && validationEntry.RawEventShotIntervalSec <= 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV029",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment uses Timed EventShotSchedule with non-positive EventShotIntervalSec at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (emissionMode == SourceSpawnEmissionModeId.EventBurst)
                             {
-                                if (entry.Emission.BurstIntervalSec <= 0f)
+                                if (validationEntry.RawBurstIntervalSec <= 0f)
                                 {
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV020",
-                                        clips[i].Location,
+                                        validationEntry.EntryLocation,
                                         $"Clip segment has non-positive BurstIntervalSec at segmentIndex={s}, entryIndex={e}."));
                                 }
 
-                                int repeatCount = entry.Emission.BurstRepeatCount;
+                                int repeatCount = validationEntry.RawBurstRepeatCount;
                                 if (repeatCount == 0 || repeatCount < -1)
                                 {
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV021",
-                                        clips[i].Location,
+                                        validationEntry.EntryLocation,
                                         $"Clip segment has invalid BurstRepeatCount at segmentIndex={s}, entryIndex={e}. Use -1 or >= 1."));
                                 }
                             }
 
-                            if (entry.ResolveSpawnMode() == SourceSpawnModeId.CapAndMaxDensity && entry.ResolveMaxActiveDensityPerArea() < 0f)
+                            if (snapshot.SpawnMode == SourceSpawnModeId.CapAndMaxDensity && validationEntry.RawMaxActiveDensityPerArea < 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV016",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment has negative MaxActiveDensityPerArea for CapAndMaxDensity at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (entry.Sampling.SpawnSampleBudget < 0)
+                            if (validationEntry.RawSpawnSampleBudget < 0)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV018",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment has negative SpawnSampleBudget at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (entry.ResolvePlayerNoSpawnRadius() < 0f)
+                            if (validationEntry.RawPlayerNoSpawnRadius < 0f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV019",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment has negative PlayerNoSpawnRadius at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            var directionMode = entry.ResolveDirectionMode();
-                            if (directionMode == SourceSpawnDirectionModeId.NWay && entry.ResolveNWayCount() < 2)
+                            var directionMode = snapshot.DirectionMode;
+                            if (directionMode == SourceSpawnDirectionModeId.NWay && validationEntry.RawNWayCount < 2)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV023",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment uses NWay with NWayCount < 2 at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (directionMode == SourceSpawnDirectionModeId.RadialBurst && entry.Emission.BurstShotsPerEvent < 2)
+                            if (directionMode == SourceSpawnDirectionModeId.RadialBurst && validationEntry.RawBurstShotsPerEvent < 2)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV024",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment uses RadialBurst with BurstShotsPerEvent < 2 at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (directionMode == SourceSpawnDirectionModeId.Spiral && Mathf.Abs(entry.ResolveSpiralStepDeg()) < 0.0001f)
+                            if (directionMode == SourceSpawnDirectionModeId.Spiral && Mathf.Abs(validationEntry.RawSpiralStepDeg) < 0.0001f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Warning,
                                     "CVW032",
-                                    clips[i].Location,
+                                    validationEntry.EntryLocation,
                                     $"Clip segment uses Spiral with near-zero SpiralStepDeg at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            var samplingMode = entry.ResolveSamplingMode();
+                            var samplingMode = snapshot.SamplingMode;
                             if (samplingMode == SourceSpawnSamplingModeId.LineEven)
                             {
-                                float len = (entry.ResolveLineEnd() - entry.ResolveLineStart()).magnitude;
-                                if (len <= 0f || entry.Sampling.SampleSpacing <= 0f)
+                                if (validationEntry.RawLineLength <= 0f || validationEntry.RawLineSampleSpacing <= 0f)
                                 {
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV026",
-                                        clips[i].Location,
+                                        validationEntry.EntryLocation,
                                         $"Clip segment has invalid LineEven parameters at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
 
                             if (samplingMode == SourceSpawnSamplingModeId.PointSet)
                             {
-                                if (entry.Sampling.PointCount <= 0)
+                                if (validationEntry.RawPointCount <= 0)
                                 {
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Error,
                                         "CV028",
-                                        clips[i].Location,
+                                        validationEntry.EntryLocation,
                                         $"Clip segment uses PointSet with PointCount <= 0 at segmentIndex={s}, entryIndex={e}."));
                                 }
 
-                                if (entry.Sampling.PointCount > WaveClipSO.SpawnSamplingProfile.PointSetMaxCount)
+                                if (validationEntry.RawPointCount > WaveClipSO.SpawnSamplingProfile.PointSetMaxCount)
                                 {
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Warning,
                                         "CVW033",
-                                        clips[i].Location,
+                                        validationEntry.EntryLocation,
                                         $"Clip segment PointSet PointCount exceeds max({WaveClipSO.SpawnSamplingProfile.PointSetMaxCount}) and will be clamped at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
@@ -507,6 +544,182 @@ namespace SweepNDodge.DotsBullets.Editor
                     }
                 }
             }
+        }
+
+        private readonly struct WaveClipValidationEntry
+        {
+            public readonly string EntryLocation;
+            public readonly ResolvedWaveSpawnDirectiveSnapshot Snapshot;
+            public readonly float RawRatePerSecPerArea;
+            public readonly float RawMeanEventsPerSec;
+            public readonly int RawBurstRepeatCount;
+            public readonly float RawBurstIntervalSec;
+            public readonly int RawBurstShotsPerEvent;
+            public readonly float RawEventShotIntervalSec;
+            public readonly float RawMaxActiveDensityPerArea;
+            public readonly int RawSpawnSampleBudget;
+            public readonly float RawPlayerNoSpawnRadius;
+            public readonly int RawNWayCount;
+            public readonly float RawSpiralStepDeg;
+            public readonly float RawLineLength;
+            public readonly float RawLineSampleSpacing;
+            public readonly int RawPointCount;
+
+            public WaveClipValidationEntry(
+                string entryLocation,
+                in ResolvedWaveSpawnDirectiveSnapshot snapshot,
+                float rawRatePerSecPerArea,
+                float rawMeanEventsPerSec,
+                int rawBurstRepeatCount,
+                float rawBurstIntervalSec,
+                int rawBurstShotsPerEvent,
+                float rawEventShotIntervalSec,
+                float rawMaxActiveDensityPerArea,
+                int rawSpawnSampleBudget,
+                float rawPlayerNoSpawnRadius,
+                int rawNWayCount,
+                float rawSpiralStepDeg,
+                float rawLineLength,
+                float rawLineSampleSpacing,
+                int rawPointCount)
+            {
+                EntryLocation = entryLocation;
+                Snapshot = snapshot;
+                RawRatePerSecPerArea = rawRatePerSecPerArea;
+                RawMeanEventsPerSec = rawMeanEventsPerSec;
+                RawBurstRepeatCount = rawBurstRepeatCount;
+                RawBurstIntervalSec = rawBurstIntervalSec;
+                RawBurstShotsPerEvent = rawBurstShotsPerEvent;
+                RawEventShotIntervalSec = rawEventShotIntervalSec;
+                RawMaxActiveDensityPerArea = rawMaxActiveDensityPerArea;
+                RawSpawnSampleBudget = rawSpawnSampleBudget;
+                RawPlayerNoSpawnRadius = rawPlayerNoSpawnRadius;
+                RawNWayCount = rawNWayCount;
+                RawSpiralStepDeg = rawSpiralStepDeg;
+                RawLineLength = rawLineLength;
+                RawLineSampleSpacing = rawLineSampleSpacing;
+                RawPointCount = rawPointCount;
+            }
+        }
+
+        private static bool TryBuildWaveClipValidationEntry(
+            in WaveClipSO.ClipSegment segment,
+            bool usesTypedEntries,
+            int entryIndex,
+            string segmentLocation,
+            out WaveClipValidationEntry validationEntry,
+            out string error)
+        {
+            string entryCollection = usesTypedEntries ? "Directives" : "LegacyEntries";
+            string entryLocation = $"{segmentLocation}/{entryCollection}[{entryIndex}]";
+
+            if (usesTypedEntries)
+            {
+                var typedEntry = segment.Directives[entryIndex];
+                if (!WaveClipAuthoringResolver.TryResolveTypedEntry(typedEntry, out var snapshot, out error))
+                {
+                    validationEntry = default;
+                    return false;
+                }
+
+                float rawRate = 0f;
+                float rawMean = 0f;
+                int rawBurstRepeatCount = 1;
+                float rawBurstIntervalSec = 1f;
+                int rawBurstShotsPerEvent = 1;
+                float rawEventShotIntervalSec = 0f;
+                float rawMaxActiveDensity = typedEntry.Emission.SpawnMode == SourceSpawnModeId.CapAndMaxDensity
+                    ? typedEntry.Emission.MaxActiveDensityPerArea
+                    : typedEntry.Emission.MaxActiveDensityPerArea;
+                switch (typedEntry.Emission)
+                {
+                    case RateFieldEmissionAuthoring rateField:
+                        rawRate = rateField.RatePerSecPerArea;
+                        break;
+                    case PoissonEmissionAuthoring poisson:
+                        rawMean = poisson.MeanEventsPerSec;
+                        rawBurstShotsPerEvent = poisson.BurstShotsPerEvent;
+                        rawEventShotIntervalSec = poisson.EventShotIntervalSec;
+                        break;
+                    case EventBurstEmissionAuthoring eventBurst:
+                        rawBurstRepeatCount = eventBurst.BurstRepeatCount;
+                        rawBurstIntervalSec = eventBurst.BurstIntervalSec;
+                        rawBurstShotsPerEvent = eventBurst.BurstShotsPerEvent;
+                        rawEventShotIntervalSec = eventBurst.EventShotIntervalSec;
+                        break;
+                }
+
+                int rawSpawnSampleBudget = typedEntry.Sampling.SpawnSampleBudget;
+                float rawPlayerNoSpawnRadius = typedEntry.Sampling.PlayerNoSpawnRadius;
+                float rawLineLength = 0f;
+                float rawLineSampleSpacing = 0f;
+                int rawPointCount = 0;
+                switch (typedEntry.Sampling)
+                {
+                    case LineEvenSamplingAuthoring lineEven:
+                        rawLineLength = (lineEven.LineEnd - lineEven.LineStart).magnitude;
+                        rawLineSampleSpacing = lineEven.SampleSpacing;
+                        break;
+                    case PointSetSamplingAuthoring pointSet:
+                        rawPointCount = pointSet.Points?.Length ?? 0;
+                        break;
+                }
+
+                int rawNWayCount = 1;
+                float rawSpiralStepDeg = 0f;
+                switch (typedEntry.Direction)
+                {
+                    case NWayDirectionAuthoring nWay:
+                        rawNWayCount = nWay.NWayCount;
+                        break;
+                    case SpiralDirectionAuthoring spiral:
+                        rawSpiralStepDeg = spiral.SpiralStepDeg;
+                        break;
+                }
+
+                validationEntry = new WaveClipValidationEntry(
+                    entryLocation,
+                    in snapshot,
+                    rawRate,
+                    rawMean,
+                    rawBurstRepeatCount,
+                    rawBurstIntervalSec,
+                    rawBurstShotsPerEvent,
+                    rawEventShotIntervalSec,
+                    rawMaxActiveDensity,
+                    rawSpawnSampleBudget,
+                    rawPlayerNoSpawnRadius,
+                    rawNWayCount,
+                    rawSpiralStepDeg,
+                    rawLineLength,
+                    rawLineSampleSpacing,
+                    rawPointCount);
+                error = string.Empty;
+                return true;
+            }
+
+            var legacyEntry = segment.LegacyEntries[entryIndex];
+            var legacySnapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in legacyEntry);
+            float legacyLineLength = (legacyEntry.Sampling.LineEnd - legacyEntry.Sampling.LineStart).magnitude;
+            validationEntry = new WaveClipValidationEntry(
+                entryLocation,
+                in legacySnapshot,
+                legacyEntry.Emission.RatePerSecPerArea,
+                legacyEntry.Emission.MeanEventsPerSec,
+                legacyEntry.Emission.BurstRepeatCount,
+                legacyEntry.Emission.BurstIntervalSec,
+                legacyEntry.Emission.BurstShotsPerEvent,
+                legacyEntry.Emission.EventShotIntervalSec,
+                legacyEntry.Emission.MaxActiveDensityPerArea,
+                legacyEntry.Sampling.SpawnSampleBudget,
+                legacyEntry.Sampling.PlayerNoSpawnRadius,
+                legacyEntry.Direction.NWayCount,
+                legacyEntry.Direction.SpiralStepDeg,
+                legacyLineLength,
+                legacyEntry.Sampling.SampleSpacing,
+                legacyEntry.Sampling.PointCount);
+            error = string.Empty;
+            return true;
         }
 
         private static void ValidateAutoCorrectionWarnings(
@@ -590,6 +803,175 @@ namespace SweepNDodge.DotsBullets.Editor
                         "CV030",
                         catalogs[i].Location,
                         "StageTopologyPrefabCatalogSO.SourceTemplatePrefab is null."));
+                }
+            }
+        }
+
+        private static void ValidateCleanupActionSetContracts(
+            IReadOnlyList<ContentValidationRecord<PlayerCleanupActionSetSO>> actionSets,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < actionSets.Count; i++)
+            {
+                var actionSet = actionSets[i].Value;
+                if (actionSet == null)
+                    continue;
+
+                string location = actionSets[i].Location;
+                if (actionSet.Profiles == null || actionSet.Profiles.Length <= 0)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV039",
+                        location,
+                        "PlayerCleanupActionSetSO.Profiles is null or empty."));
+                    continue;
+                }
+
+                var keyOwners = new Dictionary<string, string>(StringComparer.Ordinal);
+                for (int p = 0; p < actionSet.Profiles.Length; p++)
+                {
+                    var profile = actionSet.Profiles[p];
+                    string entryLocation = $"{location}::Profiles[{p}]";
+                    if (profile == null)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV039",
+                            entryLocation,
+                            "Cleanup action profile reference is null."));
+                        continue;
+                    }
+
+                    if (!PlayerCleanupActionContractUtility.IsValidProfileKey(profile.ProfileKey, out string reason))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV037",
+                            entryLocation,
+                            reason));
+                    }
+                    else if (keyOwners.TryGetValue(profile.ProfileKey, out string ownerLocation))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV037",
+                            entryLocation,
+                            $"Duplicate cleanup action ProfileKey '{profile.ProfileKey}'. First owner: {ownerLocation}"));
+                    }
+                    else
+                    {
+                        keyOwners.Add(profile.ProfileKey, entryLocation);
+                    }
+
+                    if (profile.CaptureActiveTime < 0f
+                        || profile.CaptureCooldown < 0f
+                        || profile.ActiveTime < 0f
+                        || profile.Cooldown < 0f
+                        || profile.ActiveMoveSpeedScale < 0f)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV039",
+                            entryLocation,
+                            "Cleanup action timing/motion values must be non-negative."));
+                    }
+
+                    if (profile is BroomSweepCleanupActionProfileSO broomProfile)
+                    {
+                        if (broomProfile.TrashSweepOuterRadius <= 0f
+                            || broomProfile.TrashSweepHalfAngleDeg <= 0f
+                            || broomProfile.HazardRectLength <= 0f)
+                        {
+                            issues.Add(new ContentValidationIssue(
+                                ContentValidationSeverity.Error,
+                                "CV039",
+                                entryLocation,
+                                "BroomSweep profile requires positive TrashSweepOuterRadius, TrashSweepHalfAngleDeg, and HazardRectLength."));
+                        }
+                    }
+                    else if (profile is RadialRingCleanupActionProfileSO radialProfile)
+                    {
+                        if (radialProfile.TrashRange <= 0f)
+                        {
+                            issues.Add(new ContentValidationIssue(
+                                ContentValidationSeverity.Error,
+                                "CV039",
+                                entryLocation,
+                                "RadialRing profile requires positive TrashRange."));
+                        }
+                    }
+                    else if (profile is ForwardFanLineCleanupActionProfileSO forwardProfile)
+                    {
+                        if (forwardProfile.TrashRange <= 0f || forwardProfile.HazardLineLength <= 0f)
+                        {
+                            issues.Add(new ContentValidationIssue(
+                                ContentValidationSeverity.Error,
+                                "CV039",
+                                entryLocation,
+                                "ForwardFanLine profile requires positive TrashRange and HazardLineLength."));
+                        }
+                    }
+                    else
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV039",
+                            entryLocation,
+                            $"Unsupported cleanup action profile type '{profile.GetType().Name}'."));
+                    }
+                }
+
+                ValidateCleanupActionSetRootKey(location, nameof(actionSet.InitialSelectedProfileKey), actionSet.InitialSelectedProfileKey, keyOwners, issues);
+                ValidateCleanupActionSetRootKey(location, nameof(actionSet.PrimarySlotProfileKey), actionSet.PrimarySlotProfileKey, keyOwners, issues);
+                ValidateCleanupActionSetRootKey(location, nameof(actionSet.SecondarySlotProfileKey), actionSet.SecondarySlotProfileKey, keyOwners, issues);
+            }
+        }
+
+        private static void ValidateCleanupActionSetRootKey(
+            string location,
+            string fieldName,
+            string profileKey,
+            Dictionary<string, string> keyOwners,
+            List<ContentValidationIssue> issues)
+        {
+            if (!PlayerCleanupActionContractUtility.IsValidProfileKey(profileKey, out string reason))
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV038",
+                    location,
+                    $"{fieldName} is invalid. {reason}"));
+                return;
+            }
+
+            if (!keyOwners.ContainsKey(profileKey))
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV038",
+                    location,
+                    $"{fieldName} references missing ProfileKey '{profileKey}'."));
+            }
+        }
+
+        private static void ValidatePlayerProxyAuthoringContracts(
+            IReadOnlyList<ContentValidationRecord<PlayerProxyAuthoring>> authorings,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < authorings.Count; i++)
+            {
+                var authoring = authorings[i].Value;
+                if (authoring == null)
+                    continue;
+
+                if (authoring.CleanupActionSet == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV036",
+                        authorings[i].Location,
+                        "PlayerProxyAuthoring.CleanupActionSet is null."));
                 }
             }
         }

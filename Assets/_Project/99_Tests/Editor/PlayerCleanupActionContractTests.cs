@@ -11,6 +11,8 @@ namespace SweepNDodge.DotsBullets.Tests
 {
     public class PlayerCleanupActionContractTests
     {
+        private static readonly FixedString64Bytes BroomDefaultKey = "broom_default";
+
         [SetUp]
         public void SetUp()
         {
@@ -30,11 +32,9 @@ namespace SweepNDodge.DotsBullets.Tests
             var asset = ScriptableObject.CreateInstance<PlayerCleanupActionSetSO>();
             try
             {
-                Assert.That(asset.InitialSelectedAction, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-                Assert.That(asset.PrimarySlotAction, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-                Assert.That(asset.SecondarySlotAction, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-                Assert.That(asset.LockFacingWhileActive, Is.True);
-                Assert.That(asset.ActiveMoveSpeedScale, Is.EqualTo(0.5f));
+                Assert.That(asset.InitialSelectedProfileKey, Is.EqualTo("broom_default"));
+                Assert.That(asset.PrimarySlotProfileKey, Is.EqualTo("broom_default"));
+                Assert.That(asset.SecondarySlotProfileKey, Is.EqualTo("broom_default"));
             }
             finally
             {
@@ -56,32 +56,39 @@ namespace SweepNDodge.DotsBullets.Tests
                 "Assets/_Project/03_Datas/PlayerActionSet/pas_default.asset");
 
             Assert.That(asset, Is.Not.Null);
-            Assert.That(asset.InitialSelectedAction, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-            Assert.That(asset.PrimarySlotAction, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-            Assert.That(asset.SecondarySlotAction, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-            Assert.That(asset.LockFacingWhileActive, Is.True);
-            Assert.That(asset.ActiveMoveSpeedScale, Is.EqualTo(0.5f));
+            Assert.That(asset.InitialSelectedProfileKey, Is.EqualTo("broom_default"));
+            Assert.That(asset.PrimarySlotProfileKey, Is.EqualTo("broom_default"));
+            Assert.That(asset.SecondarySlotProfileKey, Is.EqualTo("broom_default"));
             Assert.That(asset.Profiles, Has.Length.EqualTo(1));
-            Assert.That(asset.Profiles[0].ActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-            Assert.That(asset.Profiles[0].CaptureActiveTime, Is.EqualTo(0.20f));
-            Assert.That(asset.Profiles[0].CaptureCooldown, Is.EqualTo(0f));
-            Assert.That(asset.Profiles[0].ActiveTime, Is.EqualTo(0.22f));
-            Assert.That(asset.Profiles[0].Cooldown, Is.EqualTo(1.8f));
-            Assert.That(asset.Profiles[0].TrashRange, Is.EqualTo(3.2f));
-            Assert.That(asset.Profiles[0].TrashSweepInnerRadius, Is.EqualTo(1f));
-            Assert.That(asset.Profiles[0].HazardRectHalfWidth, Is.EqualTo(0.55f));
-            Assert.That(asset.Profiles[0].HazardForwardWindowAngleDeg, Is.EqualTo(7f));
+            Assert.That(asset.Profiles[0], Is.TypeOf<BroomSweepCleanupActionProfileSO>());
+            var profile = asset.Profiles[0] as BroomSweepCleanupActionProfileSO;
+            Assert.That(profile, Is.Not.Null);
+            Assert.That(profile.ProfileKey, Is.EqualTo("broom_default"));
+            Assert.That(profile.ActionKind, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+            Assert.That(profile.LockFacingWhileActive, Is.True);
+            Assert.That(profile.ActiveMoveSpeedScale, Is.EqualTo(0.5f));
+            Assert.That(profile.CaptureActiveTime, Is.EqualTo(0.20f));
+            Assert.That(profile.CaptureCooldown, Is.EqualTo(0f));
+            Assert.That(profile.ActiveTime, Is.EqualTo(0.22f));
+            Assert.That(profile.Cooldown, Is.EqualTo(1.8f));
+            Assert.That(profile.TrashSweepInnerRadius, Is.EqualTo(1f));
+            Assert.That(profile.HazardRectHalfWidth, Is.EqualTo(0.55f));
+            Assert.That(profile.HazardForwardWindowAngleDeg, Is.EqualTo(7f));
         }
 
         [Test]
         public void FallbackBroomSweepProfile_PopulatesLegacyAndBroomFields()
         {
             var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                profileKey: "broom_default",
                 range: 3.2f,
                 captureRingRadius: 2.88f,
                 captureRingWidth: 0.8f);
 
+            Assert.That(profile.ProfileKey, Is.EqualTo(BroomDefaultKey));
             Assert.That(profile.ActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+            Assert.That(profile.LockFacingWhileActive, Is.EqualTo(1));
+            Assert.That(profile.ActiveMoveSpeedScale, Is.EqualTo(0.5f));
             Assert.That(profile.CaptureActiveTime, Is.EqualTo(0.20f));
             Assert.That(profile.CaptureCooldown, Is.EqualTo(0f));
             Assert.That(profile.ActiveTime, Is.EqualTo(0.22f));
@@ -105,7 +112,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_ActivationFrame_UsesStartAngleAndSearchRadius()
         {
-            var profile = CreateBroomSweepTimingProfile();
+            var profile = CreateResolvedBroomSweepProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0.25f,
@@ -141,7 +148,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_RightToLeft_MirrorsSweepAngle()
         {
-            var profile = CreateBroomSweepTimingProfile();
+            var profile = CreateResolvedBroomSweepProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0.25f,
@@ -173,7 +180,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_HazardWindowAndRectCapture_ActivateNearForward()
         {
-            var profile = CreateBroomSweepTimingProfile();
+            var profile = CreateResolvedBroomSweepProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 12f / 60f,
@@ -213,7 +220,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_TrashCapture_UsesCurrentBand()
         {
-            var profile = CreateBroomSweepTimingProfile();
+            var profile = CreateResolvedBroomSweepProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0.25f,
@@ -260,7 +267,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void PlayerCleanupActionSelectSystem_NormalizesInvalidActionsToBroomSweep()
+        public void PlayerCleanupActionSelectSystem_NormalizesInvalidProfileKeysToDefaultProfile()
         {
             using var world = new World("PlayerCleanupActionSelectSystem_Normalize");
             var em = world.EntityManager;
@@ -268,14 +275,24 @@ namespace SweepNDodge.DotsBullets.Tests
             var player = em.CreateEntity(
                 typeof(PlayerTag),
                 typeof(PlayerCleanupActionStateComponent),
+                typeof(PlayerCleanupActionSelectionConfigComponent),
+                typeof(PlayerCleanupResolvedProfileComponent),
                 typeof(VacuumRuntimeStateComponent));
+
+            var profiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
+            profiles.Add(CreateBroomSweepTimingProfile());
 
             em.SetComponentData(player, new PlayerCleanupActionStateComponent
             {
-                SelectedActionId = (PlayerCleanupActionId)254,
-                PendingActionId = (PlayerCleanupActionId)255,
+                SelectedProfileKey = "missing_selected",
+                PendingProfileKey = "missing_pending",
                 Version = 0u,
             });
+            em.SetComponentData(player, new PlayerCleanupActionSelectionConfigComponent
+            {
+                DefaultProfileKey = BroomDefaultKey,
+            });
+            em.SetComponentData(player, default(PlayerCleanupResolvedProfileComponent));
             em.SetComponentData(player, new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0f,
@@ -289,9 +306,12 @@ namespace SweepNDodge.DotsBullets.Tests
             world.GetOrCreateSystem<PlayerCleanupActionSelectSystem>().Update(world.Unmanaged);
 
             var state = em.GetComponentData<PlayerCleanupActionStateComponent>(player);
-            Assert.That(state.SelectedActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-            Assert.That(state.PendingActionId, Is.EqualTo(PlayerCleanupActionId.None));
+            var resolvedProfile = em.GetComponentData<PlayerCleanupResolvedProfileComponent>(player);
+            Assert.That(state.SelectedProfileKey, Is.EqualTo(BroomDefaultKey));
+            Assert.That(state.PendingProfileKey, Is.EqualTo(default(FixedString64Bytes)));
             Assert.That(state.Version, Is.EqualTo(0u));
+            Assert.That(resolvedProfile.ProfileKey, Is.EqualTo(BroomDefaultKey));
+            Assert.That(resolvedProfile.ActionKind, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
         }
 
         [Test]
@@ -496,9 +516,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerHazardRiskRequestComponent),
                 typeof(PlayerHazardPenaltyStateComponent),
                 typeof(PlayerCleanupActionStateComponent),
+                typeof(PlayerCleanupActionSelectionConfigComponent),
                 typeof(PlayerCleanupActionSlotMapComponent),
                 typeof(PlayerCleanupSweepRuntimeStateComponent),
-                typeof(PlayerCleanupMotionConstraintConfigComponent));
+                typeof(PlayerCleanupResolvedProfileComponent));
 
             em.SetComponentData(player, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
             em.SetComponentData(player, new PlayerGoSyncComponent
@@ -545,14 +566,18 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             em.SetComponentData(player, new PlayerCleanupActionStateComponent
             {
-                SelectedActionId = PlayerCleanupActionId.BroomSweep,
-                PendingActionId = PlayerCleanupActionId.None,
+                SelectedProfileKey = BroomDefaultKey,
+                PendingProfileKey = default,
                 Version = 0u,
+            });
+            em.SetComponentData(player, new PlayerCleanupActionSelectionConfigComponent
+            {
+                DefaultProfileKey = BroomDefaultKey,
             });
             em.SetComponentData(player, new PlayerCleanupActionSlotMapComponent
             {
-                PrimaryActionId = PlayerCleanupActionId.BroomSweep,
-                SecondaryActionId = PlayerCleanupActionId.BroomSweep,
+                PrimaryProfileKey = BroomDefaultKey,
+                SecondaryProfileKey = BroomDefaultKey,
             });
             em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
             {
@@ -562,14 +587,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 HasLockedFacing = 0,
                 ActivationFrame = 0u,
             });
-            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
-            {
-                LockFacingWhileActive = 1,
-                ActiveMoveSpeedScale = 0.5f,
-            });
 
             var profiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
-            profiles.Add(CreateBroomSweepTimingProfile());
+            var profile = CreateBroomSweepTimingProfile();
+            profiles.Add(profile);
+            em.SetComponentData(player, PlayerCleanupActionContractUtility.CreateResolvedProfile(profile, 0u));
 
             var uiBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
             uiBuffer.EnsureCapacity(16);
@@ -682,6 +704,7 @@ namespace SweepNDodge.DotsBullets.Tests
             float captureCooldown = 0f)
         {
             return PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                "broom_default",
                 3.2f,
                 2.88f,
                 0.8f,
@@ -689,6 +712,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 captureCooldown,
                 activeTime,
                 cooldown);
+        }
+
+        private static PlayerCleanupResolvedProfileComponent CreateResolvedBroomSweepProfile(
+            float activeTime = 0.25f,
+            float cooldown = 0f,
+            float captureActiveTime = 0.25f,
+            float captureCooldown = 0f)
+        {
+            return PlayerCleanupActionContractUtility.CreateResolvedProfile(
+                CreateBroomSweepTimingProfile(activeTime, cooldown, captureActiveTime, captureCooldown),
+                0u);
         }
 
         private static void CreateSingleton<T>(EntityManager em, T value)

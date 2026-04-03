@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -276,7 +277,8 @@ namespace SweepNDodge.DotsBullets
             for (int s = 0; s < clip.Segments.Length; s++)
             {
                 var segment = clip.Segments[s];
-                if (segment.EndSec <= segment.StartSec || segment.Entries == null)
+                int entryCount = WaveClipAuthoringResolver.GetPreferredEntryCount(in segment);
+                if (segment.EndSec <= segment.StartSec || entryCount <= 0)
                     continue;
 
                 float startSec = Mathf.Max(0f, segment.StartSec);
@@ -289,23 +291,27 @@ namespace SweepNDodge.DotsBullets
                         continue;
                 }
 
-                for (int e = 0; e < segment.Entries.Length; e++)
+                for (int e = 0; e < entryCount; e++)
                 {
-                    var entry = segment.Entries[e];
-                    var bullet = entry.ResolveBullet();
+                    ResolvedWaveSpawnDirectiveSnapshot snapshot;
+                    if (WaveClipAuthoringResolver.UsesTypedEntries(in segment))
+                    {
+                        if (!WaveClipAuthoringResolver.TryResolveTypedEntry(segment.Directives[e], out snapshot, out string error))
+                        {
+                            throw new InvalidOperationException(
+                                $"{nameof(WaveClipSO)} '{clip.name}' has invalid typed directive at segmentIndex={s}, entryIndex={e}. {error}");
+                        }
+                    }
+                    else
+                    {
+                        snapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in segment.LegacyEntries[e]);
+                    }
+
+                    var bullet = snapshot.Bullet;
                     if (bullet == null)
                         continue;
 
                     int typeKey = bullet.DefinitionId;
-                    var fixedPoint = entry.ResolveFixedPoint();
-                    var spawnOffset = entry.ResolveSpawnOffset();
-                    var lineStart = entry.ResolveLineStart();
-                    var lineEnd = entry.ResolveLineEnd();
-                    int pointSetCount = entry.ResolvePointSetCount();
-                    var point0 = entry.ResolvePointSetPoint(0);
-                    var point1 = entry.ResolvePointSetPoint(1);
-                    var point2 = entry.ResolvePointSetPoint(2);
-                    var point3 = entry.ResolvePointSetPoint(3);
                     clipPatternBuffer.Add(new SourceClipPatternBuffer
                     {
                         DirectiveId = nextDirectiveId++,
@@ -317,35 +323,35 @@ namespace SweepNDodge.DotsBullets
                         LocalStartSec = startSec,
                         LocalEndSec = endSec,
                         BulletTypeKey = typeKey,
-                        EmissionMode = entry.ResolveEmissionMode(),
-                        SpawnMode = entry.ResolveSpawnMode(),
-                        SamplingMode = entry.ResolveSamplingMode(),
-                        CenterMode = entry.ResolveCenterMode(),
-                        DirectionMode = entry.ResolveDirectionMode(),
-                        FixedPoint = new float2(fixedPoint.x, fixedPoint.y),
-                        SpawnOffset = new float2(spawnOffset.x, spawnOffset.y),
-                        LineStart = new float2(lineStart.x, lineStart.y),
-                        LineEnd = new float2(lineEnd.x, lineEnd.y),
-                        SampleSpacing = Mathf.Max(0.001f, entry.ResolveSampleSpacing()),
-                        PointSetCount = Mathf.Clamp(pointSetCount, 0, WaveClipSO.SpawnSamplingProfile.PointSetMaxCount),
-                        Point0 = new float2(point0.x, point0.y),
-                        Point1 = new float2(point1.x, point1.y),
-                        Point2 = new float2(point2.x, point2.y),
-                        Point3 = new float2(point3.x, point3.y),
-                        SpawnSampleBudget = Mathf.Max(1, entry.ResolveSpawnSampleBudget()),
-                        PlayerNoSpawnRadius = Mathf.Max(0f, entry.ResolvePlayerNoSpawnRadius()),
-                        BaseAngleDeg = entry.ResolveBaseAngleDeg(),
-                        NWayCount = Mathf.Max(1, entry.ResolveNWayCount()),
-                        SpiralStepDeg = entry.ResolveSpiralStepDeg(),
-                        SpawnDensityPerSecPerArea = Mathf.Max(0f, entry.ResolveRatePerSecPerArea()),
-                        MeanEventsPerSec = Mathf.Max(0f, entry.ResolveMeanEventsPerSec()),
-                        BurstRepeatCount = entry.ResolveBurstRepeatCount(),
-                        BurstIntervalSec = Mathf.Max(0.001f, entry.ResolveBurstIntervalSec()),
-                        BurstShotsPerEvent = Mathf.Max(1, entry.ResolveBurstShotsPerEvent()),
-                        EventShotSchedule = entry.ResolveEventShotSchedule(),
-                        EventShotIntervalSec = Mathf.Max(0f, entry.ResolveEventShotIntervalSec()),
+                        EmissionMode = snapshot.EmissionMode,
+                        SpawnMode = snapshot.SpawnMode,
+                        SamplingMode = snapshot.SamplingMode,
+                        CenterMode = snapshot.CenterMode,
+                        DirectionMode = snapshot.DirectionMode,
+                        FixedPoint = new float2(snapshot.FixedPoint.x, snapshot.FixedPoint.y),
+                        SpawnOffset = new float2(snapshot.SpawnOffset.x, snapshot.SpawnOffset.y),
+                        LineStart = new float2(snapshot.LineStart.x, snapshot.LineStart.y),
+                        LineEnd = new float2(snapshot.LineEnd.x, snapshot.LineEnd.y),
+                        SampleSpacing = Mathf.Max(0.001f, snapshot.SampleSpacing),
+                        PointSetCount = Mathf.Clamp(snapshot.PointSetCount, 0, WaveClipSO.SpawnSamplingProfile.PointSetMaxCount),
+                        Point0 = new float2(snapshot.Point0.x, snapshot.Point0.y),
+                        Point1 = new float2(snapshot.Point1.x, snapshot.Point1.y),
+                        Point2 = new float2(snapshot.Point2.x, snapshot.Point2.y),
+                        Point3 = new float2(snapshot.Point3.x, snapshot.Point3.y),
+                        SpawnSampleBudget = Mathf.Max(1, snapshot.SpawnSampleBudget),
+                        PlayerNoSpawnRadius = Mathf.Max(0f, snapshot.PlayerNoSpawnRadius),
+                        BaseAngleDeg = snapshot.BaseAngleDeg,
+                        NWayCount = Mathf.Max(1, snapshot.NWayCount),
+                        SpiralStepDeg = snapshot.SpiralStepDeg,
+                        SpawnDensityPerSecPerArea = Mathf.Max(0f, snapshot.RatePerSecPerArea),
+                        MeanEventsPerSec = Mathf.Max(0f, snapshot.MeanEventsPerSec),
+                        BurstRepeatCount = snapshot.BurstRepeatCount,
+                        BurstIntervalSec = Mathf.Max(0.001f, snapshot.BurstIntervalSec),
+                        BurstShotsPerEvent = Mathf.Max(1, snapshot.BurstShotsPerEvent),
+                        EventShotSchedule = snapshot.EventShotSchedule,
+                        EventShotIntervalSec = Mathf.Max(0f, snapshot.EventShotIntervalSec),
                         LanePriority = lanePriority,
-                        MaxActiveDensityPerArea = Mathf.Max(0f, entry.ResolveMaxActiveDensityPerArea()),
+                        MaxActiveDensityPerArea = Mathf.Max(0f, snapshot.MaxActiveDensityPerArea),
                         SpawnAccumulator = 0f,
                         BurstEventsEmitted = 0,
                     });

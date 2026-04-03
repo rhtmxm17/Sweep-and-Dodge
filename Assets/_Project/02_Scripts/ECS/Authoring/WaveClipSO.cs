@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -8,16 +10,156 @@ namespace SweepNDodge.DotsBullets
         OnStateEnterOnce = 1
     }
 
+    [Serializable]
+    public abstract class WaveEmissionAuthoringBase
+    {
+        public SourceSpawnModeId SpawnMode = SourceSpawnModeId.FixedDensity;
+        public float MaxActiveDensityPerArea = 0f;
+
+        public abstract SourceSpawnEmissionModeId EmissionMode { get; }
+    }
+
+    [Serializable]
+    public sealed class RateFieldEmissionAuthoring : WaveEmissionAuthoringBase
+    {
+        public float RatePerSecPerArea = 1f;
+
+        public override SourceSpawnEmissionModeId EmissionMode => SourceSpawnEmissionModeId.RateField;
+    }
+
+    [Serializable]
+    public sealed class PoissonEmissionAuthoring : WaveEmissionAuthoringBase
+    {
+        public float MeanEventsPerSec = 0f;
+        public int BurstShotsPerEvent = 1;
+        public SourceSpawnEventShotScheduleId EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
+        public float EventShotIntervalSec = 0.1f;
+
+        public override SourceSpawnEmissionModeId EmissionMode => SourceSpawnEmissionModeId.Poisson;
+    }
+
+    [Serializable]
+    public sealed class EventBurstEmissionAuthoring : WaveEmissionAuthoringBase
+    {
+        public int BurstRepeatCount = 1;
+        public float BurstIntervalSec = 1f;
+        public int BurstShotsPerEvent = 1;
+        public SourceSpawnEventShotScheduleId EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
+        public float EventShotIntervalSec = 0.1f;
+
+        public override SourceSpawnEmissionModeId EmissionMode => SourceSpawnEmissionModeId.EventBurst;
+    }
+
+    [Serializable]
+    public abstract class WaveSamplingAuthoringBase
+    {
+        public SourceSpawnCenterModeId CenterMode = SourceSpawnCenterModeId.SourceCenter;
+        public Vector2 FixedPoint = Vector2.zero;
+        public Vector2 SpawnOffset = Vector2.zero;
+        public int SpawnSampleBudget = 16;
+        public float PlayerNoSpawnRadius = 0f;
+
+        public abstract SourceSpawnSamplingModeId SamplingMode { get; }
+    }
+
+    [Serializable]
+    public sealed class UniformFieldSamplingAuthoring : WaveSamplingAuthoringBase
+    {
+        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.UniformField;
+    }
+
+    [Serializable]
+    public sealed class PollutionTopKSamplingAuthoring : WaveSamplingAuthoringBase
+    {
+        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.PollutionTopK;
+    }
+
+    [Serializable]
+    public sealed class LineEvenSamplingAuthoring : WaveSamplingAuthoringBase
+    {
+        public Vector2 LineStart = Vector2.zero;
+        public Vector2 LineEnd = Vector2.zero;
+        public float SampleSpacing = 1f;
+
+        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.LineEven;
+    }
+
+    [Serializable]
+    public sealed class PointSetSamplingAuthoring : WaveSamplingAuthoringBase
+    {
+        public Vector2[] Points = Array.Empty<Vector2>();
+
+        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.PointSet;
+    }
+
+    [Serializable]
+    public abstract class WaveDirectionAuthoringBase
+    {
+        public abstract SourceSpawnDirectionModeId DirectionMode { get; }
+    }
+
+    [Serializable]
+    public sealed class RandomDirectionAuthoring : WaveDirectionAuthoringBase
+    {
+        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.Random;
+    }
+
+    [Serializable]
+    public sealed class FixedDirectionAuthoring : WaveDirectionAuthoringBase
+    {
+        public float BaseAngleDeg = 0f;
+
+        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.Fixed;
+    }
+
+    [Serializable]
+    public sealed class NWayDirectionAuthoring : WaveDirectionAuthoringBase
+    {
+        public float BaseAngleDeg = 0f;
+        public int NWayCount = 2;
+
+        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.NWay;
+    }
+
+    [Serializable]
+    public sealed class SpiralDirectionAuthoring : WaveDirectionAuthoringBase
+    {
+        public float BaseAngleDeg = 0f;
+        public float SpiralStepDeg = 0f;
+
+        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.Spiral;
+    }
+
+    [Serializable]
+    public sealed class RadialBurstDirectionAuthoring : WaveDirectionAuthoringBase
+    {
+        public float BaseAngleDeg = 0f;
+
+        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.RadialBurst;
+    }
+
+    [Serializable]
+    public sealed class WaveSpawnEntryAuthoring
+    {
+        [Header("Payload")]
+        public WaveClipSO.SpawnPayloadProfile Payload;
+
+        [Header("Directive")]
+        [SerializeReference] public WaveEmissionAuthoringBase Emission = new RateFieldEmissionAuthoring();
+        [SerializeReference] public WaveSamplingAuthoringBase Sampling = new UniformFieldSamplingAuthoring();
+        [SerializeReference] public WaveDirectionAuthoringBase Direction = new RandomDirectionAuthoring();
+    }
+
     [CreateAssetMenu(menuName = "SweepNDodge/Bullet/Wave Clip", fileName = "bwc_")]
     public class WaveClipSO : ScriptableObject
     {
-        [System.Serializable]
+        [Serializable]
         public struct SpawnPayloadProfile
         {
             public BulletDefinitionSO Bullet;
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct SpawnEmissionProfile
         {
             public SourceSpawnEmissionModeId EmissionMode;
@@ -32,7 +174,7 @@ namespace SweepNDodge.DotsBullets
             public float MaxActiveDensityPerArea;
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct SpawnSamplingProfile
         {
             public const int PointSetMaxCount = 4;
@@ -53,7 +195,7 @@ namespace SweepNDodge.DotsBullets
             public float PlayerNoSpawnRadius;
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct SpawnDirectionProfile
         {
             public SourceSpawnDirectionModeId DirectionMode;
@@ -62,7 +204,7 @@ namespace SweepNDodge.DotsBullets
             public float SpiralStepDeg;
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct SpawnEntry
         {
             [Header("Payload")]
@@ -75,165 +217,144 @@ namespace SweepNDodge.DotsBullets
 
             public BulletDefinitionSO ResolveBullet()
             {
-                return Payload.Bullet;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).Bullet;
             }
 
             public SourceSpawnEmissionModeId ResolveEmissionMode()
             {
-                return Emission.EmissionMode;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).EmissionMode;
             }
 
             public SourceSpawnModeId ResolveSpawnMode()
             {
-                return Emission.SpawnMode;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).SpawnMode;
             }
 
             public float ResolveRatePerSecPerArea()
             {
-                return Emission.RatePerSecPerArea;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).RatePerSecPerArea;
             }
 
             public float ResolveMaxActiveDensityPerArea()
             {
-                return Emission.MaxActiveDensityPerArea;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).MaxActiveDensityPerArea;
             }
 
             public float ResolveMeanEventsPerSec()
             {
-                return Emission.MeanEventsPerSec;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).MeanEventsPerSec;
             }
 
             public int ResolveBurstRepeatCount()
             {
-                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst)
-                    return 1;
-
-                return Emission.BurstRepeatCount == 0 ? 1 : Emission.BurstRepeatCount;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).BurstRepeatCount;
             }
 
             public float ResolveBurstIntervalSec()
             {
-                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst)
-                    return 1f;
-
-                return Emission.BurstIntervalSec > 0f ? Emission.BurstIntervalSec : 1f;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).BurstIntervalSec;
             }
 
             public int ResolveBurstShotsPerEvent()
             {
-                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst
-                    && Emission.EmissionMode != SourceSpawnEmissionModeId.Poisson)
-                    return 1;
-
-                return Emission.BurstShotsPerEvent > 0 ? Emission.BurstShotsPerEvent : 1;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).BurstShotsPerEvent;
             }
 
             public SourceSpawnEventShotScheduleId ResolveEventShotSchedule()
             {
-                if (Emission.EmissionMode != SourceSpawnEmissionModeId.EventBurst
-                    && Emission.EmissionMode != SourceSpawnEmissionModeId.Poisson)
-                    return SourceSpawnEventShotScheduleId.Instant;
-
-                return Emission.EventShotSchedule;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).EventShotSchedule;
             }
 
             public float ResolveEventShotIntervalSec()
             {
-                if (ResolveEventShotSchedule() != SourceSpawnEventShotScheduleId.Timed)
-                    return 0f;
-
-                return Emission.EventShotIntervalSec > 0f ? Emission.EventShotIntervalSec : 0.1f;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).EventShotIntervalSec;
             }
 
             public SourceSpawnSamplingModeId ResolveSamplingMode()
             {
-                return Sampling.SamplingMode;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).SamplingMode;
             }
 
             public SourceSpawnCenterModeId ResolveCenterMode()
             {
-                return Sampling.CenterMode;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).CenterMode;
             }
 
             public Vector2 ResolveFixedPoint()
             {
-                return Sampling.FixedPoint;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).FixedPoint;
             }
 
             public Vector2 ResolveSpawnOffset()
             {
-                return Sampling.SpawnOffset;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).SpawnOffset;
             }
 
             public Vector2 ResolveLineStart()
             {
-                return Sampling.LineStart;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).LineStart;
             }
 
             public Vector2 ResolveLineEnd()
             {
-                return Sampling.LineEnd;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).LineEnd;
             }
 
             public float ResolveSampleSpacing()
             {
-                return Sampling.SampleSpacing > 0f ? Sampling.SampleSpacing : 1f;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).SampleSpacing;
             }
 
             public int ResolvePointSetCount()
             {
-                return Mathf.Clamp(Sampling.PointCount, 0, SpawnSamplingProfile.PointSetMaxCount);
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).PointSetCount;
             }
 
             public Vector2 ResolvePointSetPoint(int index)
             {
-                switch (index)
+                var snapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in this);
+                return index switch
                 {
-                    case 0:
-                        return Sampling.Point0;
-                    case 1:
-                        return Sampling.Point1;
-                    case 2:
-                        return Sampling.Point2;
-                    case 3:
-                        return Sampling.Point3;
-                    default:
-                        return Vector2.zero;
-                }
+                    0 => snapshot.Point0,
+                    1 => snapshot.Point1,
+                    2 => snapshot.Point2,
+                    3 => snapshot.Point3,
+                    _ => Vector2.zero,
+                };
             }
 
             public SourceSpawnDirectionModeId ResolveDirectionMode()
             {
-                return Direction.DirectionMode;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).DirectionMode;
             }
 
             public float ResolveBaseAngleDeg()
             {
-                return Direction.BaseAngleDeg;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).BaseAngleDeg;
             }
 
             public int ResolveNWayCount()
             {
-                return Direction.NWayCount > 0 ? Direction.NWayCount : 1;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).NWayCount;
             }
 
             public float ResolveSpiralStepDeg()
             {
-                return Direction.SpiralStepDeg;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).SpiralStepDeg;
             }
 
             public int ResolveSpawnSampleBudget()
             {
-                return Sampling.SpawnSampleBudget > 0 ? Sampling.SpawnSampleBudget : 16;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).SpawnSampleBudget;
             }
 
             public float ResolvePlayerNoSpawnRadius()
             {
-                return Sampling.PlayerNoSpawnRadius;
+                return WaveClipAuthoringResolver.ResolveLegacyEntry(in this).PlayerNoSpawnRadius;
             }
         }
 
-        [System.Serializable]
+        [Serializable]
         public struct ClipSegment
         {
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -242,7 +363,15 @@ namespace SweepNDodge.DotsBullets
             #endif
             public float StartSec;
             public float EndSec;
-            public SpawnEntry[] Entries;
+            public WaveSpawnEntryAuthoring[] Directives;
+            [FormerlySerializedAs("Entries")] public SpawnEntry[] LegacyEntries;
+
+            [Obsolete("Use Directives for typed authoring or LegacyEntries for migration fallback.")]
+            public SpawnEntry[] Entries
+            {
+                get => LegacyEntries;
+                set => LegacyEntries = value;
+            }
         }
 
         [Header("Clip Metadata")]

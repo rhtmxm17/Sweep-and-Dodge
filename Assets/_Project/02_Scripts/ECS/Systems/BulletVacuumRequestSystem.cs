@@ -35,9 +35,8 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerHazardRiskRequestComponent>();
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
-            state.RequireForUpdate<PlayerCleanupActionStateComponent>();
+            state.RequireForUpdate<PlayerCleanupResolvedProfileComponent>();
             state.RequireForUpdate<PlayerCleanupSweepRuntimeStateComponent>();
-            state.RequireForUpdate<PlayerCleanupActionProfileBufferElement>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
             _combatEventChannelQuery = SystemAPI.QueryBuilder()
@@ -70,17 +69,15 @@ namespace SweepNDodge.DotsBullets
             var hazardRiskStateRO = SystemAPI.GetComponent<PlayerHazardRiskStateComponent>(playerEntity);
             var carryBinRO = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
             var goSyncRO = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
-            var actionStateRO = SystemAPI.GetComponent<PlayerCleanupActionStateComponent>(playerEntity);
+            var resolvedProfileRO = SystemAPI.GetComponent<PlayerCleanupResolvedProfileComponent>(playerEntity);
             var sweepRuntimeStateRW = SystemAPI.GetComponentRW<PlayerCleanupSweepRuntimeStateComponent>(playerEntity);
-            var actionProfiles = SystemAPI.GetBuffer<PlayerCleanupActionProfileBufferElement>(playerEntity);
             var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
-            var actionId = NormalizeActionId(actionStateRO.SelectedActionId);
-            var actionProfile = PlayerCleanupActionDebugGeometryUtility.ResolveActionProfile(actionProfiles, actionId);
+            var actionId = NormalizeActionId(resolvedProfileRO.ActionKind);
             bool wasVacuumActive = vacuumStateRW.ValueRO.IsActive != 0;
             byte isCarryFull = CarryBinRules.IsFull(in carryBinRO) ? (byte)1 : (byte)0;
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
             byte blockReason = UpdateVacuumState(
-                in actionProfile,
+                in resolvedProfileRO,
                 ref vacuumStateRW.ValueRW,
                 in penaltyRW.ValueRO,
                 in carryBinRO,
@@ -116,7 +113,7 @@ namespace SweepNDodge.DotsBullets
                 actionId,
                 in vacuumStateRW.ValueRO,
                 in sweepRuntimeStateRW.ValueRO,
-                in actionProfile);
+                in resolvedProfileRO);
             float3 playerForward = GetPlayerForward(in goSyncRO);
             float searchRange = broomGeometry.SearchRadius;
             float hazardRiskMultiplier = 1f
@@ -179,14 +176,14 @@ namespace SweepNDodge.DotsBullets
                 IsCarryFull = isCarryFull,
                 ActionId = actionId,
                 PlayerForward = playerForward,
-                RadialTrashRange = actionProfile.TrashRange,
-                RadialHazardRingInner = PlayerCleanupActionDebugGeometryUtility.GetHazardRingInner(in actionProfile),
-                RadialHazardRingOuter = PlayerCleanupActionDebugGeometryUtility.GetHazardRingOuter(in actionProfile),
-                ForwardTrashRange = actionProfile.TrashRange,
-                ForwardTrashCosHalfAngle = math.cos(math.radians(actionProfile.TrashFanHalfAngleDeg)),
-                ForwardHazardLineLength = actionProfile.HazardLineLength,
-                ForwardHazardLineHalfWidth = actionProfile.HazardLineHalfWidth,
-                ActionProfile = actionProfile,
+                RadialTrashRange = resolvedProfileRO.TrashRange,
+                RadialHazardRingInner = PlayerCleanupActionDebugGeometryUtility.GetHazardRingInner(in resolvedProfileRO),
+                RadialHazardRingOuter = PlayerCleanupActionDebugGeometryUtility.GetHazardRingOuter(in resolvedProfileRO),
+                ForwardTrashRange = resolvedProfileRO.TrashRange,
+                ForwardTrashCosHalfAngle = math.cos(math.radians(resolvedProfileRO.TrashFanHalfAngleDeg)),
+                ForwardHazardLineLength = resolvedProfileRO.HazardLineLength,
+                ForwardHazardLineHalfWidth = resolvedProfileRO.HazardLineHalfWidth,
+                ActionProfile = resolvedProfileRO,
                 BroomGeometry = broomGeometry,
                 HazardRiskMultiplier = hazardRiskMultiplier,
 
@@ -228,7 +225,7 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static byte UpdateVacuumState(
-            in PlayerCleanupActionProfileBufferElement profile,
+            in PlayerCleanupResolvedProfileComponent profile,
             ref VacuumRuntimeStateComponent state,
             in PlayerHazardPenaltyStateComponent penalty,
             in PlayerCarryBinComponent carry,
@@ -356,7 +353,7 @@ namespace SweepNDodge.DotsBullets
             public float ForwardTrashCosHalfAngle;
             public float ForwardHazardLineLength;
             public float ForwardHazardLineHalfWidth;
-            public PlayerCleanupActionProfileBufferElement ActionProfile;
+            public PlayerCleanupResolvedProfileComponent ActionProfile;
             public BroomSweepFrameGeometry BroomGeometry;
             public float HazardRiskMultiplier;
 

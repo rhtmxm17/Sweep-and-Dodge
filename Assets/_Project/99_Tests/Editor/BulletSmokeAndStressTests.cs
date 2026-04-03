@@ -13,6 +13,8 @@ namespace SweepNDodge.DotsBullets.Tests
 {
     public class BulletSmokeAndStressTests
     {
+        private static readonly FixedString64Bytes BroomDefaultProfileKey = "broom_default";
+
         [Test]
         public void Smoke_CoreLoopAndBurstSpawnDespawn_RunWithoutHardLimit()
         {
@@ -382,13 +384,22 @@ namespace SweepNDodge.DotsBullets.Tests
                 SetupVacuumContractEnvironment(em, carryLoad: 0, carryCapacity: 10, out var playerEntity);
 
                 var actionState = em.GetComponentData<PlayerCleanupActionStateComponent>(playerEntity);
+                var selectionConfig = em.GetComponentData<PlayerCleanupActionSelectionConfigComponent>(playerEntity);
                 var slotMap = em.GetComponentData<PlayerCleanupActionSlotMapComponent>(playerEntity);
+                var resolvedProfile = em.GetComponentData<PlayerCleanupResolvedProfileComponent>(playerEntity);
                 var profiles = em.GetBuffer<PlayerCleanupActionProfileBufferElement>(playerEntity);
 
-                Assert.That(actionState.SelectedActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-                Assert.That(slotMap.PrimaryActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-                Assert.That(slotMap.SecondaryActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+                Assert.That(actionState.SelectedProfileKey, Is.EqualTo(BroomDefaultProfileKey));
+                Assert.That(actionState.PendingProfileKey, Is.EqualTo(default(FixedString64Bytes)));
+                Assert.That(selectionConfig.DefaultProfileKey, Is.EqualTo(BroomDefaultProfileKey));
+                Assert.That(slotMap.PrimaryProfileKey, Is.EqualTo(BroomDefaultProfileKey));
+                Assert.That(slotMap.SecondaryProfileKey, Is.EqualTo(BroomDefaultProfileKey));
+                Assert.That(resolvedProfile.ProfileKey, Is.EqualTo(BroomDefaultProfileKey));
+                Assert.That(resolvedProfile.ActionKind, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+                Assert.That(resolvedProfile.LockFacingWhileActive, Is.EqualTo(1));
+                Assert.That(resolvedProfile.ActiveMoveSpeedScale, Is.EqualTo(0.5f));
                 Assert.That(profiles.Length, Is.EqualTo(1));
+                Assert.That(profiles[0].ProfileKey, Is.EqualTo(BroomDefaultProfileKey));
                 Assert.That(profiles[0].ActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
             }
             finally
@@ -3873,9 +3884,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerHazardPenaltyConfigComponent),
                 typeof(PlayerHazardPenaltyStateComponent),
                 typeof(PlayerCleanupActionStateComponent),
+                typeof(PlayerCleanupActionSelectionConfigComponent),
                 typeof(PlayerCleanupActionSlotMapComponent),
                 typeof(PlayerCleanupSweepRuntimeStateComponent),
-                typeof(PlayerCleanupMotionConstraintConfigComponent),
+                typeof(PlayerCleanupResolvedProfileComponent),
                 typeof(PlayerCarryBinDepositRequestTag),
                 typeof(PlayerCarryBinDepositContextComponent),
                 typeof(PlayerHazardHitRequestTag),
@@ -3957,14 +3969,18 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             em.SetComponentData(player, new PlayerCleanupActionStateComponent
             {
-                SelectedActionId = PlayerCleanupActionId.BroomSweep,
-                PendingActionId = PlayerCleanupActionId.None,
+                SelectedProfileKey = BroomDefaultProfileKey,
+                PendingProfileKey = default,
                 Version = 0,
+            });
+            em.SetComponentData(player, new PlayerCleanupActionSelectionConfigComponent
+            {
+                DefaultProfileKey = BroomDefaultProfileKey,
             });
             em.SetComponentData(player, new PlayerCleanupActionSlotMapComponent
             {
-                PrimaryActionId = PlayerCleanupActionId.BroomSweep,
-                SecondaryActionId = PlayerCleanupActionId.BroomSweep,
+                PrimaryProfileKey = BroomDefaultProfileKey,
+                SecondaryProfileKey = BroomDefaultProfileKey,
             });
             em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
             {
@@ -3973,11 +3989,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 LockedFacingXZ = float2.zero,
                 HasLockedFacing = 0,
                 ActivationFrame = 0u,
-            });
-            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
-            {
-                LockFacingWhileActive = 1,
-                ActiveMoveSpeedScale = 0.5f,
             });
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
             em.SetComponentData(player, new PlayerCarryBinDepositContextComponent
@@ -3993,14 +4004,17 @@ namespace SweepNDodge.DotsBullets.Tests
             });
 
             var actionProfiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
-            actionProfiles.Add(PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+            var broomProfile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                "broom_default",
                 3.2f,
                 2.88f,
                 0.8f,
                 0.25f,
                 0f,
                 0.25f,
-                0f));
+                0f);
+            actionProfiles.Add(broomProfile);
+            em.SetComponentData(player, PlayerCleanupActionContractUtility.CreateResolvedProfile(broomProfile, 0u));
 
             var uiBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
             uiBuffer.EnsureCapacity(64);
@@ -4282,7 +4296,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(LocalTransform),
                 typeof(PlayerGoSyncComponent),
                 typeof(PlayerInputIntentComponent),
-                typeof(PlayerResolvedInputSnapshotComponent));
+                typeof(PlayerResolvedInputSnapshotComponent),
+                typeof(VacuumRuntimeStateComponent),
+                typeof(PlayerCleanupResolvedProfileComponent),
+                typeof(PlayerCleanupSweepRuntimeStateComponent));
             em.SetName(player, "SmokeStress_Player_WithTransform");
             em.SetComponentData(player, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
             em.SetComponentData(player, new PlayerGoSyncComponent
@@ -4313,6 +4330,30 @@ namespace SweepNDodge.DotsBullets.Tests
                 CleanupActionRequested = 0,
                 RequestedCleanupActionSlot = 0,
                 Sequence = 0u,
+            });
+            em.SetComponentData(player, new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 0f,
+                CaptureCooldownTimer = 0f,
+                ActiveTimer = 0f,
+                CooldownTimer = 0f,
+                IsActive = 0,
+                ActivateRequested = 0,
+            });
+            em.SetComponentData(player, PlayerCleanupActionContractUtility.CreateResolvedProfile(
+                PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                    "broom_default",
+                    3.2f,
+                    2.88f,
+                    0.8f),
+                0u));
+            em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = 1,
+                ActiveSweepDirectionSign = 0,
+                LockedFacingXZ = float2.zero,
+                HasLockedFacing = 0,
+                ActivationFrame = 0u,
             });
         }
 

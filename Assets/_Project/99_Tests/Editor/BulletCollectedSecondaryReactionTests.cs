@@ -13,6 +13,9 @@ namespace SweepNDodge.DotsBullets.Tests
     /// </summary>
     public class BulletCleanupRemovedSecondaryReactionTests
     {
+        private static readonly FixedString64Bytes LegacyRadialProfileKey = "legacy_radial";
+        private static readonly FixedString64Bytes LegacyForwardProfileKey = "legacy_forward";
+
         [SetUp]
         public void SetUp()
         {
@@ -284,9 +287,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerHazardPenaltyConfigComponent),
                 typeof(PlayerHazardPenaltyStateComponent),
                 typeof(PlayerCleanupActionStateComponent),
+                typeof(PlayerCleanupActionSelectionConfigComponent),
                 typeof(PlayerCleanupActionSlotMapComponent),
                 typeof(PlayerCleanupSweepRuntimeStateComponent),
-                typeof(PlayerCleanupMotionConstraintConfigComponent),
+                typeof(PlayerCleanupResolvedProfileComponent),
                 typeof(PlayerCarryBinDepositRequestTag),
                 typeof(PlayerCarryBinDepositContextComponent),
                 typeof(PlayerHazardHitRequestTag),
@@ -367,14 +371,18 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             em.SetComponentData(player, new PlayerCleanupActionStateComponent
             {
-                SelectedActionId = PlayerCleanupActionId.RadialRing,
-                PendingActionId = PlayerCleanupActionId.None,
+                SelectedProfileKey = LegacyRadialProfileKey,
+                PendingProfileKey = default,
                 Version = 0,
+            });
+            em.SetComponentData(player, new PlayerCleanupActionSelectionConfigComponent
+            {
+                DefaultProfileKey = LegacyRadialProfileKey,
             });
             em.SetComponentData(player, new PlayerCleanupActionSlotMapComponent
             {
-                PrimaryActionId = PlayerCleanupActionId.RadialRing,
-                SecondaryActionId = PlayerCleanupActionId.ForwardFanLine,
+                PrimaryProfileKey = LegacyRadialProfileKey,
+                SecondaryProfileKey = LegacyForwardProfileKey,
             });
             em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
             {
@@ -383,11 +391,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 LockedFacingXZ = float2.zero,
                 HasLockedFacing = 0,
                 ActivationFrame = 0u,
-            });
-            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
-            {
-                LockFacingWhileActive = 1,
-                ActiveMoveSpeedScale = 0.5f,
             });
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
             em.SetComponentData(player, new PlayerCarryBinDepositContextComponent());
@@ -399,13 +402,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 HitDirZ = 0f,
             });
             var actionProfiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
-            actionProfiles.Add(new PlayerCleanupActionProfileBufferElement
+            var radialProfile = PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
             {
+                ProfileKey = LegacyRadialProfileKey,
                 ActionId = PlayerCleanupActionId.RadialRing,
                 CaptureActiveTime = 0.25f,
                 CaptureCooldown = 0f,
                 ActiveTime = 0.25f,
                 Cooldown = 0f,
+                LockFacingWhileActive = 1,
+                ActiveMoveSpeedScale = 0.5f,
                 TrashRange = 3.2f,
                 TrashFanHalfAngleDeg = 180f,
                 HazardRingRadius = 2.88f,
@@ -413,6 +419,26 @@ namespace SweepNDodge.DotsBullets.Tests
                 HazardLineLength = 0f,
                 HazardLineHalfWidth = 0f,
             });
+            var forwardProfile = PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
+            {
+                ProfileKey = LegacyForwardProfileKey,
+                ActionId = PlayerCleanupActionId.ForwardFanLine,
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
+                LockFacingWhileActive = 1,
+                ActiveMoveSpeedScale = 0.5f,
+                TrashRange = 3.2f,
+                TrashFanHalfAngleDeg = 40f,
+                HazardRingRadius = 0f,
+                HazardRingWidth = 0f,
+                HazardLineLength = 3.2f,
+                HazardLineHalfWidth = 0.5f,
+            });
+            actionProfiles.Add(radialProfile);
+            actionProfiles.Add(forwardProfile);
+            em.SetComponentData(player, PlayerCleanupActionContractUtility.CreateResolvedProfile(radialProfile, 0u));
             var uiBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
             uiBuffer.EnsureCapacity(64);
             var impulseBuffer = em.AddBuffer<PlayerImpulseEventBufferElement>(player);

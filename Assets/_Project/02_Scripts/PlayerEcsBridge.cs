@@ -362,31 +362,28 @@ namespace SweepNDodge.DotsBullets
         {
             context = default;
 
-            if (!_em.HasComponent<PlayerCleanupActionStateComponent>(_playerEntity)
-                || !_em.HasComponent<VacuumRuntimeStateComponent>(_playerEntity)
+            if (!_em.HasComponent<VacuumRuntimeStateComponent>(_playerEntity)
+                || !_em.HasComponent<PlayerCleanupResolvedProfileComponent>(_playerEntity)
                 || !_em.HasComponent<PlayerCleanupSweepRuntimeStateComponent>(_playerEntity)
-                || !_em.HasComponent<PlayerGoSyncComponent>(_playerEntity)
-                || !_em.HasBuffer<PlayerCleanupActionProfileBufferElement>(_playerEntity))
+                || !_em.HasComponent<PlayerGoSyncComponent>(_playerEntity))
                 return false;
 
             var goSync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
-            var actionState = _em.GetComponentData<PlayerCleanupActionStateComponent>(_playerEntity);
+            var resolvedProfile = _em.GetComponentData<PlayerCleanupResolvedProfileComponent>(_playerEntity);
             var vacuumState = _em.GetComponentData<VacuumRuntimeStateComponent>(_playerEntity);
             var sweepState = _em.GetComponentData<PlayerCleanupSweepRuntimeStateComponent>(_playerEntity);
-            var actionId = PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(actionState.SelectedActionId, allowNone: true);
-            var profiles = _em.GetBuffer<PlayerCleanupActionProfileBufferElement>(_playerEntity);
-            var profile = PlayerCleanupActionDebugGeometryUtility.ResolveActionProfile(profiles, actionId);
+            var actionId = PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(resolvedProfile.ActionKind, allowNone: true);
             var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 actionId,
                 in vacuumState,
                 in sweepState,
-                in profile);
+                in resolvedProfile);
 
             context = new CleanupGizmoContext
             {
                 Center = new Vector3(goSync.Position.x, goSync.Position.y, goSync.Position.z) + (Vector3.up * GizmoHeightOffset),
                 ActionId = actionId,
-                Profile = profile,
+                Profile = resolvedProfile,
                 VacuumState = vacuumState,
                 SweepState = sweepState,
                 Geometry = geometry,
@@ -699,7 +696,7 @@ namespace SweepNDodge.DotsBullets
         {
             public Vector3 Center;
             public PlayerCleanupActionId ActionId;
-            public PlayerCleanupActionProfileBufferElement Profile;
+            public PlayerCleanupResolvedProfileComponent Profile;
             public VacuumRuntimeStateComponent VacuumState;
             public PlayerCleanupSweepRuntimeStateComponent SweepState;
             public BroomSweepFrameGeometry Geometry;

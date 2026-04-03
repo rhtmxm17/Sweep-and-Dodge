@@ -20,74 +20,77 @@ MonoBehaviour:
   - editorOnlyDescription: Cleanup Reward - VacuumCollected
     StartSec: 2.25
     EndSec: 3.25
-    Entries:
+    Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
       Emission:
-        EmissionMode: 2
-        SpawnMode: 0
-        RatePerSecPerArea: 0
-        MeanEventsPerSec: 0
-        BurstRepeatCount: 3
-        BurstIntervalSec: 0.3
-        BurstShotsPerEvent: 1
-        EventShotSchedule: 0
-        EventShotIntervalSec: 0
-        MaxActiveDensityPerArea: 0
+        rid: 6141543268140187731
       Sampling:
-        SamplingMode: 4
-        CenterMode: 2
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        LineStart: {x: 0, y: 0}
-        LineEnd: {x: 0, y: 0}
-        SampleSpacing: 1
-        PointCount: 1
-        Point0: {x: 2.88, y: 0}
-        Point1: {x: 0, y: 0}
-        Point2: {x: 0, y: 0}
-        Point3: {x: 0, y: 0}
-        SpawnSampleBudget: 1
-        PlayerNoSpawnRadius: 0
+        rid: 6141543268140187732
       Direction:
-        DirectionMode: 4
-        BaseAngleDeg: 180
-        NWayCount: 1
-        SpiralStepDeg: 0
+        rid: 6141543268140187733
+    LegacyEntries: []
   - editorOnlyDescription: Cleanup Reward - CarryFullRemoved
     StartSec: 8.5
     EndSec: 9.5
-    Entries:
+    Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
       Emission:
-        EmissionMode: 2
+        rid: 6141543268140187734
+      Sampling:
+        rid: 6141543268140187735
+      Direction:
+        rid: 6141543268140187736
+    LegacyEntries: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 6141543268140187731
+      type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
         SpawnMode: 0
-        RatePerSecPerArea: 0
-        MeanEventsPerSec: 0
+        MaxActiveDensityPerArea: 0
         BurstRepeatCount: 3
         BurstIntervalSec: 0.3
         BurstShotsPerEvent: 1
         EventShotSchedule: 0
         EventShotIntervalSec: 0
-        MaxActiveDensityPerArea: 0
-      Sampling:
-        SamplingMode: 4
+    - rid: 6141543268140187732
+      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
         CenterMode: 2
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
-        LineStart: {x: 0, y: 0}
-        LineEnd: {x: 0, y: 0}
-        SampleSpacing: 1
-        PointCount: 1
-        Point0: {x: 2.88, y: 0}
-        Point1: {x: 0, y: 0}
-        Point2: {x: 0, y: 0}
-        Point3: {x: 0, y: 0}
         SpawnSampleBudget: 1
         PlayerNoSpawnRadius: 0
-      Direction:
-        DirectionMode: 4
+        Points:
+        - {x: 2.88, y: 0}
+    - rid: 6141543268140187733
+      type: {class: FixedDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
         BaseAngleDeg: 180
-        NWayCount: 1
-        SpiralStepDeg: 0
+    - rid: 6141543268140187734
+      type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        SpawnMode: 0
+        MaxActiveDensityPerArea: 0
+        BurstRepeatCount: 3
+        BurstIntervalSec: 0.3
+        BurstShotsPerEvent: 1
+        EventShotSchedule: 0
+        EventShotIntervalSec: 0
+    - rid: 6141543268140187735
+      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        CenterMode: 2
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Points:
+        - {x: 2.88, y: 0}
+    - rid: 6141543268140187736
+      type: {class: FixedDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        BaseAngleDeg: 180

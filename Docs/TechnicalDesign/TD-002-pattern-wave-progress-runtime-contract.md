@@ -4,7 +4,7 @@
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-01`
+- last_updated: `2026-04-03`
 - related_adr:
   - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
   - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
@@ -70,6 +70,11 @@
 | LanePriority | int | 요청 소비 우선순위 | `특수 > Hazard > Trash`, 동률은 `OldestFrame` 우선 |
 
 `PatternDefinitionSlim`은 밀도 기반 구버전 용어이며, 스폰 모델은 `TD-003`의 SpawnDirective 용어를 기준으로 유지한다.
+
+Authoring/Bake 해석 경로:
+- `WaveClipSO.Segments[].Directives[]` typed authoring이 기본 SSOT다.
+- `WaveClipAuthoringResolver`가 typed authoring 또는 `LegacyEntries[]` fallback을 `ResolvedWaveSpawnDirectiveSnapshot`으로 통합 해석한다.
+- `SourceRuntimeApplyUtility`는 resolved snapshot만 flat runtime buffer(`SourceClipPatternBuffer`)로 flatten한다.
 
 ### 3.2 Progress 모델
 #### StageProgressProfile
@@ -180,6 +185,7 @@ Hit:
 - Source에 WaveClip 바인딩이 전혀 없음 (`CV006`).
 - Wave clip `Segments` 비어 있음 (`CV008`).
 - `ClipId` 중복 (`CV009`).
+- invalid typed authoring managed reference(`Emission/Sampling/Direction == null`) (`CV040`).
 - Wave entry의 `RatePerSecPerArea < 0` (`CV015`, RateField 모드).
 - Wave entry의 `MeanEventsPerSec < 0` (`CV017`, Poisson 모드).
 - `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0` (`CV016`).
@@ -192,16 +198,16 @@ Hit:
 - NWay에서 `NWayCount < 2` (`CV023`, 필수 제약 위반).
 - RadialBurst에서 `BurstShotsPerEvent < 2` (`CV024`).
 - LineEven에서 선분 길이 0 또는 `SampleSpacing <= 0` (`CV026`).
-- PointSet에서 `PointCount <= 0` (`CV028`).
+- PointSet에서 authored `Points.Length <= 0` (`CV028`).
 - Warning:
 - `SpawnSampleBudget`가 권장 범위 초과.
 - `MaxActiveDensityPerArea`가 Stage 목표 대비 과도함.
 - `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
 - Spiral에서 `SpiralStepDeg`가 0에 근접 (`CVW032`).
-- PointSet `PointCount > 4` 입력(clamp 경고) (`CVW033`).
+- PointSet authored `Points.Length > 4` 입력(clamp 경고) (`CVW033`).
 
 검증 코드 매핑(현재 구현):
-- `CV012`: Wave segment의 `Entries` 비어 있음
+- `CV012`: Wave segment의 `Directives`/`LegacyEntries` 비어 있음
 - `CV013`: Wave entry의 `Bullet == null`
 - `CV014`: Wave entry가 미등록 `DefinitionId` 참조
 - `CV015`: Wave entry의 `RatePerSecPerArea < 0` (RateField)
@@ -215,9 +221,10 @@ Hit:
 - `CV023`: NWay `NWayCount < 2`
 - `CV024`: RadialBurst `BurstShotsPerEvent < 2`
 - `CV026`: LineEven 파라미터 오류
-- `CV028`: PointSet `PointCount <= 0`
+- `CV028`: PointSet authored `Points.Length <= 0`
 - `CVW032`: Spiral `SpiralStepDeg` 0 근접 (Warning)
-- `CVW033`: PointSet `PointCount` max 초과 clamp 경고 (Warning)
+- `CVW033`: PointSet authored `Points.Length` max 초과 clamp 경고 (Warning)
+- `CV040`: typed authoring managed reference 누락
 - `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
 
 ### 6.2 테스트 루프
@@ -271,6 +278,7 @@ Hit:
   - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
 
 ## 10. 변경 이력
+- 2026-04-03: `WaveClipSO` authoring/runtime split 1차 반영. `Directives[] -> WaveClipAuthoringResolver -> SourceClipPatternBuffer` 경로, `LegacyEntries[]` fallback, `CV040`, `PointSet Points[]` authored shape와 `CVW033` clamp warning을 동기화했다.
 - 2026-04-01: `EventBurst` 첫 burst를 `StartSec` 시점에 맞추고, clip 종료 판정을 `WaveClipSO.DurationSec` 기준으로 동기화했다.
 - 2026-03-16: `RiskMultiplier` 범위를 `1 + HazardStack × HazardBonusRate`로 축소해 현행 구현 계획과 동기화하고, `HazardStack` 다음 프레임 반영 규칙을 `TD-018` 참조로 분리했다.
 - 2026-03-05: `EventShotSchedule/Interval` 및 관련 검증 문구를 구현 반영 상태로 동기화했다.

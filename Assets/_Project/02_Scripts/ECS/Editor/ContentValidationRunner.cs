@@ -27,14 +27,16 @@ namespace SweepNDodge.DotsBullets.Editor
             var stageLayouts = CollectScriptableObjects<StageLayoutSO>();
             var stagePresentationCatalogs = CollectScriptableObjects<StagePresentationCatalogSO>();
             var topologyPrefabCatalogs = CollectScriptableObjects<StageTopologyPrefabCatalogSO>();
+            var cleanupActionSets = CollectScriptableObjects<PlayerCleanupActionSetSO>();
             var inWorldDialogueCatalogs = CollectScriptableObjects<InWorldDialogueCatalogSO>();
             var inWorldDialogueSpeakerCatalogs = CollectScriptableObjects<InWorldDialogueSpeakerCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             var sources = new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
             var bullets = new List<ContentValidationRecord<BulletAuthoring>>();
+            var playerProxies = new List<ContentValidationRecord<PlayerProxyAuthoring>>();
 
-            CollectAuthoringsFromPrefabs(visuals, sources, bullets);
-            CollectAuthoringsFromScenes(visuals, sources, bullets);
+            CollectAuthoringsFromPrefabs(visuals, sources, bullets, playerProxies);
+            CollectAuthoringsFromScenes(visuals, sources, bullets, playerProxies);
 
             SortRecordsByLocation(definitions);
             SortRecordsByLocation(waveClips);
@@ -42,13 +44,15 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(stageLayouts);
             SortRecordsByLocation(stagePresentationCatalogs);
             SortRecordsByLocation(topologyPrefabCatalogs);
+            SortRecordsByLocation(cleanupActionSets);
             SortRecordsByLocation(inWorldDialogueCatalogs);
             SortRecordsByLocation(inWorldDialogueSpeakerCatalogs);
             SortRecordsByLocation(visuals);
             SortRecordsByLocation(sources);
             SortRecordsByLocation(bullets);
+            SortRecordsByLocation(playerProxies);
 
-            var input = new ContentValidationInput(definitions, waveClips, topologyPrefabCatalogs, visuals, sources, bullets);
+            var input = new ContentValidationInput(definitions, waveClips, topologyPrefabCatalogs, cleanupActionSets, visuals, sources, bullets, playerProxies);
             var issues = ContentValidationRules.Validate(input);
             StageGridLayoutValidationRules.ValidateLayoutRecords(stageLayouts, issues);
             StageCatalogValidationRules.ValidateCatalogRecords(stageCatalogs, issues);
@@ -138,7 +142,8 @@ namespace SweepNDodge.DotsBullets.Editor
         private static void CollectAuthoringsFromPrefabs(
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
             List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sources,
-            List<ContentValidationRecord<BulletAuthoring>> bullets)
+            List<ContentValidationRecord<BulletAuthoring>> bullets,
+            List<ContentValidationRecord<PlayerProxyAuthoring>> playerProxies)
         {
             string[] guids = AssetDatabase.FindAssets("t:Prefab", SearchRoots);
             System.Array.Sort(guids, System.StringComparer.Ordinal);
@@ -149,14 +154,15 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (root == null)
                     continue;
 
-                CollectAuthoringsInHierarchy(path, root, visuals, sources, bullets);
+                CollectAuthoringsInHierarchy(path, root, visuals, sources, bullets, playerProxies);
             }
         }
 
         private static void CollectAuthoringsFromScenes(
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
             List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sources,
-            List<ContentValidationRecord<BulletAuthoring>> bullets)
+            List<ContentValidationRecord<BulletAuthoring>> bullets,
+            List<ContentValidationRecord<PlayerProxyAuthoring>> playerProxies)
         {
             string[] guids = AssetDatabase.FindAssets("t:Scene", SearchRoots);
             System.Array.Sort(guids, System.StringComparer.Ordinal);
@@ -174,7 +180,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     var roots = scene.GetRootGameObjects();
                     for (int r = 0; r < roots.Length; r++)
                     {
-                        CollectAuthoringsInHierarchy(path, roots[r], visuals, sources, bullets);
+                        CollectAuthoringsInHierarchy(path, roots[r], visuals, sources, bullets, playerProxies);
                     }
 
                     EditorSceneManager.CloseScene(scene, removeScene: true);
@@ -198,7 +204,8 @@ namespace SweepNDodge.DotsBullets.Editor
             GameObject root,
             List<ContentValidationRecord<BulletVisualPrefabAuthoring>> visuals,
             List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sources,
-            List<ContentValidationRecord<BulletAuthoring>> bullets)
+            List<ContentValidationRecord<BulletAuthoring>> bullets,
+            List<ContentValidationRecord<PlayerProxyAuthoring>> playerProxies)
         {
             var visualComponents = root.GetComponentsInChildren<BulletVisualPrefabAuthoring>(includeInactive: true);
             for (int i = 0; i < visualComponents.Length; i++)
@@ -219,6 +226,13 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 string location = $"{assetPath}::{BuildHierarchyPath(bulletComponents[i].transform)}";
                 bullets.Add(new ContentValidationRecord<BulletAuthoring>(bulletComponents[i], location));
+            }
+
+            var playerProxyComponents = root.GetComponentsInChildren<PlayerProxyAuthoring>(includeInactive: true);
+            for (int i = 0; i < playerProxyComponents.Length; i++)
+            {
+                string location = $"{assetPath}::{BuildHierarchyPath(playerProxyComponents[i].transform)}";
+                playerProxies.Add(new ContentValidationRecord<PlayerProxyAuthoring>(playerProxyComponents[i], location));
             }
         }
 

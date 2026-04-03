@@ -17,40 +17,37 @@ MonoBehaviour:
   Lane: 1
   DurationSec: 1
   Segments:
-  - editorOnlyDescription: "초기 상태 Hazard: 밀도 기반 무작위 스폰 + 안전거리 규칙"
+  - editorOnlyDescription: "\uCD08\uAE30 \uC0C1\uD0DC Hazard: \uBC00\uB3C4 \uAE30\uBC18
+      \uBB34\uC791\uC704 \uC2A4\uD3F0 + \uC548\uC804\uAC70\uB9AC \uADDC\uCE59"
     StartSec: 0
     EndSec: 1
-    Entries:
+    Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 0
-        SpawnMode: 0
-        RatePerSecPerArea: 0.03
-        MeanEventsPerSec: 0
-        BurstRepeatCount: 1
-        BurstIntervalSec: 1
-        BurstShotsPerEvent: 1
-        EventShotSchedule: 0
-        EventShotIntervalSec: 0
-        MaxActiveDensityPerArea: 0
+        rid: 6141543268140187722
       Sampling:
-        SamplingMode: 1
+        rid: 6141543268140187723
+      Direction:
+        rid: 6141543268140187724
+    LegacyEntries: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 6141543268140187722
+      type: {class: RateFieldEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        SpawnMode: 0
+        MaxActiveDensityPerArea: 0
+        RatePerSecPerArea: 0.03
+    - rid: 6141543268140187723
+      type: {class: PollutionTopKSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
-        LineStart: {x: 0, y: 0}
-        LineEnd: {x: 0, y: 0}
-        SampleSpacing: 1
-        PointCount: 0
-        Point0: {x: 0, y: 0}
-        Point1: {x: 0, y: 0}
-        Point2: {x: 0, y: 0}
-        Point3: {x: 0, y: 0}
         SpawnSampleBudget: 24
         PlayerNoSpawnRadius: 2.2
-      Direction:
-        DirectionMode: 0
-        BaseAngleDeg: 0
-        NWayCount: 1
-        SpiralStepDeg: 0
+    - rid: 6141543268140187724
+      type: {class: RandomDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 

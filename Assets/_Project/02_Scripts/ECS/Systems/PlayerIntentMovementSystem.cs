@@ -19,8 +19,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerInputIntentComponent>();
             state.RequireForUpdate<PlayerGoSyncComponent>();
             state.RequireForUpdate<VacuumRuntimeStateComponent>();
-            state.RequireForUpdate<PlayerCleanupActionStateComponent>();
-            state.RequireForUpdate<PlayerCleanupMotionConstraintConfigComponent>();
+            state.RequireForUpdate<PlayerCleanupResolvedProfileComponent>();
             state.RequireForUpdate<PlayerCleanupSweepRuntimeStateComponent>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
@@ -38,20 +37,19 @@ namespace SweepNDodge.DotsBullets
             if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float dt))
                 return;
 
-            foreach (var (intent, tx, sync, vacuum, actionState, motionConstraint, sweepRuntime) in
+            foreach (var (intent, tx, sync, vacuum, resolvedProfile, sweepRuntime) in
                      SystemAPI.Query<
                          RefRO<PlayerInputIntentComponent>,
                          RefRW<LocalTransform>,
                          RefRW<PlayerGoSyncComponent>,
                          RefRO<VacuumRuntimeStateComponent>,
-                         RefRO<PlayerCleanupActionStateComponent>,
-                         RefRO<PlayerCleanupMotionConstraintConfigComponent>,
+                         RefRO<PlayerCleanupResolvedProfileComponent>,
                          RefRO<PlayerCleanupSweepRuntimeStateComponent>>()
                          .WithAll<PlayerTag>())
             {
                 var txValue = tx.ValueRO;
                 var normalizedActionId = PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(
-                    actionState.ValueRO.SelectedActionId,
+                    resolvedProfile.ValueRO.ActionKind,
                     allowNone: true);
                 bool isBroomSweepConstraintActive = normalizedActionId == PlayerCleanupActionId.BroomSweep
                     && vacuum.ValueRO.IsActive != 0;
@@ -64,13 +62,13 @@ namespace SweepNDodge.DotsBullets
                 {
                     float moveSpeed = DefaultMoveSpeed;
                     if (isBroomSweepConstraintActive)
-                        moveSpeed *= math.max(0f, motionConstraint.ValueRO.ActiveMoveSpeedScale);
+                        moveSpeed *= math.max(0f, resolvedProfile.ValueRO.ActiveMoveSpeedScale);
 
                     txValue.Position += new float3(moveAxis.x, 0f, moveAxis.y) * (moveSpeed * dt);
                 }
 
                 bool shouldLockFacing = isBroomSweepConstraintActive
-                    && motionConstraint.ValueRO.LockFacingWhileActive != 0;
+                    && resolvedProfile.ValueRO.LockFacingWhileActive != 0;
                 if (shouldLockFacing)
                 {
                     float2 lockedFacingXZ = sweepRuntime.ValueRO.LockedFacingXZ;

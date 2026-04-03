@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -13,7 +14,7 @@ namespace SweepNDodge.DotsBullets.Tests
             using var world = new World("PlayerIntentMovementSystem_InactiveAim");
             var em = world.EntityManager;
             CreateFixedTickRuntime(em, deltaTime: 1f);
-            var player = CreatePlayer(em);
+            var player = CreatePlayer(em, CreateResolvedProfile("broom_default", PlayerCleanupActionId.BroomSweep, 1, 0.5f));
 
             em.SetComponentData(player, new PlayerInputIntentComponent
             {
@@ -38,7 +39,7 @@ namespace SweepNDodge.DotsBullets.Tests
             using var world = new World("PlayerIntentMovementSystem_LockedFacing");
             var em = world.EntityManager;
             CreateFixedTickRuntime(em, deltaTime: 1f);
-            var player = CreatePlayer(em);
+            var player = CreatePlayer(em, CreateResolvedProfile("broom_default", PlayerCleanupActionId.BroomSweep, 1, 0.5f));
 
             em.SetComponentData(player, new PlayerInputIntentComponent
             {
@@ -80,7 +81,7 @@ namespace SweepNDodge.DotsBullets.Tests
             using var world = new World("PlayerIntentMovementSystem_LockDisabled");
             var em = world.EntityManager;
             CreateFixedTickRuntime(em, deltaTime: 1f);
-            var player = CreatePlayer(em);
+            var player = CreatePlayer(em, CreateResolvedProfile("broom_default", PlayerCleanupActionId.BroomSweep, 0, 0.5f));
 
             em.SetComponentData(player, new PlayerInputIntentComponent
             {
@@ -100,11 +101,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 CooldownTimer = 0f,
                 IsActive = 1,
                 ActivateRequested = 0,
-            });
-            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
-            {
-                LockFacingWhileActive = 0,
-                ActiveMoveSpeedScale = 0.5f,
             });
             em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
             {
@@ -126,7 +122,7 @@ namespace SweepNDodge.DotsBullets.Tests
             using var world = new World("PlayerIntentMovementSystem_MovementScale");
             var em = world.EntityManager;
             CreateFixedTickRuntime(em, deltaTime: 1f);
-            var player = CreatePlayer(em);
+            var player = CreatePlayer(em, CreateResolvedProfile("broom_default", PlayerCleanupActionId.BroomSweep, 1, 0.5f));
 
             em.SetComponentData(player, new PlayerInputIntentComponent
             {
@@ -147,11 +143,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 IsActive = 1,
                 ActivateRequested = 0,
             });
-            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
-            {
-                LockFacingWhileActive = 1,
-                ActiveMoveSpeedScale = 0.5f,
-            });
 
             world.GetOrCreateSystem<PlayerIntentMovementSystem>().Update(world.Unmanaged);
 
@@ -165,7 +156,7 @@ namespace SweepNDodge.DotsBullets.Tests
             using var world = new World("PlayerIntentMovementSystem_LegacyAction");
             var em = world.EntityManager;
             CreateFixedTickRuntime(em, deltaTime: 1f);
-            var player = CreatePlayer(em, selectedActionId: PlayerCleanupActionId.RadialRing);
+            var player = CreatePlayer(em, CreateResolvedProfile("legacy_radial", PlayerCleanupActionId.RadialRing, 1, 0.5f));
 
             em.SetComponentData(player, new PlayerInputIntentComponent
             {
@@ -215,7 +206,7 @@ namespace SweepNDodge.DotsBullets.Tests
             });
         }
 
-        private static Entity CreatePlayer(EntityManager em, PlayerCleanupActionId selectedActionId = PlayerCleanupActionId.BroomSweep)
+        private static Entity CreatePlayer(EntityManager em, PlayerCleanupResolvedProfileComponent resolvedProfile)
         {
             var player = em.CreateEntity(
                 typeof(PlayerTag),
@@ -223,8 +214,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(LocalTransform),
                 typeof(PlayerGoSyncComponent),
                 typeof(VacuumRuntimeStateComponent),
-                typeof(PlayerCleanupActionStateComponent),
-                typeof(PlayerCleanupMotionConstraintConfigComponent),
+                typeof(PlayerCleanupResolvedProfileComponent),
                 typeof(PlayerCleanupSweepRuntimeStateComponent));
 
             var initialRotation = quaternion.identity;
@@ -257,17 +247,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 IsActive = 0,
                 ActivateRequested = 0,
             });
-            em.SetComponentData(player, new PlayerCleanupActionStateComponent
-            {
-                SelectedActionId = selectedActionId,
-                PendingActionId = PlayerCleanupActionId.None,
-                Version = 0u,
-            });
-            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
-            {
-                LockFacingWhileActive = 1,
-                ActiveMoveSpeedScale = 0.5f,
-            });
+            em.SetComponentData(player, resolvedProfile);
             em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
             {
                 NextSweepDirectionSign = 1,
@@ -277,6 +257,27 @@ namespace SweepNDodge.DotsBullets.Tests
                 ActivationFrame = 0u,
             });
             return player;
+        }
+
+        private static PlayerCleanupResolvedProfileComponent CreateResolvedProfile(
+            string profileKey,
+            PlayerCleanupActionId actionKind,
+            byte lockFacing,
+            float activeMoveSpeedScale)
+        {
+            FixedString64Bytes fixedKey = profileKey;
+            return new PlayerCleanupResolvedProfileComponent
+            {
+                ProfileKey = fixedKey,
+                ActionKind = actionKind,
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
+                LockFacingWhileActive = lockFacing,
+                ActiveMoveSpeedScale = activeMoveSpeedScale,
+                Version = 1u,
+            };
         }
 
         private static void AssertForward(quaternion rotation, float3 expectedForward)

@@ -49,7 +49,7 @@
   - 변경 결과:
     - `PlayerCleanupActionId`에 `BroomSweep`를 추가했다.
     - profile buffer에 broom 전용 필드와 sanitize/fallback 유틸리티를 추가했다.
-    - `PlayerCleanupSweepRuntimeStateComponent`, `PlayerCleanupMotionConstraintConfigComponent`를 추가했다.
+    - `PlayerCleanupSweepRuntimeStateComponent`를 추가했고, 당시 제약 config component를 도입했다. 이후 ownership refactor로 motion constraint는 profile/resolved snapshot 소유로 이동했다.
     - `PlayerCleanupActionSetSO`, `PlayerProxyAuthoring`, `pas_default.asset`를 `BroomSweep` 기본값 기준으로 정리했다.
     - `PlayerCleanupActionSelectSystem`, `BulletVacuumRequestSystem`에 T1 shim normalize/fallback 경로를 추가했다.
     - 계약/기본값 회귀를 검증하는 EditMode 테스트를 추가했다.
@@ -84,7 +84,7 @@
     - 기본 경로 보호용 smoke fixture에 `BroomSweep` 기본값 계약 테스트를 추가했다.
     - `PlayerCleanupActionComponents`, `PlayerCleanupActionSetSO`의 legacy 주석을 현재 운영 기준에 맞게 정리했다.
     - `BulletCollectedSecondaryReactionTests`와 대응 PlayMode fixture에 legacy compatibility 의도를 주석/헬퍼 이름으로 명시했다.
-    - legacy PlayMode fixture에도 `PlayerCleanupSweepRuntimeStateComponent`, `PlayerCleanupMotionConstraintConfigComponent`를 보강해 현재 vacuum 계약과 맞췄다.
+    - legacy PlayMode fixture에도 당시 vacuum 계약에 맞춰 sweep/config runtime을 보강했다. 이후 pipeline refactor에서 motion constraint fixture는 resolved profile 기준으로 재정리했다.
     - `TD-012`, `GD-006`을 "기본 경로는 BroomSweep, legacy는 compatibility layer" 기준으로 정렬했다.
   - 검증 결과:
     - Unity compile 요청 후 console error 0
@@ -113,8 +113,33 @@
     - EditMode 전체 392/392 통과
     - PlayMode smoke 38/38 통과
     - 테스트 임시 산출물 정리 완료
+- [x] D9. cleanup action selection pipeline을 `ActionKind + ProfileKey + ResolvedProfile` 기준으로 개편했다.
+  - 변경 결과:
+    - `PlayerCleanupActionId`를 행동 종류(`ActionKind`)로 고정하고, 슬롯/선택 상태는 `ProfileKey(FixedString64Bytes)`를 사용하도록 전환했다.
+    - `PlayerCleanupActionSetSO` root를 `Initial/Primary/Secondary ProfileKey` 기준으로 바꾸고, motion constraint ownership을 profile entry로 이동했다.
+    - `PlayerCleanupActionSelectionConfigComponent`, `PlayerCleanupResolvedProfileComponent`를 추가하고, `PlayerCleanupActionSelectSystem`이 key resolve와 resolved snapshot 갱신을 단일 책임으로 수행하도록 정리했다.
+    - `BulletVacuumRequestSystem`, `PlayerIntentMovementSystem`, `PlayerEcsBridge`는 profile buffer 재탐색 대신 resolved snapshot만 읽도록 전환했다.
+    - `ContentValidationRules`에 `CV036~CV039`를 추가해 cleanup action set / player proxy authored invalid state를 bake 이전 validation에서 차단하도록 했다.
+    - 기본 asset과 legacy compatibility fixture, contract/smoke tests를 새 key 기반 계약으로 갱신했다.
+  - 검증 결과:
+    - Unity compile 요청 후 console error 0
+    - EditMode 전체 397/397 통과
+    - PlayMode 전체 42/42 통과
+    - 테스트 임시 산출물 정리 완료
+- [x] D10. cleanup action authoring shape를 typed profile definition 기준으로 2차 정리했다.
+  - 변경 결과:
+    - `PlayerCleanupActionSetSO`의 flat profile entry 배열을 제거하고 typed `PlayerCleanupActionProfileDefinitionSO` reference 배열로 교체했다.
+    - `BroomSweep`, `RadialRing`, `ForwardFanLine` authored profile을 각각 subtype `ScriptableObject`로 분리해 에디터에는 현재 kind에 필요한 필드만 노출되도록 정리했다.
+    - `PlayerProxyAuthoring` bake는 typed profile definition을 flat ECS profile buffer/resolved snapshot으로 내리는 경로로 교체했다.
+    - `ContentValidationRules`와 cleanup action asset/tests를 typed authoring shape 기준으로 갱신했다.
+    - 기본 asset `pas_default.asset`는 `broom_default` typed profile asset을 참조하도록 정리했다.
+  - 검증 결과:
+    - Unity compile 요청 후 최종 console error 0
+    - EditMode 전체 397/397 통과
+    - PlayMode 전체 42/42 통과
+    - 테스트 임시 산출물 정리 완료
 
 ## End of Session
-- 결과: `BroomSweep` 기본 경로 고정, legacy compatibility fixture 구분, 문서/테스트 의미 정렬까지 완료했다.
+- 결과: `BroomSweep` 기본 경로 고정, legacy compatibility fixture 구분, `ActionKind + ProfileKey + ResolvedProfile` 파이프라인 정리까지 완료했다.
 - 남은 리스크: `RadialRing`/`ForwardFanLine` 완전 삭제 여부는 별도 범위로 다시 판단해야 한다.
 - 다음 세션 시작점: 후속 밸런싱 또는 legacy 삭제 여부 판단

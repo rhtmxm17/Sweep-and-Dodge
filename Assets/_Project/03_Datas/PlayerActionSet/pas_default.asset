@@ -12,28 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5cf0dcf2ac72c344b98d2e933e0ab2d, type: 3}
   m_Name: pas_default
   m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.PlayerCleanupActionSetSO
-  InitialSelectedAction: 3
-  PrimarySlotAction: 3
-  SecondarySlotAction: 3
-  LockFacingWhileActive: 1
-  ActiveMoveSpeedScale: 0.5
+  InitialSelectedProfileKey: broom_default
+  PrimarySlotProfileKey: broom_default
+  SecondarySlotProfileKey: broom_default
   Profiles:
-  - ActionId: 3
-    CaptureActiveTime: 0.2
-    CaptureCooldown: 0
-    ActiveTime: 0.22
-    Cooldown: 1.8
-    TrashRange: 3.2
-    TrashFanHalfAngleDeg: 180
-    HazardRingRadius: 2.88
-    HazardRingWidth: 0.8
-    HazardLineLength: 0
-    HazardLineHalfWidth: 0
-    TrashSweepInnerRadius: 1
-    TrashSweepOuterRadius: 3.2
-    TrashSweepHalfAngleDeg: 12
-    TrashSweepStartAngleDeg: -20
-    TrashSweepEndAngleDeg: 80
-    HazardRectLength: 3.2
-    HazardRectHalfWidth: 0.55
-    HazardForwardWindowAngleDeg: 7
+  - {fileID: 11400000, guid: d1bf93d2fe7147249af1dfc724ac257e, type: 2}

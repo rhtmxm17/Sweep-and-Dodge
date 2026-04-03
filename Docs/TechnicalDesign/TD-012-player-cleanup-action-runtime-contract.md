@@ -29,55 +29,74 @@
   - `Vacuum` 활성 중 기준 방향 고정과 이동속도 제한을 통해 스윕 읽기성을 확보한다.
   - 기존 Request owner/공통 후처리 구조를 유지한다.
 - 비목표:
-  - 액션 다변화 복귀.
+  - 새로운 gameplay action kind 추가.
   - HUD/VFX/사운드의 상세 연출 규칙 확정.
   - 피격 페널티 수치 튜닝.
 
 ## 3. 설계안
 ### 3.1 Action 모델
-- 현재 지원 액션:
+- `PlayerCleanupActionId`는 행동 종류(`ActionKind`)로만 사용한다.
   - `BroomSweep`
+  - `RadialRing`
+  - `ForwardFanLine`
+- 실제 슬롯 선택과 런타임 실행 대상은 `ProfileKey`가 구분한다.
+  - 예: `broom_default`, `broom_fast_narrow`, `legacy_radial`
+- 기본 플레이 경로:
+  - 기본 asset와 기본 fixture는 `broom_default` 1개 `BroomSweep` profile을 사용한다.
 - 레거시 상태:
-  - `RadialRing`, `ForwardFanLine`은 이번 합의 기준에서 미사용으로 내린다.
-  - 런타임에 남아 있는 선택/슬롯 경로는 호환 레이어로만 취급한다.
+  - `RadialRing`, `ForwardFanLine`은 기본 경로에서는 미사용으로 내렸다.
+  - 다만 enum, profile 정의, 런타임 분기는 compatibility layer로 유지한다.
 - 상태 컴포넌트:
   - `PlayerCleanupActionStateComponent`
-    - 기본 플레이 경로의 `SelectedActionId`는 `BroomSweep`로 수렴시킨다.
-    - `PendingActionId` 경로와 legacy action id 자체는 호환 레이어로 유지한다.
-  - `PlayerCleanupSweepRuntimeStateComponent`(구현 예정)
-    - `NextSweepDirection`
-    - `ActiveSweepDirection`
-    - `ActiveFacing`
-    - `ActiveFacingLocked`
-    - `ActivationFrame` 또는 동등한 진행률 계산 기준
+    - `SelectedProfileKey`
+    - `PendingProfileKey`
+    - `Version`
+  - `PlayerCleanupActionSelectionConfigComponent`
+    - `DefaultProfileKey`
+  - `PlayerCleanupResolvedProfileComponent`
+    - 현재 선택된 profile의 timing / motion / geometry snapshot
+    - runtime consumer는 이것만 읽는 것을 원칙으로 한다
+  - `PlayerCleanupSweepRuntimeStateComponent`
+    - `NextSweepDirectionSign`
+    - `ActiveSweepDirectionSign`
+    - `LockedFacingXZ`
+    - `HasLockedFacing`
+    - `ActivationFrame`
 
-### 3.2 입력 해석 계약 (`Input -> Slot -> ActionId`)
+### 3.2 입력 해석 계약 (`Input -> Slot -> ProfileKey`)
 - 브리지(`PlayerEcsBridge`)는 입력 시 슬롯(`Primary`/`Secondary`)만 요청한다.
-- fixed-tick consume 시스템(`PlayerIntentConsumeSystem`)이 슬롯을 ActionId로 매핑해 `PendingActionId`에 기록한다.
-- 현재 기준에서는 두 슬롯 모두 `BroomSweep`를 가리키는 구성을 기본값으로 사용한다.
+- fixed-tick consume 시스템(`PlayerIntentConsumeSystem`)이 슬롯을 profile key로 매핑해 `PendingProfileKey`에 기록한다.
+- 현재 기준에서는 두 슬롯 모두 `broom_default`를 가리키는 구성을 기본값으로 사용한다.
 - 입력 계층은 좌/우 스윕 방향을 직접 소유하지 않는다.
   - 좌/우 교대는 `BroomSweep` 내부 runtime state가 단일 책임으로 관리한다.
 
 ### 3.3 상태 적용 계약 (`Pending` 확정 타이밍)
 - 선택 확정 owner: `PlayerCleanupActionSelectSystem`.
 - 적용 규칙:
-  - `PendingActionId == None`이면 변경 없음.
-  - `PendingActionId == SelectedActionId`이면 요청만 소비.
+  - `PendingProfileKey`가 비어 있으면 변경 없음.
   - Vacuum 활성 중(`IsActive != 0`) 전환 요청은 즉시 소비하고 전환하지 않는다.
-  - Vacuum 비활성 상태에서만 `SelectedActionId = PendingActionId`를 확정하고 `Version`을 증가시킨다.
-- 현재 기준에서는 결과적으로 `SelectedActionId = BroomSweep`를 유지하는 경로가 기본이다.
-- `RadialRing`, `ForwardFanLine`은 명시적 compatibility fixture 또는 회귀 테스트에서만 사용한다.
+  - Vacuum 비활성 상태에서만 `PendingProfileKey -> SelectedProfileKey`를 확정하고 `Version`을 증가시킨다.
+  - 같은 key 요청이면 요청만 소비하고 `Version`은 증가시키지 않는다.
+  - resolve 실패 시 fallback precedence는 `요청 key -> DefaultProfileKey -> 첫 profile` 순서로 고정한다.
+- 확정 시 `PlayerCleanupResolvedProfileComponent`를 같은 profile snapshot으로 동기 갱신한다.
+- 현재 기준에서는 결과적으로 `SelectedProfileKey = broom_default`를 유지하는 경로가 기본이다.
 
 ### 3.4 프로파일 데이터 경로
 - Authoring 원본:
   - `PlayerCleanupActionSetSO`
+  - `PlayerCleanupActionProfileDefinitionSO` subtype assets
 - Bake 대상:
   - `PlayerCleanupActionStateComponent`
+  - `PlayerCleanupActionSelectionConfigComponent`
   - `PlayerCleanupActionSlotMapComponent`
+  - `PlayerCleanupResolvedProfileComponent`
   - `DynamicBuffer<PlayerCleanupActionProfileBufferElement>`
 - 프로파일 구조:
-  - 액션은 1개지만, 내부 메타데이터는 아래 두 서브 프로파일로 분리한다.
-  - 액션 타이밍 4종(`CaptureActiveTime`, `CaptureCooldown`, `ActiveTime`, `Cooldown`)도 profile이 직접 소유한다.
+  - authored profile은 `ActionKind`별 typed profile definition으로 분리한다.
+  - `PlayerCleanupActionSetSO`는 `Initial/Primary/Secondary ProfileKey`와 typed profile reference 목록만 가진다.
+  - `ActionKind`는 authored subtype에서 유도하며, 에디터에서 직접 수정하지 않는다.
+  - bake 결과 flat runtime profile은 `ProfileKey + ActionKind + Timing + Motion + Geometry`를 함께 가진다.
+  - 같은 `ActionKind = BroomSweep`의 수치 변형 여러 개를 둘 수 있다.
   - `TrashSweepProfile`
     - 스윕 반경(`InnerRadius`, `OuterRadius`)
     - 스윕 폭(`HalfAngleDeg`)
@@ -92,12 +111,13 @@
   - `CaptureCooldown`
   - `ActiveTime`
   - `Cooldown`
-  - 좌/우 교대 규칙
-  - 활성 시 기준 전방 고정 여부
+- motion constraint 메타데이터:
+  - `LockFacingWhileActive`
+  - `ActiveMoveSpeedScale`
 - fallback:
   - 기본 플레이 경로는 `CleanupActionSetSO`를 필수로 사용한다.
   - no-asset fallback은 더 이상 지원하지 않는다.
-  - 기본값은 `pas_default.asset`의 `BroomSweep` profile이 소유한다.
+  - 기본값은 `pas_default.asset`의 `broom_default` profile이 소유한다.
 
 ### 3.5 Request 단계 판정 분기와 공통 후처리
 - 판정 분기 owner: `BulletVacuumRequestSystem`.
@@ -128,9 +148,9 @@
 
 ### 3.6 활성 중 방향 잠금/이동 제한
 - 이동/회전 writer는 `PlayerFixedStepGroup`의 `PlayerIntentMovementSystem`이 단일 책임으로 가진다.
-- `Vacuum` 활성 중 제약 설정은 별도 config component로 분리한다.
-  - `LockFacingWhileActive`
-  - `ActiveMoveSpeedScale`
+- `Vacuum` 활성 중 제약 설정은 선택된 profile이 직접 소유한다.
+  - `PlayerCleanupResolvedProfileComponent.LockFacingWhileActive`
+  - `PlayerCleanupResolvedProfileComponent.ActiveMoveSpeedScale`
 - 적용 규칙:
   - 발동이 승인된 프레임의 전방을 `ActiveFacing`에 저장한다.
   - `LockFacingWhileActive = true`면 활성 종료 전까지 `AimWorldXZ` 입력으로 회전하지 않는다.
@@ -149,11 +169,11 @@
   3. `PlayerObstacleBlockSystem`
   4. `PlayerIntentConsumeSystem`
 - Request 그룹 내 순서:
-  1. `PlayerCleanupActionSelectSystem` (선택 상태 확정)
+  1. `PlayerCleanupActionSelectSystem` (profile key resolve + resolved snapshot 확정)
   2. `BulletVacuumRequestSystem` (`BroomSweep` 진행률 해석/요청 생성)
   3. 후속 충돌/Deposit 요청 시스템
 - 소유권 규칙:
-  - 액션 선택 확정은 `PlayerCleanupActionSelectSystem` 단일 책임.
+  - 선택 해석(`ProfileKey -> ResolvedProfile`)은 `PlayerCleanupActionSelectSystem` 단일 책임.
   - 활성 중 이동/회전 제약 적용은 `PlayerIntentMovementSystem` 단일 책임.
   - 스윕 방향 교대와 기준 전방 스냅샷 확정은 `BulletVacuumRequestSystem` 단일 책임.
   - 판정 분기는 `BulletVacuumRequestSystem` 단일 책임.
@@ -172,11 +192,12 @@
   - `BroomSweep`를 기본 청소 동작으로 채택하는 설계 방향 합의
   - `Trash`/`Hazard` 판정 메타데이터 분리 원칙 합의
   - 활성 중 방향 잠금/이동 제한 필요성 확인
-  - `PlayerCleanupActionId`/프로파일 구조를 `BroomSweep` 기준으로 정리
-  - `PlayerCleanupSweepRuntimeStateComponent`와 활성 제약 config component 추가
+  - `ActionKind + ProfileKey + ResolvedProfile` 파이프라인으로 selection/runtime 계약을 재정의
+  - `PlayerCleanupSweepRuntimeStateComponent` 추가
   - `BulletVacuumRequestSystem`의 정적 기하 분기를 스윕 진행률 기반 판정으로 교체
-  - `PlayerIntentMovementSystem`에 활성 중 회전 잠금/이동 감속 적용
+  - `PlayerIntentMovementSystem`에 resolved profile 기반 활성 중 회전 잠금/이동 감속 적용
   - 기본 asset/fallback/기본 fixture를 `BroomSweep` 기준으로 정리
+  - cleanup action timing/motion ownership을 profile로 이관
 - 유지:
   - `RadialRing`/`ForwardFanLine` enum, normalize, 런타임 분기, explicit compatibility fixture는 삭제하지 않는다.
 

@@ -21,75 +21,74 @@ MonoBehaviour:
       \uAE30\uBC18 \uC2ED\uC790\uD615 4\uBC29\uD5A5 \uC2A4\uD3F0 + \uC548\uC804\uAC70\uB9AC"
     StartSec: 0
     EndSec: 8
-    Entries:
+    Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 0
-        SpawnMode: 0
-        RatePerSecPerArea: 0.03
-        MeanEventsPerSec: 0
-        BurstRepeatCount: 1
-        BurstIntervalSec: 1
-        BurstShotsPerEvent: 1
-        EventShotSchedule: 0
-        EventShotIntervalSec: 0
-        MaxActiveDensityPerArea: 0
+        rid: 6141543268140187749
       Sampling:
-        SamplingMode: 1
-        CenterMode: 0
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        LineStart: {x: 0, y: 0}
-        LineEnd: {x: 0, y: 0}
-        SampleSpacing: 1
-        PointCount: 0
-        Point0: {x: 0, y: 0}
-        Point1: {x: 0, y: 0}
-        Point2: {x: 0, y: 0}
-        Point3: {x: 0, y: 0}
-        SpawnSampleBudget: 24
-        PlayerNoSpawnRadius: 2.2
+        rid: 6141543268140187750
       Direction:
-        DirectionMode: 1
-        BaseAngleDeg: 0
-        NWayCount: 4
-        SpiralStepDeg: 0
+        rid: 6141543268140187751
+    LegacyEntries: []
   - editorOnlyDescription: "\uACE0\uC815 \uB77C\uC778 \uBC1C\uC0AC: (-10,-10)~(10,-10),
       \uAC04\uACA9 4, 4\uCD08 \uAC04\uACA9 Hazard \uBC1C\uC0AC"
     StartSec: 0
     EndSec: 8
-    Entries:
+    Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
-        EmissionMode: 2
+        rid: 6141543268140187752
+      Sampling:
+        rid: 6141543268140187753
+      Direction:
+        rid: 6141543268140187754
+    LegacyEntries: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 6141543268140187749
+      type: {class: RateFieldEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
         SpawnMode: 0
-        RatePerSecPerArea: 0
-        MeanEventsPerSec: 0
+        MaxActiveDensityPerArea: 0
+        RatePerSecPerArea: 0.03
+    - rid: 6141543268140187750
+      type: {class: PollutionTopKSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        CenterMode: 0
+        FixedPoint: {x: 0, y: 0}
+        SpawnOffset: {x: 0, y: 0}
+        SpawnSampleBudget: 24
+        PlayerNoSpawnRadius: 2.2
+    - rid: 6141543268140187751
+      type: {class: NWayDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        BaseAngleDeg: 0
+        NWayCount: 4
+    - rid: 6141543268140187752
+      type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        SpawnMode: 0
+        MaxActiveDensityPerArea: 0
         BurstRepeatCount: -1
         BurstIntervalSec: 4
         BurstShotsPerEvent: 6
         EventShotSchedule: 0
         EventShotIntervalSec: 0
-        MaxActiveDensityPerArea: 0
-      Sampling:
-        SamplingMode: 2
+    - rid: 6141543268140187753
+      type: {class: LineEvenSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
+        SpawnSampleBudget: 16
+        PlayerNoSpawnRadius: 0
         LineStart: {x: -10, y: -10}
         LineEnd: {x: 10, y: -10}
         SampleSpacing: 4
-        PointCount: 0
-        Point0: {x: 0, y: 0}
-        Point1: {x: 0, y: 0}
-        Point2: {x: 0, y: 0}
-        Point3: {x: 0, y: 0}
-        SpawnSampleBudget: 16
-        PlayerNoSpawnRadius: 0
-      Direction:
-        DirectionMode: 4
+    - rid: 6141543268140187754
+      type: {class: FixedDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
         BaseAngleDeg: 90
-        NWayCount: 1
-        SpiralStepDeg: 0

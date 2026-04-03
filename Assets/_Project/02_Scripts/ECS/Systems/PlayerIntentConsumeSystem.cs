@@ -1,5 +1,6 @@
 using Unity.Entities;
 using Unity.Transforms;
+using Unity.Collections;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -53,7 +54,7 @@ namespace SweepNDodge.DotsBullets
                     vacuum.ValueRW.ActivateRequested = 1;
                 if (hasCleanupRequest)
                 {
-                    actionState.ValueRW.PendingActionId = ResolveActionId(
+                    actionState.ValueRW.PendingProfileKey = ResolveProfileKey(
                         (PlayerCleanupActionSlotId)resolvedInput.ValueRO.RequestedCleanupActionSlot,
                         in slotMap.ValueRO);
                 }
@@ -72,15 +73,15 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static PlayerCleanupActionId ResolveActionId(
+        private static FixedString64Bytes ResolveProfileKey(
             PlayerCleanupActionSlotId slotId,
             in PlayerCleanupActionSlotMapComponent slotMap)
         {
             return slotId switch
             {
-                PlayerCleanupActionSlotId.Primary => slotMap.PrimaryActionId,
-                PlayerCleanupActionSlotId.Secondary => slotMap.SecondaryActionId,
-                _ => PlayerCleanupActionId.None,
+                PlayerCleanupActionSlotId.Primary => slotMap.PrimaryProfileKey,
+                PlayerCleanupActionSlotId.Secondary => slotMap.SecondaryProfileKey,
+                _ => default,
             };
         }
     }

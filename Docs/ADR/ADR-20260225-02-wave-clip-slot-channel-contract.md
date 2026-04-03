@@ -4,6 +4,7 @@
 ## 상태
 - 반영됨(구현 완료)
 - 현행 운영 보충: Source 정의 SSOT는 이후 `StageDefinitionSO`로 이동했고, `BulletSourceAuthoring` 직참조 슬롯은 legacy migration data로 축소됐다.
+- 2026-04-03 보충: `WaveClipSO`는 root asset 스키마를 유지하고, segment 내부 authoring은 typed managed `Directives[]`로 분리됐다. `LegacyEntries[]`는 migration fallback 전용이다.
 
 ## 배경
 - 기존 `WaveTimelineSO`는 Source 단위 전체 흐름을 함께 담고 있어, 이벤트 기반 웨이브 재생/재사용 확장 시 결합도가 높았다.
@@ -67,7 +68,8 @@
 - `DurationSec` (float, `> 0`)
 - `Segments[]`
   - `StartSec`, `EndSec`
-  - `Entries[]` (`Payload/Emission/Sampling/Direction`)
+  - `Directives[]` (typed `Payload + Emission/Sampling/Direction` authoring)
+  - `LegacyEntries[]` (migration fallback only)
 
 ### Source Authoring 스키마
 1. `BulletSourceAuthoring` 직참조 배열
@@ -117,9 +119,10 @@
   - `CV013`: 엔트리 `Bullet == null`
   - `CV014`: 미등록 `DefinitionId` 참조
   - `CV015~CV024`, `CV026`: emission/sampling/direction 파라미터 오류
+  - `CV040`: typed authoring managed reference 누락
 - Warning:
   - `CVW032`: `SpiralStepDeg` 근접 0
-  - `CVW033`: `PointSet` 사용(1차 Uniform fallback)
+  - `CVW033`: PointSet authored 포인트 수가 runtime max(4)를 초과해 clamp됨
 - Runtime policy:
   - sustain 슬롯 후보군 비어 있음은 런타임 skip + `Error` 로그로 처리한다.
 

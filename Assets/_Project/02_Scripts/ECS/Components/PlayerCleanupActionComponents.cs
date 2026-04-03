@@ -1,3 +1,5 @@
+using System.Text;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -20,15 +22,47 @@ namespace SweepNDodge.DotsBullets
 
     public struct PlayerCleanupActionStateComponent : IComponentData
     {
-        public PlayerCleanupActionId SelectedActionId;
-        public PlayerCleanupActionId PendingActionId;
+        public FixedString64Bytes SelectedProfileKey;
+        public FixedString64Bytes PendingProfileKey;
         public uint Version;
+    }
+
+    public struct PlayerCleanupActionSelectionConfigComponent : IComponentData
+    {
+        public FixedString64Bytes DefaultProfileKey;
     }
 
     public struct PlayerCleanupActionSlotMapComponent : IComponentData
     {
-        public PlayerCleanupActionId PrimaryActionId;
-        public PlayerCleanupActionId SecondaryActionId;
+        public FixedString64Bytes PrimaryProfileKey;
+        public FixedString64Bytes SecondaryProfileKey;
+    }
+
+    public struct PlayerCleanupResolvedProfileComponent : IComponentData
+    {
+        public FixedString64Bytes ProfileKey;
+        public PlayerCleanupActionId ActionKind;
+        public float CaptureActiveTime;
+        public float CaptureCooldown;
+        public float ActiveTime;
+        public float Cooldown;
+        public byte LockFacingWhileActive;
+        public float ActiveMoveSpeedScale;
+        public float TrashRange;
+        public float TrashFanHalfAngleDeg;
+        public float HazardRingRadius;
+        public float HazardRingWidth;
+        public float HazardLineLength;
+        public float HazardLineHalfWidth;
+        public float TrashSweepInnerRadius;
+        public float TrashSweepOuterRadius;
+        public float TrashSweepHalfAngleDeg;
+        public float TrashSweepStartAngleDeg;
+        public float TrashSweepEndAngleDeg;
+        public float HazardRectLength;
+        public float HazardRectHalfWidth;
+        public float HazardForwardWindowAngleDeg;
+        public uint Version;
     }
 
     public struct PlayerCleanupSweepRuntimeStateComponent : IComponentData
@@ -40,15 +74,10 @@ namespace SweepNDodge.DotsBullets
         public uint ActivationFrame;
     }
 
-    public struct PlayerCleanupMotionConstraintConfigComponent : IComponentData
-    {
-        public byte LockFacingWhileActive;
-        public float ActiveMoveSpeedScale;
-    }
-
     [InternalBufferCapacity(4)]
     public struct PlayerCleanupActionProfileBufferElement : IBufferElementData
     {
+        public FixedString64Bytes ProfileKey;
         public PlayerCleanupActionId ActionId;
 
         // action timing profile
@@ -56,6 +85,8 @@ namespace SweepNDodge.DotsBullets
         public float CaptureCooldown;
         public float ActiveTime;
         public float Cooldown;
+        public byte LockFacingWhileActive;
+        public float ActiveMoveSpeedScale;
 
         // legacy compatibility fields for non-default compatibility actions
         public float TrashRange;
@@ -82,6 +113,53 @@ namespace SweepNDodge.DotsBullets
 
     public static class PlayerCleanupActionContractUtility
     {
+        public static bool IsValidProfileKey(string profileKey, out string reason)
+        {
+            if (string.IsNullOrEmpty(profileKey))
+            {
+                reason = "ProfileKey is empty.";
+                return false;
+            }
+
+            int byteCount = Encoding.UTF8.GetByteCount(profileKey);
+            if (byteCount > 64)
+            {
+                reason = $"ProfileKey exceeds 64 UTF-8 bytes ({byteCount}).";
+                return false;
+            }
+
+            for (int i = 0; i < profileKey.Length; i++)
+            {
+                char c = profileKey[i];
+                bool isLowerAlpha = c >= 'a' && c <= 'z';
+                bool isDigit = c >= '0' && c <= '9';
+                bool isAllowedPunctuation = c == '_' || c == '.' || c == '/' || c == '-';
+                if (!isLowerAlpha && !isDigit && !isAllowedPunctuation)
+                {
+                    reason = $"ProfileKey contains invalid character '{c}'.";
+                    return false;
+                }
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+
+        public static bool TryConvertProfileKey(string profileKey, out FixedString64Bytes fixedKey)
+        {
+            fixedKey = default;
+            if (!IsValidProfileKey(profileKey, out _))
+                return false;
+
+            fixedKey = profileKey;
+            return true;
+        }
+
+        public static bool IsEmptyProfileKey(in FixedString64Bytes profileKey)
+        {
+            return profileKey.Length <= 0;
+        }
+
         public static PlayerCleanupActionId NormalizeConfiguredActionId(PlayerCleanupActionId actionId)
         {
             return actionId switch
@@ -109,6 +187,8 @@ namespace SweepNDodge.DotsBullets
             sanitized.CaptureCooldown = math.max(0f, profile.CaptureCooldown);
             sanitized.ActiveTime = math.max(0f, profile.ActiveTime);
             sanitized.Cooldown = math.max(0f, profile.Cooldown);
+            sanitized.LockFacingWhileActive = profile.LockFacingWhileActive != 0 ? (byte)1 : (byte)0;
+            sanitized.ActiveMoveSpeedScale = math.max(0f, profile.ActiveMoveSpeedScale);
             sanitized.TrashRange = math.max(0f, profile.TrashRange);
             sanitized.TrashFanHalfAngleDeg = math.clamp(profile.TrashFanHalfAngleDeg, 0f, 180f);
             sanitized.HazardRingRadius = math.max(0f, profile.HazardRingRadius);
@@ -124,23 +204,66 @@ namespace SweepNDodge.DotsBullets
             return sanitized;
         }
 
+        public static PlayerCleanupResolvedProfileComponent CreateResolvedProfile(
+            in PlayerCleanupActionProfileBufferElement profile,
+            uint version)
+        {
+            var sanitized = SanitizeProfile(profile);
+            return new PlayerCleanupResolvedProfileComponent
+            {
+                ProfileKey = sanitized.ProfileKey,
+                ActionKind = sanitized.ActionId,
+                CaptureActiveTime = sanitized.CaptureActiveTime,
+                CaptureCooldown = sanitized.CaptureCooldown,
+                ActiveTime = sanitized.ActiveTime,
+                Cooldown = sanitized.Cooldown,
+                LockFacingWhileActive = sanitized.LockFacingWhileActive,
+                ActiveMoveSpeedScale = sanitized.ActiveMoveSpeedScale,
+                TrashRange = sanitized.TrashRange,
+                TrashFanHalfAngleDeg = sanitized.TrashFanHalfAngleDeg,
+                HazardRingRadius = sanitized.HazardRingRadius,
+                HazardRingWidth = sanitized.HazardRingWidth,
+                HazardLineLength = sanitized.HazardLineLength,
+                HazardLineHalfWidth = sanitized.HazardLineHalfWidth,
+                TrashSweepInnerRadius = sanitized.TrashSweepInnerRadius,
+                TrashSweepOuterRadius = sanitized.TrashSweepOuterRadius,
+                TrashSweepHalfAngleDeg = sanitized.TrashSweepHalfAngleDeg,
+                TrashSweepStartAngleDeg = sanitized.TrashSweepStartAngleDeg,
+                TrashSweepEndAngleDeg = sanitized.TrashSweepEndAngleDeg,
+                HazardRectLength = sanitized.HazardRectLength,
+                HazardRectHalfWidth = sanitized.HazardRectHalfWidth,
+                HazardForwardWindowAngleDeg = sanitized.HazardForwardWindowAngleDeg,
+                Version = version,
+            };
+        }
+
         public static PlayerCleanupActionProfileBufferElement CreateFallbackBroomSweepProfile(
+            string profileKey,
             float range,
             float captureRingRadius,
             float captureRingWidth,
             float captureActiveTime = 0.20f,
             float captureCooldown = 0f,
             float activeTime = 0.22f,
-            float cooldown = 1.8f)
+            float cooldown = 1.8f,
+            bool lockFacingWhileActive = true,
+            float activeMoveSpeedScale = 0.5f)
         {
             float safeRange = math.max(0f, range);
+            FixedString64Bytes fixedProfileKey = default;
+            if (!TryConvertProfileKey(profileKey, out fixedProfileKey))
+                fixedProfileKey = default;
+
             return SanitizeProfile(new PlayerCleanupActionProfileBufferElement
             {
+                ProfileKey = fixedProfileKey,
                 ActionId = PlayerCleanupActionId.BroomSweep,
                 CaptureActiveTime = captureActiveTime,
                 CaptureCooldown = captureCooldown,
                 ActiveTime = activeTime,
                 Cooldown = cooldown,
+                LockFacingWhileActive = lockFacingWhileActive ? (byte)1 : (byte)0,
+                ActiveMoveSpeedScale = activeMoveSpeedScale,
 
                 // Legacy compatibility values retained for explicit RadialRing/ForwardFanLine fixtures.
                 TrashRange = safeRange,

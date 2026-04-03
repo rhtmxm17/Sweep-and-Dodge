@@ -2,6 +2,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 using System;
+using Unity.Collections;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -105,15 +106,20 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(e, new PlayerCleanupActionStateComponent
                 {
-                    SelectedActionId = ResolveInitialSelectedAction(cleanupActionSet),
-                    PendingActionId = PlayerCleanupActionId.None,
+                    SelectedProfileKey = ResolveInitialSelectedProfileKey(cleanupActionSet),
+                    PendingProfileKey = default,
                     Version = 0,
+                });
+
+                AddComponent(e, new PlayerCleanupActionSelectionConfigComponent
+                {
+                    DefaultProfileKey = ResolveInitialSelectedProfileKey(cleanupActionSet),
                 });
 
                 AddComponent(e, new PlayerCleanupActionSlotMapComponent
                 {
-                    PrimaryActionId = ResolvePrimarySlotAction(cleanupActionSet),
-                    SecondaryActionId = ResolveSecondarySlotAction(cleanupActionSet),
+                    PrimaryProfileKey = ResolvePrimarySlotProfileKey(cleanupActionSet),
+                    SecondaryProfileKey = ResolveSecondarySlotProfileKey(cleanupActionSet),
                 });
 
                 AddComponent(e, new PlayerCleanupSweepRuntimeStateComponent
@@ -125,15 +131,16 @@ namespace SweepNDodge.DotsBullets
                     ActivationFrame = 0u,
                 });
 
-                AddComponent(e, new PlayerCleanupMotionConstraintConfigComponent
-                {
-                    LockFacingWhileActive = cleanupActionSet.LockFacingWhileActive ? (byte)1 : (byte)0,
-                    ActiveMoveSpeedScale = Mathf.Max(0f, cleanupActionSet.ActiveMoveSpeedScale),
-                });
-
                 var actionProfileBuffer = AddBuffer<PlayerCleanupActionProfileBufferElement>(e);
                 actionProfileBuffer.EnsureCapacity(4);
                 BakeCleanupActionProfiles(cleanupActionSet, actionProfileBuffer);
+
+                var initialProfile = ResolveProfileByKey(
+                    cleanupActionSet,
+                    ResolveInitialSelectedProfileKey(cleanupActionSet));
+                AddComponent(e, PlayerCleanupActionContractUtility.CreateResolvedProfile(
+                    CreateRuntimeProfileEntry(initialProfile),
+                    version: 0u));
 
                 AddComponent(e, new PlayerCarryBinComponent
                 {
@@ -236,31 +243,11 @@ namespace SweepNDodge.DotsBullets
                     for (int i = 0; i < actionSet.Profiles.Length; i++)
                     {
                         var profile = actionSet.Profiles[i];
-                        if (profile.ActionId == PlayerCleanupActionId.None)
-                            continue;
+                        if (profile == null)
+                            throw new InvalidOperationException(
+                                $"{nameof(PlayerCleanupActionSetSO)} contains a null cleanup action profile reference at index {i}.");
 
-                        actionProfileBuffer.Add(PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
-                        {
-                            ActionId = profile.ActionId,
-                            CaptureActiveTime = profile.CaptureActiveTime,
-                            CaptureCooldown = profile.CaptureCooldown,
-                            ActiveTime = profile.ActiveTime,
-                            Cooldown = profile.Cooldown,
-                            TrashRange = profile.TrashRange,
-                            TrashFanHalfAngleDeg = profile.TrashFanHalfAngleDeg,
-                            HazardRingRadius = profile.HazardRingRadius,
-                            HazardRingWidth = profile.HazardRingWidth,
-                            HazardLineLength = profile.HazardLineLength,
-                            HazardLineHalfWidth = profile.HazardLineHalfWidth,
-                            TrashSweepInnerRadius = profile.TrashSweepInnerRadius,
-                            TrashSweepOuterRadius = profile.TrashSweepOuterRadius,
-                            TrashSweepHalfAngleDeg = profile.TrashSweepHalfAngleDeg,
-                            TrashSweepStartAngleDeg = profile.TrashSweepStartAngleDeg,
-                            TrashSweepEndAngleDeg = profile.TrashSweepEndAngleDeg,
-                            HazardRectLength = profile.HazardRectLength,
-                            HazardRectHalfWidth = profile.HazardRectHalfWidth,
-                            HazardForwardWindowAngleDeg = profile.HazardForwardWindowAngleDeg,
-                        }));
+                        actionProfileBuffer.Add(CreateRuntimeProfileEntry(profile));
                     }
                 }
 
@@ -271,24 +258,74 @@ namespace SweepNDodge.DotsBullets
                 }
             }
 
-            private static PlayerCleanupActionId ResolveInitialSelectedAction(PlayerCleanupActionSetSO actionSet)
+            private static PlayerCleanupActionProfileBufferElement CreateRuntimeProfileEntry(
+                PlayerCleanupActionProfileDefinitionSO profile)
             {
-                return NormalizeActionId(actionSet.InitialSelectedAction);
+                if (profile == null)
+                    throw new InvalidOperationException("Cleanup action profile definition is null.");
+
+                if (!PlayerCleanupActionContractUtility.TryConvertProfileKey(profile.ProfileKey, out var profileKey))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid cleanup action ProfileKey '{profile.ProfileKey}'.");
+                }
+
+                var runtimeProfile = new PlayerCleanupActionProfileBufferElement
+                {
+                    ProfileKey = profileKey,
+                    ActionId = profile.ActionKind,
+                };
+                profile.ApplySharedFields(ref runtimeProfile);
+                profile.ApplyGeometry(ref runtimeProfile);
+                return PlayerCleanupActionContractUtility.SanitizeProfile(runtimeProfile);
             }
 
-            private static PlayerCleanupActionId ResolvePrimarySlotAction(PlayerCleanupActionSetSO actionSet)
+            private static FixedString64Bytes ResolveInitialSelectedProfileKey(PlayerCleanupActionSetSO actionSet)
             {
-                return NormalizeActionId(actionSet.PrimarySlotAction);
+                return RequireProfileKey(actionSet.InitialSelectedProfileKey, nameof(actionSet.InitialSelectedProfileKey));
             }
 
-            private static PlayerCleanupActionId ResolveSecondarySlotAction(PlayerCleanupActionSetSO actionSet)
+            private static FixedString64Bytes ResolvePrimarySlotProfileKey(PlayerCleanupActionSetSO actionSet)
             {
-                return NormalizeActionId(actionSet.SecondarySlotAction);
+                return RequireProfileKey(actionSet.PrimarySlotProfileKey, nameof(actionSet.PrimarySlotProfileKey));
             }
 
-            private static PlayerCleanupActionId NormalizeActionId(PlayerCleanupActionId actionId)
+            private static FixedString64Bytes ResolveSecondarySlotProfileKey(PlayerCleanupActionSetSO actionSet)
             {
-                return PlayerCleanupActionContractUtility.NormalizeConfiguredActionId(actionId);
+                return RequireProfileKey(actionSet.SecondarySlotProfileKey, nameof(actionSet.SecondarySlotProfileKey));
+            }
+
+            private static FixedString64Bytes RequireProfileKey(string profileKey, string fieldName)
+            {
+                if (PlayerCleanupActionContractUtility.TryConvertProfileKey(profileKey, out var fixedKey))
+                    return fixedKey;
+
+                throw new InvalidOperationException(
+                    $"{nameof(PlayerCleanupActionSetSO)}.{fieldName} contains invalid ProfileKey '{profileKey}'.");
+            }
+
+            private static PlayerCleanupActionProfileDefinitionSO ResolveProfileByKey(
+                PlayerCleanupActionSetSO actionSet,
+                FixedString64Bytes profileKey)
+            {
+                if (actionSet.Profiles == null)
+                    throw new InvalidOperationException($"{nameof(PlayerCleanupActionSetSO)} has no profiles.");
+
+                for (int i = 0; i < actionSet.Profiles.Length; i++)
+                {
+                    var profile = actionSet.Profiles[i];
+                    if (profile == null)
+                        continue;
+
+                    if (!PlayerCleanupActionContractUtility.TryConvertProfileKey(profile.ProfileKey, out var candidateKey))
+                        continue;
+
+                    if (candidateKey.Equals(profileKey))
+                        return profile;
+                }
+
+                throw new InvalidOperationException(
+                    $"{nameof(PlayerCleanupActionSetSO)} does not contain requested ProfileKey '{profileKey}'.");
             }
         }
     }
