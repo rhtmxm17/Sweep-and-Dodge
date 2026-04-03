@@ -12,21 +12,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5cf0dcf2ac72c344b98d2e933e0ab2d, type: 3}
   m_Name: pas_default
   m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.PlayerCleanupActionSetSO
-  InitialSelectedAction: 1
-  PrimarySlotAction: 1
-  SecondarySlotAction: 2
+  InitialSelectedAction: 3
+  PrimarySlotAction: 3
+  SecondarySlotAction: 3
+  LockFacingWhileActive: 1
+  ActiveMoveSpeedScale: 0.5
   Profiles:
-  - ActionId: 1
+  - ActionId: 3
     TrashRange: 3.2
     TrashFanHalfAngleDeg: 180
     HazardRingRadius: 2.88
     HazardRingWidth: 0.8
     HazardLineLength: 0
     HazardLineHalfWidth: 0
-  - ActionId: 2
-    TrashRange: 5.8
-    TrashFanHalfAngleDeg: 50
-    HazardRingRadius: 0
-    HazardRingWidth: 0
-    HazardLineLength: 6
-    HazardLineHalfWidth: 0.55
+    TrashSweepInnerRadius: 1
+    TrashSweepOuterRadius: 3.2
+    TrashSweepHalfAngleDeg: 12
+    TrashSweepStartAngleDeg: -20
+    TrashSweepEndAngleDeg: 80
+    HazardRectLength: 3.2
+    HazardRectHalfWidth: 0.55
+    HazardForwardWindowAngleDeg: 7

@@ -383,6 +383,19 @@ namespace SweepNDodge.DotsBullets
                     });
                 }
 
+                if (em.HasComponent<VacuumRuntimeStateComponent>(player))
+                {
+                    em.SetComponentData(player, new VacuumRuntimeStateComponent
+                    {
+                        CaptureActiveTimer = 0f,
+                        CaptureCooldownTimer = 0f,
+                        ActiveTimer = 0f,
+                        CooldownTimer = 0f,
+                        IsActive = 0,
+                        ActivateRequested = 0,
+                    });
+                }
+
                 if (em.HasComponent<PlayerHazardRiskConfigComponent>(player) && !hasHazardStackMax)
                 {
                     var riskConfig = em.GetComponentData<PlayerHazardRiskConfigComponent>(player);
@@ -442,6 +455,18 @@ namespace SweepNDodge.DotsBullets
                     sync.CleanupActionRequested = 0;
                     sync.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None;
                     em.SetComponentData(player, sync);
+                }
+
+                if (em.HasComponent<PlayerCleanupSweepRuntimeStateComponent>(player))
+                {
+                    em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+                    {
+                        NextSweepDirectionSign = 1,
+                        ActiveSweepDirectionSign = 0,
+                        LockedFacingXZ = Unity.Mathematics.float2.zero,
+                        HasLockedFacing = 0,
+                        ActivationFrame = 0u,
+                    });
                 }
 
                 if (em.HasComponent<PlayerStageEntryApplyStateComponent>(player))

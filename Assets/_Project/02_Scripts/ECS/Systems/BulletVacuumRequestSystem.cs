@@ -13,6 +13,7 @@ namespace SweepNDodge.DotsBullets
     /// - 기본 제공:
     ///   - RadialRing: 원형 흡입 + 외곽 링 위험탄 처리
     ///   - ForwardFanLine: 전방 부채꼴 + 전방 직선 위험탄 처리
+    ///   - BroomSweep(T1 shim): 새 기본 액션이지만, broom 전용 기하는 T3 전까지 radial-compatible legacy 필드를 사용한다.
     /// - 실제 비활성/풀 반납은 BulletExecutionEndGroup의 BulletDespawnExecutionSystem이 단일 책임으로 수행
     /// - LocalTransform 타입 충돌 방지: 메인 스레드에서 LocalTransform을 직접 읽지 않고 Job으로 스케줄
     /// </summary>
@@ -43,6 +44,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerHazardPenaltyStateComponent>();
             state.RequireForUpdate<PlayerUiFeedbackEventBufferElement>();
             state.RequireForUpdate<PlayerCleanupActionStateComponent>();
+            state.RequireForUpdate<PlayerCleanupSweepRuntimeStateComponent>();
             state.RequireForUpdate<PlayerCleanupActionProfileBufferElement>();
             state.RequireForUpdate<BulletFrameCounterComponent>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
@@ -78,8 +80,11 @@ namespace SweepNDodge.DotsBullets
             var carryBinRO = SystemAPI.GetComponent<PlayerCarryBinComponent>(playerEntity);
             var goSyncRO = SystemAPI.GetComponent<PlayerGoSyncComponent>(playerEntity);
             var actionStateRO = SystemAPI.GetComponent<PlayerCleanupActionStateComponent>(playerEntity);
+            var sweepRuntimeStateRW = SystemAPI.GetComponentRW<PlayerCleanupSweepRuntimeStateComponent>(playerEntity);
             var actionProfiles = SystemAPI.GetBuffer<PlayerCleanupActionProfileBufferElement>(playerEntity);
             var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
+            var actionId = NormalizeActionId(actionStateRO.SelectedActionId);
+            bool wasVacuumActive = vacuumStateRW.ValueRO.IsActive != 0;
             byte isCarryFull = CarryBinRules.IsFull(in carryBinRO) ? (byte)1 : (byte)0;
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
             byte blockReason = UpdateVacuumState(
@@ -88,6 +93,13 @@ namespace SweepNDodge.DotsBullets
                 in penaltyRW.ValueRO,
                 in carryBinRO,
                 dt);
+            UpdateSweepRuntimeState(
+                ref sweepRuntimeStateRW.ValueRW,
+                actionId,
+                wasVacuumActive,
+                vacuumStateRW.ValueRO.IsActive != 0,
+                in goSyncRO,
+                frame);
 
             if (blockReason != (byte)PlayerUiFeedbackReasonId.None)
             {
@@ -108,7 +120,6 @@ namespace SweepNDodge.DotsBullets
             if (!BulletFieldShared.IsInitialized)
                 return;
 
-            var actionId = NormalizeActionId(actionStateRO.SelectedActionId);
             var actionProfile = ResolveActionProfile(actionProfiles, actionId);
             float3 playerForward = GetPlayerForward(in goSyncRO);
             float searchRange = ComputeSearchRange(in actionProfile);
@@ -276,11 +287,34 @@ namespace SweepNDodge.DotsBullets
 
         private static PlayerCleanupActionId NormalizeActionId(PlayerCleanupActionId actionId)
         {
-            return actionId switch
+            return PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(actionId);
+        }
+
+        private static void UpdateSweepRuntimeState(
+            ref PlayerCleanupSweepRuntimeStateComponent runtimeState,
+            PlayerCleanupActionId actionId,
+            bool wasVacuumActive,
+            bool isVacuumActive,
+            in PlayerGoSyncComponent sync,
+            uint frame)
+        {
+            if (actionId == PlayerCleanupActionId.BroomSweep)
             {
-                PlayerCleanupActionId.ForwardFanLine => PlayerCleanupActionId.ForwardFanLine,
-                _ => PlayerCleanupActionId.RadialRing,
-            };
+                if (!wasVacuumActive && isVacuumActive)
+                {
+                    runtimeState.LockedFacingXZ = GetPlayerForwardXZ(in sync);
+                    runtimeState.HasLockedFacing = 1;
+                    runtimeState.ActivationFrame = frame;
+                    return;
+                }
+
+                if (isVacuumActive)
+                    return;
+            }
+
+            runtimeState.LockedFacingXZ = float2.zero;
+            runtimeState.HasLockedFacing = 0;
+            runtimeState.ActivationFrame = 0u;
         }
 
         private static PlayerCleanupActionProfileBufferElement ResolveActionProfile(
@@ -291,20 +325,13 @@ namespace SweepNDodge.DotsBullets
             {
                 if (profiles[i].ActionId == actionId)
                 {
-                    var profile = profiles[i];
-                    profile.TrashRange = math.max(0f, profile.TrashRange);
-                    profile.TrashFanHalfAngleDeg = math.clamp(profile.TrashFanHalfAngleDeg, 0f, 180f);
-                    profile.HazardRingRadius = math.max(0f, profile.HazardRingRadius);
-                    profile.HazardRingWidth = math.max(0f, profile.HazardRingWidth);
-                    profile.HazardLineLength = math.max(0f, profile.HazardLineLength);
-                    profile.HazardLineHalfWidth = math.max(0f, profile.HazardLineHalfWidth);
-                    return profile;
+                    return PlayerCleanupActionContractUtility.SanitizeProfile(profiles[i]);
                 }
             }
 
             if (actionId == PlayerCleanupActionId.ForwardFanLine)
             {
-                return new PlayerCleanupActionProfileBufferElement
+                return PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
                 {
                     ActionId = PlayerCleanupActionId.ForwardFanLine,
                     TrashRange = FallbackForwardTrashRange,
@@ -313,10 +340,18 @@ namespace SweepNDodge.DotsBullets
                     HazardRingWidth = 0f,
                     HazardLineLength = FallbackForwardHazardLineLength,
                     HazardLineHalfWidth = FallbackForwardHazardLineHalfWidth,
-                };
+                });
             }
 
-            return new PlayerCleanupActionProfileBufferElement
+            if (actionId == PlayerCleanupActionId.BroomSweep)
+            {
+                return PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                    FallbackRadialTrashRange,
+                    FallbackRadialHazardRingRadius,
+                    FallbackRadialHazardRingWidth);
+            }
+
+            return PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
             {
                 ActionId = PlayerCleanupActionId.RadialRing,
                 TrashRange = FallbackRadialTrashRange,
@@ -325,7 +360,7 @@ namespace SweepNDodge.DotsBullets
                 HazardRingWidth = FallbackRadialHazardRingWidth,
                 HazardLineLength = 0f,
                 HazardLineHalfWidth = 0f,
-            };
+            });
         }
 
         private static float3 GetPlayerForward(in PlayerGoSyncComponent sync)
@@ -335,6 +370,12 @@ namespace SweepNDodge.DotsBullets
             if (math.lengthsq(forward) < 1e-8f)
                 return new float3(0f, 0f, 1f);
             return math.normalize(forward);
+        }
+
+        private static float2 GetPlayerForwardXZ(in PlayerGoSyncComponent sync)
+        {
+            float3 forward = GetPlayerForward(in sync);
+            return new float2(forward.x, forward.z);
         }
 
         private static float ComputeSearchRange(in PlayerCleanupActionProfileBufferElement profile)

@@ -28,6 +28,13 @@ namespace SweepNDodge.DotsBullets
             {
                 var pending = Normalize(actionState.ValueRO.PendingActionId);
                 var selected = Normalize(actionState.ValueRO.SelectedActionId);
+
+                if (actionState.ValueRO.SelectedActionId != selected)
+                    actionState.ValueRW.SelectedActionId = selected;
+
+                if (actionState.ValueRO.PendingActionId != pending)
+                    actionState.ValueRW.PendingActionId = pending;
+
                 if (pending == PlayerCleanupActionId.None)
                     continue;
 
@@ -54,12 +61,7 @@ namespace SweepNDodge.DotsBullets
 
         private static PlayerCleanupActionId Normalize(PlayerCleanupActionId actionId)
         {
-            return actionId switch
-            {
-                PlayerCleanupActionId.RadialRing => PlayerCleanupActionId.RadialRing,
-                PlayerCleanupActionId.ForwardFanLine => PlayerCleanupActionId.ForwardFanLine,
-                _ => PlayerCleanupActionId.None,
-            };
+            return PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(actionId, allowNone: true);
         }
     }
 }

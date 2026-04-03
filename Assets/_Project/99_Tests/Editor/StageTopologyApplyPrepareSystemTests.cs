@@ -64,6 +64,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerInputIntentComponent),
                 typeof(PlayerResolvedInputSnapshotComponent),
                 typeof(PlayerGoSyncComponent),
+                typeof(VacuumRuntimeStateComponent),
+                typeof(PlayerCleanupSweepRuntimeStateComponent),
                 typeof(PlayerStageEntryApplyStateComponent));
             em.SetComponentData(player, new PlayerInputIntentComponent
             {
@@ -94,6 +96,23 @@ namespace SweepNDodge.DotsBullets.Tests
                 CleanupActionRequested = 1,
                 RequestedCleanupActionSlot = 2,
             });
+            em.SetComponentData(player, new VacuumRuntimeStateComponent
+            {
+                CaptureActiveTimer = 0.3f,
+                CaptureCooldownTimer = 0.2f,
+                ActiveTimer = 0.4f,
+                CooldownTimer = 0.1f,
+                IsActive = 1,
+                ActivateRequested = 1,
+            });
+            em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = -1,
+                ActiveSweepDirectionSign = 1,
+                LockedFacingXZ = new float2(1f, 0f),
+                HasLockedFacing = 1,
+                ActivationFrame = 9u,
+            });
             em.SetComponentData(player, new PlayerStageEntryApplyStateComponent
             {
                 LastAppliedVersion = 9u,
@@ -111,6 +130,8 @@ namespace SweepNDodge.DotsBullets.Tests
             var intent = em.GetComponentData<PlayerInputIntentComponent>(player);
             var snapshot = em.GetComponentData<PlayerResolvedInputSnapshotComponent>(player);
             var sync = em.GetComponentData<PlayerGoSyncComponent>(player);
+            var vacuum = em.GetComponentData<VacuumRuntimeStateComponent>(player);
+            var sweepRuntime = em.GetComponentData<PlayerCleanupSweepRuntimeStateComponent>(player);
             var applyState = em.GetComponentData<PlayerStageEntryApplyStateComponent>(player);
 
             Assert.That(intent.VacuumRequested, Is.EqualTo(0));
@@ -124,6 +145,15 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(sync.VacuumRequested, Is.EqualTo(0));
             Assert.That(sync.CleanupActionRequested, Is.EqualTo(0));
             Assert.That(sync.RequestedCleanupActionSlot, Is.EqualTo(0));
+            Assert.That(vacuum.IsActive, Is.EqualTo(0));
+            Assert.That(vacuum.ActivateRequested, Is.EqualTo(0));
+            Assert.That(vacuum.ActiveTimer, Is.EqualTo(0f));
+            Assert.That(vacuum.CaptureActiveTimer, Is.EqualTo(0f));
+            Assert.That(sweepRuntime.NextSweepDirectionSign, Is.EqualTo(1));
+            Assert.That(sweepRuntime.ActiveSweepDirectionSign, Is.EqualTo(0));
+            Assert.That(sweepRuntime.LockedFacingXZ, Is.EqualTo(float2.zero));
+            Assert.That(sweepRuntime.HasLockedFacing, Is.EqualTo(0));
+            Assert.That(sweepRuntime.ActivationFrame, Is.EqualTo(0u));
             Assert.That(applyState.LastAppliedVersion, Is.EqualTo(0u));
         }
 

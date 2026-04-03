@@ -9,18 +9,33 @@ namespace SweepNDodge.DotsBullets
         public struct CleanupActionProfileEntry
         {
             public PlayerCleanupActionId ActionId;
+
+            // legacy compatibility for pre-BroomSweep runtime
             public float TrashRange;
             public float TrashFanHalfAngleDeg;
             public float HazardRingRadius;
             public float HazardRingWidth;
             public float HazardLineLength;
             public float HazardLineHalfWidth;
+
+            public float TrashSweepInnerRadius;
+            public float TrashSweepOuterRadius;
+            public float TrashSweepHalfAngleDeg;
+            public float TrashSweepStartAngleDeg;
+            public float TrashSweepEndAngleDeg;
+            public float HazardRectLength;
+            public float HazardRectHalfWidth;
+            public float HazardForwardWindowAngleDeg;
         }
 
         [Header("Initial State")]
-        public PlayerCleanupActionId InitialSelectedAction = PlayerCleanupActionId.RadialRing;
-        public PlayerCleanupActionId PrimarySlotAction = PlayerCleanupActionId.RadialRing;
-        public PlayerCleanupActionId SecondarySlotAction = PlayerCleanupActionId.ForwardFanLine;
+        public PlayerCleanupActionId InitialSelectedAction = PlayerCleanupActionId.BroomSweep;
+        public PlayerCleanupActionId PrimarySlotAction = PlayerCleanupActionId.BroomSweep;
+        public PlayerCleanupActionId SecondarySlotAction = PlayerCleanupActionId.BroomSweep;
+
+        [Header("Motion Constraints")]
+        public bool LockFacingWhileActive = true;
+        public float ActiveMoveSpeedScale = 0.5f;
 
         [Header("Action Profiles")]
         public CleanupActionProfileEntry[] Profiles;

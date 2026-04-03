@@ -3857,6 +3857,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerHazardPenaltyStateComponent),
                 typeof(PlayerCleanupActionStateComponent),
                 typeof(PlayerCleanupActionSlotMapComponent),
+                typeof(PlayerCleanupSweepRuntimeStateComponent),
+                typeof(PlayerCleanupMotionConstraintConfigComponent),
                 typeof(PlayerCarryBinDepositRequestTag),
                 typeof(PlayerCarryBinDepositContextComponent),
                 typeof(PlayerHazardHitRequestTag),
@@ -3953,6 +3955,19 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 PrimaryActionId = PlayerCleanupActionId.RadialRing,
                 SecondaryActionId = PlayerCleanupActionId.ForwardFanLine,
+            });
+            em.SetComponentData(player, new PlayerCleanupSweepRuntimeStateComponent
+            {
+                NextSweepDirectionSign = 1,
+                ActiveSweepDirectionSign = 0,
+                LockedFacingXZ = float2.zero,
+                HasLockedFacing = 0,
+                ActivationFrame = 0u,
+            });
+            em.SetComponentData(player, new PlayerCleanupMotionConstraintConfigComponent
+            {
+                LockFacingWhileActive = 1,
+                ActiveMoveSpeedScale = 0.5f,
             });
             em.SetComponentEnabled<PlayerCarryBinDepositRequestTag>(player, false);
             em.SetComponentData(player, new PlayerCarryBinDepositContextComponent

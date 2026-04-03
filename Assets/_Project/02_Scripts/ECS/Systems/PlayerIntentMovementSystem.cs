@@ -18,6 +18,10 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerInputIntentComponent>();
             state.RequireForUpdate<PlayerGoSyncComponent>();
+            state.RequireForUpdate<VacuumRuntimeStateComponent>();
+            state.RequireForUpdate<PlayerCleanupActionStateComponent>();
+            state.RequireForUpdate<PlayerCleanupMotionConstraintConfigComponent>();
+            state.RequireForUpdate<PlayerCleanupSweepRuntimeStateComponent>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
         }
 
@@ -34,24 +38,50 @@ namespace SweepNDodge.DotsBullets
             if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float dt))
                 return;
 
-            foreach (var (intent, tx, sync) in
+            foreach (var (intent, tx, sync, vacuum, actionState, motionConstraint, sweepRuntime) in
                      SystemAPI.Query<
                          RefRO<PlayerInputIntentComponent>,
                          RefRW<LocalTransform>,
-                         RefRW<PlayerGoSyncComponent>>()
+                         RefRW<PlayerGoSyncComponent>,
+                         RefRO<VacuumRuntimeStateComponent>,
+                         RefRO<PlayerCleanupActionStateComponent>,
+                         RefRO<PlayerCleanupMotionConstraintConfigComponent>,
+                         RefRO<PlayerCleanupSweepRuntimeStateComponent>>()
                          .WithAll<PlayerTag>())
             {
                 var txValue = tx.ValueRO;
+                var normalizedActionId = PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(
+                    actionState.ValueRO.SelectedActionId,
+                    allowNone: true);
+                bool isBroomSweepConstraintActive = normalizedActionId == PlayerCleanupActionId.BroomSweep
+                    && vacuum.ValueRO.IsActive != 0;
+
                 float2 moveAxis = intent.ValueRO.MoveAxis;
                 if (math.lengthsq(moveAxis) > 1f)
                     moveAxis = math.normalizesafe(moveAxis, new float2(0f, 1f));
 
                 if (math.lengthsq(moveAxis) > 1e-8f)
                 {
-                    txValue.Position += new float3(moveAxis.x, 0f, moveAxis.y) * (DefaultMoveSpeed * dt);
+                    float moveSpeed = DefaultMoveSpeed;
+                    if (isBroomSweepConstraintActive)
+                        moveSpeed *= math.max(0f, motionConstraint.ValueRO.ActiveMoveSpeedScale);
+
+                    txValue.Position += new float3(moveAxis.x, 0f, moveAxis.y) * (moveSpeed * dt);
                 }
 
-                if (intent.ValueRO.HasAimWorldPoint != 0)
+                bool shouldLockFacing = isBroomSweepConstraintActive
+                    && motionConstraint.ValueRO.LockFacingWhileActive != 0;
+                if (shouldLockFacing)
+                {
+                    float2 lockedFacingXZ = sweepRuntime.ValueRO.LockedFacingXZ;
+                    if (sweepRuntime.ValueRO.HasLockedFacing != 0
+                        && math.lengthsq(lockedFacingXZ) > 1e-8f)
+                    {
+                        float3 lockedForward = math.normalize(new float3(lockedFacingXZ.x, 0f, lockedFacingXZ.y));
+                        txValue.Rotation = quaternion.LookRotationSafe(lockedForward, new float3(0f, 1f, 0f));
+                    }
+                }
+                else if (intent.ValueRO.HasAimWorldPoint != 0)
                 {
                     float3 aimWorld = new float3(intent.ValueRO.AimWorldXZ.x, txValue.Position.y, intent.ValueRO.AimWorldXZ.y);
                     float3 aimDir = aimWorld - txValue.Position;

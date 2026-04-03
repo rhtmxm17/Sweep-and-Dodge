@@ -123,6 +123,21 @@ namespace SweepNDodge.DotsBullets
                     SecondaryActionId = ResolveSecondarySlotAction(authoring),
                 });
 
+                AddComponent(e, new PlayerCleanupSweepRuntimeStateComponent
+                {
+                    NextSweepDirectionSign = 1,
+                    ActiveSweepDirectionSign = 0,
+                    LockedFacingXZ = float2.zero,
+                    HasLockedFacing = 0,
+                    ActivationFrame = 0u,
+                });
+
+                AddComponent(e, new PlayerCleanupMotionConstraintConfigComponent
+                {
+                    LockFacingWhileActive = ResolveLockFacingWhileActive(authoring) ? (byte)1 : (byte)0,
+                    ActiveMoveSpeedScale = ResolveActiveMoveSpeedScale(authoring),
+                });
+
                 var actionProfileBuffer = AddBuffer<PlayerCleanupActionProfileBufferElement>(e);
                 actionProfileBuffer.EnsureCapacity(4);
                 BakeCleanupActionProfiles(authoring, actionProfileBuffer);
@@ -232,74 +247,73 @@ namespace SweepNDodge.DotsBullets
                         if (profile.ActionId == PlayerCleanupActionId.None)
                             continue;
 
-                        actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
+                        actionProfileBuffer.Add(PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
                         {
                             ActionId = profile.ActionId,
-                            TrashRange = Mathf.Max(0f, profile.TrashRange),
-                            TrashFanHalfAngleDeg = Mathf.Clamp(profile.TrashFanHalfAngleDeg, 0f, 180f),
-                            HazardRingRadius = Mathf.Max(0f, profile.HazardRingRadius),
-                            HazardRingWidth = Mathf.Max(0f, profile.HazardRingWidth),
-                            HazardLineLength = Mathf.Max(0f, profile.HazardLineLength),
-                            HazardLineHalfWidth = Mathf.Max(0f, profile.HazardLineHalfWidth),
-                        });
+                            TrashRange = profile.TrashRange,
+                            TrashFanHalfAngleDeg = profile.TrashFanHalfAngleDeg,
+                            HazardRingRadius = profile.HazardRingRadius,
+                            HazardRingWidth = profile.HazardRingWidth,
+                            HazardLineLength = profile.HazardLineLength,
+                            HazardLineHalfWidth = profile.HazardLineHalfWidth,
+                            TrashSweepInnerRadius = profile.TrashSweepInnerRadius,
+                            TrashSweepOuterRadius = profile.TrashSweepOuterRadius,
+                            TrashSweepHalfAngleDeg = profile.TrashSweepHalfAngleDeg,
+                            TrashSweepStartAngleDeg = profile.TrashSweepStartAngleDeg,
+                            TrashSweepEndAngleDeg = profile.TrashSweepEndAngleDeg,
+                            HazardRectLength = profile.HazardRectLength,
+                            HazardRectHalfWidth = profile.HazardRectHalfWidth,
+                            HazardForwardWindowAngleDeg = profile.HazardForwardWindowAngleDeg,
+                        }));
                     }
                 }
 
                 if (actionProfileBuffer.Length > 0)
                     return;
 
-                // fallback default 설정 추가
-                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
-                {
-                    ActionId = PlayerCleanupActionId.RadialRing,
-                    TrashRange = Mathf.Max(0f, authoring.Range),
-                    TrashFanHalfAngleDeg = 180f,
-                    HazardRingRadius = Mathf.Max(0f, authoring.CaptureRingRadius),
-                    HazardRingWidth = Mathf.Max(0f, authoring.CaptureRingWidth),
-                    HazardLineLength = 0f,
-                    HazardLineHalfWidth = 0f,
-                });
-                actionProfileBuffer.Add(new PlayerCleanupActionProfileBufferElement
-                {
-                    ActionId = PlayerCleanupActionId.ForwardFanLine,
-                    TrashRange = Mathf.Max(0f, authoring.Range),
-                    TrashFanHalfAngleDeg = 40f,
-                    HazardRingRadius = 0f,
-                    HazardRingWidth = 0f,
-                    HazardLineLength = Mathf.Max(0f, authoring.Range),
-                    HazardLineHalfWidth = 0.55f,
-                });
+                actionProfileBuffer.Add(PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                    authoring.Range,
+                    authoring.CaptureRingRadius,
+                    authoring.CaptureRingWidth));
             }
 
             private static PlayerCleanupActionId ResolveInitialSelectedAction(PlayerProxyAuthoring authoring)
             {
                 return authoring.CleanupActionSet != null
                     ? NormalizeActionId(authoring.CleanupActionSet.InitialSelectedAction)
-                    : PlayerCleanupActionId.RadialRing;
+                    : PlayerCleanupActionId.BroomSweep;
             }
 
             private static PlayerCleanupActionId ResolvePrimarySlotAction(PlayerProxyAuthoring authoring)
             {
                 return authoring.CleanupActionSet != null
                     ? NormalizeActionId(authoring.CleanupActionSet.PrimarySlotAction)
-                    : PlayerCleanupActionId.RadialRing;
+                    : PlayerCleanupActionId.BroomSweep;
             }
 
             private static PlayerCleanupActionId ResolveSecondarySlotAction(PlayerProxyAuthoring authoring)
             {
                 return authoring.CleanupActionSet != null
                     ? NormalizeActionId(authoring.CleanupActionSet.SecondarySlotAction)
-                    : PlayerCleanupActionId.ForwardFanLine;
+                    : PlayerCleanupActionId.BroomSweep;
+            }
+
+            private static bool ResolveLockFacingWhileActive(PlayerProxyAuthoring authoring)
+            {
+                return authoring.CleanupActionSet == null || authoring.CleanupActionSet.LockFacingWhileActive;
+            }
+
+            private static float ResolveActiveMoveSpeedScale(PlayerProxyAuthoring authoring)
+            {
+                if (authoring.CleanupActionSet == null)
+                    return 0.5f;
+
+                return Mathf.Max(0f, authoring.CleanupActionSet.ActiveMoveSpeedScale);
             }
 
             private static PlayerCleanupActionId NormalizeActionId(PlayerCleanupActionId actionId)
             {
-                return actionId switch
-                {
-                    PlayerCleanupActionId.RadialRing => PlayerCleanupActionId.RadialRing,
-                    PlayerCleanupActionId.ForwardFanLine => PlayerCleanupActionId.ForwardFanLine,
-                    _ => PlayerCleanupActionId.RadialRing,
-                };
+                return PlayerCleanupActionContractUtility.NormalizeConfiguredActionId(actionId);
             }
         }
     }
