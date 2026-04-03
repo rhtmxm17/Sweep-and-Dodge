@@ -10,6 +10,11 @@ namespace SweepNDodge.DotsBullets
         {
             public PlayerCleanupActionId ActionId;
 
+            public float CaptureActiveTime;
+            public float CaptureCooldown;
+            public float ActiveTime;
+            public float Cooldown;
+
             // legacy compatibility fields for non-default compatibility actions
             public float TrashRange;
             public float TrashFanHalfAngleDeg;

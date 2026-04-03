@@ -43,6 +43,13 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void PlayerProxyAuthoring_RequiresCleanupActionSetForBake()
+        {
+            Assert.Throws<System.InvalidOperationException>(() =>
+                PlayerProxyAuthoring.RequireCleanupActionSet(null));
+        }
+
+        [Test]
         public void DefaultCleanupActionAsset_UsesSingleBroomSweepProfile()
         {
             var asset = AssetDatabase.LoadAssetAtPath<PlayerCleanupActionSetSO>(
@@ -56,6 +63,10 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(asset.ActiveMoveSpeedScale, Is.EqualTo(0.5f));
             Assert.That(asset.Profiles, Has.Length.EqualTo(1));
             Assert.That(asset.Profiles[0].ActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+            Assert.That(asset.Profiles[0].CaptureActiveTime, Is.EqualTo(0.20f));
+            Assert.That(asset.Profiles[0].CaptureCooldown, Is.EqualTo(0f));
+            Assert.That(asset.Profiles[0].ActiveTime, Is.EqualTo(0.22f));
+            Assert.That(asset.Profiles[0].Cooldown, Is.EqualTo(1.8f));
             Assert.That(asset.Profiles[0].TrashRange, Is.EqualTo(3.2f));
             Assert.That(asset.Profiles[0].TrashSweepInnerRadius, Is.EqualTo(1f));
             Assert.That(asset.Profiles[0].HazardRectHalfWidth, Is.EqualTo(0.55f));
@@ -71,6 +82,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 captureRingWidth: 0.8f);
 
             Assert.That(profile.ActionId, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
+            Assert.That(profile.CaptureActiveTime, Is.EqualTo(0.20f));
+            Assert.That(profile.CaptureCooldown, Is.EqualTo(0f));
+            Assert.That(profile.ActiveTime, Is.EqualTo(0.22f));
+            Assert.That(profile.Cooldown, Is.EqualTo(1.8f));
             Assert.That(profile.TrashRange, Is.EqualTo(3.2f));
             Assert.That(profile.TrashFanHalfAngleDeg, Is.EqualTo(180f));
             Assert.That(profile.HazardRingRadius, Is.EqualTo(2.88f));
@@ -90,14 +105,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_ActivationFrame_UsesStartAngleAndSearchRadius()
         {
-            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
-            var config = new VacuumActivationConfigComponent
-            {
-                CaptureActiveTime = 0.25f,
-                CaptureCooldown = 0f,
-                ActiveTime = 0.25f,
-                Cooldown = 0f,
-            };
+            var profile = CreateBroomSweepTimingProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0.25f,
@@ -118,7 +126,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 PlayerCleanupActionId.BroomSweep,
-                in config,
                 in vacuum,
                 in sweep,
                 in profile);
@@ -134,14 +141,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_RightToLeft_MirrorsSweepAngle()
         {
-            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
-            var config = new VacuumActivationConfigComponent
-            {
-                CaptureActiveTime = 0.25f,
-                CaptureCooldown = 0f,
-                ActiveTime = 0.25f,
-                Cooldown = 0f,
-            };
+            var profile = CreateBroomSweepTimingProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0.25f,
@@ -162,7 +162,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 PlayerCleanupActionId.BroomSweep,
-                in config,
                 in vacuum,
                 in sweep,
                 in profile);
@@ -174,14 +173,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_HazardWindowAndRectCapture_ActivateNearForward()
         {
-            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
-            var config = new VacuumActivationConfigComponent
-            {
-                CaptureActiveTime = 0.25f,
-                CaptureCooldown = 0f,
-                ActiveTime = 0.25f,
-                Cooldown = 0f,
-            };
+            var profile = CreateBroomSweepTimingProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 12f / 60f,
@@ -202,7 +194,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 PlayerCleanupActionId.BroomSweep,
-                in config,
                 in vacuum,
                 in sweep,
                 in profile);
@@ -222,14 +213,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void BroomSweepGeometryUtility_TrashCapture_UsesCurrentBand()
         {
-            var profile = PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f);
-            var config = new VacuumActivationConfigComponent
-            {
-                CaptureActiveTime = 0.25f,
-                CaptureCooldown = 0f,
-                ActiveTime = 0.25f,
-                Cooldown = 0f,
-            };
+            var profile = CreateBroomSweepTimingProfile();
             var vacuum = new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0.25f,
@@ -250,7 +234,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 PlayerCleanupActionId.BroomSweep,
-                in config,
                 in vacuum,
                 in sweep,
                 in profile);
@@ -506,7 +489,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerTag),
                 typeof(LocalTransform),
                 typeof(PlayerGoSyncComponent),
-                typeof(VacuumActivationConfigComponent),
                 typeof(VacuumRuntimeStateComponent),
                 typeof(PlayerCarryBinComponent),
                 typeof(PlayerHazardRiskConfigComponent),
@@ -527,13 +509,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 VacuumRequested = 0,
                 CleanupActionRequested = 0,
                 RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.None,
-            });
-            em.SetComponentData(player, new VacuumActivationConfigComponent
-            {
-                CaptureActiveTime = 0.25f,
-                CaptureCooldown = 0f,
-                ActiveTime = 0.25f,
-                Cooldown = 0f,
             });
             em.SetComponentData(player, new VacuumRuntimeStateComponent
             {
@@ -594,7 +569,7 @@ namespace SweepNDodge.DotsBullets.Tests
             });
 
             var profiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
-            profiles.Add(PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f));
+            profiles.Add(CreateBroomSweepTimingProfile());
 
             var uiBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
             uiBuffer.EnsureCapacity(16);
@@ -698,6 +673,22 @@ namespace SweepNDodge.DotsBullets.Tests
                 radius * math.sin(rad),
                 0f,
                 radius * math.cos(rad));
+        }
+
+        private static PlayerCleanupActionProfileBufferElement CreateBroomSweepTimingProfile(
+            float activeTime = 0.25f,
+            float cooldown = 0f,
+            float captureActiveTime = 0.25f,
+            float captureCooldown = 0f)
+        {
+            return PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                3.2f,
+                2.88f,
+                0.8f,
+                captureActiveTime,
+                captureCooldown,
+                activeTime,
+                cooldown);
         }
 
         private static void CreateSingleton<T>(EntityManager em, T value)

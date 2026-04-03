@@ -1,6 +1,7 @@
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using System;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -8,16 +9,6 @@ namespace SweepNDodge.DotsBullets
     {
         [Header("Proxy Radius")]
         public float PlayerRadius = 0.35f;
-
-        [Header("Vacuum Fallback(CleanupActionSet이 없을 때)")]
-        public float Range = 3.2f;
-        public float CaptureActiveTime = 0.20f;
-        public float CaptureRingRadius = 2.88f;
-        public float CaptureRingWidth = 0.8f;
-        public float CaptureCooldown = 0.0f;
-
-        public float ActiveTime = 0.22f;
-        public float Cooldown = 1.8f;
 
         [Header("Cleanup Action Set")]
         public PlayerCleanupActionSetSO CleanupActionSet;
@@ -37,11 +28,21 @@ namespace SweepNDodge.DotsBullets
         public int HazardStackMax = 5;
         public float HazardBonusRate = 0.05f;
 
+        public static PlayerCleanupActionSetSO RequireCleanupActionSet(PlayerCleanupActionSetSO cleanupActionSet)
+        {
+            if (cleanupActionSet != null)
+                return cleanupActionSet;
+
+            throw new InvalidOperationException(
+                $"{nameof(PlayerProxyAuthoring)} requires a {nameof(PlayerCleanupActionSetSO)} reference.");
+        }
+
         private class PlayerProxyBaker : Baker<PlayerProxyAuthoring>
         {
             public override void Bake(PlayerProxyAuthoring authoring)
             {
                 var e = GetEntity(TransformUsageFlags.Dynamic);
+                var cleanupActionSet = RequireCleanupActionSet(authoring.CleanupActionSet);
 
                 AddComponent<PlayerTag>(e);
 
@@ -53,14 +54,6 @@ namespace SweepNDodge.DotsBullets
                 AddComponent(e, new PlayerPreviousPositionComponent
                 {
                     Position = authoring.transform.position
-                });
-
-                AddComponent(e, new VacuumActivationConfigComponent
-                {
-                    CaptureActiveTime = Mathf.Max(0f, authoring.CaptureActiveTime),
-                    CaptureCooldown = Mathf.Max(0f, authoring.CaptureCooldown),
-                    ActiveTime = authoring.ActiveTime,
-                    Cooldown = authoring.Cooldown,
                 });
 
                 AddComponent(e, new VacuumRuntimeStateComponent
@@ -112,15 +105,15 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(e, new PlayerCleanupActionStateComponent
                 {
-                    SelectedActionId = ResolveInitialSelectedAction(authoring),
+                    SelectedActionId = ResolveInitialSelectedAction(cleanupActionSet),
                     PendingActionId = PlayerCleanupActionId.None,
                     Version = 0,
                 });
 
                 AddComponent(e, new PlayerCleanupActionSlotMapComponent
                 {
-                    PrimaryActionId = ResolvePrimarySlotAction(authoring),
-                    SecondaryActionId = ResolveSecondarySlotAction(authoring),
+                    PrimaryActionId = ResolvePrimarySlotAction(cleanupActionSet),
+                    SecondaryActionId = ResolveSecondarySlotAction(cleanupActionSet),
                 });
 
                 AddComponent(e, new PlayerCleanupSweepRuntimeStateComponent
@@ -134,13 +127,13 @@ namespace SweepNDodge.DotsBullets
 
                 AddComponent(e, new PlayerCleanupMotionConstraintConfigComponent
                 {
-                    LockFacingWhileActive = ResolveLockFacingWhileActive(authoring) ? (byte)1 : (byte)0,
-                    ActiveMoveSpeedScale = ResolveActiveMoveSpeedScale(authoring),
+                    LockFacingWhileActive = cleanupActionSet.LockFacingWhileActive ? (byte)1 : (byte)0,
+                    ActiveMoveSpeedScale = Mathf.Max(0f, cleanupActionSet.ActiveMoveSpeedScale),
                 });
 
                 var actionProfileBuffer = AddBuffer<PlayerCleanupActionProfileBufferElement>(e);
                 actionProfileBuffer.EnsureCapacity(4);
-                BakeCleanupActionProfiles(authoring, actionProfileBuffer);
+                BakeCleanupActionProfiles(cleanupActionSet, actionProfileBuffer);
 
                 AddComponent(e, new PlayerCarryBinComponent
                 {
@@ -235,11 +228,10 @@ namespace SweepNDodge.DotsBullets
             }
 
             private static void BakeCleanupActionProfiles(
-                PlayerProxyAuthoring authoring,
+                PlayerCleanupActionSetSO actionSet,
                 DynamicBuffer<PlayerCleanupActionProfileBufferElement> actionProfileBuffer)
             {
-                var actionSet = authoring.CleanupActionSet;
-                if (actionSet != null && actionSet.Profiles != null && actionSet.Profiles.Length > 0)
+                if (actionSet.Profiles != null && actionSet.Profiles.Length > 0)
                 {
                     for (int i = 0; i < actionSet.Profiles.Length; i++)
                     {
@@ -250,6 +242,10 @@ namespace SweepNDodge.DotsBullets
                         actionProfileBuffer.Add(PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
                         {
                             ActionId = profile.ActionId,
+                            CaptureActiveTime = profile.CaptureActiveTime,
+                            CaptureCooldown = profile.CaptureCooldown,
+                            ActiveTime = profile.ActiveTime,
+                            Cooldown = profile.Cooldown,
                             TrashRange = profile.TrashRange,
                             TrashFanHalfAngleDeg = profile.TrashFanHalfAngleDeg,
                             HazardRingRadius = profile.HazardRingRadius,
@@ -268,47 +264,26 @@ namespace SweepNDodge.DotsBullets
                     }
                 }
 
-                if (actionProfileBuffer.Length > 0)
-                    return;
-
-                actionProfileBuffer.Add(PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
-                    authoring.Range,
-                    authoring.CaptureRingRadius,
-                    authoring.CaptureRingWidth));
+                if (actionProfileBuffer.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{nameof(PlayerCleanupActionSetSO)} must contain at least one cleanup action profile.");
+                }
             }
 
-            private static PlayerCleanupActionId ResolveInitialSelectedAction(PlayerProxyAuthoring authoring)
+            private static PlayerCleanupActionId ResolveInitialSelectedAction(PlayerCleanupActionSetSO actionSet)
             {
-                return authoring.CleanupActionSet != null
-                    ? NormalizeActionId(authoring.CleanupActionSet.InitialSelectedAction)
-                    : PlayerCleanupActionId.BroomSweep;
+                return NormalizeActionId(actionSet.InitialSelectedAction);
             }
 
-            private static PlayerCleanupActionId ResolvePrimarySlotAction(PlayerProxyAuthoring authoring)
+            private static PlayerCleanupActionId ResolvePrimarySlotAction(PlayerCleanupActionSetSO actionSet)
             {
-                return authoring.CleanupActionSet != null
-                    ? NormalizeActionId(authoring.CleanupActionSet.PrimarySlotAction)
-                    : PlayerCleanupActionId.BroomSweep;
+                return NormalizeActionId(actionSet.PrimarySlotAction);
             }
 
-            private static PlayerCleanupActionId ResolveSecondarySlotAction(PlayerProxyAuthoring authoring)
+            private static PlayerCleanupActionId ResolveSecondarySlotAction(PlayerCleanupActionSetSO actionSet)
             {
-                return authoring.CleanupActionSet != null
-                    ? NormalizeActionId(authoring.CleanupActionSet.SecondarySlotAction)
-                    : PlayerCleanupActionId.BroomSweep;
-            }
-
-            private static bool ResolveLockFacingWhileActive(PlayerProxyAuthoring authoring)
-            {
-                return authoring.CleanupActionSet == null || authoring.CleanupActionSet.LockFacingWhileActive;
-            }
-
-            private static float ResolveActiveMoveSpeedScale(PlayerProxyAuthoring authoring)
-            {
-                if (authoring.CleanupActionSet == null)
-                    return 0.5f;
-
-                return Mathf.Max(0f, authoring.CleanupActionSet.ActiveMoveSpeedScale);
+                return NormalizeActionId(actionSet.SecondarySlotAction);
             }
 
             private static PlayerCleanupActionId NormalizeActionId(PlayerCleanupActionId actionId)

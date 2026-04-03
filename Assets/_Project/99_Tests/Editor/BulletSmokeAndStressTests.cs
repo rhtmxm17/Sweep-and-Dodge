@@ -3865,7 +3865,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerInputIntentComponent),
                 typeof(PlayerResolvedInputSnapshotComponent),
                 typeof(PlayerRadiusComponent),
-                typeof(VacuumActivationConfigComponent),
                 typeof(VacuumRuntimeStateComponent),
                 typeof(PlayerCarryBinComponent),
                 typeof(PlayerHazardRiskConfigComponent),
@@ -3914,13 +3913,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Sequence = 0u,
             });
             em.SetComponentData(player, new PlayerRadiusComponent { Value = 0.35f });
-            em.SetComponentData(player, new VacuumActivationConfigComponent
-            {
-                CaptureActiveTime = 0.25f,
-                CaptureCooldown = 0f,
-                ActiveTime = 0.25f,
-                Cooldown = 0f,
-            });
             em.SetComponentData(player, new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0f,
@@ -4001,7 +3993,14 @@ namespace SweepNDodge.DotsBullets.Tests
             });
 
             var actionProfiles = em.AddBuffer<PlayerCleanupActionProfileBufferElement>(player);
-            actionProfiles.Add(PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(3.2f, 2.88f, 0.8f));
+            actionProfiles.Add(PlayerCleanupActionContractUtility.CreateFallbackBroomSweepProfile(
+                3.2f,
+                2.88f,
+                0.8f,
+                0.25f,
+                0f,
+                0.25f,
+                0f));
 
             var uiBuffer = em.AddBuffer<PlayerUiFeedbackEventBufferElement>(player);
             uiBuffer.EnsureCapacity(64);

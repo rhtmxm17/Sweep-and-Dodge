@@ -276,7 +276,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(PlayerInputIntentComponent),
                 typeof(PlayerResolvedInputSnapshotComponent),
                 typeof(PlayerRadiusComponent),
-                typeof(VacuumActivationConfigComponent),
                 typeof(VacuumRuntimeStateComponent),
                 typeof(PlayerCarryBinComponent),
                 typeof(PlayerHazardRiskConfigComponent),
@@ -324,13 +323,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Sequence = 0u,
             });
             em.SetComponentData(player, new PlayerRadiusComponent { Value = 0.35f });
-            em.SetComponentData(player, new VacuumActivationConfigComponent
-            {
-                CaptureActiveTime = 0.25f,
-                CaptureCooldown = 0f,
-                ActiveTime = 0.25f,
-                Cooldown = 0f,
-            });
             em.SetComponentData(player, new VacuumRuntimeStateComponent
             {
                 CaptureActiveTimer = 0f,
@@ -410,6 +402,10 @@ namespace SweepNDodge.DotsBullets.Tests
             actionProfiles.Add(new PlayerCleanupActionProfileBufferElement
             {
                 ActionId = PlayerCleanupActionId.RadialRing,
+                CaptureActiveTime = 0.25f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.25f,
+                Cooldown = 0f,
                 TrashRange = 3.2f,
                 TrashFanHalfAngleDeg = 180f,
                 HazardRingRadius = 2.88f,

@@ -19,6 +19,10 @@ MonoBehaviour:
   ActiveMoveSpeedScale: 0.5
   Profiles:
   - ActionId: 3
+    CaptureActiveTime: 0.2
+    CaptureCooldown: 0
+    ActiveTime: 0.22
+    Cooldown: 1.8
     TrashRange: 3.2
     TrashFanHalfAngleDeg: 180
     HazardRingRadius: 2.88

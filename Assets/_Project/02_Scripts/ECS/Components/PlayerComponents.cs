@@ -48,14 +48,6 @@ namespace SweepNDodge.DotsBullets
         public float3 Position;
     }
 
-    public struct VacuumActivationConfigComponent : IComponentData
-    {
-        public float CaptureActiveTime;
-        public float CaptureCooldown;
-        public float ActiveTime;
-        public float Cooldown;
-    }
-
     public struct VacuumRuntimeStateComponent : IComponentData
     {
         public float CaptureActiveTimer;

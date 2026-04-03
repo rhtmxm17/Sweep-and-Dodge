@@ -363,7 +363,6 @@ namespace SweepNDodge.DotsBullets
             context = default;
 
             if (!_em.HasComponent<PlayerCleanupActionStateComponent>(_playerEntity)
-                || !_em.HasComponent<VacuumActivationConfigComponent>(_playerEntity)
                 || !_em.HasComponent<VacuumRuntimeStateComponent>(_playerEntity)
                 || !_em.HasComponent<PlayerCleanupSweepRuntimeStateComponent>(_playerEntity)
                 || !_em.HasComponent<PlayerGoSyncComponent>(_playerEntity)
@@ -373,14 +372,12 @@ namespace SweepNDodge.DotsBullets
             var goSync = _em.GetComponentData<PlayerGoSyncComponent>(_playerEntity);
             var actionState = _em.GetComponentData<PlayerCleanupActionStateComponent>(_playerEntity);
             var vacuumState = _em.GetComponentData<VacuumRuntimeStateComponent>(_playerEntity);
-            var vacuumConfig = _em.GetComponentData<VacuumActivationConfigComponent>(_playerEntity);
             var sweepState = _em.GetComponentData<PlayerCleanupSweepRuntimeStateComponent>(_playerEntity);
             var actionId = PlayerCleanupActionContractUtility.NormalizeRuntimeActionId(actionState.SelectedActionId, allowNone: true);
             var profiles = _em.GetBuffer<PlayerCleanupActionProfileBufferElement>(_playerEntity);
             var profile = PlayerCleanupActionDebugGeometryUtility.ResolveActionProfile(profiles, actionId);
             var geometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 actionId,
-                in vacuumConfig,
                 in vacuumState,
                 in sweepState,
                 in profile);

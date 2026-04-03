@@ -28,7 +28,6 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<PlayerTag>();
             state.RequireForUpdate<PlayerGoSyncComponent>();
             state.RequireForUpdate<BulletFieldConfigComponent>();
-            state.RequireForUpdate<VacuumActivationConfigComponent>();
             state.RequireForUpdate<VacuumRuntimeStateComponent>();
             state.RequireForUpdate<PlayerCarryBinComponent>();
             state.RequireForUpdate<PlayerHazardRiskConfigComponent>();
@@ -65,7 +64,6 @@ namespace SweepNDodge.DotsBullets
             uint frame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
 
             // Vacuum 상태 갱신(플레이어 단일)
-            var vacuumConfigRO = SystemAPI.GetComponent<VacuumActivationConfigComponent>(playerEntity);
             var vacuumStateRW = SystemAPI.GetComponentRW<VacuumRuntimeStateComponent>(playerEntity);
             var penaltyRW = SystemAPI.GetComponentRW<PlayerHazardPenaltyStateComponent>(playerEntity);
             var hazardRiskConfigRO = SystemAPI.GetComponent<PlayerHazardRiskConfigComponent>(playerEntity);
@@ -77,11 +75,12 @@ namespace SweepNDodge.DotsBullets
             var actionProfiles = SystemAPI.GetBuffer<PlayerCleanupActionProfileBufferElement>(playerEntity);
             var uiFeedbackBuffer = SystemAPI.GetBuffer<PlayerUiFeedbackEventBufferElement>(playerEntity);
             var actionId = NormalizeActionId(actionStateRO.SelectedActionId);
+            var actionProfile = PlayerCleanupActionDebugGeometryUtility.ResolveActionProfile(actionProfiles, actionId);
             bool wasVacuumActive = vacuumStateRW.ValueRO.IsActive != 0;
             byte isCarryFull = CarryBinRules.IsFull(in carryBinRO) ? (byte)1 : (byte)0;
             CarryBinRules.TickPenaltyTimers(ref penaltyRW.ValueRW, dt);
             byte blockReason = UpdateVacuumState(
-                in vacuumConfigRO,
+                in actionProfile,
                 ref vacuumStateRW.ValueRW,
                 in penaltyRW.ValueRO,
                 in carryBinRO,
@@ -113,10 +112,8 @@ namespace SweepNDodge.DotsBullets
             if (!BulletFieldShared.IsInitialized)
                 return;
 
-            var actionProfile = PlayerCleanupActionDebugGeometryUtility.ResolveActionProfile(actionProfiles, actionId);
             var broomGeometry = PlayerCleanupActionDebugGeometryUtility.ResolveBroomSweepFrameGeometry(
                 actionId,
-                in vacuumConfigRO,
                 in vacuumStateRW.ValueRO,
                 in sweepRuntimeStateRW.ValueRO,
                 in actionProfile);
@@ -231,7 +228,7 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static byte UpdateVacuumState(
-            in VacuumActivationConfigComponent config,
+            in PlayerCleanupActionProfileBufferElement profile,
             ref VacuumRuntimeStateComponent state,
             in PlayerHazardPenaltyStateComponent penalty,
             in PlayerCarryBinComponent carry,
@@ -260,7 +257,7 @@ namespace SweepNDodge.DotsBullets
                 if (state.ActiveTimer <= 0f)
                 {
                     state.IsActive = 0;
-                    state.CooldownTimer = config.Cooldown;
+                    state.CooldownTimer = profile.Cooldown;
                 }
                 return (byte)PlayerUiFeedbackReasonId.None;
             }
@@ -275,9 +272,9 @@ namespace SweepNDodge.DotsBullets
 
                 state.ActivateRequested = 0;
                 state.IsActive = 1;
-                state.ActiveTimer = config.ActiveTime;
-                state.CaptureActiveTimer = config.CaptureActiveTime;
-                state.CaptureCooldownTimer = config.CaptureCooldown;
+                state.ActiveTimer = profile.ActiveTime;
+                state.CaptureActiveTimer = profile.CaptureActiveTime;
+                state.CaptureCooldownTimer = profile.CaptureCooldown;
                 return CarryBinRules.IsFull(in carry)
                     ? (byte)PlayerUiFeedbackReasonId.CarryBinFull
                     : (byte)PlayerUiFeedbackReasonId.None;

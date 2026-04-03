@@ -102,6 +102,17 @@
     - EditMode 전체 391/391 통과
     - PlayMode smoke 38/38 통과
     - 테스트 임시 산출물 정리 완료
+- [x] D8. 청소 액션 timing ownership을 action profile로 이관했다.
+  - 변경 결과:
+    - `CaptureActiveTime`, `CaptureCooldown`, `ActiveTime`, `Cooldown` 4종을 `PlayerCleanupActionProfileBufferElement`와 `PlayerCleanupActionSetSO` profile entry로 이동했다.
+    - `VacuumActivationConfigComponent`를 제거하고, `BulletVacuumRequestSystem`와 `PlayerEcsBridge`가 선택된 action profile timing을 직접 사용하도록 정리했다.
+    - `PlayerProxyAuthoring`는 `CleanupActionSetSO`를 필수 authoring 자산으로 요구하고, `pas_default.asset`가 기본 `BroomSweep` timing 값을 소유하도록 정리했다.
+    - legacy compatibility fixture와 contract/smoke tests를 profile timing 기준으로 갱신했다.
+  - 검증 결과:
+    - Unity compile 요청 후 console error 0
+    - EditMode 전체 392/392 통과
+    - PlayMode smoke 38/38 통과
+    - 테스트 임시 산출물 정리 완료
 
 ## End of Session
 - 결과: `BroomSweep` 기본 경로 고정, legacy compatibility fixture 구분, 문서/테스트 의미 정렬까지 완료했다.

@@ -77,6 +77,7 @@
   - `DynamicBuffer<PlayerCleanupActionProfileBufferElement>`
 - 프로파일 구조:
   - 액션은 1개지만, 내부 메타데이터는 아래 두 서브 프로파일로 분리한다.
+  - 액션 타이밍 4종(`CaptureActiveTime`, `CaptureCooldown`, `ActiveTime`, `Cooldown`)도 profile이 직접 소유한다.
   - `TrashSweepProfile`
     - 스윕 반경(`InnerRadius`, `OuterRadius`)
     - 스윕 폭(`HalfAngleDeg`)
@@ -89,10 +90,14 @@
 - 공통 타이밍 메타데이터:
   - `CaptureActiveTime`
   - `CaptureCooldown`
+  - `ActiveTime`
+  - `Cooldown`
   - 좌/우 교대 규칙
   - 활성 시 기준 전방 고정 여부
 - fallback:
-  - SO 미지정/비어 있음 시에도 기본 `BroomSweep` 프로파일 1종만 베이크한다.
+  - 기본 플레이 경로는 `CleanupActionSetSO`를 필수로 사용한다.
+  - no-asset fallback은 더 이상 지원하지 않는다.
+  - 기본값은 `pas_default.asset`의 `BroomSweep` profile이 소유한다.
 
 ### 3.5 Request 단계 판정 분기와 공통 후처리
 - 판정 분기 owner: `BulletVacuumRequestSystem`.

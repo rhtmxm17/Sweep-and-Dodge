@@ -51,6 +51,12 @@ namespace SweepNDodge.DotsBullets
     {
         public PlayerCleanupActionId ActionId;
 
+        // action timing profile
+        public float CaptureActiveTime;
+        public float CaptureCooldown;
+        public float ActiveTime;
+        public float Cooldown;
+
         // legacy compatibility fields for non-default compatibility actions
         public float TrashRange;
         public float TrashFanHalfAngleDeg;
@@ -99,6 +105,10 @@ namespace SweepNDodge.DotsBullets
         {
             var sanitized = profile;
             sanitized.ActionId = NormalizeConfiguredActionId(profile.ActionId);
+            sanitized.CaptureActiveTime = math.max(0f, profile.CaptureActiveTime);
+            sanitized.CaptureCooldown = math.max(0f, profile.CaptureCooldown);
+            sanitized.ActiveTime = math.max(0f, profile.ActiveTime);
+            sanitized.Cooldown = math.max(0f, profile.Cooldown);
             sanitized.TrashRange = math.max(0f, profile.TrashRange);
             sanitized.TrashFanHalfAngleDeg = math.clamp(profile.TrashFanHalfAngleDeg, 0f, 180f);
             sanitized.HazardRingRadius = math.max(0f, profile.HazardRingRadius);
@@ -117,12 +127,20 @@ namespace SweepNDodge.DotsBullets
         public static PlayerCleanupActionProfileBufferElement CreateFallbackBroomSweepProfile(
             float range,
             float captureRingRadius,
-            float captureRingWidth)
+            float captureRingWidth,
+            float captureActiveTime = 0.20f,
+            float captureCooldown = 0f,
+            float activeTime = 0.22f,
+            float cooldown = 1.8f)
         {
             float safeRange = math.max(0f, range);
             return SanitizeProfile(new PlayerCleanupActionProfileBufferElement
             {
                 ActionId = PlayerCleanupActionId.BroomSweep,
+                CaptureActiveTime = captureActiveTime,
+                CaptureCooldown = captureCooldown,
+                ActiveTime = activeTime,
+                Cooldown = cooldown,
 
                 // Legacy compatibility values retained for explicit RadialRing/ForwardFanLine fixtures.
                 TrashRange = safeRange,

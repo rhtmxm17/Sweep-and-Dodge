@@ -39,6 +39,10 @@ namespace SweepNDodge.DotsBullets
                 return PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
                 {
                     ActionId = PlayerCleanupActionId.ForwardFanLine,
+                    CaptureActiveTime = 0.20f,
+                    CaptureCooldown = 0f,
+                    ActiveTime = 0.22f,
+                    Cooldown = 1.8f,
                     TrashRange = FallbackForwardTrashRange,
                     TrashFanHalfAngleDeg = FallbackForwardTrashHalfAngleDeg,
                     HazardRingRadius = 0f,
@@ -59,6 +63,10 @@ namespace SweepNDodge.DotsBullets
             return PlayerCleanupActionContractUtility.SanitizeProfile(new PlayerCleanupActionProfileBufferElement
             {
                 ActionId = PlayerCleanupActionId.RadialRing,
+                CaptureActiveTime = 0.20f,
+                CaptureCooldown = 0f,
+                ActiveTime = 0.22f,
+                Cooldown = 1.8f,
                 TrashRange = FallbackRadialTrashRange,
                 TrashFanHalfAngleDeg = 180f,
                 HazardRingRadius = FallbackRadialHazardRingRadius,
@@ -70,7 +78,6 @@ namespace SweepNDodge.DotsBullets
 
         public static BroomSweepFrameGeometry ResolveBroomSweepFrameGeometry(
             PlayerCleanupActionId actionId,
-            in VacuumActivationConfigComponent config,
             in VacuumRuntimeStateComponent vacuumState,
             in PlayerCleanupSweepRuntimeStateComponent sweepRuntimeState,
             in PlayerCleanupActionProfileBufferElement profile)
@@ -88,7 +95,7 @@ namespace SweepNDodge.DotsBullets
             if (math.lengthsq(facingXZ) <= 1e-8f)
                 return geometry;
 
-            float safeActiveTime = math.max(1e-5f, config.ActiveTime);
+            float safeActiveTime = math.max(1e-5f, profile.ActiveTime);
             geometry.Progress01 = math.saturate(1f - (math.max(0f, vacuumState.ActiveTimer) / safeActiveTime));
 
             float startAngleDeg;
