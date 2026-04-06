@@ -24,13 +24,11 @@
   - `Direction` subtype (`Random` / `Fixed` / `NWay` / `Spiral` / `RadialBurst`)
 - 비대상:
   - runtime flat buffer(`SourceClipPatternBuffer`)의 구조체 정의 상세
-  - `LegacyEntries[]` migration fallback의 authoring UX
   - `WallEven` 및 전용 데이터(`WallMask`, `WallInset`, 제거됨)
 
 ### 1.1 해석 계층
 - authoring SSOT는 `Directives[]`다.
 - bake/validation은 `WaveClipAuthoringResolver`가 만든 resolved snapshot을 공통으로 사용한다.
-- `LegacyEntries[]`는 1차에서 읽기 전용 migration fallback으로만 유지한다.
 
 ## 2. Payload 설정
 | 필드 | 의미 | 운영 규칙 |
@@ -228,7 +226,6 @@
 | `DurationSec` | 클립 총 길이 | `> 0` |
 | `Segments[]` | 클립 로컬 구간 | 구간별 `StartSec < EndSec`, overlap 허용 |
 | `Segments[].Directives[]` | typed SpawnDirective authoring | 기본 운영 경로. `Payload + Emission/Sampling/Direction subtype` |
-| `Segments[].LegacyEntries[]` | legacy inline fallback | 1차 migration fallback 전용. 신규 authoring 금지 |
 
 ### 9.2 BulletSourceAuthoring 직참조 필드(legacy authoring)
 | 필드 | 의미 | 운영 규칙 |
@@ -256,6 +253,7 @@
 12. `SpawnRunSeedComponent` 기본값은 `1`이며, 필요 시 런 시작 시점에 외부에서 주입해 재현성을 제어한다.
 
 ## 10. 변경 이력
+- 2026-04-03: 2차 정리 반영. legacy fallback 문구를 제거하고 `Directives[]` typed-only authoring 기준으로 레퍼런스를 고정했다.
 - 2026-04-03: `Directives[]` typed authoring, resolver snapshot 공통 해석, `LegacyEntries[]` migration fallback, `PointSet Points[]` authored shape와 runtime max4 clamp 규약을 반영했다.
 - 2026-04-01: `EventBurst` 첫 burst 시점을 `StartSec` 기준으로 명시하고, clip 종료 판정을 `DurationSec` 기준으로 동기화했다.
 - 2026-03-05: `EventShotSchedule/Interval`, 이벤트 기준점 고정 규약을 구현 반영 상태로 동기화했다.

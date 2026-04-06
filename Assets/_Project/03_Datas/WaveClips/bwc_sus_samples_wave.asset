@@ -29,7 +29,6 @@ MonoBehaviour:
         rid: 6141543268140187756
       Direction:
         rid: 6141543268140187757
-    LegacyEntries: []
   - editorOnlyDescription: 
     StartSec: 2
     EndSec: 3
@@ -42,7 +41,6 @@ MonoBehaviour:
         rid: 6141543268140187759
       Direction:
         rid: 6141543268140187760
-    LegacyEntries: []
   - editorOnlyDescription: 
     StartSec: 4
     EndSec: 5
@@ -55,7 +53,6 @@ MonoBehaviour:
         rid: 6141543268140187762
       Direction:
         rid: 6141543268140187763
-    LegacyEntries: []
   references:
     version: 2
     RefIds:

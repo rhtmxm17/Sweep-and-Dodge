@@ -4,7 +4,7 @@
 ## 상태
 - 반영됨(구현 완료)
 - 현행 운영 보충: Source 정의 SSOT는 이후 `StageDefinitionSO`로 이동했고, `BulletSourceAuthoring` 직참조 슬롯은 legacy migration data로 축소됐다.
-- 2026-04-03 보충: `WaveClipSO`는 root asset 스키마를 유지하고, segment 내부 authoring은 typed managed `Directives[]`로 분리됐다. `LegacyEntries[]`는 migration fallback 전용이다.
+- 2026-04-03 보충: `WaveClipSO`는 root asset 스키마를 유지하고, segment 내부 authoring은 typed managed `Directives[]`로 확정됐다.
 
 ## 배경
 - 기존 `WaveTimelineSO`는 Source 단위 전체 흐름을 함께 담고 있어, 이벤트 기반 웨이브 재생/재사용 확장 시 결합도가 높았다.
@@ -69,7 +69,6 @@
 - `Segments[]`
   - `StartSec`, `EndSec`
   - `Directives[]` (typed `Payload + Emission/Sampling/Direction` authoring)
-  - `LegacyEntries[]` (migration fallback only)
 
 ### Source Authoring 스키마
 1. `BulletSourceAuthoring` 직참조 배열

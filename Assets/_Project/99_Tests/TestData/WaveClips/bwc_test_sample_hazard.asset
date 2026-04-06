@@ -37,7 +37,6 @@ MonoBehaviour:
         rid: 6141543268140187741
       Direction:
         rid: 6141543268140187742
-    LegacyEntries: []
   - editorOnlyDescription: Bubble StopBurst
     StartSec: 4.75
     EndSec: 7.75
@@ -50,7 +49,6 @@ MonoBehaviour:
         rid: 6141543268140187744
       Direction:
         rid: 6141543268140187745
-    LegacyEntries: []
   - editorOnlyDescription: HomingLite
     StartSec: 8
     EndSec: 11
@@ -63,7 +61,6 @@ MonoBehaviour:
         rid: 6141543268140187747
       Direction:
         rid: 6141543268140187748
-    LegacyEntries: []
   references:
     version: 2
     RefIds:

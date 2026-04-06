@@ -30,7 +30,6 @@ MonoBehaviour:
         rid: 6141543268140187726
       Direction:
         rid: 6141543268140187727
-    LegacyEntries: []
   references:
     version: 2
     RefIds:

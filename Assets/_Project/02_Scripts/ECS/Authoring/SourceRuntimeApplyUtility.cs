@@ -277,7 +277,7 @@ namespace SweepNDodge.DotsBullets
             for (int s = 0; s < clip.Segments.Length; s++)
             {
                 var segment = clip.Segments[s];
-                int entryCount = WaveClipAuthoringResolver.GetPreferredEntryCount(in segment);
+                int entryCount = segment.Directives?.Length ?? 0;
                 if (segment.EndSec <= segment.StartSec || entryCount <= 0)
                     continue;
 
@@ -293,18 +293,10 @@ namespace SweepNDodge.DotsBullets
 
                 for (int e = 0; e < entryCount; e++)
                 {
-                    ResolvedWaveSpawnDirectiveSnapshot snapshot;
-                    if (WaveClipAuthoringResolver.UsesTypedEntries(in segment))
+                    if (!WaveClipAuthoringResolver.TryResolveTypedEntry(segment.Directives[e], out var snapshot, out string error))
                     {
-                        if (!WaveClipAuthoringResolver.TryResolveTypedEntry(segment.Directives[e], out snapshot, out string error))
-                        {
-                            throw new InvalidOperationException(
-                                $"{nameof(WaveClipSO)} '{clip.name}' has invalid typed directive at segmentIndex={s}, entryIndex={e}. {error}");
-                        }
-                    }
-                    else
-                    {
-                        snapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in segment.LegacyEntries[e]);
+                        throw new InvalidOperationException(
+                            $"{nameof(WaveClipSO)} '{clip.name}' has invalid typed directive at segmentIndex={s}, entryIndex={e}. {error}");
                     }
 
                     var bullet = snapshot.Bullet;
@@ -333,7 +325,7 @@ namespace SweepNDodge.DotsBullets
                         LineStart = new float2(snapshot.LineStart.x, snapshot.LineStart.y),
                         LineEnd = new float2(snapshot.LineEnd.x, snapshot.LineEnd.y),
                         SampleSpacing = Mathf.Max(0.001f, snapshot.SampleSpacing),
-                        PointSetCount = Mathf.Clamp(snapshot.PointSetCount, 0, WaveClipSO.SpawnSamplingProfile.PointSetMaxCount),
+                        PointSetCount = Mathf.Clamp(snapshot.PointSetCount, 0, PointSetSamplingAuthoring.MaxPointCount),
                         Point0 = new float2(snapshot.Point0.x, snapshot.Point0.y),
                         Point1 = new float2(snapshot.Point1.x, snapshot.Point1.y),
                         Point2 = new float2(snapshot.Point2.x, snapshot.Point2.y),

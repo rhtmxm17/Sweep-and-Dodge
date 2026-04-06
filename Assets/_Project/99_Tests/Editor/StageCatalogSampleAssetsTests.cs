@@ -141,7 +141,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void WaveClipAssets_UseTypedAuthoringWithoutLegacyEntries()
+        public void WaveClipAssets_UseTypedAuthoringOnly()
         {
             string[] guids = AssetDatabase.FindAssets($"t:{nameof(WaveClipSO)}", WaveClipSearchRoots);
             Assert.That(guids.Length, Is.GreaterThan(0));
@@ -157,11 +157,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     var segment = segments[s];
                     int typedCount = segment.Directives?.Length ?? 0;
-                    int legacyCount = segment.LegacyEntries?.Length ?? 0;
-
-                    Assert.That(legacyCount, Is.EqualTo(0), $"{path} segment[{s}] must not keep legacy entries after migration.");
-                    if (typedCount > 0)
-                        Assert.That(WaveClipAuthoringResolver.UsesTypedEntries(in segment), Is.True, $"{path} segment[{s}] must resolve through typed authoring.");
+                    Assert.That(typedCount, Is.GreaterThan(0), $"{path} segment[{s}] must keep typed directives.");
                 }
             }
         }
@@ -339,31 +335,16 @@ namespace SweepNDodge.DotsBullets.Tests
             for (int i = 0; i < segments.Length; i++)
             {
                 var segment = segments[i];
-                if (WaveClipAuthoringResolver.UsesTypedEntries(in segment))
+                var directives = segment.Directives ?? Array.Empty<WaveSpawnEntryAuthoring>();
+                for (int e = 0; e < directives.Length; e++)
                 {
-                    var directives = segment.Directives ?? Array.Empty<WaveSpawnEntryAuthoring>();
-                    for (int e = 0; e < directives.Length; e++)
-                    {
-                        if (!WaveClipAuthoringResolver.TryResolveTypedEntry(directives[e], out var snapshot, out _))
-                            continue;
+                    if (!WaveClipAuthoringResolver.TryResolveTypedEntry(directives[e], out var snapshot, out _))
+                        continue;
 
-                        if (snapshot.Bullet == null)
-                            continue;
+                    if (snapshot.Bullet == null)
+                        continue;
 
-                        ids.Add(snapshot.Bullet.DefinitionId);
-                    }
-                }
-                else
-                {
-                    var entries = segment.LegacyEntries ?? Array.Empty<WaveClipSO.SpawnEntry>();
-                    for (int e = 0; e < entries.Length; e++)
-                    {
-                        var snapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in entries[e]);
-                        if (snapshot.Bullet == null)
-                            continue;
-
-                        ids.Add(snapshot.Bullet.DefinitionId);
-                    }
+                    ids.Add(snapshot.Bullet.DefinitionId);
                 }
             }
 

@@ -16,13 +16,13 @@ MonoBehaviour:
   CaptureActiveTime: 0.2
   CaptureCooldown: 0
   ActiveTime: 0.22
-  Cooldown: 1.8
+  Cooldown: 0.85
   LockFacingWhileActive: 1
   ActiveMoveSpeedScale: 0.5
   TrashSweepInnerRadius: 1
   TrashSweepOuterRadius: 3.2
   TrashSweepHalfAngleDeg: 12
-  TrashSweepStartAngleDeg: -20
+  TrashSweepStartAngleDeg: -40
   TrashSweepEndAngleDeg: 80
   HazardRectLength: 3.2
   HazardRectHalfWidth: 0.55

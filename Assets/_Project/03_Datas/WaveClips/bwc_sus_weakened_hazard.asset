@@ -30,7 +30,6 @@ MonoBehaviour:
         rid: 6141543268140187750
       Direction:
         rid: 6141543268140187751
-    LegacyEntries: []
   - editorOnlyDescription: "\uACE0\uC815 \uB77C\uC778 \uBC1C\uC0AC: (-10,-10)~(10,-10),
       \uAC04\uACA9 4, 4\uCD08 \uAC04\uACA9 Hazard \uBC1C\uC0AC"
     StartSec: 0
@@ -44,7 +43,6 @@ MonoBehaviour:
         rid: 6141543268140187753
       Direction:
         rid: 6141543268140187754
-    LegacyEntries: []
   references:
     version: 2
     RefIds:

@@ -327,8 +327,7 @@ namespace SweepNDodge.DotsBullets.Editor
                         continue;
                     }
 
-                    int entryCount = WaveClipAuthoringResolver.GetPreferredEntryCount(in seg);
-                    bool usesTypedEntries = WaveClipAuthoringResolver.UsesTypedEntries(in seg);
+                    int entryCount = seg.Directives?.Length ?? 0;
                     if (entryCount <= 0)
                     {
                         issues.Add(new ContentValidationIssue(
@@ -343,7 +342,6 @@ namespace SweepNDodge.DotsBullets.Editor
                         {
                             if (!TryBuildWaveClipValidationEntry(
                                     in seg,
-                                    usesTypedEntries,
                                     e,
                                     segmentLocation,
                                     out var validationEntry,
@@ -352,7 +350,7 @@ namespace SweepNDodge.DotsBullets.Editor
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV040",
-                                    $"{segmentLocation}/{(usesTypedEntries ? "Directives" : "LegacyEntries")}[{e}]",
+                                    $"{segmentLocation}/Directives[{e}]",
                                     authoringError));
                                 continue;
                             }
@@ -531,13 +529,13 @@ namespace SweepNDodge.DotsBullets.Editor
                                         $"Clip segment uses PointSet with PointCount <= 0 at segmentIndex={s}, entryIndex={e}."));
                                 }
 
-                                if (validationEntry.RawPointCount > WaveClipSO.SpawnSamplingProfile.PointSetMaxCount)
+                                if (validationEntry.RawPointCount > PointSetSamplingAuthoring.MaxPointCount)
                                 {
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Warning,
                                         "CVW033",
                                         validationEntry.EntryLocation,
-                                        $"Clip segment PointSet PointCount exceeds max({WaveClipSO.SpawnSamplingProfile.PointSetMaxCount}) and will be clamped at segmentIndex={s}, entryIndex={e}."));
+                                        $"Clip segment PointSet PointCount exceeds max({PointSetSamplingAuthoring.MaxPointCount}) and will be clamped at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
                         }
@@ -604,120 +602,89 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static bool TryBuildWaveClipValidationEntry(
             in WaveClipSO.ClipSegment segment,
-            bool usesTypedEntries,
             int entryIndex,
             string segmentLocation,
             out WaveClipValidationEntry validationEntry,
             out string error)
         {
-            string entryCollection = usesTypedEntries ? "Directives" : "LegacyEntries";
-            string entryLocation = $"{segmentLocation}/{entryCollection}[{entryIndex}]";
-
-            if (usesTypedEntries)
+            string entryLocation = $"{segmentLocation}/Directives[{entryIndex}]";
+            var typedEntry = segment.Directives[entryIndex];
+            if (!WaveClipAuthoringResolver.TryResolveTypedEntry(typedEntry, out var snapshot, out error))
             {
-                var typedEntry = segment.Directives[entryIndex];
-                if (!WaveClipAuthoringResolver.TryResolveTypedEntry(typedEntry, out var snapshot, out error))
-                {
-                    validationEntry = default;
-                    return false;
-                }
-
-                float rawRate = 0f;
-                float rawMean = 0f;
-                int rawBurstRepeatCount = 1;
-                float rawBurstIntervalSec = 1f;
-                int rawBurstShotsPerEvent = 1;
-                float rawEventShotIntervalSec = 0f;
-                float rawMaxActiveDensity = typedEntry.Emission.SpawnMode == SourceSpawnModeId.CapAndMaxDensity
-                    ? typedEntry.Emission.MaxActiveDensityPerArea
-                    : typedEntry.Emission.MaxActiveDensityPerArea;
-                switch (typedEntry.Emission)
-                {
-                    case RateFieldEmissionAuthoring rateField:
-                        rawRate = rateField.RatePerSecPerArea;
-                        break;
-                    case PoissonEmissionAuthoring poisson:
-                        rawMean = poisson.MeanEventsPerSec;
-                        rawBurstShotsPerEvent = poisson.BurstShotsPerEvent;
-                        rawEventShotIntervalSec = poisson.EventShotIntervalSec;
-                        break;
-                    case EventBurstEmissionAuthoring eventBurst:
-                        rawBurstRepeatCount = eventBurst.BurstRepeatCount;
-                        rawBurstIntervalSec = eventBurst.BurstIntervalSec;
-                        rawBurstShotsPerEvent = eventBurst.BurstShotsPerEvent;
-                        rawEventShotIntervalSec = eventBurst.EventShotIntervalSec;
-                        break;
-                }
-
-                int rawSpawnSampleBudget = typedEntry.Sampling.SpawnSampleBudget;
-                float rawPlayerNoSpawnRadius = typedEntry.Sampling.PlayerNoSpawnRadius;
-                float rawLineLength = 0f;
-                float rawLineSampleSpacing = 0f;
-                int rawPointCount = 0;
-                switch (typedEntry.Sampling)
-                {
-                    case LineEvenSamplingAuthoring lineEven:
-                        rawLineLength = (lineEven.LineEnd - lineEven.LineStart).magnitude;
-                        rawLineSampleSpacing = lineEven.SampleSpacing;
-                        break;
-                    case PointSetSamplingAuthoring pointSet:
-                        rawPointCount = pointSet.Points?.Length ?? 0;
-                        break;
-                }
-
-                int rawNWayCount = 1;
-                float rawSpiralStepDeg = 0f;
-                switch (typedEntry.Direction)
-                {
-                    case NWayDirectionAuthoring nWay:
-                        rawNWayCount = nWay.NWayCount;
-                        break;
-                    case SpiralDirectionAuthoring spiral:
-                        rawSpiralStepDeg = spiral.SpiralStepDeg;
-                        break;
-                }
-
-                validationEntry = new WaveClipValidationEntry(
-                    entryLocation,
-                    in snapshot,
-                    rawRate,
-                    rawMean,
-                    rawBurstRepeatCount,
-                    rawBurstIntervalSec,
-                    rawBurstShotsPerEvent,
-                    rawEventShotIntervalSec,
-                    rawMaxActiveDensity,
-                    rawSpawnSampleBudget,
-                    rawPlayerNoSpawnRadius,
-                    rawNWayCount,
-                    rawSpiralStepDeg,
-                    rawLineLength,
-                    rawLineSampleSpacing,
-                    rawPointCount);
-                error = string.Empty;
-                return true;
+                validationEntry = default;
+                return false;
             }
 
-            var legacyEntry = segment.LegacyEntries[entryIndex];
-            var legacySnapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in legacyEntry);
-            float legacyLineLength = (legacyEntry.Sampling.LineEnd - legacyEntry.Sampling.LineStart).magnitude;
+            float rawRate = 0f;
+            float rawMean = 0f;
+            int rawBurstRepeatCount = 1;
+            float rawBurstIntervalSec = 1f;
+            int rawBurstShotsPerEvent = 1;
+            float rawEventShotIntervalSec = 0f;
+            float rawMaxActiveDensity = typedEntry.Emission.MaxActiveDensityPerArea;
+            switch (typedEntry.Emission)
+            {
+                case RateFieldEmissionAuthoring rateField:
+                    rawRate = rateField.RatePerSecPerArea;
+                    break;
+                case PoissonEmissionAuthoring poisson:
+                    rawMean = poisson.MeanEventsPerSec;
+                    rawBurstShotsPerEvent = poisson.BurstShotsPerEvent;
+                    rawEventShotIntervalSec = poisson.EventShotIntervalSec;
+                    break;
+                case EventBurstEmissionAuthoring eventBurst:
+                    rawBurstRepeatCount = eventBurst.BurstRepeatCount;
+                    rawBurstIntervalSec = eventBurst.BurstIntervalSec;
+                    rawBurstShotsPerEvent = eventBurst.BurstShotsPerEvent;
+                    rawEventShotIntervalSec = eventBurst.EventShotIntervalSec;
+                    break;
+            }
+
+            int rawSpawnSampleBudget = typedEntry.Sampling.SpawnSampleBudget;
+            float rawPlayerNoSpawnRadius = typedEntry.Sampling.PlayerNoSpawnRadius;
+            float rawLineLength = 0f;
+            float rawLineSampleSpacing = 0f;
+            int rawPointCount = 0;
+            switch (typedEntry.Sampling)
+            {
+                case LineEvenSamplingAuthoring lineEven:
+                    rawLineLength = (lineEven.LineEnd - lineEven.LineStart).magnitude;
+                    rawLineSampleSpacing = lineEven.SampleSpacing;
+                    break;
+                case PointSetSamplingAuthoring pointSet:
+                    rawPointCount = pointSet.Points?.Length ?? 0;
+                    break;
+            }
+
+            int rawNWayCount = 1;
+            float rawSpiralStepDeg = 0f;
+            switch (typedEntry.Direction)
+            {
+                case NWayDirectionAuthoring nWay:
+                    rawNWayCount = nWay.NWayCount;
+                    break;
+                case SpiralDirectionAuthoring spiral:
+                    rawSpiralStepDeg = spiral.SpiralStepDeg;
+                    break;
+            }
+
             validationEntry = new WaveClipValidationEntry(
                 entryLocation,
-                in legacySnapshot,
-                legacyEntry.Emission.RatePerSecPerArea,
-                legacyEntry.Emission.MeanEventsPerSec,
-                legacyEntry.Emission.BurstRepeatCount,
-                legacyEntry.Emission.BurstIntervalSec,
-                legacyEntry.Emission.BurstShotsPerEvent,
-                legacyEntry.Emission.EventShotIntervalSec,
-                legacyEntry.Emission.MaxActiveDensityPerArea,
-                legacyEntry.Sampling.SpawnSampleBudget,
-                legacyEntry.Sampling.PlayerNoSpawnRadius,
-                legacyEntry.Direction.NWayCount,
-                legacyEntry.Direction.SpiralStepDeg,
-                legacyLineLength,
-                legacyEntry.Sampling.SampleSpacing,
-                legacyEntry.Sampling.PointCount);
+                in snapshot,
+                rawRate,
+                rawMean,
+                rawBurstRepeatCount,
+                rawBurstIntervalSec,
+                rawBurstShotsPerEvent,
+                rawEventShotIntervalSec,
+                rawMaxActiveDensity,
+                rawSpawnSampleBudget,
+                rawPlayerNoSpawnRadius,
+                rawNWayCount,
+                rawSpiralStepDeg,
+                rawLineLength,
+                rawLineSampleSpacing,
+                rawPointCount);
             error = string.Empty;
             return true;
         }

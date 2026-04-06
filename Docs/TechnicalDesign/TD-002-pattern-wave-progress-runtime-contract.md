@@ -73,7 +73,7 @@
 
 Authoring/Bake 해석 경로:
 - `WaveClipSO.Segments[].Directives[]` typed authoring이 기본 SSOT다.
-- `WaveClipAuthoringResolver`가 typed authoring 또는 `LegacyEntries[]` fallback을 `ResolvedWaveSpawnDirectiveSnapshot`으로 통합 해석한다.
+- `WaveClipAuthoringResolver`가 typed authoring을 `ResolvedWaveSpawnDirectiveSnapshot`으로 해석한다.
 - `SourceRuntimeApplyUtility`는 resolved snapshot만 flat runtime buffer(`SourceClipPatternBuffer`)로 flatten한다.
 
 ### 3.2 Progress 모델
@@ -207,7 +207,7 @@ Hit:
 - PointSet authored `Points.Length > 4` 입력(clamp 경고) (`CVW033`).
 
 검증 코드 매핑(현재 구현):
-- `CV012`: Wave segment의 `Directives`/`LegacyEntries` 비어 있음
+- `CV012`: Wave segment의 `Directives` 비어 있음
 - `CV013`: Wave entry의 `Bullet == null`
 - `CV014`: Wave entry가 미등록 `DefinitionId` 참조
 - `CV015`: Wave entry의 `RatePerSecPerArea < 0` (RateField)
@@ -278,6 +278,7 @@ Hit:
   - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
 
 ## 10. 변경 이력
+- 2026-04-03: 2차 정리 반영. WaveClip validation/bake 경로를 typed-only로 고정하고 legacy fallback 문구를 제거했다.
 - 2026-04-03: `WaveClipSO` authoring/runtime split 1차 반영. `Directives[] -> WaveClipAuthoringResolver -> SourceClipPatternBuffer` 경로, `LegacyEntries[]` fallback, `CV040`, `PointSet Points[]` authored shape와 `CVW033` clamp warning을 동기화했다.
 - 2026-04-01: `EventBurst` 첫 burst를 `StartSec` 시점에 맞추고, clip 종료 판정을 `WaveClipSO.DurationSec` 기준으로 동기화했다.
 - 2026-03-16: `RiskMultiplier` 범위를 `1 + HazardStack × HazardBonusRate`로 축소해 현행 구현 계획과 동기화하고, `HazardStack` 다음 프레임 반영 규칙을 `TD-018` 참조로 분리했다.

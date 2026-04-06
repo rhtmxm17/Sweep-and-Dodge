@@ -30,7 +30,6 @@ MonoBehaviour:
         rid: 6141543268140187717
       Direction:
         rid: 6141543268140187718
-    LegacyEntries: []
   - editorOnlyDescription: "Phase \uC804\uD658 2\uCD08 \uC2DC\uC810: \uBB34\uC791\uC704
       \uC704\uCE58 8\uBC29\uD5A5 \uBC29\uC0AC 3\uD68C (0.2\uCD08 \uAC04\uACA9)"
     StartSec: 1.8
@@ -41,10 +40,9 @@ MonoBehaviour:
       Emission:
         rid: 6141543268140187719
       Sampling:
-        rid: 6141543268140187720
+        rid: 6141543335094648918
       Direction:
-        rid: 6141543268140187721
-    LegacyEntries: []
+        rid: 6141543335094648915
   references:
     version: 2
     RefIds:
@@ -79,20 +77,20 @@ MonoBehaviour:
         SpawnMode: 0
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 3
-        BurstIntervalSec: 0.2
+        BurstIntervalSec: 0.5
         BurstShotsPerEvent: 8
-        EventShotSchedule: 0
-        EventShotIntervalSec: 0
-    - rid: 6141543268140187720
+        EventShotSchedule: 1
+        EventShotIntervalSec: 0.15
+    - rid: 6141543335094648915
+      type: {class: NWayDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        BaseAngleDeg: 15
+        NWayCount: 8
+    - rid: 6141543335094648918
       type: {class: UniformFieldSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         CenterMode: 0
         FixedPoint: {x: 0, y: 0}
         SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 24
+        SpawnSampleBudget: 16
         PlayerNoSpawnRadius: 0
-    - rid: 6141543268140187721
-      type: {class: NWayDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        BaseAngleDeg: 0
-        NWayCount: 8

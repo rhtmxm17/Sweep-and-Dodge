@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
@@ -41,40 +40,6 @@ namespace SweepNDodge.DotsBullets
         public const int DefaultSpawnSampleBudget = 16;
         public const float DefaultBurstIntervalSec = 1f;
         public const float DefaultTimedEventShotIntervalSec = 0.1f;
-
-        public static bool UsesTypedEntries(in WaveClipSO.ClipSegment segment)
-        {
-            return segment.Directives != null && segment.Directives.Length > 0;
-        }
-
-        public static int GetPreferredEntryCount(in WaveClipSO.ClipSegment segment)
-        {
-            if (UsesTypedEntries(in segment))
-                return segment.Directives.Length;
-
-            return segment.LegacyEntries?.Length ?? 0;
-        }
-
-        public static WaveSpawnEntryAuthoring ConvertLegacyEntry(in WaveClipSO.SpawnEntry legacyEntry)
-        {
-            return new WaveSpawnEntryAuthoring
-            {
-                Payload = legacyEntry.Payload,
-                Emission = ConvertLegacyEmission(legacyEntry.Emission),
-                Sampling = ConvertLegacySampling(legacyEntry.Sampling),
-                Direction = ConvertLegacyDirection(legacyEntry.Direction),
-            };
-        }
-
-        public static ResolvedWaveSpawnDirectiveSnapshot ResolveLegacyEntry(in WaveClipSO.SpawnEntry entry)
-        {
-            var snapshot = CreateDefaultSnapshot();
-            snapshot.Bullet = entry.Payload.Bullet;
-            ApplyLegacyEmission(ref snapshot, entry.Emission);
-            ApplyLegacySampling(ref snapshot, entry.Sampling);
-            ApplyLegacyDirection(ref snapshot, entry.Direction);
-            return snapshot;
-        }
 
         public static bool TryResolveTypedEntry(
             WaveSpawnEntryAuthoring entry,
@@ -151,58 +116,6 @@ namespace SweepNDodge.DotsBullets
             };
         }
 
-        private static void ApplyLegacyEmission(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveClipSO.SpawnEmissionProfile emission)
-        {
-            snapshot.EmissionMode = emission.EmissionMode;
-            snapshot.SpawnMode = emission.SpawnMode;
-            snapshot.RatePerSecPerArea = emission.RatePerSecPerArea;
-            snapshot.MeanEventsPerSec = emission.MeanEventsPerSec;
-            snapshot.BurstRepeatCount = emission.EmissionMode == SourceSpawnEmissionModeId.EventBurst
-                ? (emission.BurstRepeatCount == 0 ? 1 : emission.BurstRepeatCount)
-                : 1;
-            snapshot.BurstIntervalSec = emission.EmissionMode == SourceSpawnEmissionModeId.EventBurst
-                ? (emission.BurstIntervalSec > 0f ? emission.BurstIntervalSec : DefaultBurstIntervalSec)
-                : DefaultBurstIntervalSec;
-            snapshot.BurstShotsPerEvent = (emission.EmissionMode == SourceSpawnEmissionModeId.Poisson
-                || emission.EmissionMode == SourceSpawnEmissionModeId.EventBurst)
-                ? (emission.BurstShotsPerEvent > 0 ? emission.BurstShotsPerEvent : 1)
-                : 1;
-            snapshot.EventShotSchedule = (emission.EmissionMode == SourceSpawnEmissionModeId.Poisson
-                || emission.EmissionMode == SourceSpawnEmissionModeId.EventBurst)
-                ? emission.EventShotSchedule
-                : SourceSpawnEventShotScheduleId.Instant;
-            snapshot.EventShotIntervalSec = snapshot.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
-                ? (emission.EventShotIntervalSec > 0f ? emission.EventShotIntervalSec : DefaultTimedEventShotIntervalSec)
-                : 0f;
-            snapshot.MaxActiveDensityPerArea = emission.MaxActiveDensityPerArea;
-        }
-
-        private static void ApplyLegacySampling(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveClipSO.SpawnSamplingProfile sampling)
-        {
-            snapshot.SamplingMode = sampling.SamplingMode;
-            snapshot.CenterMode = sampling.CenterMode;
-            snapshot.FixedPoint = sampling.FixedPoint;
-            snapshot.SpawnOffset = sampling.SpawnOffset;
-            snapshot.LineStart = sampling.LineStart;
-            snapshot.LineEnd = sampling.LineEnd;
-            snapshot.SampleSpacing = sampling.SampleSpacing > 0f ? sampling.SampleSpacing : 1f;
-            snapshot.PointSetCount = Mathf.Clamp(sampling.PointCount, 0, WaveClipSO.SpawnSamplingProfile.PointSetMaxCount);
-            snapshot.Point0 = sampling.Point0;
-            snapshot.Point1 = sampling.Point1;
-            snapshot.Point2 = sampling.Point2;
-            snapshot.Point3 = sampling.Point3;
-            snapshot.SpawnSampleBudget = sampling.SpawnSampleBudget > 0 ? sampling.SpawnSampleBudget : DefaultSpawnSampleBudget;
-            snapshot.PlayerNoSpawnRadius = sampling.PlayerNoSpawnRadius;
-        }
-
-        private static void ApplyLegacyDirection(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveClipSO.SpawnDirectionProfile direction)
-        {
-            snapshot.DirectionMode = direction.DirectionMode;
-            snapshot.BaseAngleDeg = direction.BaseAngleDeg;
-            snapshot.NWayCount = direction.NWayCount > 0 ? direction.NWayCount : 1;
-            snapshot.SpiralStepDeg = direction.SpiralStepDeg;
-        }
-
         private static void ApplyTypedEmission(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveEmissionAuthoringBase emission)
         {
             snapshot.EmissionMode = emission.EmissionMode;
@@ -254,7 +167,7 @@ namespace SweepNDodge.DotsBullets
                     break;
 
                 case PointSetSamplingAuthoring pointSet:
-                    int pointCount = Mathf.Clamp(pointSet.Points?.Length ?? 0, 0, WaveClipSO.SpawnSamplingProfile.PointSetMaxCount);
+                    int pointCount = Mathf.Clamp(pointSet.Points?.Length ?? 0, 0, PointSetSamplingAuthoring.MaxPointCount);
                     snapshot.PointSetCount = pointCount;
                     snapshot.Point0 = GetPoint(pointSet.Points, 0);
                     snapshot.Point1 = GetPoint(pointSet.Points, 1);
@@ -288,104 +201,6 @@ namespace SweepNDodge.DotsBullets
                     snapshot.BaseAngleDeg = radialBurst.BaseAngleDeg;
                     break;
             }
-        }
-
-        private static WaveEmissionAuthoringBase ConvertLegacyEmission(WaveClipSO.SpawnEmissionProfile emission)
-        {
-            return emission.EmissionMode switch
-            {
-                SourceSpawnEmissionModeId.Poisson => new PoissonEmissionAuthoring
-                {
-                    SpawnMode = emission.SpawnMode,
-                    MaxActiveDensityPerArea = emission.MaxActiveDensityPerArea,
-                    MeanEventsPerSec = emission.MeanEventsPerSec,
-                    BurstShotsPerEvent = emission.BurstShotsPerEvent,
-                    EventShotSchedule = emission.EventShotSchedule,
-                    EventShotIntervalSec = emission.EventShotIntervalSec,
-                },
-                SourceSpawnEmissionModeId.EventBurst => new EventBurstEmissionAuthoring
-                {
-                    SpawnMode = emission.SpawnMode,
-                    MaxActiveDensityPerArea = emission.MaxActiveDensityPerArea,
-                    BurstRepeatCount = emission.BurstRepeatCount,
-                    BurstIntervalSec = emission.BurstIntervalSec,
-                    BurstShotsPerEvent = emission.BurstShotsPerEvent,
-                    EventShotSchedule = emission.EventShotSchedule,
-                    EventShotIntervalSec = emission.EventShotIntervalSec,
-                },
-                _ => new RateFieldEmissionAuthoring
-                {
-                    SpawnMode = emission.SpawnMode,
-                    MaxActiveDensityPerArea = emission.MaxActiveDensityPerArea,
-                    RatePerSecPerArea = emission.RatePerSecPerArea,
-                },
-            };
-        }
-
-        private static WaveSamplingAuthoringBase ConvertLegacySampling(WaveClipSO.SpawnSamplingProfile sampling)
-        {
-            WaveSamplingAuthoringBase result = sampling.SamplingMode switch
-            {
-                SourceSpawnSamplingModeId.PollutionTopK => new PollutionTopKSamplingAuthoring(),
-                SourceSpawnSamplingModeId.LineEven => new LineEvenSamplingAuthoring
-                {
-                    LineStart = sampling.LineStart,
-                    LineEnd = sampling.LineEnd,
-                    SampleSpacing = sampling.SampleSpacing,
-                },
-                SourceSpawnSamplingModeId.PointSet => new PointSetSamplingAuthoring
-                {
-                    Points = CollectLegacyPoints(sampling),
-                },
-                _ => new UniformFieldSamplingAuthoring(),
-            };
-
-            result.CenterMode = sampling.CenterMode;
-            result.FixedPoint = sampling.FixedPoint;
-            result.SpawnOffset = sampling.SpawnOffset;
-            result.SpawnSampleBudget = sampling.SpawnSampleBudget;
-            result.PlayerNoSpawnRadius = sampling.PlayerNoSpawnRadius;
-            return result;
-        }
-
-        private static WaveDirectionAuthoringBase ConvertLegacyDirection(WaveClipSO.SpawnDirectionProfile direction)
-        {
-            return direction.DirectionMode switch
-            {
-                SourceSpawnDirectionModeId.Fixed => new FixedDirectionAuthoring
-                {
-                    BaseAngleDeg = direction.BaseAngleDeg,
-                },
-                SourceSpawnDirectionModeId.NWay => new NWayDirectionAuthoring
-                {
-                    BaseAngleDeg = direction.BaseAngleDeg,
-                    NWayCount = direction.NWayCount,
-                },
-                SourceSpawnDirectionModeId.Spiral => new SpiralDirectionAuthoring
-                {
-                    BaseAngleDeg = direction.BaseAngleDeg,
-                    SpiralStepDeg = direction.SpiralStepDeg,
-                },
-                SourceSpawnDirectionModeId.RadialBurst => new RadialBurstDirectionAuthoring
-                {
-                    BaseAngleDeg = direction.BaseAngleDeg,
-                },
-                _ => new RandomDirectionAuthoring(),
-            };
-        }
-
-        private static Vector2[] CollectLegacyPoints(WaveClipSO.SpawnSamplingProfile sampling)
-        {
-            int pointCount = Mathf.Clamp(sampling.PointCount, 0, WaveClipSO.SpawnSamplingProfile.PointSetMaxCount);
-            if (pointCount <= 0)
-                return Array.Empty<Vector2>();
-
-            var points = new Vector2[pointCount];
-            if (pointCount > 0) points[0] = sampling.Point0;
-            if (pointCount > 1) points[1] = sampling.Point1;
-            if (pointCount > 2) points[2] = sampling.Point2;
-            if (pointCount > 3) points[3] = sampling.Point3;
-            return points;
         }
 
         private static Vector2 GetPoint(Vector2[] points, int index)

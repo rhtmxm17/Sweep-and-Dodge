@@ -29,7 +29,6 @@ MonoBehaviour:
         rid: 6141543268140187732
       Direction:
         rid: 6141543268140187733
-    LegacyEntries: []
   - editorOnlyDescription: Cleanup Reward - CarryFullRemoved
     StartSec: 8.5
     EndSec: 9.5
@@ -42,7 +41,6 @@ MonoBehaviour:
         rid: 6141543268140187735
       Direction:
         rid: 6141543268140187736
-    LegacyEntries: []
   references:
     version: 2
     RefIds:

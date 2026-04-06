@@ -38,7 +38,6 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 
 - 현재 authoring SSOT는 `WaveClipSO.Segments[].Directives[]`의 typed managed entry다.
 - bake/validation 공통 해석은 `WaveClipAuthoringResolver`가 담당하며, 결과는 resolved snapshot을 거쳐 flat runtime buffer로 내려간다.
-- `WaveClipSO.Segments[].LegacyEntries[]`는 1차 migration fallback 전용이다.
 
 ## 4. SamplingProfile (어디에서 뽑는가)
 - 역할: 공간 분포와 공정성 제어.
@@ -156,7 +155,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 - 방향 계산(Direction)도 `ExecutionBegin` 스폰 소비 시점에서 수행한다.
 - 사건형 이벤트 모드 확장(`Poisson/EventBurst`, `Timed`)에서는 이벤트 시작 시 샘플링 기준점을 고정하고, 이벤트 내부 샷은 해당 기준점 집합으로만 소비한다.
 - `WaveClipSO`는 root asset(`ClipId/Phase/Lane/DurationSec/Segments`)을 유지하고, segment authoring은 `Directives[]` typed 모델을 기본 경로로 사용한다.
-- `WaveClipAuthoringResolver`는 typed authoring과 legacy fallback을 공통 resolved snapshot으로 해석한 뒤 runtime flat shape에 동일 규약으로 내려준다.
+- `WaveClipAuthoringResolver`는 typed authoring을 resolved snapshot으로 해석한 뒤 runtime flat shape에 동일 규약으로 내려준다.
 - 프레임 예산(`BudgetPerFrame`)은 요청 전체(탄 종류 공용)에서 공유한다.
   - 우선순위 규칙: Lane 우선순위(`특수 > Hazard > Trash`)를 적용한다.
 - field sampling directive(`UniformField`, `PollutionTopK`)는 pollution runtime state가 존재할 때 full source area가 아니라 active-area 비율이 반영된 effective area로 density/cap을 계산한다.
@@ -169,7 +168,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
 
 ## 11. 마이그레이션 체크리스트
 - [x] 대상 `WaveClipSO.Segments[].Directives[]`가 typed authoring(`Payload + Emission/Sampling/Direction subtype`) 기준으로 정리되었는가
-- [x] 운영/test WaveClip asset이 `LegacyEntries[]` 없이 typed authoring만 사용하도록 마이그레이션되었는가
+- [x] 운영/test WaveClip asset이 typed authoring만 사용하도록 정리되었는가
 - [x] `Payload.Bullet` 참조가 각 엔트리에 채워졌는가
 - [x] `Sampling` 기본값을 명시했는가 (`SamplingMode=PollutionTopK`, `CenterMode=SourceCenter`, `SpawnSampleBudget=16`)
 - [x] `Poisson` 사용 시 `EmissionMode=Poisson`, `MeanEventsPerSec>=0`를 확인했는가
@@ -194,6 +193,7 @@ SpawnDirective = SamplingProfile(어디) × EmissionProfile(언제/얼마나) ×
   - 채널 명칭은 탄 타입과 혼동 방지를 위해 `SpawnLane` 계열 네이밍을 검토한다.
 
 ## 14. 변경 이력
+- 2026-04-03: 2차 정리 반영. `LegacyEntries`/legacy compat layer를 제거하고 typed-only authoring SSOT로 고정했다.
 - 2026-04-03: `WaveClipSO` authoring/runtime split 1차 반영. `Segments[].Directives[]` typed managed model, `WaveClipAuthoringResolver` 공통 해석, `LegacyEntries[]` migration fallback, `PointSet Points[] -> runtime max4 clamp` 규약을 문서에 동기화했다.
 - 2026-03-30: `GD-014` 구현 준비를 위해 pollution recovery specialized contract를 `TD-026`으로 분리하고 본 문서에서 우선 참조 링크를 추가했다.
 - 2026-03-05: `Poisson/EventBurst Timed`와 이벤트 기준점 고정 항목을 구현 반영 상태로 동기화했다.

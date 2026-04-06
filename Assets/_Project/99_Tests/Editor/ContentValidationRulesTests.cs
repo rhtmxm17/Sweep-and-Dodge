@@ -1045,63 +1045,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void WaveClip_TypedAndLegacyEntries_ProduceSameResolvedSnapshot()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(9301);
-                def.Prefab = prefab;
-
-                var legacyEntry = CreateDefaultLegacyEntry(def);
-                legacyEntry.Emission.EmissionMode = SourceSpawnEmissionModeId.EventBurst;
-                legacyEntry.Emission.SpawnMode = SourceSpawnModeId.CapAndMaxDensity;
-                legacyEntry.Emission.BurstRepeatCount = 3;
-                legacyEntry.Emission.BurstIntervalSec = 0.25f;
-                legacyEntry.Emission.BurstShotsPerEvent = 8;
-                legacyEntry.Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
-                legacyEntry.Emission.EventShotIntervalSec = 0.2f;
-                legacyEntry.Emission.MaxActiveDensityPerArea = 2f;
-                legacyEntry.Sampling.SamplingMode = SourceSpawnSamplingModeId.PointSet;
-                legacyEntry.Sampling.PointCount = 4;
-                legacyEntry.Sampling.Point0 = Vector2.left;
-                legacyEntry.Sampling.Point1 = Vector2.right;
-                legacyEntry.Sampling.Point2 = Vector2.up;
-                legacyEntry.Sampling.Point3 = Vector2.down;
-                legacyEntry.Direction.DirectionMode = SourceSpawnDirectionModeId.Spiral;
-                legacyEntry.Direction.BaseAngleDeg = 15f;
-                legacyEntry.Direction.SpiralStepDeg = 20f;
-
-                var typedEntry = WaveClipAuthoringResolver.ConvertLegacyEntry(in legacyEntry);
-                bool ok = WaveClipAuthoringResolver.TryResolveTypedEntry(typedEntry, out var typedSnapshot, out string error);
-                Assert.That(ok, Is.True, error);
-
-                var legacySnapshot = WaveClipAuthoringResolver.ResolveLegacyEntry(in legacyEntry);
-                Assert.That(typedSnapshot.Bullet, Is.EqualTo(legacySnapshot.Bullet));
-                Assert.That(typedSnapshot.EmissionMode, Is.EqualTo(legacySnapshot.EmissionMode));
-                Assert.That(typedSnapshot.SpawnMode, Is.EqualTo(legacySnapshot.SpawnMode));
-                Assert.That(typedSnapshot.SamplingMode, Is.EqualTo(legacySnapshot.SamplingMode));
-                Assert.That(typedSnapshot.DirectionMode, Is.EqualTo(legacySnapshot.DirectionMode));
-                Assert.That(typedSnapshot.BurstRepeatCount, Is.EqualTo(legacySnapshot.BurstRepeatCount));
-                Assert.That(typedSnapshot.BurstIntervalSec, Is.EqualTo(legacySnapshot.BurstIntervalSec));
-                Assert.That(typedSnapshot.BurstShotsPerEvent, Is.EqualTo(legacySnapshot.BurstShotsPerEvent));
-                Assert.That(typedSnapshot.EventShotSchedule, Is.EqualTo(legacySnapshot.EventShotSchedule));
-                Assert.That(typedSnapshot.EventShotIntervalSec, Is.EqualTo(legacySnapshot.EventShotIntervalSec));
-                Assert.That(typedSnapshot.PointSetCount, Is.EqualTo(legacySnapshot.PointSetCount));
-                Assert.That(typedSnapshot.Point3, Is.EqualTo(legacySnapshot.Point3));
-                Assert.That(typedSnapshot.BaseAngleDeg, Is.EqualTo(legacySnapshot.BaseAngleDeg));
-                Assert.That(typedSnapshot.SpiralStepDeg, Is.EqualTo(legacySnapshot.SpiralStepDeg));
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
         public void WaveClip_TypedEntryMissingEmission_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -1148,52 +1091,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(prefab);
             }
-        }
-
-        private static WaveClipSO.SpawnEntry CreateDefaultLegacyEntry(BulletDefinitionSO def)
-        {
-            return new WaveClipSO.SpawnEntry
-            {
-                Payload = new WaveClipSO.SpawnPayloadProfile
-                {
-                    Bullet = def,
-                },
-                Emission = new WaveClipSO.SpawnEmissionProfile
-                {
-                    EmissionMode = SourceSpawnEmissionModeId.RateField,
-                    SpawnMode = SourceSpawnModeId.FixedDensity,
-                    RatePerSecPerArea = 1f,
-                    MeanEventsPerSec = 0f,
-                    BurstRepeatCount = 1,
-                    BurstIntervalSec = 1f,
-                    BurstShotsPerEvent = 1,
-                    MaxActiveDensityPerArea = 0f,
-                },
-                Sampling = new WaveClipSO.SpawnSamplingProfile
-                {
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = Vector2.zero,
-                    SpawnOffset = Vector2.zero,
-                    LineStart = Vector2.zero,
-                    LineEnd = Vector2.zero,
-                    SampleSpacing = 1f,
-                    PointCount = 0,
-                    Point0 = Vector2.zero,
-                    Point1 = Vector2.zero,
-                    Point2 = Vector2.zero,
-                    Point3 = Vector2.zero,
-                    SpawnSampleBudget = 16,
-                    PlayerNoSpawnRadius = 0f,
-                },
-                Direction = new WaveClipSO.SpawnDirectionProfile
-                {
-                    DirectionMode = SourceSpawnDirectionModeId.Random,
-                    BaseAngleDeg = 0f,
-                    NWayCount = 1,
-                    SpiralStepDeg = 0f,
-                }
-            };
         }
 
         private static WaveSpawnEntryAuthoring CreateDefaultTypedEntry(BulletDefinitionSO def)
