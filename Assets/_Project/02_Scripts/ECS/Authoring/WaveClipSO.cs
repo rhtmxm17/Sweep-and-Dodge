@@ -280,6 +280,12 @@ namespace SweepNDodge.DotsBullets
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
             [SerializeField, TextArea(2, 5)]
             private string editorOnlyDescription;
+
+            public string EditorOnlyDescription
+            {
+                get => editorOnlyDescription;
+                set => editorOnlyDescription = value ?? string.Empty;
+            }
             #endif
             public float StartSec;
             public float EndSec;

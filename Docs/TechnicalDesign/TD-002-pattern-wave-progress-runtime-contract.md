@@ -164,6 +164,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - `CV025`: `Timed`인데 `EventShotIntervalSec <= 0`
 - `CV026`: invalid `LineEven PositionPattern`
 - `CV028`: invalid `PointSet PositionPattern`
+- `CV041`: shared `SerializeReference` graph detected inside one `WaveClip`
 - `CVW032`: near-zero `SpiralStepDeg`
 - `CVW033`: `PointSet` authored count > runtime clamp max
 
@@ -190,7 +191,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 이번 문서는 Wave / Spawn runtime contract만 SSOT로 다룬다.
 
 ## 10. 변경 이력
-- 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget을 허용하고 관련 validation 제약(`CV041`)을 제거했다.
+- 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget을 허용하고 unsupported snapshot timing validation 제약을 제거했다.
 - 2026-04-06: Plan D 반영. canonical runtime field, event item split, event-local snapshot ownership, validation 기준을 현재 구현 상태로 전면 정리했다.
 - 2026-04-06: Plan C 반영. `SourceSpawnRequestBuffer`를 event-local snapshot owner로 고정하고 `Poisson` / `EventBurst` event item split을 도입했다.
 - 2026-04-03: typed-only authoring / resolver snapshot 경로를 runtime 계약에 반영했다.

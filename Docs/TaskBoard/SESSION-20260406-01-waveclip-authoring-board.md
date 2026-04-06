@@ -114,10 +114,17 @@
 - [x] D13. Plan F. `PlayerPositionAim`의 `PerShot` retarget을 canonical contract에 맞게 확장했다.
   - 검증 결과:
     - `PlayerPositionAimAuthoring.SnapshotTiming`은 `EventStart`와 `PerShot`를 모두 허용하도록 resolver / validation / 문서가 동기화됐다.
-    - `CV041`는 제거되고 `PlayerPositionAim(PerShot)`는 canonical authoring으로 허용된다.
+    - unsupported snapshot timing validation 제약이 제거되고 `PlayerPositionAim(PerShot)`는 canonical authoring으로 허용된다.
     - runtime은 `EventStart`에서만 request-local `EventAimTargetPosition`을 고정하고, `PerShot`는 repeat consume 시점마다 현재 player world position으로 retarget한다.
     - `Timed + PlayerPositionAim(EventStart)` fixation, `Timed/Instant + PlayerPositionAim(PerShot)` retarget, `PerShot + NWay/Radial` 회귀 테스트를 추가했다.
     - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 다시 통과했다.
+- [x] D14. Plan G. `WaveClip`의 shared `SerializeReference` graph를 invalid state로 고정하고 deep-copy UX를 추가했다.
+  - 검증 결과:
+    - `WaveClipSO` custom inspector가 `Segments` / `Directives` add/duplicate를 직접 소유하고 shallow copy 대신 fresh instance / deep clone을 사용한다.
+    - editor utility가 shared managed reference 탐지, explicit deep clone, clip repair, project asset repair 배치를 공통 규칙으로 제공한다.
+    - `CV041`는 `WaveClip` 내부 shared `SerializeReference` graph error로 재정의됐다.
+    - 운영/test WaveClip asset 검사와 sample asset regression이 shared managed reference graph 부재를 포함하도록 강화됐다.
+    - `bwc_sus_samples_wave.asset`의 shared `rid` 상태를 실제 직렬화 데이터에서 제거했다.
 
 ## End of Session
 - 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.

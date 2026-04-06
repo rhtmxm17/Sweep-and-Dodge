@@ -303,6 +303,17 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (clip == null)
                     continue;
 
+                var sharedManagedReferenceIssues = WaveClipManagedReferenceGraphUtility.DetectSharedManagedReferences(clip);
+                for (int issueIndex = 0; issueIndex < sharedManagedReferenceIssues.Count; issueIndex++)
+                {
+                    var issue = sharedManagedReferenceIssues[issueIndex];
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV041",
+                        $"{clips[i].Location}::{issue.DuplicateLocation}",
+                        $"Shared SerializeReference graph detected for {issue.SlotName}. First owner: {clips[i].Location}::{issue.FirstLocation}. Duplicate owner: {clips[i].Location}::{issue.DuplicateLocation}. Use 'Repair Shared References' to uniquify managed nodes."));
+                }
+
                 if (clip.Segments == null || clip.Segments.Length <= 0)
                 {
                     issues.Add(new ContentValidationIssue(

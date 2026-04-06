@@ -40,6 +40,8 @@ WaveSpawnEntryAuthoring
   - `SourceClipPatternBuffer`
   - `SourceSpawnRequestBuffer`
   - canonical field만 직접 사용한다.
+- authoring invariant:
+  - 하나의 `WaveClipSO` 안에서 서로 다른 `Segment` / `Directive`가 `SerializeReference` managed node를 공유하면 invalid다.
 
 ## 3. 축별 책임
 
@@ -155,6 +157,7 @@ WaveSpawnEntryAuthoring
 - `Sampling`과 `PositionPattern`이 분리된 상태로 설명된다.
 - `BurstShotsPerEvent` 대신 `EventRepeatCount`를 기준 용어로 사용한다.
 - `PlayerPositionAim(EventStart / PerShot)` 계약이 문서와 구현에서 일치한다.
+- `WaveClip` authoring graph는 shared `SerializeReference` 없이 unique ownership으로 유지된다.
 
 ## 7. 변경 이력
 - 2026-04-06: Plan E 반영. runtime/product code의 compat field mirror 제거 상태를 문서 기준에도 반영했다.

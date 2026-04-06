@@ -128,6 +128,7 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 | `CV024` | `Radial ShotPattern`의 `ShotCount < 2` |
 | `CV026` | `LineEven PositionPattern` 파라미터 오류 |
 | `CV028` | `PointSet PositionPattern`의 포인트 개수 오류 |
+| `CV041` | `WaveClip` 내부 shared `SerializeReference` graph |
 | `CVW032` | `SpiralAim`의 near-zero `SpiralStepDeg` |
 | `CVW033` | `PointSet` authored 포인트 수가 runtime clamp 상한 초과 |
 
@@ -135,9 +136,11 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 - canonical snapshot은 `SourceClipPatternBuffer`와 `SourceSpawnRequestBuffer`에 내려간다.
 - runtime/product code는 canonical field만 유지한다.
 - `SourceSpawnRequestBuffer`가 event-local snapshot owner다.
+- 같은 `WaveClipSO` 내부에서 `SerializeReference` managed node를 segment/directive 사이에 공유하는 authoring은 invalid다.
 
 ## 10. 변경 이력
 - 2026-04-06: Plan E 반영. runtime/product code가 canonical field만 유지하는 상태로 문서 메모를 보정했다.
+- 2026-04-06: Plan G 반영. `WaveClip` custom editor deep-copy UX와 shared `SerializeReference` graph validation/repair 규칙을 추가했다.
 - 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget 지원과 validation 제약 제거를 문서에 반영했다.
 - 2026-04-06: Plan D 반영. canonical authoring 축과 validation 용어 기준으로 문서를 전면 정리했다.
 - 2026-04-03: typed-only authoring과 resolver snapshot 경로를 문서에 반영했다.

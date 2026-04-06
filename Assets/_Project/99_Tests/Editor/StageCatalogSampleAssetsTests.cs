@@ -153,6 +153,9 @@ namespace SweepNDodge.DotsBullets.Tests
                         Assert.That(directive.ShotPattern, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep ShotPattern.");
                     }
                 }
+
+                var sharedManagedReferenceIssues = WaveClipManagedReferenceGraphUtility.DetectSharedManagedReferences(clip);
+                Assert.That(sharedManagedReferenceIssues, Is.Empty, $"{path} must not keep shared SerializeReference graph.");
             }
         }
 
