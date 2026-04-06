@@ -39,6 +39,7 @@ WaveSpawnEntryAuthoring
 - runtime flatten:
   - `SourceClipPatternBuffer`
   - `SourceSpawnRequestBuffer`
+  - canonical field만 직접 사용한다.
 
 ## 3. 축별 책임
 
@@ -155,6 +156,7 @@ WaveSpawnEntryAuthoring
 - `PlayerPositionAim(EventStart)` 계약이 문서와 구현에서 일치한다.
 
 ## 7. 변경 이력
+- 2026-04-06: Plan E 반영. runtime/product code의 compat field mirror 제거 상태를 문서 기준에도 반영했다.
 - 2026-04-06: Plan D 반영. canonical 축(`Emission / Sampling / PositionPattern / Aim / ShotPattern / Payload`) 기준으로 문서를 전면 정리했다.
 - 2026-04-03: 2차 정리 반영. typed-only authoring SSOT로 고정했다.
 - 2026-04-03: 1차 정리 반영. `Directives[]` typed authoring과 resolver snapshot 경로를 도입했다.

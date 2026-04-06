@@ -44,9 +44,9 @@ WaveClipSO.Directives[]
   - event-local mutable state도 함께 가진다.
 
 ### 2.2 Compat field 정책
-- compat field(`SamplingMode`, `CenterMode`, `DirectionMode`, `NWayCount`, `BurstShotsPerEvent`)는 아직 구조체에 남아 있다.
-- gameplay core는 compat field를 SSOT로 읽지 않는다.
-- compat field는 legacy mirror / debug 관찰용으로만 본다.
+- compat field mirror는 Plan E에서 제거됐다.
+- runtime/product code는 canonical field만 유지한다.
+- 테스트가 필요하면 test-local canonical helper로만 request / pattern을 구성한다.
 
 ## 3. Request item identity
 
@@ -118,6 +118,10 @@ Count = EventRepeatCount × ShotPattern 1회당 탄 수
   - `EventShotIntervalSec` 간격으로 repeat를 1회씩 consume
 - 공통:
   - event anchor / event aim snapshot은 event 범위에서 고정
+
+## 6. 변경 이력
+- 2026-04-06: Plan E 반영. compat runtime mirror 필드와 canonical fallback 경로를 제거하고 runtime/product code를 canonical-only로 고정했다.
+- 2026-04-06: Plan D / Plan C 반영. event-local snapshot ownership과 canonical runtime contract를 문서화했다.
 
 ## 6. 업데이트 순서 / 소유권
 - Group 의미:

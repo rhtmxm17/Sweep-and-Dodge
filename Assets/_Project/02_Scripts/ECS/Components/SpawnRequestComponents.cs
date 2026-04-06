@@ -23,9 +23,6 @@ namespace SweepNDodge.DotsBullets
         public WaveShotPatternModeId ShotPatternMode;
         public int ShotCount;
         public int EventRepeatCount;
-        public SourceSpawnSamplingModeId SamplingMode;
-        public SourceSpawnCenterModeId CenterMode;
-        public SourceSpawnDirectionModeId DirectionMode;
         public Unity.Mathematics.float2 FixedPoint;
         public Unity.Mathematics.float2 SpawnOffset;
         public Unity.Mathematics.float2 LineStart;
@@ -39,9 +36,7 @@ namespace SweepNDodge.DotsBullets
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;
-        public int NWayCount;
         public float SpiralStepDeg;
-        public int BurstShotsPerEvent;
         public SourceSpawnEventShotScheduleId EventShotSchedule;
         public float EventShotIntervalSec;
         public float EventShotElapsedSec;

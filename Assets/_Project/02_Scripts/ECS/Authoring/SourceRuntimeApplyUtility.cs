@@ -326,9 +326,6 @@ namespace SweepNDodge.DotsBullets
                         ShotPatternMode = snapshot.ShotPatternMode,
                         ShotCount = Mathf.Max(1, snapshot.ShotCount),
                         EventRepeatCount = Mathf.Max(1, snapshot.EventRepeatCount),
-                        SamplingMode = ResolveCompatSamplingMode(snapshot),
-                        CenterMode = ResolveCompatCenterMode(snapshot),
-                        DirectionMode = ResolveCompatDirectionMode(snapshot),
                         FixedPoint = new float2(snapshot.FixedPoint.x, snapshot.FixedPoint.y),
                         SpawnOffset = new float2(snapshot.SpawnOffset.x, snapshot.SpawnOffset.y),
                         LineStart = new float2(snapshot.LineStart.x, snapshot.LineStart.y),
@@ -341,14 +338,12 @@ namespace SweepNDodge.DotsBullets
                         Point3 = new float2(snapshot.Point3.x, snapshot.Point3.y),
                         SpawnSampleBudget = Mathf.Max(1, snapshot.SpawnSampleBudget),
                         PlayerNoSpawnRadius = Mathf.Max(0f, snapshot.PlayerNoSpawnRadius),
-                        BaseAngleDeg = ResolveCompatBaseAngleDeg(snapshot),
-                        NWayCount = ResolveCompatNWayCount(snapshot),
-                        SpiralStepDeg = ResolveCompatSpiralStepDeg(snapshot),
+                        BaseAngleDeg = snapshot.BaseAngleDeg,
+                        SpiralStepDeg = snapshot.SpiralStepDeg,
                         SpawnDensityPerSecPerArea = Mathf.Max(0f, snapshot.RatePerSecPerArea),
                         MeanEventsPerSec = Mathf.Max(0f, snapshot.MeanEventsPerSec),
                         BurstRepeatCount = snapshot.BurstRepeatCount,
                         BurstIntervalSec = Mathf.Max(0.001f, snapshot.BurstIntervalSec),
-                        BurstShotsPerEvent = ResolveCompatBurstShotsPerEvent(snapshot),
                         EventShotSchedule = snapshot.EventShotSchedule,
                         EventShotIntervalSec = Mathf.Max(0f, snapshot.EventShotIntervalSec),
                         LanePriority = lanePriority,
@@ -404,79 +399,6 @@ namespace SweepNDodge.DotsBullets
                 BulletTypeKey = typeKey,
                 ActiveCount = 0,
             });
-        }
-
-        private static SourceSpawnSamplingModeId ResolveCompatSamplingMode(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
-        {
-            return snapshot.PositionPatternMode switch
-            {
-                WavePositionPatternModeId.LineEven => SourceSpawnSamplingModeId.LineEven,
-                WavePositionPatternModeId.PointSet => SourceSpawnSamplingModeId.PointSet,
-                _ => snapshot.AreaSamplerMode switch
-                {
-                    WaveAreaSamplerModeId.PollutionTopK => SourceSpawnSamplingModeId.PollutionTopK,
-                    WaveAreaSamplerModeId.CenterPoint => SourceSpawnSamplingModeId.CenterPoint,
-                    _ => SourceSpawnSamplingModeId.UniformField,
-                },
-            };
-        }
-
-        private static SourceSpawnCenterModeId ResolveCompatCenterMode(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
-        {
-            return snapshot.SamplingAnchorMode switch
-            {
-                WaveSamplingAnchorModeId.FixedPoint => SourceSpawnCenterModeId.FixedPoint,
-                WaveSamplingAnchorModeId.PlayerRelative => SourceSpawnCenterModeId.PlayerRelative,
-                _ => SourceSpawnCenterModeId.SourceCenter,
-            };
-        }
-
-        private static SourceSpawnDirectionModeId ResolveCompatDirectionMode(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
-        {
-            return snapshot.ShotPatternMode switch
-            {
-                WaveShotPatternModeId.NWay => SourceSpawnDirectionModeId.NWay,
-                WaveShotPatternModeId.Radial => SourceSpawnDirectionModeId.RadialBurst,
-                _ => snapshot.AimMode switch
-                {
-                    WaveAimModeId.Fixed => SourceSpawnDirectionModeId.Fixed,
-                    WaveAimModeId.Spiral => SourceSpawnDirectionModeId.Spiral,
-                    _ => SourceSpawnDirectionModeId.Random,
-                },
-            };
-        }
-
-        private static float ResolveCompatBaseAngleDeg(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
-        {
-            return snapshot.AimMode switch
-            {
-                WaveAimModeId.Fixed => snapshot.BaseAngleDeg,
-                WaveAimModeId.Spiral => snapshot.BaseAngleDeg,
-                WaveAimModeId.PlayerPosition => snapshot.AimAngleOffsetDeg,
-                _ => 0f,
-            };
-        }
-
-        private static int ResolveCompatNWayCount(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
-        {
-            return snapshot.ShotPatternMode == WaveShotPatternModeId.NWay
-                ? Mathf.Max(1, snapshot.ShotCount)
-                : 1;
-        }
-
-        private static float ResolveCompatSpiralStepDeg(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
-        {
-            return snapshot.AimMode == WaveAimModeId.Spiral
-                ? snapshot.SpiralStepDeg
-                : 0f;
-        }
-
-        private static int ResolveCompatBurstShotsPerEvent(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
-        {
-            if (snapshot.ShotPatternMode == WaveShotPatternModeId.Radial)
-                return Mathf.Max(1, snapshot.ShotCount);
-
-            return Mathf.Max(1, snapshot.EventRepeatCount);
         }
 
         private static void BakePollutionGrid(

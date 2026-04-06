@@ -41,7 +41,7 @@ namespace SweepNDodge.DotsBullets.Tests
             InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
             var source = CreateSourceWithPattern(
                 em,
-                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                areaSamplerMode: WaveAreaSamplerModeId.UniformField,
                 emissionMode: SourceSpawnEmissionModeId.RateField,
                 spawnMode: SourceSpawnModeId.FixedDensity,
                 shapeSize: new float2(2f, 2f),
@@ -64,7 +64,7 @@ namespace SweepNDodge.DotsBullets.Tests
             InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
             var source = CreateSourceWithPattern(
                 em,
-                samplingMode: SourceSpawnSamplingModeId.PollutionTopK,
+                areaSamplerMode: WaveAreaSamplerModeId.PollutionTopK,
                 emissionMode: SourceSpawnEmissionModeId.RateField,
                 spawnMode: SourceSpawnModeId.FixedDensity,
                 shapeSize: new float2(2f, 2f),
@@ -87,7 +87,8 @@ namespace SweepNDodge.DotsBullets.Tests
             InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
             var source = CreateSourceWithPattern(
                 em,
-                samplingMode: SourceSpawnSamplingModeId.LineEven,
+                areaSamplerMode: WaveAreaSamplerModeId.CenterPoint,
+                positionPatternMode: WavePositionPatternModeId.LineEven,
                 emissionMode: SourceSpawnEmissionModeId.RateField,
                 spawnMode: SourceSpawnModeId.FixedDensity,
                 shapeSize: new float2(2f, 2f),
@@ -110,7 +111,7 @@ namespace SweepNDodge.DotsBullets.Tests
             InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
             var source = CreateSourceWithPattern(
                 em,
-                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                areaSamplerMode: WaveAreaSamplerModeId.UniformField,
                 emissionMode: SourceSpawnEmissionModeId.RateField,
                 spawnMode: SourceSpawnModeId.FixedDensity,
                 shapeSize: new float2(2f, 2f),
@@ -132,7 +133,7 @@ namespace SweepNDodge.DotsBullets.Tests
             InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 4f);
             var source = CreateSourceWithPattern(
                 em,
-                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                areaSamplerMode: WaveAreaSamplerModeId.UniformField,
                 emissionMode: SourceSpawnEmissionModeId.EventBurst,
                 spawnMode: SourceSpawnModeId.CapAndMaxDensity,
                 shapeSize: new float2(2f, 2f),
@@ -241,7 +242,7 @@ namespace SweepNDodge.DotsBullets.Tests
             InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
             var source = CreateSourceWithPattern(
                 em,
-                samplingMode: SourceSpawnSamplingModeId.UniformField,
+                areaSamplerMode: WaveAreaSamplerModeId.UniformField,
                 emissionMode: SourceSpawnEmissionModeId.RateField,
                 spawnMode: SourceSpawnModeId.FixedDensity,
                 shapeSize: new float2(2f, 2f),
@@ -336,7 +337,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static Entity CreateSourceWithPattern(
             EntityManager em,
-            SourceSpawnSamplingModeId samplingMode = SourceSpawnSamplingModeId.UniformField,
+            WaveAreaSamplerModeId areaSamplerMode = WaveAreaSamplerModeId.UniformField,
+            WavePositionPatternModeId positionPatternMode = WavePositionPatternModeId.SinglePoint,
+            WaveSamplingAnchorModeId samplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
             SourceSpawnEmissionModeId emissionMode = SourceSpawnEmissionModeId.RateField,
             SourceSpawnModeId spawnMode = SourceSpawnModeId.FixedDensity,
             float2? shapeSize = null,
@@ -420,28 +423,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 BulletTypeKey = 101,
                 EmissionMode = emissionMode,
                 SpawnMode = spawnMode,
-                SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
-                AreaSamplerMode = samplingMode switch
-                {
-                    SourceSpawnSamplingModeId.PollutionTopK => WaveAreaSamplerModeId.PollutionTopK,
-                    SourceSpawnSamplingModeId.UniformField => WaveAreaSamplerModeId.UniformField,
-                    _ => WaveAreaSamplerModeId.CenterPoint,
-                },
-                PositionPatternMode = samplingMode switch
-                {
-                    SourceSpawnSamplingModeId.LineEven => WavePositionPatternModeId.LineEven,
-                    SourceSpawnSamplingModeId.PointSet => WavePositionPatternModeId.PointSet,
-                    _ => WavePositionPatternModeId.SinglePoint,
-                },
+                SamplingAnchorMode = samplingAnchorMode,
+                AreaSamplerMode = areaSamplerMode,
+                PositionPatternMode = positionPatternMode,
                 AimMode = WaveAimModeId.Fixed,
                 AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
                 AimAngleOffsetDeg = 0f,
                 ShotPatternMode = WaveShotPatternModeId.Single,
                 ShotCount = 1,
                 EventRepeatCount = eventRepeatCount,
-                SamplingMode = samplingMode,
-                CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                DirectionMode = SourceSpawnDirectionModeId.Fixed,
                 SampleSpacing = 1f,
                 LineStart = new float2(-0.5f, 0f),
                 LineEnd = new float2(0.5f, 0f),
@@ -449,7 +439,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 SpawnDensityPerSecPerArea = spawnDensityPerSecPerArea,
                 MeanEventsPerSec = meanEventsPerSec,
                 BurstIntervalSec = burstIntervalSec,
-                BurstShotsPerEvent = eventRepeatCount,
                 BurstRepeatCount = burstRepeatCount,
                 MaxActiveDensityPerArea = maxActiveDensityPerArea,
                 LanePriority = 1,

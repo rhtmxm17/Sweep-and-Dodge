@@ -671,7 +671,6 @@ namespace SweepNDodge.DotsBullets
             float deltaTime,
             float densityScale)
         {
-            SpawnRequestCommonUtility.NormalizeCanonicalMirrors(ref pattern);
             float spawnDensityPerSecPerArea = pattern.SpawnDensityPerSecPerArea;
             if (pattern.Phase == SourceWavePhaseId.Sustain
                 && pattern.Lane == SourceSpawnLaneId.Trash
@@ -845,9 +844,6 @@ namespace SweepNDodge.DotsBullets
                 pattern.ShotPatternMode,
                 pattern.ShotCount,
                 pattern.EventRepeatCount,
-                pattern.SamplingMode,
-                pattern.CenterMode,
-                pattern.DirectionMode,
                 pattern.FixedPoint,
                 pattern.SpawnOffset,
                 pattern.LineStart,
@@ -861,9 +857,7 @@ namespace SweepNDodge.DotsBullets
                 pattern.SpawnSampleBudget,
                 pattern.PlayerNoSpawnRadius,
                 pattern.BaseAngleDeg,
-                pattern.NWayCount,
                 pattern.SpiralStepDeg,
-                pattern.BurstShotsPerEvent,
                 pattern.EventShotSchedule,
                 pattern.EventShotIntervalSec);
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);

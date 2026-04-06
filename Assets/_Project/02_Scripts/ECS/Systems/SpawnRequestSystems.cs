@@ -450,9 +450,7 @@ namespace SweepNDodge.DotsBullets
 
         private static int ResolveRequestConsumeUnitCount(in SourceSpawnRequestBuffer request)
         {
-            var normalized = request;
-            SpawnRequestCommonUtility.NormalizeCanonicalMirrors(ref normalized);
-            return SpawnRequestCommonUtility.ResolveShotPatternUnitCount(in normalized);
+            return SpawnRequestCommonUtility.ResolveShotPatternUnitCount(in request);
         }
 
         private static bool TrySpawnFromRequest(
@@ -489,7 +487,6 @@ namespace SweepNDodge.DotsBullets
             out int consumedCount,
             out uint sequenceAdvance)
         {
-            SpawnRequestCommonUtility.NormalizeCanonicalMirrors(ref request);
             consumedCount = 0;
             sequenceAdvance = 0u;
 
@@ -635,7 +632,6 @@ namespace SweepNDodge.DotsBullets
             float3 playerPosition,
             uint frame)
         {
-            SpawnRequestCommonUtility.NormalizeCanonicalMirrors(ref request);
             int requestedTypeKey = request.BulletTypeKey;
             if (!SpawnRequestCommonUtility.TryDequeueByKey(ref BulletFieldShared.FreeByKey, requestedTypeKey, out var bulletEntity))
                 return false;

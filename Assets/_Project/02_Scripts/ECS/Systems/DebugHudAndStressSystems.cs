@@ -29,9 +29,6 @@ namespace SweepNDodge.DotsBullets
             public WaveShotPatternModeId ShotPatternMode;
             public int ShotCount;
             public int EventRepeatCount;
-            public SourceSpawnSamplingModeId SamplingMode;
-            public SourceSpawnCenterModeId CenterMode;
-            public SourceSpawnDirectionModeId DirectionMode;
             public float2 FixedPoint;
             public float2 SpawnOffset;
             public float2 LineStart;
@@ -45,9 +42,7 @@ namespace SweepNDodge.DotsBullets
             public int SpawnSampleBudget;
             public float PlayerNoSpawnRadius;
             public float BaseAngleDeg;
-            public int NWayCount;
             public float SpiralStepDeg;
-            public int BurstShotsPerEvent;
             public SourceSpawnEventShotScheduleId EventShotSchedule;
             public float EventShotIntervalSec;
         }
@@ -153,9 +148,6 @@ namespace SweepNDodge.DotsBullets
                         ShotPatternMode = resolvedV3.ShotPatternMode,
                         ShotCount = resolvedV3.ShotCount,
                         EventRepeatCount = resolvedV3.EventRepeatCount,
-                        SamplingMode = resolvedV3.SamplingMode,
-                        CenterMode = resolvedV3.CenterMode,
-                        DirectionMode = resolvedV3.DirectionMode,
                         FixedPoint = resolvedV3.FixedPoint,
                         SpawnOffset = resolvedV3.SpawnOffset,
                         LineStart = resolvedV3.LineStart,
@@ -169,9 +161,7 @@ namespace SweepNDodge.DotsBullets
                         SpawnSampleBudget = resolvedV3.SpawnSampleBudget,
                         PlayerNoSpawnRadius = resolvedV3.PlayerNoSpawnRadius,
                         BaseAngleDeg = resolvedV3.BaseAngleDeg,
-                        NWayCount = resolvedV3.NWayCount,
                         SpiralStepDeg = resolvedV3.SpiralStepDeg,
-                        BurstShotsPerEvent = resolvedV3.BurstShotsPerEvent,
                         EventShotSchedule = resolvedV3.EventShotSchedule,
                         EventShotIntervalSec = resolvedV3.EventShotIntervalSec,
                     });
@@ -274,9 +264,6 @@ namespace SweepNDodge.DotsBullets
                 target.ShotPatternMode,
                 target.ShotCount,
                 target.EventRepeatCount,
-                target.SamplingMode,
-                target.CenterMode,
-                target.DirectionMode,
                 target.FixedPoint,
                 target.SpawnOffset,
                 target.LineStart,
@@ -290,9 +277,7 @@ namespace SweepNDodge.DotsBullets
                 target.SpawnSampleBudget,
                 target.PlayerNoSpawnRadius,
                 target.BaseAngleDeg,
-                target.NWayCount,
                 target.SpiralStepDeg,
-                target.BurstShotsPerEvent,
                 target.EventShotSchedule,
                 target.EventShotIntervalSec);
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);

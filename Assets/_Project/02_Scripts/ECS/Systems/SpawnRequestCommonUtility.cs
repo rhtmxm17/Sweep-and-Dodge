@@ -159,9 +159,6 @@ namespace SweepNDodge.DotsBullets
             WaveShotPatternModeId shotPatternMode,
             int shotCount,
             int eventRepeatCount,
-            SourceSpawnSamplingModeId samplingMode,
-            SourceSpawnCenterModeId centerMode,
-            SourceSpawnDirectionModeId directionMode,
             float2 fixedPoint,
             float2 spawnOffset,
             float2 lineStart,
@@ -175,9 +172,7 @@ namespace SweepNDodge.DotsBullets
             int spawnSampleBudget,
             float playerNoSpawnRadius,
             float baseAngleDeg,
-            int nWayCount,
             float spiralStepDeg,
-            int burstShotsPerEvent,
             SourceSpawnEventShotScheduleId eventShotSchedule,
             float eventShotIntervalSec)
         {
@@ -199,9 +194,6 @@ namespace SweepNDodge.DotsBullets
                 ShotPatternMode = shotPatternMode,
                 ShotCount = math.max(1, shotCount),
                 EventRepeatCount = math.max(1, eventRepeatCount),
-                SamplingMode = samplingMode,
-                CenterMode = centerMode,
-                DirectionMode = directionMode,
                 FixedPoint = fixedPoint,
                 SpawnOffset = spawnOffset,
                 LineStart = lineStart,
@@ -215,9 +207,7 @@ namespace SweepNDodge.DotsBullets
                 SpawnSampleBudget = math.max(1, spawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, playerNoSpawnRadius),
                 BaseAngleDeg = baseAngleDeg,
-                NWayCount = math.max(1, nWayCount),
                 SpiralStepDeg = spiralStepDeg,
-                BurstShotsPerEvent = math.max(1, burstShotsPerEvent),
                 EventShotSchedule = eventShotSchedule,
                 EventShotIntervalSec = math.max(0f, eventShotIntervalSec),
                 EventShotElapsedSec = 0f,
@@ -240,16 +230,14 @@ namespace SweepNDodge.DotsBullets
             if (count <= 0)
                 return;
 
-            var normalizedTemplate = requestTemplate;
-            NormalizeCanonicalMirrors(ref normalizedTemplate);
-            if (UsesDiscreteEventIdentity(in normalizedTemplate))
+            if (UsesDiscreteEventIdentity(in requestTemplate))
             {
-                int shotsPerEvent = ResolvePerEventBulletCount(in normalizedTemplate);
+                int shotsPerEvent = ResolvePerEventBulletCount(in requestTemplate);
                 int remaining = count;
                 while (remaining > 0)
                 {
                     int eventShotCount = math.min(shotsPerEvent, remaining);
-                    var timedItem = normalizedTemplate;
+                    var timedItem = requestTemplate;
                     timedItem.Count = eventShotCount;
                     timedItem.OldestFrame = frame;
                     timedItem.EventShotElapsedSec = 0f;
@@ -267,7 +255,7 @@ namespace SweepNDodge.DotsBullets
             for (int i = 0; i < requests.Length; i++)
             {
                 var item = requests[i];
-                if (item.DirectiveId != normalizedTemplate.DirectiveId)
+                if (item.DirectiveId != requestTemplate.DirectiveId)
                     continue;
 
                 if (item.Count <= 0)
@@ -278,138 +266,18 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            var itemToAdd = normalizedTemplate;
+            var itemToAdd = requestTemplate;
             itemToAdd.Count = count;
             itemToAdd.OldestFrame = frame;
             requests.Add(itemToAdd);
-        }
-
-        public static void NormalizeCanonicalMirrors(ref SourceClipPatternBuffer pattern)
-        {
-            if (pattern.AreaSamplerMode == default && pattern.SamplingMode != SourceSpawnSamplingModeId.CenterPoint)
-            {
-                pattern.AreaSamplerMode = pattern.SamplingMode switch
-                {
-                    SourceSpawnSamplingModeId.UniformField => WaveAreaSamplerModeId.UniformField,
-                    SourceSpawnSamplingModeId.PollutionTopK => WaveAreaSamplerModeId.PollutionTopK,
-                    _ => WaveAreaSamplerModeId.CenterPoint,
-                };
-            }
-
-            if (pattern.PositionPatternMode == default)
-            {
-                pattern.PositionPatternMode = pattern.SamplingMode switch
-                {
-                    SourceSpawnSamplingModeId.LineEven => WavePositionPatternModeId.LineEven,
-                    SourceSpawnSamplingModeId.PointSet => WavePositionPatternModeId.PointSet,
-                    _ => WavePositionPatternModeId.SinglePoint,
-                };
-            }
-
-            if (pattern.SamplingAnchorMode == default && pattern.CenterMode != SourceSpawnCenterModeId.SourceCenter)
-            {
-                pattern.SamplingAnchorMode = pattern.CenterMode switch
-                {
-                    SourceSpawnCenterModeId.FixedPoint => WaveSamplingAnchorModeId.FixedPoint,
-                    SourceSpawnCenterModeId.PlayerRelative => WaveSamplingAnchorModeId.PlayerRelative,
-                    _ => WaveSamplingAnchorModeId.SourceCenter,
-                };
-            }
-
-            if (pattern.ShotPatternMode == default && pattern.DirectionMode != SourceSpawnDirectionModeId.Random)
-            {
-                pattern.ShotPatternMode = pattern.DirectionMode switch
-                {
-                    SourceSpawnDirectionModeId.NWay => WaveShotPatternModeId.NWay,
-                    SourceSpawnDirectionModeId.RadialBurst => WaveShotPatternModeId.Radial,
-                    _ => WaveShotPatternModeId.Single,
-                };
-            }
-
-            if (pattern.AimMode == default && pattern.DirectionMode != SourceSpawnDirectionModeId.Random)
-            {
-                pattern.AimMode = pattern.DirectionMode switch
-                {
-                    SourceSpawnDirectionModeId.Fixed => WaveAimModeId.Fixed,
-                    SourceSpawnDirectionModeId.Spiral => WaveAimModeId.Spiral,
-                    SourceSpawnDirectionModeId.NWay => WaveAimModeId.Fixed,
-                    SourceSpawnDirectionModeId.RadialBurst => WaveAimModeId.Fixed,
-                    _ => WaveAimModeId.Random,
-                };
-            }
-
-            pattern.ShotCount = ResolveShotPatternUnitCount(in pattern);
-            pattern.EventRepeatCount = math.max(1, pattern.EventRepeatCount > 0 ? pattern.EventRepeatCount : pattern.BurstShotsPerEvent);
-            if (pattern.AimSnapshotTiming == default && pattern.AimMode != WaveAimModeId.Random)
-                pattern.AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart;
-        }
-
-        public static void NormalizeCanonicalMirrors(ref SourceSpawnRequestBuffer request)
-        {
-            if (request.AreaSamplerMode == default && request.SamplingMode != SourceSpawnSamplingModeId.CenterPoint)
-            {
-                request.AreaSamplerMode = request.SamplingMode switch
-                {
-                    SourceSpawnSamplingModeId.UniformField => WaveAreaSamplerModeId.UniformField,
-                    SourceSpawnSamplingModeId.PollutionTopK => WaveAreaSamplerModeId.PollutionTopK,
-                    _ => WaveAreaSamplerModeId.CenterPoint,
-                };
-            }
-
-            if (request.PositionPatternMode == default)
-            {
-                request.PositionPatternMode = request.SamplingMode switch
-                {
-                    SourceSpawnSamplingModeId.LineEven => WavePositionPatternModeId.LineEven,
-                    SourceSpawnSamplingModeId.PointSet => WavePositionPatternModeId.PointSet,
-                    _ => WavePositionPatternModeId.SinglePoint,
-                };
-            }
-
-            if (request.SamplingAnchorMode == default && request.CenterMode != SourceSpawnCenterModeId.SourceCenter)
-            {
-                request.SamplingAnchorMode = request.CenterMode switch
-                {
-                    SourceSpawnCenterModeId.FixedPoint => WaveSamplingAnchorModeId.FixedPoint,
-                    SourceSpawnCenterModeId.PlayerRelative => WaveSamplingAnchorModeId.PlayerRelative,
-                    _ => WaveSamplingAnchorModeId.SourceCenter,
-                };
-            }
-
-            if (request.ShotPatternMode == default && request.DirectionMode != SourceSpawnDirectionModeId.Random)
-            {
-                request.ShotPatternMode = request.DirectionMode switch
-                {
-                    SourceSpawnDirectionModeId.NWay => WaveShotPatternModeId.NWay,
-                    SourceSpawnDirectionModeId.RadialBurst => WaveShotPatternModeId.Radial,
-                    _ => WaveShotPatternModeId.Single,
-                };
-            }
-
-            if (request.AimMode == default && request.DirectionMode != SourceSpawnDirectionModeId.Random)
-            {
-                request.AimMode = request.DirectionMode switch
-                {
-                    SourceSpawnDirectionModeId.Fixed => WaveAimModeId.Fixed,
-                    SourceSpawnDirectionModeId.Spiral => WaveAimModeId.Spiral,
-                    SourceSpawnDirectionModeId.NWay => WaveAimModeId.Fixed,
-                    SourceSpawnDirectionModeId.RadialBurst => WaveAimModeId.Fixed,
-                    _ => WaveAimModeId.Random,
-                };
-            }
-
-            request.ShotCount = ResolveShotPatternUnitCount(in request);
-            request.EventRepeatCount = math.max(1, request.EventRepeatCount > 0 ? request.EventRepeatCount : request.BurstShotsPerEvent);
-            if (request.AimSnapshotTiming == default && request.AimMode != WaveAimModeId.Random)
-                request.AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart;
         }
 
         public static int ResolveShotPatternUnitCount(in SourceClipPatternBuffer pattern)
         {
             return pattern.ShotPatternMode switch
             {
-                WaveShotPatternModeId.NWay => math.max(1, pattern.ShotCount > 0 ? pattern.ShotCount : pattern.NWayCount),
-                WaveShotPatternModeId.Radial => math.max(1, pattern.ShotCount > 0 ? pattern.ShotCount : pattern.BurstShotsPerEvent),
+                WaveShotPatternModeId.NWay => math.max(1, pattern.ShotCount),
+                WaveShotPatternModeId.Radial => math.max(1, pattern.ShotCount),
                 _ => 1,
             };
         }
@@ -418,8 +286,8 @@ namespace SweepNDodge.DotsBullets
         {
             return request.ShotPatternMode switch
             {
-                WaveShotPatternModeId.NWay => math.max(1, request.ShotCount > 0 ? request.ShotCount : request.NWayCount),
-                WaveShotPatternModeId.Radial => math.max(1, request.ShotCount > 0 ? request.ShotCount : request.BurstShotsPerEvent),
+                WaveShotPatternModeId.NWay => math.max(1, request.ShotCount),
+                WaveShotPatternModeId.Radial => math.max(1, request.ShotCount),
                 _ => 1,
             };
         }

@@ -31,13 +31,7 @@
 - 없음
 
 ## Next
-- [ ] T6. Plan E. 구현 착수 순서를 고정한다.
-  - 완료 기준:
-    - `Authoring -> Resolver -> Runtime -> Validation/Migration -> Verification` 순으로 착수 순서가 고정된다.
-    - 각 단계의 소유 파일/타입과 중단 보고 조건이 정리된다.
-  - 검증: 다음 구현 요청 시 바로 작업을 시작할 수 있다.
-  - 근거:
-    - 현재는 설계 채택안이 충분히 쌓였고, 남은 것은 실행 단위로 끊는 일이다.
+- 없음
 
 ## Blocked
 - 없음
@@ -109,6 +103,14 @@
     - `TD-002`, `TD-003`, `TD-005`를 current canonical contract 기준으로 전면 갱신했다.
     - 운영/test `WaveClip` asset YAML에서 `Directives[]` only와 current managed reference type 사용 상태를 재확인했다.
     - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 다시 통과했다.
+- [x] D12. Plan E. runtime/product code의 legacy/compat 경로를 canonical-only 기준으로 정리했다.
+  - 검증 결과:
+    - `SourceClipPatternBuffer`와 `SourceSpawnRequestBuffer`에서 compat runtime field(`SamplingMode`, `CenterMode`, `DirectionMode`, `NWayCount`, `BurstShotsPerEvent`)를 제거했다.
+    - `SpawnRequestCommonUtility`의 compat fallback(`NormalizeCanonicalMirrors`)과 compat-aware request template 인자를 제거했다.
+    - runtime/product code에서 compat enum/type(`SourceSpawnSamplingModeId`, `SourceSpawnCenterModeId`, `SourceSpawnDirectionModeId`) 참조를 제거했다.
+    - debug / playmode / editmode fixture helper를 canonical field 기준으로 재작성했다.
+    - current SSOT 문서(`TD-002`, `TD-003`, `TD-005`)에서 compat mirror 잔존 설명을 제거했다.
+    - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 통과했다.
 
 ## End of Session
 - 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.
@@ -116,4 +118,4 @@
   - `PlayerPositionAim`에서 player world position만 볼지, player aim point subtype를 추가할지는 아직 후속 결정이 남아 있다.
   - runtime flat shape rename을 미룬 만큼, authoring 용어와 runtime 용어가 당분간 완전히 일치하지 않을 수 있다.
 - 다음 세션 시작점:
-  - `Plan E`에서 구현 착수 순서와 남은 compat 제거/후속 범위를 정리한다.
+  - 후속 플랜에서 `PlayerPositionAim` 확장, 추가 `Aim` / `PositionPattern` 조합, editor UX polish 같은 계약 확장 범위를 다시 논의한다.

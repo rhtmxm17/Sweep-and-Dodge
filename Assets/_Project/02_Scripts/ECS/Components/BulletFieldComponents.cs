@@ -54,31 +54,6 @@ namespace SweepNDodge.DotsBullets
         Timed = 1,
     }
 
-    public enum SourceSpawnSamplingModeId : byte
-    {
-        UniformField = 0,
-        PollutionTopK = 1,
-        LineEven = 2,
-        CenterPoint = 3,
-        PointSet = 4,
-    }
-
-    public enum SourceSpawnCenterModeId : byte
-    {
-        SourceCenter = 0,
-        FixedPoint = 1,
-        PlayerRelative = 2,
-    }
-
-    public enum SourceSpawnDirectionModeId : byte
-    {
-        Random = 0,
-        NWay = 1,
-        Spiral = 2,
-        RadialBurst = 3,
-        Fixed = 4,
-    }
-
     // v3 lane model.
     // - Trash/Hazard are default lanes.
     // - values >= 2 are reserved for special/custom lanes.
@@ -179,9 +154,6 @@ namespace SweepNDodge.DotsBullets
         public WaveShotPatternModeId ShotPatternMode;
         public int ShotCount;
         public int EventRepeatCount;
-        public SourceSpawnSamplingModeId SamplingMode;
-        public SourceSpawnCenterModeId CenterMode;
-        public SourceSpawnDirectionModeId DirectionMode;
         public float2 FixedPoint;
         public float2 SpawnOffset;
         public float2 LineStart;
@@ -195,13 +167,11 @@ namespace SweepNDodge.DotsBullets
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;
-        public int NWayCount;
         public float SpiralStepDeg;
         public float SpawnDensityPerSecPerArea;
         public float MeanEventsPerSec;
         public int BurstRepeatCount;
         public float BurstIntervalSec;
-        public int BurstShotsPerEvent;
         public SourceSpawnEventShotScheduleId EventShotSchedule;
         public float EventShotIntervalSec;
         public int LanePriority;

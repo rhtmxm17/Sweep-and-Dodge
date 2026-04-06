@@ -24,8 +24,7 @@
   - `Aim`
   - `ShotPattern`
 - 비대상:
-  - compat runtime mirror field 상세
-  - 레거시 `Direction` / `BurstShotsPerEvent` authoring 설명
+  - historical ADR의 과거 schema 상세
 
 ## 2. Payload
 | 필드 | 의미 | 규약 |
@@ -133,9 +132,10 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 
 ## 9. 현재 runtime 적용 메모
 - canonical snapshot은 `SourceClipPatternBuffer`와 `SourceSpawnRequestBuffer`에 내려간다.
-- compat field는 아직 남아 있지만 gameplay SSOT는 아니다.
+- runtime/product code는 canonical field만 유지한다.
 - `SourceSpawnRequestBuffer`가 event-local snapshot owner다.
 
 ## 10. 변경 이력
+- 2026-04-06: Plan E 반영. runtime/product code가 canonical field만 유지하는 상태로 문서 메모를 보정했다.
 - 2026-04-06: Plan D 반영. canonical authoring 축과 validation 용어 기준으로 문서를 전면 정리했다.
 - 2026-04-03: typed-only authoring과 resolver snapshot 경로를 문서에 반영했다.
