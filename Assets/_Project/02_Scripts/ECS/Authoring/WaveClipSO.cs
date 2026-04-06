@@ -73,7 +73,7 @@ namespace SweepNDodge.DotsBullets
     public sealed class PoissonEmissionAuthoring : WaveEmissionAuthoringBase
     {
         public float MeanEventsPerSec = 0f;
-        [FormerlySerializedAs("BurstShotsPerEvent")] public int EventRepeatCount = 1;
+        public int EventRepeatCount = 1;
         public SourceSpawnEventShotScheduleId EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
         public float EventShotIntervalSec = 0.1f;
 
@@ -85,7 +85,7 @@ namespace SweepNDodge.DotsBullets
     {
         public int BurstRepeatCount = 1;
         public float BurstIntervalSec = 1f;
-        [FormerlySerializedAs("BurstShotsPerEvent")] public int EventRepeatCount = 1;
+        public int EventRepeatCount = 1;
         public SourceSpawnEventShotScheduleId EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
         public float EventShotIntervalSec = 0.1f;
 
@@ -261,7 +261,6 @@ namespace SweepNDodge.DotsBullets
         [SerializeReference] public WaveEmissionAuthoringBase Emission = new RateFieldEmissionAuthoring();
         public WaveSamplingAuthoring Sampling = new WaveSamplingAuthoring();
         [SerializeReference] public WavePositionPatternAuthoringBase PositionPattern = new SinglePointPositionPatternAuthoring();
-        [FormerlySerializedAs("Direction")]
         [SerializeReference] public WaveAimAuthoringBase Aim = new RandomAimAuthoring();
         [SerializeReference] public WaveShotPatternAuthoringBase ShotPattern = new SingleShotPatternAuthoring();
     }
