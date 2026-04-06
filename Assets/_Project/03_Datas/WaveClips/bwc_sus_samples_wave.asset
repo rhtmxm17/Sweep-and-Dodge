@@ -82,8 +82,8 @@ MonoBehaviour:
         rid: 6141543268140187763
       ShotPattern:
         rid: 9141543268140187763
-  - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 3\uBC1C 3\uC138\uD2B8
-      \uBC1C\uC0AC. \uAC01 \uC138\uD2B8 \uAC1C\uC2DC\uC2DC \uC870\uC900"
+  - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 3*3\uBC1C,
+      3\uC138\uD2B8 \uBC1C\uC0AC. \uAC01 \uC138\uD2B8 \uAC1C\uC2DC\uC2DC \uC870\uC900"
     StartSec: 6
     EndSec: 8
     Directives:
@@ -103,7 +103,7 @@ MonoBehaviour:
       Aim:
         rid: 6141543401000000003
       ShotPattern:
-        rid: 9141543401000000003
+        rid: 6141543335094649075
   - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 10\uBC1C
       \uBC1C\uC0AC. \uB9E4 \uBC1C \uC7AC\uC870\uC900"
     StartSec: 8
@@ -189,6 +189,11 @@ MonoBehaviour:
       data:
         BaseAngleDeg: 180
         SpiralStepDeg: 30
+    - rid: 6141543335094649075
+      type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        ShotCount: 3
+        AngleSpacingDeg: 30
     - rid: 6141543401000000001
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -228,7 +233,7 @@ MonoBehaviour:
       type: {class: PlayerPositionAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         AngleOffsetDeg: 0
-        SnapshotTiming: 0
+        SnapshotTiming: 1
     - rid: 7141543268140187756
       type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
@@ -266,9 +271,6 @@ MonoBehaviour:
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
     - rid: 9141543268140187763
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: 
-    - rid: 9141543401000000003
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
     - rid: 9141543401000000013
