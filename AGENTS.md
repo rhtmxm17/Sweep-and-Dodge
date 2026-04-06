@@ -113,6 +113,20 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 공개 API, 복잡한 로직, 소유권/업데이트 순서처럼 규칙이 중요한 곳에는 `summary` 주석 작성을 권장한다.
 - 자명한 코드에는 주석을 생략한다.
 
+### 5.4 테스트/콘텐츠 검증 작성
+- 테스트 오라클은 `코드 contract`, `명시적 SSOT`, `validation rule`, `runtime behavior`를 기준으로 잡는다.
+- TD/ADR/GD의 예시값, 권장값, 설계 중 제안값을 serialized asset 검사 테스트의 기준값으로 승격하지 않는다.
+- serialized asset 직접 검사 테스트는 아래 경우에만 허용한다.
+  - 명시적 SSOT asset/table/manifest와의 동기 검증
+  - validation rule, reference integrity, schema presence, 금지 참조 여부 검증
+  - authoring -> bake/runtime 변환의 심볼릭 계약 검증
+- 다음 패턴은 금지한다.
+  - sample/default/demo asset의 metadata를 raw literal(`float/int/string`)로 비교
+  - `DefinitionId`, 개수, 순서, stage id 등 콘텐츠 값을 외부 SSOT 없이 하드코딩
+  - 설계 문서의 권장 범위/예시값을 exact assert로 고정
+- exact tuning 값을 장기 계약으로 보호해야 하면 먼저 repo 내부 SSOT(constants, manifest asset, data table)를 만든다.
+- 명시적 SSOT가 없으면 데이터 snapshot test 대신 validation test 또는 behavior smoke test를 작성한다.
+
 ---
 
 ## 6. 성능 기준(Performance Budget)
@@ -131,6 +145,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
   - `EditMode` 테스트 통과
   - `PlayMode` 전용 씬 스모크 통과(작업 완료 기준)
 - 성능 리스크 변화시 근거(수치/캡처) 첨부
+- 신규/수정 테스트는 설계 제안값 snapshot이 아니라 명시적 SSOT 또는 behavior contract를 검증해야 한다.
 - 코드 리뷰 관점:
   - 소유권/업데이트 순서/플래그 전환 규칙이 문서·코드에서 일치
 - 예외 처리:

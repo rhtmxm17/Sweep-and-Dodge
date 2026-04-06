@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using NUnit.Framework;
+using SweepNDodge.DotsBullets.Editor;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -50,30 +52,29 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void DefaultCleanupActionAsset_UsesSingleBroomSweepProfile()
+        public void DefaultCleanupActionAsset_PassesValidationRules()
         {
+            const string assetPath = "Assets/_Project/03_Datas/PlayerActionSet/pas_default.asset";
             var asset = AssetDatabase.LoadAssetAtPath<PlayerCleanupActionSetSO>(
-                "Assets/_Project/03_Datas/PlayerActionSet/pas_default.asset");
+                assetPath);
 
             Assert.That(asset, Is.Not.Null);
-            Assert.That(asset.InitialSelectedProfileKey, Is.EqualTo("broom_default"));
-            Assert.That(asset.PrimarySlotProfileKey, Is.EqualTo("broom_default"));
-            Assert.That(asset.SecondarySlotProfileKey, Is.EqualTo("broom_default"));
-            Assert.That(asset.Profiles, Has.Length.EqualTo(1));
-            Assert.That(asset.Profiles[0], Is.TypeOf<BroomSweepCleanupActionProfileSO>());
-            var profile = asset.Profiles[0] as BroomSweepCleanupActionProfileSO;
-            Assert.That(profile, Is.Not.Null);
-            Assert.That(profile.ProfileKey, Is.EqualTo("broom_default"));
-            Assert.That(profile.ActionKind, Is.EqualTo(PlayerCleanupActionId.BroomSweep));
-            Assert.That(profile.LockFacingWhileActive, Is.True);
-            Assert.That(profile.ActiveMoveSpeedScale, Is.EqualTo(0.5f));
-            Assert.That(profile.CaptureActiveTime, Is.EqualTo(0.20f));
-            Assert.That(profile.CaptureCooldown, Is.EqualTo(0f));
-            Assert.That(profile.ActiveTime, Is.EqualTo(0.22f));
-            Assert.That(profile.Cooldown, Is.EqualTo(1.8f));
-            Assert.That(profile.TrashSweepInnerRadius, Is.EqualTo(1f));
-            Assert.That(profile.HazardRectHalfWidth, Is.EqualTo(0.55f));
-            Assert.That(profile.HazardForwardWindowAngleDeg, Is.EqualTo(7f));
+
+            var input = new ContentValidationInput(
+                null,
+                null,
+                null,
+                new List<ContentValidationRecord<PlayerCleanupActionSetSO>>
+                {
+                    new ContentValidationRecord<PlayerCleanupActionSetSO>(asset, assetPath),
+                },
+                null,
+                null,
+                null,
+                null);
+
+            var issues = ContentValidationRules.Validate(input);
+            Assert.That(issues, Is.Empty, "pas_default.asset must satisfy cleanup action validation rules.");
         }
 
         [Test]

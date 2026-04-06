@@ -20,8 +20,6 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string StageLayout3Path = "Assets/_Project/03_Datas/StageCatalog/sl_demo_3.asset";
         private const string SampleScenePath = "Assets/_Project/01_Scenes/StageLayoutEditingSampleV1.unity";
         private const string TestStageCatalogPath = "Assets/_Project/99_Tests/TestData/StageCatalog/sc_test_sample_verification.asset";
-        private const string TestHazardWaveClipPath = "Assets/_Project/99_Tests/TestData/WaveClips/bwc_test_sample_hazard.asset";
-        private const string TestCleanupWaveClipPath = "Assets/_Project/99_Tests/TestData/WaveClips/bwc_test_sample_cleanup.asset";
         private static readonly string[] WaveClipSearchRoots =
         {
             "Assets/_Project/03_Datas/WaveClips",
@@ -121,23 +119,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 issues);
 
             Assert.That(issues, Is.Empty, "sc_test_sample_verification.asset must satisfy StageCatalog validation rules.");
-        }
-
-        [Test]
-        public void SampleVerificationWaveClips_ContainExpectedSampleDefinitions()
-        {
-            var hazardClip = AssetDatabase.LoadAssetAtPath<WaveClipSO>(TestHazardWaveClipPath);
-            var cleanupClip = AssetDatabase.LoadAssetAtPath<WaveClipSO>(TestCleanupWaveClipPath);
-            Assert.That(hazardClip, Is.Not.Null);
-            Assert.That(cleanupClip, Is.Not.Null);
-
-            var hazardDefinitionIds = CollectDefinitionIds(hazardClip);
-            var cleanupDefinitionIds = CollectDefinitionIds(cleanupClip);
-
-            Assert.That(hazardDefinitionIds.Contains(1435459723), Is.True, "Hazard sample clip must include linear sample.");
-            Assert.That(hazardDefinitionIds.Contains(2613000), Is.True, "Hazard sample clip must include bubble sample.");
-            Assert.That(hazardDefinitionIds.Contains(699804262), Is.True, "Hazard sample clip must include homing sample.");
-            Assert.That(cleanupDefinitionIds.Contains(1653732613), Is.True, "Cleanup sample clip must include candy sample.");
         }
 
         [Test]
@@ -326,29 +307,6 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return path;
-        }
-
-        private static HashSet<int> CollectDefinitionIds(WaveClipSO clip)
-        {
-            var ids = new HashSet<int>();
-            var segments = clip.Segments ?? Array.Empty<WaveClipSO.ClipSegment>();
-            for (int i = 0; i < segments.Length; i++)
-            {
-                var segment = segments[i];
-                var directives = segment.Directives ?? Array.Empty<WaveSpawnEntryAuthoring>();
-                for (int e = 0; e < directives.Length; e++)
-                {
-                    if (!WaveClipAuthoringResolver.TryResolveTypedEntry(directives[e], out var snapshot, out _))
-                        continue;
-
-                    if (snapshot.Bullet == null)
-                        continue;
-
-                    ids.Add(snapshot.Bullet.DefinitionId);
-                }
-            }
-
-            return ids;
         }
     }
 }
