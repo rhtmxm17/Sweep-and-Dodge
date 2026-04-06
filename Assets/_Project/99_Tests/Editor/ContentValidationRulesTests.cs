@@ -628,7 +628,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void WaveClip_NWayShotPatternCountTooLow_IsError()
+        public void WaveClip_NWayShotPatternCountOrSpacingInvalid_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             var clip = ScriptableObject.CreateInstance<WaveClipSO>();
@@ -641,7 +641,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var entry = CreateDefaultTypedEntry(def);
                 entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 15f };
-                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 1 };
+                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 1, AngleSpacingDeg = 30f };
 
                 clip.ClipId = 14;
                 clip.Segments = new[]
@@ -668,6 +668,10 @@ namespace SweepNDodge.DotsBullets.Tests
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
+
+                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 4, AngleSpacingDeg = 0f };
+                issues = ContentValidationRules.Validate(input);
                 Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
             }
             finally
@@ -807,6 +811,33 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.PlayerPosition));
                 Assert.That(snapshot.AimSnapshotTiming, Is.EqualTo(WaveAimSnapshotTimingId.PerShot));
                 Assert.That(snapshot.AimAngleOffsetDeg, Is.EqualTo(15f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
+        public void WaveClipResolver_NWayFanSpacing_ResolvesCanonicalSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.Editor_SetDefinitionId(3008);
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 0f };
+                entry.ShotPattern = new NWayShotPatternAuthoring
+                {
+                    ShotCount = 4,
+                    AngleSpacingDeg = 30f,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out var snapshot, out var error), Is.True, error);
+                Assert.That(snapshot.ShotPatternMode, Is.EqualTo(WaveShotPatternModeId.NWay));
+                Assert.That(snapshot.ShotCount, Is.EqualTo(4));
+                Assert.That(snapshot.NWayAngleSpacingDeg, Is.EqualTo(30f));
             }
             finally
             {

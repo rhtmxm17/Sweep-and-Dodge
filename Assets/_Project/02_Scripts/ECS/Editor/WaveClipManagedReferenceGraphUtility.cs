@@ -391,6 +391,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 NWayShotPatternAuthoring nWay => new NWayShotPatternAuthoring
                 {
                     ShotCount = nWay.ShotCount,
+                    AngleSpacingDeg = nWay.AngleSpacingDeg,
                 },
                 RadialShotPatternAuthoring radial => new RadialShotPatternAuthoring
                 {

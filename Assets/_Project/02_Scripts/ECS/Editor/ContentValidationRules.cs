@@ -489,13 +489,14 @@ namespace SweepNDodge.DotsBullets.Editor
                             }
 
                             var shotPatternMode = snapshot.ShotPatternMode;
-                            if (shotPatternMode == WaveShotPatternModeId.NWay && validationEntry.RawShotCount < 2)
+                            if (shotPatternMode == WaveShotPatternModeId.NWay
+                                && (validationEntry.RawShotCount < 2 || validationEntry.RawNWayAngleSpacingDeg <= 0f))
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV023",
                                     validationEntry.EntryLocation,
-                                    $"Clip segment uses NWay ShotPattern with ShotCount < 2 at segmentIndex={s}, entryIndex={e}."));
+                                    $"Clip segment uses NWay ShotPattern with ShotCount < 2 or AngleSpacingDeg <= 0 at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (shotPatternMode == WaveShotPatternModeId.Radial && validationEntry.RawShotCount < 2)
@@ -572,6 +573,7 @@ namespace SweepNDodge.DotsBullets.Editor
             public readonly float RawSpiralStepDeg;
             public readonly WaveAimSnapshotTimingId RawAimSnapshotTiming;
             public readonly int RawShotCount;
+            public readonly float RawNWayAngleSpacingDeg;
             public readonly float RawLineLength;
             public readonly float RawLineSampleSpacing;
             public readonly int RawPointCount;
@@ -591,6 +593,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 float rawSpiralStepDeg,
                 WaveAimSnapshotTimingId rawAimSnapshotTiming,
                 int rawShotCount,
+                float rawNWayAngleSpacingDeg,
                 float rawLineLength,
                 float rawLineSampleSpacing,
                 int rawPointCount)
@@ -609,6 +612,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 RawSpiralStepDeg = rawSpiralStepDeg;
                 RawAimSnapshotTiming = rawAimSnapshotTiming;
                 RawShotCount = rawShotCount;
+                RawNWayAngleSpacingDeg = rawNWayAngleSpacingDeg;
                 RawLineLength = rawLineLength;
                 RawLineSampleSpacing = rawLineSampleSpacing;
                 RawPointCount = rawPointCount;
@@ -672,6 +676,7 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             int rawShotCount = 1;
+            float rawNWayAngleSpacingDeg = 0f;
             float rawSpiralStepDeg = 0f;
             WaveAimSnapshotTimingId rawAimSnapshotTiming = WaveAimSnapshotTimingId.EventStart;
             switch (typedEntry.Aim)
@@ -688,6 +693,7 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 case NWayShotPatternAuthoring nWay:
                     rawShotCount = nWay.ShotCount;
+                    rawNWayAngleSpacingDeg = nWay.AngleSpacingDeg;
                     break;
                 case RadialShotPatternAuthoring radial:
                     rawShotCount = radial.ShotCount;
@@ -709,6 +715,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 rawSpiralStepDeg,
                 rawAimSnapshotTiming,
                 rawShotCount,
+                rawNWayAngleSpacingDeg,
                 rawLineLength,
                 rawLineSampleSpacing,
                 rawPointCount);

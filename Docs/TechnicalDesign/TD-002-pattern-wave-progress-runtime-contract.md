@@ -110,6 +110,8 @@ Count = EventRepeatCount × ShotPattern 1회당 탄 수
 - `Aim`은 base angle 계산 책임만 가진다.
 - `ShotPattern`은 repeat 1회가 만드는 슬롯 구조 책임만 가진다.
 - `NWay` / `Radial`은 모두 atomic consume이다.
+- `NWay`는 centered fan이며 `NWayAngleSpacingDeg`를 인접 슬롯 간격으로 사용한다.
+- `Radial`은 full-circle 균등 분배다.
 - `Spiral + NWay`, `Spiral + Radial`, `PlayerPosition + NWay`, `PlayerPosition + Radial` 조합을 지원한다.
 
 ### 5.3 Timed vs Instant
@@ -159,7 +161,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - `CV020`: `BurstIntervalSec <= 0`
 - `CV021`: invalid `BurstRepeatCount`
 - `CV022`: `Poisson` / `EventBurst`의 `EventRepeatCount <= 0`
-- `CV023`: `NWay ShotPattern`의 `ShotCount < 2`
+- `CV023`: `NWay ShotPattern`의 `ShotCount < 2` 또는 `AngleSpacingDeg <= 0`
 - `CV024`: `Radial ShotPattern`의 `ShotCount < 2`
 - `CV025`: `Timed`인데 `EventShotIntervalSec <= 0`
 - `CV026`: invalid `LineEven PositionPattern`

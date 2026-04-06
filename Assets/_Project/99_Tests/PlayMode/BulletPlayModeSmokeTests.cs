@@ -4336,6 +4336,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     AimAngleOffsetDeg = pattern.AimAngleOffsetDeg,
                     ShotPatternMode = pattern.ShotPatternMode,
                     ShotCount = pattern.ShotCount,
+                    NWayAngleSpacingDeg = pattern.NWayAngleSpacingDeg,
                     EventRepeatCount = pattern.EventRepeatCount,
                     FixedPoint = pattern.FixedPoint,
                     SpawnOffset = pattern.SpawnOffset,

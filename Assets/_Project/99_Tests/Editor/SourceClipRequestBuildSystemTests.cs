@@ -431,6 +431,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 AimAngleOffsetDeg = 0f,
                 ShotPatternMode = WaveShotPatternModeId.Single,
                 ShotCount = 1,
+                NWayAngleSpacingDeg = 0f,
                 EventRepeatCount = eventRepeatCount,
                 SampleSpacing = 1f,
                 LineStart = new float2(-0.5f, 0f),

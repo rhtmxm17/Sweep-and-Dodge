@@ -42,6 +42,7 @@ namespace SweepNDodge.DotsBullets
 
         public WaveShotPatternModeId ShotPatternMode;
         public int ShotCount;
+        public float NWayAngleSpacingDeg;
     }
 
     public static class WaveClipAuthoringResolver
@@ -152,6 +153,7 @@ namespace SweepNDodge.DotsBullets
                 AimAngleOffsetDeg = 0f,
                 ShotPatternMode = WaveShotPatternModeId.Single,
                 ShotCount = 1,
+                NWayAngleSpacingDeg = 0f,
             };
         }
 
@@ -266,14 +268,17 @@ namespace SweepNDodge.DotsBullets
             {
                 case NWayShotPatternAuthoring nWay:
                     snapshot.ShotCount = nWay.ShotCount > 0 ? nWay.ShotCount : 1;
+                    snapshot.NWayAngleSpacingDeg = nWay.AngleSpacingDeg;
                     break;
 
                 case RadialShotPatternAuthoring radial:
                     snapshot.ShotCount = radial.ShotCount > 0 ? radial.ShotCount : 1;
+                    snapshot.NWayAngleSpacingDeg = 0f;
                     break;
 
                 default:
                     snapshot.ShotCount = 1;
+                    snapshot.NWayAngleSpacingDeg = 0f;
                     break;
             }
         }

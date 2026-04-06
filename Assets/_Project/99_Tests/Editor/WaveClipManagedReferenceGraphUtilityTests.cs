@@ -81,6 +81,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var sharedShotPattern = new NWayShotPatternAuthoring
             {
                 ShotCount = 3,
+                AngleSpacingDeg = 45f,
             };
             var sharedAnchor = new SourceCenterSamplingAnchorAuthoring();
             var sharedAreaSampler = new UniformFieldAreaSamplerAuthoring();

@@ -153,6 +153,7 @@ namespace SweepNDodge.DotsBullets
         public float AimAngleOffsetDeg;
         public WaveShotPatternModeId ShotPatternMode;
         public int ShotCount;
+        public float NWayAngleSpacingDeg;
         public int EventRepeatCount;
         public float2 FixedPoint;
         public float2 SpawnOffset;

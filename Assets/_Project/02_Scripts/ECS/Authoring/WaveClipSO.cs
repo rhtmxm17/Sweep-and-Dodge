@@ -239,6 +239,7 @@ namespace SweepNDodge.DotsBullets
     public sealed class NWayShotPatternAuthoring : WaveShotPatternAuthoringBase
     {
         public int ShotCount = 2;
+        public float AngleSpacingDeg = 30f;
 
         public override WaveShotPatternModeId ShotPatternMode => WaveShotPatternModeId.NWay;
     }

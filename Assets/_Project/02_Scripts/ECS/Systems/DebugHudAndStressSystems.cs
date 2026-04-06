@@ -28,6 +28,7 @@ namespace SweepNDodge.DotsBullets
             public float AimAngleOffsetDeg;
             public WaveShotPatternModeId ShotPatternMode;
             public int ShotCount;
+            public float NWayAngleSpacingDeg;
             public int EventRepeatCount;
             public float2 FixedPoint;
             public float2 SpawnOffset;
@@ -147,6 +148,7 @@ namespace SweepNDodge.DotsBullets
                         AimAngleOffsetDeg = resolvedV3.AimAngleOffsetDeg,
                         ShotPatternMode = resolvedV3.ShotPatternMode,
                         ShotCount = resolvedV3.ShotCount,
+                        NWayAngleSpacingDeg = resolvedV3.NWayAngleSpacingDeg,
                         EventRepeatCount = resolvedV3.EventRepeatCount,
                         FixedPoint = resolvedV3.FixedPoint,
                         SpawnOffset = resolvedV3.SpawnOffset,
@@ -263,6 +265,7 @@ namespace SweepNDodge.DotsBullets
                 target.AimAngleOffsetDeg,
                 target.ShotPatternMode,
                 target.ShotCount,
+                target.NWayAngleSpacingDeg,
                 target.EventRepeatCount,
                 target.FixedPoint,
                 target.SpawnOffset,

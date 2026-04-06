@@ -125,6 +125,12 @@
     - `CV041`는 `WaveClip` 내부 shared `SerializeReference` graph error로 재정의됐다.
     - 운영/test WaveClip asset 검사와 sample asset regression이 shared managed reference graph 부재를 포함하도록 강화됐다.
     - `bwc_sus_samples_wave.asset`의 shared `rid` 상태를 실제 직렬화 데이터에서 제거했다.
+- [x] D15. Plan H. `NWay = centered fan`, `Radial = full circle`로 `ShotPattern` 의미를 분리했다.
+  - 검증 결과:
+    - `NWayShotPatternAuthoring`에 `AngleSpacingDeg`를 추가하고 canonical snapshot/runtime field `NWayAngleSpacingDeg`를 도입했다.
+    - runtime angle 계산은 `NWay` fan offset과 `Radial` full-circle offset을 분리해서 사용한다.
+    - `CV023`는 `NWay ShotCount < 2`뿐 아니라 `AngleSpacingDeg <= 0`도 차단하도록 확장됐다.
+    - 기존 360도 의미의 운영 WaveClip `NWay` 자산은 `Radial`로 마이그레이션됐다.
 
 ## End of Session
 - 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.

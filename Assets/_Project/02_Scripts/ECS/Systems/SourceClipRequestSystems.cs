@@ -843,6 +843,7 @@ namespace SweepNDodge.DotsBullets
                 pattern.AimAngleOffsetDeg,
                 pattern.ShotPatternMode,
                 pattern.ShotCount,
+                pattern.NWayAngleSpacingDeg,
                 pattern.EventRepeatCount,
                 pattern.FixedPoint,
                 pattern.SpawnOffset,

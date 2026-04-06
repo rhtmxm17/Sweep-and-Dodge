@@ -1227,7 +1227,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SpawnExecution_LineEvenNWay_SpawnsAtomicSetsPerSamplePoint()
+        public void SpawnExecution_LineEvenNWayFan_SpawnsAtomicSetsPerSamplePoint()
         {
             try
             {
@@ -1255,6 +1255,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     AimMode = WaveAimModeId.Fixed,
                     ShotPatternMode = WaveShotPatternModeId.NWay,
                     ShotCount = 4,
+                    NWayAngleSpacingDeg = 30f,
                     EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     LineStart = new float2(-2f, 0f),
@@ -1262,7 +1263,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     SampleSpacing = 1f,
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
-                    BaseAngleDeg = 45f,
+                    BaseAngleDeg = 0f,
                     Count = 20,
                     OldestFrame = 0u,
                 });
@@ -1274,19 +1275,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 CollectActiveBulletSnapshotsForSource(em, source, snapshots);
                 Assert.That(snapshots.Count, Is.EqualTo(20));
 
-                float invSqrt2 = 0.70710677f;
-                float2 dir45 = new float2(invSqrt2, invSqrt2);
-                float2 dir135 = new float2(-invSqrt2, invSqrt2);
-                float2 dir225 = new float2(-invSqrt2, -invSqrt2);
-                float2 dir315 = new float2(invSqrt2, -invSqrt2);
+                float2 dirNeg45 = new float2(0.70710677f, -0.70710677f);
+                float2 dirNeg15 = new float2(0.9659258f, -0.25881904f);
+                float2 dirPos15 = new float2(0.9659258f, 0.25881904f);
+                float2 dirPos45 = new float2(0.70710677f, 0.70710677f);
 
                 for (int i = -2; i <= 2; i++)
                 {
                     var point = new float3(i, 0f, 0f);
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir45, 0.0001f, 0.0001f), Is.EqualTo(1));
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir135, 0.0001f, 0.0001f), Is.EqualTo(1));
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir225, 0.0001f, 0.0001f), Is.EqualTo(1));
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir315, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirNeg45, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirNeg15, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirPos15, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirPos45, 0.0001f, 0.0001f), Is.EqualTo(1));
                 }
 
                 var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
@@ -1327,6 +1327,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     AimMode = WaveAimModeId.Fixed,
                     ShotPatternMode = WaveShotPatternModeId.NWay,
                     ShotCount = 4,
+                    NWayAngleSpacingDeg = 30f,
                     EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     LineStart = new float2(-1f, 0f),
@@ -1392,6 +1393,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     AimMode = WaveAimModeId.Fixed,
                     ShotPatternMode = WaveShotPatternModeId.NWay,
                     ShotCount = 4,
+                    NWayAngleSpacingDeg = 30f,
                     EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     LineStart = new float2(-2f, 0f),
@@ -1833,6 +1835,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     AimAngleOffsetDeg = 0f,
                     ShotPatternMode = WaveShotPatternModeId.NWay,
                     ShotCount = 2,
+                    NWayAngleSpacingDeg = 180f,
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
                     Count = 4,
@@ -5248,6 +5251,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 AimAngleOffsetDeg = 0f,
                 ShotPatternMode = WaveShotPatternModeId.Single,
                 ShotCount = 1,
+                NWayAngleSpacingDeg = 0f,
                 EventRepeatCount = 1,
                 FixedPoint = float2.zero,
                 SpawnOffset = float2.zero,

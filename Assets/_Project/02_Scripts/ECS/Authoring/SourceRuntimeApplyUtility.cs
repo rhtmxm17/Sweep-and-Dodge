@@ -325,6 +325,9 @@ namespace SweepNDodge.DotsBullets
                         AimAngleOffsetDeg = snapshot.AimAngleOffsetDeg,
                         ShotPatternMode = snapshot.ShotPatternMode,
                         ShotCount = Mathf.Max(1, snapshot.ShotCount),
+                        NWayAngleSpacingDeg = snapshot.ShotPatternMode == WaveShotPatternModeId.NWay
+                            ? snapshot.NWayAngleSpacingDeg
+                            : 0f,
                         EventRepeatCount = Mathf.Max(1, snapshot.EventRepeatCount),
                         FixedPoint = new float2(snapshot.FixedPoint.x, snapshot.FixedPoint.y),
                         SpawnOffset = new float2(snapshot.SpawnOffset.x, snapshot.SpawnOffset.y),

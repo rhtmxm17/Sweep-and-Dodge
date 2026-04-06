@@ -108,7 +108,7 @@ MonoBehaviour:
       data:
         BaseAngleDeg: 15
     - rid: 9141543335094648915
-      type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: RadialShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         ShotCount: 8
     - rid: 6141543335094648918

@@ -860,7 +860,7 @@ namespace SweepNDodge.DotsBullets
                     ? math.abs(forcedSlotIndex) % slotCount
                     : (int)(repeatSequence % (uint)slotCount));
             if (slotCount > 1)
-                angle += (math.PI * 2f * slot) / slotCount;
+                angle += ResolveShotPatternAngleOffsetRad(in request, slotCount, slot);
 
             float2 dir = new float2(math.cos(angle), math.sin(angle));
             float lenSq = math.lengthsq(dir);
@@ -870,7 +870,6 @@ namespace SweepNDodge.DotsBullets
             return dir * math.rsqrt(lenSq);
         }
 
-        // NWay와 RadialBurst는 공통 슬롯 분배 로직으로 통합한다.
         private static int ResolveDirectionalSlotCount(in SourceSpawnRequestBuffer request)
         {
             return request.ShotPatternMode switch
@@ -878,6 +877,22 @@ namespace SweepNDodge.DotsBullets
                 WaveShotPatternModeId.NWay => math.max(1, request.ShotCount),
                 WaveShotPatternModeId.Radial => math.max(1, request.ShotCount),
                 _ => 1,
+            };
+        }
+
+        private static float ResolveShotPatternAngleOffsetRad(
+            in SourceSpawnRequestBuffer request,
+            int slotCount,
+            int slot)
+        {
+            if (slotCount <= 1)
+                return 0f;
+
+            return request.ShotPatternMode switch
+            {
+                WaveShotPatternModeId.NWay => math.radians(request.NWayAngleSpacingDeg) * (slot - ((slotCount - 1) * 0.5f)),
+                WaveShotPatternModeId.Radial => (math.PI * 2f * slot) / slotCount,
+                _ => 0f,
             };
         }
 

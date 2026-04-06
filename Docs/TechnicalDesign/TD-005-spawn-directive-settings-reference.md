@@ -112,10 +112,11 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 | 타입 | 의미 | 필드 |
 | --- | --- | --- |
 | `SingleShotPatternAuthoring` | 1발 | 없음 |
-| `NWayShotPatternAuthoring` | 다방향 세트 | `ShotCount >= 2` |
+| `NWayShotPatternAuthoring` | centered fan 세트 | `ShotCount >= 2`, `AngleSpacingDeg > 0` |
 | `RadialShotPatternAuthoring` | 원형 세트 | `ShotCount >= 2` |
 
 ### 7.1 해석 규약
+- `NWay`는 기준 방향 중심 fan spread이고, `Radial`은 기준 방향 기준 full-circle 분배다.
 - `NWay`와 `Radial`은 모두 atomic consume이다.
 - 하나의 repeat에서 세트를 다 소비하지 못하면 repeat 전체를 이월한다.
 - `SpawnSequence`는 bullet 수가 아니라 repeat 단위로 증가한다.
@@ -124,7 +125,7 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 | 코드 | 의미 |
 | --- | --- |
 | `CV022` | `Poisson` / `EventBurst`의 `EventRepeatCount <= 0` |
-| `CV023` | `NWay ShotPattern`의 `ShotCount < 2` |
+| `CV023` | `NWay ShotPattern`의 `ShotCount < 2` 또는 `AngleSpacingDeg <= 0` |
 | `CV024` | `Radial ShotPattern`의 `ShotCount < 2` |
 | `CV026` | `LineEven PositionPattern` 파라미터 오류 |
 | `CV028` | `PointSet PositionPattern`의 포인트 개수 오류 |

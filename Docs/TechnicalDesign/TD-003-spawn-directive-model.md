@@ -114,7 +114,10 @@ WaveSpawnEntryAuthoring
   - `RadialShotPatternAuthoring`
 - 규약:
   - `ShotCount`는 `NWay` / `Radial`에서 사용한다.
+  - `AngleSpacingDeg`는 `NWay`에서만 사용하며, 인접 fan 슬롯 간 각도 간격을 뜻한다.
   - `NWay`와 `Radial`은 runtime에서 모두 atomic consume이다.
+  - `NWay`는 기준 방향 중심 fan spread다.
+  - `Radial`은 기준 방향 기준 full-circle 분배다.
 
 ## 4. 핵심 의미 규약
 
