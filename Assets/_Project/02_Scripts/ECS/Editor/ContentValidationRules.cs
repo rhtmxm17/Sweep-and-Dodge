@@ -506,16 +506,6 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"Clip segment uses Spiral with near-zero SpiralStepDeg at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (aimMode == WaveAimModeId.PlayerPosition
-                                && validationEntry.RawAimSnapshotTiming != WaveAimSnapshotTimingId.EventStart)
-                            {
-                                issues.Add(new ContentValidationIssue(
-                                    ContentValidationSeverity.Error,
-                                    "CV041",
-                                    validationEntry.EntryLocation,
-                                    $"Clip segment uses unsupported PlayerPositionAim snapshot timing at segmentIndex={s}, entryIndex={e}."));
-                            }
-
                             var positionPatternMode = snapshot.PositionPatternMode;
                             if (positionPatternMode == WavePositionPatternModeId.LineEven)
                             {

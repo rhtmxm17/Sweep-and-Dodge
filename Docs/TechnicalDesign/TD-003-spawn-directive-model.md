@@ -100,8 +100,9 @@ WaveSpawnEntryAuthoring
   - `PlayerPositionAimAuthoring`
 - 규약:
   - `Spiral`은 aim 축이다.
-  - `PlayerPositionAim`은 현재 `player world position + EventStart snapshot`만 지원한다.
-  - `PerShot` retarget은 지원하지 않는다.
+  - `PlayerPositionAim`은 `player world position`만 target source로 사용한다.
+  - `SnapshotTiming=EventStart`는 event 범위에서 aim target을 고정한다.
+  - `SnapshotTiming=PerShot`는 repeat consume 시점마다 현재 player world position으로 retarget한다.
 
 ### 3.6 ShotPattern
 - 역할: repeat 1회가 몇 발을 어떤 슬롯 구조로 만드는지 결정한다.
@@ -153,10 +154,11 @@ WaveSpawnEntryAuthoring
 - authoring 설명에서 `Direction` 단일 축을 더 이상 SSOT로 쓰지 않는다.
 - `Sampling`과 `PositionPattern`이 분리된 상태로 설명된다.
 - `BurstShotsPerEvent` 대신 `EventRepeatCount`를 기준 용어로 사용한다.
-- `PlayerPositionAim(EventStart)` 계약이 문서와 구현에서 일치한다.
+- `PlayerPositionAim(EventStart / PerShot)` 계약이 문서와 구현에서 일치한다.
 
 ## 7. 변경 이력
 - 2026-04-06: Plan E 반영. runtime/product code의 compat field mirror 제거 상태를 문서 기준에도 반영했다.
+- 2026-04-06: Plan F 반영. `PlayerPositionAim`이 `EventStart`와 `PerShot` snapshot timing을 모두 지원하도록 모델 설명을 갱신했다.
 - 2026-04-06: Plan D 반영. canonical 축(`Emission / Sampling / PositionPattern / Aim / ShotPattern / Payload`) 기준으로 문서를 전면 정리했다.
 - 2026-04-03: 2차 정리 반영. typed-only authoring SSOT로 고정했다.
 - 2026-04-03: 1차 정리 반영. `Directives[]` typed authoring과 resolver snapshot 경로를 도입했다.

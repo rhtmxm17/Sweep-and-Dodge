@@ -991,9 +991,11 @@ namespace SweepNDodge.DotsBullets
                     return math.radians(request.BaseAngleDeg + request.SpiralStepDeg * repeatSequence);
                 case WaveAimModeId.PlayerPosition:
                 {
+                    bool useEventStartSnapshot = SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in request)
+                        && request.AimSnapshotTiming == WaveAimSnapshotTimingId.EventStart;
                     float3 aimTarget = playerPosition;
-                    if (SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in request)
-                        && request.AimSnapshotTiming == WaveAimSnapshotTimingId.EventStart)
+
+                    if (useEventStartSnapshot)
                     {
                         if (request.EventAimInitialized == 0)
                         {
@@ -1002,6 +1004,10 @@ namespace SweepNDodge.DotsBullets
                         }
 
                         aimTarget = request.EventAimTargetPosition;
+                    }
+                    else if (request.AimSnapshotTiming == WaveAimSnapshotTimingId.PerShot)
+                    {
+                        aimTarget = hasPlayer ? playerPosition : repeatOrigin;
                     }
                     else if (!hasPlayer)
                     {

@@ -1662,6 +1662,282 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnExecution_PlayerPositionAimEventStart_KeepsInitialAimTargetAcrossRepeats()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimEventStartWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8010,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 3,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(2));
+
+                float2 dirRight = new float2(1f, 0f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(2));
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requestsAfter.Length, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].EventAimInitialized, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].EventAimTargetPosition.x, Is.EqualTo(10f).Within(0.0001f));
+                Assert.That(requestsAfter[0].EventAimTargetPosition.z, Is.EqualTo(0f).Within(0.0001f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerPositionAimPerShot_RetargetsAcrossRepeats()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimPerShotWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8011,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 3,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(2));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requestsAfter.Length, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].EventAimInitialized, Is.EqualTo(0));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerPositionAimPerShotNWay_UsesCurrentPlayerForEachSet()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimPerShotNWayWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8012,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 2,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.NWay,
+                    ShotCount = 2,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 4,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(4));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                float2 dirDown = new float2(0f, -1f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerPositionAimPerShotRadial_UsesCurrentPlayerForEachSet()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimPerShotRadialWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8013,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 2,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Radial,
+                    ShotCount = 2,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 4,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(4));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                float2 dirDown = new float2(0f, -1f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnExecution_PollutionFieldSampling_UsesPollutionGridOriginInsteadOfSourceAnchor()
         {
             try

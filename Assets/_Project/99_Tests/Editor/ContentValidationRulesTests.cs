@@ -679,7 +679,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void WaveClip_PlayerPositionAimWithUnsupportedTiming_IsError()
+        public void WaveClip_PlayerPositionAimPerShot_IsAllowed()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             var clip = ScriptableObject.CreateInstance<WaveClipSO>();
@@ -722,7 +722,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV041"), Is.True);
+                Assert.That(issues.Any(i => i.Code == "CV041"), Is.False);
             }
             finally
             {
@@ -781,6 +781,32 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(snapshot.AimSnapshotTiming, Is.EqualTo(WaveAimSnapshotTimingId.EventStart));
                 Assert.That(snapshot.ShotPatternMode, Is.EqualTo(WaveShotPatternModeId.Radial));
                 Assert.That(snapshot.ShotCount, Is.EqualTo(6));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
+        public void WaveClipResolver_PlayerPositionAimPerShot_ResolvesCanonicalSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.Editor_SetDefinitionId(3007);
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Aim = new PlayerPositionAimAuthoring
+                {
+                    AngleOffsetDeg = 15f,
+                    SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out var snapshot, out var error), Is.True, error);
+                Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.PlayerPosition));
+                Assert.That(snapshot.AimSnapshotTiming, Is.EqualTo(WaveAimSnapshotTimingId.PerShot));
+                Assert.That(snapshot.AimAngleOffsetDeg, Is.EqualTo(15f));
             }
             finally
             {

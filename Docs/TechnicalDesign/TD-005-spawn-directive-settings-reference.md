@@ -103,7 +103,9 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 
 ### 6.1 해석 규약
 - `Spiral`은 aim 축이다.
-- `PlayerPositionAim`은 현재 `SnapshotTiming=EventStart`만 지원한다.
+- `PlayerPositionAim`은 `SnapshotTiming=EventStart | PerShot`를 지원한다.
+- `EventStart`는 discrete event 범위에서 aim target을 고정한다.
+- `PerShot`는 repeat consume 시점마다 현재 player world position으로 retarget한다.
 - target source는 player world position만 사용한다.
 
 ## 7. ShotPattern
@@ -126,7 +128,6 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 | `CV024` | `Radial ShotPattern`의 `ShotCount < 2` |
 | `CV026` | `LineEven PositionPattern` 파라미터 오류 |
 | `CV028` | `PointSet PositionPattern`의 포인트 개수 오류 |
-| `CV041` | `PlayerPositionAim`의 unsupported snapshot timing |
 | `CVW032` | `SpiralAim`의 near-zero `SpiralStepDeg` |
 | `CVW033` | `PointSet` authored 포인트 수가 runtime clamp 상한 초과 |
 
@@ -137,5 +138,6 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 
 ## 10. 변경 이력
 - 2026-04-06: Plan E 반영. runtime/product code가 canonical field만 유지하는 상태로 문서 메모를 보정했다.
+- 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget 지원과 validation 제약 제거를 문서에 반영했다.
 - 2026-04-06: Plan D 반영. canonical authoring 축과 validation 용어 기준으로 문서를 전면 정리했다.
 - 2026-04-03: typed-only authoring과 resolver snapshot 경로를 문서에 반영했다.

@@ -95,6 +95,7 @@ Count = EventRepeatCount × ShotPattern 1회당 탄 수
   - event anchor는 첫 consume 시 1회 resolve
   - 같은 event의 repeat는 `EventAnchorPosition` 재사용
   - `PlayerPositionAim(EventStart)`는 첫 consume 시 `EventAimTargetPosition`을 잡고 재사용
+  - `PlayerPositionAim(PerShot)`는 repeat consume 시점마다 현재 player world position을 다시 읽는다
 - `Instant`와 `Timed`는 같은 고정 규칙을 공유한다.
   - 차이는 repeat 간 시간 간격뿐이다.
 
@@ -117,7 +118,9 @@ Count = EventRepeatCount × ShotPattern 1회당 탄 수
 - `Timed`
   - `EventShotIntervalSec` 간격으로 repeat를 1회씩 consume
 - 공통:
-  - event anchor / event aim snapshot은 event 범위에서 고정
+  - event anchor는 event 범위에서 고정
+  - `PlayerPositionAim(EventStart)`는 event aim snapshot을 고정한다
+  - `PlayerPositionAim(PerShot)`는 repeat마다 현재 player world position으로 retarget한다
 
 ## 6. 변경 이력
 - 2026-04-06: Plan E 반영. compat runtime mirror 필드와 canonical fallback 경로를 제거하고 runtime/product code를 canonical-only로 고정했다.
@@ -161,7 +164,6 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - `CV025`: `Timed`인데 `EventShotIntervalSec <= 0`
 - `CV026`: invalid `LineEven PositionPattern`
 - `CV028`: invalid `PointSet PositionPattern`
-- `CV041`: unsupported `PlayerPositionAim` snapshot timing
 - `CVW032`: near-zero `SpiralStepDeg`
 - `CVW033`: `PointSet` authored count > runtime clamp max
 
@@ -173,6 +175,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - event item split regression
 - timed event anchor fixation
 - `PlayerPositionAim(EventStart)` fixation
+- `PlayerPositionAim(PerShot)` retarget
 - `NWay` / `Radial` atomic consume
 - `LineEven` / `PointSet` repeat-sequence origin selection
 
@@ -187,6 +190,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 이번 문서는 Wave / Spawn runtime contract만 SSOT로 다룬다.
 
 ## 10. 변경 이력
+- 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget을 허용하고 관련 validation 제약(`CV041`)을 제거했다.
 - 2026-04-06: Plan D 반영. canonical runtime field, event item split, event-local snapshot ownership, validation 기준을 현재 구현 상태로 전면 정리했다.
 - 2026-04-06: Plan C 반영. `SourceSpawnRequestBuffer`를 event-local snapshot owner로 고정하고 `Poisson` / `EventBurst` event item split을 도입했다.
 - 2026-04-03: typed-only authoring / resolver snapshot 경로를 runtime 계약에 반영했다.

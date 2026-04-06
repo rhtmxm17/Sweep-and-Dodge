@@ -82,9 +82,10 @@ MonoBehaviour:
         rid: 6141543268140187763
       ShotPattern:
         rid: 9141543268140187763
-  - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 \uBC1C\uC0AC"
+  - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 3\uBC1C 3\uC138\uD2B8
+      \uBC1C\uC0AC. \uAC01 \uC138\uD2B8 \uAC1C\uC2DC\uC2DC \uC870\uC900"
     StartSec: 6
-    EndSec: 7
+    EndSec: 8
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
@@ -102,7 +103,29 @@ MonoBehaviour:
       Aim:
         rid: 6141543335094649072
       ShotPattern:
-        rid: 6141543335094649073
+        rid: 6141543335094649074
+  - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 10\uBC1C
+      \uBC1C\uC0AC. \uB9E4 \uBC1C \uC7AC\uC870\uC900"
+    StartSec: 8
+    EndSec: 9
+    Directives:
+    - Payload:
+        Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
+      Emission:
+        rid: 6141543268140187761
+      Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187762
+        AreaSampler:
+          rid: 8141543268140187762
+      PositionPattern:
+        rid: 6141543268140187762
+      Aim:
+        rid: 6141543335094649072
+      ShotPattern:
+        rid: 6141543335094649074
   references:
     version: 2
     RefIds:
@@ -151,11 +174,11 @@ MonoBehaviour:
       data:
         SpawnMode: 0
         MaxActiveDensityPerArea: 0
-        BurstRepeatCount: 1
-        BurstIntervalSec: 1
+        BurstRepeatCount: 3
+        BurstIntervalSec: 0.5
         EventRepeatCount: 3
         EventShotSchedule: 1
-        EventShotIntervalSec: 0.15
+        EventShotIntervalSec: 0.1
     - rid: 6141543268140187762
       type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -171,10 +194,9 @@ MonoBehaviour:
       data:
         AngleOffsetDeg: 0
         SnapshotTiming: 0
-    - rid: 6141543335094649073
-      type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        ShotCount: 4
+    - rid: 6141543335094649074
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
     - rid: 7141543268140187756
       type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 

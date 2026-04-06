@@ -84,7 +84,7 @@
 - [x] D9. Plan B. resolver/validation contract를 새 축 기준으로 재정의하고 검증했다.
   - 검증 결과:
     - `ResolvedWaveSpawnDirectiveSnapshot`가 canonical snapshot으로 교체됐다.
-    - validation은 `CV040` 구조 검증과 semantic 검증(`CV018`, `CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CV041`, `CVW032`, `CVW033`)으로 재배치됐다.
+    - validation은 `CV040` 구조 검증과 semantic 검증(`CV018`, `CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CVW032`, `CVW033`)으로 재배치됐다.
     - 운영 6개 + test 2개 WaveClip asset이 새 authoring schema로 마이그레이션됐다.
     - `compile -> console error 0 -> EditMode 404/404 -> PlayMode smoke 1/1`까지 통과했다.
 - [x] D10. Plan C. runtime request/event-local snapshot ownership을 canonical runtime 기준으로 고정했다.
@@ -97,7 +97,7 @@
     - `compile -> console error 0 -> EditMode 403/403 -> PlayMode smoke 1/1`까지 통과했다.
 - [x] D11. Plan D. validation / fixture / document 정합성을 canonical 계약 기준으로 마감했다.
   - 검증 결과:
-    - `ContentValidationRules`의 canonical 코드 의미(`CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CV041`, `CVW032`, `CVW033`)와 테스트 이름/메시지의 stale 용어를 정리했다.
+    - `ContentValidationRules`의 canonical 코드 의미(`CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CVW032`, `CVW033`)와 테스트 이름/메시지의 stale 용어를 정리했다.
     - sample asset test가 typed-only뿐 아니라 각 directive 축(`Emission`, `Sampling`, `Sampling.Anchor`, `Sampling.AreaSampler`, `PositionPattern`, `Aim`, `ShotPattern`)의 non-null도 확인하도록 강화됐다.
     - request build / stress fixture의 stale `BurstShotsPerEvent` 명칭을 `EventRepeatCount` 중심으로 정리했다.
     - `TD-002`, `TD-003`, `TD-005`를 current canonical contract 기준으로 전면 갱신했다.
@@ -111,11 +111,18 @@
     - debug / playmode / editmode fixture helper를 canonical field 기준으로 재작성했다.
     - current SSOT 문서(`TD-002`, `TD-003`, `TD-005`)에서 compat mirror 잔존 설명을 제거했다.
     - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 통과했다.
+- [x] D13. Plan F. `PlayerPositionAim`의 `PerShot` retarget을 canonical contract에 맞게 확장했다.
+  - 검증 결과:
+    - `PlayerPositionAimAuthoring.SnapshotTiming`은 `EventStart`와 `PerShot`를 모두 허용하도록 resolver / validation / 문서가 동기화됐다.
+    - `CV041`는 제거되고 `PlayerPositionAim(PerShot)`는 canonical authoring으로 허용된다.
+    - runtime은 `EventStart`에서만 request-local `EventAimTargetPosition`을 고정하고, `PerShot`는 repeat consume 시점마다 현재 player world position으로 retarget한다.
+    - `Timed + PlayerPositionAim(EventStart)` fixation, `Timed/Instant + PlayerPositionAim(PerShot)` retarget, `PerShot + NWay/Radial` 회귀 테스트를 추가했다.
+    - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 다시 통과했다.
 
 ## End of Session
 - 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.
 - 남은 리스크:
   - `PlayerPositionAim`에서 player world position만 볼지, player aim point subtype를 추가할지는 아직 후속 결정이 남아 있다.
-  - runtime flat shape rename을 미룬 만큼, authoring 용어와 runtime 용어가 당분간 완전히 일치하지 않을 수 있다.
+  - `LineNormalAim`, `PlayerAimPointAim`, `LineEven`의 count-based authoring 같은 계약 확장은 별도 플랜으로 다뤄야 한다.
 - 다음 세션 시작점:
-  - 후속 플랜에서 `PlayerPositionAim` 확장, 추가 `Aim` / `PositionPattern` 조합, editor UX polish 같은 계약 확장 범위를 다시 논의한다.
+  - 후속 플랜에서 `PlayerAimPointAim`, `LineNormalAim`, 추가 `Aim` / `PositionPattern` 조합, editor UX polish 같은 계약 확장 범위를 다시 논의한다.
