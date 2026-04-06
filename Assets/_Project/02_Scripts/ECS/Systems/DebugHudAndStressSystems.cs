@@ -26,6 +26,8 @@ namespace SweepNDodge.DotsBullets
             public WaveAimModeId AimMode;
             public WaveAimSnapshotTimingId AimSnapshotTiming;
             public float AimAngleOffsetDeg;
+            public WaveLineNormalSideId LineNormalSide;
+            public float LineNormalAngleOffsetDeg;
             public WaveShotPatternModeId ShotPatternMode;
             public int ShotCount;
             public float NWayAngleSpacingDeg;
@@ -146,6 +148,8 @@ namespace SweepNDodge.DotsBullets
                         AimMode = resolvedV3.AimMode,
                         AimSnapshotTiming = resolvedV3.AimSnapshotTiming,
                         AimAngleOffsetDeg = resolvedV3.AimAngleOffsetDeg,
+                        LineNormalSide = resolvedV3.LineNormalSide,
+                        LineNormalAngleOffsetDeg = resolvedV3.LineNormalAngleOffsetDeg,
                         ShotPatternMode = resolvedV3.ShotPatternMode,
                         ShotCount = resolvedV3.ShotCount,
                         NWayAngleSpacingDeg = resolvedV3.NWayAngleSpacingDeg,
@@ -263,6 +267,8 @@ namespace SweepNDodge.DotsBullets
                 target.AimMode,
                 target.AimSnapshotTiming,
                 target.AimAngleOffsetDeg,
+                target.LineNormalSide,
+                target.LineNormalAngleOffsetDeg,
                 target.ShotPatternMode,
                 target.ShotCount,
                 target.NWayAngleSpacingDeg,

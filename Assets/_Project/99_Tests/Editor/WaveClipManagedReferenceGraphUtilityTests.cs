@@ -67,6 +67,31 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void CloneDirective_LineNormalAim_PreservesSideAndOffsetWithoutSharing()
+        {
+            var source = CreateRichDirective();
+            source.PositionPattern = new LineEvenPositionPatternAuthoring
+            {
+                LineStart = new Vector2(-1f, 0f),
+                LineEnd = new Vector2(1f, 0f),
+                SampleSpacing = 1f,
+            };
+            source.Aim = new LineNormalAimAuthoring
+            {
+                NormalSide = WaveLineNormalSideId.Right,
+                AngleOffsetDeg = 15f,
+            };
+
+            var clone = WaveClipManagedReferenceGraphUtility.CloneDirective(source);
+
+            var cloneAim = clone.Aim as LineNormalAimAuthoring;
+            Assert.That(cloneAim, Is.Not.Null);
+            Assert.That(cloneAim, Is.Not.SameAs(source.Aim));
+            Assert.That(cloneAim.NormalSide, Is.EqualTo(WaveLineNormalSideId.Right));
+            Assert.That(cloneAim.AngleOffsetDeg, Is.EqualTo(15f));
+        }
+
+        [Test]
         public void RepairSharedManagedReferences_UniquifiesClipGraph()
         {
             var sharedEmission = new EventBurstEmissionAuthoring

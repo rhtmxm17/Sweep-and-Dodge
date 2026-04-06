@@ -151,6 +151,8 @@ namespace SweepNDodge.DotsBullets
         public WaveAimModeId AimMode;
         public WaveAimSnapshotTimingId AimSnapshotTiming;
         public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
         public WaveShotPatternModeId ShotPatternMode;
         public int ShotCount;
         public float NWayAngleSpacingDeg;

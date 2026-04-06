@@ -98,11 +98,15 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 | --- | --- | --- |
 | `RandomAimAuthoring` | 랜덤 각도 | 없음 |
 | `FixedAimAuthoring` | 고정 각도 | `BaseAngleDeg` |
+| `LineNormalAimAuthoring` | `LineEven` 선분 법선 기준 각도 | `NormalSide`, `AngleOffsetDeg` |
 | `SpiralAimAuthoring` | repeat마다 누적 회전 | `BaseAngleDeg`, `SpiralStepDeg` |
 | `PlayerPositionAimAuthoring` | 플레이어 위치를 향함 | `AngleOffsetDeg`, `SnapshotTiming` |
 
 ### 6.1 해석 규약
 - `Spiral`은 aim 축이다.
+- `LineNormalAim`은 `LineEven PositionPattern`에서만 valid하다.
+- `NormalSide`는 `LineStart -> LineEnd` tangent 기준 좌/우 법선을 선택한다.
+- `AngleOffsetDeg = 0`이면 선택한 법선 그대로, 양수/음수는 그 기준 추가 회전이다.
 - `PlayerPositionAim`은 `SnapshotTiming=EventStart | PerShot`를 지원한다.
 - `EventStart`는 discrete event 범위에서 aim target을 고정한다.
 - `PerShot`는 repeat consume 시점마다 현재 player world position으로 retarget한다.
@@ -130,6 +134,7 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 | `CV026` | `LineEven PositionPattern` 파라미터 오류 |
 | `CV028` | `PointSet PositionPattern`의 포인트 개수 오류 |
 | `CV041` | `WaveClip` 내부 shared `SerializeReference` graph |
+| `CV042` | `LineNormalAim`이 `LineEven PositionPattern` 없이 사용됨 |
 | `CVW032` | `SpiralAim`의 near-zero `SpiralStepDeg` |
 | `CVW033` | `PointSet` authored 포인트 수가 runtime clamp 상한 초과 |
 
@@ -141,6 +146,7 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 
 ## 10. 변경 이력
 - 2026-04-06: Plan E 반영. runtime/product code가 canonical field만 유지하는 상태로 문서 메모를 보정했다.
+- 2026-04-06: Plan I 반영. `LineNormalAimAuthoring`와 `CV042` 규약을 추가했다.
 - 2026-04-06: Plan G 반영. `WaveClip` custom editor deep-copy UX와 shared `SerializeReference` graph validation/repair 규칙을 추가했다.
 - 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget 지원과 validation 제약 제거를 문서에 반영했다.
 - 2026-04-06: Plan D 반영. canonical authoring 축과 validation 용어 기준으로 문서를 전면 정리했다.

@@ -519,6 +519,16 @@ namespace SweepNDodge.DotsBullets.Editor
                             }
 
                             var positionPatternMode = snapshot.PositionPatternMode;
+                            if (aimMode == WaveAimModeId.LineNormal
+                                && positionPatternMode != WavePositionPatternModeId.LineEven)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV042",
+                                    validationEntry.EntryLocation,
+                                    $"Clip segment uses LineNormalAim without LineEven PositionPattern at segmentIndex={s}, entryIndex={e}."));
+                            }
+
                             if (positionPatternMode == WavePositionPatternModeId.LineEven)
                             {
                                 if (validationEntry.RawLineLength <= 0f || validationEntry.RawLineSampleSpacing <= 0f)

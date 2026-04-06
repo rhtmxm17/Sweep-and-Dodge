@@ -39,6 +39,8 @@ namespace SweepNDodge.DotsBullets
         public float BaseAngleDeg;
         public float SpiralStepDeg;
         public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
 
         public WaveShotPatternModeId ShotPatternMode;
         public int ShotCount;
@@ -151,6 +153,8 @@ namespace SweepNDodge.DotsBullets
                 BaseAngleDeg = 0f,
                 SpiralStepDeg = 0f,
                 AimAngleOffsetDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                LineNormalAngleOffsetDeg = 0f,
                 ShotPatternMode = WaveShotPatternModeId.Single,
                 ShotCount = 1,
                 NWayAngleSpacingDeg = 0f,
@@ -256,6 +260,11 @@ namespace SweepNDodge.DotsBullets
                 case PlayerPositionAimAuthoring playerPositionAim:
                     snapshot.AimAngleOffsetDeg = playerPositionAim.AngleOffsetDeg;
                     snapshot.AimSnapshotTiming = playerPositionAim.SnapshotTiming;
+                    break;
+
+                case LineNormalAimAuthoring lineNormalAim:
+                    snapshot.LineNormalSide = lineNormalAim.NormalSide;
+                    snapshot.LineNormalAngleOffsetDeg = lineNormalAim.AngleOffsetDeg;
                     break;
             }
         }

@@ -37,6 +37,13 @@ namespace SweepNDodge.DotsBullets
         Fixed = 1,
         Spiral = 2,
         PlayerPosition = 3,
+        LineNormal = 4,
+    }
+
+    public enum WaveLineNormalSideId : byte
+    {
+        Left = 0,
+        Right = 1,
     }
 
     public enum WaveAimSnapshotTimingId : byte
@@ -221,6 +228,15 @@ namespace SweepNDodge.DotsBullets
         public WaveAimSnapshotTimingId SnapshotTiming = WaveAimSnapshotTimingId.EventStart;
 
         public override WaveAimModeId AimMode => WaveAimModeId.PlayerPosition;
+    }
+
+    [Serializable]
+    public sealed class LineNormalAimAuthoring : WaveAimAuthoringBase
+    {
+        public WaveLineNormalSideId NormalSide = WaveLineNormalSideId.Left;
+        public float AngleOffsetDeg = 0f;
+
+        public override WaveAimModeId AimMode => WaveAimModeId.LineNormal;
     }
 
     [Serializable]

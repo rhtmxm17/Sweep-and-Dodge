@@ -1299,6 +1299,321 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnExecution_LineNormalAimLeft_Single_UsesLineLeftNormal()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalLeftWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5203,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(3));
+
+                float2 dirUp = new float2(0f, 1f);
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(-2f, 0f, 0f), dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(0f, 0f, 0f), dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(2f, 0f, 0f), dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimRight_Single_UsesLineRightNormal()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalRightWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5204,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Right,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(3));
+
+                float2 dirDown = new float2(0f, -1f);
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(-2f, 0f, 0f), dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(0f, 0f, 0f), dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(2f, 0f, 0f), dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimOffset_Single_RotatesFromNormal()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalOffsetWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 8, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5205,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 15f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(3));
+
+                float2 dirOffset = new float2(-0.25881904f, 0.9659258f);
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(-2f, 0f, 0f), dirOffset, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(0f, 0f, 0f), dirOffset, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(2f, 0f, 0f), dirOffset, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimNWay_UsesLineNormalAsFanCenter()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalNWayWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5206,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.NWay,
+                    ShotCount = 3,
+                    NWayAngleSpacingDeg = 30f,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 9,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(16);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(9));
+
+                float2 dir60 = new float2(0.5f, 0.8660254f);
+                float2 dir90 = new float2(0f, 1f);
+                float2 dir120 = new float2(-0.5f, 0.8660254f);
+                for (int i = -2; i <= 2; i += 2)
+                {
+                    var point = new float3(i, 0f, 0f);
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir60, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir90, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir120, 0.0001f, 0.0001f), Is.EqualTo(1));
+                }
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimRadial_UsesLineNormalAsRadialBaseAngle()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalRadialWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5207,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Radial,
+                    ShotCount = 4,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 12,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(16);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(12));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirDown = new float2(0f, -1f);
+                for (int i = -2; i <= 2; i += 2)
+                {
+                    var point = new float3(i, 0f, 0f);
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                }
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnExecution_NWayAtomicity_BudgetAndPoolShortage_KeepSequenceAndPending()
         {
             try
@@ -5249,6 +5564,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 AimMode = WaveAimModeId.Random,
                 AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
                 AimAngleOffsetDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                LineNormalAngleOffsetDeg = 0f,
                 ShotPatternMode = WaveShotPatternModeId.Single,
                 ShotCount = 1,
                 NWayAngleSpacingDeg = 0f,

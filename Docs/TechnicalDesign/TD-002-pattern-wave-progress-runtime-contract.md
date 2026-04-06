@@ -112,6 +112,8 @@ Count = EventRepeatCount × ShotPattern 1회당 탄 수
 - `NWay` / `Radial`은 모두 atomic consume이다.
 - `NWay`는 centered fan이며 `NWayAngleSpacingDeg`를 인접 슬롯 간격으로 사용한다.
 - `Radial`은 full-circle 균등 분배다.
+- `LineNormalAim`은 `LineEven PositionPattern`의 `LineStart -> LineEnd` tangent normal을 base angle로 사용한다.
+- `LineNormalSide = Left`면 `(-y, +x)`, `Right`면 `(+y, -x)` 법선을 사용하고 `LineNormalAngleOffsetDeg`를 마지막에 더한다.
 - `Spiral + NWay`, `Spiral + Radial`, `PlayerPosition + NWay`, `PlayerPosition + Radial` 조합을 지원한다.
 
 ### 5.3 Timed vs Instant
@@ -167,6 +169,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - `CV026`: invalid `LineEven PositionPattern`
 - `CV028`: invalid `PointSet PositionPattern`
 - `CV041`: shared `SerializeReference` graph detected inside one `WaveClip`
+- `CV042`: `LineNormalAim` without `LineEven PositionPattern`
 - `CVW032`: near-zero `SpiralStepDeg`
 - `CVW033`: `PointSet` authored count > runtime clamp max
 
@@ -193,6 +196,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - 이번 문서는 Wave / Spawn runtime contract만 SSOT로 다룬다.
 
 ## 10. 변경 이력
+- 2026-04-06: Plan I 반영. `LineNormalAim`의 line-normal base angle 계산과 `CV042` validation 계약을 추가했다.
 - 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget을 허용하고 unsupported snapshot timing validation 제약을 제거했다.
 - 2026-04-06: Plan D 반영. canonical runtime field, event item split, event-local snapshot ownership, validation 기준을 현재 구현 상태로 전면 정리했다.
 - 2026-04-06: Plan C 반영. `SourceSpawnRequestBuffer`를 event-local snapshot owner로 고정하고 `Poisson` / `EventBurst` event item split을 도입했다.

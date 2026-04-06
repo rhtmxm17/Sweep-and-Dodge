@@ -1002,6 +1002,8 @@ namespace SweepNDodge.DotsBullets
             {
                 case WaveAimModeId.Fixed:
                     return math.radians(request.BaseAngleDeg);
+                case WaveAimModeId.LineNormal:
+                    return ResolveLineNormalAimAngleRad(in request);
                 case WaveAimModeId.Spiral:
                     return math.radians(request.BaseAngleDeg + request.SpiralStepDeg * repeatSequence);
                 case WaveAimModeId.PlayerPosition:
@@ -1038,6 +1040,19 @@ namespace SweepNDodge.DotsBullets
                 default:
                     return random.NextFloat(0f, math.PI * 2f);
             }
+        }
+
+        private static float ResolveLineNormalAimAngleRad(in SourceSpawnRequestBuffer request)
+        {
+            float2 line = request.LineEnd - request.LineStart;
+            if (math.lengthsq(line) <= 1e-6f)
+                return math.radians(request.LineNormalAngleOffsetDeg);
+
+            float2 tangent = math.normalize(line);
+            float2 normal = request.LineNormalSide == WaveLineNormalSideId.Right
+                ? new float2(tangent.y, -tangent.x)
+                : new float2(-tangent.y, tangent.x);
+            return math.atan2(normal.y, normal.x) + math.radians(request.LineNormalAngleOffsetDeg);
         }
 
         private static bool TrySampleSpawnPositionPointSet(

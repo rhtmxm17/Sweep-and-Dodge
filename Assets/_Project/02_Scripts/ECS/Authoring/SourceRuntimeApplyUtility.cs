@@ -323,6 +323,8 @@ namespace SweepNDodge.DotsBullets
                         AimMode = snapshot.AimMode,
                         AimSnapshotTiming = snapshot.AimSnapshotTiming,
                         AimAngleOffsetDeg = snapshot.AimAngleOffsetDeg,
+                        LineNormalSide = snapshot.LineNormalSide,
+                        LineNormalAngleOffsetDeg = snapshot.LineNormalAngleOffsetDeg,
                         ShotPatternMode = snapshot.ShotPatternMode,
                         ShotCount = Mathf.Max(1, snapshot.ShotCount),
                         NWayAngleSpacingDeg = snapshot.ShotPatternMode == WaveShotPatternModeId.NWay

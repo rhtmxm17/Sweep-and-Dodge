@@ -429,6 +429,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 AimMode = WaveAimModeId.Fixed,
                 AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
                 AimAngleOffsetDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                LineNormalAngleOffsetDeg = 0f,
                 ShotPatternMode = WaveShotPatternModeId.Single,
                 ShotCount = 1,
                 NWayAngleSpacingDeg = 0f,

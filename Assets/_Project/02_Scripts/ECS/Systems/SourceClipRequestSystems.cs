@@ -841,6 +841,8 @@ namespace SweepNDodge.DotsBullets
                 pattern.AimMode,
                 pattern.AimSnapshotTiming,
                 pattern.AimAngleOffsetDeg,
+                pattern.LineNormalSide,
+                pattern.LineNormalAngleOffsetDeg,
                 pattern.ShotPatternMode,
                 pattern.ShotCount,
                 pattern.NWayAngleSpacingDeg,

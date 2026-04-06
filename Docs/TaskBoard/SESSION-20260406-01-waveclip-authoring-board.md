@@ -131,11 +131,16 @@
     - runtime angle 계산은 `NWay` fan offset과 `Radial` full-circle offset을 분리해서 사용한다.
     - `CV023`는 `NWay ShotCount < 2`뿐 아니라 `AngleSpacingDeg <= 0`도 차단하도록 확장됐다.
     - 기존 360도 의미의 운영 WaveClip `NWay` 자산은 `Radial`로 마이그레이션됐다.
+- [x] D16. Plan I. `LineNormalAim`을 `LineEven PositionPattern` 전용 aim subtype으로 도입했다.
+  - 검증 결과:
+    - `LineNormalAimAuthoring`와 `WaveLineNormalSideId`가 추가되고 canonical snapshot/runtime field에 `LineNormalSide`, `LineNormalAngleOffsetDeg`가 반영됐다.
+    - runtime은 `LineStart -> LineEnd` tangent 기준 좌/우 법선과 `AngleOffsetDeg`로 base angle을 계산한다.
+    - `CV042`가 추가되어 `LineNormalAim`이 `LineEven PositionPattern` 없이 사용되면 error로 차단된다.
+    - `LineNormal + Single/NWay/Radial` EditMode 회귀와 resolver/validation 테스트가 추가됐다.
 
 ## End of Session
 - 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.
 - 남은 리스크:
-  - `PlayerPositionAim`에서 player world position만 볼지, player aim point subtype를 추가할지는 아직 후속 결정이 남아 있다.
-  - `LineNormalAim`, `PlayerAimPointAim`, `LineEven`의 count-based authoring 같은 계약 확장은 별도 플랜으로 다뤄야 한다.
+  - `LineEven`의 count-based authoring 같은 계약 확장은 별도 플랜으로 다뤄야 한다.
 - 다음 세션 시작점:
-  - 후속 플랜에서 `PlayerAimPointAim`, `LineNormalAim`, 추가 `Aim` / `PositionPattern` 조합, editor UX polish 같은 계약 확장 범위를 다시 논의한다.
+  - 후속 플랜에서 추가 `Aim` / `PositionPattern` 조합, editor UX polish 같은 계약 확장 범위를 다시 논의한다.

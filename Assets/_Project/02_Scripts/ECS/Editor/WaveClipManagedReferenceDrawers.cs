@@ -208,6 +208,7 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             typeof(RandomAimAuthoring),
             typeof(FixedAimAuthoring),
+            typeof(LineNormalAimAuthoring),
             typeof(SpiralAimAuthoring),
             typeof(PlayerPositionAimAuthoring),
         };

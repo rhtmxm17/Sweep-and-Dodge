@@ -368,6 +368,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 {
                     BaseAngleDeg = fixedAim.BaseAngleDeg,
                 },
+                LineNormalAimAuthoring lineNormalAim => new LineNormalAimAuthoring
+                {
+                    NormalSide = lineNormalAim.NormalSide,
+                    AngleOffsetDeg = lineNormalAim.AngleOffsetDeg,
+                },
                 SpiralAimAuthoring spiralAim => new SpiralAimAuthoring
                 {
                     BaseAngleDeg = spiralAim.BaseAngleDeg,

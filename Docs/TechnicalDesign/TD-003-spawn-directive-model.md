@@ -98,10 +98,15 @@ WaveSpawnEntryAuthoring
 - subtype:
   - `RandomAimAuthoring`
   - `FixedAimAuthoring`
+  - `LineNormalAimAuthoring`
   - `SpiralAimAuthoring`
   - `PlayerPositionAimAuthoring`
 - 규약:
   - `Spiral`은 aim 축이다.
+  - `LineNormalAim`은 `PositionPattern.LineEven`의 tangent normal을 base angle로 사용한다.
+  - `LineNormalAim.NormalSide = Left | Right`는 `LineStart -> LineEnd` 기준 좌/우 법선을 뜻한다.
+  - `LineNormalAim.AngleOffsetDeg = 0`이면 선분 법선 방향 그대로 발사되고, 양수/음수는 선택한 법선을 기준으로 추가 회전한다.
+  - `LineNormalAim`은 `LineEven PositionPattern`에서만 valid하다.
   - `PlayerPositionAim`은 `player world position`만 target source로 사용한다.
   - `SnapshotTiming=EventStart`는 event 범위에서 aim target을 고정한다.
   - `SnapshotTiming=PerShot`는 repeat consume 시점마다 현재 player world position으로 retarget한다.
@@ -164,6 +169,7 @@ WaveSpawnEntryAuthoring
 
 ## 7. 변경 이력
 - 2026-04-06: Plan E 반영. runtime/product code의 compat field mirror 제거 상태를 문서 기준에도 반영했다.
+- 2026-04-06: Plan I 반영. `LineNormalAim`을 추가하고 `LineEven PositionPattern` 전용 line-normal base angle 계약을 문서화했다.
 - 2026-04-06: Plan F 반영. `PlayerPositionAim`이 `EventStart`와 `PerShot` snapshot timing을 모두 지원하도록 모델 설명을 갱신했다.
 - 2026-04-06: Plan D 반영. canonical 축(`Emission / Sampling / PositionPattern / Aim / ShotPattern / Payload`) 기준으로 문서를 전면 정리했다.
 - 2026-04-03: 2차 정리 반영. typed-only authoring SSOT로 고정했다.

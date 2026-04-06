@@ -737,6 +737,129 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void WaveClip_LineNormalAimRequiresLineEven_IsCV042()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3006);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.PositionPattern = new SinglePointPositionPatternAuthoring();
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Left,
+                    AngleOffsetDeg = 0f,
+                };
+
+                clip.ClipId = 16;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        EndSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV042"), Is.True);
+
+                entry.PositionPattern = new PointSetPositionPatternAuthoring
+                {
+                    Points = new[] { Vector2.zero }
+                };
+                issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV042"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_LineNormalAimWithInvalidLineEven_UsesCV026()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3007);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                {
+                    LineStart = Vector2.zero,
+                    LineEnd = Vector2.zero,
+                    SampleSpacing = 1f,
+                };
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Right,
+                    AngleOffsetDeg = 15f,
+                };
+
+                clip.ClipId = 17;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        EndSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV026"), Is.True);
+                Assert.That(issues.Any(i => i.Code == "CV042"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
         public void WaveClipResolver_PlayerPositionAimEventStart_ResolvesCanonicalSnapshot()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -793,6 +916,49 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void WaveClipResolver_LineNormalAim_ResolvesCanonicalSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.Editor_SetDefinitionId(3008);
+                var entry = CreateDefaultTypedEntry(def);
+                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                {
+                    LineStart = new Vector2(-2f, 0f),
+                    LineEnd = new Vector2(2f, 0f),
+                    SampleSpacing = 1f,
+                };
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Left,
+                    AngleOffsetDeg = 0f,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out var snapshot, out var error), Is.True, error);
+                Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.LineNormal));
+                Assert.That(snapshot.LineNormalSide, Is.EqualTo(WaveLineNormalSideId.Left));
+                Assert.That(snapshot.LineNormalAngleOffsetDeg, Is.EqualTo(0f));
+
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Right,
+                    AngleOffsetDeg = 15f,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out snapshot, out error), Is.True, error);
+                Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.LineNormal));
+                Assert.That(snapshot.LineNormalSide, Is.EqualTo(WaveLineNormalSideId.Right));
+                Assert.That(snapshot.LineNormalAngleOffsetDeg, Is.EqualTo(15f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
         public void WaveClipResolver_PlayerPositionAimPerShot_ResolvesCanonicalSnapshot()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -825,7 +991,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             try
             {
-                def.Editor_SetDefinitionId(3008);
+                def.Editor_SetDefinitionId(3009);
                 var entry = CreateDefaultTypedEntry(def);
                 entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 0f };
                 entry.ShotPattern = new NWayShotPatternAuthoring
