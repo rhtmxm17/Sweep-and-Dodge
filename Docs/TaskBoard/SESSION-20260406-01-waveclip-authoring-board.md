@@ -31,22 +31,6 @@
 - 없음
 
 ## Next
-- [ ] T4. Plan C. runtime request/event-local snapshot ownership을 고정한다.
-  - 완료 기준:
-    - `PlayerPositionAim` snapshot을 request/event-local state에 저장하고 consume 시 재계산하지 않는 기준이 확정된다.
-    - runtime hot path는 rename 없이 최소 변경으로 유지하는 기본 방침이 정리된다.
-    - ownership/update-order 영향과 필요한 event-local fields 추가 범위가 정리된다.
-  - 검증: runtime hot path 수정 여부와 범위가 구현 전에 고정된다.
-  - 근거:
-    - player-dependent aim은 request/event-local snapshot 저장 여부에 따라 ownership이 갈린다.
-- [ ] T5. Plan D. validation/migration/test/document 범위를 묶는다.
-  - 완료 기준:
-    - validation 코드 재배치, asset migration 범위, fixture/sample asset 갱신 범위가 고정된다.
-    - 문서 갱신 순서와 SSOT 문서가 정리된다.
-    - compile / console / EditMode / PlayMode smoke까지의 합격 기준이 구현 플랜에 포함된다.
-  - 검증: 구현 완료 정의가 플랜에 포함된다.
-  - 근거:
-    - schema 수정만 먼저 하고 validation/migration/test 계획이 없으면 구현 세션에서 범위가 다시 퍼진다.
 - [ ] T6. Plan E. 구현 착수 순서를 고정한다.
   - 완료 기준:
     - `Authoring -> Resolver -> Runtime -> Validation/Migration -> Verification` 순으로 착수 순서가 고정된다.
@@ -109,6 +93,22 @@
     - validation은 `CV040` 구조 검증과 semantic 검증(`CV018`, `CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CV041`, `CVW032`, `CVW033`)으로 재배치됐다.
     - 운영 6개 + test 2개 WaveClip asset이 새 authoring schema로 마이그레이션됐다.
     - `compile -> console error 0 -> EditMode 404/404 -> PlayMode smoke 1/1`까지 통과했다.
+- [x] D10. Plan C. runtime request/event-local snapshot ownership을 canonical runtime 기준으로 고정했다.
+  - 검증 결과:
+    - runtime SSOT가 `ResolvedWaveSpawnDirectiveSnapshot -> SourceClipPatternBuffer -> SourceSpawnRequestBuffer` 흐름으로 재정렬됐다.
+    - `SourceClipPatternBuffer`와 `SourceSpawnRequestBuffer`에 canonical runtime 필드(`SamplingAnchorMode`, `AreaSamplerMode`, `PositionPatternMode`, `AimMode`, `AimSnapshotTiming`, `AimAngleOffsetDeg`, `ShotPatternMode`, `ShotCount`, `EventRepeatCount`)가 추가됐다.
+    - `SourceSpawnRequestBuffer`가 `EventAnchorPosition`, `EventAimTargetPosition`, `EventShotElapsedSec`, `SpawnSequence`를 포함한 event-local mutable state의 owner로 정리됐다.
+    - `Poisson` / `EventBurst`는 `Instant`와 `Timed` 모두 event 단위 request item을 유지하고 merge하지 않도록 변경됐다.
+    - runtime consume는 `Aim + ShotPattern + PositionPattern` canonical field를 읽고, `PlayerPositionAim(EventStart)` snapshot을 request-local state에 고정한다.
+    - `compile -> console error 0 -> EditMode 403/403 -> PlayMode smoke 1/1`까지 통과했다.
+- [x] D11. Plan D. validation / fixture / document 정합성을 canonical 계약 기준으로 마감했다.
+  - 검증 결과:
+    - `ContentValidationRules`의 canonical 코드 의미(`CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CV041`, `CVW032`, `CVW033`)와 테스트 이름/메시지의 stale 용어를 정리했다.
+    - sample asset test가 typed-only뿐 아니라 각 directive 축(`Emission`, `Sampling`, `Sampling.Anchor`, `Sampling.AreaSampler`, `PositionPattern`, `Aim`, `ShotPattern`)의 non-null도 확인하도록 강화됐다.
+    - request build / stress fixture의 stale `BurstShotsPerEvent` 명칭을 `EventRepeatCount` 중심으로 정리했다.
+    - `TD-002`, `TD-003`, `TD-005`를 current canonical contract 기준으로 전면 갱신했다.
+    - 운영/test `WaveClip` asset YAML에서 `Directives[]` only와 current managed reference type 사용 상태를 재확인했다.
+    - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 다시 통과했다.
 
 ## End of Session
 - 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.
@@ -116,4 +116,4 @@
   - `PlayerPositionAim`에서 player world position만 볼지, player aim point subtype를 추가할지는 아직 후속 결정이 남아 있다.
   - runtime flat shape rename을 미룬 만큼, authoring 용어와 runtime 용어가 당분간 완전히 일치하지 않을 수 있다.
 - 다음 세션 시작점:
-  - `Plan C`에서 runtime request/event-local snapshot ownership과 compat flatten 경계를 고정한다.
+  - `Plan E`에서 구현 착수 순서와 남은 compat 제거/후속 범위를 정리한다.

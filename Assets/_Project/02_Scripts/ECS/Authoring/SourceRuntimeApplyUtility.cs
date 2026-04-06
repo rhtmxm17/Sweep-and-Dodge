@@ -317,6 +317,15 @@ namespace SweepNDodge.DotsBullets
                         BulletTypeKey = typeKey,
                         EmissionMode = snapshot.EmissionMode,
                         SpawnMode = snapshot.SpawnMode,
+                        SamplingAnchorMode = snapshot.SamplingAnchorMode,
+                        AreaSamplerMode = snapshot.AreaSamplerMode,
+                        PositionPatternMode = snapshot.PositionPatternMode,
+                        AimMode = snapshot.AimMode,
+                        AimSnapshotTiming = snapshot.AimSnapshotTiming,
+                        AimAngleOffsetDeg = snapshot.AimAngleOffsetDeg,
+                        ShotPatternMode = snapshot.ShotPatternMode,
+                        ShotCount = Mathf.Max(1, snapshot.ShotCount),
+                        EventRepeatCount = Mathf.Max(1, snapshot.EventRepeatCount),
                         SamplingMode = ResolveCompatSamplingMode(snapshot),
                         CenterMode = ResolveCompatCenterMode(snapshot),
                         DirectionMode = ResolveCompatDirectionMode(snapshot),
@@ -424,15 +433,16 @@ namespace SweepNDodge.DotsBullets
 
         private static SourceSpawnDirectionModeId ResolveCompatDirectionMode(in ResolvedWaveSpawnDirectiveSnapshot snapshot)
         {
-            return (snapshot.AimMode, snapshot.ShotPatternMode) switch
+            return snapshot.ShotPatternMode switch
             {
-                (WaveAimModeId.Random, WaveShotPatternModeId.Single) => SourceSpawnDirectionModeId.Random,
-                (WaveAimModeId.Fixed, WaveShotPatternModeId.Single) => SourceSpawnDirectionModeId.Fixed,
-                (WaveAimModeId.Spiral, WaveShotPatternModeId.Single) => SourceSpawnDirectionModeId.Spiral,
-                (WaveAimModeId.Fixed, WaveShotPatternModeId.NWay) => SourceSpawnDirectionModeId.NWay,
-                (WaveAimModeId.Fixed, WaveShotPatternModeId.Radial) => SourceSpawnDirectionModeId.RadialBurst,
-                _ => throw new InvalidOperationException(
-                    $"WaveClip compat flatten does not support Aim={snapshot.AimMode} with ShotPattern={snapshot.ShotPatternMode}. Plan C runtime contract is required."),
+                WaveShotPatternModeId.NWay => SourceSpawnDirectionModeId.NWay,
+                WaveShotPatternModeId.Radial => SourceSpawnDirectionModeId.RadialBurst,
+                _ => snapshot.AimMode switch
+                {
+                    WaveAimModeId.Fixed => SourceSpawnDirectionModeId.Fixed,
+                    WaveAimModeId.Spiral => SourceSpawnDirectionModeId.Spiral,
+                    _ => SourceSpawnDirectionModeId.Random,
+                },
             };
         }
 
@@ -442,6 +452,7 @@ namespace SweepNDodge.DotsBullets
             {
                 WaveAimModeId.Fixed => snapshot.BaseAngleDeg,
                 WaveAimModeId.Spiral => snapshot.BaseAngleDeg,
+                WaveAimModeId.PlayerPosition => snapshot.AimAngleOffsetDeg,
                 _ => 0f,
             };
         }

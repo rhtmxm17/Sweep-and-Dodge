@@ -18,6 +18,17 @@ namespace SweepNDodge.DotsBullets
             public SourceSpawnLaneId Lane;
             public int LanePriority;
             public int BulletTypeKey;
+            public SourceSpawnEmissionModeId EmissionMode;
+            public SourceSpawnModeId SpawnMode;
+            public WaveSamplingAnchorModeId SamplingAnchorMode;
+            public WaveAreaSamplerModeId AreaSamplerMode;
+            public WavePositionPatternModeId PositionPatternMode;
+            public WaveAimModeId AimMode;
+            public WaveAimSnapshotTimingId AimSnapshotTiming;
+            public float AimAngleOffsetDeg;
+            public WaveShotPatternModeId ShotPatternMode;
+            public int ShotCount;
+            public int EventRepeatCount;
             public SourceSpawnSamplingModeId SamplingMode;
             public SourceSpawnCenterModeId CenterMode;
             public SourceSpawnDirectionModeId DirectionMode;
@@ -131,6 +142,17 @@ namespace SweepNDodge.DotsBullets
                         Lane = resolvedV3.Lane,
                         LanePriority = resolvedV3.LanePriority,
                         BulletTypeKey = resolvedV3.BulletTypeKey,
+                        EmissionMode = resolvedV3.EmissionMode,
+                        SpawnMode = resolvedV3.SpawnMode,
+                        SamplingAnchorMode = resolvedV3.SamplingAnchorMode,
+                        AreaSamplerMode = resolvedV3.AreaSamplerMode,
+                        PositionPatternMode = resolvedV3.PositionPatternMode,
+                        AimMode = resolvedV3.AimMode,
+                        AimSnapshotTiming = resolvedV3.AimSnapshotTiming,
+                        AimAngleOffsetDeg = resolvedV3.AimAngleOffsetDeg,
+                        ShotPatternMode = resolvedV3.ShotPatternMode,
+                        ShotCount = resolvedV3.ShotCount,
+                        EventRepeatCount = resolvedV3.EventRepeatCount,
                         SamplingMode = resolvedV3.SamplingMode,
                         CenterMode = resolvedV3.CenterMode,
                         DirectionMode = resolvedV3.DirectionMode,
@@ -241,6 +263,17 @@ namespace SweepNDodge.DotsBullets
                 target.Lane,
                 target.LanePriority,
                 target.BulletTypeKey,
+                target.EmissionMode,
+                target.SpawnMode,
+                target.SamplingAnchorMode,
+                target.AreaSamplerMode,
+                target.PositionPatternMode,
+                target.AimMode,
+                target.AimSnapshotTiming,
+                target.AimAngleOffsetDeg,
+                target.ShotPatternMode,
+                target.ShotCount,
+                target.EventRepeatCount,
                 target.SamplingMode,
                 target.CenterMode,
                 target.DirectionMode,

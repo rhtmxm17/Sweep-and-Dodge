@@ -148,6 +148,17 @@ namespace SweepNDodge.DotsBullets
             SourceSpawnLaneId lane,
             int lanePriority,
             int bulletTypeKey,
+            SourceSpawnEmissionModeId emissionMode,
+            SourceSpawnModeId spawnMode,
+            WaveSamplingAnchorModeId samplingAnchorMode,
+            WaveAreaSamplerModeId areaSamplerMode,
+            WavePositionPatternModeId positionPatternMode,
+            WaveAimModeId aimMode,
+            WaveAimSnapshotTimingId aimSnapshotTiming,
+            float aimAngleOffsetDeg,
+            WaveShotPatternModeId shotPatternMode,
+            int shotCount,
+            int eventRepeatCount,
             SourceSpawnSamplingModeId samplingMode,
             SourceSpawnCenterModeId centerMode,
             SourceSpawnDirectionModeId directionMode,
@@ -177,6 +188,17 @@ namespace SweepNDodge.DotsBullets
                 Lane = lane,
                 LanePriority = lanePriority,
                 BulletTypeKey = bulletTypeKey,
+                EmissionMode = emissionMode,
+                SpawnMode = spawnMode,
+                SamplingAnchorMode = samplingAnchorMode,
+                AreaSamplerMode = areaSamplerMode,
+                PositionPatternMode = positionPatternMode,
+                AimMode = aimMode,
+                AimSnapshotTiming = aimSnapshotTiming,
+                AimAngleOffsetDeg = aimAngleOffsetDeg,
+                ShotPatternMode = shotPatternMode,
+                ShotCount = math.max(1, shotCount),
+                EventRepeatCount = math.max(1, eventRepeatCount),
                 SamplingMode = samplingMode,
                 CenterMode = centerMode,
                 DirectionMode = directionMode,
@@ -200,9 +222,9 @@ namespace SweepNDodge.DotsBullets
                 EventShotIntervalSec = math.max(0f, eventShotIntervalSec),
                 EventShotElapsedSec = 0f,
                 EventAnchorInitialized = 0,
-                EventAnchorUseFixedPosition = 0,
-                EventAnchorCenter = float3.zero,
                 EventAnchorPosition = float3.zero,
+                EventAimInitialized = 0,
+                EventAimTargetPosition = float3.zero,
                 SpawnSequence = 0u,
                 Count = 0,
                 OldestFrame = 0u,
@@ -218,21 +240,23 @@ namespace SweepNDodge.DotsBullets
             if (count <= 0)
                 return;
 
-            if (requestTemplate.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
+            var normalizedTemplate = requestTemplate;
+            NormalizeCanonicalMirrors(ref normalizedTemplate);
+            if (UsesDiscreteEventIdentity(in normalizedTemplate))
             {
-                int shotsPerEvent = math.max(1, requestTemplate.BurstShotsPerEvent);
+                int shotsPerEvent = ResolvePerEventBulletCount(in normalizedTemplate);
                 int remaining = count;
                 while (remaining > 0)
                 {
                     int eventShotCount = math.min(shotsPerEvent, remaining);
-                    var timedItem = requestTemplate;
+                    var timedItem = normalizedTemplate;
                     timedItem.Count = eventShotCount;
                     timedItem.OldestFrame = frame;
                     timedItem.EventShotElapsedSec = 0f;
                     timedItem.EventAnchorInitialized = 0;
-                    timedItem.EventAnchorUseFixedPosition = 0;
-                    timedItem.EventAnchorCenter = float3.zero;
                     timedItem.EventAnchorPosition = float3.zero;
+                    timedItem.EventAimInitialized = 0;
+                    timedItem.EventAimTargetPosition = float3.zero;
                     requests.Add(timedItem);
                     remaining -= eventShotCount;
                 }
@@ -243,7 +267,7 @@ namespace SweepNDodge.DotsBullets
             for (int i = 0; i < requests.Length; i++)
             {
                 var item = requests[i];
-                if (item.DirectiveId != requestTemplate.DirectiveId)
+                if (item.DirectiveId != normalizedTemplate.DirectiveId)
                     continue;
 
                 if (item.Count <= 0)
@@ -254,10 +278,172 @@ namespace SweepNDodge.DotsBullets
                 return;
             }
 
-            var itemToAdd = requestTemplate;
+            var itemToAdd = normalizedTemplate;
             itemToAdd.Count = count;
             itemToAdd.OldestFrame = frame;
             requests.Add(itemToAdd);
+        }
+
+        public static void NormalizeCanonicalMirrors(ref SourceClipPatternBuffer pattern)
+        {
+            if (pattern.AreaSamplerMode == default && pattern.SamplingMode != SourceSpawnSamplingModeId.CenterPoint)
+            {
+                pattern.AreaSamplerMode = pattern.SamplingMode switch
+                {
+                    SourceSpawnSamplingModeId.UniformField => WaveAreaSamplerModeId.UniformField,
+                    SourceSpawnSamplingModeId.PollutionTopK => WaveAreaSamplerModeId.PollutionTopK,
+                    _ => WaveAreaSamplerModeId.CenterPoint,
+                };
+            }
+
+            if (pattern.PositionPatternMode == default)
+            {
+                pattern.PositionPatternMode = pattern.SamplingMode switch
+                {
+                    SourceSpawnSamplingModeId.LineEven => WavePositionPatternModeId.LineEven,
+                    SourceSpawnSamplingModeId.PointSet => WavePositionPatternModeId.PointSet,
+                    _ => WavePositionPatternModeId.SinglePoint,
+                };
+            }
+
+            if (pattern.SamplingAnchorMode == default && pattern.CenterMode != SourceSpawnCenterModeId.SourceCenter)
+            {
+                pattern.SamplingAnchorMode = pattern.CenterMode switch
+                {
+                    SourceSpawnCenterModeId.FixedPoint => WaveSamplingAnchorModeId.FixedPoint,
+                    SourceSpawnCenterModeId.PlayerRelative => WaveSamplingAnchorModeId.PlayerRelative,
+                    _ => WaveSamplingAnchorModeId.SourceCenter,
+                };
+            }
+
+            if (pattern.ShotPatternMode == default && pattern.DirectionMode != SourceSpawnDirectionModeId.Random)
+            {
+                pattern.ShotPatternMode = pattern.DirectionMode switch
+                {
+                    SourceSpawnDirectionModeId.NWay => WaveShotPatternModeId.NWay,
+                    SourceSpawnDirectionModeId.RadialBurst => WaveShotPatternModeId.Radial,
+                    _ => WaveShotPatternModeId.Single,
+                };
+            }
+
+            if (pattern.AimMode == default && pattern.DirectionMode != SourceSpawnDirectionModeId.Random)
+            {
+                pattern.AimMode = pattern.DirectionMode switch
+                {
+                    SourceSpawnDirectionModeId.Fixed => WaveAimModeId.Fixed,
+                    SourceSpawnDirectionModeId.Spiral => WaveAimModeId.Spiral,
+                    SourceSpawnDirectionModeId.NWay => WaveAimModeId.Fixed,
+                    SourceSpawnDirectionModeId.RadialBurst => WaveAimModeId.Fixed,
+                    _ => WaveAimModeId.Random,
+                };
+            }
+
+            pattern.ShotCount = ResolveShotPatternUnitCount(in pattern);
+            pattern.EventRepeatCount = math.max(1, pattern.EventRepeatCount > 0 ? pattern.EventRepeatCount : pattern.BurstShotsPerEvent);
+            if (pattern.AimSnapshotTiming == default && pattern.AimMode != WaveAimModeId.Random)
+                pattern.AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart;
+        }
+
+        public static void NormalizeCanonicalMirrors(ref SourceSpawnRequestBuffer request)
+        {
+            if (request.AreaSamplerMode == default && request.SamplingMode != SourceSpawnSamplingModeId.CenterPoint)
+            {
+                request.AreaSamplerMode = request.SamplingMode switch
+                {
+                    SourceSpawnSamplingModeId.UniformField => WaveAreaSamplerModeId.UniformField,
+                    SourceSpawnSamplingModeId.PollutionTopK => WaveAreaSamplerModeId.PollutionTopK,
+                    _ => WaveAreaSamplerModeId.CenterPoint,
+                };
+            }
+
+            if (request.PositionPatternMode == default)
+            {
+                request.PositionPatternMode = request.SamplingMode switch
+                {
+                    SourceSpawnSamplingModeId.LineEven => WavePositionPatternModeId.LineEven,
+                    SourceSpawnSamplingModeId.PointSet => WavePositionPatternModeId.PointSet,
+                    _ => WavePositionPatternModeId.SinglePoint,
+                };
+            }
+
+            if (request.SamplingAnchorMode == default && request.CenterMode != SourceSpawnCenterModeId.SourceCenter)
+            {
+                request.SamplingAnchorMode = request.CenterMode switch
+                {
+                    SourceSpawnCenterModeId.FixedPoint => WaveSamplingAnchorModeId.FixedPoint,
+                    SourceSpawnCenterModeId.PlayerRelative => WaveSamplingAnchorModeId.PlayerRelative,
+                    _ => WaveSamplingAnchorModeId.SourceCenter,
+                };
+            }
+
+            if (request.ShotPatternMode == default && request.DirectionMode != SourceSpawnDirectionModeId.Random)
+            {
+                request.ShotPatternMode = request.DirectionMode switch
+                {
+                    SourceSpawnDirectionModeId.NWay => WaveShotPatternModeId.NWay,
+                    SourceSpawnDirectionModeId.RadialBurst => WaveShotPatternModeId.Radial,
+                    _ => WaveShotPatternModeId.Single,
+                };
+            }
+
+            if (request.AimMode == default && request.DirectionMode != SourceSpawnDirectionModeId.Random)
+            {
+                request.AimMode = request.DirectionMode switch
+                {
+                    SourceSpawnDirectionModeId.Fixed => WaveAimModeId.Fixed,
+                    SourceSpawnDirectionModeId.Spiral => WaveAimModeId.Spiral,
+                    SourceSpawnDirectionModeId.NWay => WaveAimModeId.Fixed,
+                    SourceSpawnDirectionModeId.RadialBurst => WaveAimModeId.Fixed,
+                    _ => WaveAimModeId.Random,
+                };
+            }
+
+            request.ShotCount = ResolveShotPatternUnitCount(in request);
+            request.EventRepeatCount = math.max(1, request.EventRepeatCount > 0 ? request.EventRepeatCount : request.BurstShotsPerEvent);
+            if (request.AimSnapshotTiming == default && request.AimMode != WaveAimModeId.Random)
+                request.AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart;
+        }
+
+        public static int ResolveShotPatternUnitCount(in SourceClipPatternBuffer pattern)
+        {
+            return pattern.ShotPatternMode switch
+            {
+                WaveShotPatternModeId.NWay => math.max(1, pattern.ShotCount > 0 ? pattern.ShotCount : pattern.NWayCount),
+                WaveShotPatternModeId.Radial => math.max(1, pattern.ShotCount > 0 ? pattern.ShotCount : pattern.BurstShotsPerEvent),
+                _ => 1,
+            };
+        }
+
+        public static int ResolveShotPatternUnitCount(in SourceSpawnRequestBuffer request)
+        {
+            return request.ShotPatternMode switch
+            {
+                WaveShotPatternModeId.NWay => math.max(1, request.ShotCount > 0 ? request.ShotCount : request.NWayCount),
+                WaveShotPatternModeId.Radial => math.max(1, request.ShotCount > 0 ? request.ShotCount : request.BurstShotsPerEvent),
+                _ => 1,
+            };
+        }
+
+        public static int ResolvePerEventBulletCount(in SourceClipPatternBuffer pattern)
+        {
+            return math.max(1, pattern.EventRepeatCount) * ResolveShotPatternUnitCount(in pattern);
+        }
+
+        public static int ResolvePerEventBulletCount(in SourceSpawnRequestBuffer request)
+        {
+            return math.max(1, request.EventRepeatCount) * ResolveShotPatternUnitCount(in request);
+        }
+
+        public static bool UsesDiscreteEventIdentity(in SourceClipPatternBuffer pattern)
+        {
+            return pattern.EmissionMode == SourceSpawnEmissionModeId.Poisson
+                || pattern.EmissionMode == SourceSpawnEmissionModeId.EventBurst;
+        }
+
+        public static bool UsesDiscreteEventIdentity(in SourceSpawnRequestBuffer request)
+        {
+            return request.EmissionMode == SourceSpawnEmissionModeId.Poisson
+                || request.EmissionMode == SourceSpawnEmissionModeId.EventBurst;
         }
 
         private static int GetActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)

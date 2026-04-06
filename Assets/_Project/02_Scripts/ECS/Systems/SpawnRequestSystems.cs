@@ -450,11 +450,9 @@ namespace SweepNDodge.DotsBullets
 
         private static int ResolveRequestConsumeUnitCount(in SourceSpawnRequestBuffer request)
         {
-            // NWay는 "샘플 1지점의 NWay 1세트"를 원자 단위로 소비한다.
-            if (request.DirectionMode == SourceSpawnDirectionModeId.NWay)
-                return math.max(1, request.NWayCount);
-
-            return 1;
+            var normalized = request;
+            SpawnRequestCommonUtility.NormalizeCanonicalMirrors(ref normalized);
+            return SpawnRequestCommonUtility.ResolveShotPatternUnitCount(in normalized);
         }
 
         private static bool TrySpawnFromRequest(
@@ -491,53 +489,12 @@ namespace SweepNDodge.DotsBullets
             out int consumedCount,
             out uint sequenceAdvance)
         {
+            SpawnRequestCommonUtility.NormalizeCanonicalMirrors(ref request);
             consumedCount = 0;
             sequenceAdvance = 0u;
 
-            if (request.DirectionMode != SourceSpawnDirectionModeId.NWay)
-            {
-                bool singleSpawned = TrySpawnOneFromRequest(
-                    sourceEntity,
-                    runSeed,
-                    sourceStableId,
-                    ref request,
-                    ref sourceRuntimeLookup,
-                    ref sourceAnchorLookup,
-                    ref pollutionConfigLookup,
-                    ref pollutionGridLookup,
-                    ref pollutionCellsLookup,
-                    ref pollutionValidCellIndicesLookup,
-                    ref txLookup,
-                    ref localToWorldLookup,
-                    ref velLookup,
-                    ref lifeLookup,
-                    ref speedLookup,
-                    ref lifeMaxLookup,
-                    ref lifecycleRequestLookup,
-                    ref lifecycleContactLookup,
-                    ref typeKeyLookup,
-                    ref sourceRefLookup,
-                    ref lifeCycleLookup,
-                    ref activeLookup,
-                    ref despawnRequestLookup,
-                    ref renderPartsLookup,
-                    ref renderLookup,
-                    ref parentLookup,
-                    ref activeCountLookup,
-                    hasPlayer,
-                    playerPosition,
-                    frame);
-                if (!singleSpawned)
-                    return false;
-
-                consumedCount = 1;
-                sequenceAdvance = 1u;
-                ConsumeTimedEventSchedule(ref request, consumedCount);
-                return true;
-            }
-
-            int slotCount = math.max(1, request.NWayCount);
-            if (slotCount <= 1)
+            int shotUnitCount = math.max(1, SpawnRequestCommonUtility.ResolveShotPatternUnitCount(in request));
+            if (shotUnitCount <= 1)
             {
                 bool singleSpawned = TrySpawnOneFromRequest(
                     sourceEntity,
@@ -597,14 +554,21 @@ namespace SweepNDodge.DotsBullets
                 ref pollutionGridLookup,
                 ref pollutionCellsLookup,
                 ref pollutionValidCellIndicesLookup,
-                out uint sampledSequence);
+                out uint repeatSequence);
 
-            for (int slotIndex = 0; slotIndex < slotCount; slotIndex++)
+            for (int slotIndex = 0; slotIndex < shotUnitCount; slotIndex++)
             {
                 if (!SpawnRequestCommonUtility.TryDequeueByKey(ref BulletFieldShared.FreeByKey, request.BulletTypeKey, out var bulletEntity))
                     return false;
 
-                float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence, slotIndex);
+                float2 dir = ResolveSpawnDirection(
+                    ref random,
+                    ref request,
+                    pos,
+                    hasPlayer,
+                    playerPosition,
+                    repeatSequence,
+                    slotIndex);
                 SpawnRequestCommonUtility.ApplySpawnedBulletState(
                     bulletEntity,
                     sourceEntity,
@@ -631,9 +595,9 @@ namespace SweepNDodge.DotsBullets
             }
 
             if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
-                SpawnRequestCommonUtility.IncrementActiveCount(activeCounts, request.BulletTypeKey, slotCount);
+                SpawnRequestCommonUtility.IncrementActiveCount(activeCounts, request.BulletTypeKey, shotUnitCount);
 
-            consumedCount = slotCount;
+            consumedCount = shotUnitCount;
             sequenceAdvance = 1u;
             ConsumeTimedEventSchedule(ref request, consumedCount);
             return true;
@@ -671,6 +635,7 @@ namespace SweepNDodge.DotsBullets
             float3 playerPosition,
             uint frame)
         {
+            SpawnRequestCommonUtility.NormalizeCanonicalMirrors(ref request);
             int requestedTypeKey = request.BulletTypeKey;
             if (!SpawnRequestCommonUtility.TryDequeueByKey(ref BulletFieldShared.FreeByKey, requestedTypeKey, out var bulletEntity))
                 return false;
@@ -693,9 +658,16 @@ namespace SweepNDodge.DotsBullets
                 ref pollutionGridLookup,
                 ref pollutionCellsLookup,
                 ref pollutionValidCellIndicesLookup,
-                out uint sampledSequence);
+                out uint repeatSequence);
 
-            float2 dir = ResolveSpawnDirection(ref random, in request, sampledSequence, -1);
+            float2 dir = ResolveSpawnDirection(
+                ref random,
+                ref request,
+                pos,
+                hasPlayer,
+                playerPosition,
+                repeatSequence,
+                -1);
             SpawnRequestCommonUtility.ApplySpawnedBulletState(
                 bulletEntity,
                 sourceEntity,
@@ -737,11 +709,11 @@ namespace SweepNDodge.DotsBullets
                 ? sourceAnchorLookup[sourceEntity].Position
                 : float3.zero;
 
-            switch (request.CenterMode)
+            switch (request.SamplingAnchorMode)
             {
-                case SourceSpawnCenterModeId.FixedPoint:
+                case WaveSamplingAnchorModeId.FixedPoint:
                     return new float3(request.FixedPoint.x, sourceCenter.y, request.FixedPoint.y);
-                case SourceSpawnCenterModeId.PlayerRelative:
+                case WaveSamplingAnchorModeId.PlayerRelative:
                     if (hasPlayer)
                     {
                         return new float3(
@@ -777,76 +749,55 @@ namespace SweepNDodge.DotsBullets
                 hasPlayer,
                 playerPosition);
 
-            if (request.EventShotSchedule != SourceSpawnEventShotScheduleId.Timed)
+            float3 sourceAnchor = sourceAnchorLookup.HasComponent(sourceEntity)
+                ? sourceAnchorLookup[sourceEntity].Position
+                : center;
+            sampledSequence = request.SpawnSequence;
+
+            if (!SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in request))
             {
-                return SampleSpawnPosition(
+                float3 eventAnchor = SampleEventAnchorPosition(
                     ref random,
                     sourceEntity,
                     in request,
                     center,
-                    sourceAnchorLookup.HasComponent(sourceEntity) ? sourceAnchorLookup[sourceEntity].Position : center,
+                    sourceAnchor,
                     hasPlayer,
                     playerPosition,
                     ref pollutionConfigLookup,
                     ref pollutionGridLookup,
                     ref pollutionCellsLookup,
                     ref pollutionValidCellIndicesLookup,
-                    out sampledSequence);
+                    sampledSequence);
+                return ResolveRepeatOriginPosition(eventAnchor, in request, sampledSequence);
             }
 
             if (request.EventAnchorInitialized == 0)
             {
-                sampledSequence = request.SpawnSequence;
-                if (request.SamplingMode == SourceSpawnSamplingModeId.UniformField
-                    || request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
-                {
-                    float3 anchoredPosition = SampleSpawnPosition(
-                        ref random,
-                        sourceEntity,
-                        in request,
-                        center,
-                        sourceAnchorLookup.HasComponent(sourceEntity) ? sourceAnchorLookup[sourceEntity].Position : center,
-                        hasPlayer,
-                        playerPosition,
-                        ref pollutionConfigLookup,
-                        ref pollutionGridLookup,
-                        ref pollutionCellsLookup,
-                        ref pollutionValidCellIndicesLookup,
-                        out sampledSequence);
-                    request.EventAnchorUseFixedPosition = 1;
-                    request.EventAnchorPosition = anchoredPosition;
-                    request.EventAnchorCenter = center;
-                    request.EventAnchorInitialized = 1;
-                    request.EventShotElapsedSec = 0f;
-                    return anchoredPosition;
-                }
-
-                request.EventAnchorUseFixedPosition = 0;
-                request.EventAnchorCenter = center;
-                request.EventAnchorPosition = float3.zero;
+                request.EventAnchorPosition = SampleEventAnchorPosition(
+                    ref random,
+                    sourceEntity,
+                    in request,
+                    center,
+                    sourceAnchor,
+                    hasPlayer,
+                    playerPosition,
+                    ref pollutionConfigLookup,
+                    ref pollutionGridLookup,
+                    ref pollutionCellsLookup,
+                    ref pollutionValidCellIndicesLookup,
+                    sampledSequence);
                 request.EventAnchorInitialized = 1;
                 request.EventShotElapsedSec = 0f;
+                if (request.AimMode == WaveAimModeId.PlayerPosition
+                    && request.AimSnapshotTiming == WaveAimSnapshotTimingId.EventStart)
+                {
+                    request.EventAimTargetPosition = hasPlayer ? playerPosition : request.EventAnchorPosition;
+                    request.EventAimInitialized = 1;
+                }
             }
 
-            if (request.EventAnchorUseFixedPosition != 0)
-            {
-                sampledSequence = request.SpawnSequence;
-                return request.EventAnchorPosition;
-            }
-
-            return SampleSpawnPosition(
-                ref random,
-                sourceEntity,
-                in request,
-                request.EventAnchorCenter,
-                sourceAnchorLookup.HasComponent(sourceEntity) ? sourceAnchorLookup[sourceEntity].Position : request.EventAnchorCenter,
-                false,
-                playerPosition,
-                ref pollutionConfigLookup,
-                ref pollutionGridLookup,
-                ref pollutionCellsLookup,
-                ref pollutionValidCellIndicesLookup,
-                out sampledSequence);
+            return ResolveRepeatOriginPosition(request.EventAnchorPosition, in request, sampledSequence);
         }
 
         private static void ConsumeTimedEventSchedule(ref SourceSpawnRequestBuffer request, int consumedCount)
@@ -891,50 +842,29 @@ namespace SweepNDodge.DotsBullets
 
         private static float2 ResolveSpawnDirection(
             ref Unity.Mathematics.Random random,
-            in SourceSpawnRequestBuffer request,
-            uint spawnSequence,
+            ref SourceSpawnRequestBuffer request,
+            float3 repeatOrigin,
+            bool hasPlayer,
+            float3 playerPosition,
+            uint repeatSequence,
             int forcedSlotIndex)
         {
-            float baseRad = math.radians(request.BaseAngleDeg);
-            uint directionSequence = spawnSequence;
-            if (request.SamplingMode == SourceSpawnSamplingModeId.PointSet)
-            {
-                int pointCount = ResolvePointSetCount(in request);
-                if (pointCount > 0)
-                {
-                    // PointSet에서는 포인트별 로컬 시퀀스로 방향(Spiral/NWay)을 계산해 동시 패턴 위상을 맞춘다.
-                    directionSequence = spawnSequence / (uint)pointCount;
-                }
-            }
+            float angle = ResolveBaseAimAngleRad(
+                ref random,
+                ref request,
+                repeatOrigin,
+                hasPlayer,
+                playerPosition,
+                repeatSequence);
 
-            float angle;
-            switch (request.DirectionMode)
-            {
-                case SourceSpawnDirectionModeId.Fixed:
-                    angle = baseRad;
-                    break;
-                case SourceSpawnDirectionModeId.Spiral:
-                {
-                    float stepRad = math.radians(request.SpiralStepDeg);
-                    angle = baseRad + stepRad * directionSequence;
-                    break;
-                }
-                case SourceSpawnDirectionModeId.NWay:
-                case SourceSpawnDirectionModeId.RadialBurst:
-                {
-                    int slotCount = ResolveDirectionalSlotCount(in request);
-                    int slot = slotCount <= 1
-                        ? 0
-                        : (forcedSlotIndex >= 0
-                            ? math.abs(forcedSlotIndex) % slotCount
-                            : (int)(directionSequence % (uint)slotCount));
-                    angle = baseRad + (slotCount <= 1 ? 0f : (math.PI * 2f * slot) / slotCount);
-                    break;
-                }
-                default:
-                    angle = random.NextFloat(0f, math.PI * 2f);
-                    break;
-            }
+            int slotCount = ResolveDirectionalSlotCount(in request);
+            int slot = slotCount <= 1
+                ? 0
+                : (forcedSlotIndex >= 0
+                    ? math.abs(forcedSlotIndex) % slotCount
+                    : (int)(repeatSequence % (uint)slotCount));
+            if (slotCount > 1)
+                angle += (math.PI * 2f * slot) / slotCount;
 
             float2 dir = new float2(math.cos(angle), math.sin(angle));
             float lenSq = math.lengthsq(dir);
@@ -947,13 +877,15 @@ namespace SweepNDodge.DotsBullets
         // NWay와 RadialBurst는 공통 슬롯 분배 로직으로 통합한다.
         private static int ResolveDirectionalSlotCount(in SourceSpawnRequestBuffer request)
         {
-            if (request.DirectionMode == SourceSpawnDirectionModeId.RadialBurst)
-                return math.max(1, request.BurstShotsPerEvent);
-
-            return math.max(1, request.NWayCount);
+            return request.ShotPatternMode switch
+            {
+                WaveShotPatternModeId.NWay => math.max(1, request.ShotCount),
+                WaveShotPatternModeId.Radial => math.max(1, request.ShotCount),
+                _ => 1,
+            };
         }
 
-        private static float3 SampleSpawnPosition(
+        private static float3 SampleEventAnchorPosition(
             ref Unity.Mathematics.Random random,
             Entity sourceEntity,
             in SourceSpawnRequestBuffer request,
@@ -965,19 +897,16 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
             ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup,
-            out uint sampledSequence)
+            uint sampledSequence)
         {
             int sampleBudget = math.max(1, request.SpawnSampleBudget);
             float noSpawnRadius = math.max(0f, request.PlayerNoSpawnRadius);
             float noSpawnRadiusSq = noSpawnRadius * noSpawnRadius;
             float3 lastSample = center;
-            sampledSequence = request.SpawnSequence;
 
             for (int i = 0; i < sampleBudget; i++)
             {
-                uint sequence = request.SpawnSequence + (uint)i;
-                sampledSequence = sequence;
-                if (request.SamplingMode == SourceSpawnSamplingModeId.PollutionTopK)
+                if (request.AreaSamplerMode == WaveAreaSamplerModeId.PollutionTopK)
                 {
                     if (TrySampleSpawnPositionFromPollution(
                             ref random,
@@ -997,7 +926,7 @@ namespace SweepNDodge.DotsBullets
                         lastSample = center;
                     }
                 }
-                else if (request.SamplingMode == SourceSpawnSamplingModeId.UniformField)
+                else if (request.AreaSamplerMode == WaveAreaSamplerModeId.UniformField)
                 {
                     if (TrySampleSpawnPositionUniform(
                             ref random,
@@ -1016,17 +945,6 @@ namespace SweepNDodge.DotsBullets
                         lastSample = center;
                     }
                 }
-                else if (request.SamplingMode == SourceSpawnSamplingModeId.LineEven)
-                {
-                    lastSample = SampleSpawnPositionLineEven(center, in request, sequence);
-                }
-                else if (request.SamplingMode == SourceSpawnSamplingModeId.PointSet)
-                {
-                    if (TrySampleSpawnPositionPointSet(center, in request, sequence, out var pointSetPos))
-                        lastSample = pointSetPos;
-                    else
-                        lastSample = center;
-                }
                 else
                 {
                     lastSample = center;
@@ -1041,6 +959,68 @@ namespace SweepNDodge.DotsBullets
             }
 
             return lastSample;
+        }
+
+        private static float3 ResolveRepeatOriginPosition(
+            float3 eventAnchorPosition,
+            in SourceSpawnRequestBuffer request,
+            uint repeatSequence)
+        {
+            switch (request.PositionPatternMode)
+            {
+                case WavePositionPatternModeId.LineEven:
+                    return SampleSpawnPositionLineEven(eventAnchorPosition, in request, repeatSequence);
+                case WavePositionPatternModeId.PointSet:
+                    return TrySampleSpawnPositionPointSet(eventAnchorPosition, in request, repeatSequence, out var pointSetPos)
+                        ? pointSetPos
+                        : eventAnchorPosition;
+                default:
+                    return eventAnchorPosition;
+            }
+        }
+
+        private static float ResolveBaseAimAngleRad(
+            ref Unity.Mathematics.Random random,
+            ref SourceSpawnRequestBuffer request,
+            float3 repeatOrigin,
+            bool hasPlayer,
+            float3 playerPosition,
+            uint repeatSequence)
+        {
+            switch (request.AimMode)
+            {
+                case WaveAimModeId.Fixed:
+                    return math.radians(request.BaseAngleDeg);
+                case WaveAimModeId.Spiral:
+                    return math.radians(request.BaseAngleDeg + request.SpiralStepDeg * repeatSequence);
+                case WaveAimModeId.PlayerPosition:
+                {
+                    float3 aimTarget = playerPosition;
+                    if (SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in request)
+                        && request.AimSnapshotTiming == WaveAimSnapshotTimingId.EventStart)
+                    {
+                        if (request.EventAimInitialized == 0)
+                        {
+                            request.EventAimTargetPosition = hasPlayer ? playerPosition : request.EventAnchorPosition;
+                            request.EventAimInitialized = 1;
+                        }
+
+                        aimTarget = request.EventAimTargetPosition;
+                    }
+                    else if (!hasPlayer)
+                    {
+                        aimTarget = repeatOrigin;
+                    }
+
+                    float2 aimDelta = new float2(aimTarget.x - repeatOrigin.x, aimTarget.z - repeatOrigin.z);
+                    float angle = math.lengthsq(aimDelta) > 1e-6f
+                        ? math.atan2(aimDelta.y, aimDelta.x)
+                        : 0f;
+                    return angle + math.radians(request.AimAngleOffsetDeg);
+                }
+                default:
+                    return random.NextFloat(0f, math.PI * 2f);
+            }
         }
 
         private static bool TrySampleSpawnPositionPointSet(

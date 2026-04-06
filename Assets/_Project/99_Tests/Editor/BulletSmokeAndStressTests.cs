@@ -1127,7 +1127,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SpawnExecution_PointSetSpiral_UsesPerPointLocalSequence()
+        public void SpawnExecution_PointSetSpiral_UsesRepeatSequencePerEvent()
         {
             try
             {
@@ -1177,12 +1177,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 float3 p2 = new float3(2f, 0f, 0f);
                 float2 dirRight = new float2(1f, 0f);
                 float2 dirUp = new float2(0f, 1f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirDown = new float2(0f, -1f);
 
                 Assert.That(CountDirectionAtPoint(snapshots, p0, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
-                Assert.That(CountDirectionAtPoint(snapshots, p1, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
-                Assert.That(CountDirectionAtPoint(snapshots, p2, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
-                Assert.That(CountDirectionAtPoint(snapshots, p0, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p0, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
                 Assert.That(CountDirectionAtPoint(snapshots, p1, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p1, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p2, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
                 Assert.That(CountDirectionAtPoint(snapshots, p2, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
             }
             finally
@@ -1466,11 +1468,11 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SpawnRequestBuild_PoissonBurstShotsPerEvent_AccumulatesAsShotMultiples()
+        public void SpawnRequestBuild_PoissonEventRepeatCount_AccumulatesAsShotMultiples()
         {
             try
             {
-                using var world = CreateDefaultTestWorld("SpawnPoissonShotMultipleWorld", out var simGroup);
+                using var world = CreateDefaultTestWorld("SpawnPoissonEventRepeatWorld", out var simGroup);
                 var em = world.EntityManager;
 
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
@@ -1499,7 +1501,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     ratePerSecPerArea: 0f);
                 poissonPattern.EmissionMode = SourceSpawnEmissionModeId.Poisson;
                 poissonPattern.MeanEventsPerSec = 3600f;
-                poissonPattern.BurstShotsPerEvent = 3;
+                poissonPattern.EventRepeatCount = 3;
                 clipPatterns.Add(poissonPattern);
 
                 var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
@@ -1529,7 +1531,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 int pending = SumPendingRequestCount(em.GetBuffer<SourceSpawnRequestBuffer>(source));
                 Assert.That(pending, Is.GreaterThan(0));
-                Assert.That(pending % 3, Is.EqualTo(0), "Poisson pending shots should follow BurstShotsPerEvent multiples.");
+                Assert.That(pending % 3, Is.EqualTo(0), "Poisson pending shots should follow EventRepeatCount multiples.");
             }
             finally
             {
@@ -1561,6 +1563,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 8001,
                     BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 3,
                     SamplingMode = SourceSpawnSamplingModeId.UniformField,
                     CenterMode = SourceSpawnCenterModeId.SourceCenter,
                     SpawnSampleBudget = 8,

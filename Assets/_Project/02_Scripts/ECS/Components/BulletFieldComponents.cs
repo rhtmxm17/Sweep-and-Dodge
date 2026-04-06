@@ -170,6 +170,15 @@ namespace SweepNDodge.DotsBullets
         public int BulletTypeKey;
         public SourceSpawnEmissionModeId EmissionMode;
         public SourceSpawnModeId SpawnMode;
+        public WaveSamplingAnchorModeId SamplingAnchorMode;
+        public WaveAreaSamplerModeId AreaSamplerMode;
+        public WavePositionPatternModeId PositionPatternMode;
+        public WaveAimModeId AimMode;
+        public WaveAimSnapshotTimingId AimSnapshotTiming;
+        public float AimAngleOffsetDeg;
+        public WaveShotPatternModeId ShotPatternMode;
+        public int ShotCount;
+        public int EventRepeatCount;
         public SourceSpawnSamplingModeId SamplingMode;
         public SourceSpawnCenterModeId CenterMode;
         public SourceSpawnDirectionModeId DirectionMode;

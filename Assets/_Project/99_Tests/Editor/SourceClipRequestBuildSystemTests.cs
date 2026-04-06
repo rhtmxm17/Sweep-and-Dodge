@@ -138,7 +138,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 shapeSize: new float2(2f, 2f),
                 spawnDensityPerSecPerArea: 0f,
                 burstIntervalSec: 1f,
-                burstShotsPerEvent: 1,
+                eventRepeatCount: 1,
                 burstRepeatCount: -1,
                 maxActiveDensityPerArea: 2f);
             AttachPollutionCells(em, source, 2, 2, activeValidCount: 1);
@@ -146,7 +146,8 @@ namespace SweepNDodge.DotsBullets.Tests
             world.SetTime(new TimeData(4d, 4f));
             buildSystem.Update(world.Unmanaged);
 
-            AssertRequestCount(em, source, 2);
+            AssertPendingCount(em, source, 2);
+            Assert.That(em.GetBuffer<SourceSpawnRequestBuffer>(source).Length, Is.EqualTo(2));
         }
 
         [Test]
@@ -162,7 +163,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 emissionMode: SourceSpawnEmissionModeId.EventBurst,
                 spawnMode: SourceSpawnModeId.FixedDensity,
                 burstIntervalSec: 2f,
-                burstShotsPerEvent: 1,
+                eventRepeatCount: 1,
                 burstRepeatCount: 3,
                 localStartSec: 1f,
                 localEndSec: 10f,
@@ -342,7 +343,7 @@ namespace SweepNDodge.DotsBullets.Tests
             float spawnDensityPerSecPerArea = 60f,
             float meanEventsPerSec = 0f,
             float burstIntervalSec = 1f,
-            int burstShotsPerEvent = 1,
+            int eventRepeatCount = 1,
             int burstRepeatCount = 0,
             float maxActiveDensityPerArea = 0f,
             float localStartSec = 0f,
@@ -419,6 +420,25 @@ namespace SweepNDodge.DotsBullets.Tests
                 BulletTypeKey = 101,
                 EmissionMode = emissionMode,
                 SpawnMode = spawnMode,
+                SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                AreaSamplerMode = samplingMode switch
+                {
+                    SourceSpawnSamplingModeId.PollutionTopK => WaveAreaSamplerModeId.PollutionTopK,
+                    SourceSpawnSamplingModeId.UniformField => WaveAreaSamplerModeId.UniformField,
+                    _ => WaveAreaSamplerModeId.CenterPoint,
+                },
+                PositionPatternMode = samplingMode switch
+                {
+                    SourceSpawnSamplingModeId.LineEven => WavePositionPatternModeId.LineEven,
+                    SourceSpawnSamplingModeId.PointSet => WavePositionPatternModeId.PointSet,
+                    _ => WavePositionPatternModeId.SinglePoint,
+                },
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                AimAngleOffsetDeg = 0f,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventRepeatCount = eventRepeatCount,
                 SamplingMode = samplingMode,
                 CenterMode = SourceSpawnCenterModeId.SourceCenter,
                 DirectionMode = SourceSpawnDirectionModeId.Fixed,
@@ -429,7 +449,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SpawnDensityPerSecPerArea = spawnDensityPerSecPerArea,
                 MeanEventsPerSec = meanEventsPerSec,
                 BurstIntervalSec = burstIntervalSec,
-                BurstShotsPerEvent = burstShotsPerEvent,
+                BurstShotsPerEvent = eventRepeatCount,
                 BurstRepeatCount = burstRepeatCount,
                 MaxActiveDensityPerArea = maxActiveDensityPerArea,
                 LanePriority = 1,

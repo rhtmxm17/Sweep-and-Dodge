@@ -122,7 +122,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void WaveClipAssets_UseTypedAuthoringOnly()
+        public void WaveClipAssets_UseCanonicalTypedAuthoringOnly()
         {
             string[] guids = AssetDatabase.FindAssets($"t:{nameof(WaveClipSO)}", WaveClipSearchRoots);
             Assert.That(guids.Length, Is.GreaterThan(0));
@@ -139,6 +139,19 @@ namespace SweepNDodge.DotsBullets.Tests
                     var segment = segments[s];
                     int typedCount = segment.Directives?.Length ?? 0;
                     Assert.That(typedCount, Is.GreaterThan(0), $"{path} segment[{s}] must keep typed directives.");
+
+                    for (int d = 0; d < typedCount; d++)
+                    {
+                        var directive = segment.Directives[d];
+                        Assert.That(directive.Payload.Bullet, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Payload.Bullet.");
+                        Assert.That(directive.Emission, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Emission.");
+                        Assert.That(directive.Sampling, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Sampling.");
+                        Assert.That(directive.Sampling.Anchor, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Sampling.Anchor.");
+                        Assert.That(directive.Sampling.AreaSampler, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Sampling.AreaSampler.");
+                        Assert.That(directive.PositionPattern, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep PositionPattern.");
+                        Assert.That(directive.Aim, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Aim.");
+                        Assert.That(directive.ShotPattern, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep ShotPattern.");
+                    }
                 }
             }
         }

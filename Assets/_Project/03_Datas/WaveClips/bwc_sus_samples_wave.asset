@@ -15,7 +15,7 @@ MonoBehaviour:
   ClipId: 1
   Phase: 0
   Lane: 1
-  DurationSec: 8
+  DurationSec: 12
   Segments:
   - editorOnlyDescription: "\uC815\uC9C0\uC2DC \uD3ED\uBC1C\uD558\uB294 \uD0C4\uD658"
     StartSec: 0
@@ -38,7 +38,8 @@ MonoBehaviour:
         rid: 6141543268140187757
       ShotPattern:
         rid: 9141543268140187757
-  - editorOnlyDescription: 
+  - editorOnlyDescription: "\uC81C\uAC70\uC2DC \uBCF4\uB108\uC2A4\uB97C \uB0A8\uAE30\uB294
+      \uD0C4\uD658"
     StartSec: 2
     EndSec: 3
     Directives:
@@ -59,7 +60,8 @@ MonoBehaviour:
         rid: 6141543268140187760
       ShotPattern:
         rid: 9141543268140187760
-  - editorOnlyDescription: 
+  - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uC57D\uD558\uAC8C \uCD94\uC801\uD558\uB294
+      \uD0C4\uD658"
     StartSec: 4
     EndSec: 5
     Directives:
@@ -80,6 +82,27 @@ MonoBehaviour:
         rid: 6141543268140187763
       ShotPattern:
         rid: 9141543268140187763
+  - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 \uBC1C\uC0AC"
+    StartSec: 6
+    EndSec: 7
+    Directives:
+    - Payload:
+        Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
+      Emission:
+        rid: 6141543268140187761
+      Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187762
+        AreaSampler:
+          rid: 8141543268140187762
+      PositionPattern:
+        rid: 6141543268140187762
+      Aim:
+        rid: 6141543335094649072
+      ShotPattern:
+        rid: 6141543335094649073
   references:
     version: 2
     RefIds:
@@ -98,20 +121,11 @@ MonoBehaviour:
       data:
         Points:
         - {x: 0, y: 0}
-    - rid: 7141543268140187756
-      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 8141543268140187756
-      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187757
       type: {class: SpiralAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 0
         SpiralStepDeg: 30
-    - rid: 9141543268140187757
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187758
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -127,20 +141,11 @@ MonoBehaviour:
       data:
         Points:
         - {x: 0, y: 0}
-    - rid: 7141543268140187759
-      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 8141543268140187759
-      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187760
       type: {class: SpiralAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 90
         SpiralStepDeg: 30
-    - rid: 9141543268140187760
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187761
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -156,17 +161,44 @@ MonoBehaviour:
       data:
         Points:
         - {x: 0, y: 0}
-    - rid: 7141543268140187762
-      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 8141543268140187762
-      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187763
       type: {class: SpiralAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 180
         SpiralStepDeg: 30
+    - rid: 6141543335094649072
+      type: {class: PlayerPositionAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        AngleOffsetDeg: 0
+        SnapshotTiming: 0
+    - rid: 6141543335094649073
+      type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        ShotCount: 4
+    - rid: 7141543268140187756
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 7141543268140187759
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 7141543268140187762
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 8141543268140187756
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 8141543268140187759
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 8141543268140187762
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 9141543268140187757
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 9141543268140187760
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
     - rid: 9141543268140187763
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
+      data: 
