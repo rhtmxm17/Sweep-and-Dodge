@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -19,7 +19,7 @@ MonoBehaviour:
   Segments:
   - editorOnlyDescription: Cleanup Reward - VacuumCollected
     StartSec: 2.25
-    EndSec: 3.25
+    DurationSec: 1
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
@@ -40,7 +40,7 @@ MonoBehaviour:
         rid: 9141543268140187733
   - editorOnlyDescription: Cleanup Reward - CarryFullRemoved
     StartSec: 8.5
-    EndSec: 9.5
+    DurationSec: 1
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
@@ -120,3 +120,4 @@ MonoBehaviour:
     - rid: 9141543268140187736
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: {}
+

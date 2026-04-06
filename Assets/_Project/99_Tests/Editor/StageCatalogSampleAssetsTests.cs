@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
@@ -156,6 +157,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var sharedManagedReferenceIssues = WaveClipManagedReferenceGraphUtility.DetectSharedManagedReferences(clip);
                 Assert.That(sharedManagedReferenceIssues, Is.Empty, $"{path} must not keep shared SerializeReference graph.");
+
+                string yaml = File.ReadAllText(path);
+                Assert.That(yaml.Contains("EndSec:"), Is.False, $"{path} must not keep legacy EndSec serialization.");
             }
         }
 

@@ -5,6 +5,14 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Editor
 {
+    public enum WaveClipDirectivePresetId : byte
+    {
+        SingleHazard = 0,
+        FanBurst = 1,
+        RadialBurst = 2,
+        LineNormalFan = 3,
+    }
+
     public readonly struct WaveClipSharedManagedReferenceIssue
     {
         public readonly string SlotName;
@@ -110,7 +118,7 @@ namespace SweepNDodge.DotsBullets.Editor
             return new WaveClipSO.ClipSegment
             {
                 StartSec = 0f,
-                EndSec = 1f,
+                DurationSec = 1f,
                 Directives = new[] { CreateDefaultDirective() },
                 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 EditorOnlyDescription = string.Empty,
@@ -135,12 +143,119 @@ namespace SweepNDodge.DotsBullets.Editor
             };
         }
 
+        public static WaveSpawnEntryAuthoring CreatePresetDirective(WaveClipDirectivePresetId preset)
+        {
+            return preset switch
+            {
+                WaveClipDirectivePresetId.SingleHazard => CreateDefaultDirective(),
+                WaveClipDirectivePresetId.FanBurst => new WaveSpawnEntryAuthoring
+                {
+                    Payload = new WaveClipSO.SpawnPayloadProfile(),
+                    Emission = new EventBurstEmissionAuthoring(),
+                    Sampling = new WaveSamplingAuthoring
+                    {
+                        Anchor = new SourceCenterSamplingAnchorAuthoring(),
+                        AreaSampler = new CenterPointAreaSamplerAuthoring(),
+                    },
+                    PositionPattern = new SinglePointPositionPatternAuthoring(),
+                    Aim = new FixedAimAuthoring(),
+                    ShotPattern = new NWayShotPatternAuthoring
+                    {
+                        ShotCount = 4,
+                        AngleSpacingDeg = 30f,
+                    },
+                },
+                WaveClipDirectivePresetId.RadialBurst => new WaveSpawnEntryAuthoring
+                {
+                    Payload = new WaveClipSO.SpawnPayloadProfile(),
+                    Emission = new EventBurstEmissionAuthoring(),
+                    Sampling = new WaveSamplingAuthoring
+                    {
+                        Anchor = new SourceCenterSamplingAnchorAuthoring(),
+                        AreaSampler = new CenterPointAreaSamplerAuthoring(),
+                    },
+                    PositionPattern = new SinglePointPositionPatternAuthoring(),
+                    Aim = new FixedAimAuthoring(),
+                    ShotPattern = new RadialShotPatternAuthoring
+                    {
+                        ShotCount = 8,
+                    },
+                },
+                WaveClipDirectivePresetId.LineNormalFan => new WaveSpawnEntryAuthoring
+                {
+                    Payload = new WaveClipSO.SpawnPayloadProfile(),
+                    Emission = new EventBurstEmissionAuthoring(),
+                    Sampling = new WaveSamplingAuthoring
+                    {
+                        Anchor = new FixedPointSamplingAnchorAuthoring(),
+                        AreaSampler = new CenterPointAreaSamplerAuthoring(),
+                    },
+                    PositionPattern = new LineEvenPositionPatternAuthoring
+                    {
+                        LineStart = new Vector2(-2f, 0f),
+                        LineEnd = new Vector2(2f, 0f),
+                        SampleSpacing = 1f,
+                    },
+                    Aim = new LineNormalAimAuthoring
+                    {
+                        NormalSide = WaveLineNormalSideId.Left,
+                        AngleOffsetDeg = 0f,
+                    },
+                    ShotPattern = new NWayShotPatternAuthoring
+                    {
+                        ShotCount = 3,
+                        AngleSpacingDeg = 30f,
+                    },
+                },
+                _ => CreateDefaultDirective(),
+            };
+        }
+
+        public static bool MoveSegment(WaveClipSO clip, int fromIndex, int toIndex)
+        {
+            if (clip == null || clip.Segments == null)
+                return false;
+
+            if (fromIndex < 0 || fromIndex >= clip.Segments.Length || toIndex < 0 || toIndex >= clip.Segments.Length || fromIndex == toIndex)
+                return false;
+
+            var segments = new List<WaveClipSO.ClipSegment>(clip.Segments);
+            var segment = segments[fromIndex];
+            segments.RemoveAt(fromIndex);
+            segments.Insert(toIndex, segment);
+            clip.Segments = segments.ToArray();
+            return true;
+        }
+
+        public static bool MoveDirective(WaveClipSO clip, int segmentIndex, int fromIndex, int toIndex)
+        {
+            if (clip?.Segments == null || segmentIndex < 0 || segmentIndex >= clip.Segments.Length)
+                return false;
+
+            var segments = clip.Segments;
+            var segment = segments[segmentIndex];
+            if (segment.Directives == null)
+                return false;
+
+            if (fromIndex < 0 || fromIndex >= segment.Directives.Length || toIndex < 0 || toIndex >= segment.Directives.Length || fromIndex == toIndex)
+                return false;
+
+            var directives = new List<WaveSpawnEntryAuthoring>(segment.Directives);
+            var directive = directives[fromIndex];
+            directives.RemoveAt(fromIndex);
+            directives.Insert(toIndex, directive);
+            segment.Directives = directives.ToArray();
+            segments[segmentIndex] = segment;
+            clip.Segments = segments;
+            return true;
+        }
+
         public static WaveClipSO.ClipSegment CloneSegment(in WaveClipSO.ClipSegment source)
         {
             return new WaveClipSO.ClipSegment
             {
                 StartSec = source.StartSec,
-                EndSec = source.EndSec,
+                DurationSec = source.DurationSec,
                 Directives = CloneDirectiveArray(source.Directives),
                 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 EditorOnlyDescription = source.EditorOnlyDescription,

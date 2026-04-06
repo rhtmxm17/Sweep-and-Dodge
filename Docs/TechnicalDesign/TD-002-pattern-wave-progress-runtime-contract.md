@@ -155,6 +155,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
   - `ShotPattern`
 
 ### 7.2 Semantic validation
+- `CV010`: `ClipSegment.DurationSec <= 0` 또는 effective active duration 0
 - `CV015`: `RatePerSecPerArea < 0`
 - `CV016`: `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0`
 - `CV017`: `MeanEventsPerSec < 0`
@@ -170,6 +171,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 - `CV028`: invalid `PointSet PositionPattern`
 - `CV041`: shared `SerializeReference` graph detected inside one `WaveClip`
 - `CV042`: `LineNormalAim` without `LineEven PositionPattern`
+- `CVW040`: `EventBurst`의 `BurstRepeatCount`가 segment effective duration 안에서 도달 가능한 burst event 수를 초과
 - `CVW032`: near-zero `SpiralStepDeg`
 - `CVW033`: `PointSet` authored count > runtime clamp max
 
@@ -197,6 +199,7 @@ ExecutionBegin -> Simulation -> Request -> ExecutionEnd
 
 ## 10. 변경 이력
 - 2026-04-06: Plan I 반영. `LineNormalAim`의 line-normal base angle 계산과 `CV042` validation 계약을 추가했다.
+- 2026-04-06: Plan K 반영. `ClipSegment` authoring 시간을 `StartSec + DurationSec`로 전환하고 `CVW040` truncation warning 계약을 추가했다.
 - 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget을 허용하고 unsupported snapshot timing validation 제약을 제거했다.
 - 2026-04-06: Plan D 반영. canonical runtime field, event item split, event-local snapshot ownership, validation 기준을 현재 구현 상태로 전면 정리했다.
 - 2026-04-06: Plan C 반영. `SourceSpawnRequestBuffer`를 event-local snapshot owner로 고정하고 `Poisson` / `EventBurst` event item split을 도입했다.

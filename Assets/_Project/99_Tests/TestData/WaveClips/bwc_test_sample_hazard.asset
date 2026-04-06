@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -19,7 +19,7 @@ MonoBehaviour:
   Segments:
   - editorOnlyDescription: Linear Baseline
     StartSec: 1.5
-    EndSec: 4.5
+    DurationSec: 3
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
@@ -57,7 +57,7 @@ MonoBehaviour:
         rid: 9141543268140187742
   - editorOnlyDescription: Bubble StopBurst
     StartSec: 4.75
-    EndSec: 7.75
+    DurationSec: 3
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: d770120fbd6b4061836ce6a8b58441f3, type: 2}
@@ -78,7 +78,7 @@ MonoBehaviour:
         rid: 9141543268140187745
   - editorOnlyDescription: HomingLite
     StartSec: 8
-    EndSec: 11
+    DurationSec: 3
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
@@ -216,3 +216,4 @@ MonoBehaviour:
     - rid: 9141543268140187748
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: {}
+

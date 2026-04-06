@@ -328,13 +328,17 @@ namespace SweepNDodge.DotsBullets.Editor
                 {
                     var seg = clip.Segments[s];
                     string segmentLocation = $"{clips[i].Location}::Segments[{s}]";
-                    if (seg.EndSec <= seg.StartSec)
+                    float rawDurationSec = seg.DurationSec;
+                    float startSec = seg.StartSec;
+                    float clipDurationSec = clip.DurationSec;
+                    float effectiveDurationSec = ResolveEffectiveSegmentDurationSec(startSec, rawDurationSec, clipDurationSec);
+                    if (rawDurationSec <= 0f || effectiveDurationSec <= 0f)
                     {
                         issues.Add(new ContentValidationIssue(
                             ContentValidationSeverity.Error,
                             "CV010",
                             segmentLocation,
-                            $"Clip segment has invalid range at segmentIndex={s}. StartSec={seg.StartSec}, EndSec={seg.EndSec}."));
+                            $"Clip segment has invalid active duration at segmentIndex={s}. StartSec={startSec}, DurationSec={rawDurationSec}, ClipDurationSec={clipDurationSec}."));
                         continue;
                     }
 
@@ -458,6 +462,21 @@ namespace SweepNDodge.DotsBullets.Editor
                                         "CV021",
                                         validationEntry.EntryLocation,
                                         $"Clip segment has invalid BurstRepeatCount at segmentIndex={s}, entryIndex={e}. Use -1 or >= 1."));
+                                }
+
+                                int maxReachableBurstEvents = ResolveMaxReachableBurstEvents(
+                                    effectiveDurationSec,
+                                    validationEntry.RawBurstIntervalSec);
+                                if (repeatCount >= 1
+                                    && validationEntry.RawBurstIntervalSec > 0f
+                                    && maxReachableBurstEvents >= 0
+                                    && repeatCount > maxReachableBurstEvents)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Warning,
+                                        "CVW040",
+                                        validationEntry.EntryLocation,
+                                        $"Clip segment configures BurstRepeatCount={repeatCount} but only {maxReachableBurstEvents} burst events are reachable within segment duration; tail bursts may never trigger."));
                                 }
                             }
 
@@ -731,6 +750,28 @@ namespace SweepNDodge.DotsBullets.Editor
                 rawPointCount);
             error = string.Empty;
             return true;
+        }
+
+        private static float ResolveEffectiveSegmentDurationSec(float startSec, float durationSec, float clipDurationSec)
+        {
+            float safeStartSec = Mathf.Max(0f, startSec);
+            float safeDurationSec = Mathf.Max(0f, durationSec);
+            float endSec = safeStartSec + safeDurationSec;
+            if (clipDurationSec > 0f)
+                endSec = Mathf.Min(endSec, clipDurationSec);
+
+            return Mathf.Max(0f, endSec - safeStartSec);
+        }
+
+        private static int ResolveMaxReachableBurstEvents(float effectiveDurationSec, float burstIntervalSec)
+        {
+            if (effectiveDurationSec <= 0f || burstIntervalSec <= 0f)
+                return -1;
+
+            const float burstScheduleEpsilon = 1e-5f;
+            float safeDurationSec = Mathf.Max(0f, effectiveDurationSec);
+            float safeIntervalSec = Mathf.Max(0.001f, burstIntervalSec);
+            return 1 + Mathf.FloorToInt(Mathf.Max(0f, safeDurationSec - burstScheduleEpsilon) / safeIntervalSec);
         }
 
         private static void ValidateAutoCorrectionWarnings(

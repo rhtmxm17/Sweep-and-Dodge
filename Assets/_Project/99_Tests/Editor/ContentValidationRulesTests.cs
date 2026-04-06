@@ -490,7 +490,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -511,6 +511,270 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 var errors = issues.Where(i => i.Code == "CV015").ToArray();
                 Assert.That(errors.Length, Is.GreaterThanOrEqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_WithNonPositiveSegmentDuration_IsCV010()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30015);
+                def.Prefab = prefab;
+
+                clip.ClipId = 111;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 0f,
+                        Directives = new[] { CreateDefaultTypedEntry(def) }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV010"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_WithStartOutsideClipDuration_IsCV010()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30016);
+                def.Prefab = prefab;
+
+                clip.ClipId = 112;
+                clip.DurationSec = 1f;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 1f,
+                        DurationSec = 1f,
+                        Directives = new[] { CreateDefaultTypedEntry(def) }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV010"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_EventBurstWithUnreachableTailRepeats_IsCVW040()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30017);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new EventBurstEmissionAuthoring
+                {
+                    BurstRepeatCount = 3,
+                    BurstIntervalSec = 1f,
+                    EventRepeatCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                };
+
+                clip.ClipId = 113;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1.5f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CVW040"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_EventBurstExactFit_DoesNotWarnCVW040()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30018);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new EventBurstEmissionAuthoring
+                {
+                    BurstRepeatCount = 3,
+                    BurstIntervalSec = 1f,
+                    EventRepeatCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                };
+
+                clip.ClipId = 114;
+                clip.DurationSec = 3f;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 3f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CVW040"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_EventBurstInfiniteRepeat_DoesNotWarnCVW040()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30019);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new EventBurstEmissionAuthoring
+                {
+                    BurstRepeatCount = -1,
+                    BurstIntervalSec = 1f,
+                    EventRepeatCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                };
+
+                clip.ClipId = 115;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1.5f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CVW040"), Is.False);
             }
             finally
             {
@@ -548,7 +812,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -598,7 +862,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -649,7 +913,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -707,7 +971,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -762,7 +1026,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -829,7 +1093,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1030,13 +1294,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 5f,
+                        DurationSec = 5f,
                         Directives = new[] { entry }
                     },
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 4f,
-                        EndSec = 8f,
+                        DurationSec = 4f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1085,13 +1349,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 5f,
+                        DurationSec = 5f,
                         Directives = new[] { entry }
                     },
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 5f,
-                        EndSec = 9f,
+                        DurationSec = 4f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1159,8 +1423,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 clipA.ClipId = 777;
                 clipB.ClipId = 777;
-                clipA.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
-                clipB.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
+                clipA.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, DurationSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
+                clipB.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, DurationSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
 
                 var input = new ContentValidationInput(
                     null,
@@ -1203,7 +1467,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1252,7 +1516,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1311,7 +1575,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1555,7 +1819,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1680,6 +1944,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
+
 
 
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -42,7 +42,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var source = new WaveClipSO.ClipSegment
             {
                 StartSec = 2f,
-                EndSec = 4f,
+                DurationSec = 2f,
                 Directives = new[]
                 {
                     CreateRichDirective(),
@@ -55,7 +55,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var clone = WaveClipManagedReferenceGraphUtility.CloneSegment(source);
 
             Assert.That(clone.StartSec, Is.EqualTo(source.StartSec));
-            Assert.That(clone.EndSec, Is.EqualTo(source.EndSec));
+            Assert.That(clone.DurationSec, Is.EqualTo(source.DurationSec));
             Assert.That(clone.Directives, Is.Not.SameAs(source.Directives));
             Assert.That(clone.Directives.Length, Is.EqualTo(1));
             Assert.That(clone.Directives[0], Is.Not.SameAs(source.Directives[0]));
@@ -92,6 +92,270 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void BuildDirectiveSummary_LineNormalAndNWay_IsReadable()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.name = "haz_01";
+                var directive = new WaveSpawnEntryAuthoring
+                {
+                    Payload = new WaveClipSO.SpawnPayloadProfile { Bullet = def },
+                    Emission = new EventBurstEmissionAuthoring
+                    {
+                        EventRepeatCount = 3,
+                        EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    },
+                    Sampling = new WaveSamplingAuthoring
+                    {
+                        Anchor = new FixedPointSamplingAnchorAuthoring(),
+                        AreaSampler = new CenterPointAreaSamplerAuthoring(),
+                    },
+                    PositionPattern = new LineEvenPositionPatternAuthoring(),
+                    Aim = new LineNormalAimAuthoring
+                    {
+                        NormalSide = WaveLineNormalSideId.Left,
+                        AngleOffsetDeg = 15f,
+                    },
+                    ShotPattern = new NWayShotPatternAuthoring
+                    {
+                        ShotCount = 4,
+                        AngleSpacingDeg = 30f,
+                    },
+                };
+
+                string summary = WaveClipEditorPresentationUtility.BuildDirectiveSummary(directive);
+                Assert.That(summary, Does.Contain("Bullet=haz_01"));
+                Assert.That(summary, Does.Contain("EventBurst x3 Timed"));
+                Assert.That(summary, Does.Contain("FixedPoint+CenterPoint"));
+                Assert.That(summary, Does.Contain("LineEven"));
+                Assert.That(summary, Does.Contain("LineNormal(L,+15"));
+                Assert.That(summary, Does.Contain("NWay(4@30"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
+        public void BuildDirectiveSummary_PlayerPositionPerShotAndRadial_IsReadable()
+        {
+            var directive = new WaveSpawnEntryAuthoring
+            {
+                Emission = new PoissonEmissionAuthoring
+                {
+                    EventRepeatCount = 2,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                },
+                Sampling = new WaveSamplingAuthoring
+                {
+                    Anchor = new SourceCenterSamplingAnchorAuthoring(),
+                    AreaSampler = new UniformFieldAreaSamplerAuthoring(),
+                },
+                PositionPattern = new PointSetPositionPatternAuthoring
+                {
+                    Points = new[] { Vector2.zero, Vector2.right }
+                },
+                Aim = new PlayerPositionAimAuthoring
+                {
+                    SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                    AngleOffsetDeg = 10f,
+                },
+                ShotPattern = new RadialShotPatternAuthoring
+                {
+                    ShotCount = 8,
+                },
+            };
+
+            string summary = WaveClipEditorPresentationUtility.BuildDirectiveSummary(directive);
+            Assert.That(summary, Does.Contain("Poisson x2 Instant"));
+            Assert.That(summary, Does.Contain("SourceCenter+UniformField"));
+            Assert.That(summary, Does.Contain("PointSet(2)"));
+            Assert.That(summary, Does.Contain("PlayerPosition(PerShot,+10"));
+            Assert.That(summary, Does.Contain("Radial(8)"));
+        }
+
+        [Test]
+        public void CollectInlineWarnings_LineNormalWithoutLineEven_ReturnsCV042()
+        {
+            var directive = new WaveSpawnEntryAuthoring
+            {
+                Emission = new EventBurstEmissionAuthoring(),
+                Sampling = new WaveSamplingAuthoring
+                {
+                    Anchor = new SourceCenterSamplingAnchorAuthoring(),
+                    AreaSampler = new CenterPointAreaSamplerAuthoring(),
+                },
+                PositionPattern = new SinglePointPositionPatternAuthoring(),
+                Aim = new LineNormalAimAuthoring(),
+                ShotPattern = new SingleShotPatternAuthoring(),
+            };
+
+            var warnings = WaveClipEditorPresentationUtility.CollectInlineWarnings(directive);
+            Assert.That(warnings.Any(w => w.Contains("CV042")), Is.True);
+        }
+
+        [Test]
+        public void ValidateCurrentClip_LineNormalWithoutLineEven_ReturnsCV042()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Prefab = prefab;
+                def.Editor_SetDefinitionId(8801);
+
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[]
+                        {
+                            new WaveSpawnEntryAuthoring
+                            {
+                                Payload = new WaveClipSO.SpawnPayloadProfile { Bullet = def },
+                                Emission = new EventBurstEmissionAuthoring(),
+                                Sampling = new WaveSamplingAuthoring
+                                {
+                                    Anchor = new SourceCenterSamplingAnchorAuthoring(),
+                                    AreaSampler = new CenterPointAreaSamplerAuthoring(),
+                                },
+                                PositionPattern = new SinglePointPositionPatternAuthoring(),
+                                Aim = new LineNormalAimAuthoring(),
+                                ShotPattern = new SingleShotPatternAuthoring(),
+                            }
+                        }
+                    }
+                };
+
+                var issues = WaveClipEditorPresentationUtility.ValidateCurrentClip(clip);
+                Assert.That(issues.Any(i => i.Code == "CV042"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void CreatePresetDirective_LineNormalFan_HasExpectedSubtypeGraph()
+        {
+            var directive = WaveClipManagedReferenceGraphUtility.CreatePresetDirective(WaveClipDirectivePresetId.LineNormalFan);
+
+            Assert.That(directive.Emission, Is.TypeOf<EventBurstEmissionAuthoring>());
+            Assert.That(directive.Sampling.Anchor, Is.TypeOf<FixedPointSamplingAnchorAuthoring>());
+            Assert.That(directive.Sampling.AreaSampler, Is.TypeOf<CenterPointAreaSamplerAuthoring>());
+            Assert.That(directive.PositionPattern, Is.TypeOf<LineEvenPositionPatternAuthoring>());
+            Assert.That(directive.Aim, Is.TypeOf<LineNormalAimAuthoring>());
+            Assert.That(directive.ShotPattern, Is.TypeOf<NWayShotPatternAuthoring>());
+
+            var aim = (LineNormalAimAuthoring)directive.Aim;
+            var shotPattern = (NWayShotPatternAuthoring)directive.ShotPattern;
+            Assert.That(aim.NormalSide, Is.EqualTo(WaveLineNormalSideId.Left));
+            Assert.That(aim.AngleOffsetDeg, Is.EqualTo(0f));
+            Assert.That(shotPattern.ShotCount, Is.EqualTo(3));
+            Assert.That(shotPattern.AngleSpacingDeg, Is.EqualTo(30f));
+        }
+
+        [Test]
+        public void CreatePresetDirective_TwoCalls_DoNotShareManagedNodes()
+        {
+            var first = WaveClipManagedReferenceGraphUtility.CreatePresetDirective(WaveClipDirectivePresetId.LineNormalFan);
+            var second = WaveClipManagedReferenceGraphUtility.CreatePresetDirective(WaveClipDirectivePresetId.LineNormalFan);
+
+            Assert.That(first, Is.Not.SameAs(second));
+            Assert.That(first.Emission, Is.Not.SameAs(second.Emission));
+            Assert.That(first.Sampling, Is.Not.SameAs(second.Sampling));
+            Assert.That(first.Sampling.Anchor, Is.Not.SameAs(second.Sampling.Anchor));
+            Assert.That(first.Sampling.AreaSampler, Is.Not.SameAs(second.Sampling.AreaSampler));
+            Assert.That(first.PositionPattern, Is.Not.SameAs(second.PositionPattern));
+            Assert.That(first.Aim, Is.Not.SameAs(second.Aim));
+            Assert.That(first.ShotPattern, Is.Not.SameAs(second.ShotPattern));
+        }
+
+        [Test]
+        public void MoveSegment_ReordersWithoutIntroducingSharedManagedNodes()
+        {
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+
+            try
+            {
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { WaveClipManagedReferenceGraphUtility.CreatePresetDirective(WaveClipDirectivePresetId.SingleHazard) },
+                    },
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 1f,
+                        DurationSec = 1f,
+                        Directives = new[] { WaveClipManagedReferenceGraphUtility.CreatePresetDirective(WaveClipDirectivePresetId.LineNormalFan) },
+                    }
+                };
+
+                Assert.That(WaveClipManagedReferenceGraphUtility.MoveSegment(clip, 1, 0), Is.True);
+                Assert.That(clip.Segments[0].StartSec, Is.EqualTo(1f));
+                Assert.That(WaveClipManagedReferenceGraphUtility.DetectSharedManagedReferences(clip), Is.Empty);
+            }
+            finally
+            {
+                Object.DestroyImmediate(clip);
+            }
+        }
+
+        [Test]
+        public void MoveDirective_ReordersWithoutIntroducingSharedManagedNodes()
+        {
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+
+            try
+            {
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[]
+                        {
+                            WaveClipManagedReferenceGraphUtility.CreatePresetDirective(WaveClipDirectivePresetId.SingleHazard),
+                            WaveClipManagedReferenceGraphUtility.CreatePresetDirective(WaveClipDirectivePresetId.LineNormalFan),
+                        },
+                    }
+                };
+
+                Assert.That(WaveClipManagedReferenceGraphUtility.MoveDirective(clip, 0, 1, 0), Is.True);
+                Assert.That(clip.Segments[0].Directives[0].Aim, Is.TypeOf<LineNormalAimAuthoring>());
+                Assert.That(WaveClipManagedReferenceGraphUtility.DetectSharedManagedReferences(clip), Is.Empty);
+            }
+            finally
+            {
+                Object.DestroyImmediate(clip);
+            }
+        }
+
+        [Test]
+        public void TryParseJumpTarget_ExtractsSegmentAndDirective()
+        {
+            Assert.That(
+                WaveClipEditorPresentationUtility.TryParseJumpTarget("clip/Segments[3]/Directives[2]", out int segmentIndex, out int directiveIndex),
+                Is.True);
+            Assert.That(segmentIndex, Is.EqualTo(3));
+            Assert.That(directiveIndex, Is.EqualTo(2));
+        }
+
+        [Test]
         public void RepairSharedManagedReferences_UniquifiesClipGraph()
         {
             var sharedEmission = new EventBurstEmissionAuthoring
@@ -123,7 +387,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[]
                         {
                             new WaveSpawnEntryAuthoring
@@ -143,7 +407,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 1f,
-                        EndSec = 2f,
+                        DurationSec = 1f,
                         Directives = new[]
                         {
                             new WaveSpawnEntryAuthoring
@@ -210,7 +474,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entryA, entryB },
                     }
                 };
@@ -284,3 +548,4 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
+

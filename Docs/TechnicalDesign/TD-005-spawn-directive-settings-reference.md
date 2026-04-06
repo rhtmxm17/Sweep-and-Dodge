@@ -17,6 +17,7 @@
 
 ## 1. 적용 범위
 - 대상:
+  - `WaveClipSO.ClipSegment`
   - `Payload`
   - `Emission`
   - `Sampling`
@@ -25,6 +26,18 @@
   - `ShotPattern`
 - 비대상:
   - historical ADR의 과거 schema 상세
+
+## 1.1 ClipSegment
+| 필드 | 의미 | 규약 |
+| --- | --- | --- |
+| `ClipSegment.StartSec` | segment 시작 시각 | `>= 0` 권장 |
+| `ClipSegment.DurationSec` | authoring 길이 | `> 0` |
+
+### 1.2 해석 규약
+- authoring은 `EndSec`를 저장하지 않는다.
+- effective end는 `StartSec + DurationSec`으로 계산한다.
+- `clip.DurationSec > 0`이면 runtime flatten 시 clip end로 clamp된다.
+- runtime buffer는 계속 `LocalStartSec`, `LocalEndSec`를 사용한다.
 
 ## 2. Payload
 | 필드 | 의미 | 규약 |
@@ -131,10 +144,12 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 | `CV022` | `Poisson` / `EventBurst`의 `EventRepeatCount <= 0` |
 | `CV023` | `NWay ShotPattern`의 `ShotCount < 2` 또는 `AngleSpacingDeg <= 0` |
 | `CV024` | `Radial ShotPattern`의 `ShotCount < 2` |
+| `CV010` | `ClipSegment.DurationSec <= 0` 또는 effective active duration 0 |
 | `CV026` | `LineEven PositionPattern` 파라미터 오류 |
 | `CV028` | `PointSet PositionPattern`의 포인트 개수 오류 |
 | `CV041` | `WaveClip` 내부 shared `SerializeReference` graph |
 | `CV042` | `LineNormalAim`이 `LineEven PositionPattern` 없이 사용됨 |
+| `CVW040` | `EventBurst`의 `BurstRepeatCount`가 segment duration 안에서 도달 가능한 burst 수를 초과 |
 | `CVW032` | `SpiralAim`의 near-zero `SpiralStepDeg` |
 | `CVW033` | `PointSet` authored 포인트 수가 runtime clamp 상한 초과 |
 
@@ -147,6 +162,7 @@ EventRepeatCount × ShotPattern 1회당 탄 수
 ## 10. 변경 이력
 - 2026-04-06: Plan E 반영. runtime/product code가 canonical field만 유지하는 상태로 문서 메모를 보정했다.
 - 2026-04-06: Plan I 반영. `LineNormalAimAuthoring`와 `CV042` 규약을 추가했다.
+- 2026-04-06: Plan K 반영. `ClipSegment` 시간을 `StartSec + DurationSec`로 전환하고 `CVW040` warning을 추가했다.
 - 2026-04-06: Plan G 반영. `WaveClip` custom editor deep-copy UX와 shared `SerializeReference` graph validation/repair 규칙을 추가했다.
 - 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget 지원과 validation 제약 제거를 문서에 반영했다.
 - 2026-04-06: Plan D 반영. canonical authoring 축과 validation 용어 기준으로 문서를 전면 정리했다.

@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -19,7 +19,7 @@ MonoBehaviour:
   Segments:
   - editorOnlyDescription: "\uC815\uC9C0\uC2DC \uD3ED\uBC1C\uD558\uB294 \uD0C4\uD658"
     StartSec: 0
-    EndSec: 1
+    DurationSec: 1
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: d770120fbd6b4061836ce6a8b58441f3, type: 2}
@@ -41,7 +41,7 @@ MonoBehaviour:
   - editorOnlyDescription: "\uC81C\uAC70\uC2DC \uBCF4\uB108\uC2A4\uB97C \uB0A8\uAE30\uB294
       \uD0C4\uD658"
     StartSec: 2
-    EndSec: 3
+    DurationSec: 1
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
@@ -63,7 +63,7 @@ MonoBehaviour:
   - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uC57D\uD558\uAC8C \uCD94\uC801\uD558\uB294
       \uD0C4\uD658"
     StartSec: 4
-    EndSec: 5
+    DurationSec: 1
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
@@ -85,7 +85,7 @@ MonoBehaviour:
   - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 3*3\uBC1C,
       3\uC138\uD2B8 \uBC1C\uC0AC. \uAC01 \uC138\uD2B8 \uAC1C\uC2DC\uC2DC \uC870\uC900"
     StartSec: 6
-    EndSec: 8
+    DurationSec: 2
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
@@ -107,7 +107,7 @@ MonoBehaviour:
   - editorOnlyDescription: "\uD50C\uB808\uC774\uC5B4\uB97C \uD5A5\uD574 10\uBC1C
       \uBC1C\uC0AC. \uB9E4 \uBC1C \uC7AC\uC870\uC900"
     StartSec: 8
-    EndSec: 10
+    DurationSec: 2
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
@@ -276,3 +276,4 @@ MonoBehaviour:
     - rid: 9141543401000000013
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
+

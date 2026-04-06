@@ -271,10 +271,8 @@ namespace SweepNDodge.DotsBullets
     [Serializable]
     public sealed class WaveSpawnEntryAuthoring
     {
-        [Header("Payload")]
         public WaveClipSO.SpawnPayloadProfile Payload;
 
-        [Header("Directive")]
         [SerializeReference] public WaveEmissionAuthoringBase Emission = new RateFieldEmissionAuthoring();
         public WaveSamplingAuthoring Sampling = new WaveSamplingAuthoring();
         [SerializeReference] public WavePositionPatternAuthoringBase PositionPattern = new SinglePointPositionPatternAuthoring();
@@ -305,7 +303,7 @@ namespace SweepNDodge.DotsBullets
             }
             #endif
             public float StartSec;
-            public float EndSec;
+            public float DurationSec;
             public WaveSpawnEntryAuthoring[] Directives;
         }
 

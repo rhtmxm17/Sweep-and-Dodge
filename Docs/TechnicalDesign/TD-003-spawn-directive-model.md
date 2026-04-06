@@ -43,6 +43,14 @@ WaveSpawnEntryAuthoring
 - authoring invariant:
   - 하나의 `WaveClipSO` 안에서 서로 다른 `Segment` / `Directive`가 `SerializeReference` managed node를 공유하면 invalid다.
 
+## 2.1 ClipSegment 시간 authoring
+- `WaveClipSO.ClipSegment`는 `StartSec + DurationSec + Directives[]`를 사용한다.
+- authoring은 end 시각을 저장하지 않는다.
+- effective segment end:
+  - `StartSec + DurationSec`
+  - `clip.DurationSec > 0`이면 runtime flatten에서는 clip end로 clamp된다.
+- runtime flatten은 계속 `LocalStartSec`, `LocalEndSec`를 사용한다.
+
 ## 3. 축별 책임
 
 ### 3.1 Payload

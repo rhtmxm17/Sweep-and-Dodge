@@ -278,11 +278,12 @@ namespace SweepNDodge.DotsBullets
             {
                 var segment = clip.Segments[s];
                 int entryCount = segment.Directives?.Length ?? 0;
-                if (segment.EndSec <= segment.StartSec || entryCount <= 0)
+                if (segment.DurationSec <= 0f || entryCount <= 0)
                     continue;
 
                 float startSec = Mathf.Max(0f, segment.StartSec);
-                float endSec = Mathf.Max(startSec, segment.EndSec);
+                float rawEndSec = startSec + Mathf.Max(0f, segment.DurationSec);
+                float endSec = Mathf.Max(startSec, rawEndSec);
                 if (clipDuration > 0f)
                 {
                     startSec = Mathf.Min(startSec, clipDuration);

@@ -137,6 +137,17 @@
     - runtime은 `LineStart -> LineEnd` tangent 기준 좌/우 법선과 `AngleOffsetDeg`로 base angle을 계산한다.
     - `CV042`가 추가되어 `LineNormalAim`이 `LineEven PositionPattern` 없이 사용되면 error로 차단된다.
     - `LineNormal + Single/NWay/Radial` EditMode 회귀와 resolver/validation 테스트가 추가됐다.
+- [x] D17. Plan J. `WaveClipSO` custom inspector를 summary / safety / editing power 중심으로 확장했다.
+  - 검증 결과:
+    - segment/directive foldout을 `SessionState`로 직접 소유하고, summary row와 dense mode 토글을 추가했다.
+    - inline warning, current clip validation panel, shared graph issue row + jump 동선을 추가했다.
+    - `Move Up / Move Down`, `Add Default Directive`, `Add From Preset`(`Single Hazard`, `Fan Burst`, `Radial Burst`, `Line Normal Fan`)을 editor-only workflow로 추가했다.
+    - summary / preset / move / current-clip validation helper 테스트를 existing imported EditMode suite에 통합했고 `EditMode 431/431`, dedicated PlayMode smoke `1/1`을 다시 통과했다.
+- [x] D18. Plan K. `ClipSegment` 시간을 `StartSec + DurationSec`로 재정의하고 `EventBurst` truncation warning을 추가했다.
+  - 검증 결과:
+    - `WaveClipSO.ClipSegment`에서 `EndSec`를 제거하고 `DurationSec`로 교체했으며, bake는 계속 `LocalStartSec/LocalEndSec`로 flatten한다.
+    - `CV010`은 non-positive/effective-zero duration error로 재정의했고, `CVW040`은 `EventBurst` tail burst truncation warning으로 추가했다.
+    - 운영/test `WaveClip` asset을 직접 마이그레이션해 `EndSec:` YAML 잔존을 제거했고, sample asset test에서 이를 다시 검사한다.
 
 ## End of Session
 - 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.
