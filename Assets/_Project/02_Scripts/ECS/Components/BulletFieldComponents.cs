@@ -59,6 +59,7 @@ namespace SweepNDodge.DotsBullets
         UniformField = 0,
         PollutionTopK = 1,
         LineEven = 2,
+        CenterPoint = 3,
         PointSet = 4,
     }
 

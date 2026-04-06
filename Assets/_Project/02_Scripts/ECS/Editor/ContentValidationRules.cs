@@ -407,13 +407,13 @@ namespace SweepNDodge.DotsBullets.Editor
 
                             if ((emissionMode == SourceSpawnEmissionModeId.Poisson
                                   || emissionMode == SourceSpawnEmissionModeId.EventBurst)
-                                && validationEntry.RawBurstShotsPerEvent < 1)
+                                && validationEntry.RawEventRepeatCount <= 0)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV022",
                                     validationEntry.EntryLocation,
-                                    $"Clip segment has invalid BurstShotsPerEvent at segmentIndex={s}, entryIndex={e}."));
+                                    $"Clip segment has invalid EventRepeatCount at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if ((emissionMode == SourceSpawnEmissionModeId.Poisson
@@ -423,7 +423,7 @@ namespace SweepNDodge.DotsBullets.Editor
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
-                                    "CV029",
+                                    "CV025",
                                     validationEntry.EntryLocation,
                                     $"Clip segment uses Timed EventShotSchedule with non-positive EventShotIntervalSec at segmentIndex={s}, entryIndex={e}."));
                             }
@@ -459,13 +459,13 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"Clip segment has negative MaxActiveDensityPerArea for CapAndMaxDensity at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (validationEntry.RawSpawnSampleBudget < 0)
+                            if (validationEntry.RawSpawnSampleBudget <= 0)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV018",
                                     validationEntry.EntryLocation,
-                                    $"Clip segment has negative SpawnSampleBudget at segmentIndex={s}, entryIndex={e}."));
+                                    $"Clip segment has non-positive SpawnSampleBudget at segmentIndex={s}, entryIndex={e}."));
                             }
 
                             if (validationEntry.RawPlayerNoSpawnRadius < 0f)
@@ -477,26 +477,27 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"Clip segment has negative PlayerNoSpawnRadius at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            var directionMode = snapshot.DirectionMode;
-                            if (directionMode == SourceSpawnDirectionModeId.NWay && validationEntry.RawNWayCount < 2)
+                            var shotPatternMode = snapshot.ShotPatternMode;
+                            if (shotPatternMode == WaveShotPatternModeId.NWay && validationEntry.RawShotCount < 2)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV023",
                                     validationEntry.EntryLocation,
-                                    $"Clip segment uses NWay with NWayCount < 2 at segmentIndex={s}, entryIndex={e}."));
+                                    $"Clip segment uses NWay ShotPattern with ShotCount < 2 at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (directionMode == SourceSpawnDirectionModeId.RadialBurst && validationEntry.RawBurstShotsPerEvent < 2)
+                            if (shotPatternMode == WaveShotPatternModeId.Radial && validationEntry.RawShotCount < 2)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Error,
                                     "CV024",
                                     validationEntry.EntryLocation,
-                                    $"Clip segment uses RadialBurst with BurstShotsPerEvent < 2 at segmentIndex={s}, entryIndex={e}."));
+                                    $"Clip segment uses Radial ShotPattern with ShotCount < 2 at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            if (directionMode == SourceSpawnDirectionModeId.Spiral && Mathf.Abs(validationEntry.RawSpiralStepDeg) < 0.0001f)
+                            var aimMode = snapshot.AimMode;
+                            if (aimMode == WaveAimModeId.Spiral && Mathf.Abs(validationEntry.RawSpiralStepDeg) < 0.0001f)
                             {
                                 issues.Add(new ContentValidationIssue(
                                     ContentValidationSeverity.Warning,
@@ -505,8 +506,18 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"Clip segment uses Spiral with near-zero SpiralStepDeg at segmentIndex={s}, entryIndex={e}."));
                             }
 
-                            var samplingMode = snapshot.SamplingMode;
-                            if (samplingMode == SourceSpawnSamplingModeId.LineEven)
+                            if (aimMode == WaveAimModeId.PlayerPosition
+                                && validationEntry.RawAimSnapshotTiming != WaveAimSnapshotTimingId.EventStart)
+                            {
+                                issues.Add(new ContentValidationIssue(
+                                    ContentValidationSeverity.Error,
+                                    "CV041",
+                                    validationEntry.EntryLocation,
+                                    $"Clip segment uses unsupported PlayerPositionAim snapshot timing at segmentIndex={s}, entryIndex={e}."));
+                            }
+
+                            var positionPatternMode = snapshot.PositionPatternMode;
+                            if (positionPatternMode == WavePositionPatternModeId.LineEven)
                             {
                                 if (validationEntry.RawLineLength <= 0f || validationEntry.RawLineSampleSpacing <= 0f)
                                 {
@@ -518,7 +529,7 @@ namespace SweepNDodge.DotsBullets.Editor
                                 }
                             }
 
-                            if (samplingMode == SourceSpawnSamplingModeId.PointSet)
+                            if (positionPatternMode == WavePositionPatternModeId.PointSet)
                             {
                                 if (validationEntry.RawPointCount <= 0)
                                 {
@@ -529,13 +540,13 @@ namespace SweepNDodge.DotsBullets.Editor
                                         $"Clip segment uses PointSet with PointCount <= 0 at segmentIndex={s}, entryIndex={e}."));
                                 }
 
-                                if (validationEntry.RawPointCount > PointSetSamplingAuthoring.MaxPointCount)
+                                if (validationEntry.RawPointCount > PointSetPositionPatternAuthoring.MaxPointCount)
                                 {
                                     issues.Add(new ContentValidationIssue(
                                         ContentValidationSeverity.Warning,
                                         "CVW033",
                                         validationEntry.EntryLocation,
-                                        $"Clip segment PointSet PointCount exceeds max({PointSetSamplingAuthoring.MaxPointCount}) and will be clamped at segmentIndex={s}, entryIndex={e}."));
+                                        $"Clip segment PointSet PointCount exceeds max({PointSetPositionPatternAuthoring.MaxPointCount}) and will be clamped at segmentIndex={s}, entryIndex={e}."));
                                 }
                             }
                         }
@@ -552,13 +563,14 @@ namespace SweepNDodge.DotsBullets.Editor
             public readonly float RawMeanEventsPerSec;
             public readonly int RawBurstRepeatCount;
             public readonly float RawBurstIntervalSec;
-            public readonly int RawBurstShotsPerEvent;
+            public readonly int RawEventRepeatCount;
             public readonly float RawEventShotIntervalSec;
             public readonly float RawMaxActiveDensityPerArea;
             public readonly int RawSpawnSampleBudget;
             public readonly float RawPlayerNoSpawnRadius;
-            public readonly int RawNWayCount;
             public readonly float RawSpiralStepDeg;
+            public readonly WaveAimSnapshotTimingId RawAimSnapshotTiming;
+            public readonly int RawShotCount;
             public readonly float RawLineLength;
             public readonly float RawLineSampleSpacing;
             public readonly int RawPointCount;
@@ -570,13 +582,14 @@ namespace SweepNDodge.DotsBullets.Editor
                 float rawMeanEventsPerSec,
                 int rawBurstRepeatCount,
                 float rawBurstIntervalSec,
-                int rawBurstShotsPerEvent,
+                int rawEventRepeatCount,
                 float rawEventShotIntervalSec,
                 float rawMaxActiveDensityPerArea,
                 int rawSpawnSampleBudget,
                 float rawPlayerNoSpawnRadius,
-                int rawNWayCount,
                 float rawSpiralStepDeg,
+                WaveAimSnapshotTimingId rawAimSnapshotTiming,
+                int rawShotCount,
                 float rawLineLength,
                 float rawLineSampleSpacing,
                 int rawPointCount)
@@ -587,13 +600,14 @@ namespace SweepNDodge.DotsBullets.Editor
                 RawMeanEventsPerSec = rawMeanEventsPerSec;
                 RawBurstRepeatCount = rawBurstRepeatCount;
                 RawBurstIntervalSec = rawBurstIntervalSec;
-                RawBurstShotsPerEvent = rawBurstShotsPerEvent;
+                RawEventRepeatCount = rawEventRepeatCount;
                 RawEventShotIntervalSec = rawEventShotIntervalSec;
                 RawMaxActiveDensityPerArea = rawMaxActiveDensityPerArea;
                 RawSpawnSampleBudget = rawSpawnSampleBudget;
                 RawPlayerNoSpawnRadius = rawPlayerNoSpawnRadius;
-                RawNWayCount = rawNWayCount;
                 RawSpiralStepDeg = rawSpiralStepDeg;
+                RawAimSnapshotTiming = rawAimSnapshotTiming;
+                RawShotCount = rawShotCount;
                 RawLineLength = rawLineLength;
                 RawLineSampleSpacing = rawLineSampleSpacing;
                 RawPointCount = rawPointCount;
@@ -619,7 +633,7 @@ namespace SweepNDodge.DotsBullets.Editor
             float rawMean = 0f;
             int rawBurstRepeatCount = 1;
             float rawBurstIntervalSec = 1f;
-            int rawBurstShotsPerEvent = 1;
+            int rawEventRepeatCount = 1;
             float rawEventShotIntervalSec = 0f;
             float rawMaxActiveDensity = typedEntry.Emission.MaxActiveDensityPerArea;
             switch (typedEntry.Emission)
@@ -629,13 +643,13 @@ namespace SweepNDodge.DotsBullets.Editor
                     break;
                 case PoissonEmissionAuthoring poisson:
                     rawMean = poisson.MeanEventsPerSec;
-                    rawBurstShotsPerEvent = poisson.BurstShotsPerEvent;
+                    rawEventRepeatCount = poisson.EventRepeatCount;
                     rawEventShotIntervalSec = poisson.EventShotIntervalSec;
                     break;
                 case EventBurstEmissionAuthoring eventBurst:
                     rawBurstRepeatCount = eventBurst.BurstRepeatCount;
                     rawBurstIntervalSec = eventBurst.BurstIntervalSec;
-                    rawBurstShotsPerEvent = eventBurst.BurstShotsPerEvent;
+                    rawEventRepeatCount = eventBurst.EventRepeatCount;
                     rawEventShotIntervalSec = eventBurst.EventShotIntervalSec;
                     break;
             }
@@ -645,26 +659,37 @@ namespace SweepNDodge.DotsBullets.Editor
             float rawLineLength = 0f;
             float rawLineSampleSpacing = 0f;
             int rawPointCount = 0;
-            switch (typedEntry.Sampling)
+            switch (typedEntry.PositionPattern)
             {
-                case LineEvenSamplingAuthoring lineEven:
+                case LineEvenPositionPatternAuthoring lineEven:
                     rawLineLength = (lineEven.LineEnd - lineEven.LineStart).magnitude;
                     rawLineSampleSpacing = lineEven.SampleSpacing;
                     break;
-                case PointSetSamplingAuthoring pointSet:
+                case PointSetPositionPatternAuthoring pointSet:
                     rawPointCount = pointSet.Points?.Length ?? 0;
                     break;
             }
 
-            int rawNWayCount = 1;
+            int rawShotCount = 1;
             float rawSpiralStepDeg = 0f;
-            switch (typedEntry.Direction)
+            WaveAimSnapshotTimingId rawAimSnapshotTiming = WaveAimSnapshotTimingId.EventStart;
+            switch (typedEntry.Aim)
             {
-                case NWayDirectionAuthoring nWay:
-                    rawNWayCount = nWay.NWayCount;
-                    break;
-                case SpiralDirectionAuthoring spiral:
+                case SpiralAimAuthoring spiral:
                     rawSpiralStepDeg = spiral.SpiralStepDeg;
+                    break;
+                case PlayerPositionAimAuthoring playerPositionAim:
+                    rawAimSnapshotTiming = playerPositionAim.SnapshotTiming;
+                    break;
+            }
+
+            switch (typedEntry.ShotPattern)
+            {
+                case NWayShotPatternAuthoring nWay:
+                    rawShotCount = nWay.ShotCount;
+                    break;
+                case RadialShotPatternAuthoring radial:
+                    rawShotCount = radial.ShotCount;
                     break;
             }
 
@@ -675,13 +700,14 @@ namespace SweepNDodge.DotsBullets.Editor
                 rawMean,
                 rawBurstRepeatCount,
                 rawBurstIntervalSec,
-                rawBurstShotsPerEvent,
+                rawEventRepeatCount,
                 rawEventShotIntervalSec,
                 rawMaxActiveDensity,
                 rawSpawnSampleBudget,
                 rawPlayerNoSpawnRadius,
-                rawNWayCount,
                 rawSpiralStepDeg,
+                rawAimSnapshotTiming,
+                rawShotCount,
                 rawLineLength,
                 rawLineSampleSpacing,
                 rawPointCount);

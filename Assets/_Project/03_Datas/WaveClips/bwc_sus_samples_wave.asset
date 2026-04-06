@@ -26,9 +26,18 @@ MonoBehaviour:
       Emission:
         rid: 6141543268140187755
       Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187756
+        AreaSampler:
+          rid: 8141543268140187756
+      PositionPattern:
         rid: 6141543268140187756
-      Direction:
+      Aim:
         rid: 6141543268140187757
+      ShotPattern:
+        rid: 9141543268140187757
   - editorOnlyDescription: 
     StartSec: 2
     EndSec: 3
@@ -38,9 +47,18 @@ MonoBehaviour:
       Emission:
         rid: 6141543268140187758
       Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187759
+        AreaSampler:
+          rid: 8141543268140187759
+      PositionPattern:
         rid: 6141543268140187759
-      Direction:
+      Aim:
         rid: 6141543268140187760
+      ShotPattern:
+        rid: 9141543268140187760
   - editorOnlyDescription: 
     StartSec: 4
     EndSec: 5
@@ -50,9 +68,18 @@ MonoBehaviour:
       Emission:
         rid: 6141543268140187761
       Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187762
+        AreaSampler:
+          rid: 8141543268140187762
+      PositionPattern:
         rid: 6141543268140187762
-      Direction:
+      Aim:
         rid: 6141543268140187763
+      ShotPattern:
+        rid: 9141543268140187763
   references:
     version: 2
     RefIds:
@@ -63,24 +90,28 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 1
         BurstIntervalSec: 1
-        BurstShotsPerEvent: 3
+        EventRepeatCount: 3
         EventShotSchedule: 1
         EventShotIntervalSec: 0.15
     - rid: 6141543268140187756
-      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        CenterMode: 0
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 0
-        PlayerNoSpawnRadius: 0
         Points:
         - {x: 0, y: 0}
+    - rid: 7141543268140187756
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
+    - rid: 8141543268140187756
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187757
-      type: {class: SpiralDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: SpiralAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 0
         SpiralStepDeg: 30
+    - rid: 9141543268140187757
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187758
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -88,24 +119,28 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 1
         BurstIntervalSec: 1
-        BurstShotsPerEvent: 3
+        EventRepeatCount: 3
         EventShotSchedule: 1
         EventShotIntervalSec: 0.15
     - rid: 6141543268140187759
-      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        CenterMode: 0
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 0
-        PlayerNoSpawnRadius: 0
         Points:
         - {x: 0, y: 0}
+    - rid: 7141543268140187759
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
+    - rid: 8141543268140187759
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187760
-      type: {class: SpiralDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: SpiralAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 90
         SpiralStepDeg: 30
+    - rid: 9141543268140187760
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187761
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -113,21 +148,25 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 1
         BurstIntervalSec: 1
-        BurstShotsPerEvent: 3
+        EventRepeatCount: 3
         EventShotSchedule: 1
         EventShotIntervalSec: 0.15
     - rid: 6141543268140187762
-      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        CenterMode: 0
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 0
-        PlayerNoSpawnRadius: 0
         Points:
         - {x: 0, y: 0}
+    - rid: 7141543268140187762
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
+    - rid: 8141543268140187762
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187763
-      type: {class: SpiralDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: SpiralAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 180
         SpiralStepDeg: 30
+    - rid: 9141543268140187763
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}

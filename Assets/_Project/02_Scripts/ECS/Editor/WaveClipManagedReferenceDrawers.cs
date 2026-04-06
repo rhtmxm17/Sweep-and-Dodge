@@ -128,8 +128,11 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             string name = type.Name;
             name = name.Replace("EmissionAuthoring", string.Empty);
-            name = name.Replace("SamplingAuthoring", string.Empty);
-            name = name.Replace("DirectionAuthoring", string.Empty);
+            name = name.Replace("SamplingAnchorAuthoring", string.Empty);
+            name = name.Replace("AreaSamplerAuthoring", string.Empty);
+            name = name.Replace("PositionPatternAuthoring", string.Empty);
+            name = name.Replace("ShotPatternAuthoring", string.Empty);
+            name = name.Replace("AimAuthoring", string.Empty);
             name = name.Replace("Authoring", string.Empty);
             return ObjectNames.NicifyVariableName(name);
         }
@@ -159,30 +162,67 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 
-    [CustomPropertyDrawer(typeof(WaveSamplingAuthoringBase), true)]
-    internal sealed class WaveSamplingAuthoringDrawer : WaveManagedReferenceDrawerBase
+    [CustomPropertyDrawer(typeof(WaveSamplingAnchorAuthoringBase), true)]
+    internal sealed class WaveSamplingAnchorAuthoringDrawer : WaveManagedReferenceDrawerBase
     {
         private static readonly Type[] Types =
         {
-            typeof(UniformFieldSamplingAuthoring),
-            typeof(PollutionTopKSamplingAuthoring),
-            typeof(LineEvenSamplingAuthoring),
-            typeof(PointSetSamplingAuthoring),
+            typeof(SourceCenterSamplingAnchorAuthoring),
+            typeof(FixedPointSamplingAnchorAuthoring),
+            typeof(PlayerRelativeSamplingAnchorAuthoring),
         };
 
         protected override Type[] ConcreteTypes => Types;
     }
 
-    [CustomPropertyDrawer(typeof(WaveDirectionAuthoringBase), true)]
-    internal sealed class WaveDirectionAuthoringDrawer : WaveManagedReferenceDrawerBase
+    [CustomPropertyDrawer(typeof(WaveAreaSamplerAuthoringBase), true)]
+    internal sealed class WaveAreaSamplerAuthoringDrawer : WaveManagedReferenceDrawerBase
     {
         private static readonly Type[] Types =
         {
-            typeof(RandomDirectionAuthoring),
-            typeof(FixedDirectionAuthoring),
-            typeof(NWayDirectionAuthoring),
-            typeof(SpiralDirectionAuthoring),
-            typeof(RadialBurstDirectionAuthoring),
+            typeof(CenterPointAreaSamplerAuthoring),
+            typeof(UniformFieldAreaSamplerAuthoring),
+            typeof(PollutionTopKAreaSamplerAuthoring),
+        };
+
+        protected override Type[] ConcreteTypes => Types;
+    }
+
+    [CustomPropertyDrawer(typeof(WavePositionPatternAuthoringBase), true)]
+    internal sealed class WavePositionPatternAuthoringDrawer : WaveManagedReferenceDrawerBase
+    {
+        private static readonly Type[] Types =
+        {
+            typeof(SinglePointPositionPatternAuthoring),
+            typeof(LineEvenPositionPatternAuthoring),
+            typeof(PointSetPositionPatternAuthoring),
+        };
+
+        protected override Type[] ConcreteTypes => Types;
+    }
+
+    [CustomPropertyDrawer(typeof(WaveAimAuthoringBase), true)]
+    internal sealed class WaveAimAuthoringDrawer : WaveManagedReferenceDrawerBase
+    {
+        private static readonly Type[] Types =
+        {
+            typeof(RandomAimAuthoring),
+            typeof(FixedAimAuthoring),
+            typeof(SpiralAimAuthoring),
+            typeof(PlayerPositionAimAuthoring),
+        };
+
+        protected override Type[] ConcreteTypes => Types;
+    }
+
+    [CustomPropertyDrawer(typeof(WaveShotPatternAuthoringBase), true)]
+    internal sealed class WaveShotPatternAuthoringDrawer : WaveManagedReferenceDrawerBase
+    {
+        private static readonly Type[] Types =
+        {
+            typeof(SingleShotPatternAuthoring),
+            typeof(NWayShotPatternAuthoring),
+            typeof(RadialShotPatternAuthoring),
         };
 
         protected override Type[] ConcreteTypes => Types;

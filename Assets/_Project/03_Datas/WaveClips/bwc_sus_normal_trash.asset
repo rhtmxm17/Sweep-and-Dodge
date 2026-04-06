@@ -27,9 +27,18 @@ MonoBehaviour:
       Emission:
         rid: 6141543268140187725
       Sampling:
-        rid: 6141543268140187726
-      Direction:
+        SpawnSampleBudget: 16
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187726
+        AreaSampler:
+          rid: 6141543268140187726
+      PositionPattern:
+        rid: 8141543268140187726
+      Aim:
         rid: 6141543268140187727
+      ShotPattern:
+        rid: 9141543268140187727
   references:
     version: 2
     RefIds:
@@ -40,13 +49,17 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         RatePerSecPerArea: 10
     - rid: 6141543268140187726
-      type: {class: PollutionTopKSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        CenterMode: 0
-        FixedPoint: {x: 0, y: 0}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 16
-        PlayerNoSpawnRadius: 0
+      type: {class: PollutionTopKAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
+    - rid: 7141543268140187726
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
+    - rid: 8141543268140187726
+      type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187727
-      type: {class: RandomDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: 
+      type: {class: RandomAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
+    - rid: 9141543268140187727
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
