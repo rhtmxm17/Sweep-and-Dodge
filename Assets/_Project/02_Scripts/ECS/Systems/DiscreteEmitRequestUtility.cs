@@ -1,0 +1,96 @@
+using Unity.Entities;
+using Unity.Mathematics;
+
+namespace SweepNDodge.DotsBullets
+{
+    public struct DiscreteEmitRequestSeed
+    {
+        public DiscreteEmitProducerKind ProducerKind;
+        public Entity SourceEntity;
+        public Entity ProducerEntity;
+        public int EmissionId;
+        public int BulletTypeKey;
+
+        public DiscreteEmitAnchorMode AnchorMode;
+        public Entity AnchorEntity;
+        public float3 AnchorPosition;
+        public float3 AnchorLocalOffset;
+
+        public WavePositionPatternModeId PositionPatternMode;
+        public float2 SpawnOffset;
+        public float2 LineStart;
+        public float2 LineEnd;
+        public float SampleSpacing;
+        public int PointSetCount;
+        public float2 Point0;
+        public float2 Point1;
+        public float2 Point2;
+        public float2 Point3;
+
+        public WaveAimModeId AimMode;
+        public WaveAimSnapshotTimingId AimSnapshotTiming;
+        public float BaseAngleDeg;
+        public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
+        public float SpiralStepDeg;
+
+        public WaveShotPatternModeId ShotPatternMode;
+        public int ShotCount;
+        public float NWayAngleSpacingDeg;
+
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        public float EventShotIntervalSec;
+        public int RepeatCount;
+
+        public byte Priority;
+    }
+
+    public static class DiscreteEmitRequestUtility
+    {
+        public static DiscreteEmitRequestBuffer CreateDiscreteEmitRequest(in DiscreteEmitRequestSeed seed, uint frame)
+        {
+            return new DiscreteEmitRequestBuffer
+            {
+                ProducerKind = seed.ProducerKind,
+                SourceEntity = seed.SourceEntity,
+                ProducerEntity = seed.ProducerEntity,
+                EmissionId = seed.EmissionId,
+                BulletTypeKey = seed.BulletTypeKey,
+                AnchorMode = seed.AnchorMode,
+                AnchorEntity = seed.AnchorEntity,
+                AnchorPosition = seed.AnchorPosition,
+                AnchorLocalOffset = seed.AnchorLocalOffset,
+                PositionPatternMode = seed.PositionPatternMode,
+                SpawnOffset = seed.SpawnOffset,
+                LineStart = seed.LineStart,
+                LineEnd = seed.LineEnd,
+                SampleSpacing = seed.SampleSpacing,
+                PointSetCount = math.clamp(seed.PointSetCount, 0, 4),
+                Point0 = seed.Point0,
+                Point1 = seed.Point1,
+                Point2 = seed.Point2,
+                Point3 = seed.Point3,
+                AimMode = seed.AimMode,
+                AimSnapshotTiming = seed.AimSnapshotTiming,
+                BaseAngleDeg = seed.BaseAngleDeg,
+                AimAngleOffsetDeg = seed.AimAngleOffsetDeg,
+                LineNormalSide = seed.LineNormalSide,
+                LineNormalAngleOffsetDeg = seed.LineNormalAngleOffsetDeg,
+                SpiralStepDeg = seed.SpiralStepDeg,
+                ShotPatternMode = seed.ShotPatternMode,
+                ShotCount = math.max(1, seed.ShotCount),
+                NWayAngleSpacingDeg = seed.NWayAngleSpacingDeg,
+                EventShotSchedule = seed.EventShotSchedule,
+                EventShotIntervalSec = math.max(0f, seed.EventShotIntervalSec),
+                RemainingRepeats = math.max(1, seed.RepeatCount),
+                RepeatSequence = 0u,
+                EventAimInitialized = 0,
+                EventAimTargetPosition = float3.zero,
+                EventShotElapsedSec = 0f,
+                Priority = seed.Priority,
+                OldestFrame = frame,
+            };
+        }
+    }
+}

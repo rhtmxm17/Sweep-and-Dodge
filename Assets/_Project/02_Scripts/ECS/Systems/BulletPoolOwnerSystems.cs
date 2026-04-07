@@ -212,6 +212,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             EnsureSecondarySpawnRuntimeSingleton(em);
+            EnsureDiscreteEmitRuntimeSingleton(em);
 
             if (!HasSingleton<RunProgressDirectorConfigComponent>(em))
             {
@@ -406,6 +407,36 @@ namespace SweepNDodge.DotsBullets
 
             if (!em.HasComponent<SecondarySpawnBacklogMetricsComponent>(singletonEntity))
                 em.AddComponentData(singletonEntity, default(SecondarySpawnBacklogMetricsComponent));
+        }
+
+        private static void EnsureDiscreteEmitRuntimeSingleton(EntityManager em)
+        {
+            Entity singletonEntity;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<DiscreteEmitChannelSingletonTag>()))
+            {
+                singletonEntity = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(DiscreteEmitChannelSingletonTag))
+                    : query.GetSingletonEntity();
+            }
+
+            if (!em.HasBuffer<DiscreteEmitRequestBuffer>(singletonEntity))
+            {
+                var buffer = em.AddBuffer<DiscreteEmitRequestBuffer>(singletonEntity);
+                buffer.EnsureCapacity(32);
+            }
+
+            if (!em.HasComponent<DiscreteEmitPolicyComponent>(singletonEntity))
+            {
+                em.AddComponentData(singletonEntity, new DiscreteEmitPolicyComponent
+                {
+                    BudgetPerFrame = 256,
+                    MaxPendingCount = 8192,
+                    MaxPendingAgeFrames = 120,
+                });
+            }
+
+            if (!em.HasComponent<DiscreteEmitBacklogMetricsComponent>(singletonEntity))
+                em.AddComponentData(singletonEntity, default(DiscreteEmitBacklogMetricsComponent));
         }
 
         private static void ApplyDefinitionBehaviorComponents(EntityManager em, Entity bullet, in BulletPoolDefinitionBuffer def)

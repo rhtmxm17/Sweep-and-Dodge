@@ -25,14 +25,11 @@
 - 이번 세션에서 하지 않을 것: 스테이지별 실배치 확정, 수치 밸런싱 확정, `RotatingSet coordinator` owner 최종 확정, `AnchorRef` wire shape 최종 확정, `SourceRelative` consume semantics 구현 완료
 
 ## Now
-- [ ] Plan A. `DiscreteEmit` schema/channel skeleton
-  - 완료 기준: `DiscreteEmitRequestBuffer`, channel singleton, seed/helper seam, 최소 metrics/budget config type의 코드 진입점이 추가된다.
-  - 검증: compile, console error 0, EditMode request 기본값/anchor mode contract 테스트
-
-## Next
 - [ ] Plan B. source discrete branch extraction
   - 완료 기준: `EventBurst + Poisson` discrete branch가 `SourceClipDiscreteEmitBuildSystem`로 분리되고, sustain/ratefield는 기존 source path에 남는다.
   - 검증: compile, console error 0, existing source event regression EditMode, PlayMode smoke
+
+## Next
 - [ ] Plan C. `DiscreteEmitExecutionSystem` 도입
   - 완료 기준: `DiscreteEmitRequestBuffer` consumer, arbitration, repeat atomic consume, budget gate가 `ExecutionBegin` 경계에 도입된다.
   - 검증: compile, console error 0, EditMode repeat consume/no-merge/budget defer 테스트, PlayMode smoke
@@ -79,8 +76,14 @@
     - `Plan D` `HazardEmitter` runtime path 연결
     - `Plan E` integration/metrics/문서 마감
     로 선후 관계와 검증 루프가 정리됐다.
+- [x] D10. Plan A. `DiscreteEmit` schema/channel skeleton을 구현하고 검증했다.
+  - 검증 결과:
+    - `DiscreteEmitRequestBuffer`, `DiscreteEmitPolicyComponent`, `DiscreteEmitBacklogMetricsComponent`, `DiscreteEmitChannelSingletonTag`가 runtime schema에 추가됐다.
+    - `DiscreteEmitRequestSeed`와 `CreateDiscreteEmitRequest(in DiscreteEmitRequestSeed seed, uint frame)` helper가 추가됐다.
+    - `BulletPoolOwnerBootstrapSystem`가 `DiscreteEmit` singleton buffer/policy/metrics를 보장하도록 확장됐다.
+    - `EditMode 442/442`, `PlayMode 43/43`, console error 0을 통과했다.
 
 ## End of Session
 - 결과: 진행 중
 - 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics는 후속 확정이 필요하다.
-- 다음 세션 시작점: `Plan A` `DiscreteEmit` schema/channel skeleton 구현 세션 착수
+- 다음 세션 시작점: `Plan B` source discrete branch extraction 구현 세션 착수
