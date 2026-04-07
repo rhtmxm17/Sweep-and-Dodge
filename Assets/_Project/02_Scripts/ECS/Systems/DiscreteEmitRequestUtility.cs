@@ -93,6 +93,52 @@ namespace SweepNDodge.DotsBullets
             };
         }
 
+        public static DiscreteEmitRequestSeed BuildDiscreteEmitSeedFromEmitter(
+            Entity sourceEntity,
+            Entity emitterEntity,
+            int emissionId,
+            in HazardEmitterEmissionProfileComponent emissionProfile,
+            float3 resolvedAnchorPosition,
+            byte priority)
+        {
+            return new DiscreteEmitRequestSeed
+            {
+                ProducerKind = DiscreteEmitProducerKind.HazardEmitter,
+                SourceEntity = sourceEntity,
+                ProducerEntity = emitterEntity,
+                EmissionId = emissionId,
+                BulletTypeKey = emissionProfile.BulletTypeKey,
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorEntity = emitterEntity,
+                AnchorPosition = resolvedAnchorPosition,
+                AnchorLocalOffset = float3.zero,
+                PositionPatternMode = emissionProfile.PositionPatternMode,
+                SpawnOffset = emissionProfile.SpawnOffset,
+                LineStart = emissionProfile.LineStart,
+                LineEnd = emissionProfile.LineEnd,
+                SampleSpacing = emissionProfile.SampleSpacing,
+                PointSetCount = emissionProfile.PointSetCount,
+                Point0 = emissionProfile.Point0,
+                Point1 = emissionProfile.Point1,
+                Point2 = emissionProfile.Point2,
+                Point3 = emissionProfile.Point3,
+                AimMode = emissionProfile.AimMode,
+                AimSnapshotTiming = emissionProfile.AimSnapshotTiming,
+                BaseAngleDeg = emissionProfile.BaseAngleDeg,
+                AimAngleOffsetDeg = emissionProfile.AimAngleOffsetDeg,
+                LineNormalSide = emissionProfile.LineNormalSide,
+                LineNormalAngleOffsetDeg = emissionProfile.LineNormalAngleOffsetDeg,
+                SpiralStepDeg = emissionProfile.SpiralStepDeg,
+                ShotPatternMode = emissionProfile.ShotPatternMode,
+                ShotCount = emissionProfile.ShotCount,
+                NWayAngleSpacingDeg = emissionProfile.NWayAngleSpacingDeg,
+                EventShotSchedule = emissionProfile.EventShotSchedule,
+                EventShotIntervalSec = emissionProfile.EventShotIntervalSec,
+                RepeatCount = emissionProfile.EventRepeatCount,
+                Priority = priority,
+            };
+        }
+
         public static DiscreteEmitRequestBuffer CreateDiscreteEmitRequest(in DiscreteEmitRequestSeed seed, uint frame)
         {
             return new DiscreteEmitRequestBuffer
