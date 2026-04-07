@@ -9,6 +9,7 @@
   - [GD-002-source-based-spawn-and-depletion.md](./GD-002-source-based-spawn-and-depletion.md)
   - [GD-003-stage-cleaning-route-mvp.md](./GD-003-stage-cleaning-route-mvp.md)
   - [GD-006-hazard-conditional-capture-system.md](./GD-006-hazard-conditional-capture-system.md)
+  - [../TechnicalDesign/TD-028-hazard-emitter-common-contract.md](../TechnicalDesign/TD-028-hazard-emitter-common-contract.md)
 
 > `Source`를 "청소 대상이자 오염을 생성하는 방"으로 두고, `Hazard`는 방 내부의 개별 발화점 `HazardEmitter`를 중심으로 발생시켜 플레이어가 위험의 원인, 전조, 진입 타이밍을 읽게 만드는 방향 문서.
 
