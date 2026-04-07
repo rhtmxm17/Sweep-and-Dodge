@@ -261,6 +261,134 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertRequestCount(em, source, 4);
         }
 
+        [Test]
+        public void SourceClipDiscreteEmitBuild_QueuesEventAndStartsClip_OnStateChange()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipDiscreteEmitBuildWorld_StateChange", out _);
+            var em = world.EntityManager;
+            var discreteSystem = world.GetOrCreateSystem<SourceClipDiscreteEmitBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(em);
+            AppendEventPattern(em, source, triggerState: SourceStateId.Weakened);
+            SetSelectedClipState(em, source, SourceStateId.Weakened);
+
+            world.SetTime(new TimeData(1d, 1f));
+            discreteSystem.Update(world.Unmanaged);
+
+            var sustainRuntime = em.GetComponentData<SourceSustainRuntimeComponent>(source);
+            var eventRuntime = em.GetComponentData<SourceEventRuntimeComponent>(source);
+            var eventQueue = em.GetBuffer<SourceEventQueueBuffer>(source);
+
+            Assert.That(sustainRuntime.ActiveState, Is.EqualTo(SourceStateId.Weakened));
+            Assert.That(eventQueue.Length, Is.EqualTo(0));
+            Assert.That(eventRuntime.IsPlaying, Is.EqualTo(1));
+            Assert.That(eventRuntime.ActiveEventClipId, Is.EqualTo(20));
+            Assert.That(eventRuntime.TriggerState, Is.EqualTo(SourceStateId.Weakened));
+        }
+
+        [Test]
+        public void SourceClipDiscreteEmitBuild_StopsSustainAndRemovesSustainPendingRequests_WhenEventStarts()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipDiscreteEmitBuildWorld_StopSustain", out _);
+            var em = world.EntityManager;
+            var discreteSystem = world.GetOrCreateSystem<SourceClipDiscreteEmitBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(em);
+            AppendEventPattern(em, source, triggerState: SourceStateId.Weakened);
+            SetSelectedClipState(em, source, SourceStateId.Weakened);
+            SetSustainLaneActive(em, source, clipId: 10, elapsedSec: 0.5f);
+            AddPendingSustainRequest(em, source, count: 3);
+
+            world.SetTime(new TimeData(1d, 1f));
+            discreteSystem.Update(world.Unmanaged);
+
+            var sustainLane = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source)[0];
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+
+            Assert.That(sustainLane.ActiveClipId, Is.EqualTo(0));
+            Assert.That(sustainLane.LastClipId, Is.EqualTo(10));
+            Assert.That(CountPendingRequestsInPhase(requests, SourceWavePhaseId.Sustain), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SourceClipRequestBuild_SkipsSustainWhileEventRuntimeIsPlaying()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_SkipSustainWhileEvent", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(em);
+
+            em.SetComponentData(source, new SourceEventRuntimeComponent
+            {
+                IsPlaying = 1,
+                ActiveEventClipId = 20,
+                TriggerState = SourceStateId.Normal,
+                ElapsedSec = 0f,
+                SelectionSequence = 1u,
+            });
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+
+            var sustainLane = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source)[0];
+            Assert.That(sustainLane.ActiveClipId, Is.EqualTo(0));
+            AssertPendingCount(em, source, 0);
+        }
+
+        [Test]
+        public void SourceClipDiscreteEmitBuild_EventBurst_StillProducesLegacySourceSpawnRequests()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipDiscreteEmitBuildWorld_EventBurstCompat", out _);
+            var em = world.EntityManager;
+            var discreteSystem = world.GetOrCreateSystem<SourceClipDiscreteEmitBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(em);
+            AppendEventPattern(
+                em,
+                source,
+                triggerState: SourceStateId.Weakened,
+                emissionMode: SourceSpawnEmissionModeId.EventBurst,
+                burstIntervalSec: 1f,
+                burstRepeatCount: 1);
+            SetSelectedClipState(em, source, SourceStateId.Weakened);
+
+            world.SetTime(new TimeData(1d, 1f));
+            discreteSystem.Update(world.Unmanaged);
+
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            Assert.That(CountPendingRequestsInPhase(requests, SourceWavePhaseId.OnStateEnterOnce), Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void SourceClipDiscreteEmitBuild_Poisson_StillProducesLegacySourceSpawnRequests()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipDiscreteEmitBuildWorld_PoissonCompat", out _);
+            var em = world.EntityManager;
+            var discreteSystem = world.GetOrCreateSystem<SourceClipDiscreteEmitBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(em);
+            AppendEventPattern(
+                em,
+                source,
+                triggerState: SourceStateId.Weakened,
+                emissionMode: SourceSpawnEmissionModeId.Poisson,
+                meanEventsPerSec: 1000f,
+                burstRepeatCount: 0);
+            SetSelectedClipState(em, source, SourceStateId.Weakened);
+
+            world.SetTime(new TimeData(1d, 1f));
+            discreteSystem.Update(world.Unmanaged);
+
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            Assert.That(CountPendingRequestsInPhase(requests, SourceWavePhaseId.OnStateEnterOnce), Is.GreaterThan(0));
+        }
+
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
         {
             var world = new World(worldName);
@@ -481,6 +609,92 @@ namespace SweepNDodge.DotsBullets.Tests
             return entity;
         }
 
+        private static void SetSelectedClipState(EntityManager em, Entity source, SourceStateId selectedClipState)
+        {
+            var directorState = em.GetComponentData<SourceRunDirectorStateComponent>(source);
+            directorState.SelectedClipState = selectedClipState;
+            directorState.Version += 1u;
+            em.SetComponentData(source, directorState);
+        }
+
+        private static void AppendEventPattern(
+            EntityManager em,
+            Entity source,
+            SourceStateId triggerState,
+            SourceSpawnEmissionModeId emissionMode = SourceSpawnEmissionModeId.EventBurst,
+            SourceSpawnModeId spawnMode = SourceSpawnModeId.FixedDensity,
+            float meanEventsPerSec = 0f,
+            float burstIntervalSec = 1f,
+            int eventRepeatCount = 1,
+            int burstRepeatCount = 1,
+            float localStartSec = 0f,
+            float localEndSec = 10f,
+            float clipDurationSec = 10f)
+        {
+            var clipPatterns = em.GetBuffer<SourceClipPatternBuffer>(source);
+            clipPatterns.Add(new SourceClipPatternBuffer
+            {
+                DirectiveId = 2,
+                ClipId = 20,
+                ClipDurationSec = clipDurationSec,
+                Phase = SourceWavePhaseId.OnStateEnterOnce,
+                Lane = SourceSpawnLaneId.Hazard,
+                TriggerState = triggerState,
+                LocalStartSec = localStartSec,
+                LocalEndSec = localEndSec,
+                BulletTypeKey = 101,
+                EmissionMode = emissionMode,
+                SpawnMode = spawnMode,
+                SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                AimAngleOffsetDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                LineNormalAngleOffsetDeg = 0f,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                NWayAngleSpacingDeg = 0f,
+                EventRepeatCount = eventRepeatCount,
+                SampleSpacing = 1f,
+                SpawnSampleBudget = 16,
+                SpawnDensityPerSecPerArea = 0f,
+                MeanEventsPerSec = meanEventsPerSec,
+                BurstIntervalSec = burstIntervalSec,
+                BurstRepeatCount = burstRepeatCount,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                EventShotIntervalSec = 0f,
+                LanePriority = 1,
+                MaxActiveDensityPerArea = 0f,
+                SpawnAccumulator = 0f,
+                BurstEventsEmitted = 0,
+            });
+        }
+
+        private static void SetSustainLaneActive(EntityManager em, Entity source, int clipId, float elapsedSec)
+        {
+            var sustainLanes = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source);
+            var lane = sustainLanes[0];
+            lane.ActiveClipId = clipId;
+            lane.ElapsedSec = elapsedSec;
+            sustainLanes[0] = lane;
+        }
+
+        private static void AddPendingSustainRequest(EntityManager em, Entity source, int count)
+        {
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            requests.Add(new SourceSpawnRequestBuffer
+            {
+                DirectiveId = 1,
+                Phase = SourceWavePhaseId.Sustain,
+                Lane = SourceSpawnLaneId.Hazard,
+                BulletTypeKey = 101,
+                Count = count,
+                OldestFrame = 1u,
+            });
+        }
+
         private static void AttachPollutionCells(
             EntityManager em,
             Entity source,
@@ -593,6 +807,12 @@ namespace SweepNDodge.DotsBullets.Tests
         private static void AssertPendingCount(EntityManager em, Entity source, int expectedCount)
         {
             var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            int pendingCount = CountPendingRequests(requests);
+            Assert.That(pendingCount, Is.EqualTo(expectedCount));
+        }
+
+        private static int CountPendingRequests(DynamicBuffer<SourceSpawnRequestBuffer> requests)
+        {
             int pendingCount = 0;
             for (int i = 0; i < requests.Length; i++)
             {
@@ -602,7 +822,23 @@ namespace SweepNDodge.DotsBullets.Tests
                 pendingCount += requests[i].Count;
             }
 
-            Assert.That(pendingCount, Is.EqualTo(expectedCount));
+            return pendingCount;
+        }
+
+        private static int CountPendingRequestsInPhase(
+            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            SourceWavePhaseId phase)
+        {
+            int pendingCount = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                if (requests[i].Count <= 0 || requests[i].Phase != phase)
+                    continue;
+
+                pendingCount += requests[i].Count;
+            }
+
+            return pendingCount;
         }
     }
 }
