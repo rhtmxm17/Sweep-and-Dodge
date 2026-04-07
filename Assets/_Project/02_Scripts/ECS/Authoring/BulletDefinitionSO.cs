@@ -12,6 +12,7 @@ namespace SweepNDodge.DotsBullets
         public BulletSecondarySpawnShapeId Shape;
         public float SpreadAngleDeg;
         public float SpawnRadius;
+        public float SpawnDelaySec;
     }
 
     [CreateAssetMenu(menuName = "SweepNDodge/Bullet/Bullet Definition", fileName = "bd_")]
@@ -55,6 +56,7 @@ namespace SweepNDodge.DotsBullets
             Shape = BulletSecondarySpawnShapeId.PointBurst,
             SpreadAngleDeg = 90f,
             SpawnRadius = 0f,
+            SpawnDelaySec = 0f,
         };
         [FormerlySerializedAs("OnCollectedSpawnSecondary")]
         public BulletSecondarySpawnReactionDefinition OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
@@ -65,6 +67,7 @@ namespace SweepNDodge.DotsBullets
             Shape = BulletSecondarySpawnShapeId.PointBurst,
             SpreadAngleDeg = 90f,
             SpawnRadius = 0f,
+            SpawnDelaySec = 0f,
         };
 
 #if UNITY_EDITOR

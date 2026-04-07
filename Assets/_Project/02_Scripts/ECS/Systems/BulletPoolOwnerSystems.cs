@@ -448,6 +448,7 @@ namespace SweepNDodge.DotsBullets
                     Shape = reaction.Shape,
                     SpreadAngleDeg = reaction.SpreadAngleDeg,
                     SpawnRadius = reaction.SpawnRadius,
+                    SpawnDelaySec = reaction.SpawnDelaySec,
                 });
 
             ApplyReactionComponent(
@@ -461,6 +462,7 @@ namespace SweepNDodge.DotsBullets
                     Shape = reaction.Shape,
                     SpreadAngleDeg = reaction.SpreadAngleDeg,
                     SpawnRadius = reaction.SpawnRadius,
+                    SpawnDelaySec = reaction.SpawnDelaySec,
                 });
         }
 

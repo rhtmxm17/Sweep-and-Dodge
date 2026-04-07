@@ -66,6 +66,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 .GetSingleton<SecondarySpawnBacklogMetricsComponent>();
             Assert.That(metrics.PendingCount, Is.EqualTo(0));
             Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(0));
+            Assert.That(metrics.DeferredByDelay, Is.EqualTo(0));
             Assert.That(metrics.DeferredByBudget, Is.EqualTo(0));
             Assert.That(metrics.DeferredByPool, Is.EqualTo(0));
         }
@@ -263,10 +264,67 @@ namespace SweepNDodge.DotsBullets.Tests
 
             Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(2));
             Assert.That(metrics.PendingCount, Is.EqualTo(2));
+            Assert.That(metrics.DeferredByDelay, Is.EqualTo(0));
             Assert.That(metrics.DeferredByBudget, Is.EqualTo(2));
             Assert.That(remaining.Length, Is.EqualTo(1));
             Assert.That(remaining[0].Count, Is.EqualTo(2));
             Assert.That(remaining[0].Sequence, Is.EqualTo(2u));
+        }
+
+        [Test]
+        public void SecondarySpawnExecution_ReadyFrameDefersRequestsWithoutSpendingBudget()
+        {
+            using var world = new World("SecondarySpawn_ReadyFrameDelay");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 14u);
+            var channelEntity = CreateSecondaryChannel(em, budgetPerFrame: 2, maxPendingCount: 16, maxPendingAgeFrames: 30);
+            for (int i = 0; i < 3; i++)
+            {
+                var bullet = CreatePooledBullet(em, 61, 2f, 5f);
+                BulletFieldShared.FreeByKey.Add(61, bullet);
+            }
+
+            var requests = em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity);
+            requests.Add(new BulletSecondarySpawnRequestBuffer
+            {
+                BulletTypeKey = 61,
+                Count = 3,
+                Priority = 0,
+                SourceEntity = Entity.Null,
+                CauserEntity = Entity.Null,
+                OriginPosition = float3.zero,
+                BaseDirection = new float2(1f, 0f),
+                SpreadAngleDeg = 0f,
+                SpawnRadius = 0f,
+                Shape = BulletSecondarySpawnShapeId.SingleForward,
+                OldestFrame = 14u,
+                ReadyFrame = 15u,
+                Sequence = 0u,
+            });
+
+            world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            var metrics = em.CreateEntityQuery(ComponentType.ReadOnly<SecondarySpawnBacklogMetricsComponent>())
+                .GetSingleton<SecondarySpawnBacklogMetricsComponent>();
+            Assert.That(metrics.PendingCount, Is.EqualTo(3));
+            Assert.That(metrics.DeferredByDelay, Is.EqualTo(3));
+            Assert.That(metrics.DeferredByBudget, Is.EqualTo(0));
+            Assert.That(metrics.DeferredByPool, Is.EqualTo(0));
+            Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(0));
+
+            CreateFrameCounterValue(em, 15u);
+            world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            metrics = em.CreateEntityQuery(ComponentType.ReadOnly<SecondarySpawnBacklogMetricsComponent>())
+                .GetSingleton<SecondarySpawnBacklogMetricsComponent>();
+            Assert.That(metrics.PendingCount, Is.EqualTo(1));
+            Assert.That(metrics.DeferredByDelay, Is.EqualTo(0));
+            Assert.That(metrics.DeferredByBudget, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(2));
         }
 
         [Test]
@@ -359,6 +417,12 @@ namespace SweepNDodge.DotsBullets.Tests
         private static void CreateFrameCounter(EntityManager em, uint frame)
         {
             var entity = em.CreateEntity(typeof(BulletFrameCounterComponent));
+            em.SetComponentData(entity, new BulletFrameCounterComponent { Value = frame });
+        }
+
+        private static void CreateFrameCounterValue(EntityManager em, uint frame)
+        {
+            var entity = em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>()).GetSingletonEntity();
             em.SetComponentData(entity, new BulletFrameCounterComponent { Value = frame });
         }
 

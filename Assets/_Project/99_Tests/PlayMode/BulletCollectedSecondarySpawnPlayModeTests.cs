@@ -51,6 +51,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         Shape = BulletSecondarySpawnShapeId.PointBurst,
                         SpreadAngleDeg = 0f,
                         SpawnRadius = 1f,
+                        SpawnDelaySec = 0f,
                     });
 
                 var secondaryBullets = new Entity[2];
@@ -66,6 +67,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletDespawnExecutionSystem>().Update(world.Unmanaged);
+                AdvanceFrame(em);
                 world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();
 
@@ -125,6 +127,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         Shape = BulletSecondarySpawnShapeId.PointBurst,
                         SpreadAngleDeg = 0f,
                         SpawnRadius = 1f,
+                        SpawnDelaySec = 0f,
                     });
 
                 var secondaryBullets = new Entity[2];
@@ -140,6 +143,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletDespawnExecutionSystem>().Update(world.Unmanaged);
+                AdvanceFrame(em);
                 world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();
 
@@ -167,7 +171,113 @@ namespace SweepNDodge.DotsBullets.Tests
             yield break;
         }
 
-        private static void SetSimulationAndVacuumPrerequisites(EntityManager em, uint frame)
+        [UnityTest]
+        public IEnumerator PlayMode_DelayedCleanupRemovedSecondary_SurvivesUntilReadyFrame_ThenBecomesCleanupTarget()
+        {
+            ForceDisposeSharedContainersIfNeeded();
+            InitializeSharedContainers();
+
+            try
+            {
+                using var world = new World("PlayMode_DelayedCleanupRemovedSecondary");
+                var em = world.EntityManager;
+
+                SetSimulationAndVacuumPrerequisites(em, frame: 1u, deltaTime: 1f / 60f);
+                SetGameplayReadySingletons(em);
+                SetRuntimeGrid(em, new[] { StageCellMovementFlags.None });
+                CreateCombatChannel(em);
+                CreateSecondaryChannel(em);
+                var player = CreateLegacyCompatibilityVacuumContractPlayer(em, carryLoad: 10, carryCapacity: 10);
+
+                var source = em.CreateEntity();
+                em.AddBuffer<SourceActiveBulletCountBuffer>(source);
+
+                var removedBullet = CreateCleanupRemovableHazardBullet(
+                    em,
+                    position: new float3(2.88f, 0f, 0f),
+                    scoreValue: 2,
+                    sourceEntity: source,
+                    cleanupRemovedReaction: new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
+                    {
+                        SecondaryBulletTypeKey = 21,
+                        SpawnCount = 2,
+                        Shape = BulletSecondarySpawnShapeId.PointBurst,
+                        SpreadAngleDeg = 0f,
+                        SpawnRadius = 0f,
+                        SpawnDelaySec = 0.10f,
+                    });
+
+                var secondaryBullets = new Entity[2];
+                for (int i = 0; i < secondaryBullets.Length; i++)
+                {
+                    secondaryBullets[i] = CreatePooledCleanupHazardSecondaryBullet(em, typeKey: 21, speed: 2f, lifetime: 6f);
+                    BulletFieldShared.FreeByKey.Add(21, secondaryBullets[i]);
+                }
+
+                ActivateLegacyCompatibilityVacuum(em, player);
+
+                world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletDespawnExecutionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                Assert.That(em.IsComponentEnabled<BulletActiveTag>(removedBullet), Is.False);
+
+                var channelEntity = em.CreateEntityQuery(ComponentType.ReadOnly<BulletSecondarySpawnChannelSingletonTag>()).GetSingletonEntity();
+                var requests = em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity);
+                Assert.That(requests.Length, Is.EqualTo(1));
+                Assert.That(requests[0].ReadyFrame, Is.EqualTo(7u));
+
+                for (uint frame = 2u; frame < 7u; frame++)
+                {
+                    SetFrame(em, frame);
+                    world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+                    world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+                    world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
+                    em.CompleteAllTrackedJobs();
+
+                    for (int i = 0; i < secondaryBullets.Length; i++)
+                        Assert.That(em.IsComponentEnabled<BulletActiveTag>(secondaryBullets[i]), Is.False);
+                }
+
+                SetFrame(em, 7u);
+                world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                int readyFrameSpawned = 0;
+                for (int i = 0; i < secondaryBullets.Length; i++)
+                {
+                    if (!em.IsComponentEnabled<BulletActiveTag>(secondaryBullets[i]))
+                        continue;
+
+                    readyFrameSpawned++;
+                    Assert.That(em.GetComponentData<BulletSourceRefComponent>(secondaryBullets[i]).Value, Is.EqualTo(source));
+                }
+
+                Assert.That(readyFrameSpawned, Is.EqualTo(2));
+
+                SetFrame(em, 8u);
+                world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletVacuumRequestSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<BulletDespawnExecutionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                for (int i = 0; i < secondaryBullets.Length; i++)
+                    Assert.That(em.IsComponentEnabled<BulletActiveTag>(secondaryBullets[i]), Is.False);
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+
+            yield break;
+        }
+
+        private static void SetSimulationAndVacuumPrerequisites(EntityManager em, uint frame, float deltaTime = 1f)
         {
             SetSingleton(em, new BulletFieldConfigComponent
             {
@@ -180,8 +290,8 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             SetSingleton(em, new FixedTickStepRuntimeComponent
             {
-                FrameDeltaTime = 1f,
-                LogicDeltaTime = 1f,
+                FrameDeltaTime = deltaTime,
+                LogicDeltaTime = deltaTime,
                 LogicStepCount = 1,
                 HasStep = 1,
                 UsingFixedTick = 0,
@@ -549,6 +659,49 @@ namespace SweepNDodge.DotsBullets.Tests
             return entity;
         }
 
+        private static Entity CreatePooledCleanupHazardSecondaryBullet(EntityManager em, int typeKey, float speed, float lifetime)
+        {
+            var entity = em.CreateEntity(
+                typeof(LocalTransform),
+                typeof(LocalToWorld),
+                typeof(BulletVelocityComponent),
+                typeof(BulletLifetimeComponent),
+                typeof(BulletSpeedComponent),
+                typeof(BulletLifetimeMaxComponent),
+                typeof(BulletLifecycleRequestComponent),
+                typeof(BulletLifecycleContactComponent),
+                typeof(BulletTypeKeyComponent),
+                typeof(BulletSourceRefComponent),
+                typeof(BulletLifecycleTraceComponent),
+                typeof(BulletRadiusComponent),
+                typeof(BulletCaptureRuleComponent),
+                typeof(BulletActiveTag),
+                typeof(BulletDespawnRequestTag));
+
+            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
+            em.SetComponentData(entity, new LocalToWorld { Value = float4x4.identity });
+            em.SetComponentData(entity, new BulletVelocityComponent { Value = float2.zero });
+            em.SetComponentData(entity, new BulletLifetimeComponent { Value = 0f });
+            em.SetComponentData(entity, new BulletSpeedComponent { Value = speed });
+            em.SetComponentData(entity, new BulletLifetimeMaxComponent { Value = lifetime });
+            em.SetComponentData(entity, new BulletLifecycleRequestComponent
+            {
+                Reason = BulletLifecycleReasonId.None,
+                Priority = 0,
+                RelatedEntity = Entity.Null,
+                Frame = 0u,
+            });
+            em.SetComponentData(entity, default(BulletLifecycleContactComponent));
+            em.SetComponentData(entity, new BulletTypeKeyComponent { Value = typeKey });
+            em.SetComponentData(entity, new BulletSourceRefComponent { Value = Entity.Null });
+            em.SetComponentData(entity, new BulletLifecycleTraceComponent());
+            em.SetComponentData(entity, new BulletRadiusComponent { Value = 0.2f });
+            em.SetComponentData(entity, new BulletCaptureRuleComponent { Value = BulletCaptureRuleId.RiskTimedResolve });
+            em.SetComponentEnabled<BulletActiveTag>(entity, false);
+            em.SetComponentEnabled<BulletDespawnRequestTag>(entity, true);
+            return entity;
+        }
+
         private static void InitializeSharedContainers(int capacity = 128)
         {
             BulletFieldShared.FreeByKey = new NativeParallelMultiHashMap<int, Entity>(capacity, Allocator.Persistent);
@@ -582,6 +735,20 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var entity = em.CreateEntity(typeof(T));
             em.SetComponentData(entity, value);
+        }
+
+        private static void AdvanceFrame(EntityManager em)
+        {
+            var entity = em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var counter = em.GetComponentData<BulletFrameCounterComponent>(entity);
+            counter.Value += 1;
+            em.SetComponentData(entity, counter);
+        }
+
+        private static void SetFrame(EntityManager em, uint frame)
+        {
+            var entity = em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>()).GetSingletonEntity();
+            em.SetComponentData(entity, new BulletFrameCounterComponent { Value = frame });
         }
     }
 }

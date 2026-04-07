@@ -89,6 +89,7 @@ namespace SweepNDodge.DotsBullets
         public BulletSecondarySpawnShapeId Shape;
         public float SpreadAngleDeg;
         public float SpawnRadius;
+        public float SpawnDelaySec;
     }
 
     public struct BulletDampedMotionComponent : IComponentData
@@ -111,6 +112,7 @@ namespace SweepNDodge.DotsBullets
         public BulletSecondarySpawnShapeId Shape;
         public float SpreadAngleDeg;
         public float SpawnRadius;
+        public float SpawnDelaySec;
     }
 
     public struct BulletOnCleanupRemovedSpawnSecondaryReactionComponent : IComponentData
@@ -120,6 +122,7 @@ namespace SweepNDodge.DotsBullets
         public BulletSecondarySpawnShapeId Shape;
         public float SpreadAngleDeg;
         public float SpawnRadius;
+        public float SpawnDelaySec;
     }
 
     public struct BulletLifecycleRequestComponent : IComponentData

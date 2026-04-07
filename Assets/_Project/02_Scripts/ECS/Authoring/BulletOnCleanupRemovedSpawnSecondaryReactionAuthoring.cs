@@ -10,6 +10,7 @@ namespace SweepNDodge.DotsBullets
         public BulletSecondarySpawnShapeId Shape = BulletSecondarySpawnShapeId.PointBurst;
         public float SpreadAngleDeg = 90f;
         [Min(0f)] public float SpawnRadius = 0f;
+        [Min(0f)] public float SpawnDelaySec = 0f;
 
         private sealed class Baker : Baker<BulletOnCleanupRemovedSpawnSecondaryReactionAuthoring>
         {
@@ -23,6 +24,7 @@ namespace SweepNDodge.DotsBullets
                     Shape = authoring.Shape,
                     SpreadAngleDeg = authoring.SpreadAngleDeg,
                     SpawnRadius = authoring.SpawnRadius,
+                    SpawnDelaySec = authoring.SpawnDelaySec,
                 });
             }
         }

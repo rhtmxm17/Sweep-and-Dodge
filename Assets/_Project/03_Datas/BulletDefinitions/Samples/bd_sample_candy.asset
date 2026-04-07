@@ -42,3 +42,4 @@ MonoBehaviour:
     Shape: 2
     SpreadAngleDeg: 110
     SpawnRadius: 0.05
+    SpawnDelaySec: 0.1

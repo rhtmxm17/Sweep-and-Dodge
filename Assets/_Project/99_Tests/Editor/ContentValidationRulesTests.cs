@@ -267,6 +267,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 45f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 };
 
                 var input = new ContentValidationInput(
@@ -309,6 +310,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 45f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 };
 
                 var input = new ContentValidationInput(
@@ -385,6 +387,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.ForwardSpread,
                     SpreadAngleDeg = 60f,
                     SpawnRadius = 0.5f,
+                    SpawnDelaySec = 0.1f,
                 };
 
                 var input = new ContentValidationInput(
@@ -517,6 +520,54 @@ namespace SweepNDodge.DotsBullets.Tests
                 Object.DestroyImmediate(def);
                 Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Definition_ReactionWithNegativeSpawnDelay_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2208);
+                def.Prefab = prefab;
+                secondary.Editor_SetDefinitionId(2209);
+                secondary.Prefab = secondaryPrefab;
+                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+                {
+                    Enabled = true,
+                    SecondaryBullet = secondary,
+                    SpawnCount = 1,
+                    Shape = BulletSecondarySpawnShapeId.PointBurst,
+                    SpreadAngleDeg = 45f,
+                    SpawnRadius = 1f,
+                    SpawnDelaySec = -0.01f,
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                        new ContentValidationRecord<BulletDefinitionSO>(secondary, "secondary"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV033"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(secondary);
+                Object.DestroyImmediate(prefab);
+                Object.DestroyImmediate(secondaryPrefab);
             }
         }
 

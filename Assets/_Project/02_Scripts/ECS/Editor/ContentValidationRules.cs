@@ -1075,6 +1075,7 @@ namespace SweepNDodge.DotsBullets.Editor
             if (reaction.SpawnCount <= 0
                 || reaction.SpreadAngleDeg < 0f
                 || reaction.SpawnRadius < 0f
+                || reaction.SpawnDelaySec < 0f
                 || reaction.SecondaryBullet == null)
             {
                 issues.Add(new ContentValidationIssue(

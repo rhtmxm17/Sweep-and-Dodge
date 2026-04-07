@@ -29,6 +29,7 @@ namespace SweepNDodge.DotsBullets
             uint currentFrame = 0u;
             if (SystemAPI.TryGetSingleton<BulletFrameCounterComponent>(out var frameCounter))
                 currentFrame = FrameSequenceUtility.GetCurrentFrame(in frameCounter);
+            bool hasFixedTickRuntime = SystemAPI.TryGetSingleton<FixedTickStepRuntimeComponent>(out var fixedTickRuntime);
 
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             var sourceRefLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(true);
@@ -51,6 +52,8 @@ namespace SweepNDodge.DotsBullets
                     in lifecycleRequest.ValueRO,
                     in lifecycleContact.ValueRO,
                     currentFrame,
+                    hasFixedTickRuntime,
+                    in fixedTickRuntime,
                     hasSecondaryChannel,
                     secondaryRequests,
                     ref txLookup,
@@ -65,6 +68,8 @@ namespace SweepNDodge.DotsBullets
             in BulletLifecycleRequestComponent lifecycleRequest,
             in BulletLifecycleContactComponent lifecycleContact,
             uint currentFrame,
+            bool hasFixedTickRuntime,
+            in FixedTickStepRuntimeComponent fixedTickRuntime,
             bool hasSecondaryChannel,
             DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
             ref ComponentLookup<LocalTransform> txLookup,
@@ -84,6 +89,8 @@ namespace SweepNDodge.DotsBullets
                         bullet,
                         in lifecycleContact,
                         currentFrame,
+                        hasFixedTickRuntime,
+                        in fixedTickRuntime,
                         hasSecondaryChannel,
                         secondaryRequests,
                         ref txLookup,
@@ -95,6 +102,8 @@ namespace SweepNDodge.DotsBullets
                         bullet,
                         in lifecycleContact,
                         currentFrame,
+                        hasFixedTickRuntime,
+                        in fixedTickRuntime,
                         hasSecondaryChannel,
                         secondaryRequests,
                         ref txLookup,
@@ -111,6 +120,8 @@ namespace SweepNDodge.DotsBullets
             Entity bullet,
             in BulletLifecycleContactComponent lifecycleContact,
             uint currentFrame,
+            bool hasFixedTickRuntime,
+            in FixedTickStepRuntimeComponent fixedTickRuntime,
             bool hasSecondaryChannel,
             DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
             ref ComponentLookup<LocalTransform> txLookup,
@@ -128,8 +139,11 @@ namespace SweepNDodge.DotsBullets
                 reaction.Shape,
                 reaction.SpreadAngleDeg,
                 reaction.SpawnRadius,
+                reaction.SpawnDelaySec,
                 in lifecycleContact,
                 currentFrame,
+                hasFixedTickRuntime,
+                in fixedTickRuntime,
                 secondaryRequests,
                 ref txLookup,
                 ref sourceRefLookup);
@@ -139,6 +153,8 @@ namespace SweepNDodge.DotsBullets
             Entity bullet,
             in BulletLifecycleContactComponent lifecycleContact,
             uint currentFrame,
+            bool hasFixedTickRuntime,
+            in FixedTickStepRuntimeComponent fixedTickRuntime,
             bool hasSecondaryChannel,
             DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
             ref ComponentLookup<LocalTransform> txLookup,
@@ -156,8 +172,11 @@ namespace SweepNDodge.DotsBullets
                 reaction.Shape,
                 reaction.SpreadAngleDeg,
                 reaction.SpawnRadius,
+                reaction.SpawnDelaySec,
                 in lifecycleContact,
                 currentFrame,
+                hasFixedTickRuntime,
+                in fixedTickRuntime,
                 secondaryRequests,
                 ref txLookup,
                 ref sourceRefLookup);
@@ -170,8 +189,11 @@ namespace SweepNDodge.DotsBullets
             BulletSecondarySpawnShapeId shape,
             float spreadAngleDeg,
             float spawnRadius,
+            float spawnDelaySec,
             in BulletLifecycleContactComponent lifecycleContact,
             uint currentFrame,
+            bool hasFixedTickRuntime,
+            in FixedTickStepRuntimeComponent fixedTickRuntime,
             DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
             ref ComponentLookup<LocalTransform> txLookup,
             ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup)
@@ -185,6 +207,11 @@ namespace SweepNDodge.DotsBullets
             float originY = txLookup.HasComponent(bullet)
                 ? txLookup[bullet].Position.y
                 : 0f;
+            uint readyFrame = ResolveReadyFrame(
+                currentFrame,
+                spawnDelaySec,
+                hasFixedTickRuntime,
+                in fixedTickRuntime);
 
             secondaryRequests.Add(new BulletSecondarySpawnRequestBuffer
             {
@@ -199,8 +226,26 @@ namespace SweepNDodge.DotsBullets
                 SpawnRadius = spawnRadius,
                 Shape = shape,
                 OldestFrame = currentFrame,
+                ReadyFrame = readyFrame,
                 Sequence = 0u,
             });
+        }
+
+        private static uint ResolveReadyFrame(
+            uint currentFrame,
+            float spawnDelaySec,
+            bool hasFixedTickRuntime,
+            in FixedTickStepRuntimeComponent fixedTickRuntime)
+        {
+            int delayFrames = 1;
+            if (hasFixedTickRuntime
+                && FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float deltaTime)
+                && deltaTime > 0f)
+            {
+                delayFrames = math.max(1, (int)math.ceil(math.max(0f, spawnDelaySec) / deltaTime));
+            }
+
+            return currentFrame + (uint)delayFrames;
         }
     }
 }

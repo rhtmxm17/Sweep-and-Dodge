@@ -118,6 +118,7 @@ namespace SweepNDodge.DotsBullets
         public float SpawnRadius;
         public BulletSecondarySpawnShapeId Shape;
         public uint OldestFrame;
+        public uint ReadyFrame;
         public uint Sequence;
     }
 
@@ -131,6 +132,7 @@ namespace SweepNDodge.DotsBullets
     public struct SecondarySpawnBacklogMetricsComponent : IComponentData
     {
         public int PendingCount;
+        public int DeferredByDelay;
         public int DeferredByBudget;
         public int DeferredByPool;
         public int DroppedByCapacity;

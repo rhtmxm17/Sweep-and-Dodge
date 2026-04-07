@@ -44,6 +44,7 @@ namespace SweepNDodge.DotsBullets
             var metricsRW = SystemAPI.GetSingletonRW<SecondarySpawnBacklogMetricsComponent>();
             var metrics = metricsRW.ValueRO;
             metrics.LastFrameBudgetUsed = 0;
+            metrics.DeferredByDelay = 0;
             metrics.DeferredByBudget = 0;
             metrics.DeferredByPool = 0;
             metrics.LastFrameDroppedByCapacity = 0;
@@ -121,6 +122,8 @@ namespace SweepNDodge.DotsBullets
                 var item = requests[i];
                 if (item.Count <= 0)
                     continue;
+                if (frame < item.ReadyFrame)
+                    continue;
 
                 int availablePoolCount = SpawnRequestCommonUtility.CountFreeByKey(ref BulletFieldShared.FreeByKey, item.BulletTypeKey);
                 if (availablePoolCount <= 0)
@@ -162,14 +165,18 @@ namespace SweepNDodge.DotsBullets
 
             CompactRequestBuffer(requests);
 
-            metrics.PendingCount = pending;
+            RecountPendingRequests(requests, frame, out int pendingCount, out int delayedPendingCount);
+            int readyPendingCount = math.max(0, pendingCount - delayedPendingCount);
+
+            metrics.PendingCount = pendingCount;
             metrics.LastFrameBudgetUsed = budgetUsed;
-            if (pending > 0)
+            metrics.DeferredByDelay = delayedPendingCount;
+            if (readyPendingCount > 0)
             {
                 if (remainingBudget <= 0)
-                    metrics.DeferredByBudget = pending;
+                    metrics.DeferredByBudget = readyPendingCount;
                 else
-                    metrics.DeferredByPool = pending;
+                    metrics.DeferredByPool = readyPendingCount;
             }
 
             metricsRW.ValueRW = metrics;
@@ -239,6 +246,26 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 requests.RemoveAt(i);
+            }
+        }
+
+        private static void RecountPendingRequests(
+            DynamicBuffer<BulletSecondarySpawnRequestBuffer> requests,
+            uint frame,
+            out int pendingCount,
+            out int delayedPendingCount)
+        {
+            pendingCount = 0;
+            delayedPendingCount = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                int count = math.max(0, requests[i].Count);
+                if (count <= 0)
+                    continue;
+
+                pendingCount = SpawnRequestCommonUtility.SafeAdd(pendingCount, count);
+                if (frame < requests[i].ReadyFrame)
+                    delayedPendingCount = SpawnRequestCommonUtility.SafeAdd(delayedPendingCount, count);
             }
         }
 

@@ -50,6 +50,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         Shape = BulletSecondarySpawnShapeId.PointBurst,
                         SpreadAngleDeg = 0f,
                         SpawnRadius = 1f,
+                        SpawnDelaySec = 0f,
                     });
 
                 var secondaryBullets = new Entity[3];
@@ -62,6 +63,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<BulletDespawnExecutionSystem>().Update(world.Unmanaged);
+                AdvanceFrame(em);
                 world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();
 
@@ -287,6 +289,14 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var entity = em.CreateEntity(typeof(T));
             em.SetComponentData(entity, value);
+        }
+
+        private static void AdvanceFrame(EntityManager em)
+        {
+            var entity = em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var counter = em.GetComponentData<BulletFrameCounterComponent>(entity);
+            counter.Value += 1;
+            em.SetComponentData(entity, counter);
         }
     }
 }
