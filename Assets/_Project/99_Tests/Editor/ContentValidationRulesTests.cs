@@ -267,6 +267,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 45f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 };
 
                 var input = new ContentValidationInput(
@@ -309,6 +310,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 45f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 };
 
                 var input = new ContentValidationInput(
@@ -385,6 +387,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.ForwardSpread,
                     SpreadAngleDeg = 60f,
                     SpawnRadius = 0.5f,
+                    SpawnDelaySec = 0.1f,
                 };
 
                 var input = new ContentValidationInput(
@@ -490,7 +493,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -521,6 +524,809 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void Definition_ReactionWithNegativeSpawnDelay_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var prefab = new GameObject("bullet_prefab");
+            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(2208);
+                def.Prefab = prefab;
+                secondary.Editor_SetDefinitionId(2209);
+                secondary.Prefab = secondaryPrefab;
+                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
+                {
+                    Enabled = true,
+                    SecondaryBullet = secondary,
+                    SpawnCount = 1,
+                    Shape = BulletSecondarySpawnShapeId.PointBurst,
+                    SpreadAngleDeg = 45f,
+                    SpawnRadius = 1f,
+                    SpawnDelaySec = -0.01f,
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                        new ContentValidationRecord<BulletDefinitionSO>(secondary, "secondary"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV033"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(secondary);
+                Object.DestroyImmediate(prefab);
+                Object.DestroyImmediate(secondaryPrefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_WithNonPositiveSegmentDuration_IsCV010()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30015);
+                def.Prefab = prefab;
+
+                clip.ClipId = 111;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 0f,
+                        Directives = new[] { CreateDefaultTypedEntry(def) }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV010"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_WithStartOutsideClipDuration_IsCV010()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30016);
+                def.Prefab = prefab;
+
+                clip.ClipId = 112;
+                clip.DurationSec = 1f;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 1f,
+                        DurationSec = 1f,
+                        Directives = new[] { CreateDefaultTypedEntry(def) }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV010"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_EventBurstWithUnreachableTailRepeats_IsCVW040()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30017);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new EventBurstEmissionAuthoring
+                {
+                    BurstRepeatCount = 3,
+                    BurstIntervalSec = 1f,
+                    EventRepeatCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                };
+
+                clip.ClipId = 113;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1.5f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CVW040"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_EventBurstExactFit_DoesNotWarnCVW040()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30018);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new EventBurstEmissionAuthoring
+                {
+                    BurstRepeatCount = 3,
+                    BurstIntervalSec = 1f,
+                    EventRepeatCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                };
+
+                clip.ClipId = 114;
+                clip.DurationSec = 3f;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 3f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CVW040"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_EventBurstInfiniteRepeat_DoesNotWarnCVW040()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(30019);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new EventBurstEmissionAuthoring
+                {
+                    BurstRepeatCount = -1,
+                    BurstIntervalSec = 1f,
+                    EventRepeatCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                };
+
+                clip.ClipId = 115;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1.5f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CVW040"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_PoissonWithNonPositiveEventRepeatCount_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3002);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new PoissonEmissionAuthoring
+                {
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    MaxActiveDensityPerArea = 0f,
+                    MeanEventsPerSec = 1f,
+                    EventRepeatCount = 0,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                };
+
+                clip.ClipId = 12;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV022"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_SpawnSampleBudgetZero_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3003);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Sampling.SpawnSampleBudget = 0;
+
+                clip.ClipId = 13;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV018"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_NWayShotPatternCountOrSpacingInvalid_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3004);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 15f };
+                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 1, AngleSpacingDeg = 30f };
+
+                clip.ClipId = 14;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
+
+                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 4, AngleSpacingDeg = 0f };
+                issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_PlayerPositionAimPerShot_IsAllowed()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3005);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Aim = new PlayerPositionAimAuthoring
+                {
+                    AngleOffsetDeg = 10f,
+                    SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                };
+
+                clip.ClipId = 15;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV041"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_LineNormalAimRequiresLineEven_IsCV042()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3006);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.PositionPattern = new SinglePointPositionPatternAuthoring();
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Left,
+                    AngleOffsetDeg = 0f,
+                };
+
+                clip.ClipId = 16;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV042"), Is.True);
+
+                entry.PositionPattern = new PointSetPositionPatternAuthoring
+                {
+                    Points = new[] { Vector2.zero }
+                };
+                issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV042"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClip_LineNormalAimWithInvalidLineEven_UsesCV026()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(3007);
+                def.Prefab = prefab;
+
+                var entry = CreateDefaultTypedEntry(def);
+                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                {
+                    LineStart = Vector2.zero,
+                    LineEnd = Vector2.zero,
+                    SampleSpacing = 1f,
+                };
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Right,
+                    AngleOffsetDeg = 15f,
+                };
+
+                clip.ClipId = 17;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry }
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "clip"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV026"), Is.True);
+                Assert.That(issues.Any(i => i.Code == "CV042"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void WaveClipResolver_PlayerPositionAimEventStart_ResolvesCanonicalSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.Editor_SetDefinitionId(3006);
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Emission = new EventBurstEmissionAuthoring
+                {
+                    SpawnMode = SourceSpawnModeId.FixedDensity,
+                    MaxActiveDensityPerArea = 0f,
+                    BurstRepeatCount = 3,
+                    BurstIntervalSec = 0.5f,
+                    EventRepeatCount = 2,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.15f,
+                };
+                entry.Sampling = new WaveSamplingAuthoring
+                {
+                    SpawnSampleBudget = 12,
+                    PlayerNoSpawnRadius = 1.25f,
+                    Anchor = new SourceCenterSamplingAnchorAuthoring(),
+                    AreaSampler = new CenterPointAreaSamplerAuthoring(),
+                };
+                entry.PositionPattern = new PointSetPositionPatternAuthoring
+                {
+                    Points = new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one, new Vector2(-1f, 0f) }
+                };
+                entry.Aim = new PlayerPositionAimAuthoring
+                {
+                    AngleOffsetDeg = 22f,
+                    SnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                };
+                entry.ShotPattern = new RadialShotPatternAuthoring
+                {
+                    ShotCount = 6,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out var snapshot, out var error), Is.True, error);
+                Assert.That(snapshot.EmissionMode, Is.EqualTo(SourceSpawnEmissionModeId.EventBurst));
+                Assert.That(snapshot.EventRepeatCount, Is.EqualTo(2));
+                Assert.That(snapshot.PositionPatternMode, Is.EqualTo(WavePositionPatternModeId.PointSet));
+                Assert.That(snapshot.PointSetCount, Is.EqualTo(4));
+                Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.PlayerPosition));
+                Assert.That(snapshot.AimSnapshotTiming, Is.EqualTo(WaveAimSnapshotTimingId.EventStart));
+                Assert.That(snapshot.ShotPatternMode, Is.EqualTo(WaveShotPatternModeId.Radial));
+                Assert.That(snapshot.ShotCount, Is.EqualTo(6));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
+        public void WaveClipResolver_LineNormalAim_ResolvesCanonicalSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.Editor_SetDefinitionId(3008);
+                var entry = CreateDefaultTypedEntry(def);
+                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                {
+                    LineStart = new Vector2(-2f, 0f),
+                    LineEnd = new Vector2(2f, 0f),
+                    SampleSpacing = 1f,
+                };
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Left,
+                    AngleOffsetDeg = 0f,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out var snapshot, out var error), Is.True, error);
+                Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.LineNormal));
+                Assert.That(snapshot.LineNormalSide, Is.EqualTo(WaveLineNormalSideId.Left));
+                Assert.That(snapshot.LineNormalAngleOffsetDeg, Is.EqualTo(0f));
+
+                entry.Aim = new LineNormalAimAuthoring
+                {
+                    NormalSide = WaveLineNormalSideId.Right,
+                    AngleOffsetDeg = 15f,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out snapshot, out error), Is.True, error);
+                Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.LineNormal));
+                Assert.That(snapshot.LineNormalSide, Is.EqualTo(WaveLineNormalSideId.Right));
+                Assert.That(snapshot.LineNormalAngleOffsetDeg, Is.EqualTo(15f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
+        public void WaveClipResolver_PlayerPositionAimPerShot_ResolvesCanonicalSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.Editor_SetDefinitionId(3007);
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Aim = new PlayerPositionAimAuthoring
+                {
+                    AngleOffsetDeg = 15f,
+                    SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out var snapshot, out var error), Is.True, error);
+                Assert.That(snapshot.AimMode, Is.EqualTo(WaveAimModeId.PlayerPosition));
+                Assert.That(snapshot.AimSnapshotTiming, Is.EqualTo(WaveAimSnapshotTimingId.PerShot));
+                Assert.That(snapshot.AimAngleOffsetDeg, Is.EqualTo(15f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
+        public void WaveClipResolver_NWayFanSpacing_ResolvesCanonicalSnapshot()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                def.Editor_SetDefinitionId(3009);
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 0f };
+                entry.ShotPattern = new NWayShotPatternAuthoring
+                {
+                    ShotCount = 4,
+                    AngleSpacingDeg = 30f,
+                };
+
+                Assert.That(WaveClipAuthoringResolver.TryResolveTypedEntry(entry, out var snapshot, out var error), Is.True, error);
+                Assert.That(snapshot.ShotPatternMode, Is.EqualTo(WaveShotPatternModeId.NWay));
+                Assert.That(snapshot.ShotCount, Is.EqualTo(4));
+                Assert.That(snapshot.NWayAngleSpacingDeg, Is.EqualTo(30f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+            }
+        }
+
+        [Test]
         public void WaveClip_OverlappingSegments_IsAllowed()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -539,13 +1345,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 5f,
+                        DurationSec = 5f,
                         Directives = new[] { entry }
                     },
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 4f,
-                        EndSec = 8f,
+                        DurationSec = 4f,
                         Directives = new[] { entry }
                     }
                 };
@@ -594,13 +1400,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 5f,
+                        DurationSec = 5f,
                         Directives = new[] { entry }
                     },
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 5f,
-                        EndSec = 9f,
+                        DurationSec = 4f,
                         Directives = new[] { entry }
                     }
                 };
@@ -668,8 +1474,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 clipA.ClipId = 777;
                 clipB.ClipId = 777;
-                clipA.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
-                clipB.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, EndSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
+                clipA.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, DurationSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
+                clipB.Segments = new[] { new WaveClipSO.ClipSegment { StartSec = 0f, DurationSec = 1f, Directives = Array.Empty<WaveSpawnEntryAuthoring>() } };
 
                 var input = new ContentValidationInput(
                     null,
@@ -712,7 +1518,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -761,7 +1567,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -820,7 +1626,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1064,7 +1870,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
-                        EndSec = 1f,
+                        DurationSec = 1f,
                         Directives = new[] { entry }
                     }
                 };
@@ -1107,30 +1913,24 @@ namespace SweepNDodge.DotsBullets.Tests
                     MaxActiveDensityPerArea = 0f,
                     RatePerSecPerArea = 1f,
                 },
-                Sampling = new UniformFieldSamplingAuthoring
+                Sampling = new WaveSamplingAuthoring
                 {
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    FixedPoint = Vector2.zero,
-                    SpawnOffset = Vector2.zero,
                     SpawnSampleBudget = 16,
                     PlayerNoSpawnRadius = 0f,
+                    Anchor = new SourceCenterSamplingAnchorAuthoring(),
+                    AreaSampler = new UniformFieldAreaSamplerAuthoring(),
                 },
-                Direction = new RandomDirectionAuthoring(),
+                PositionPattern = new SinglePointPositionPatternAuthoring(),
+                Aim = new RandomAimAuthoring(),
+                ShotPattern = new SingleShotPatternAuthoring(),
             };
         }
 
         private static WaveSpawnEntryAuthoring CreatePointSetTypedEntry(BulletDefinitionSO def, Vector2[] points)
         {
             var entry = CreateDefaultTypedEntry(def);
-            entry.Sampling = new PointSetSamplingAuthoring
-            {
-                CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                FixedPoint = Vector2.zero,
-                SpawnOffset = Vector2.zero,
-                SpawnSampleBudget = 16,
-                PlayerNoSpawnRadius = 0f,
-                Points = points,
-            };
+            entry.Sampling.AreaSampler = new CenterPointAreaSamplerAuthoring();
+            entry.PositionPattern = new PointSetPositionPatternAuthoring { Points = points };
             return entry;
         }
 
@@ -1195,6 +1995,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
     }
 }
+
 
 
 

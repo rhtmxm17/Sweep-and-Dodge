@@ -5,13 +5,26 @@ namespace SweepNDodge.DotsBullets
     public struct ResolvedWaveSpawnDirectiveSnapshot
     {
         public BulletDefinitionSO Bullet;
+
         public SourceSpawnEmissionModeId EmissionMode;
         public SourceSpawnModeId SpawnMode;
-        public SourceSpawnSamplingModeId SamplingMode;
-        public SourceSpawnCenterModeId CenterMode;
-        public SourceSpawnDirectionModeId DirectionMode;
+        public float MaxActiveDensityPerArea;
+        public float RatePerSecPerArea;
+        public float MeanEventsPerSec;
+        public int BurstRepeatCount;
+        public float BurstIntervalSec;
+        public int EventRepeatCount;
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        public float EventShotIntervalSec;
+
+        public WaveSamplingAnchorModeId SamplingAnchorMode;
+        public WaveAreaSamplerModeId AreaSamplerMode;
         public Vector2 FixedPoint;
         public Vector2 SpawnOffset;
+        public int SpawnSampleBudget;
+        public float PlayerNoSpawnRadius;
+
+        public WavePositionPatternModeId PositionPatternMode;
         public Vector2 LineStart;
         public Vector2 LineEnd;
         public float SampleSpacing;
@@ -20,19 +33,18 @@ namespace SweepNDodge.DotsBullets
         public Vector2 Point1;
         public Vector2 Point2;
         public Vector2 Point3;
-        public int SpawnSampleBudget;
-        public float PlayerNoSpawnRadius;
+
+        public WaveAimModeId AimMode;
+        public WaveAimSnapshotTimingId AimSnapshotTiming;
         public float BaseAngleDeg;
-        public int NWayCount;
         public float SpiralStepDeg;
-        public float RatePerSecPerArea;
-        public float MeanEventsPerSec;
-        public int BurstRepeatCount;
-        public float BurstIntervalSec;
-        public int BurstShotsPerEvent;
-        public SourceSpawnEventShotScheduleId EventShotSchedule;
-        public float EventShotIntervalSec;
-        public float MaxActiveDensityPerArea;
+        public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
+
+        public WaveShotPatternModeId ShotPatternMode;
+        public int ShotCount;
+        public float NWayAngleSpacingDeg;
     }
 
     public static class WaveClipAuthoringResolver
@@ -67,16 +79,42 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            if (entry.Direction == null)
+            if (entry.Sampling.Anchor == null)
             {
-                error = "Typed wave directive entry is missing Direction authoring.";
+                error = "Typed wave directive entry is missing Sampling.Anchor authoring.";
+                return false;
+            }
+
+            if (entry.Sampling.AreaSampler == null)
+            {
+                error = "Typed wave directive entry is missing Sampling.AreaSampler authoring.";
+                return false;
+            }
+
+            if (entry.PositionPattern == null)
+            {
+                error = "Typed wave directive entry is missing PositionPattern authoring.";
+                return false;
+            }
+
+            if (entry.Aim == null)
+            {
+                error = "Typed wave directive entry is missing Aim authoring.";
+                return false;
+            }
+
+            if (entry.ShotPattern == null)
+            {
+                error = "Typed wave directive entry is missing ShotPattern authoring.";
                 return false;
             }
 
             snapshot.Bullet = entry.Payload.Bullet;
             ApplyTypedEmission(ref snapshot, entry.Emission);
             ApplyTypedSampling(ref snapshot, entry.Sampling);
-            ApplyTypedDirection(ref snapshot, entry.Direction);
+            ApplyTypedPositionPattern(ref snapshot, entry.PositionPattern);
+            ApplyTypedAim(ref snapshot, entry.Aim);
+            ApplyTypedShotPattern(ref snapshot, entry.ShotPattern);
             return true;
         }
 
@@ -87,11 +125,21 @@ namespace SweepNDodge.DotsBullets
                 Bullet = null,
                 EmissionMode = SourceSpawnEmissionModeId.RateField,
                 SpawnMode = SourceSpawnModeId.FixedDensity,
-                SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                DirectionMode = SourceSpawnDirectionModeId.Random,
+                MaxActiveDensityPerArea = 0f,
+                RatePerSecPerArea = 0f,
+                MeanEventsPerSec = 0f,
+                BurstRepeatCount = 1,
+                BurstIntervalSec = DefaultBurstIntervalSec,
+                EventRepeatCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                EventShotIntervalSec = 0f,
+                SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
                 FixedPoint = Vector2.zero,
                 SpawnOffset = Vector2.zero,
+                SpawnSampleBudget = DefaultSpawnSampleBudget,
+                PlayerNoSpawnRadius = 0f,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
                 LineStart = Vector2.zero,
                 LineEnd = Vector2.zero,
                 SampleSpacing = 1f,
@@ -100,19 +148,16 @@ namespace SweepNDodge.DotsBullets
                 Point1 = Vector2.zero,
                 Point2 = Vector2.zero,
                 Point3 = Vector2.zero,
-                SpawnSampleBudget = DefaultSpawnSampleBudget,
-                PlayerNoSpawnRadius = 0f,
+                AimMode = WaveAimModeId.Random,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
                 BaseAngleDeg = 0f,
-                NWayCount = 1,
                 SpiralStepDeg = 0f,
-                RatePerSecPerArea = 0f,
-                MeanEventsPerSec = 0f,
-                BurstRepeatCount = 1,
-                BurstIntervalSec = DefaultBurstIntervalSec,
-                BurstShotsPerEvent = 1,
-                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
-                EventShotIntervalSec = 0f,
-                MaxActiveDensityPerArea = 0f,
+                AimAngleOffsetDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                LineNormalAngleOffsetDeg = 0f,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                NWayAngleSpacingDeg = 0f,
             };
         }
 
@@ -130,7 +175,7 @@ namespace SweepNDodge.DotsBullets
 
                 case PoissonEmissionAuthoring poisson:
                     snapshot.MeanEventsPerSec = poisson.MeanEventsPerSec;
-                    snapshot.BurstShotsPerEvent = poisson.BurstShotsPerEvent > 0 ? poisson.BurstShotsPerEvent : 1;
+                    snapshot.EventRepeatCount = poisson.EventRepeatCount > 0 ? poisson.EventRepeatCount : 1;
                     snapshot.EventShotSchedule = poisson.EventShotSchedule;
                     snapshot.EventShotIntervalSec = poisson.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
                         ? (poisson.EventShotIntervalSec > 0f ? poisson.EventShotIntervalSec : DefaultTimedEventShotIntervalSec)
@@ -140,7 +185,7 @@ namespace SweepNDodge.DotsBullets
                 case EventBurstEmissionAuthoring eventBurst:
                     snapshot.BurstRepeatCount = eventBurst.BurstRepeatCount == 0 ? 1 : eventBurst.BurstRepeatCount;
                     snapshot.BurstIntervalSec = eventBurst.BurstIntervalSec > 0f ? eventBurst.BurstIntervalSec : DefaultBurstIntervalSec;
-                    snapshot.BurstShotsPerEvent = eventBurst.BurstShotsPerEvent > 0 ? eventBurst.BurstShotsPerEvent : 1;
+                    snapshot.EventRepeatCount = eventBurst.EventRepeatCount > 0 ? eventBurst.EventRepeatCount : 1;
                     snapshot.EventShotSchedule = eventBurst.EventShotSchedule;
                     snapshot.EventShotIntervalSec = eventBurst.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
                         ? (eventBurst.EventShotIntervalSec > 0f ? eventBurst.EventShotIntervalSec : DefaultTimedEventShotIntervalSec)
@@ -149,25 +194,43 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static void ApplyTypedSampling(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveSamplingAuthoringBase sampling)
+        private static void ApplyTypedSampling(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveSamplingAuthoring sampling)
         {
-            snapshot.SamplingMode = sampling.SamplingMode;
-            snapshot.CenterMode = sampling.CenterMode;
-            snapshot.FixedPoint = sampling.FixedPoint;
-            snapshot.SpawnOffset = sampling.SpawnOffset;
             snapshot.SpawnSampleBudget = sampling.SpawnSampleBudget > 0 ? sampling.SpawnSampleBudget : DefaultSpawnSampleBudget;
             snapshot.PlayerNoSpawnRadius = sampling.PlayerNoSpawnRadius;
 
-            switch (sampling)
+            switch (sampling.Anchor)
             {
-                case LineEvenSamplingAuthoring lineEven:
+                case FixedPointSamplingAnchorAuthoring fixedPoint:
+                    snapshot.SamplingAnchorMode = fixedPoint.AnchorMode;
+                    snapshot.FixedPoint = fixedPoint.FixedPoint;
+                    break;
+                case PlayerRelativeSamplingAnchorAuthoring playerRelative:
+                    snapshot.SamplingAnchorMode = playerRelative.AnchorMode;
+                    snapshot.SpawnOffset = playerRelative.SpawnOffset;
+                    break;
+                default:
+                    snapshot.SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter;
+                    break;
+            }
+
+            snapshot.AreaSamplerMode = sampling.AreaSampler.AreaSamplerMode;
+        }
+
+        private static void ApplyTypedPositionPattern(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WavePositionPatternAuthoringBase positionPattern)
+        {
+            snapshot.PositionPatternMode = positionPattern.PositionPatternMode;
+
+            switch (positionPattern)
+            {
+                case LineEvenPositionPatternAuthoring lineEven:
                     snapshot.LineStart = lineEven.LineStart;
                     snapshot.LineEnd = lineEven.LineEnd;
                     snapshot.SampleSpacing = lineEven.SampleSpacing > 0f ? lineEven.SampleSpacing : 1f;
                     break;
 
-                case PointSetSamplingAuthoring pointSet:
-                    int pointCount = Mathf.Clamp(pointSet.Points?.Length ?? 0, 0, PointSetSamplingAuthoring.MaxPointCount);
+                case PointSetPositionPatternAuthoring pointSet:
+                    int pointCount = Mathf.Clamp(pointSet.Points?.Length ?? 0, 0, PointSetPositionPatternAuthoring.MaxPointCount);
                     snapshot.PointSetCount = pointCount;
                     snapshot.Point0 = GetPoint(pointSet.Points, 0);
                     snapshot.Point1 = GetPoint(pointSet.Points, 1);
@@ -177,28 +240,54 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static void ApplyTypedDirection(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveDirectionAuthoringBase direction)
+        private static void ApplyTypedAim(
+            ref ResolvedWaveSpawnDirectiveSnapshot snapshot,
+            WaveAimAuthoringBase aim)
         {
-            snapshot.DirectionMode = direction.DirectionMode;
+            snapshot.AimMode = aim.AimMode;
 
-            switch (direction)
+            switch (aim)
             {
-                case FixedDirectionAuthoring fixedDirection:
-                    snapshot.BaseAngleDeg = fixedDirection.BaseAngleDeg;
+                case FixedAimAuthoring fixedAim:
+                    snapshot.BaseAngleDeg = fixedAim.BaseAngleDeg;
                     break;
 
-                case NWayDirectionAuthoring nWay:
-                    snapshot.BaseAngleDeg = nWay.BaseAngleDeg;
-                    snapshot.NWayCount = nWay.NWayCount > 0 ? nWay.NWayCount : 1;
-                    break;
-
-                case SpiralDirectionAuthoring spiral:
+                case SpiralAimAuthoring spiral:
                     snapshot.BaseAngleDeg = spiral.BaseAngleDeg;
                     snapshot.SpiralStepDeg = spiral.SpiralStepDeg;
                     break;
 
-                case RadialBurstDirectionAuthoring radialBurst:
-                    snapshot.BaseAngleDeg = radialBurst.BaseAngleDeg;
+                case PlayerPositionAimAuthoring playerPositionAim:
+                    snapshot.AimAngleOffsetDeg = playerPositionAim.AngleOffsetDeg;
+                    snapshot.AimSnapshotTiming = playerPositionAim.SnapshotTiming;
+                    break;
+
+                case LineNormalAimAuthoring lineNormalAim:
+                    snapshot.LineNormalSide = lineNormalAim.NormalSide;
+                    snapshot.LineNormalAngleOffsetDeg = lineNormalAim.AngleOffsetDeg;
+                    break;
+            }
+        }
+
+        private static void ApplyTypedShotPattern(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveShotPatternAuthoringBase shotPattern)
+        {
+            snapshot.ShotPatternMode = shotPattern.ShotPatternMode;
+
+            switch (shotPattern)
+            {
+                case NWayShotPatternAuthoring nWay:
+                    snapshot.ShotCount = nWay.ShotCount > 0 ? nWay.ShotCount : 1;
+                    snapshot.NWayAngleSpacingDeg = nWay.AngleSpacingDeg;
+                    break;
+
+                case RadialShotPatternAuthoring radial:
+                    snapshot.ShotCount = radial.ShotCount > 0 ? radial.ShotCount : 1;
+                    snapshot.NWayAngleSpacingDeg = 0f;
+                    break;
+
+                default:
+                    snapshot.ShotCount = 1;
+                    snapshot.NWayAngleSpacingDeg = 0f;
                     break;
             }
         }

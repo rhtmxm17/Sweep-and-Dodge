@@ -54,6 +54,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 1.5f,
+                    SpawnDelaySec = 0.2f,
                 },
                 OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionRuntimeDefinition
                 {
@@ -62,6 +63,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.ForwardSpread,
                     SpreadAngleDeg = 30f,
                     SpawnRadius = 0.5f,
+                    SpawnDelaySec = 0.1f,
                 },
             });
 
@@ -81,10 +83,12 @@ namespace SweepNDodge.DotsBullets.Tests
             var explode = em.GetComponentData<BulletOnMotionCompletedExplodeReactionComponent>(bullet);
             Assert.That(explode.SecondaryBulletTypeKey, Is.EqualTo(777));
             Assert.That(explode.SpawnCount, Is.EqualTo(4));
+            Assert.That(explode.SpawnDelaySec, Is.EqualTo(0.2f));
 
             var collect = em.GetComponentData<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(bullet);
             Assert.That(collect.SecondaryBulletTypeKey, Is.EqualTo(778));
             Assert.That(collect.SpawnCount, Is.EqualTo(2));
+            Assert.That(collect.SpawnDelaySec, Is.EqualTo(0.1f));
         }
 
         [Test]
@@ -140,10 +144,12 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0.25f,
                 });
 
                 Assert.That(runtime.SecondaryBulletTypeKey, Is.EqualTo(881));
                 Assert.That(runtime.SpawnCount, Is.EqualTo(3));
+                Assert.That(runtime.SpawnDelaySec, Is.EqualTo(0.25f));
             }
             finally
             {
@@ -225,6 +231,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 0f,
+                    SpawnDelaySec = 0f,
                 });
                 em.AddComponentData(prefab, new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
                 {
@@ -233,6 +240,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 0f,
+                    SpawnDelaySec = 0f,
                 });
             }
 

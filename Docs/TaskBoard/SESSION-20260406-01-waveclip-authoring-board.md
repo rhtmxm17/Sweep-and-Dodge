@@ -1,0 +1,157 @@
+# SESSION-20260406-01
+
+## Metadata
+- doc_id: `SESSION-20260406-01`
+- type: `SessionTaskBoard`
+- status: `active`
+- last_updated: `2026-04-06`
+- related_docs:
+  - [../TechnicalDesign/TD-002-pattern-wave-progress-runtime-contract.md](../TechnicalDesign/TD-002-pattern-wave-progress-runtime-contract.md)
+  - [../TechnicalDesign/TD-003-spawn-directive-model.md](../TechnicalDesign/TD-003-spawn-directive-model.md)
+  - [../TechnicalDesign/TD-005-spawn-directive-settings-reference.md](../TechnicalDesign/TD-005-spawn-directive-settings-reference.md)
+  - [../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
+  - [../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
+  - [../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md)
+
+## Session Goal
+- 한 줄 목표: `WaveSpawnEntryAuthoring`의 authoring 축을 재정의해 `의미가 섞인 필드/타입`을 분리하고, 이후 구현 세션에서 사용할 decision-complete 기준을 고정한다.
+- 완료 기준:
+  - `Emission`, `Sampling`, `Direction` 현행 의미와 runtime 소비 규칙을 코드 기준으로 설명할 수 있다.
+  - `PositionPattern` 분리와 `EventRepeatCount` 대체를 반영한 새 authoring 축을 고정한다.
+  - 플레이어 방향 의존 `Aim`을 파이프라인에 수용하는 기준 입력과 runtime 참조 경로를 고정한다.
+  - `EventRepeatCount`, `PlayerPositionAim`, `PositionPattern.LineEven`, runtime flatten naming에 대한 권장 기본값이 채택 상태로 고정된다.
+  - event 내부 shot과 sampling 고정 규칙에 대해 채택 invariant를 명시한다.
+  - `WaveSpawnEntryAuthoring` authoring 축 재구성안이 implementation-ready 상태로 고정된다.
+  - 이후 세션에서 `WaveClipSO` schema 실제 수정, bake/validation 재구성, runtime hot path 구조 변경 여부 판단 및 필요 시 구현까지 이어질 수 있도록 단계별 작업 기준을 남긴다.
+- 이번 세션에서 하지 않을 것:
+  - inspector/polish 구현
+  - asset migration 실행
+
+## Now
+- 없음
+
+## Next
+- 없음
+
+## Blocked
+- 없음
+
+## Parking Lot
+- [ ] P1. `SerializeReference` editor UX 세부 polish는 authoring 축 재구성 이후에 다시 본다.
+  - 근거: 현재 핵심 문제는 표현 UX보다 authoring 의미 체계 자체의 혼선이다.
+- [ ] P2. runtime flat shape rename 여부는 authoring 의미 재정의가 끝난 뒤 판단한다.
+  - 근거: 지금 단계에서 runtime 계약 이름까지 함께 흔들면 회귀 범위가 커진다.
+
+## Done
+- [x] D1. `DirectionAuthoring`와 `EventShotSchedule`의 실제 runtime 결합 방식을 확인했다.
+  - 검증 결과:
+    - `Direction`은 각도 계산 규칙을, `EventShotSchedule`은 event 내부 shot 소비 타이밍을 결정한다.
+    - `NWay`는 세트 atomic consume, `RadialBurst`는 `BurstShotsPerEvent` 기반 radial slot 순환, `Spiral`은 sequence 기반 각도 진행으로 확인됐다.
+- [x] D2. `BurstShotsPerEvent`의 현행 의미와 혼선 지점을 확인했다.
+  - 검증 결과:
+    - `Poisson/EventBurst`에서는 event당 shot 수이고, `RadialBurst`에서는 radial slot count까지 겸한다.
+    - `NWay`와 조합될 때는 `NWayCount`와 의미가 겹쳐 authoring UX가 나빠진다.
+- [x] D3. sampling fixation이 현재 부분 적용 상태임을 확인했다.
+  - 검증 결과:
+    - `Timed + UniformField/PollutionTopK`만 event anchor position을 고정한다.
+    - `LineEven/PointSet`은 동일 event 안에서도 shot sequence에 따라 위치가 다시 계산된다.
+- [x] D4. `PositionPattern`을 `Sampling`과 별도 축으로 분리하는 권장안을 채택했다.
+  - 검증 결과:
+    - `LineEven`과 `PointSet`을 event anchor sampling이 아니라 shot-local position pattern으로 재분류하는 방향이 합의됐다.
+    - `디자인상 의미를 갖는 직선상의 등간격 좌표에서 수직 발사` 같은 조합도 `PositionPattern + Aim` 조합으로 유지 가능하다는 점을 확인했다.
+- [x] D5. `BurstShotsPerEvent`를 폐기하고 `EventRepeatCount`로 대체하는 방향을 채택했다.
+  - 검증 결과:
+    - `ShotPattern` 1회당 탄 수와 `event 내부 반복 횟수`를 분리하는 방향이 합의됐다.
+    - 새 해석은 `총 탄 수 = ShotPattern 1회당 탄 수 × EventRepeatCount` 기준으로 설명 가능하다.
+- [x] D6. 플레이어 방향 의존 `Aim`을 파이프라인에 미리 수용하는 방향을 채택했다.
+  - 검증 결과:
+    - 플레이어 입력 파이프라인에는 `AimWorldXZ/HasAimWorldPoint`와 player transform rotation, cleanup 전용 `LockedFacingXZ`가 이미 존재한다는 점을 확인했다.
+    - WaveClip의 player-dependent aim은 별도 ad-hoc 입력이 아니라 fixed-step player snapshot 계약으로 수용하는 방향이 합의됐다.
+- [x] D7. 구현 착수 전 권장 기본값 6개를 채택했다.
+  - 검증 결과:
+    - `EventRepeatCount`는 `Poisson` / `EventBurst` 전용 필드로 둔다.
+    - `PlayerPositionAim`은 1차에서 `EventStart` snapshot timing만 지원한다.
+    - `PlayerPositionAim` snapshot은 request/event-local state에 저장하고 consume 시 재계산하지 않는다.
+    - `PositionPattern.LineEven`은 1차에서 `SampleSpacing` 기준만 유지한다.
+    - `Aim.LineNormal`은 이번 단계에 포함하지 않고 후속 확장으로 미룬다.
+    - runtime flat shape rename은 이번 단계에서 수행하지 않고 compat 이름을 한 단계 더 유지한다.
+- [x] D8. Plan A. `WaveClipSO` authoring contract를 새 축 기준으로 재구성했다.
+  - 검증 결과:
+    - `WaveSpawnEntryAuthoring`는 `Payload / Emission / Sampling / PositionPattern / Aim / ShotPattern` 6축으로 재구성됐다.
+    - `WaveSamplingAuthoring`는 `Anchor + AreaSampler + SpawnSampleBudget + PlayerNoSpawnRadius` 컨테이너로 분리됐다.
+    - `BurstShotsPerEvent`는 authoring schema에서 제거되고 `EventRepeatCount`로 대체됐다.
+    - `PointSet`, `LineEven`, `Random/Fixed/Spiral/PlayerPosition`, `Single/NWay/Radial` subtype 트리와 SerializeReference drawer가 구현됐다.
+- [x] D9. Plan B. resolver/validation contract를 새 축 기준으로 재정의하고 검증했다.
+  - 검증 결과:
+    - `ResolvedWaveSpawnDirectiveSnapshot`가 canonical snapshot으로 교체됐다.
+    - validation은 `CV040` 구조 검증과 semantic 검증(`CV018`, `CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CVW032`, `CVW033`)으로 재배치됐다.
+    - 운영 6개 + test 2개 WaveClip asset이 새 authoring schema로 마이그레이션됐다.
+    - `compile -> console error 0 -> EditMode 404/404 -> PlayMode smoke 1/1`까지 통과했다.
+- [x] D10. Plan C. runtime request/event-local snapshot ownership을 canonical runtime 기준으로 고정했다.
+  - 검증 결과:
+    - runtime SSOT가 `ResolvedWaveSpawnDirectiveSnapshot -> SourceClipPatternBuffer -> SourceSpawnRequestBuffer` 흐름으로 재정렬됐다.
+    - `SourceClipPatternBuffer`와 `SourceSpawnRequestBuffer`에 canonical runtime 필드(`SamplingAnchorMode`, `AreaSamplerMode`, `PositionPatternMode`, `AimMode`, `AimSnapshotTiming`, `AimAngleOffsetDeg`, `ShotPatternMode`, `ShotCount`, `EventRepeatCount`)가 추가됐다.
+    - `SourceSpawnRequestBuffer`가 `EventAnchorPosition`, `EventAimTargetPosition`, `EventShotElapsedSec`, `SpawnSequence`를 포함한 event-local mutable state의 owner로 정리됐다.
+    - `Poisson` / `EventBurst`는 `Instant`와 `Timed` 모두 event 단위 request item을 유지하고 merge하지 않도록 변경됐다.
+    - runtime consume는 `Aim + ShotPattern + PositionPattern` canonical field를 읽고, `PlayerPositionAim(EventStart)` snapshot을 request-local state에 고정한다.
+    - `compile -> console error 0 -> EditMode 403/403 -> PlayMode smoke 1/1`까지 통과했다.
+- [x] D11. Plan D. validation / fixture / document 정합성을 canonical 계약 기준으로 마감했다.
+  - 검증 결과:
+    - `ContentValidationRules`의 canonical 코드 의미(`CV022`, `CV023`, `CV024`, `CV026`, `CV028`, `CVW032`, `CVW033`)와 테스트 이름/메시지의 stale 용어를 정리했다.
+    - sample asset test가 typed-only뿐 아니라 각 directive 축(`Emission`, `Sampling`, `Sampling.Anchor`, `Sampling.AreaSampler`, `PositionPattern`, `Aim`, `ShotPattern`)의 non-null도 확인하도록 강화됐다.
+    - request build / stress fixture의 stale `BurstShotsPerEvent` 명칭을 `EventRepeatCount` 중심으로 정리했다.
+    - `TD-002`, `TD-003`, `TD-005`를 current canonical contract 기준으로 전면 갱신했다.
+    - 운영/test `WaveClip` asset YAML에서 `Directives[]` only와 current managed reference type 사용 상태를 재확인했다.
+    - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 다시 통과했다.
+- [x] D12. Plan E. runtime/product code의 legacy/compat 경로를 canonical-only 기준으로 정리했다.
+  - 검증 결과:
+    - `SourceClipPatternBuffer`와 `SourceSpawnRequestBuffer`에서 compat runtime field(`SamplingMode`, `CenterMode`, `DirectionMode`, `NWayCount`, `BurstShotsPerEvent`)를 제거했다.
+    - `SpawnRequestCommonUtility`의 compat fallback(`NormalizeCanonicalMirrors`)과 compat-aware request template 인자를 제거했다.
+    - runtime/product code에서 compat enum/type(`SourceSpawnSamplingModeId`, `SourceSpawnCenterModeId`, `SourceSpawnDirectionModeId`) 참조를 제거했다.
+    - debug / playmode / editmode fixture helper를 canonical field 기준으로 재작성했다.
+    - current SSOT 문서(`TD-002`, `TD-003`, `TD-005`)에서 compat mirror 잔존 설명을 제거했다.
+    - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 통과했다.
+- [x] D13. Plan F. `PlayerPositionAim`의 `PerShot` retarget을 canonical contract에 맞게 확장했다.
+  - 검증 결과:
+    - `PlayerPositionAimAuthoring.SnapshotTiming`은 `EventStart`와 `PerShot`를 모두 허용하도록 resolver / validation / 문서가 동기화됐다.
+    - unsupported snapshot timing validation 제약이 제거되고 `PlayerPositionAim(PerShot)`는 canonical authoring으로 허용된다.
+    - runtime은 `EventStart`에서만 request-local `EventAimTargetPosition`을 고정하고, `PerShot`는 repeat consume 시점마다 현재 player world position으로 retarget한다.
+    - `Timed + PlayerPositionAim(EventStart)` fixation, `Timed/Instant + PlayerPositionAim(PerShot)` retarget, `PerShot + NWay/Radial` 회귀 테스트를 추가했다.
+    - `compile -> console error 0 -> EditMode -> PlayMode smoke` 최종 루프를 다시 통과했다.
+- [x] D14. Plan G. `WaveClip`의 shared `SerializeReference` graph를 invalid state로 고정하고 deep-copy UX를 추가했다.
+  - 검증 결과:
+    - `WaveClipSO` custom inspector가 `Segments` / `Directives` add/duplicate를 직접 소유하고 shallow copy 대신 fresh instance / deep clone을 사용한다.
+    - editor utility가 shared managed reference 탐지, explicit deep clone, clip repair, project asset repair 배치를 공통 규칙으로 제공한다.
+    - `CV041`는 `WaveClip` 내부 shared `SerializeReference` graph error로 재정의됐다.
+    - 운영/test WaveClip asset 검사와 sample asset regression이 shared managed reference graph 부재를 포함하도록 강화됐다.
+    - `bwc_sus_samples_wave.asset`의 shared `rid` 상태를 실제 직렬화 데이터에서 제거했다.
+- [x] D15. Plan H. `NWay = centered fan`, `Radial = full circle`로 `ShotPattern` 의미를 분리했다.
+  - 검증 결과:
+    - `NWayShotPatternAuthoring`에 `AngleSpacingDeg`를 추가하고 canonical snapshot/runtime field `NWayAngleSpacingDeg`를 도입했다.
+    - runtime angle 계산은 `NWay` fan offset과 `Radial` full-circle offset을 분리해서 사용한다.
+    - `CV023`는 `NWay ShotCount < 2`뿐 아니라 `AngleSpacingDeg <= 0`도 차단하도록 확장됐다.
+    - 기존 360도 의미의 운영 WaveClip `NWay` 자산은 `Radial`로 마이그레이션됐다.
+- [x] D16. Plan I. `LineNormalAim`을 `LineEven PositionPattern` 전용 aim subtype으로 도입했다.
+  - 검증 결과:
+    - `LineNormalAimAuthoring`와 `WaveLineNormalSideId`가 추가되고 canonical snapshot/runtime field에 `LineNormalSide`, `LineNormalAngleOffsetDeg`가 반영됐다.
+    - runtime은 `LineStart -> LineEnd` tangent 기준 좌/우 법선과 `AngleOffsetDeg`로 base angle을 계산한다.
+    - `CV042`가 추가되어 `LineNormalAim`이 `LineEven PositionPattern` 없이 사용되면 error로 차단된다.
+    - `LineNormal + Single/NWay/Radial` EditMode 회귀와 resolver/validation 테스트가 추가됐다.
+- [x] D17. Plan J. `WaveClipSO` custom inspector를 summary / safety / editing power 중심으로 확장했다.
+  - 검증 결과:
+    - segment/directive foldout을 `SessionState`로 직접 소유하고, summary row와 dense mode 토글을 추가했다.
+    - inline warning, current clip validation panel, shared graph issue row + jump 동선을 추가했다.
+    - `Move Up / Move Down`, `Add Default Directive`, `Add From Preset`(`Single Hazard`, `Fan Burst`, `Radial Burst`, `Line Normal Fan`)을 editor-only workflow로 추가했다.
+    - summary / preset / move / current-clip validation helper 테스트를 existing imported EditMode suite에 통합했고 `EditMode 431/431`, dedicated PlayMode smoke `1/1`을 다시 통과했다.
+- [x] D18. Plan K. `ClipSegment` 시간을 `StartSec + DurationSec`로 재정의하고 `EventBurst` truncation warning을 추가했다.
+  - 검증 결과:
+    - `WaveClipSO.ClipSegment`에서 `EndSec`를 제거하고 `DurationSec`로 교체했으며, bake는 계속 `LocalStartSec/LocalEndSec`로 flatten한다.
+    - `CV010`은 non-positive/effective-zero duration error로 재정의했고, `CVW040`은 `EventBurst` tail burst truncation warning으로 추가했다.
+    - 운영/test `WaveClip` asset을 직접 마이그레이션해 `EndSec:` YAML 잔존을 제거했고, sample asset test에서 이를 다시 검사한다.
+
+## End of Session
+- 결과: `WaveSpawnEntryAuthoring` 개편 논의의 핵심 쟁점을 `Sampling`, `PositionPattern`, `Aim`, `ShotPattern`, `EventRepeatCount`, `player-dependent Aim` 축으로 재정리했다.
+- 남은 리스크:
+  - `LineEven`의 count-based authoring 같은 계약 확장은 별도 플랜으로 다뤄야 한다.
+- 다음 세션 시작점:
+  - 후속 플랜에서 추가 `Aim` / `PositionPattern` 조합, editor UX polish 같은 계약 확장 범위를 다시 논의한다.

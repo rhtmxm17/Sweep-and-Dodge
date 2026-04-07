@@ -12,9 +12,20 @@ namespace SweepNDodge.DotsBullets
         public SourceSpawnLaneId Lane;
         public int LanePriority;
         public int BulletTypeKey;
-        public SourceSpawnSamplingModeId SamplingMode;
-        public SourceSpawnCenterModeId CenterMode;
-        public SourceSpawnDirectionModeId DirectionMode;
+        public SourceSpawnEmissionModeId EmissionMode;
+        public SourceSpawnModeId SpawnMode;
+        public WaveSamplingAnchorModeId SamplingAnchorMode;
+        public WaveAreaSamplerModeId AreaSamplerMode;
+        public WavePositionPatternModeId PositionPatternMode;
+        public WaveAimModeId AimMode;
+        public WaveAimSnapshotTimingId AimSnapshotTiming;
+        public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
+        public WaveShotPatternModeId ShotPatternMode;
+        public int ShotCount;
+        public float NWayAngleSpacingDeg;
+        public int EventRepeatCount;
         public Unity.Mathematics.float2 FixedPoint;
         public Unity.Mathematics.float2 SpawnOffset;
         public Unity.Mathematics.float2 LineStart;
@@ -28,16 +39,14 @@ namespace SweepNDodge.DotsBullets
         public int SpawnSampleBudget;
         public float PlayerNoSpawnRadius;
         public float BaseAngleDeg;
-        public int NWayCount;
         public float SpiralStepDeg;
-        public int BurstShotsPerEvent;
         public SourceSpawnEventShotScheduleId EventShotSchedule;
         public float EventShotIntervalSec;
         public float EventShotElapsedSec;
         public byte EventAnchorInitialized;
-        public byte EventAnchorUseFixedPosition;
-        public Unity.Mathematics.float3 EventAnchorCenter;
         public Unity.Mathematics.float3 EventAnchorPosition;
+        public byte EventAimInitialized;
+        public Unity.Mathematics.float3 EventAimTargetPosition;
         public uint SpawnSequence;
         public int Count;
         public uint OldestFrame;
@@ -109,6 +118,7 @@ namespace SweepNDodge.DotsBullets
         public float SpawnRadius;
         public BulletSecondarySpawnShapeId Shape;
         public uint OldestFrame;
+        public uint ReadyFrame;
         public uint Sequence;
     }
 
@@ -122,6 +132,7 @@ namespace SweepNDodge.DotsBullets
     public struct SecondarySpawnBacklogMetricsComponent : IComponentData
     {
         public int PendingCount;
+        public int DeferredByDelay;
         public int DeferredByBudget;
         public int DeferredByPool;
         public int DroppedByCapacity;

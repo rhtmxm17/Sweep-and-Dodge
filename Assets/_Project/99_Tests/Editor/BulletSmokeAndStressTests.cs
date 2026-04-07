@@ -880,8 +880,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5001,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = new float2(3f, 4f),
                     SpawnOffset = float2.zero,
                     SpawnSampleBudget = 8,
@@ -926,8 +931,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5002,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.PlayerRelative,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.PlayerRelative,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     SpawnOffset = new float2(2f, -3f),
                     SpawnSampleBudget = 8,
@@ -973,8 +983,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5003,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.PlayerRelative,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.PlayerRelative,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     SpawnOffset = float2.zero,
                     SpawnSampleBudget = 2,
@@ -1021,8 +1036,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     Lane = SourceSpawnLaneId.Hazard,
                     LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = new float2(1f, 4f),
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
@@ -1035,8 +1055,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     Lane = SourceSpawnLaneId.Hazard,
                     LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = new float2(9f, 10f),
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
@@ -1085,8 +1110,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5101,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.PointSet,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.PointSet,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = new float2(5f, 7f),
                     PointSetCount = 3,
                     Point0 = new float2(-1f, 0f),
@@ -1094,7 +1124,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     Point2 = new float2(3f, -1f),
                     SpawnSampleBudget = 4,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
                     BaseAngleDeg = 0f,
                     Count = 3,
                     OldestFrame = 0u,
@@ -1127,7 +1156,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SpawnExecution_PointSetSpiral_UsesPerPointLocalSequence()
+        public void SpawnExecution_PointSetSpiral_UsesRepeatSequencePerEvent()
         {
             try
             {
@@ -1149,8 +1178,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5102,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.PointSet,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.PointSet,
+                    AimMode = WaveAimModeId.Spiral,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     PointSetCount = 3,
                     Point0 = new float2(-2f, 0f),
@@ -1158,7 +1192,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     Point2 = new float2(2f, 0f),
                     SpawnSampleBudget = 4,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.Spiral,
                     BaseAngleDeg = 0f,
                     SpiralStepDeg = 90f,
                     Count = 6,
@@ -1177,12 +1210,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 float3 p2 = new float3(2f, 0f, 0f);
                 float2 dirRight = new float2(1f, 0f);
                 float2 dirUp = new float2(0f, 1f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirDown = new float2(0f, -1f);
 
                 Assert.That(CountDirectionAtPoint(snapshots, p0, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
-                Assert.That(CountDirectionAtPoint(snapshots, p1, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
-                Assert.That(CountDirectionAtPoint(snapshots, p2, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
-                Assert.That(CountDirectionAtPoint(snapshots, p0, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p0, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
                 Assert.That(CountDirectionAtPoint(snapshots, p1, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p1, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, p2, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
                 Assert.That(CountDirectionAtPoint(snapshots, p2, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
             }
             finally
@@ -1192,7 +1227,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SpawnExecution_LineEvenNWay_SpawnsAtomicSetsPerSamplePoint()
+        public void SpawnExecution_LineEvenNWayFan_SpawnsAtomicSetsPerSamplePoint()
         {
             try
             {
@@ -1214,17 +1249,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5201,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.NWay,
+                    ShotCount = 4,
+                    NWayAngleSpacingDeg = 30f,
+                    EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     LineStart = new float2(-2f, 0f),
                     LineEnd = new float2(2f, 0f),
                     SampleSpacing = 1f,
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.NWay,
-                    BaseAngleDeg = 45f,
-                    NWayCount = 4,
+                    BaseAngleDeg = 0f,
                     Count = 20,
                     OldestFrame = 0u,
                 });
@@ -1236,23 +1275,337 @@ namespace SweepNDodge.DotsBullets.Tests
                 CollectActiveBulletSnapshotsForSource(em, source, snapshots);
                 Assert.That(snapshots.Count, Is.EqualTo(20));
 
-                float invSqrt2 = 0.70710677f;
-                float2 dir45 = new float2(invSqrt2, invSqrt2);
-                float2 dir135 = new float2(-invSqrt2, invSqrt2);
-                float2 dir225 = new float2(-invSqrt2, -invSqrt2);
-                float2 dir315 = new float2(invSqrt2, -invSqrt2);
+                float2 dirNeg45 = new float2(0.70710677f, -0.70710677f);
+                float2 dirNeg15 = new float2(0.9659258f, -0.25881904f);
+                float2 dirPos15 = new float2(0.9659258f, 0.25881904f);
+                float2 dirPos45 = new float2(0.70710677f, 0.70710677f);
 
                 for (int i = -2; i <= 2; i++)
                 {
                     var point = new float3(i, 0f, 0f);
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir45, 0.0001f, 0.0001f), Is.EqualTo(1));
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir135, 0.0001f, 0.0001f), Is.EqualTo(1));
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir225, 0.0001f, 0.0001f), Is.EqualTo(1));
-                    Assert.That(CountDirectionAtPoint(snapshots, point, dir315, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirNeg45, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirNeg15, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirPos15, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirPos45, 0.0001f, 0.0001f), Is.EqualTo(1));
                 }
 
                 var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 Assert.That(requestsAfter.Length, Is.EqualTo(0));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimLeft_Single_UsesLineLeftNormal()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalLeftWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5203,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(3));
+
+                float2 dirUp = new float2(0f, 1f);
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(-2f, 0f, 0f), dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(0f, 0f, 0f), dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(2f, 0f, 0f), dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimRight_Single_UsesLineRightNormal()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalRightWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5204,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Right,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(3));
+
+                float2 dirDown = new float2(0f, -1f);
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(-2f, 0f, 0f), dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(0f, 0f, 0f), dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(2f, 0f, 0f), dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimOffset_Single_RotatesFromNormal()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalOffsetWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 8, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5205,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 15f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(3));
+
+                float2 dirOffset = new float2(-0.25881904f, 0.9659258f);
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(-2f, 0f, 0f), dirOffset, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(0f, 0f, 0f), dirOffset, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, new float3(2f, 0f, 0f), dirOffset, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimNWay_UsesLineNormalAsFanCenter()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalNWayWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5206,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.NWay,
+                    ShotCount = 3,
+                    NWayAngleSpacingDeg = 30f,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 9,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(16);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(9));
+
+                float2 dir60 = new float2(0.5f, 0.8660254f);
+                float2 dir90 = new float2(0f, 1f);
+                float2 dir120 = new float2(-0.5f, 0.8660254f);
+                for (int i = -2; i <= 2; i += 2)
+                {
+                    var point = new float3(i, 0f, 0f);
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir60, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir90, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dir120, 0.0001f, 0.0001f), Is.EqualTo(1));
+                }
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_LineNormalAimRadial_UsesLineNormalAsRadialBaseAngle()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnLineNormalRadialWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 16, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5207,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.LineNormal,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    LineNormalAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Radial,
+                    ShotCount = 4,
+                    EventRepeatCount = 1,
+                    FixedPoint = float2.zero,
+                    LineStart = new float2(-2f, 0f),
+                    LineEnd = new float2(2f, 0f),
+                    SampleSpacing = 2f,
+                    SpawnSampleBudget = 4,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 12,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(16);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(12));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirDown = new float2(0f, -1f);
+                for (int i = -2; i <= 2; i += 2)
+                {
+                    var point = new float3(i, 0f, 0f);
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+                    Assert.That(CountDirectionAtPoint(snapshots, point, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                }
             }
             finally
             {
@@ -1283,17 +1636,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5202,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.NWay,
+                    ShotCount = 4,
+                    NWayAngleSpacingDeg = 30f,
+                    EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     LineStart = new float2(-1f, 0f),
                     LineEnd = new float2(1f, 0f),
                     SampleSpacing = 1f,
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.NWay,
                     BaseAngleDeg = 0f,
-                    NWayCount = 4,
                     SpawnSequence = 7u,
                     Count = 4,
                     OldestFrame = 0u,
@@ -1345,17 +1702,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 5203,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
-                    CenterMode = SourceSpawnCenterModeId.FixedPoint,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.NWay,
+                    ShotCount = 4,
+                    NWayAngleSpacingDeg = 30f,
+                    EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     LineStart = new float2(-2f, 0f),
                     LineEnd = new float2(2f, 0f),
                     SampleSpacing = 1f,
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.NWay,
                     BaseAngleDeg = 45f,
-                    NWayCount = 4,
                     SpawnSequence = 3u,
                     Count = 8,
                     OldestFrame = 0u,
@@ -1466,11 +1827,11 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SpawnRequestBuild_PoissonBurstShotsPerEvent_AccumulatesAsShotMultiples()
+        public void SpawnRequestBuild_PoissonEventRepeatCount_AccumulatesAsShotMultiples()
         {
             try
             {
-                using var world = CreateDefaultTestWorld("SpawnPoissonShotMultipleWorld", out var simGroup);
+                using var world = CreateDefaultTestWorld("SpawnPoissonEventRepeatWorld", out var simGroup);
                 var em = world.EntityManager;
 
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
@@ -1499,7 +1860,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     ratePerSecPerArea: 0f);
                 poissonPattern.EmissionMode = SourceSpawnEmissionModeId.Poisson;
                 poissonPattern.MeanEventsPerSec = 3600f;
-                poissonPattern.BurstShotsPerEvent = 3;
+                poissonPattern.EventRepeatCount = 3;
                 clipPatterns.Add(poissonPattern);
 
                 var sustainCandidates = em.GetBuffer<SourceSustainSlotCandidateBuffer>(source);
@@ -1529,7 +1890,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 int pending = SumPendingRequestCount(em.GetBuffer<SourceSpawnRequestBuffer>(source));
                 Assert.That(pending, Is.GreaterThan(0));
-                Assert.That(pending % 3, Is.EqualTo(0), "Poisson pending shots should follow BurstShotsPerEvent multiples.");
+                Assert.That(pending % 3, Is.EqualTo(0), "Poisson pending shots should follow EventRepeatCount multiples.");
             }
             finally
             {
@@ -1561,11 +1922,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 8001,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 3,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
                     BaseAngleDeg = 0f,
                     Count = 3,
                     EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
@@ -1605,6 +1971,283 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
 
                 Assert.That(anchoredCount, Is.EqualTo(2), "Timed Uniform event should keep a fixed world anchor across shots.");
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerPositionAimEventStart_KeepsInitialAimTargetAcrossRepeats()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimEventStartWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8010,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 3,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(2));
+
+                float2 dirRight = new float2(1f, 0f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(2));
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requestsAfter.Length, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].EventAimInitialized, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].EventAimTargetPosition.x, Is.EqualTo(10f).Within(0.0001f));
+                Assert.That(requestsAfter[0].EventAimTargetPosition.z, Is.EqualTo(0f).Within(0.0001f));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerPositionAimPerShot_RetargetsAcrossRepeats()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimPerShotWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8011,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 3,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 3,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(2));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+
+                var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                Assert.That(requestsAfter.Length, Is.EqualTo(1));
+                Assert.That(requestsAfter[0].EventAimInitialized, Is.EqualTo(0));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerPositionAimPerShotNWay_UsesCurrentPlayerForEachSet()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimPerShotNWayWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8012,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 2,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.NWay,
+                    ShotCount = 2,
+                    NWayAngleSpacingDeg = 180f,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 4,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(4));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                float2 dirDown = new float2(0f, -1f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
+        public void SpawnExecution_PlayerPositionAimPerShotRadial_UsesCurrentPlayerForEachSet()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnPlayerAimPerShotRadialWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayerWithTransform(em, new float3(10f, 0f, 0f));
+                SetFixedTickEnabled(em, enabled: false);
+                CreateConfigSingletons(em, budgetPerFrame: 8, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, float3.zero);
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 8013,
+                    BulletTypeKey = 1,
+                    EmissionMode = SourceSpawnEmissionModeId.Poisson,
+                    EventRepeatCount = 2,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.PlayerPosition,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.PerShot,
+                    AimAngleOffsetDeg = 0f,
+                    ShotPatternMode = WaveShotPatternModeId.Radial,
+                    ShotCount = 2,
+                    SpawnSampleBudget = 8,
+                    PlayerNoSpawnRadius = 0f,
+                    Count = 4,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
+                    EventShotIntervalSec = 0.2f,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(0.1d, 0.1f));
+                simGroup.Update();
+                SetPlayerPosition(em, new float3(0f, 0f, 10f));
+                world.SetTime(new TimeData(0.2d, 0.1f));
+                simGroup.Update();
+                world.SetTime(new TimeData(0.3d, 0.1f));
+                simGroup.Update();
+
+                var snapshots = new List<ActiveBulletSnapshot>(8);
+                CollectActiveBulletSnapshotsForSource(em, source, snapshots);
+                Assert.That(snapshots.Count, Is.EqualTo(4));
+
+                float2 dirRight = new float2(1f, 0f);
+                float2 dirLeft = new float2(-1f, 0f);
+                float2 dirUp = new float2(0f, 1f);
+                float2 dirDown = new float2(0f, -1f);
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirRight, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirLeft, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirUp, 0.0001f, 0.0001f), Is.EqualTo(1));
+                Assert.That(CountDirectionAtPoint(snapshots, float3.zero, dirDown, 0.0001f, 0.0001f), Is.EqualTo(1));
             }
             finally
             {
@@ -1670,11 +2313,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 8003,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.PollutionTopK,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.PollutionTopK,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     SpawnSampleBudget = 1,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
                     BaseAngleDeg = 0f,
                     Count = 1,
                     OldestFrame = 0u,
@@ -1752,11 +2399,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 8004,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     SpawnSampleBudget = 1,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
                     BaseAngleDeg = 0f,
                     Count = 1,
                     OldestFrame = 0u,
@@ -1803,14 +2454,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     DirectiveId = 8002,
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.LineEven,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.LineEven,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     LineStart = new float2(-1f, 0f),
                     LineEnd = new float2(1f, 0f),
                     SampleSpacing = 2f,
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
-                    DirectionMode = SourceSpawnDirectionModeId.Fixed,
                     BaseAngleDeg = 0f,
                     Count = 2,
                     EventShotSchedule = SourceSpawnEventShotScheduleId.Timed,
@@ -2009,9 +2664,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     Lane = SourceSpawnLaneId.Hazard,
                     LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    DirectionMode = SourceSpawnDirectionModeId.Random,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     FixedPoint = float2.zero,
                     SpawnOffset = float2.zero,
                     LineStart = float2.zero,
@@ -2020,9 +2679,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     SpawnSampleBudget = 8,
                     PlayerNoSpawnRadius = 0f,
                     BaseAngleDeg = 0f,
-                    NWayCount = 1,
                     SpiralStepDeg = 0f,
-                    BurstShotsPerEvent = 1,
                     SpawnSequence = 0u,
                     Count = 5,
                     OldestFrame = 0u,
@@ -3480,11 +4137,14 @@ namespace SweepNDodge.DotsBullets.Tests
                     Lane = SourceSpawnLaneId.Hazard,
                     LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    DirectionMode = SourceSpawnDirectionModeId.Random,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     SpawnSampleBudget = 8,
-                    NWayCount = 1,
                     Count = 60,
                     OldestFrame = 0u,
                 });
@@ -3603,11 +4263,14 @@ namespace SweepNDodge.DotsBullets.Tests
                     Lane = SourceSpawnLaneId.Hazard,
                     LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(SourceSpawnLaneId.Hazard),
                     BulletTypeKey = 1,
-                    SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                    CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                    DirectionMode = SourceSpawnDirectionModeId.Random,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                    AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Random,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
                     SpawnSampleBudget = 8,
-                    NWayCount = 1,
                     Count = 100,
                     OldestFrame = 0u,
                 });
@@ -4895,9 +5558,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 BulletTypeKey = 1,
                 EmissionMode = SourceSpawnEmissionModeId.RateField,
                 SpawnMode = SourceSpawnModeId.FixedDensity,
-                SamplingMode = SourceSpawnSamplingModeId.UniformField,
-                CenterMode = SourceSpawnCenterModeId.SourceCenter,
-                DirectionMode = SourceSpawnDirectionModeId.Random,
+                SamplingAnchorMode = WaveSamplingAnchorModeId.SourceCenter,
+                AreaSamplerMode = WaveAreaSamplerModeId.UniformField,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Random,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                AimAngleOffsetDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                LineNormalAngleOffsetDeg = 0f,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                NWayAngleSpacingDeg = 0f,
+                EventRepeatCount = 1,
                 FixedPoint = float2.zero,
                 SpawnOffset = float2.zero,
                 LineStart = float2.zero,
@@ -4911,13 +5583,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 SpawnSampleBudget = 16,
                 PlayerNoSpawnRadius = 0f,
                 BaseAngleDeg = 0f,
-                NWayCount = 1,
                 SpiralStepDeg = 0f,
                 SpawnDensityPerSecPerArea = ratePerSecPerArea,
                 MeanEventsPerSec = 0f,
                 BurstRepeatCount = 1,
                 BurstIntervalSec = 1f,
-                BurstShotsPerEvent = 1,
                 EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
                 EventShotIntervalSec = 0f,
                 LanePriority = SourceSpawnLanePriorityUtility.ResolvePriority(lane),

@@ -278,11 +278,12 @@ namespace SweepNDodge.DotsBullets
             {
                 var segment = clip.Segments[s];
                 int entryCount = segment.Directives?.Length ?? 0;
-                if (segment.EndSec <= segment.StartSec || entryCount <= 0)
+                if (segment.DurationSec <= 0f || entryCount <= 0)
                     continue;
 
                 float startSec = Mathf.Max(0f, segment.StartSec);
-                float endSec = Mathf.Max(startSec, segment.EndSec);
+                float rawEndSec = startSec + Mathf.Max(0f, segment.DurationSec);
+                float endSec = Mathf.Max(startSec, rawEndSec);
                 if (clipDuration > 0f)
                 {
                     startSec = Mathf.Min(startSec, clipDuration);
@@ -317,15 +318,26 @@ namespace SweepNDodge.DotsBullets
                         BulletTypeKey = typeKey,
                         EmissionMode = snapshot.EmissionMode,
                         SpawnMode = snapshot.SpawnMode,
-                        SamplingMode = snapshot.SamplingMode,
-                        CenterMode = snapshot.CenterMode,
-                        DirectionMode = snapshot.DirectionMode,
+                        SamplingAnchorMode = snapshot.SamplingAnchorMode,
+                        AreaSamplerMode = snapshot.AreaSamplerMode,
+                        PositionPatternMode = snapshot.PositionPatternMode,
+                        AimMode = snapshot.AimMode,
+                        AimSnapshotTiming = snapshot.AimSnapshotTiming,
+                        AimAngleOffsetDeg = snapshot.AimAngleOffsetDeg,
+                        LineNormalSide = snapshot.LineNormalSide,
+                        LineNormalAngleOffsetDeg = snapshot.LineNormalAngleOffsetDeg,
+                        ShotPatternMode = snapshot.ShotPatternMode,
+                        ShotCount = Mathf.Max(1, snapshot.ShotCount),
+                        NWayAngleSpacingDeg = snapshot.ShotPatternMode == WaveShotPatternModeId.NWay
+                            ? snapshot.NWayAngleSpacingDeg
+                            : 0f,
+                        EventRepeatCount = Mathf.Max(1, snapshot.EventRepeatCount),
                         FixedPoint = new float2(snapshot.FixedPoint.x, snapshot.FixedPoint.y),
                         SpawnOffset = new float2(snapshot.SpawnOffset.x, snapshot.SpawnOffset.y),
                         LineStart = new float2(snapshot.LineStart.x, snapshot.LineStart.y),
                         LineEnd = new float2(snapshot.LineEnd.x, snapshot.LineEnd.y),
                         SampleSpacing = Mathf.Max(0.001f, snapshot.SampleSpacing),
-                        PointSetCount = Mathf.Clamp(snapshot.PointSetCount, 0, PointSetSamplingAuthoring.MaxPointCount),
+                        PointSetCount = Mathf.Clamp(snapshot.PointSetCount, 0, PointSetPositionPatternAuthoring.MaxPointCount),
                         Point0 = new float2(snapshot.Point0.x, snapshot.Point0.y),
                         Point1 = new float2(snapshot.Point1.x, snapshot.Point1.y),
                         Point2 = new float2(snapshot.Point2.x, snapshot.Point2.y),
@@ -333,13 +345,11 @@ namespace SweepNDodge.DotsBullets
                         SpawnSampleBudget = Mathf.Max(1, snapshot.SpawnSampleBudget),
                         PlayerNoSpawnRadius = Mathf.Max(0f, snapshot.PlayerNoSpawnRadius),
                         BaseAngleDeg = snapshot.BaseAngleDeg,
-                        NWayCount = Mathf.Max(1, snapshot.NWayCount),
                         SpiralStepDeg = snapshot.SpiralStepDeg,
                         SpawnDensityPerSecPerArea = Mathf.Max(0f, snapshot.RatePerSecPerArea),
                         MeanEventsPerSec = Mathf.Max(0f, snapshot.MeanEventsPerSec),
                         BurstRepeatCount = snapshot.BurstRepeatCount,
                         BurstIntervalSec = Mathf.Max(0.001f, snapshot.BurstIntervalSec),
-                        BurstShotsPerEvent = Mathf.Max(1, snapshot.BurstShotsPerEvent),
                         EventShotSchedule = snapshot.EventShotSchedule,
                         EventShotIntervalSec = Mathf.Max(0f, snapshot.EventShotIntervalSec),
                         LanePriority = lanePriority,

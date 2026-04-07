@@ -122,6 +122,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 45f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 },
                 collectReaction: null);
 
@@ -193,6 +194,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 30f,
                     SpawnRadius = 0.5f,
+                    SpawnDelaySec = 0f,
                 });
 
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
@@ -230,6 +232,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.ForwardSpread,
                     SpreadAngleDeg = 90f,
                     SpawnRadius = 1.5f,
+                    SpawnDelaySec = 0f,
                 },
                 collectReaction: null);
 
@@ -250,6 +253,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.SpawnRadius, Is.EqualTo(1.5f));
             Assert.That(request.Shape, Is.EqualTo(BulletSecondarySpawnShapeId.ForwardSpread));
             Assert.That(request.OldestFrame, Is.EqualTo(12u));
+            Assert.That(request.ReadyFrame, Is.EqualTo(13u));
             Assert.That(request.Sequence, Is.EqualTo(0u));
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
@@ -288,6 +292,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.SingleForward,
                     SpreadAngleDeg = 15f,
                     SpawnRadius = 0.25f,
+                    SpawnDelaySec = 0f,
                 });
 
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
@@ -307,6 +312,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.SpawnRadius, Is.EqualTo(0.25f));
             Assert.That(request.Shape, Is.EqualTo(BulletSecondarySpawnShapeId.SingleForward));
             Assert.That(request.OldestFrame, Is.EqualTo(14u));
+            Assert.That(request.ReadyFrame, Is.EqualTo(15u));
             Assert.That(request.Sequence, Is.EqualTo(0u));
 
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
@@ -345,6 +351,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.SingleForward,
                     SpreadAngleDeg = 15f,
                     SpawnRadius = 0.25f,
+                    SpawnDelaySec = 0f,
                 });
 
             world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
@@ -356,9 +363,53 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(requests[0].Count, Is.EqualTo(2));
             Assert.That(requests[0].SourceEntity, Is.EqualTo(source));
             Assert.That(requests[0].CauserEntity, Is.EqualTo(bullet));
+            Assert.That(requests[0].ReadyFrame, Is.EqualTo(15u));
             Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
             Assert.That(em.IsComponentEnabled<BulletActiveTag>(bullet), Is.True);
             Assert.That(em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason, Is.EqualTo(BulletLifecycleReasonId.CarryFullRemoved));
+        }
+
+        [Test]
+        public void ReactionOwner_DelayedCleanupRemovedReaction_ComputesReadyFrameFromLogicDelta()
+        {
+            using var world = new World("BulletLifecycleReaction_DelayedReadyFrame");
+            var em = world.EntityManager;
+
+            SetExecutionEndPrerequisites(em, frame: 14u);
+            SetFixedTickRuntime(em, 1f / 60f);
+            var channelEntity = CreateSecondaryChannel(em);
+            var source = em.CreateEntity();
+            CreatePendingBullet(
+                em,
+                BulletLifecycleReasonId.VacuumCollected,
+                new BulletLifecycleContactComponent
+                {
+                    PositionXZ = new float2(2f, 3f),
+                    DirectionXZ = new float2(2f, 0f),
+                },
+                active: true,
+                despawnRequested: true,
+                typeKey: 11,
+                sourceRef: source,
+                addTransform: true,
+                explodeReaction: null,
+                collectReaction: new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
+                {
+                    SecondaryBulletTypeKey = 33,
+                    SpawnCount = 2,
+                    Shape = BulletSecondarySpawnShapeId.SingleForward,
+                    SpreadAngleDeg = 15f,
+                    SpawnRadius = 0.25f,
+                    SpawnDelaySec = 0.10f,
+                });
+
+            world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            var requests = em.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity);
+            Assert.That(requests.Length, Is.EqualTo(1));
+            Assert.That(requests[0].OldestFrame, Is.EqualTo(14u));
+            Assert.That(requests[0].ReadyFrame, Is.EqualTo(20u));
         }
 
         [Test]
@@ -395,6 +446,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 0f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 });
 
             var secondaryBullets = new NativeArray<Entity>(3, Allocator.Temp);
@@ -414,6 +466,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(sourceBullet), Is.False);
                 Assert.That(em.IsComponentEnabled<BulletActiveTag>(sourceBullet), Is.False);
 
+                AdvanceFrame(em);
                 world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();
 
@@ -452,6 +505,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 Value = frame,
             });
             em.CreateEntity(typeof(PlayerTag));
+        }
+
+        private static void SetFixedTickRuntime(EntityManager em, float deltaTime)
+        {
+            SetSingleton(em, new FixedTickStepRuntimeComponent
+            {
+                FrameDeltaTime = deltaTime,
+                LogicDeltaTime = deltaTime,
+                LogicStepCount = 1,
+                HasStep = 1,
+                UsingFixedTick = 0,
+            });
         }
 
         private static void SetFrameAndSimulationPrerequisites(EntityManager em, uint frame)
@@ -521,6 +586,15 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, default(SecondarySpawnBacklogMetricsComponent));
             em.AddBuffer<BulletSecondarySpawnRequestBuffer>(entity);
             return entity;
+        }
+
+        private static void AdvanceFrame(EntityManager em)
+        {
+            var query = em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>());
+            var entity = query.GetSingletonEntity();
+            var counter = em.GetComponentData<BulletFrameCounterComponent>(entity);
+            counter.Value += 1;
+            em.SetComponentData(entity, counter);
         }
 
         private static Entity CreatePendingBullet(

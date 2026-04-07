@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -19,48 +19,84 @@ MonoBehaviour:
   Segments:
   - editorOnlyDescription: Linear Baseline
     StartSec: 1.5
-    EndSec: 4.5
+    DurationSec: 3
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
       Emission:
         rid: 6141543268140187737
       Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187738
+        AreaSampler:
+          rid: 8141543268140187738
+      PositionPattern:
         rid: 6141543268140187738
-      Direction:
+      Aim:
         rid: 6141543268140187739
+      ShotPattern:
+        rid: 9141543268140187739
     - Payload:
         Bullet: {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
       Emission:
         rid: 6141543268140187740
       Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187741
+        AreaSampler:
+          rid: 8141543268140187741
+      PositionPattern:
         rid: 6141543268140187741
-      Direction:
+      Aim:
         rid: 6141543268140187742
+      ShotPattern:
+        rid: 9141543268140187742
   - editorOnlyDescription: Bubble StopBurst
     StartSec: 4.75
-    EndSec: 7.75
+    DurationSec: 3
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: d770120fbd6b4061836ce6a8b58441f3, type: 2}
       Emission:
         rid: 6141543268140187743
       Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187744
+        AreaSampler:
+          rid: 8141543268140187744
+      PositionPattern:
         rid: 6141543268140187744
-      Direction:
+      Aim:
         rid: 6141543268140187745
+      ShotPattern:
+        rid: 9141543268140187745
   - editorOnlyDescription: HomingLite
     StartSec: 8
-    EndSec: 11
+    DurationSec: 3
     Directives:
     - Payload:
         Bullet: {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
       Emission:
         rid: 6141543268140187746
       Sampling:
+        SpawnSampleBudget: 1
+        PlayerNoSpawnRadius: 0
+        Anchor:
+          rid: 7141543268140187747
+        AreaSampler:
+          rid: 8141543268140187747
+      PositionPattern:
         rid: 6141543268140187747
-      Direction:
+      Aim:
         rid: 6141543268140187748
+      ShotPattern:
+        rid: 9141543268140187748
   references:
     version: 2
     RefIds:
@@ -71,23 +107,28 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 3
         BurstIntervalSec: 0.75
-        BurstShotsPerEvent: 4
+        EventRepeatCount: 4
         EventShotSchedule: 1
         EventShotIntervalSec: 0.08
     - rid: 6141543268140187738
-      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        CenterMode: 1
-        FixedPoint: {x: 3.5, y: 2.5}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 1
-        PlayerNoSpawnRadius: 0
         Points:
         - {x: 0, y: 0}
+    - rid: 7141543268140187738
+      type: {class: FixedPointSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        FixedPoint: {x: 3.5, y: 2.5}
+    - rid: 8141543268140187738
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187739
-      type: {class: FixedDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 180
+    - rid: 9141543268140187739
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187740
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -95,23 +136,28 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 2
         BurstIntervalSec: 0.9
-        BurstShotsPerEvent: 1
+        EventRepeatCount: 1
         EventShotSchedule: 0
         EventShotIntervalSec: 0
     - rid: 6141543268140187741
-      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        CenterMode: 1
-        FixedPoint: {x: 2.5, y: -1.75}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 1
-        PlayerNoSpawnRadius: 0
         Points:
         - {x: 0, y: 0}
+    - rid: 7141543268140187741
+      type: {class: FixedPointSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        FixedPoint: {x: 2.5, y: -1.75}
+    - rid: 8141543268140187741
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187742
-      type: {class: FixedDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 180
+    - rid: 9141543268140187742
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187743
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -119,23 +165,28 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 4
         BurstIntervalSec: 0.6
-        BurstShotsPerEvent: 2
+        EventRepeatCount: 2
         EventShotSchedule: 1
         EventShotIntervalSec: 0.1
     - rid: 6141543268140187744
-      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        CenterMode: 1
-        FixedPoint: {x: 2.25, y: 1.75}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 1
-        PlayerNoSpawnRadius: 0
         Points:
         - {x: 0, y: 0}
+    - rid: 7141543268140187744
+      type: {class: FixedPointSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        FixedPoint: {x: 2.25, y: 1.75}
+    - rid: 8141543268140187744
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187745
-      type: {class: FixedDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 225
+    - rid: 9141543268140187745
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187746
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -143,20 +194,26 @@ MonoBehaviour:
         MaxActiveDensityPerArea: 0
         BurstRepeatCount: 3
         BurstIntervalSec: 0.75
-        BurstShotsPerEvent: 2
+        EventRepeatCount: 2
         EventShotSchedule: 1
         EventShotIntervalSec: 0.12
     - rid: 6141543268140187747
-      type: {class: PointSetSamplingAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        CenterMode: 1
-        FixedPoint: {x: 2.5, y: -1.75}
-        SpawnOffset: {x: 0, y: 0}
-        SpawnSampleBudget: 1
-        PlayerNoSpawnRadius: 0
         Points:
         - {x: 0, y: 0}
+    - rid: 7141543268140187747
+      type: {class: FixedPointSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        FixedPoint: {x: 2.5, y: -1.75}
+    - rid: 8141543268140187747
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
     - rid: 6141543268140187748
-      type: {class: FixedDirectionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 180
+    - rid: 9141543268140187748
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: {}
+

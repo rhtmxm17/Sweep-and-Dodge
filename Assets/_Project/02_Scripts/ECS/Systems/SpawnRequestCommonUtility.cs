@@ -148,9 +148,20 @@ namespace SweepNDodge.DotsBullets
             SourceSpawnLaneId lane,
             int lanePriority,
             int bulletTypeKey,
-            SourceSpawnSamplingModeId samplingMode,
-            SourceSpawnCenterModeId centerMode,
-            SourceSpawnDirectionModeId directionMode,
+            SourceSpawnEmissionModeId emissionMode,
+            SourceSpawnModeId spawnMode,
+            WaveSamplingAnchorModeId samplingAnchorMode,
+            WaveAreaSamplerModeId areaSamplerMode,
+            WavePositionPatternModeId positionPatternMode,
+            WaveAimModeId aimMode,
+            WaveAimSnapshotTimingId aimSnapshotTiming,
+            float aimAngleOffsetDeg,
+            WaveLineNormalSideId lineNormalSide,
+            float lineNormalAngleOffsetDeg,
+            WaveShotPatternModeId shotPatternMode,
+            int shotCount,
+            float nWayAngleSpacingDeg,
+            int eventRepeatCount,
             float2 fixedPoint,
             float2 spawnOffset,
             float2 lineStart,
@@ -164,9 +175,7 @@ namespace SweepNDodge.DotsBullets
             int spawnSampleBudget,
             float playerNoSpawnRadius,
             float baseAngleDeg,
-            int nWayCount,
             float spiralStepDeg,
-            int burstShotsPerEvent,
             SourceSpawnEventShotScheduleId eventShotSchedule,
             float eventShotIntervalSec)
         {
@@ -177,9 +186,20 @@ namespace SweepNDodge.DotsBullets
                 Lane = lane,
                 LanePriority = lanePriority,
                 BulletTypeKey = bulletTypeKey,
-                SamplingMode = samplingMode,
-                CenterMode = centerMode,
-                DirectionMode = directionMode,
+                EmissionMode = emissionMode,
+                SpawnMode = spawnMode,
+                SamplingAnchorMode = samplingAnchorMode,
+                AreaSamplerMode = areaSamplerMode,
+                PositionPatternMode = positionPatternMode,
+                AimMode = aimMode,
+                AimSnapshotTiming = aimSnapshotTiming,
+                AimAngleOffsetDeg = aimAngleOffsetDeg,
+                LineNormalSide = lineNormalSide,
+                LineNormalAngleOffsetDeg = lineNormalAngleOffsetDeg,
+                ShotPatternMode = shotPatternMode,
+                ShotCount = math.max(1, shotCount),
+                NWayAngleSpacingDeg = shotPatternMode == WaveShotPatternModeId.NWay ? nWayAngleSpacingDeg : 0f,
+                EventRepeatCount = math.max(1, eventRepeatCount),
                 FixedPoint = fixedPoint,
                 SpawnOffset = spawnOffset,
                 LineStart = lineStart,
@@ -193,16 +213,14 @@ namespace SweepNDodge.DotsBullets
                 SpawnSampleBudget = math.max(1, spawnSampleBudget),
                 PlayerNoSpawnRadius = math.max(0f, playerNoSpawnRadius),
                 BaseAngleDeg = baseAngleDeg,
-                NWayCount = math.max(1, nWayCount),
                 SpiralStepDeg = spiralStepDeg,
-                BurstShotsPerEvent = math.max(1, burstShotsPerEvent),
                 EventShotSchedule = eventShotSchedule,
                 EventShotIntervalSec = math.max(0f, eventShotIntervalSec),
                 EventShotElapsedSec = 0f,
                 EventAnchorInitialized = 0,
-                EventAnchorUseFixedPosition = 0,
-                EventAnchorCenter = float3.zero,
                 EventAnchorPosition = float3.zero,
+                EventAimInitialized = 0,
+                EventAimTargetPosition = float3.zero,
                 SpawnSequence = 0u,
                 Count = 0,
                 OldestFrame = 0u,
@@ -218,9 +236,9 @@ namespace SweepNDodge.DotsBullets
             if (count <= 0)
                 return;
 
-            if (requestTemplate.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
+            if (UsesDiscreteEventIdentity(in requestTemplate))
             {
-                int shotsPerEvent = math.max(1, requestTemplate.BurstShotsPerEvent);
+                int shotsPerEvent = ResolvePerEventBulletCount(in requestTemplate);
                 int remaining = count;
                 while (remaining > 0)
                 {
@@ -230,9 +248,9 @@ namespace SweepNDodge.DotsBullets
                     timedItem.OldestFrame = frame;
                     timedItem.EventShotElapsedSec = 0f;
                     timedItem.EventAnchorInitialized = 0;
-                    timedItem.EventAnchorUseFixedPosition = 0;
-                    timedItem.EventAnchorCenter = float3.zero;
                     timedItem.EventAnchorPosition = float3.zero;
+                    timedItem.EventAimInitialized = 0;
+                    timedItem.EventAimTargetPosition = float3.zero;
                     requests.Add(timedItem);
                     remaining -= eventShotCount;
                 }
@@ -258,6 +276,48 @@ namespace SweepNDodge.DotsBullets
             itemToAdd.Count = count;
             itemToAdd.OldestFrame = frame;
             requests.Add(itemToAdd);
+        }
+
+        public static int ResolveShotPatternUnitCount(in SourceClipPatternBuffer pattern)
+        {
+            return pattern.ShotPatternMode switch
+            {
+                WaveShotPatternModeId.NWay => math.max(1, pattern.ShotCount),
+                WaveShotPatternModeId.Radial => math.max(1, pattern.ShotCount),
+                _ => 1,
+            };
+        }
+
+        public static int ResolveShotPatternUnitCount(in SourceSpawnRequestBuffer request)
+        {
+            return request.ShotPatternMode switch
+            {
+                WaveShotPatternModeId.NWay => math.max(1, request.ShotCount),
+                WaveShotPatternModeId.Radial => math.max(1, request.ShotCount),
+                _ => 1,
+            };
+        }
+
+        public static int ResolvePerEventBulletCount(in SourceClipPatternBuffer pattern)
+        {
+            return math.max(1, pattern.EventRepeatCount) * ResolveShotPatternUnitCount(in pattern);
+        }
+
+        public static int ResolvePerEventBulletCount(in SourceSpawnRequestBuffer request)
+        {
+            return math.max(1, request.EventRepeatCount) * ResolveShotPatternUnitCount(in request);
+        }
+
+        public static bool UsesDiscreteEventIdentity(in SourceClipPatternBuffer pattern)
+        {
+            return pattern.EmissionMode == SourceSpawnEmissionModeId.Poisson
+                || pattern.EmissionMode == SourceSpawnEmissionModeId.EventBurst;
+        }
+
+        public static bool UsesDiscreteEventIdentity(in SourceSpawnRequestBuffer request)
+        {
+            return request.EmissionMode == SourceSpawnEmissionModeId.Poisson
+                || request.EmissionMode == SourceSpawnEmissionModeId.EventBurst;
         }
 
         private static int GetActiveCount(DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts, int typeKey)

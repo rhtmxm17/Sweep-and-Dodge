@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -7,6 +8,55 @@ namespace SweepNDodge.DotsBullets
     {
         Sustain = 0,
         OnStateEnterOnce = 1
+    }
+
+    public enum WaveSamplingAnchorModeId : byte
+    {
+        SourceCenter = 0,
+        FixedPoint = 1,
+        PlayerRelative = 2,
+    }
+
+    public enum WaveAreaSamplerModeId : byte
+    {
+        CenterPoint = 0,
+        UniformField = 1,
+        PollutionTopK = 2,
+    }
+
+    public enum WavePositionPatternModeId : byte
+    {
+        SinglePoint = 0,
+        LineEven = 1,
+        PointSet = 2,
+    }
+
+    public enum WaveAimModeId : byte
+    {
+        Random = 0,
+        Fixed = 1,
+        Spiral = 2,
+        PlayerPosition = 3,
+        LineNormal = 4,
+    }
+
+    public enum WaveLineNormalSideId : byte
+    {
+        Left = 0,
+        Right = 1,
+    }
+
+    public enum WaveAimSnapshotTimingId : byte
+    {
+        EventStart = 0,
+        PerShot = 1,
+    }
+
+    public enum WaveShotPatternModeId : byte
+    {
+        Single = 0,
+        NWay = 1,
+        Radial = 2,
     }
 
     [Serializable]
@@ -30,7 +80,7 @@ namespace SweepNDodge.DotsBullets
     public sealed class PoissonEmissionAuthoring : WaveEmissionAuthoringBase
     {
         public float MeanEventsPerSec = 0f;
-        public int BurstShotsPerEvent = 1;
+        public int EventRepeatCount = 1;
         public SourceSpawnEventShotScheduleId EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
         public float EventShotIntervalSec = 0.1f;
 
@@ -42,7 +92,7 @@ namespace SweepNDodge.DotsBullets
     {
         public int BurstRepeatCount = 1;
         public float BurstIntervalSec = 1f;
-        public int BurstShotsPerEvent = 1;
+        public int EventRepeatCount = 1;
         public SourceSpawnEventShotScheduleId EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
         public float EventShotIntervalSec = 0.1f;
 
@@ -50,105 +100,184 @@ namespace SweepNDodge.DotsBullets
     }
 
     [Serializable]
-    public abstract class WaveSamplingAuthoringBase
+    public sealed class WaveSamplingAuthoring
     {
-        public SourceSpawnCenterModeId CenterMode = SourceSpawnCenterModeId.SourceCenter;
-        public Vector2 FixedPoint = Vector2.zero;
-        public Vector2 SpawnOffset = Vector2.zero;
         public int SpawnSampleBudget = 16;
         public float PlayerNoSpawnRadius = 0f;
-
-        public abstract SourceSpawnSamplingModeId SamplingMode { get; }
+        [SerializeReference] public WaveSamplingAnchorAuthoringBase Anchor = new SourceCenterSamplingAnchorAuthoring();
+        [SerializeReference] public WaveAreaSamplerAuthoringBase AreaSampler = new UniformFieldAreaSamplerAuthoring();
     }
 
     [Serializable]
-    public sealed class UniformFieldSamplingAuthoring : WaveSamplingAuthoringBase
+    public abstract class WaveSamplingAnchorAuthoringBase
     {
-        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.UniformField;
+        public abstract WaveSamplingAnchorModeId AnchorMode { get; }
     }
 
     [Serializable]
-    public sealed class PollutionTopKSamplingAuthoring : WaveSamplingAuthoringBase
+    public sealed class SourceCenterSamplingAnchorAuthoring : WaveSamplingAnchorAuthoringBase
     {
-        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.PollutionTopK;
+        public override WaveSamplingAnchorModeId AnchorMode => WaveSamplingAnchorModeId.SourceCenter;
     }
 
     [Serializable]
-    public sealed class LineEvenSamplingAuthoring : WaveSamplingAuthoringBase
+    public sealed class FixedPointSamplingAnchorAuthoring : WaveSamplingAnchorAuthoringBase
+    {
+        public Vector2 FixedPoint = Vector2.zero;
+
+        public override WaveSamplingAnchorModeId AnchorMode => WaveSamplingAnchorModeId.FixedPoint;
+    }
+
+    [Serializable]
+    public sealed class PlayerRelativeSamplingAnchorAuthoring : WaveSamplingAnchorAuthoringBase
+    {
+        public Vector2 SpawnOffset = Vector2.zero;
+
+        public override WaveSamplingAnchorModeId AnchorMode => WaveSamplingAnchorModeId.PlayerRelative;
+    }
+
+    [Serializable]
+    public abstract class WaveAreaSamplerAuthoringBase
+    {
+        public abstract WaveAreaSamplerModeId AreaSamplerMode { get; }
+    }
+
+    [Serializable]
+    public sealed class CenterPointAreaSamplerAuthoring : WaveAreaSamplerAuthoringBase
+    {
+        public override WaveAreaSamplerModeId AreaSamplerMode => WaveAreaSamplerModeId.CenterPoint;
+    }
+
+    [Serializable]
+    public sealed class UniformFieldAreaSamplerAuthoring : WaveAreaSamplerAuthoringBase
+    {
+        public override WaveAreaSamplerModeId AreaSamplerMode => WaveAreaSamplerModeId.UniformField;
+    }
+
+    [Serializable]
+    public sealed class PollutionTopKAreaSamplerAuthoring : WaveAreaSamplerAuthoringBase
+    {
+        public override WaveAreaSamplerModeId AreaSamplerMode => WaveAreaSamplerModeId.PollutionTopK;
+    }
+
+    [Serializable]
+    public abstract class WavePositionPatternAuthoringBase
+    {
+        public abstract WavePositionPatternModeId PositionPatternMode { get; }
+    }
+
+    [Serializable]
+    public sealed class SinglePointPositionPatternAuthoring : WavePositionPatternAuthoringBase
+    {
+        public override WavePositionPatternModeId PositionPatternMode => WavePositionPatternModeId.SinglePoint;
+    }
+
+    [Serializable]
+    public sealed class LineEvenPositionPatternAuthoring : WavePositionPatternAuthoringBase
     {
         public Vector2 LineStart = Vector2.zero;
         public Vector2 LineEnd = Vector2.zero;
         public float SampleSpacing = 1f;
 
-        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.LineEven;
+        public override WavePositionPatternModeId PositionPatternMode => WavePositionPatternModeId.LineEven;
     }
 
     [Serializable]
-    public sealed class PointSetSamplingAuthoring : WaveSamplingAuthoringBase
+    public sealed class PointSetPositionPatternAuthoring : WavePositionPatternAuthoringBase
     {
         public const int MaxPointCount = 4;
 
         public Vector2[] Points = Array.Empty<Vector2>();
 
-        public override SourceSpawnSamplingModeId SamplingMode => SourceSpawnSamplingModeId.PointSet;
+        public override WavePositionPatternModeId PositionPatternMode => WavePositionPatternModeId.PointSet;
     }
 
     [Serializable]
-    public abstract class WaveDirectionAuthoringBase
+    public abstract class WaveAimAuthoringBase
     {
-        public abstract SourceSpawnDirectionModeId DirectionMode { get; }
+        public abstract WaveAimModeId AimMode { get; }
     }
 
     [Serializable]
-    public sealed class RandomDirectionAuthoring : WaveDirectionAuthoringBase
+    public sealed class RandomAimAuthoring : WaveAimAuthoringBase
     {
-        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.Random;
+        public override WaveAimModeId AimMode => WaveAimModeId.Random;
     }
 
     [Serializable]
-    public sealed class FixedDirectionAuthoring : WaveDirectionAuthoringBase
-    {
-        public float BaseAngleDeg = 0f;
-
-        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.Fixed;
-    }
-
-    [Serializable]
-    public sealed class NWayDirectionAuthoring : WaveDirectionAuthoringBase
+    public sealed class FixedAimAuthoring : WaveAimAuthoringBase
     {
         public float BaseAngleDeg = 0f;
-        public int NWayCount = 2;
 
-        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.NWay;
+        public override WaveAimModeId AimMode => WaveAimModeId.Fixed;
     }
 
     [Serializable]
-    public sealed class SpiralDirectionAuthoring : WaveDirectionAuthoringBase
+    public sealed class SpiralAimAuthoring : WaveAimAuthoringBase
     {
         public float BaseAngleDeg = 0f;
         public float SpiralStepDeg = 0f;
 
-        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.Spiral;
+        public override WaveAimModeId AimMode => WaveAimModeId.Spiral;
     }
 
     [Serializable]
-    public sealed class RadialBurstDirectionAuthoring : WaveDirectionAuthoringBase
+    public sealed class PlayerPositionAimAuthoring : WaveAimAuthoringBase
     {
-        public float BaseAngleDeg = 0f;
+        public float AngleOffsetDeg = 0f;
+        public WaveAimSnapshotTimingId SnapshotTiming = WaveAimSnapshotTimingId.EventStart;
 
-        public override SourceSpawnDirectionModeId DirectionMode => SourceSpawnDirectionModeId.RadialBurst;
+        public override WaveAimModeId AimMode => WaveAimModeId.PlayerPosition;
+    }
+
+    [Serializable]
+    public sealed class LineNormalAimAuthoring : WaveAimAuthoringBase
+    {
+        public WaveLineNormalSideId NormalSide = WaveLineNormalSideId.Left;
+        public float AngleOffsetDeg = 0f;
+
+        public override WaveAimModeId AimMode => WaveAimModeId.LineNormal;
+    }
+
+    [Serializable]
+    public abstract class WaveShotPatternAuthoringBase
+    {
+        public abstract WaveShotPatternModeId ShotPatternMode { get; }
+    }
+
+    [Serializable]
+    public sealed class SingleShotPatternAuthoring : WaveShotPatternAuthoringBase
+    {
+        public override WaveShotPatternModeId ShotPatternMode => WaveShotPatternModeId.Single;
+    }
+
+    [Serializable]
+    public sealed class NWayShotPatternAuthoring : WaveShotPatternAuthoringBase
+    {
+        public int ShotCount = 2;
+        public float AngleSpacingDeg = 30f;
+
+        public override WaveShotPatternModeId ShotPatternMode => WaveShotPatternModeId.NWay;
+    }
+
+    [Serializable]
+    public sealed class RadialShotPatternAuthoring : WaveShotPatternAuthoringBase
+    {
+        public int ShotCount = 2;
+
+        public override WaveShotPatternModeId ShotPatternMode => WaveShotPatternModeId.Radial;
     }
 
     [Serializable]
     public sealed class WaveSpawnEntryAuthoring
     {
-        [Header("Payload")]
         public WaveClipSO.SpawnPayloadProfile Payload;
 
-        [Header("Directive")]
         [SerializeReference] public WaveEmissionAuthoringBase Emission = new RateFieldEmissionAuthoring();
-        [SerializeReference] public WaveSamplingAuthoringBase Sampling = new UniformFieldSamplingAuthoring();
-        [SerializeReference] public WaveDirectionAuthoringBase Direction = new RandomDirectionAuthoring();
+        public WaveSamplingAuthoring Sampling = new WaveSamplingAuthoring();
+        [SerializeReference] public WavePositionPatternAuthoringBase PositionPattern = new SinglePointPositionPatternAuthoring();
+        [SerializeReference] public WaveAimAuthoringBase Aim = new RandomAimAuthoring();
+        [SerializeReference] public WaveShotPatternAuthoringBase ShotPattern = new SingleShotPatternAuthoring();
     }
 
     [CreateAssetMenu(menuName = "SweepNDodge/Bullet/Wave Clip", fileName = "bwc_")]
@@ -166,9 +295,15 @@ namespace SweepNDodge.DotsBullets
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
             [SerializeField, TextArea(2, 5)]
             private string editorOnlyDescription;
+
+            public string EditorOnlyDescription
+            {
+                get => editorOnlyDescription;
+                set => editorOnlyDescription = value ?? string.Empty;
+            }
             #endif
             public float StartSec;
-            public float EndSec;
+            public float DurationSec;
             public WaveSpawnEntryAuthoring[] Directives;
         }
 

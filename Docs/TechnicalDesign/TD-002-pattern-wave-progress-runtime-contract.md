@@ -1,301 +1,206 @@
-# Pattern/Wave/Progress 런타임 계약 (MVP)
+# Pattern / Wave / Progress 런타임 계약
 
 ## Metadata
 - doc_id: `TD-002`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-03`
+- last_updated: `2026-04-06`
 - related_adr:
-  - [ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md](../ADR/ADR-20260212-01-so-based-bullet-definition-and-source-state-spawn-profile.md)
-  - [ADR-20260212-02-area-density-based-spawn-and-field-shapes.md](../ADR/ADR-20260212-02-area-density-based-spawn-and-field-shapes.md)
-  - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](../ADR/ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
   - [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
-  - [ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md](../ADR/ADR-20260226-01-pointset-runtime-sampler-max4-local-offset.md)
   - [ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md](../ADR/ADR-20260226-02-nway-set-atomicity-and-emission-unit-contract.md)
   - [ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md](../ADR/ADR-20260226-03-eventburst-intra-timeline-and-event-anchor-fixation.md)
   - [ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md](../ADR/ADR-20260316-01-hazardstack-runtime-ownership-and-frame-order.md)
 
-> GD-007의 기획 의도를 ECS 런타임 데이터 계약으로 변환한 기술 설계 문서.
-> SpawnDirective 분해 모델(Sampling/Emission/Payload) 상세는 `TD-003`을 참조한다.
+> 목적: 현재 `WaveClip` -> request -> execution 경로의 runtime 계약을 canonical authoring 축 기준으로 고정한다.
 
-## 1. 문제 정의
-- GD-007은 기획 의도와 밸런싱 방향을 명확히 정의하지만, 구현에 필요한 필드/수식/검증 규칙 상세는 분리 관리가 필요하다.
-- 동일 개념이 Authoring, ECS 버퍼, Request/Execution 파이프라인으로 내려갈 때 계약이 없으면 구현 편차가 발생한다.
+## 1. 목표
+- `WaveClipSO` authoring이 runtime buffer와 어떻게 연결되는지 고정한다.
+- request item identity와 event-local snapshot ownership을 명확히 한다.
+- validation / test / 운영 문서가 같은 runtime 의미를 공유하도록 한다.
 
-## 2. 목표/비목표
-- 목표:
-  - Pattern/Wave/Progress의 최소 런타임 스키마를 고정한다.
-  - Request 단계에서의 생성 규칙과 ExecutionBegin 소비 경계를 명확히 한다.
-  - 콘텐츠 검증 규칙(Error/Warning) 초안을 고정한다.
-- 비목표:
-  - 세부 밸런싱 수치의 최종 확정.
-  - UI/연출 소비 규칙 상세.
-
-## 3. 설계안
-### 3.1 데이터 모델
-#### SpawnDirectiveDefinitionSlim (현재 기준)
-
-| Field | Type | 설명 | 기본/범위 |
-| --- | --- | --- | --- |
-| DirectiveId | int | 요청/소비 추적 키 | > 0, Source 내 고유 |
-| TriggerState | enum | Source 상태 조건 | Normal / Weakened / Depleted |
-| Phase | enum | 구간 타입 | Sustain / OnStateEnterOnce |
-| StartSec | float | 활성 시작 시간 | >= 0 |
-| EndSec | float | 활성 종료 시간 | > StartSec |
-| BulletTypeKey | int | Payload 탄 타입 | 풀 레지스트리에 존재 |
-| EmissionMode | enum | 방출 모드 | RateField / Poisson / EventBurst |
-| RatePerSecPerArea | float | RateField 밀도 | >= 0 |
-| MeanEventsPerSec | float | Poisson 평균 이벤트율 | >= 0 |
-| BurstRepeatCount | int | EventBurst 반복 수 | -1(무한) 또는 >= 1 |
-| BurstIntervalSec | float | EventBurst 반복 간격 | > 0 |
-| BurstShotsPerEvent | int | 사건형 이벤트 1회당 샷 수 | Poisson / EventBurst에서 >= 1 |
-| EventShotSchedule | enum | 사건형 이벤트 내부 샷 스케줄 | Poisson / EventBurst: Instant / Timed |
-| EventShotIntervalSec | float | 사건형 이벤트 내부 샷 간격 | Poisson / EventBurst에서 Timed일 때 > 0 |
-| SpawnMode | enum | 활성 캡 정책 | FixedDensity / CapAndMaxDensity |
-| MaxActiveDensityPerArea | float | Cap 모드 상한 | Cap 모드에서 >= 0 |
-| SamplingMode | enum | 샘플링 모드 | UniformField / PollutionTopK / LineEven / PointSet |
-| CenterMode | enum | 중심 모드 | SourceCenter / FixedPoint / PlayerRelative |
-| FixedPoint | float2 | 고정 중심점 | CenterMode=FixedPoint |
-| SpawnOffset | float2 | 플레이어 상대 오프셋 | CenterMode=PlayerRelative |
-| LineStart / LineEnd | float2 | LineEven 기준 선분 | SamplingMode=LineEven |
-| SampleSpacing | float | LineEven 등간격 간격 | > 0 |
-| PointSetCount | int | PointSet 포인트 개수 | PointSet에서 `1..4` |
-| Point0..Point3 | float2 | PointSet 로컬 오프셋 포인트 | PointSet에서 사용 |
-| DirectionMode | enum | 방향 모드 | Random / Fixed / NWay / Spiral / RadialBurst |
-| BaseAngleDeg | float | 기준 각도 | 자유 범위 |
-| NWayCount | int | NWay 슬롯 수 | NWay에서 `>= 2` (필수) |
-| SpiralStepDeg | float | Spiral 각도 증분 | Spiral에서 권장 != 0 |
-| SpawnSampleBudget | int | 샘플링 재시도 예산 | >= 1 (기본 16) |
-| PlayerNoSpawnRadius | float | 플레이어 주변 제외 반경 | >= 0 |
-| LanePriority | int | 요청 소비 우선순위 | `특수 > Hazard > Trash`, 동률은 `OldestFrame` 우선 |
-
-`PatternDefinitionSlim`은 밀도 기반 구버전 용어이며, 스폰 모델은 `TD-003`의 SpawnDirective 용어를 기준으로 유지한다.
-
-Authoring/Bake 해석 경로:
-- `WaveClipSO.Segments[].Directives[]` typed authoring이 기본 SSOT다.
-- `WaveClipAuthoringResolver`가 typed authoring을 `ResolvedWaveSpawnDirectiveSnapshot`으로 해석한다.
-- `SourceRuntimeApplyUtility`는 resolved snapshot만 flat runtime buffer(`SourceClipPatternBuffer`)로 flatten한다.
-
-### 3.2 Progress 모델
-#### StageProgressProfile
-
-| Field | 설명 | 권장 범위(Stage 1) |
-| --- | --- | --- |
-| BaseTrashValue | Trash 1개 기본 진행도 | 1 |
-| BaseHazardValue | Hazard 기본 진행도 | 2~5 |
-| HazardBonusRate | HazardStack 계수 | 0.03~0.08 |
-| HazardStackMax | HazardStack 상한 | 5 (피크 스테이지 최대 10) |
-
-#### RiskMultiplier
+## 2. Runtime SSOT
 ```text
-RiskMultiplier =
-  1
-    + (HazardStack × HazardBonusRate)
+WaveClipSO.Directives[]
+  -> WaveClipAuthoringResolver
+  -> ResolvedWaveSpawnDirectiveSnapshot
+  -> SourceClipPatternBuffer
+  -> SourceSpawnRequestBuffer
+  -> SpawnRequestRoundRobinExecutionSystem
 ```
 
-현행 범위에서는 `Load / Capacity` 항을 복구하지 않고, `HazardStack` 항만 사용한다.
-증가한 `HazardStack`은 같은 프레임이 아니라 다음 프레임 수거 배율부터 반영한다.
-정수 진행도는 유지하며, multiplier 적용 해상도는 탄의 정수 진행 값 authoring으로 확보한다.
+### 2.1 Canonical runtime field
+- `SourceClipPatternBuffer`
+  - `SamplingAnchorMode`
+  - `AreaSamplerMode`
+  - `PositionPatternMode`
+  - `AimMode`
+  - `AimSnapshotTiming`
+  - `AimAngleOffsetDeg`
+  - `ShotPatternMode`
+  - `ShotCount`
+  - `EventRepeatCount`
+- `SourceSpawnRequestBuffer`
+  - 위 canonical field를 복사한다.
+  - event-local mutable state도 함께 가진다.
 
-### 3.3 이벤트 반영 계약
+### 2.2 Compat field 정책
+- compat field mirror는 Plan E에서 제거됐다.
+- runtime/product code는 canonical field만 유지한다.
+- 테스트가 필요하면 test-local canonical helper로만 request / pattern을 구성한다.
+
+## 3. Request item identity
+
+### 3.1 RateField
+- directive 단위 merge를 유지한다.
+- discrete event identity를 만들지 않는다.
+
+### 3.2 Poisson / EventBurst
+- event마다 별도 `SourceSpawnRequestBuffer` item을 만든다.
+- `Instant`여도 event끼리 merge하지 않는다.
+- 이유:
+  - event anchor 고정
+  - player aim snapshot 고정
+  - repeat sequence 고정
+
+### 3.3 Count 의미
 ```text
-FrameStartHazardStack:
-        Request 프레임 시작 시점의 HazardStack snapshot
-Trash:  ProgressDelta = BaseTrashValue × (1 + FrameStartHazardStack × HazardBonusRate)
-HazardCaptured:
-        ProgressDelta = BaseHazardValue × (1 + FrameStartHazardStack × HazardBonusRate)
-        HazardStack += 1 request (next frame apply)
-HazardRemovedWhenCarryFull:
-        ProgressDelta = 0
-        HazardStack 변화 없음
-Deposit:
-        Load = 0
-        HazardStack = 0
-Hit:
-        Load 감소 (기존 규칙)
-        HazardStack = 0
-        Source Remaining 증가 (기존 반환 규칙 유지)
+Count = request item에 남아 있는 bullet 수
 ```
 
-`HazardStack`의 단일 writer, 동프레임 `수거 확정 후 리셋`, 다음 프레임 반영 규칙은 [TD-018](./TD-018-hazardstack-runtime-contract.md)에서 관리한다.
+- discrete event item:
+```text
+Count = EventRepeatCount × ShotPattern 1회당 탄 수
+```
+- `SpawnSequence`는 bullet 수가 아니라 repeat 단위로 증가한다.
 
-### 3.4 Clip Segment 중첩 정책 (확정)
-- 동일 `WaveClipSO` 내부에서 segment 시간축 중첩을 허용한다.
-- 운영 규칙:
-  - 각 segment는 `StartSec < EndSec`만 만족하면 된다.
-  - 같은 시점에 활성인 segment가 여러 개면 모두 요청 생성 대상으로 평가한다.
-  - 경계 프레임은 `[StartSec, EndSec)` 반열림 구간으로 해석한다.
+## 4. Event-local snapshot ownership
+- owner: `SourceSpawnRequestBuffer`
+- 생성:
+  - `SourceClipRequestBuildSystem`
+- mutation / consume:
+  - `SpawnRequestRoundRobinExecutionSystem`
+- 그 외 시스템:
+  - read-only 또는 무관
 
-### 3.5 발행 단위 계약 (합의)
-- 밀도형 발행(`RateField` 중심):
-  - 요청은 엔티티 수 예약으로 해석한다.
-  - 대량 스폰에서 요청 버퍼 폭주를 방지하기 위해 집계된 수량(`Count`)을 우선 사용한다.
-- 사건형 발행(`Poisson/EventBurst + Direction` 중심):
-  - 요청은 사건 단위 예약으로 해석한다.
-  - ExecutionBegin에서 사건을 샘플/방향 슬롯으로 확장해 실제 엔티티를 소비한다.
-  - `NWay`는 샘플 지점별 `NWay 1세트`를 원자 단위로 소비한다.
-  - `EventBurst`의 첫 burst는 segment `StartSec`와 같은 시점에 발생한다.
-    - 예: `StartSec=1`, `BurstIntervalSec=2`, `BurstRepeatCount=3`이면 burst 시점은 `1, 3, 5초`다.
-  - (확장 합의) `EventShotSchedule=Timed`는 이벤트 1회 내부에서 샷을 시간 간격으로 분할 소비한다.
-  - (확장 합의) 샘플링 기준점은 이벤트 시작 시 1회 확정하고 이벤트 종료까지 고정한다(월드 고정).
+### 4.1 Event-local mutable state
+- `EventAnchorInitialized`
+- `EventAnchorPosition`
+- `EventAimInitialized`
+- `EventAimTargetPosition`
+- `EventShotElapsedSec`
+- `SpawnSequence`
 
-## 4. 업데이트 순서/소유권
-- Request 단계:
-- 런 진행도 디렉터가 Source별 `단일 활성 클립`을 결정/할당한다.
-- Directive 데이터를 사용해 `SourceSpawnRequestBuffer`를 누적 생성한다.
-- `SourceClipRequestBuildSystem`은 할당된 활성 클립을 기준으로 요청 버퍼를 생성한다.
-- Clip 교체 시점/재생 중단 규칙은 기존 Source Clip 선택/전환 규칙의 형태를 유지한다.
-- `Baseline <-> Pressure` 전환에서는 Clip을 교체하지 않는다(배율만 조정).
-- `Finish`는 `SourceState -> Depleted` 전환 시 강제 진입하며, `중단` 또는 `미량 연출` Clip으로 교체한다.
-- 요청 집계 키는 `BulletTypeKey` 단독이 아니라 `DirectiveId`를 기본 키로 사용한다.
-- EventBurst 소비 정책은 `carry`를 사용한다(미소비 샷은 다음 프레임 이월).
-- ExecutionBegin 단계:
-- Owner(`SpawnRequestRoundRobinExecutionSystem`)가 요청을 소비해 실제 스폰을 수행한다.
-- Sampling(중심 계산/샘플링/NoSpawn 반경 검증)과 Direction 계산은 ExecutionBegin에서 최종 평가한다.
-- (확장 합의) `Poisson/EventBurst`의 `Timed` 이벤트는 "이벤트 시작 시 샘플링 고정 -> 이벤트 내부 재샘플링 없이 소비" 순서로 처리한다.
-- `BudgetPerFrame`은 요청 전체(탄 종류 공용)에서 공유한다.
-  - 우선순위: Lane 규칙(`특수 > Hazard > Trash`)을 최우선으로 적용한다.
-- `NWay`/`RadialBurst` 방향 슬롯은 360도 균등 분할을 기본 규약으로 사용한다.
-- `NWay`는 샘플 지점별 1세트를 원자적으로 소비한다.
-  - 세트를 프레임 내에 완결할 수 없으면 세트 전체를 이월한다.
-  - 세트 이월 시 `SpawnSequence`는 증가시키지 않고 동일 좌표/위상으로 다음 프레임에 재시도한다.
-- ExecutionEnd 단계:
-- 디스폰 owner가 반납과 렌더 토글을 처리한다.
-- HazardStack 상태 확정은 별도 player risk owner가 담당하며, 자세한 순서는 `TD-018`을 따른다.
+### 4.2 고정 규약
+- `Poisson` / `EventBurst`:
+  - event anchor는 첫 consume 시 1회 resolve
+  - 같은 event의 repeat는 `EventAnchorPosition` 재사용
+  - `PlayerPositionAim(EventStart)`는 첫 consume 시 `EventAimTargetPosition`을 잡고 재사용
+  - `PlayerPositionAim(PerShot)`는 repeat consume 시점마다 현재 player world position을 다시 읽는다
+- `Instant`와 `Timed`는 같은 고정 규칙을 공유한다.
+  - 차이는 repeat 간 시간 간격뿐이다.
 
-현행 ECS 매핑 대상:
-- Request 빌더 시스템: `SourceClipRequestBuildSystem`
-- Source 클립 런타임 버퍼: `SourceClipPatternBuffer`
-- Source 서스테인/이벤트 런타임: `SourceSustainRuntimeLaneBuffer`, `SourceEventRuntimeComponent`, `SourceEventQueueBuffer`
-- 요청 버퍼: `SourceSpawnRequestBuffer`
-- 정책/백로그/시드: `SpawnRequestPolicyComponent`, `SpawnBacklogMetricsComponent`, `SpawnRunSeedComponent`, `SourceStableIdComponent`
+## 5. Consume semantics
 
-## 5. 성능/리스크
-- Risk 1: 과밀 데이터로 인한 pending backlog 급증.
-- 대응: `MaxPendingCount`, `BudgetPerFrame`, `MaxPendingAgeFrames` 운영.
-- Risk 2: PlayerRelative 중심 과사용으로 공정성 악화.
-- 대응: `SpawnSkipRate01` 상시 추적 + `PlayerNoSpawnRadius` 가드.
-- Risk 3: Stage별 Progress 배율 과증폭으로 체감 난이도 급상승.
-- 대응: `HitRatePerMin`, `StageClearTime/TargetTime` 동시 모니터링.
+### 5.1 Sampling / PositionPattern
+- `Sampling`은 event anchor 1회 결정 책임만 가진다.
+- `PositionPattern`은 event anchor 기준 repeat origin 분포 책임만 가진다.
+- `PlayerNoSpawnRadius` / `SpawnSampleBudget`는 sampling 단계에만 적용한다.
 
-## 6. 검증 계획
-### 6.1 콘텐츠 검증 규칙 초안
-- Error:
-- Wave segment의 `EndSec <= StartSec` (`CV010`).
-- Source에 WaveClip 바인딩이 전혀 없음 (`CV006`).
-- Wave clip `Segments` 비어 있음 (`CV008`).
-- `ClipId` 중복 (`CV009`).
-- invalid typed authoring managed reference(`Emission/Sampling/Direction == null`) (`CV040`).
-- Wave entry의 `RatePerSecPerArea < 0` (`CV015`, RateField 모드).
-- Wave entry의 `MeanEventsPerSec < 0` (`CV017`, Poisson 모드).
-- `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0` (`CV016`).
-- Wave entry의 `SpawnSampleBudget < 0` (`CV018`).
-- Wave entry의 `PlayerNoSpawnRadius < 0` (`CV019`).
-- EventBurst에서 `BurstIntervalSec <= 0` (`CV020`).
-- EventBurst에서 `BurstRepeatCount`가 `-1` 또는 `>=1`이 아님 (`CV021`).
-- Poisson/EventBurst에서 `BurstShotsPerEvent < 1` (`CV022`, 합의 기준. 구현은 EventBurst 우선).
-- Poisson/EventBurst에서 `EventShotSchedule=Timed`인데 `EventShotIntervalSec <= 0`.
-- NWay에서 `NWayCount < 2` (`CV023`, 필수 제약 위반).
-- RadialBurst에서 `BurstShotsPerEvent < 2` (`CV024`).
-- LineEven에서 선분 길이 0 또는 `SampleSpacing <= 0` (`CV026`).
-- PointSet에서 authored `Points.Length <= 0` (`CV028`).
-- Warning:
-- `SpawnSampleBudget`가 권장 범위 초과.
-- `MaxActiveDensityPerArea`가 Stage 목표 대비 과도함.
-- `RiskMultiplier` 예상 상한이 운영 목표(3.0) 초과.
-- Spiral에서 `SpiralStepDeg`가 0에 근접 (`CVW032`).
-- PointSet authored `Points.Length > 4` 입력(clamp 경고) (`CVW033`).
+### 5.2 Aim / ShotPattern
+- `Aim`은 base angle 계산 책임만 가진다.
+- `ShotPattern`은 repeat 1회가 만드는 슬롯 구조 책임만 가진다.
+- `NWay` / `Radial`은 모두 atomic consume이다.
+- `NWay`는 centered fan이며 `NWayAngleSpacingDeg`를 인접 슬롯 간격으로 사용한다.
+- `Radial`은 full-circle 균등 분배다.
+- `LineNormalAim`은 `LineEven PositionPattern`의 `LineStart -> LineEnd` tangent normal을 base angle로 사용한다.
+- `LineNormalSide = Left`면 `(-y, +x)`, `Right`면 `(+y, -x)` 법선을 사용하고 `LineNormalAngleOffsetDeg`를 마지막에 더한다.
+- `Spiral + NWay`, `Spiral + Radial`, `PlayerPosition + NWay`, `PlayerPosition + Radial` 조합을 지원한다.
 
-검증 코드 매핑(현재 구현):
-- `CV012`: Wave segment의 `Directives` 비어 있음
-- `CV013`: Wave entry의 `Bullet == null`
-- `CV014`: Wave entry가 미등록 `DefinitionId` 참조
-- `CV015`: Wave entry의 `RatePerSecPerArea < 0` (RateField)
+### 5.3 Timed vs Instant
+- `Instant`
+  - 한 프레임 안에서 budget / pool이 허용하는 만큼 repeat를 연속 consume
+- `Timed`
+  - `EventShotIntervalSec` 간격으로 repeat를 1회씩 consume
+- 공통:
+  - event anchor는 event 범위에서 고정
+  - `PlayerPositionAim(EventStart)`는 event aim snapshot을 고정한다
+  - `PlayerPositionAim(PerShot)`는 repeat마다 현재 player world position으로 retarget한다
+
+## 6. 변경 이력
+- 2026-04-06: Plan E 반영. compat runtime mirror 필드와 canonical fallback 경로를 제거하고 runtime/product code를 canonical-only로 고정했다.
+- 2026-04-06: Plan D / Plan C 반영. event-local snapshot ownership과 canonical runtime contract를 문서화했다.
+
+## 6. 업데이트 순서 / 소유권
+- Group 의미:
+```text
+ExecutionBegin -> Simulation -> Request -> ExecutionEnd
+```
+- 관련 owner:
+  - request build: `SourceClipRequestBuildSystem`
+  - request consume: `SpawnRequestRoundRobinExecutionSystem`
+  - despawn / pool 반납: existing ExecutionEnd owner
+- Plan C 기준으로 request/event-local snapshot mutation owner는 `ExecutionBegin` 하나로 고정됐다.
+
+## 7. Validation 기준
+
+### 7.1 Structural validation
+- `CV040`
+- 대상:
+  - `Emission`
+  - `Sampling`
+  - `Sampling.Anchor`
+  - `Sampling.AreaSampler`
+  - `PositionPattern`
+  - `Aim`
+  - `ShotPattern`
+
+### 7.2 Semantic validation
+- `CV010`: `ClipSegment.DurationSec <= 0` 또는 effective active duration 0
+- `CV015`: `RatePerSecPerArea < 0`
 - `CV016`: `CapAndMaxDensity`인데 `MaxActiveDensityPerArea < 0`
-- `CV017`: Wave entry의 `MeanEventsPerSec < 0` (Poisson)
-- `CV018`: Wave entry의 `SpawnSampleBudget < 0`
-- `CV019`: Wave entry의 `PlayerNoSpawnRadius < 0`
-- `CV020`: EventBurst `BurstIntervalSec <= 0`
-- `CV021`: EventBurst `BurstRepeatCount` 범위 오류
-- `CV022`: EventBurst `BurstShotsPerEvent < 1` (현재 구현)
-- `CV023`: NWay `NWayCount < 2`
-- `CV024`: RadialBurst `BurstShotsPerEvent < 2`
-- `CV026`: LineEven 파라미터 오류
-- `CV028`: PointSet authored `Points.Length <= 0`
-- `CVW032`: Spiral `SpiralStepDeg` 0 근접 (Warning)
-- `CVW033`: PointSet authored `Points.Length` max 초과 clamp 경고 (Warning)
-- `CV040`: typed authoring managed reference 누락
-- `CV010`: Wave segment 범위 오류(`EndSec <= StartSec`)
+- `CV017`: `MeanEventsPerSec < 0`
+- `CV018`: `SpawnSampleBudget <= 0`
+- `CV019`: `PlayerNoSpawnRadius < 0`
+- `CV020`: `BurstIntervalSec <= 0`
+- `CV021`: invalid `BurstRepeatCount`
+- `CV022`: `Poisson` / `EventBurst`의 `EventRepeatCount <= 0`
+- `CV023`: `NWay ShotPattern`의 `ShotCount < 2` 또는 `AngleSpacingDeg <= 0`
+- `CV024`: `Radial ShotPattern`의 `ShotCount < 2`
+- `CV025`: `Timed`인데 `EventShotIntervalSec <= 0`
+- `CV026`: invalid `LineEven PositionPattern`
+- `CV028`: invalid `PointSet PositionPattern`
+- `CV041`: shared `SerializeReference` graph detected inside one `WaveClip`
+- `CV042`: `LineNormalAim` without `LineEven PositionPattern`
+- `CVW040`: `EventBurst`의 `BurstRepeatCount`가 segment effective duration 안에서 도달 가능한 burst event 수를 초과
+- `CVW032`: near-zero `SpiralStepDeg`
+- `CVW033`: `PointSet` authored count > runtime clamp max
 
-### 6.2 테스트 루프
-- EditMode: 데이터 무결성/매핑 규칙 검증.
-- PlayMode: 전용 씬 스모크로 기동/루프 정상성 확인.
-- 스트레스: backlog/expired/drop 지표 회귀 추적.
+## 8. 테스트 / 합격 기준
 
-## 7. v3 런타임 계약 (구현 반영)
-- 기준 ADR: [ADR-20260225-02-wave-clip-slot-channel-contract.md](../ADR/ADR-20260225-02-wave-clip-slot-channel-contract.md)
-- 핵심 규약:
-  - 슬롯 키: `State + Phase + Lane`
-  - Lane enum은 확장 가능 구조로 설계한다(기본 운영: `Hazard`, `Trash`).
-  - Clip 선택 주체는 Source가 아니라 런 진행도 디렉터다.
-  - `Sustain`: 상태당 Lane별 활성 클립 1개씩(기본 최대 2개 동시)
-  - `OnStateEnterOnce` 진입 시 하드 프리엠션(기존 sustain pending 폐기 + 생성 중지)
-  - 이벤트 중복 트리거는 큐잉한다.
-  - `Sustain`도 `StartSec/EndSec` 시간축 적용
-  - clip 재생 종료 판정은 마지막 segment end가 아니라 `WaveClipSO.DurationSec`을 사용한다.
-  - 디렉터가 클립을 선택/교체할 때 `Sustain` 로컬 시간은 0으로 리셋한다.
-  - 클립 선택/교체의 상세 시점 규칙은 기존 Source Clip 선택/전환 규칙 형태를 재사용한다.
-  - `Baseline <-> Pressure` 전환에서는 Clip을 교체하지 않는다.
-  - `Baseline`은 밀도 기반 스폰 배율만 축소하고, `hazard/event`는 디렉터 배율로 조정하지 않는다.
-  - `Pressure` 기본 배율은 `1.0`이다(추가 요소 미적용 기준).
-  - `Finish` 진입 시 Clip은 `중단` 또는 `미량 연출` 경로로 교체하며, 지속 Clip은 `Trash Lane`만 허용한다.
-  - 상태 전환 시 기존 sustain 클립 즉시 중단
-  - Lane 우선순위는 `특수 > Hazard > Trash`이며 Lane 규칙이 최우선
-- 권장 ECS 스키마:
-  - `SourceClipPatternBuffer` (`ClipId`, `Phase`, `Lane`, `LocalStartSec`, `LocalEndSec`, 기존 directive 필드)
-  - `SourceSustainSlotCandidateBuffer` (`State`, `Lane`, `ClipId`, `Weight`)
-  - `SourceSustainRuntimeLaneBuffer` (`Lane`, `ActiveClipId`, `ElapsedSec`, `LastClipId`, `SelectionSequence`)
-  - `SourceEventRuntimeComponent` (`IsPlaying`, `ActiveEventClipId`, `TriggerState`, `ElapsedSec`)
-  - `SourceEventQueueBuffer` (`TriggerState`, `QueuedFrame`)
-- 결정론 요구:
-  - 무작위 선택 RNG 키는 `GlobalRunSeed + SourceStableId + SlotKey(State/Phase/Lane) + SelectionSequence`를 사용한다.
-  - `Entity.Index` 단독 사용은 재현성 리스크로 지양한다.
+### 8.1 최소 회귀 세트
+- validation code regression
+- request build regression
+- event item split regression
+- timed event anchor fixation
+- `PlayerPositionAim(EventStart)` fixation
+- `PlayerPositionAim(PerShot)` retarget
+- `NWay` / `Radial` atomic consume
+- `LineEven` / `PointSet` repeat-sequence origin selection
 
-## 8. 오픈 이슈
-- Stage별 PlayerRelative 허용 비중 상한.
-- Progress 지표를 Source 상태 전환과 연결하는 운영 규칙.
+### 8.2 최종 검증
+- compile success
+- console error 0
+- EditMode 전체 pass
+- dedicated PlayMode smoke pass
 
-## 9. 런 진행도 디렉터 연동 네이밍 가드
-- `SourceState` 용어는 Source 고갈 상태(`Normal/Weakened/Depleted`) 전용으로 유지한다.
-- 런/스테이지 진행 상태 용어는 분리해 `RunProgressState` 또는 `StageFlowState`를 사용한다.
-- `Channel` 용어는 탄 타입과 혼동 가능성이 있어 신규 설계에서도 `Lane` 용어를 유지한다.
-- 디렉터가 발행하는 선택 요청과 스폰 실행 요청을 분리한다.
-  - 디렉터 -> Source 선택 단계: `SourcePatternSelectRequest*` 계열(신규)
-  - Source -> 스폰 실행 단계: `SourceSpawnRequestBuffer`(기존 유지)
-- 역할 분리 기준:
-  - 디렉터: 진행도/상태/이벤트 해석 + 패턴 선택 요청 발행
-  - SourceClipRequestBuildSystem: 선택 결과를 소비해 `SourceSpawnRequestBuffer` 생성
-  - ExecutionBegin Owner: `SourceSpawnRequestBuffer` 소비 후 실제 스폰 실행
+## 9. Progress / Stage 쪽 주의점
+- `HazardStack` 및 progress multiplier 계약은 기존 문서를 유지한다.
+- 이번 문서는 Wave / Spawn runtime contract만 SSOT로 다룬다.
 
 ## 10. 변경 이력
-- 2026-04-03: 2차 정리 반영. WaveClip validation/bake 경로를 typed-only로 고정하고 legacy fallback 문구를 제거했다.
-- 2026-04-03: `WaveClipSO` authoring/runtime split 1차 반영. `Directives[] -> WaveClipAuthoringResolver -> SourceClipPatternBuffer` 경로, `LegacyEntries[]` fallback, `CV040`, `PointSet Points[]` authored shape와 `CVW033` clamp warning을 동기화했다.
-- 2026-04-01: `EventBurst` 첫 burst를 `StartSec` 시점에 맞추고, clip 종료 판정을 `WaveClipSO.DurationSec` 기준으로 동기화했다.
-- 2026-03-16: `RiskMultiplier` 범위를 `1 + HazardStack × HazardBonusRate`로 축소해 현행 구현 계획과 동기화하고, `HazardStack` 다음 프레임 반영 규칙을 `TD-018` 참조로 분리했다.
-- 2026-03-05: `EventShotSchedule/Interval` 및 관련 검증 문구를 구현 반영 상태로 동기화했다.
-- 2026-02-27: `TD-006` active 전환과 함께, Clip 선택 주체(디렉터), `Baseline/Pressure` Clip 유지+배율 규칙, `Finish` 강제 교체 규칙을 반영해 소유권 문구를 갱신했다.
-- 2026-02-26: 사건형 이벤트 모드(`Poisson`/`EventBurst`) 지속 사건형 확장 합의(`EventShotSchedule`, `EventShotIntervalSec`)와 이벤트 기준점 고정(월드 고정/이벤트 범위) 계약을 추가
-- 2026-02-26: NWay 실행 규약(360도 균등/세트 원자성/이월 시 SpawnSequence 보존)과 발행 단위 계약(밀도형 vs 사건형)을 합의안으로 추가
-- 2026-02-26: PointSet 런타임 샘플러를 활성화하고(`Max=4`, 로컬 오프셋), 검증 규칙을 `CV028`/갱신된 `CVW033` 기준으로 동기화
-- 2026-02-26: `WaveClipSO` 내부 segment 중첩을 전면 허용하도록 정책/검증 문구를 갱신(`CV011` 제거)
-- 2026-02-25: `WaveClipSO` 기반 v3 단일 경로 반영 상태(규약/검증/CV 코드)로 문서를 동기화
-- 2026-02-25: v3 합의 반영(하드 프리엠션, 큐잉, 상태전환 즉시중단, Lane 우선순위, RNG 키)으로 초안을 갱신
-- 2026-02-25: v3 클립/슬롯/채널 확장 초안 및 런타임 스키마 초안을 추가
-- 2026-02-25: `SpawnEntry` 레거시 fallback과 `WallEven` 전용 경로/검증 규칙(`CV025`, `CVW034`) 제거
-- 2026-02-24: `WallEven`을 정책 비활성으로 전환하고 `CV025`/`CVW034` 검증 규칙을 추가
-- 2026-02-24: `DirectionMode.Fixed`를 추가해 `LineEven + 고정 방향` 구성을 정식 지원
-- 2026-02-24: `EventBurst(carry)`, `DirectionProfile`, `LineEven/WallEven` 계약 및 CV020~CV024/CV026/CVW032/CVW033 규칙을 추가
-- 2026-02-24: 프레임 예산 공유 및 Trash 최하 우선순위 소비 규칙을 명시
-- 2026-02-23: Spawn 계약을 `PatternDefinitionSlim` 중심에서 `SpawnDirectiveDefinitionSlim` 중심으로 전환하고, 요청 집계 키를 `DirectiveId` 기준으로 명시
-- 2026-02-23: GD-007에서 구현 계약 항목(필드/수식/검증)을 분리해 `TD-002` 초안 작성
-- 2026-02-23: Wave 정책을 "동시 지속 금지"로 확정하고 중첩 우선순위 이슈를 해소
+- 2026-04-06: Plan I 반영. `LineNormalAim`의 line-normal base angle 계산과 `CV042` validation 계약을 추가했다.
+- 2026-04-06: Plan K 반영. `ClipSegment` authoring 시간을 `StartSec + DurationSec`로 전환하고 `CVW040` truncation warning 계약을 추가했다.
+- 2026-04-06: Plan F 반영. `PlayerPositionAim`의 `PerShot` retarget을 허용하고 unsupported snapshot timing validation 제약을 제거했다.
+- 2026-04-06: Plan D 반영. canonical runtime field, event item split, event-local snapshot ownership, validation 기준을 현재 구현 상태로 전면 정리했다.
+- 2026-04-06: Plan C 반영. `SourceSpawnRequestBuffer`를 event-local snapshot owner로 고정하고 `Poisson` / `EventBurst` event item split을 도입했다.
+- 2026-04-03: typed-only authoring / resolver snapshot 경로를 runtime 계약에 반영했다.

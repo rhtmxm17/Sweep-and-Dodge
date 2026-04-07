@@ -57,6 +57,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 0f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 });
 
             var secondaryBullets = new NativeArray<Entity>(2, Allocator.Temp);
@@ -84,6 +85,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(em.IsComponentEnabled<BulletActiveTag>(collectedBullet), Is.False);
                 Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(collectedBullet), Is.False);
 
+                AdvanceFrame(em);
                 world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();
 
@@ -138,6 +140,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Shape = BulletSecondarySpawnShapeId.PointBurst,
                     SpreadAngleDeg = 0f,
                     SpawnRadius = 1f,
+                    SpawnDelaySec = 0f,
                 });
 
             var secondaryBullets = new NativeArray<Entity>(2, Allocator.Temp);
@@ -166,6 +169,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(removedBullet), Is.False);
                 Assert.That(em.GetComponentData<PlayerCarryBinComponent>(player).Load, Is.EqualTo(10));
 
+                AdvanceFrame(em);
                 world.GetOrCreateSystem<SecondarySpawnExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();
 
@@ -602,6 +606,14 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var entity = em.CreateEntity(typeof(T));
             em.SetComponentData(entity, value);
+        }
+
+        private static void AdvanceFrame(EntityManager em)
+        {
+            var entity = em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>()).GetSingletonEntity();
+            var counter = em.GetComponentData<BulletFrameCounterComponent>(entity);
+            counter.Value += 1;
+            em.SetComponentData(entity, counter);
         }
     }
 }

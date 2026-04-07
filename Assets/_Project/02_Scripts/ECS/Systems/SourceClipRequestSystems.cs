@@ -679,7 +679,7 @@ namespace SweepNDodge.DotsBullets
                 spawnDensityPerSecPerArea *= math.max(0f, densityScale);
             }
 
-            float effectiveArea = ResolveEffectiveSpawnArea(pattern.SamplingMode, fullArea, fieldSamplingAreaScale);
+            float effectiveArea = ResolveEffectiveSpawnArea(in pattern, fullArea, fieldSamplingAreaScale);
             return SpawnRequestCommonUtility.ResolveSpawnCountCore(
                 ref pattern.SpawnAccumulator,
                 ref pattern.BurstEventsEmitted,
@@ -687,7 +687,9 @@ namespace SweepNDodge.DotsBullets
                 pattern.SpawnMode,
                 pattern.MeanEventsPerSec,
                 pattern.BurstIntervalSec,
-                pattern.BurstShotsPerEvent,
+                SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in pattern)
+                    ? SpawnRequestCommonUtility.ResolvePerEventBulletCount(in pattern)
+                    : 1,
                 pattern.BurstRepeatCount,
                 spawnDensityPerSecPerArea,
                 pattern.MaxActiveDensityPerArea,
@@ -731,20 +733,20 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static float ResolveEffectiveSpawnArea(
-            SourceSpawnSamplingModeId samplingMode,
+            in SourceClipPatternBuffer pattern,
             float fullArea,
             float fieldSamplingAreaScale)
         {
-            if (!UsesFieldSamplingAreaScale(samplingMode))
+            if (!UsesFieldSamplingAreaScale(pattern.AreaSamplerMode))
                 return math.max(0f, fullArea);
 
             return math.max(0f, fullArea) * math.clamp(fieldSamplingAreaScale, 0f, 1f);
         }
 
-        private static bool UsesFieldSamplingAreaScale(SourceSpawnSamplingModeId samplingMode)
+        private static bool UsesFieldSamplingAreaScale(WaveAreaSamplerModeId areaSamplerMode)
         {
-            return samplingMode == SourceSpawnSamplingModeId.UniformField
-                || samplingMode == SourceSpawnSamplingModeId.PollutionTopK;
+            return areaSamplerMode == WaveAreaSamplerModeId.UniformField
+                || areaSamplerMode == WaveAreaSamplerModeId.PollutionTopK;
         }
 
         private static int RemoveSustainPendingRequests(ref DynamicBuffer<SourceSpawnRequestBuffer> requests)
@@ -831,9 +833,20 @@ namespace SweepNDodge.DotsBullets
                 pattern.Lane,
                 pattern.LanePriority,
                 pattern.BulletTypeKey,
-                pattern.SamplingMode,
-                pattern.CenterMode,
-                pattern.DirectionMode,
+                pattern.EmissionMode,
+                pattern.SpawnMode,
+                pattern.SamplingAnchorMode,
+                pattern.AreaSamplerMode,
+                pattern.PositionPatternMode,
+                pattern.AimMode,
+                pattern.AimSnapshotTiming,
+                pattern.AimAngleOffsetDeg,
+                pattern.LineNormalSide,
+                pattern.LineNormalAngleOffsetDeg,
+                pattern.ShotPatternMode,
+                pattern.ShotCount,
+                pattern.NWayAngleSpacingDeg,
+                pattern.EventRepeatCount,
                 pattern.FixedPoint,
                 pattern.SpawnOffset,
                 pattern.LineStart,
@@ -847,9 +860,7 @@ namespace SweepNDodge.DotsBullets
                 pattern.SpawnSampleBudget,
                 pattern.PlayerNoSpawnRadius,
                 pattern.BaseAngleDeg,
-                pattern.NWayCount,
                 pattern.SpiralStepDeg,
-                pattern.BurstShotsPerEvent,
                 pattern.EventShotSchedule,
                 pattern.EventShotIntervalSec);
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);

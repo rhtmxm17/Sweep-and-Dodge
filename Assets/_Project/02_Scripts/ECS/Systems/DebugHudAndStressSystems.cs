@@ -18,9 +18,20 @@ namespace SweepNDodge.DotsBullets
             public SourceSpawnLaneId Lane;
             public int LanePriority;
             public int BulletTypeKey;
-            public SourceSpawnSamplingModeId SamplingMode;
-            public SourceSpawnCenterModeId CenterMode;
-            public SourceSpawnDirectionModeId DirectionMode;
+            public SourceSpawnEmissionModeId EmissionMode;
+            public SourceSpawnModeId SpawnMode;
+            public WaveSamplingAnchorModeId SamplingAnchorMode;
+            public WaveAreaSamplerModeId AreaSamplerMode;
+            public WavePositionPatternModeId PositionPatternMode;
+            public WaveAimModeId AimMode;
+            public WaveAimSnapshotTimingId AimSnapshotTiming;
+            public float AimAngleOffsetDeg;
+            public WaveLineNormalSideId LineNormalSide;
+            public float LineNormalAngleOffsetDeg;
+            public WaveShotPatternModeId ShotPatternMode;
+            public int ShotCount;
+            public float NWayAngleSpacingDeg;
+            public int EventRepeatCount;
             public float2 FixedPoint;
             public float2 SpawnOffset;
             public float2 LineStart;
@@ -34,9 +45,7 @@ namespace SweepNDodge.DotsBullets
             public int SpawnSampleBudget;
             public float PlayerNoSpawnRadius;
             public float BaseAngleDeg;
-            public int NWayCount;
             public float SpiralStepDeg;
-            public int BurstShotsPerEvent;
             public SourceSpawnEventShotScheduleId EventShotSchedule;
             public float EventShotIntervalSec;
         }
@@ -131,9 +140,20 @@ namespace SweepNDodge.DotsBullets
                         Lane = resolvedV3.Lane,
                         LanePriority = resolvedV3.LanePriority,
                         BulletTypeKey = resolvedV3.BulletTypeKey,
-                        SamplingMode = resolvedV3.SamplingMode,
-                        CenterMode = resolvedV3.CenterMode,
-                        DirectionMode = resolvedV3.DirectionMode,
+                        EmissionMode = resolvedV3.EmissionMode,
+                        SpawnMode = resolvedV3.SpawnMode,
+                        SamplingAnchorMode = resolvedV3.SamplingAnchorMode,
+                        AreaSamplerMode = resolvedV3.AreaSamplerMode,
+                        PositionPatternMode = resolvedV3.PositionPatternMode,
+                        AimMode = resolvedV3.AimMode,
+                        AimSnapshotTiming = resolvedV3.AimSnapshotTiming,
+                        AimAngleOffsetDeg = resolvedV3.AimAngleOffsetDeg,
+                        LineNormalSide = resolvedV3.LineNormalSide,
+                        LineNormalAngleOffsetDeg = resolvedV3.LineNormalAngleOffsetDeg,
+                        ShotPatternMode = resolvedV3.ShotPatternMode,
+                        ShotCount = resolvedV3.ShotCount,
+                        NWayAngleSpacingDeg = resolvedV3.NWayAngleSpacingDeg,
+                        EventRepeatCount = resolvedV3.EventRepeatCount,
                         FixedPoint = resolvedV3.FixedPoint,
                         SpawnOffset = resolvedV3.SpawnOffset,
                         LineStart = resolvedV3.LineStart,
@@ -147,9 +167,7 @@ namespace SweepNDodge.DotsBullets
                         SpawnSampleBudget = resolvedV3.SpawnSampleBudget,
                         PlayerNoSpawnRadius = resolvedV3.PlayerNoSpawnRadius,
                         BaseAngleDeg = resolvedV3.BaseAngleDeg,
-                        NWayCount = resolvedV3.NWayCount,
                         SpiralStepDeg = resolvedV3.SpiralStepDeg,
-                        BurstShotsPerEvent = resolvedV3.BurstShotsPerEvent,
                         EventShotSchedule = resolvedV3.EventShotSchedule,
                         EventShotIntervalSec = resolvedV3.EventShotIntervalSec,
                     });
@@ -241,9 +259,20 @@ namespace SweepNDodge.DotsBullets
                 target.Lane,
                 target.LanePriority,
                 target.BulletTypeKey,
-                target.SamplingMode,
-                target.CenterMode,
-                target.DirectionMode,
+                target.EmissionMode,
+                target.SpawnMode,
+                target.SamplingAnchorMode,
+                target.AreaSamplerMode,
+                target.PositionPatternMode,
+                target.AimMode,
+                target.AimSnapshotTiming,
+                target.AimAngleOffsetDeg,
+                target.LineNormalSide,
+                target.LineNormalAngleOffsetDeg,
+                target.ShotPatternMode,
+                target.ShotCount,
+                target.NWayAngleSpacingDeg,
+                target.EventRepeatCount,
                 target.FixedPoint,
                 target.SpawnOffset,
                 target.LineStart,
@@ -257,9 +286,7 @@ namespace SweepNDodge.DotsBullets
                 target.SpawnSampleBudget,
                 target.PlayerNoSpawnRadius,
                 target.BaseAngleDeg,
-                target.NWayCount,
                 target.SpiralStepDeg,
-                target.BurstShotsPerEvent,
                 target.EventShotSchedule,
                 target.EventShotIntervalSec);
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
