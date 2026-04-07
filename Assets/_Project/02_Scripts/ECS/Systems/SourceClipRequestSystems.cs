@@ -15,6 +15,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<BulletFrameCounterComponent>();
             state.RequireForUpdate<SpawnRequestPolicyComponent>();
+            state.RequireForUpdate<DiscreteEmitChannelSingletonTag>();
             state.RequireForUpdate<SpawnBacklogMetricsComponent>();
             state.RequireForUpdate<SpawnRunSeedComponent>();
             state.RequireForUpdate<SourceSpawnComponent>();
@@ -52,6 +53,8 @@ namespace SweepNDodge.DotsBullets
                 return;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
             uint runSeed = math.max(1u, SystemAPI.GetSingleton<SpawnRunSeedComponent>().Value);
+            var discreteChannelEntity = SystemAPI.GetSingletonEntity<DiscreteEmitChannelSingletonTag>();
+            var discreteRequests = SystemAPI.GetBuffer<DiscreteEmitRequestBuffer>(discreteChannelEntity);
 
             int pendingTotal = 0;
             foreach (var requests in SystemAPI.Query<DynamicBuffer<SourceSpawnRequestBuffer>>())
@@ -147,6 +150,7 @@ namespace SweepNDodge.DotsBullets
                     ref sustainLanesRW,
                     ref activeCounts,
                     ref requestsRW,
+                    discreteRequests,
                     ref pendingTotal,
                     ref remainingCapacity,
                     ref droppedByCapacity);
@@ -202,6 +206,7 @@ namespace SweepNDodge.DotsBullets
             ref DynamicBuffer<SourceSustainRuntimeLaneBuffer> sustainLanes,
             ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
             ref int pendingTotal,
             ref int remainingCapacity,
             ref int droppedByCapacity)
@@ -274,12 +279,14 @@ namespace SweepNDodge.DotsBullets
                     }
 
                     int requested = ResolveSpawnCount(
+                        sourceEntity,
                         ref pattern,
                         runSeed,
                         stableId,
                         frame,
                         activeCounts,
                         requests,
+                        discreteRequests,
                         fullArea,
                         fieldSamplingAreaScale,
                         deltaTime,
@@ -409,12 +416,14 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static int ResolveSpawnCount(
+            Entity sourceEntity,
             ref SourceClipPatternBuffer pattern,
             uint runSeed,
             uint sourceStableId,
             uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
             float fullArea,
             float fieldSamplingAreaScale,
             float deltaTime,
@@ -429,7 +438,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             float effectiveArea = ResolveEffectiveSpawnArea(in pattern, fullArea, fieldSamplingAreaScale);
-            return SpawnRequestCommonUtility.ResolveSpawnCountCore(
+            int requested = SpawnRequestCommonUtility.ResolveSpawnCountCore(
                 ref pattern.SpawnAccumulator,
                 ref pattern.BurstEventsEmitted,
                 pattern.EmissionMode,
@@ -452,6 +461,25 @@ namespace SweepNDodge.DotsBullets
                 effectiveArea,
                 deltaTime,
                 0xD8A89AF5u);
+
+            if (requested <= 0 || pattern.SpawnMode != SourceSpawnModeId.CapAndMaxDensity)
+                return requested;
+
+            int active = ResolveActiveCount(activeCounts, pattern.BulletTypeKey);
+            int combinedPending = ResolveCombinedPendingForSourceType(
+                sourceEntity,
+                pattern.BulletTypeKey,
+                requests,
+                discreteRequests);
+            int maxActive = (int)math.floor(math.max(0f, pattern.MaxActiveDensityPerArea) * effectiveArea);
+            int room = math.max(0, maxActive - active - combinedPending);
+            if (!SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in pattern))
+                return math.min(requested, room);
+
+            int shotsPerEvent = math.max(1, SpawnRequestCommonUtility.ResolvePerEventBulletCount(in pattern));
+            int roomEventCount = room / shotsPerEvent;
+            int requestedEventCount = requested / shotsPerEvent;
+            return math.max(0, math.min(requestedEventCount, roomEventCount)) * shotsPerEvent;
         }
 
         private static float ResolveFieldSamplingAreaScale(
@@ -593,6 +621,67 @@ namespace SweepNDodge.DotsBullets
         {
             uint seed = math.hash(new uint4(runSeed, stableId, slotKey, math.max(1u, selectionSequence)));
             return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
+        }
+
+        private static int ResolveCombinedPendingForSourceType(
+            Entity sourceEntity,
+            int bulletTypeKey,
+            DynamicBuffer<SourceSpawnRequestBuffer> legacyRequests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests)
+        {
+            return SpawnRequestCommonUtility.SafeAdd(
+                ResolveLegacyPendingCount(legacyRequests, bulletTypeKey),
+                ResolvePendingDiscreteBulletEquivalent(discreteRequests, sourceEntity, bulletTypeKey));
+        }
+
+        private static int ResolvePendingDiscreteBulletEquivalent(
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
+            Entity sourceEntity,
+            int bulletTypeKey)
+        {
+            int pending = 0;
+            for (int i = 0; i < discreteRequests.Length; i++)
+            {
+                var item = discreteRequests[i];
+                if (item.SourceEntity != sourceEntity || item.BulletTypeKey != bulletTypeKey)
+                    continue;
+
+                pending = SpawnRequestCommonUtility.SafeAdd(
+                    pending,
+                    DiscreteEmitRequestUtility.ResolvePendingBulletEquivalent(in item));
+            }
+
+            return pending;
+        }
+
+        private static int ResolveLegacyPendingCount(
+            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            int bulletTypeKey)
+        {
+            int pending = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                var item = requests[i];
+                if (item.BulletTypeKey != bulletTypeKey || item.Count <= 0)
+                    continue;
+
+                pending = SpawnRequestCommonUtility.SafeAdd(pending, item.Count);
+            }
+
+            return pending;
+        }
+
+        private static int ResolveActiveCount(
+            DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
+            int bulletTypeKey)
+        {
+            for (int i = 0; i < activeCounts.Length; i++)
+            {
+                if (activeCounts[i].BulletTypeKey == bulletTypeKey)
+                    return activeCounts[i].ActiveCount;
+            }
+
+            return 0;
         }
     }
 }

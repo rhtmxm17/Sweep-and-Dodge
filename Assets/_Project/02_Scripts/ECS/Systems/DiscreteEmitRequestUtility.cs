@@ -48,6 +48,51 @@ namespace SweepNDodge.DotsBullets
 
     public static class DiscreteEmitRequestUtility
     {
+        public static DiscreteEmitRequestSeed BuildDiscreteEmitSeedFromWaveEvent(
+            Entity sourceEntity,
+            in SourceClipPatternBuffer pattern,
+            float3 resolvedAnchorPosition,
+            int directiveId,
+            byte priority)
+        {
+            return new DiscreteEmitRequestSeed
+            {
+                ProducerKind = DiscreteEmitProducerKind.WaveClipEvent,
+                SourceEntity = sourceEntity,
+                ProducerEntity = sourceEntity,
+                EmissionId = directiveId,
+                BulletTypeKey = pattern.BulletTypeKey,
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorEntity = sourceEntity,
+                AnchorPosition = resolvedAnchorPosition,
+                AnchorLocalOffset = float3.zero,
+                PositionPatternMode = pattern.PositionPatternMode,
+                SpawnOffset = pattern.SpawnOffset,
+                LineStart = pattern.LineStart,
+                LineEnd = pattern.LineEnd,
+                SampleSpacing = pattern.SampleSpacing,
+                PointSetCount = pattern.PointSetCount,
+                Point0 = pattern.Point0,
+                Point1 = pattern.Point1,
+                Point2 = pattern.Point2,
+                Point3 = pattern.Point3,
+                AimMode = pattern.AimMode,
+                AimSnapshotTiming = pattern.AimSnapshotTiming,
+                BaseAngleDeg = pattern.BaseAngleDeg,
+                AimAngleOffsetDeg = pattern.AimAngleOffsetDeg,
+                LineNormalSide = pattern.LineNormalSide,
+                LineNormalAngleOffsetDeg = pattern.LineNormalAngleOffsetDeg,
+                SpiralStepDeg = pattern.SpiralStepDeg,
+                ShotPatternMode = pattern.ShotPatternMode,
+                ShotCount = pattern.ShotCount,
+                NWayAngleSpacingDeg = pattern.NWayAngleSpacingDeg,
+                EventShotSchedule = pattern.EventShotSchedule,
+                EventShotIntervalSec = pattern.EventShotIntervalSec,
+                RepeatCount = pattern.EventRepeatCount,
+                Priority = priority,
+            };
+        }
+
         public static DiscreteEmitRequestBuffer CreateDiscreteEmitRequest(in DiscreteEmitRequestSeed seed, uint frame)
         {
             return new DiscreteEmitRequestBuffer
@@ -91,6 +136,27 @@ namespace SweepNDodge.DotsBullets
                 Priority = seed.Priority,
                 OldestFrame = frame,
             };
+        }
+
+        public static int ResolveShotPatternUnitCount(in DiscreteEmitRequestBuffer request)
+        {
+            return request.ShotPatternMode switch
+            {
+                WaveShotPatternModeId.NWay => math.max(1, request.ShotCount),
+                WaveShotPatternModeId.Radial => math.max(1, request.ShotCount),
+                _ => 1,
+            };
+        }
+
+        public static int ResolvePendingBulletEquivalent(in DiscreteEmitRequestBuffer request)
+        {
+            int repeats = math.max(0, request.RemainingRepeats);
+            int shotsPerRepeat = ResolveShotPatternUnitCount(in request);
+            if (repeats <= 0 || shotsPerRepeat <= 0)
+                return 0;
+
+            long pending = (long)repeats * shotsPerRepeat;
+            return pending > int.MaxValue ? int.MaxValue : (int)pending;
         }
     }
 }

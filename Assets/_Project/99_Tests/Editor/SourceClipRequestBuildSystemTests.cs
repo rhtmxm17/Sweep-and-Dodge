@@ -340,7 +340,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SourceClipDiscreteEmitBuild_EventBurst_StillProducesLegacySourceSpawnRequests()
+        public void SourceClipDiscreteEmitBuild_EventBurst_AppendsDiscreteEmitRequests()
         {
             using var world = CreateDefaultTestWorld("SourceClipDiscreteEmitBuildWorld_EventBurstCompat", out _);
             var em = world.EntityManager;
@@ -360,12 +360,14 @@ namespace SweepNDodge.DotsBullets.Tests
             world.SetTime(new TimeData(1d, 1f));
             discreteSystem.Update(world.Unmanaged);
 
-            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
-            Assert.That(CountPendingRequestsInPhase(requests, SourceWavePhaseId.OnStateEnterOnce), Is.GreaterThan(0));
+            var requests = GetDiscreteEmitRequests(em);
+            Assert.That(requests.Length, Is.GreaterThan(0));
+            Assert.That(requests[0].ProducerKind, Is.EqualTo(DiscreteEmitProducerKind.WaveClipEvent));
+            Assert.That(requests[0].SourceEntity, Is.EqualTo(source));
         }
 
         [Test]
-        public void SourceClipDiscreteEmitBuild_Poisson_StillProducesLegacySourceSpawnRequests()
+        public void SourceClipDiscreteEmitBuild_Poisson_AppendsDiscreteEmitRequests()
         {
             using var world = CreateDefaultTestWorld("SourceClipDiscreteEmitBuildWorld_PoissonCompat", out _);
             var em = world.EntityManager;
@@ -385,8 +387,9 @@ namespace SweepNDodge.DotsBullets.Tests
             world.SetTime(new TimeData(1d, 1f));
             discreteSystem.Update(world.Unmanaged);
 
-            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
-            Assert.That(CountPendingRequestsInPhase(requests, SourceWavePhaseId.OnStateEnterOnce), Is.GreaterThan(0));
+            var requests = GetDiscreteEmitRequests(em);
+            Assert.That(requests.Length, Is.GreaterThan(0));
+            Assert.That(requests[0].ProducerKind, Is.EqualTo(DiscreteEmitProducerKind.WaveClipEvent));
         }
 
         private static World CreateDefaultTestWorld(string worldName, out SimulationSystemGroup simGroup)
@@ -420,6 +423,21 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var metricsEntity = GetOrCreateSingletonEntity<SpawnBacklogMetricsComponent>(em);
             em.SetComponentData(metricsEntity, default(SpawnBacklogMetricsComponent));
+
+            var discreteEntity = GetOrCreateSingletonEntity<DiscreteEmitChannelSingletonTag>(em);
+            if (!em.HasBuffer<DiscreteEmitRequestBuffer>(discreteEntity))
+                em.AddBuffer<DiscreteEmitRequestBuffer>(discreteEntity);
+            if (!em.HasComponent<DiscreteEmitPolicyComponent>(discreteEntity))
+            {
+                em.AddComponentData(discreteEntity, new DiscreteEmitPolicyComponent
+                {
+                    BudgetPerFrame = 256,
+                    MaxPendingCount = 8192,
+                    MaxPendingAgeFrames = 120u,
+                });
+            }
+            if (!em.HasComponent<DiscreteEmitBacklogMetricsComponent>(discreteEntity))
+                em.AddComponentData(discreteEntity, default(DiscreteEmitBacklogMetricsComponent));
 
             var seedEntity = GetOrCreateSingletonEntity<SpawnRunSeedComponent>(em);
             em.SetComponentData(seedEntity, new SpawnRunSeedComponent
@@ -523,6 +541,10 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, new SourceStableIdComponent
             {
                 Value = 1001u,
+            });
+            em.AddComponentData(entity, new SourceAnchorComponent
+            {
+                Position = new float3(0f, 0f, 0f),
             });
             em.SetComponentData(entity, new SourceSustainRuntimeComponent
             {
@@ -839,6 +861,13 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return pendingCount;
+        }
+
+        private static DynamicBuffer<DiscreteEmitRequestBuffer> GetDiscreteEmitRequests(EntityManager em)
+        {
+            var channelEntity = em.CreateEntityQuery(ComponentType.ReadOnly<DiscreteEmitChannelSingletonTag>())
+                .GetSingletonEntity();
+            return em.GetBuffer<DiscreteEmitRequestBuffer>(channelEntity);
         }
     }
 }

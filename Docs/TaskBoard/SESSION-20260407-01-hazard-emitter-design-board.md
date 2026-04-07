@@ -25,14 +25,11 @@
 - 이번 세션에서 하지 않을 것: 스테이지별 실배치 확정, 수치 밸런싱 확정, `RotatingSet coordinator` owner 최종 확정, `AnchorRef` wire shape 최종 확정, `SourceRelative` consume semantics 구현 완료
 
 ## Now
-- [ ] Plan C. `DiscreteEmitExecutionSystem` 도입
-  - 완료 기준: `DiscreteEmitRequestBuffer` consumer, arbitration, repeat atomic consume, budget gate가 `ExecutionBegin` 경계에 도입된다.
-  - 검증: compile, console error 0, EditMode repeat consume/no-merge/budget defer 테스트, PlayMode smoke
-
-## Next
 - [ ] Plan D. `HazardEmitter` runtime path 연결
   - 완료 기준: emitter 최소 runtime/state와 `HazardEmitterEmitBuildSystem`가 `DiscreteEmit` producer로 연결된다.
   - 검증: compile, console error 0, EditMode state machine/cooldown/telegraph zero-duration 테스트, PlayMode smoke
+
+## Next
 - [ ] Plan E. integration, metrics, 문서 마감
   - 완료 기준: source discrete branch와 emitter branch가 공통 `DiscreteEmit` 경로에서 통합되고 최소 backlog/metrics 및 문서 차이가 정리된다.
   - 검증: compile, console error 0, EditMode 통합 회귀, PlayMode smoke
@@ -87,8 +84,16 @@
     - Plan C 전까지는 accepted discrete occurrence를 legacy `SourceSpawnRequestBuffer`로 mirror하는 compat bridge를 유지한다.
     - compat bridge 제거 시점은 `Plan C` 또는 마감 단계다.
     - `EditMode 447/447`, `PlayMode 43/43`, console error 0 기준으로 회귀 없이 통과했다.
+- [x] D12. Plan C. `DiscreteEmitExecutionSystem`을 도입하고 source discrete hard cutover를 완료했다.
+  - 검증 결과:
+    - `SourceClipDiscreteEmitBuildSystem`가 legacy `SourceSpawnRequestBuffer` mirror를 제거하고 `DiscreteEmitRequestBuffer` append로 전환됐다.
+    - wave discrete branch의 anchor sampling은 producer 단계에서 fixed-world anchor로 resolve되고, deterministic random은 source runtime 상태 없이 pure hash로 고정됐다.
+    - `DiscreteEmitExecutionSystem`가 `ExecutionBegin`에서 `SecondarySpawnExecutionSystem` 다음, `SpawnRequestRoundRobinExecutionSystem` 앞의 dedicated consumer로 추가됐다.
+    - `DiscreteEmit` backlog/policy/metrics는 bullet-equivalent 기준으로 집계되고, repeat atomic consume / priority arbitration / budget gate / pool gate가 분리됐다.
+    - legacy `SourceClipRequestBuildSystem`는 sustain/ratefield owner를 유지하면서 discrete pending을 cap 계산에 포함하도록 보정됐다.
+    - `EditMode 452/452`, `PlayMode 43/43`, console error 0 기준으로 통과했다.
 
 ## End of Session
 - 결과: 진행 중
 - 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics는 후속 확정이 필요하다.
-- 다음 세션 시작점: `Plan B` source discrete branch extraction 구현 세션 착수
+- 다음 세션 시작점: `Plan D` `HazardEmitter` runtime path 연결

@@ -1,6 +1,7 @@
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Transforms;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
@@ -16,8 +17,8 @@ namespace SweepNDodge.DotsBullets
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<BulletFrameCounterComponent>();
-            state.RequireForUpdate<SpawnRequestPolicyComponent>();
             state.RequireForUpdate<SpawnRunSeedComponent>();
+            state.RequireForUpdate<DiscreteEmitChannelSingletonTag>();
             state.RequireForUpdate<SourceSpawnComponent>();
             state.RequireForUpdate<SourceRunDirectorStateComponent>();
             state.RequireForUpdate<BulletFieldAreaComponent>();
@@ -53,20 +54,21 @@ namespace SweepNDodge.DotsBullets
             if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float deltaTime))
                 return;
 
-            var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
             uint runSeed = math.max(1u, SystemAPI.GetSingleton<SpawnRunSeedComponent>().Value);
-
-            int pendingTotal = 0;
-            foreach (var requests in SystemAPI.Query<DynamicBuffer<SourceSpawnRequestBuffer>>())
+            float3 playerPosition = float3.zero;
+            bool hasPlayer = false;
+            foreach (var tx in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<PlayerTag>())
             {
-                for (int i = 0; i < requests.Length; i++)
-                    pendingTotal = SpawnRequestCommonUtility.SafeAdd(pendingTotal, math.max(0, requests[i].Count));
+                playerPosition = tx.ValueRO.Position;
+                hasPlayer = true;
+                break;
             }
 
-            int remainingCapacity = math.max(0, policy.MaxPendingCount - pendingTotal);
-            int droppedByCapacity = 0;
+            var discreteChannelEntity = SystemAPI.GetSingletonEntity<DiscreteEmitChannelSingletonTag>();
+            var discreteRequests = SystemAPI.GetBuffer<DiscreteEmitRequestBuffer>(discreteChannelEntity);
 
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
+            var anchorLookup = SystemAPI.GetComponentLookup<SourceAnchorComponent>(true);
             var derivedLookup = SystemAPI.GetComponentLookup<SourceShapeDerivedComponent>(true);
             var directorStateLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
             var sustainRuntimeLookup = SystemAPI.GetComponentLookup<SourceSustainRuntimeComponent>(false);
@@ -74,11 +76,15 @@ namespace SweepNDodge.DotsBullets
             var clipPatternLookup = SystemAPI.GetBufferLookup<SourceClipPatternBuffer>(false);
             var sustainLaneLookup = SystemAPI.GetBufferLookup<SourceSustainRuntimeLaneBuffer>(false);
             var eventQueueLookup = SystemAPI.GetBufferLookup<SourceEventQueueBuffer>(false);
-            var activeCountLookup = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(false);
+            var activeCountLookup = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(true);
             var requestLookup = SystemAPI.GetBufferLookup<SourceSpawnRequestBuffer>(false);
+            var pollutionConfigLookup = SystemAPI.GetComponentLookup<SourcePollutionConfigComponent>(true);
+            var pollutionGridLookup = SystemAPI.GetComponentLookup<SourcePollutionGridComponent>(true);
             var pollutionCellsLookup = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(true);
+            var pollutionValidCellIndicesLookup = SystemAPI.GetBufferLookup<SourcePollutionValidCellIndexBuffer>(true);
 
             stableIdLookup.Update(ref state);
+            anchorLookup.Update(ref state);
             derivedLookup.Update(ref state);
             directorStateLookup.Update(ref state);
             sustainRuntimeLookup.Update(ref state);
@@ -88,7 +94,10 @@ namespace SweepNDodge.DotsBullets
             eventQueueLookup.Update(ref state);
             activeCountLookup.Update(ref state);
             requestLookup.Update(ref state);
+            pollutionConfigLookup.Update(ref state);
+            pollutionGridLookup.Update(ref state);
             pollutionCellsLookup.Update(ref state);
+            pollutionValidCellIndicesLookup.Update(ref state);
 
             var sourceQuery = SystemAPI.QueryBuilder()
                 .WithAll<SourceSpawnComponent>()
@@ -148,9 +157,7 @@ namespace SweepNDodge.DotsBullets
                     ref eventQueueRW,
                     ref eventRuntime,
                     ref sustainLanesRW,
-                    ref requestsRW,
-                    ref pendingTotal,
-                    ref remainingCapacity);
+                    ref requestsRW);
 
                 if (eventRuntime.IsPlaying != 0)
                 {
@@ -164,13 +171,18 @@ namespace SweepNDodge.DotsBullets
                         derived.ComputedArea,
                         fieldSamplingAreaScale,
                         densityScale,
+                        hasPlayer,
+                        playerPosition,
                         ref clipPatternsRW,
-                        ref activeCounts,
-                        ref requestsRW,
+                        activeCounts,
+                        requestsRW,
+                        ref discreteRequests,
                         ref eventRuntime,
-                        ref pendingTotal,
-                        ref remainingCapacity,
-                        ref droppedByCapacity);
+                        ref anchorLookup,
+                        ref pollutionConfigLookup,
+                        ref pollutionGridLookup,
+                        ref pollutionCellsLookup,
+                        ref pollutionValidCellIndicesLookup);
                 }
 
                 SpawnRequestCommonUtility.CompactRequestBuffer(requestsRW);
@@ -233,9 +245,7 @@ namespace SweepNDodge.DotsBullets
             ref DynamicBuffer<SourceEventQueueBuffer> eventQueue,
             ref SourceEventRuntimeComponent eventRuntime,
             ref DynamicBuffer<SourceSustainRuntimeLaneBuffer> sustainLanes,
-            ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            ref int pendingTotal,
-            ref int remainingCapacity)
+            ref DynamicBuffer<SourceSpawnRequestBuffer> requests)
         {
             if (eventRuntime.IsPlaying != 0 || eventQueue.Length <= 0)
                 return;
@@ -275,13 +285,7 @@ namespace SweepNDodge.DotsBullets
                     useLaneFilter: false);
 
                 StopAllSustain(ref sustainLanes, preserveLastClip: true);
-
-                int removed = RemoveSustainPendingRequests(ref requests);
-                if (removed > 0)
-                {
-                    pendingTotal = math.max(0, pendingTotal - removed);
-                    remainingCapacity = SpawnRequestCommonUtility.SafeAdd(remainingCapacity, removed);
-                }
+                RemoveSustainPendingRequests(ref requests);
 
                 break;
             }
@@ -330,13 +334,18 @@ namespace SweepNDodge.DotsBullets
             float fullArea,
             float fieldSamplingAreaScale,
             float densityScale,
+            bool hasPlayer,
+            float3 playerPosition,
             ref DynamicBuffer<SourceClipPatternBuffer> patterns,
-            ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
-            ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
+            DynamicBuffer<SourceSpawnRequestBuffer> legacyRequests,
+            ref DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
             ref SourceEventRuntimeComponent eventRuntime,
-            ref int pendingTotal,
-            ref int remainingCapacity,
-            ref int droppedByCapacity)
+            ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
+            ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
         {
             if (eventRuntime.IsPlaying == 0 || eventRuntime.ActiveEventClipId <= 0)
                 return;
@@ -364,32 +373,52 @@ namespace SweepNDodge.DotsBullets
                     continue;
                 }
 
-                int requested = ResolveSpawnCount(
+                int requestedBullets = ResolveSpawnCount(
+                    sourceEntity,
                     ref pattern,
                     runSeed,
                     sourceStableId,
                     frame,
                     activeCounts,
-                    requests,
+                    legacyRequests,
+                    discreteRequests,
                     fullArea,
                     fieldSamplingAreaScale,
                     deltaTime,
                     densityScale);
-                patterns[i] = pattern;
-                if (requested <= 0)
-                    continue;
-
-                int accepted = math.min(requested, remainingCapacity);
-                if (accepted > 0)
+                if (requestedBullets > 0)
                 {
-                    AddOrMergeRequest(requests, in pattern, accepted, frame);
-                    pendingTotal = SpawnRequestCommonUtility.SafeAdd(pendingTotal, accepted);
-                    remainingCapacity -= accepted;
+                    int shotsPerEvent = math.max(1, SpawnRequestCommonUtility.ResolvePerEventBulletCount(in pattern));
+                    int occurrenceCount = math.max(0, requestedBullets / shotsPerEvent);
+                    for (int occurrenceIndex = 0; occurrenceIndex < occurrenceCount; occurrenceIndex++)
+                    {
+                        float3 anchorPosition = ResolveDiscreteEventAnchorPosition(
+                            sourceEntity,
+                            in pattern,
+                            hasPlayer,
+                            playerPosition,
+                            runSeed,
+                            sourceStableId,
+                            frame,
+                            occurrenceIndex,
+                            ref sourceAnchorLookup,
+                            ref pollutionConfigLookup,
+                            ref pollutionGridLookup,
+                            ref pollutionCellsLookup,
+                            ref pollutionValidCellIndicesLookup);
+                        var seed = DiscreteEmitRequestUtility.BuildDiscreteEmitSeedFromWaveEvent(
+                            sourceEntity,
+                            in pattern,
+                            anchorPosition,
+                            pattern.DirectiveId,
+                            priority: 0);
+                        discreteRequests.Add(DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(seed, frame));
+                    }
+
+                    patterns[i] = pattern;
                 }
 
-                int dropped = requested - accepted;
-                if (dropped > 0)
-                    droppedByCapacity = SpawnRequestCommonUtility.SafeAdd(droppedByCapacity, dropped);
+                patterns[i] = pattern;
             }
 
             eventRuntime.ElapsedSec += deltaTime;
@@ -403,12 +432,14 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static int ResolveSpawnCount(
+            Entity sourceEntity,
             ref SourceClipPatternBuffer pattern,
             uint runSeed,
             uint sourceStableId,
             uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
-            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            DynamicBuffer<SourceSpawnRequestBuffer> legacyRequests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
             float fullArea,
             float fieldSamplingAreaScale,
             float deltaTime,
@@ -423,7 +454,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             float effectiveArea = ResolveEffectiveSpawnArea(in pattern, fullArea, fieldSamplingAreaScale);
-            return SpawnRequestCommonUtility.ResolveSpawnCountCore(
+            int requested = SpawnRequestCommonUtility.ResolveSpawnCountCore(
                 ref pattern.SpawnAccumulator,
                 ref pattern.BurstEventsEmitted,
                 pattern.EmissionMode,
@@ -442,10 +473,29 @@ namespace SweepNDodge.DotsBullets
                 pattern.DirectiveId,
                 frame,
                 activeCounts,
-                requests,
+                legacyRequests,
                 effectiveArea,
                 deltaTime,
                 0xD8A89AF5u);
+
+            if (requested <= 0 || pattern.SpawnMode != SourceSpawnModeId.CapAndMaxDensity)
+                return requested;
+
+            int active = ResolveActiveCount(activeCounts, pattern.BulletTypeKey);
+            int combinedPending = ResolveCombinedPendingForSourceType(
+                sourceEntity,
+                pattern.BulletTypeKey,
+                legacyRequests,
+                discreteRequests);
+            int maxActive = (int)math.floor(math.max(0f, pattern.MaxActiveDensityPerArea) * effectiveArea);
+            int room = math.max(0, maxActive - active - combinedPending);
+            if (!SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in pattern))
+                return math.min(requested, room);
+
+            int shotsPerEvent = math.max(1, SpawnRequestCommonUtility.ResolvePerEventBulletCount(in pattern));
+            int roomEventCount = room / shotsPerEvent;
+            int requestedEventCount = requested / shotsPerEvent;
+            return math.max(0, math.min(requestedEventCount, roomEventCount)) * shotsPerEvent;
         }
 
         private static float ResolveFieldSamplingAreaScale(
@@ -544,51 +594,6 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static void AddOrMergeRequest(
-            DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            in SourceClipPatternBuffer pattern,
-            int count,
-            uint frame)
-        {
-            var template = SpawnRequestCommonUtility.CreateRequestTemplate(
-                pattern.DirectiveId,
-                pattern.Phase,
-                pattern.Lane,
-                pattern.LanePriority,
-                pattern.BulletTypeKey,
-                pattern.EmissionMode,
-                pattern.SpawnMode,
-                pattern.SamplingAnchorMode,
-                pattern.AreaSamplerMode,
-                pattern.PositionPatternMode,
-                pattern.AimMode,
-                pattern.AimSnapshotTiming,
-                pattern.AimAngleOffsetDeg,
-                pattern.LineNormalSide,
-                pattern.LineNormalAngleOffsetDeg,
-                pattern.ShotPatternMode,
-                pattern.ShotCount,
-                pattern.NWayAngleSpacingDeg,
-                pattern.EventRepeatCount,
-                pattern.FixedPoint,
-                pattern.SpawnOffset,
-                pattern.LineStart,
-                pattern.LineEnd,
-                pattern.SampleSpacing,
-                pattern.PointSetCount,
-                pattern.Point0,
-                pattern.Point1,
-                pattern.Point2,
-                pattern.Point3,
-                pattern.SpawnSampleBudget,
-                pattern.PlayerNoSpawnRadius,
-                pattern.BaseAngleDeg,
-                pattern.SpiralStepDeg,
-                pattern.EventShotSchedule,
-                pattern.EventShotIntervalSec);
-            SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
-        }
-
         private static bool ContainsClipId(NativeList<int> list, int value)
         {
             for (int i = 0; i < list.Length; i++)
@@ -608,6 +613,399 @@ namespace SweepNDodge.DotsBullets
         {
             uint seed = math.hash(new uint4(runSeed, stableId, slotKey, math.max(1u, selectionSequence)));
             return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
+        }
+
+        private static Unity.Mathematics.Random CreateDiscreteOccurrenceRandom(
+            uint runSeed,
+            uint sourceStableId,
+            int directiveId,
+            uint frame,
+            int occurrenceIndexWithinFrame)
+        {
+            uint seed = math.hash(new uint4(
+                math.max(1u, runSeed),
+                math.max(1u, sourceStableId),
+                (uint)math.max(0, directiveId + 1),
+                math.hash(new uint2(frame, (uint)math.max(0, occurrenceIndexWithinFrame)))));
+            return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
+        }
+
+        private static float3 ResolveDiscreteEventAnchorPosition(
+            Entity sourceEntity,
+            in SourceClipPatternBuffer pattern,
+            bool hasPlayer,
+            float3 playerPosition,
+            uint runSeed,
+            uint sourceStableId,
+            uint frame,
+            int occurrenceIndexWithinFrame,
+            ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
+            ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
+        {
+            var random = CreateDiscreteOccurrenceRandom(runSeed, sourceStableId, pattern.DirectiveId, frame, occurrenceIndexWithinFrame);
+            float3 center = ResolveSpawnCenter(
+                sourceEntity,
+                in pattern,
+                ref sourceAnchorLookup,
+                hasPlayer,
+                playerPosition);
+            float3 sourceAnchor = sourceAnchorLookup.HasComponent(sourceEntity)
+                ? sourceAnchorLookup[sourceEntity].Position
+                : center;
+            return SampleEventAnchorPosition(
+                ref random,
+                sourceEntity,
+                in pattern,
+                center,
+                sourceAnchor,
+                hasPlayer,
+                playerPosition,
+                ref pollutionConfigLookup,
+                ref pollutionGridLookup,
+                ref pollutionCellsLookup,
+                ref pollutionValidCellIndicesLookup);
+        }
+
+        private static float3 ResolveSpawnCenter(
+            Entity sourceEntity,
+            in SourceClipPatternBuffer pattern,
+            ref ComponentLookup<SourceAnchorComponent> sourceAnchorLookup,
+            bool hasPlayer,
+            float3 playerPosition)
+        {
+            float3 sourceCenter = sourceAnchorLookup.HasComponent(sourceEntity)
+                ? sourceAnchorLookup[sourceEntity].Position
+                : float3.zero;
+
+            switch (pattern.SamplingAnchorMode)
+            {
+                case WaveSamplingAnchorModeId.FixedPoint:
+                    return new float3(pattern.FixedPoint.x, sourceCenter.y, pattern.FixedPoint.y);
+                case WaveSamplingAnchorModeId.PlayerRelative:
+                    if (hasPlayer)
+                    {
+                        return new float3(
+                            playerPosition.x + pattern.SpawnOffset.x,
+                            playerPosition.y,
+                            playerPosition.z + pattern.SpawnOffset.y);
+                    }
+
+                    return sourceCenter;
+                default:
+                    return sourceCenter;
+            }
+        }
+
+        private static float3 SampleEventAnchorPosition(
+            ref Unity.Mathematics.Random random,
+            Entity sourceEntity,
+            in SourceClipPatternBuffer pattern,
+            float3 center,
+            float3 sourceAnchor,
+            bool hasPlayer,
+            float3 playerPosition,
+            ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
+        {
+            int sampleBudget = math.max(1, pattern.SpawnSampleBudget);
+            float noSpawnRadius = math.max(0f, pattern.PlayerNoSpawnRadius);
+            float noSpawnRadiusSq = noSpawnRadius * noSpawnRadius;
+            float3 lastSample = center;
+
+            for (int i = 0; i < sampleBudget; i++)
+            {
+                if (pattern.AreaSamplerMode == WaveAreaSamplerModeId.PollutionTopK)
+                {
+                    if (TrySampleSpawnPositionFromPollution(
+                            ref random,
+                            sourceEntity,
+                            center,
+                            sourceAnchor,
+                            out var pollutionPos,
+                            ref pollutionConfigLookup,
+                            ref pollutionGridLookup,
+                            ref pollutionCellsLookup,
+                            ref pollutionValidCellIndicesLookup))
+                    {
+                        lastSample = pollutionPos;
+                    }
+                    else
+                    {
+                        lastSample = center;
+                    }
+                }
+                else if (pattern.AreaSamplerMode == WaveAreaSamplerModeId.UniformField)
+                {
+                    if (TrySampleSpawnPositionUniform(
+                            ref random,
+                            sourceEntity,
+                            center,
+                            sourceAnchor,
+                            out var uniformPos,
+                            ref pollutionGridLookup,
+                            ref pollutionCellsLookup,
+                            ref pollutionValidCellIndicesLookup))
+                    {
+                        lastSample = uniformPos;
+                    }
+                    else
+                    {
+                        lastSample = center;
+                    }
+                }
+                else
+                {
+                    lastSample = center;
+                }
+
+                if (!hasPlayer || noSpawnRadius <= 0f)
+                    return lastSample;
+
+                float2 delta = new float2(lastSample.x - playerPosition.x, lastSample.z - playerPosition.z);
+                if (math.lengthsq(delta) >= noSpawnRadiusSq)
+                    return lastSample;
+            }
+
+            return lastSample;
+        }
+
+        private static bool TrySampleSpawnPositionFromPollution(
+            ref Unity.Mathematics.Random random,
+            Entity sourceEntity,
+            float3 center,
+            float3 sourceAnchor,
+            out float3 position,
+            ref ComponentLookup<SourcePollutionConfigComponent> pollutionConfigLookup,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
+        {
+            position = center;
+            if (!pollutionConfigLookup.HasComponent(sourceEntity)
+                || !pollutionGridLookup.HasComponent(sourceEntity)
+                || !pollutionCellsLookup.HasBuffer(sourceEntity)
+                || !pollutionValidCellIndicesLookup.HasBuffer(sourceEntity))
+                return false;
+
+            var config = pollutionConfigLookup[sourceEntity];
+            var grid = pollutionGridLookup[sourceEntity];
+            var cells = pollutionCellsLookup[sourceEntity];
+            var validIndices = pollutionValidCellIndicesLookup[sourceEntity];
+            int activeCount = CountActiveValidCells(cells, validIndices);
+            if (activeCount <= 0)
+                return false;
+
+            int topK = math.clamp(config.TopKSampleCount, 1, activeCount);
+            int bestCellIndex = -1;
+            float bestWeight = -1f;
+            for (int i = 0; i < topK; i++)
+            {
+                int cellIndex = SelectNthActiveValidCell(validIndices, cells, random.NextInt(0, activeCount));
+                float weight = GetValidCellWeight(cells, cellIndex);
+                if (weight < 0f)
+                    continue;
+
+                if (bestCellIndex < 0 || weight > bestWeight)
+                {
+                    bestCellIndex = cellIndex;
+                    bestWeight = weight;
+                }
+            }
+
+            if (bestCellIndex < 0)
+                return false;
+
+            position = SampleInsidePollutionCell(
+                ref random,
+                bestCellIndex,
+                center,
+                sourceAnchor,
+                math.max(1, grid.Cols),
+                math.max(1, grid.Rows),
+                in grid);
+            return true;
+        }
+
+        private static bool TrySampleSpawnPositionUniform(
+            ref Unity.Mathematics.Random random,
+            Entity sourceEntity,
+            float3 center,
+            float3 sourceAnchor,
+            out float3 position,
+            ref ComponentLookup<SourcePollutionGridComponent> pollutionGridLookup,
+            ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
+            ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup)
+        {
+            position = center;
+            if (!pollutionGridLookup.HasComponent(sourceEntity)
+                || !pollutionCellsLookup.HasBuffer(sourceEntity)
+                || !pollutionValidCellIndicesLookup.HasBuffer(sourceEntity))
+                return false;
+
+            var grid = pollutionGridLookup[sourceEntity];
+            var cells = pollutionCellsLookup[sourceEntity];
+            var validIndices = pollutionValidCellIndicesLookup[sourceEntity];
+            int activeCount = CountActiveValidCells(cells, validIndices);
+            if (activeCount <= 0)
+                return false;
+
+            int cellIndex = SelectNthActiveValidCell(validIndices, cells, random.NextInt(0, activeCount));
+            if (cellIndex < 0 || GetValidCellWeight(cells, cellIndex) < 0f)
+                return false;
+
+            position = SampleInsidePollutionCell(
+                ref random,
+                cellIndex,
+                center,
+                sourceAnchor,
+                math.max(1, grid.Cols),
+                math.max(1, grid.Rows),
+                in grid);
+            return true;
+        }
+
+        private static float GetValidCellWeight(DynamicBuffer<SourcePollutionCellBuffer> cells, int cellIndex)
+        {
+            if ((uint)cellIndex >= (uint)cells.Length)
+                return -1f;
+
+            var cell = cells[cellIndex];
+            if (cell.IsValid == 0 || cell.IsActive == 0)
+                return -1f;
+
+            return math.max(0f, cell.Value);
+        }
+
+        private static int CountActiveValidCells(
+            DynamicBuffer<SourcePollutionCellBuffer> cells,
+            DynamicBuffer<SourcePollutionValidCellIndexBuffer> validIndices)
+        {
+            int activeCount = 0;
+            for (int i = 0; i < validIndices.Length; i++)
+            {
+                if (GetValidCellWeight(cells, validIndices[i].Value) >= 0f)
+                    activeCount++;
+            }
+
+            return activeCount;
+        }
+
+        private static int SelectNthActiveValidCell(
+            DynamicBuffer<SourcePollutionValidCellIndexBuffer> validIndices,
+            DynamicBuffer<SourcePollutionCellBuffer> cells,
+            int activeOrdinal)
+        {
+            int current = 0;
+            for (int i = 0; i < validIndices.Length; i++)
+            {
+                int cellIndex = validIndices[i].Value;
+                if (GetValidCellWeight(cells, cellIndex) < 0f)
+                    continue;
+
+                if (current == activeOrdinal)
+                    return cellIndex;
+
+                current++;
+            }
+
+            return -1;
+        }
+
+        private static float3 SampleInsidePollutionCell(
+            ref Unity.Mathematics.Random random,
+            int cellIndex,
+            float3 center,
+            float3 sourceAnchor,
+            int cols,
+            int rows,
+            in SourcePollutionGridComponent grid)
+        {
+            int safeCols = math.max(1, cols);
+            int safeRows = math.max(1, rows);
+            int clampedCellIndex = math.clamp(cellIndex, 0, safeCols * safeRows - 1);
+            int cellX = clampedCellIndex % safeCols;
+            int cellY = math.clamp(clampedCellIndex / safeCols, 0, safeRows - 1);
+
+            float cellSize = math.max(0.001f, grid.CellSize);
+            float2 halfExtents = math.max(float2.zero, grid.HalfExtents);
+            float originOffsetX = center.x - sourceAnchor.x;
+            float originOffsetZ = center.z - sourceAnchor.z;
+            float worldMinX = grid.OriginX + originOffsetX;
+            float worldMinZ = grid.OriginZ + originOffsetZ;
+            float worldMaxX = worldMinX + (halfExtents.x * 2f);
+            float worldMaxZ = worldMinZ + (halfExtents.y * 2f);
+            float worldX = worldMinX + (cellX + random.NextFloat(0f, 1f)) * cellSize;
+            float worldZ = worldMinZ + (cellY + random.NextFloat(0f, 1f)) * cellSize;
+            return new float3(
+                math.clamp(worldX, worldMinX, worldMaxX),
+                center.y,
+                math.clamp(worldZ, worldMinZ, worldMaxZ));
+        }
+
+        private static int ResolveCombinedPendingForSourceType(
+            Entity sourceEntity,
+            int bulletTypeKey,
+            DynamicBuffer<SourceSpawnRequestBuffer> legacyRequests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests)
+        {
+            return SpawnRequestCommonUtility.SafeAdd(
+                ResolveLegacyPendingCount(legacyRequests, bulletTypeKey),
+                ResolvePendingDiscreteBulletEquivalent(discreteRequests, sourceEntity, bulletTypeKey));
+        }
+
+        private static int ResolvePendingDiscreteBulletEquivalent(
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
+            Entity sourceEntity,
+            int bulletTypeKey)
+        {
+            int pending = 0;
+            for (int i = 0; i < discreteRequests.Length; i++)
+            {
+                var item = discreteRequests[i];
+                if (item.SourceEntity != sourceEntity || item.BulletTypeKey != bulletTypeKey)
+                    continue;
+
+                pending = SpawnRequestCommonUtility.SafeAdd(
+                    pending,
+                    DiscreteEmitRequestUtility.ResolvePendingBulletEquivalent(in item));
+            }
+
+            return pending;
+        }
+
+        private static int ResolveLegacyPendingCount(
+            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            int bulletTypeKey)
+        {
+            int pending = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                var item = requests[i];
+                if (item.BulletTypeKey != bulletTypeKey || item.Count <= 0)
+                    continue;
+
+                pending = SpawnRequestCommonUtility.SafeAdd(pending, item.Count);
+            }
+
+            return pending;
+        }
+
+        private static int ResolveActiveCount(
+            DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
+            int bulletTypeKey)
+        {
+            for (int i = 0; i < activeCounts.Length; i++)
+            {
+                if (activeCounts[i].BulletTypeKey == bulletTypeKey)
+                    return activeCounts[i].ActiveCount;
+            }
+
+            return 0;
         }
     }
 }
