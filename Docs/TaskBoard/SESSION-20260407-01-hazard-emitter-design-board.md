@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260407-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-04-07`
+- last_updated: `2026-04-08`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
   - [../GameDesign/GD-006-hazard-conditional-capture-system.md](../GameDesign/GD-006-hazard-conditional-capture-system.md)
@@ -28,9 +28,32 @@
 - [ ] Plan E. integration, metrics, 문서 마감
   - 완료 기준: source discrete branch와 emitter branch가 공통 `DiscreteEmit` 경로에서 통합되고 최소 backlog/metrics 및 문서 차이가 정리된다.
   - 검증: compile, console error 0, EditMode 통합 회귀, PlayMode smoke
+- [ ] E2. `HazardEmitterCoordinatorSystem` 계약과 runtime orchestration 구현 계획을 고정한다.
+  - 목표: `HazardEmitter`를 source의 부속 데이터가 아니라 source 소속의 runtime 위험 주체로 보고, source state 외 입력까지 포함한 activation orchestration owner를 분리한다.
+  - 현재 합의:
+    - 명칭은 `HazardEmitterCoordinatorSystem`
+    - 입력 축은 `source state` 외에 `player distance`까지 열어 둔다.
+    - coordinator는 activation/suppression gate만 결정하고, telegraph/cooldown/emit append는 계속 `HazardEmitterEmitBuildSystem`이 소유한다.
+    - 최소 gate 축은 `HazardEmitterSourcePressureGate`, `HazardEmitterPlayerDistanceGate`, `HazardEmitterSourceProgressGate` 조합으로 본다.
+    - 예시 규칙 1: source `Pressure` 상태 + 최소 hold 시간 + player distance 범위가 모두 만족될 때 활성화
+    - 예시 규칙 2: `CollectedCount / ThresholdDepleted` 기반 `progress01`이 지정 구간에 들어오면 활성화
+    - coordinator state 최소 출력은 `ActivationAllowed`, `SuppressionReasonMask`, `LastPlayerDistanceSq`다.
+    - suppression reason mask 1차 축은 `DisabledByAppliedConfig`, `SuppressedByAppliedConfig`, `MissingSource`, `SourcePressureBlocked`, `SourceProgressBlocked`, `PlayerDistanceBlocked`, `MissingPlayer`, `GroupSuppressed`다.
+  - 구현 방향:
+    - `HazardEmitterCoordinatorStateComponent` 또는 동등한 runtime gate state 추가
+    - `HazardEmitterEmitBuildSystem`은 baked/applied config 대신 coordinator 결과를 읽어 상태기계를 진행
+    - 첫 단계 입력은 `stage-applied enable/suppression`, `source state`, `player distance`, `source progress01`로 제한
+    - 권장 update order는 `RunProgressDirectorSystem` 이후, `HazardEmitterEmitBuildSystem` 이전이다.
+  - 검증 기준: source 상태와 플레이어 거리 변화가 emit build ownership을 오염시키지 않고 emitter activation gate에 반영된다.
 
 ## Next
-- 없음
+- [ ] E3. `HazardEmitterBinding`을 반영하는 TD/ADR/TaskBoard 차이 정리를 먼저 수행한다.
+  - 이유: 현재 `TD-028/029`는 emitter 공통 계약과 discrete emit bridge까지만 닫혀 있고, stage-applied emitter override seam은 아직 문서 SSOT가 아니다.
+- [ ] E4. `HazardEmitterBinding`과 `HazardEmitterCoordinatorSystem`의 구현 선후를 정한다.
+  - 현재 판단: `HazardEmitterBinding`이 먼저, `HazardEmitterCoordinatorSystem`이 다음이다.
+  - 이유: coordinator는 stage-applied baseline이 먼저 있어야 입력 합성 책임을 깔끔하게 가져갈 수 있다.
+- [ ] E5. `HazardEmitterCoordinatorSystem`의 update order와 suppression reason mask를 확정한다.
+  - 이유: `Pressure/player distance/progress` gate를 실제 구현으로 옮기려면 source/director state update 이후, emit build 이전의 정확한 write owner 경계가 먼저 닫혀야 한다.
 
 ## Blocked
 - 없음
@@ -97,8 +120,21 @@
     - emitter는 direct spawn하지 않고 `BuildDiscreteEmitSeedFromEmitter(...) -> CreateDiscreteEmitRequest(...)` 경로로 `DiscreteEmitRequestBuffer`를 append한다.
     - emitter end-to-end를 확인하는 PlayMode smoke가 추가됐다.
     - `EditMode 457/457`, `PlayMode 44/44`, console error 0 기준으로 통과했다.
+- [x] D14. `HazardEmitter` 샘플을 source template 경로에 연결해 sample runtime 경로를 정적 구성 기준으로 정리했다.
+  - 검증 결과:
+    - sample topology catalog는 emitter child가 포함된 source template prefab을 참조하도록 조정됐다.
+    - sample emitter는 telegraph/emission profile asset 2개만 추가하는 최소 자산 경로로 구성됐다.
+    - sample verification PlayMode 테스트는 `HazardEmitter` entity 생성과 `Cooldown` 진입을 관측하도록 보강됐다.
+    - Unity MCP/batchmode 제약으로 자동 compile/EditMode/PlayMode 재검증은 이번 세션에서 완료하지 못했고, 정적 참조 경로와 테스트 코드까지 반영된 상태로 남아 있다.
+- [x] E1. `HazardEmitterBinding` stage-applied seam을 구현하고 검증했다.
+  - 검증 결과:
+    - `HazardEmitter` runtime 데이터가 `structural identity / baked baseline / applied snapshot / runtime mutable`로 분리됐다.
+    - `StageSourceBinding.HazardEmitterBindings[]`, `SourceHazardEmitterRefBuffer`, `StageTopologyApplyPrepareSystem`의 emitter apply/reset 경로가 추가됐다.
+    - `HazardEmitterEmitBuildSystem`은 applied snapshot만 읽도록 전환됐다.
+    - `StageDefinitionGenerator`는 새 필드를 빈 배열 기본값으로 유지한다.
+    - `EditMode 460/460`, `PlayMode 44/44` 통과, console error 추가 없음 기준으로 회귀 없이 통과했다.
 
 ## End of Session
 - 결과: 진행 중
-- 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics는 후속 확정이 필요하다.
-- 다음 세션 시작점: `Plan D` `HazardEmitter` runtime path 연결
+- 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics, `HazardEmitterCoordinatorSystem` 구현 세부와 stage-applied gate 확장 여부는 후속 확정이 필요하다.
+- 다음 세션 시작점: `E2` coordinator/runtime orchestration 구현 계획 고정 후 `E5` update order/reason mask를 코드 수준으로 닫는다.

@@ -875,6 +875,7 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            ApplyHazardEmitterStageConfiguration(em, entity, hazardEmitterBindings: null);
         }
 
         private static void ApplySourceDefinition(EntityManager em, Entity entity, in StageSourceBinding binding)
@@ -930,6 +931,248 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            ApplyHazardEmitterStageConfiguration(em, entity, binding.HazardEmitterBindings);
+        }
+
+        private static void ApplyHazardEmitterStageConfiguration(EntityManager em, Entity sourceEntity, HazardEmitterBinding[] hazardEmitterBindings)
+        {
+            if (!em.Exists(sourceEntity) || !em.HasBuffer<SourceHazardEmitterRefBuffer>(sourceEntity))
+                return;
+
+            var emitterRefs = em.GetBuffer<SourceHazardEmitterRefBuffer>(sourceEntity);
+            for (int i = 0; i < emitterRefs.Length; i++)
+            {
+                var emitterEntity = emitterRefs[i].EmitterEntity;
+                if (!em.Exists(emitterEntity))
+                    continue;
+
+                ResetHazardEmitterToBaseline(em, emitterEntity);
+
+                if (TryFindHazardEmitterBinding(hazardEmitterBindings, emitterRefs[i].EmitterId, out var binding))
+                    ApplyHazardEmitterBindingOverride(em, emitterEntity, in binding);
+
+                ResetHazardEmitterRuntimeState(em, emitterEntity);
+            }
+        }
+
+        private static void DisableSourceHazardEmitters(EntityManager em, Entity sourceEntity)
+        {
+            if (!em.Exists(sourceEntity) || !em.HasBuffer<SourceHazardEmitterRefBuffer>(sourceEntity))
+                return;
+
+            var emitterRefs = em.GetBuffer<SourceHazardEmitterRefBuffer>(sourceEntity);
+            for (int i = 0; i < emitterRefs.Length; i++)
+            {
+                var emitterEntity = emitterRefs[i].EmitterEntity;
+                if (!em.Exists(emitterEntity))
+                    continue;
+
+                ResetHazardEmitterToBaseline(em, emitterEntity);
+
+                if (em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+                {
+                    var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
+                    appliedConfig.IsEnabled = 0;
+                    appliedConfig.IsSuppressed = 1;
+                    em.SetComponentData(emitterEntity, appliedConfig);
+                }
+
+                ResetHazardEmitterRuntimeState(em, emitterEntity);
+            }
+        }
+
+        private static bool TryFindHazardEmitterBinding(HazardEmitterBinding[] hazardEmitterBindings, int emitterId, out HazardEmitterBinding binding)
+        {
+            if (hazardEmitterBindings != null)
+            {
+                for (int i = 0; i < hazardEmitterBindings.Length; i++)
+                {
+                    if (hazardEmitterBindings[i].EmitterId == emitterId)
+                    {
+                        binding = hazardEmitterBindings[i];
+                        return true;
+                    }
+                }
+            }
+
+            binding = default;
+            return false;
+        }
+
+        private static void ResetHazardEmitterToBaseline(EntityManager em, Entity emitterEntity)
+        {
+            if (em.HasComponent<HazardEmitterAppliedConfigBaselineComponent>(emitterEntity)
+                && em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+            {
+                var baselineConfig = em.GetComponentData<HazardEmitterAppliedConfigBaselineComponent>(emitterEntity);
+                em.SetComponentData(emitterEntity, new HazardEmitterAppliedConfigComponent
+                {
+                    IsEnabled = baselineConfig.IsEnabled,
+                    IsSuppressed = baselineConfig.IsSuppressed,
+                    LocalOffset = baselineConfig.LocalOffset,
+                    TelegraphProfileRefId = baselineConfig.TelegraphProfileRefId,
+                    EmissionProfileRefId = baselineConfig.EmissionProfileRefId,
+                });
+            }
+
+            if (em.HasComponent<HazardEmitterTelegraphProfileBaselineComponent>(emitterEntity)
+                && em.HasComponent<HazardEmitterTelegraphProfileComponent>(emitterEntity))
+            {
+                var baselineTelegraph = em.GetComponentData<HazardEmitterTelegraphProfileBaselineComponent>(emitterEntity);
+                em.SetComponentData(emitterEntity, new HazardEmitterTelegraphProfileComponent
+                {
+                    ProfileId = baselineTelegraph.ProfileId,
+                    TelegraphDurationSec = baselineTelegraph.TelegraphDurationSec,
+                });
+            }
+
+            if (em.HasComponent<HazardEmitterEmissionProfileBaselineComponent>(emitterEntity)
+                && em.HasComponent<HazardEmitterEmissionProfileComponent>(emitterEntity))
+            {
+                var baselineEmission = em.GetComponentData<HazardEmitterEmissionProfileBaselineComponent>(emitterEntity);
+                em.SetComponentData(emitterEntity, new HazardEmitterEmissionProfileComponent
+                {
+                    ProfileId = baselineEmission.ProfileId,
+                    BulletTypeKey = baselineEmission.BulletTypeKey,
+                    PositionPatternMode = baselineEmission.PositionPatternMode,
+                    SpawnOffset = baselineEmission.SpawnOffset,
+                    LineStart = baselineEmission.LineStart,
+                    LineEnd = baselineEmission.LineEnd,
+                    SampleSpacing = baselineEmission.SampleSpacing,
+                    PointSetCount = baselineEmission.PointSetCount,
+                    Point0 = baselineEmission.Point0,
+                    Point1 = baselineEmission.Point1,
+                    Point2 = baselineEmission.Point2,
+                    Point3 = baselineEmission.Point3,
+                    AimMode = baselineEmission.AimMode,
+                    AimSnapshotTiming = baselineEmission.AimSnapshotTiming,
+                    BaseAngleDeg = baselineEmission.BaseAngleDeg,
+                    AimAngleOffsetDeg = baselineEmission.AimAngleOffsetDeg,
+                    LineNormalSide = baselineEmission.LineNormalSide,
+                    LineNormalAngleOffsetDeg = baselineEmission.LineNormalAngleOffsetDeg,
+                    SpiralStepDeg = baselineEmission.SpiralStepDeg,
+                    ShotPatternMode = baselineEmission.ShotPatternMode,
+                    ShotCount = baselineEmission.ShotCount,
+                    NWayAngleSpacingDeg = baselineEmission.NWayAngleSpacingDeg,
+                    EventShotSchedule = baselineEmission.EventShotSchedule,
+                    EventShotIntervalSec = baselineEmission.EventShotIntervalSec,
+                    EventRepeatCount = baselineEmission.EventRepeatCount,
+                    CooldownSec = baselineEmission.CooldownSec,
+                });
+            }
+        }
+
+        private static void ApplyHazardEmitterBindingOverride(EntityManager em, Entity emitterEntity, in HazardEmitterBinding binding)
+        {
+            if (em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+            {
+                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
+
+                switch (binding.EnabledMode)
+                {
+                    case HazardEmitterEnabledOverrideMode.ForceEnabled:
+                        appliedConfig.IsEnabled = 1;
+                        break;
+                    case HazardEmitterEnabledOverrideMode.ForceDisabled:
+                        appliedConfig.IsEnabled = 0;
+                        break;
+                }
+
+                switch (binding.StartSuppressedMode)
+                {
+                    case HazardEmitterSuppressionOverrideMode.ForceUnsuppressed:
+                        appliedConfig.IsSuppressed = 0;
+                        break;
+                    case HazardEmitterSuppressionOverrideMode.ForceSuppressed:
+                        appliedConfig.IsSuppressed = 1;
+                        break;
+                }
+
+                if (binding.OverrideLocalOffset)
+                    appliedConfig.LocalOffset = binding.LocalOffset;
+
+                em.SetComponentData(emitterEntity, appliedConfig);
+            }
+
+            if (binding.TelegraphProfileOverride != null
+                && HazardEmitterProfileResolver.TryResolve(binding.TelegraphProfileOverride, out var resolvedTelegraph))
+            {
+                if (em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+                {
+                    var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
+                    appliedConfig.TelegraphProfileRefId = resolvedTelegraph.ProfileId;
+                    em.SetComponentData(emitterEntity, appliedConfig);
+                }
+
+                if (em.HasComponent<HazardEmitterTelegraphProfileComponent>(emitterEntity))
+                {
+                    em.SetComponentData(emitterEntity, new HazardEmitterTelegraphProfileComponent
+                    {
+                        ProfileId = resolvedTelegraph.ProfileId,
+                        TelegraphDurationSec = resolvedTelegraph.TelegraphDurationSec,
+                    });
+                }
+            }
+
+            if (binding.EmissionProfileOverride != null
+                && HazardEmitterProfileResolver.TryResolve(binding.EmissionProfileOverride, out var resolvedEmission, out _))
+            {
+                if (em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+                {
+                    var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
+                    appliedConfig.EmissionProfileRefId = binding.EmissionProfileOverride.GetInstanceID();
+                    em.SetComponentData(emitterEntity, appliedConfig);
+                }
+
+                if (em.HasComponent<HazardEmitterEmissionProfileComponent>(emitterEntity))
+                {
+                    em.SetComponentData(emitterEntity, new HazardEmitterEmissionProfileComponent
+                    {
+                        ProfileId = binding.EmissionProfileOverride.GetInstanceID(),
+                        BulletTypeKey = resolvedEmission.Bullet.DefinitionId,
+                        PositionPatternMode = resolvedEmission.PositionPatternMode,
+                        SpawnOffset = resolvedEmission.SpawnOffset,
+                        LineStart = resolvedEmission.LineStart,
+                        LineEnd = resolvedEmission.LineEnd,
+                        SampleSpacing = resolvedEmission.SampleSpacing,
+                        PointSetCount = resolvedEmission.PointSetCount,
+                        Point0 = resolvedEmission.Point0,
+                        Point1 = resolvedEmission.Point1,
+                        Point2 = resolvedEmission.Point2,
+                        Point3 = resolvedEmission.Point3,
+                        AimMode = resolvedEmission.AimMode,
+                        AimSnapshotTiming = resolvedEmission.AimSnapshotTiming,
+                        BaseAngleDeg = resolvedEmission.BaseAngleDeg,
+                        AimAngleOffsetDeg = resolvedEmission.AimAngleOffsetDeg,
+                        LineNormalSide = resolvedEmission.LineNormalSide,
+                        LineNormalAngleOffsetDeg = resolvedEmission.LineNormalAngleOffsetDeg,
+                        SpiralStepDeg = resolvedEmission.SpiralStepDeg,
+                        ShotPatternMode = resolvedEmission.ShotPatternMode,
+                        ShotCount = resolvedEmission.ShotCount,
+                        NWayAngleSpacingDeg = resolvedEmission.NWayAngleSpacingDeg,
+                        EventShotSchedule = resolvedEmission.EventShotSchedule,
+                        EventShotIntervalSec = resolvedEmission.EventShotIntervalSec,
+                        EventRepeatCount = resolvedEmission.EventRepeatCount,
+                        CooldownSec = resolvedEmission.CooldownSec,
+                    });
+                }
+            }
+        }
+
+        private static void ResetHazardEmitterRuntimeState(EntityManager em, Entity emitterEntity)
+        {
+            if (!em.HasComponent<HazardEmitterRuntimeStateComponent>(emitterEntity))
+                return;
+
+            var initialLifecycleState = HazardEmitterLifecycleStateId.Dormant;
+            if (em.HasComponent<HazardEmitterComponent>(emitterEntity))
+                initialLifecycleState = em.GetComponentData<HazardEmitterComponent>(emitterEntity).InitialLifecycleState;
+
+            em.SetComponentData(emitterEntity, new HazardEmitterRuntimeStateComponent
+            {
+                LifecycleState = initialLifecycleState,
+                StateElapsedSec = 0f,
+            });
         }
 
         private static void DisableSourceInstance(EntityManager em, Entity entity)
@@ -991,6 +1234,7 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            DisableSourceHazardEmitters(em, entity);
         }
 
         private static Entity ResolveFirstEntity(EntityQuery query)

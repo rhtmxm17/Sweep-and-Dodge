@@ -19,6 +19,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<DiscreteEmitChannelSingletonTag>();
             state.RequireForUpdate<RunDirectorStageStateComponent>();
             state.RequireForUpdate<HazardEmitterComponent>();
+            state.RequireForUpdate<HazardEmitterAppliedConfigComponent>();
             state.RequireForUpdate<HazardEmitterTelegraphProfileComponent>();
             state.RequireForUpdate<HazardEmitterEmissionProfileComponent>();
             state.RequireForUpdate<HazardEmitterRuntimeStateComponent>();
@@ -48,16 +49,18 @@ namespace SweepNDodge.DotsBullets
             localTransformLookup.Update(ref state);
             localToWorldLookup.Update(ref state);
 
-            foreach (var (emitter, telegraph, emission, runtime, entity) in SystemAPI.Query<
+            foreach (var (emitter, applied, telegraph, emission, runtime, entity) in SystemAPI.Query<
                 RefRO<HazardEmitterComponent>,
+                RefRO<HazardEmitterAppliedConfigComponent>,
                 RefRO<HazardEmitterTelegraphProfileComponent>,
                 RefRO<HazardEmitterEmissionProfileComponent>,
                 RefRW<HazardEmitterRuntimeStateComponent>>().WithEntityAccess())
             {
-                ref readonly var config = ref emitter.ValueRO;
+                ref readonly var emitterConfig = ref emitter.ValueRO;
+                ref readonly var appliedConfig = ref applied.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
 
-                if (config.IsEnabled == 0 || config.IsSuppressed != 0)
+                if (appliedConfig.IsEnabled == 0 || appliedConfig.IsSuppressed != 0)
                 {
                     runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
                     runtimeState.StateElapsedSec = 0f;
@@ -96,13 +99,13 @@ namespace SweepNDodge.DotsBullets
                             runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Emit;
                             float3 anchorPosition = ResolveWorldAnchorPosition(
                                 entity,
-                                config.LocalOffset,
+                                appliedConfig.LocalOffset,
                                 localTransformLookup,
                                 localToWorldLookup);
                             var seed = DiscreteEmitRequestUtility.BuildDiscreteEmitSeedFromEmitter(
-                                config.SourceEntity,
+                                emitterConfig.SourceEntity,
                                 entity,
-                                config.EmitterId,
+                                emitterConfig.EmitterId,
                                 in emission.ValueRO,
                                 anchorPosition,
                                 priority: 0);

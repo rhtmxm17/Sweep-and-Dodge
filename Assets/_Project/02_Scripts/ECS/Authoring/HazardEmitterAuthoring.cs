@@ -40,28 +40,28 @@ namespace SweepNDodge.DotsBullets
                 var emitterEntity = GetEntity(TransformUsageFlags.Dynamic);
                 var sourceEntity = GetEntity(sourceAuthoring.gameObject, TransformUsageFlags.Dynamic);
 
-                AddComponent(emitterEntity, new HazardEmitterComponent
+                int telegraphProfileRefId = authoring.TelegraphProfile != null ? authoring.TelegraphProfile.GetInstanceID() : 0;
+                int emissionProfileRefId = authoring.EmissionProfile != null ? authoring.EmissionProfile.GetInstanceID() : 0;
+                byte isEnabled = authoring.IsEnabled ? (byte)1 : (byte)0;
+                byte isSuppressed = authoring.StartSuppressed ? (byte)1 : (byte)0;
+                int emitterId = math.max(1, authoring.EmitterId);
+
+                var baselineConfig = new HazardEmitterAppliedConfigBaselineComponent
                 {
-                    EmitterId = math.max(1, authoring.EmitterId),
-                    SourceEntity = sourceEntity,
-                    ActivationPolicy = authoring.ActivationPolicy,
-                    InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
-                    AnchorKind = authoring.AnchorKind,
-                    Mobility = authoring.Mobility,
-                    IsEnabled = authoring.IsEnabled ? (byte)1 : (byte)0,
-                    IsSuppressed = authoring.StartSuppressed ? (byte)1 : (byte)0,
+                    IsEnabled = isEnabled,
+                    IsSuppressed = isSuppressed,
                     LocalOffset = authoring.LocalOffset,
-                    TelegraphProfileRefId = authoring.TelegraphProfile != null ? authoring.TelegraphProfile.GetInstanceID() : 0,
-                    EmissionProfileRefId = authoring.EmissionProfile != null ? authoring.EmissionProfile.GetInstanceID() : 0,
-                });
-                AddComponent(emitterEntity, new HazardEmitterTelegraphProfileComponent
+                    TelegraphProfileRefId = telegraphProfileRefId,
+                    EmissionProfileRefId = emissionProfileRefId,
+                };
+                var baselineTelegraph = new HazardEmitterTelegraphProfileBaselineComponent
                 {
-                    ProfileId = authoring.TelegraphProfile != null ? authoring.TelegraphProfile.GetInstanceID() : 0,
+                    ProfileId = telegraphProfileRefId,
                     TelegraphDurationSec = math.max(0f, authoring.TelegraphProfile.TelegraphDurationSec),
-                });
-                AddComponent(emitterEntity, new HazardEmitterEmissionProfileComponent
+                };
+                var baselineEmission = new HazardEmitterEmissionProfileBaselineComponent
                 {
-                    ProfileId = authoring.EmissionProfile != null ? authoring.EmissionProfile.GetInstanceID() : 0,
+                    ProfileId = emissionProfileRefId,
                     BulletTypeKey = resolvedEmission.Bullet.DefinitionId,
                     PositionPatternMode = resolvedEmission.PositionPatternMode,
                     SpawnOffset = resolvedEmission.SpawnOffset,
@@ -87,11 +87,71 @@ namespace SweepNDodge.DotsBullets
                     EventShotIntervalSec = resolvedEmission.EventShotIntervalSec,
                     EventRepeatCount = resolvedEmission.EventRepeatCount,
                     CooldownSec = resolvedEmission.CooldownSec,
+                };
+
+                AddComponent(emitterEntity, new HazardEmitterComponent
+                {
+                    EmitterId = emitterId,
+                    SourceEntity = sourceEntity,
+                    ActivationPolicy = authoring.ActivationPolicy,
+                    InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
+                    AnchorKind = authoring.AnchorKind,
+                    Mobility = authoring.Mobility,
+                });
+                AddComponent(emitterEntity, baselineConfig);
+                AddComponent(emitterEntity, new HazardEmitterAppliedConfigComponent
+                {
+                    IsEnabled = baselineConfig.IsEnabled,
+                    IsSuppressed = baselineConfig.IsSuppressed,
+                    LocalOffset = baselineConfig.LocalOffset,
+                    TelegraphProfileRefId = baselineConfig.TelegraphProfileRefId,
+                    EmissionProfileRefId = baselineConfig.EmissionProfileRefId,
+                });
+                AddComponent(emitterEntity, baselineTelegraph);
+                AddComponent(emitterEntity, new HazardEmitterTelegraphProfileComponent
+                {
+                    ProfileId = baselineTelegraph.ProfileId,
+                    TelegraphDurationSec = baselineTelegraph.TelegraphDurationSec,
+                });
+                AddComponent(emitterEntity, baselineEmission);
+                AddComponent(emitterEntity, new HazardEmitterEmissionProfileComponent
+                {
+                    ProfileId = baselineEmission.ProfileId,
+                    BulletTypeKey = baselineEmission.BulletTypeKey,
+                    PositionPatternMode = baselineEmission.PositionPatternMode,
+                    SpawnOffset = baselineEmission.SpawnOffset,
+                    LineStart = baselineEmission.LineStart,
+                    LineEnd = baselineEmission.LineEnd,
+                    SampleSpacing = baselineEmission.SampleSpacing,
+                    PointSetCount = baselineEmission.PointSetCount,
+                    Point0 = baselineEmission.Point0,
+                    Point1 = baselineEmission.Point1,
+                    Point2 = baselineEmission.Point2,
+                    Point3 = baselineEmission.Point3,
+                    AimMode = baselineEmission.AimMode,
+                    AimSnapshotTiming = baselineEmission.AimSnapshotTiming,
+                    BaseAngleDeg = baselineEmission.BaseAngleDeg,
+                    AimAngleOffsetDeg = baselineEmission.AimAngleOffsetDeg,
+                    LineNormalSide = baselineEmission.LineNormalSide,
+                    LineNormalAngleOffsetDeg = baselineEmission.LineNormalAngleOffsetDeg,
+                    SpiralStepDeg = baselineEmission.SpiralStepDeg,
+                    ShotPatternMode = baselineEmission.ShotPatternMode,
+                    ShotCount = baselineEmission.ShotCount,
+                    NWayAngleSpacingDeg = baselineEmission.NWayAngleSpacingDeg,
+                    EventShotSchedule = baselineEmission.EventShotSchedule,
+                    EventShotIntervalSec = baselineEmission.EventShotIntervalSec,
+                    EventRepeatCount = baselineEmission.EventRepeatCount,
+                    CooldownSec = baselineEmission.CooldownSec,
                 });
                 AddComponent(emitterEntity, new HazardEmitterRuntimeStateComponent
                 {
                     LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     StateElapsedSec = 0f,
+                });
+                AppendToBuffer(sourceEntity, new SourceHazardEmitterRefBuffer
+                {
+                    EmitterEntity = emitterEntity,
+                    EmitterId = emitterId,
                 });
             }
         }

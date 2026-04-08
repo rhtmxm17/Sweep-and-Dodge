@@ -237,6 +237,185 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageTopologyApply_AppliesHazardEmitterBindingOverride_AndResetsRuntimeState()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_HazardEmitterOverride", out var em, out var requestEntity, out _);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
+
+            try
+            {
+                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardEmitterBindings = new[]
+                {
+                    new HazardEmitterBinding
+                    {
+                        EmitterId = 41,
+                        EnabledMode = HazardEmitterEnabledOverrideMode.ForceDisabled,
+                        StartSuppressedMode = HazardEmitterSuppressionOverrideMode.ForceSuppressed,
+                        OverrideLocalOffset = true,
+                        LocalOffset = new UnityEngine.Vector3(2f, 0f, -1f),
+                        TelegraphProfileOverride = CreateTelegraphProfile(55, 0.75f),
+                        EmissionProfileOverride = CreateEmissionProfile(66, 902, 30f, 2f),
+                    }
+                };
+
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                Entity source = FindAppliedSource(em);
+                var emitterRef = em.GetBuffer<SourceHazardEmitterRefBuffer>(source)[0];
+                var emitter = emitterRef.EmitterEntity;
+
+                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
+                var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
+                var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
+                var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+
+                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
+                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
+                Assert.That(appliedConfig.LocalOffset.x, Is.EqualTo(2f).Within(0.001f));
+                Assert.That(appliedConfig.LocalOffset.z, Is.EqualTo(-1f).Within(0.001f));
+                Assert.That(appliedConfig.TelegraphProfileRefId, Is.EqualTo(stageCatalog.Entries[0].Definition.SourceBindings[0].HazardEmitterBindings[0].TelegraphProfileOverride.GetInstanceID()));
+                Assert.That(appliedConfig.EmissionProfileRefId, Is.EqualTo(stageCatalog.Entries[0].Definition.SourceBindings[0].HazardEmitterBindings[0].EmissionProfileOverride.GetInstanceID()));
+                Assert.That(telegraph.ProfileId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
+                Assert.That(telegraph.TelegraphDurationSec, Is.EqualTo(0.75f).Within(0.001f));
+                Assert.That(emission.ProfileId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
+                Assert.That(emission.BulletTypeKey, Is.EqualTo(902));
+                Assert.That(emission.BaseAngleDeg, Is.EqualTo(30f).Within(0.001f));
+                Assert.That(emission.CooldownSec, Is.EqualTo(2f).Within(0.001f));
+                Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+                Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+            }
+            finally
+            {
+                var binding = stageCatalog.Entries[0].Definition.SourceBindings[0].HazardEmitterBindings[0];
+                UnityEngine.Object.DestroyImmediate(binding.TelegraphProfileOverride);
+                UnityEngine.Object.DestroyImmediate(binding.EmissionProfileOverride.Bullet);
+                UnityEngine.Object.DestroyImmediate(binding.EmissionProfileOverride);
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_LayoutOnlyResetsHazardEmitterToBaseline()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_HazardEmitterLayoutOnly", out var em, out var requestEntity, out _);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
+
+            try
+            {
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                Entity source = FindAppliedSource(em);
+                var emitter = em.GetBuffer<SourceHazardEmitterRefBuffer>(source)[0].EmitterEntity;
+
+                em.SetComponentData(emitter, new HazardEmitterAppliedConfigComponent
+                {
+                    IsEnabled = 0,
+                    IsSuppressed = 1,
+                    LocalOffset = new float3(9f, 0f, 9f),
+                    TelegraphProfileRefId = 999,
+                    EmissionProfileRefId = 888,
+                });
+                em.SetComponentData(emitter, new HazardEmitterTelegraphProfileComponent
+                {
+                    ProfileId = 999,
+                    TelegraphDurationSec = 5f,
+                });
+                em.SetComponentData(emitter, new HazardEmitterEmissionProfileComponent
+                {
+                    ProfileId = 888,
+                    BulletTypeKey = 777,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Fixed,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                    BaseAngleDeg = 80f,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                    EventRepeatCount = 1,
+                    CooldownSec = 3f,
+                });
+                em.SetComponentData(emitter, new HazardEmitterRuntimeStateComponent
+                {
+                    LifecycleState = HazardEmitterLifecycleStateId.Cooldown,
+                    StateElapsedSec = 2f,
+                });
+
+                stageCatalog.Entries[0].Definition = null;
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
+                var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
+                var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
+                var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+
+                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(1));
+                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(0));
+                Assert.That(appliedConfig.LocalOffset.x, Is.EqualTo(0.5f).Within(0.001f));
+                Assert.That(appliedConfig.TelegraphProfileRefId, Is.EqualTo(10));
+                Assert.That(appliedConfig.EmissionProfileRefId, Is.EqualTo(20));
+                Assert.That(telegraph.ProfileId, Is.EqualTo(10));
+                Assert.That(telegraph.TelegraphDurationSec, Is.EqualTo(0.25f).Within(0.001f));
+                Assert.That(emission.ProfileId, Is.EqualTo(20));
+                Assert.That(emission.BulletTypeKey, Is.EqualTo(901));
+                Assert.That(emission.BaseAngleDeg, Is.EqualTo(15f).Within(0.001f));
+                Assert.That(emission.CooldownSec, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+                Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_MissingSourceBinding_DisablesHazardEmitterDeterministically()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_HazardEmitterDisable", out var em, out var requestEntity, out _);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
+
+            try
+            {
+                stageCatalog.Entries[0].Definition.SourceBindings = System.Array.Empty<StageSourceBinding>();
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
+                {
+                    All = new[]
+                    {
+                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                        ComponentType.ReadOnly<StageTopologySourceTag>(),
+                        ComponentType.ReadOnly<SourceStableIdComponent>(),
+                    },
+                    Options = EntityQueryOptions.IncludeDisabledEntities,
+                });
+                using var sources = sourceQuery.ToEntityArray(Allocator.Temp);
+                Assert.That(sources.Length, Is.EqualTo(1));
+
+                var source = sources[0];
+                Assert.That(em.IsEnabled(source), Is.False);
+
+                var emitter = em.GetBuffer<SourceHazardEmitterRefBuffer>(source)[0].EmitterEntity;
+                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
+                var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+
+                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
+                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
+                Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+                Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
         public void StageTopologyApply_InvalidPlayerStart_KeepsTopologyNotReady()
         {
             using var world = CreatePreparedWorld("StageTopologyApply_InvalidPlayerStart", out var em, out var requestEntity, out var topologyStateEntity);
@@ -385,6 +564,49 @@ namespace SweepNDodge.DotsBullets.Tests
             return catalog;
         }
 
+        private static Entity FindAppliedSource(EntityManager em)
+        {
+            using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologySourceTag>(),
+                    ComponentType.ReadOnly<SourceStableIdComponent>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var entities = sourceQuery.ToEntityArray(Allocator.Temp);
+            Assert.That(entities.Length, Is.GreaterThanOrEqualTo(1));
+            return entities[0];
+        }
+
+        private static HazardEmitterTelegraphProfileSO CreateTelegraphProfile(int id, float telegraphDurationSec)
+        {
+            var profile = UnityEngine.ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            profile.name = $"hetp_test_{id}";
+            profile.TelegraphDurationSec = telegraphDurationSec;
+            return profile;
+        }
+
+        private static HazardEmitterEmissionProfileSO CreateEmissionProfile(int id, int bulletTypeKey, float baseAngleDeg, float cooldownSec)
+        {
+            var bullet = UnityEngine.ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            bullet.Editor_SetDefinitionId(bulletTypeKey);
+
+            var profile = UnityEngine.ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            profile.name = $"heep_test_{id}";
+            profile.Bullet = bullet;
+            profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+            profile.Aim = new FixedAimAuthoring { BaseAngleDeg = baseAngleDeg };
+            profile.ShotPattern = new SingleShotPatternAuthoring();
+            profile.EventRepeatCount = 1;
+            profile.EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
+            profile.EventShotIntervalSec = 0f;
+            profile.CooldownSec = cooldownSec;
+            return profile;
+        }
+
         private static void SetSingleton<T>(EntityManager em, T value) where T : unmanaged, IComponentData
         {
             using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
@@ -396,6 +618,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             var entity = em.CreateEntity(
                 typeof(Prefab),
+                typeof(LinkedEntityGroup),
                 typeof(SourceStableIdComponent),
                 typeof(SourceSpawnComponent),
                 typeof(SourceSpawnRuntimeComponent),
@@ -479,6 +702,104 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddBuffer<SourcePollutionDropRequestBuffer>(entity);
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
             em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
+            em.AddBuffer<SourceHazardEmitterRefBuffer>(entity);
+
+            var linkedGroup = em.GetBuffer<LinkedEntityGroup>(entity);
+            linkedGroup.Add(new LinkedEntityGroup { Value = entity });
+
+            var emitter = em.CreateEntity(
+                typeof(Prefab),
+                typeof(LocalTransform),
+                typeof(LocalToWorld),
+                typeof(HazardEmitterComponent),
+                typeof(HazardEmitterAppliedConfigBaselineComponent),
+                typeof(HazardEmitterAppliedConfigComponent),
+                typeof(HazardEmitterTelegraphProfileBaselineComponent),
+                typeof(HazardEmitterTelegraphProfileComponent),
+                typeof(HazardEmitterEmissionProfileBaselineComponent),
+                typeof(HazardEmitterEmissionProfileComponent),
+                typeof(HazardEmitterRuntimeStateComponent));
+            em.SetComponentData(emitter, LocalTransform.FromPosition(float3.zero));
+            em.SetComponentData(emitter, new LocalToWorld { Value = float4x4.identity });
+            em.SetComponentData(emitter, new HazardEmitterComponent
+            {
+                EmitterId = 41,
+                SourceEntity = entity,
+                ActivationPolicy = HazardEmitterActivationPolicyId.AlwaysCycle,
+                InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
+                AnchorKind = HazardEmitterAnchorKindId.ObjectBound,
+                Mobility = HazardEmitterMobilityId.Static,
+            });
+            em.SetComponentData(emitter, new HazardEmitterAppliedConfigBaselineComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+                LocalOffset = new float3(0.5f, 0f, 0f),
+                TelegraphProfileRefId = 10,
+                EmissionProfileRefId = 20,
+            });
+            em.SetComponentData(emitter, new HazardEmitterAppliedConfigComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+                LocalOffset = new float3(0.5f, 0f, 0f),
+                TelegraphProfileRefId = 10,
+                EmissionProfileRefId = 20,
+            });
+            em.SetComponentData(emitter, new HazardEmitterTelegraphProfileBaselineComponent
+            {
+                ProfileId = 10,
+                TelegraphDurationSec = 0.25f,
+            });
+            em.SetComponentData(emitter, new HazardEmitterTelegraphProfileComponent
+            {
+                ProfileId = 10,
+                TelegraphDurationSec = 0.25f,
+            });
+            em.SetComponentData(emitter, new HazardEmitterEmissionProfileBaselineComponent
+            {
+                ProfileId = 20,
+                BulletTypeKey = 901,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                BaseAngleDeg = 15f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                EventShotIntervalSec = 0f,
+                EventRepeatCount = 1,
+                CooldownSec = 1f,
+            });
+            em.SetComponentData(emitter, new HazardEmitterEmissionProfileComponent
+            {
+                ProfileId = 20,
+                BulletTypeKey = 901,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                BaseAngleDeg = 15f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                EventShotIntervalSec = 0f,
+                EventRepeatCount = 1,
+                CooldownSec = 1f,
+            });
+            em.SetComponentData(emitter, new HazardEmitterRuntimeStateComponent
+            {
+                LifecycleState = HazardEmitterLifecycleStateId.Dormant,
+                StateElapsedSec = 0f,
+            });
+
+            em.GetBuffer<SourceHazardEmitterRefBuffer>(entity).Add(new SourceHazardEmitterRefBuffer
+            {
+                EmitterEntity = emitter,
+                EmitterId = 41,
+            });
+            linkedGroup.Add(new LinkedEntityGroup { Value = emitter });
             return entity;
         }
     }

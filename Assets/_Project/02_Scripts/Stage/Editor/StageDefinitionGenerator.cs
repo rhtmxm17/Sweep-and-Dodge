@@ -231,6 +231,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 ThresholdDepleted = Mathf.Max(Mathf.Max(0, authoring.ThresholdWeakened), authoring.ThresholdDepleted),
                 SustainSlots = BuildSustainSlots(authoring.SustainClipSlots),
                 EventSlots = BuildEventSlots(authoring.EventClipSlots),
+                HazardEmitterBindings = Array.Empty<HazardEmitterBinding>(),
             };
         }
 

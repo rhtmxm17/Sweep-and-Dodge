@@ -95,6 +95,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(definition.SourceBindings[1].ThresholdWeakened, Is.EqualTo(11));
                 Assert.That(definition.SourceBindings[1].ThresholdDepleted, Is.EqualTo(22));
                 Assert.That(definition.SourceBindings[1].InitialSourceState, Is.EqualTo(SourceStateId.Weakened));
+                Assert.That(definition.SourceBindings[1].HazardEmitterBindings, Is.Empty);
                 Assert.That(issues.Any(x => x.Code == "SDF905"), Is.True);
             }
             finally

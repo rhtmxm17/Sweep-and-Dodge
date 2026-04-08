@@ -67,7 +67,11 @@ namespace SweepNDodge.DotsBullets.Tests
                     typeof(LocalTransform),
                     typeof(LocalToWorld),
                     typeof(HazardEmitterComponent),
+                    typeof(HazardEmitterAppliedConfigBaselineComponent),
+                    typeof(HazardEmitterAppliedConfigComponent),
+                    typeof(HazardEmitterTelegraphProfileBaselineComponent),
                     typeof(HazardEmitterTelegraphProfileComponent),
+                    typeof(HazardEmitterEmissionProfileBaselineComponent),
                     typeof(HazardEmitterEmissionProfileComponent),
                     typeof(HazardEmitterRuntimeStateComponent));
                 em.SetComponentData(emitter, LocalTransform.FromPosition(new float3(2f, 0f, 1f)));
@@ -80,16 +84,48 @@ namespace SweepNDodge.DotsBullets.Tests
                     InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     AnchorKind = HazardEmitterAnchorKindId.ObjectBound,
                     Mobility = HazardEmitterMobilityId.Static,
+                });
+                em.SetComponentData(emitter, new HazardEmitterAppliedConfigBaselineComponent
+                {
                     IsEnabled = 1,
                     IsSuppressed = 0,
                     LocalOffset = float3.zero,
                     TelegraphProfileRefId = 1,
                     EmissionProfileRefId = 1,
                 });
+                em.SetComponentData(emitter, new HazardEmitterAppliedConfigComponent
+                {
+                    IsEnabled = 1,
+                    IsSuppressed = 0,
+                    LocalOffset = float3.zero,
+                    TelegraphProfileRefId = 1,
+                    EmissionProfileRefId = 1,
+                });
+                em.SetComponentData(emitter, new HazardEmitterTelegraphProfileBaselineComponent
+                {
+                    ProfileId = 1,
+                    TelegraphDurationSec = 0f,
+                });
                 em.SetComponentData(emitter, new HazardEmitterTelegraphProfileComponent
                 {
                     ProfileId = 1,
                     TelegraphDurationSec = 0f,
+                });
+                em.SetComponentData(emitter, new HazardEmitterEmissionProfileBaselineComponent
+                {
+                    ProfileId = 1,
+                    BulletTypeKey = 801,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Fixed,
+                    AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                    BaseAngleDeg = 0f,
+                    LineNormalSide = WaveLineNormalSideId.Left,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                    EventShotIntervalSec = 0f,
+                    EventRepeatCount = 1,
+                    CooldownSec = 1f,
                 });
                 em.SetComponentData(emitter, new HazardEmitterEmissionProfileComponent
                 {

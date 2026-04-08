@@ -2,6 +2,12 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
+    public struct ResolvedHazardEmitterTelegraphProfileSnapshot
+    {
+        public int ProfileId;
+        public float TelegraphDurationSec;
+    }
+
     public struct ResolvedHazardEmitterEmissionProfileSnapshot
     {
         public BulletDefinitionSO Bullet;
@@ -33,6 +39,22 @@ namespace SweepNDodge.DotsBullets
 
     public static class HazardEmitterProfileResolver
     {
+        public static bool TryResolve(
+            HazardEmitterTelegraphProfileSO profile,
+            out ResolvedHazardEmitterTelegraphProfileSnapshot snapshot)
+        {
+            snapshot = default;
+            if (profile == null)
+                return false;
+
+            snapshot = new ResolvedHazardEmitterTelegraphProfileSnapshot
+            {
+                ProfileId = profile.GetInstanceID(),
+                TelegraphDurationSec = Mathf.Max(0f, profile.TelegraphDurationSec),
+            };
+            return true;
+        }
+
         public static bool TryResolve(
             HazardEmitterEmissionProfileSO profile,
             out ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
