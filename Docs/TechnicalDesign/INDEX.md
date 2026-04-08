@@ -31,3 +31,4 @@
 - [TD-027-hazard-bullet-extension-contract.md](TD-027-hazard-bullet-extension-contract.md): Hazard 확장을 `Movement + Reaction + LifecycleReason` 조합으로 분리하는 초안
 - [TD-028-hazard-emitter-common-contract.md](TD-028-hazard-emitter-common-contract.md): `HazardEmitter` 최소 공통 계약을 `유형 기준 + profile ref + emit append` 경계로 고정하는 초안
 - [TD-029-discrete-emit-spawn-bridge-contract.md](TD-029-discrete-emit-spawn-bridge-contract.md): `WaveClip EventBurst/Poisson`와 `HazardEmitter Emit`을 공통 `DiscreteEmit` 브리지로 내리는 ownership/request/update-order 계약
+- [TD-030-hazard-actor-hierarchy-and-stage-application.md](TD-030-hazard-actor-hierarchy-and-stage-application.md): `HazardActor` 상위 계층, `Source -> Actor -> Emitter` hierarchy, stage-applied binding/apply/reset 계약

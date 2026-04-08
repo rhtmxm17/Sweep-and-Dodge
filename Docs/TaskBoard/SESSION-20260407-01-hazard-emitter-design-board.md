@@ -25,11 +25,14 @@
 - 이번 세션에서 하지 않을 것: 스테이지별 실배치 확정, 수치 밸런싱 확정, `RotatingSet coordinator` owner 최종 확정, `AnchorRef` wire shape 최종 확정, `SourceRelative` consume semantics 구현 완료
 
 ## Now
+-
+
+## Next
 - [ ] Plan E. integration, metrics, 문서 마감
   - 완료 기준: source discrete branch와 emitter branch가 공통 `DiscreteEmit` 경로에서 통합되고 최소 backlog/metrics 및 문서 차이가 정리된다.
   - 검증: compile, console error 0, EditMode 통합 회귀, PlayMode smoke
-
-## Next
+- [ ] actor 상위 개념 논의는 [SESSION-20260408-01-hazard-actor-design-board.md](d:\Workspace\DOTS-minigame\Docs\TaskBoard\SESSION-20260408-01-hazard-actor-design-board.md)에서 이어간다.
+  - 이유: 현재 보드는 emitter/discrete emit 구현 이력이 누적돼 있어, `HazardActor` 상위 개념 논의를 분리해 두는 편이 안전하다.
 - [ ] E3. `HazardEmitterBinding`을 반영하는 TD/ADR/TaskBoard 차이 정리를 먼저 수행한다.
   - 이유: 현재 `TD-028/029`는 emitter 공통 계약과 discrete emit bridge까지만 닫혀 있고, stage-applied emitter override seam은 아직 문서 SSOT가 아니다.
 - [ ] E4. `HazardEmitterBinding`과 `HazardEmitterCoordinatorSystem`의 구현 선후를 정한다.
@@ -123,8 +126,12 @@
     - `HazardEmitterEmitBuildSystem`은 applied config 직접 판정을 제거하고 coordinator 결과만 읽도록 전환됐다.
     - `StageTopologyApplyPrepareSystem`은 stage apply/disable 시 coordinator state를 deterministic하게 reset한다.
     - `EditMode 466/466`, `PlayMode 44/44`, console error 0 기준으로 통과했다.
+- [x] D15. `HazardActor` 상위 개념 논의를 별도 보드로 분리했다.
+  - 검증 결과:
+    - `HazardEmitter` 구현/검증 축은 현행 보드에 유지했다.
+    - actor 관점의 명명, ownership, presence/motion/pattern 확장 논의는 별도 보드로 이관했다.
 
 ## End of Session
 - 결과: 진행 중
 - 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics, stage-applied gate authoring surface, `GroupSuppressed` 실 producer 연결은 후속 확정이 필요하다.
-- 다음 세션 시작점: `Plan E` integration/metrics/문서 마감과 `E3/E5` 차이 정리를 진행한다.
+- 다음 세션 시작점: `Plan E` integration/metrics/문서 마감은 현행 보드에서 이어가고, actor 상위 개념 논의는 `SESSION-20260408-01`에서 이어간다.

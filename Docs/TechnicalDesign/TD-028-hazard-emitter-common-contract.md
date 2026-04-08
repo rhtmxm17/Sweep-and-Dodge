@@ -12,6 +12,7 @@
   - [./TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
   - [./TD-027-hazard-bullet-extension-contract.md](./TD-027-hazard-bullet-extension-contract.md)
   - [./TD-029-discrete-emit-spawn-bridge-contract.md](./TD-029-discrete-emit-spawn-bridge-contract.md)
+  - [./TD-030-hazard-actor-hierarchy-and-stage-application.md](./TD-030-hazard-actor-hierarchy-and-stage-application.md)
 
 > `GD-015`의 기획 의도를 구조 설계 기준으로 내리기 위해, `HazardEmitter`의 최소 공통 계약과 공통 상태기계를 `유형 기준 + profile ref + emit append` 경계로 고정한다.
 
@@ -89,10 +90,9 @@
   를 섞지 않고 owner별로 분리한다.
 
 ### 3.1.2 Stage Binding Seam
-- `HazardEmitter`의 stage별 차이는 `StageSourceBinding` 하위의 `HazardEmitterBinding[]`으로 적용한다.
+- `HazardEmitter`의 stage별 차이는 actor 계층 아래의 emitter-local binding으로 적용한다.
+- actor 상위 계층, actor/emitter binding 중첩 구조, source/actor/emitter lookup seam은 [TD-030](./TD-030-hazard-actor-hierarchy-and-stage-application.md)를 SSOT로 참조한다.
 - `HazardEmitterBinding`은 아래 역할만 가진다.
-  - enable/disable override
-  - start suppression override
   - local offset override
   - telegraph/emission profile override
 - `HazardEmitterBinding`은 runtime reactive rule 저장소가 아니다.
@@ -104,32 +104,24 @@
 
 #### 3.1.2.1 HazardEmitterBinding 최소 필드
 - `EmitterId`
-- `EnabledMode`
-  - `Inherit`
-  - `ForceEnabled`
-  - `ForceDisabled`
-- `StartSuppressedMode`
-  - `Inherit`
-  - `ForceUnsuppressed`
-  - `ForceSuppressed`
 - `OverrideLocalOffset`
 - `LocalOffset`
 - `TelegraphProfileOverride`
 - `EmissionProfileOverride`
 
 #### 3.1.2.2 Source Ownership Seam
-- source root는 `SourceHazardEmitterRefBuffer(Entity, EmitterId)`를 가진다.
+- source/actor/emitter lookup seam은 emitter 단독이 아니라 actor 계층 기준으로 본다.
 - 목적:
-  - stage apply 시 source 소속 emitter 집합을 빠르게 찾는다.
-  - future coordinator가 source 소속 emitter 집합을 순회할 수 있게 한다.
-  - hierarchy/LinkedEntityGroup 탐색에 의존하지 않는다.
+  - stage apply 시 source 소속 actor와 actor 소속 emitter를 명시적으로 찾는다.
+  - runtime owner가 hierarchy/LinkedEntityGroup 탐색에 의존하지 않는다.
 
 #### 3.1.2.3 Stage Apply 규칙
-- stage apply 시 emitter는 아래 순서로 처리한다.
-  1. baked baseline snapshot을 applied snapshot으로 복사
+- stage apply 순서의 actor/emitter 계층 계약은 [TD-030](./TD-030-hazard-actor-hierarchy-and-stage-application.md)를 SSOT로 참조한다.
+- emitter-local 규칙은 아래로 유지한다.
+  1. emitter baseline snapshot을 applied snapshot으로 복사
   2. `HazardEmitterBinding` override 적용
   3. `HazardEmitterRuntimeStateComponent` reset
-  4. future coordinator state도 reset
+  4. emitter coordinator state도 reset
 - stage apply에서 항상 reset하는 값:
   - `LifecycleState`
   - `StateElapsedSec`
