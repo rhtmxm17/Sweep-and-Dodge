@@ -73,7 +73,8 @@ namespace SweepNDodge.DotsBullets.Tests
                     typeof(HazardEmitterTelegraphProfileComponent),
                     typeof(HazardEmitterEmissionProfileBaselineComponent),
                     typeof(HazardEmitterEmissionProfileComponent),
-                    typeof(HazardEmitterRuntimeStateComponent));
+                    typeof(HazardEmitterRuntimeStateComponent),
+                    typeof(HazardEmitterCoordinatorStateComponent));
                 em.SetComponentData(emitter, LocalTransform.FromPosition(new float3(2f, 0f, 1f)));
                 em.SetComponentData(emitter, new LocalToWorld { Value = float4x4.Translate(new float3(2f, 0f, 1f)) });
                 em.SetComponentData(emitter, new HazardEmitterComponent
@@ -148,10 +149,17 @@ namespace SweepNDodge.DotsBullets.Tests
                     LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     StateElapsedSec = 0f,
                 });
+                em.SetComponentData(emitter, new HazardEmitterCoordinatorStateComponent
+                {
+                    ActivationAllowed = 0,
+                    SuppressionReasonMask = 0u,
+                    LastPlayerDistanceSq = float.MaxValue,
+                });
 
                 var pooledBullet = CreatePooledBullet(em, 801, 4f, 6f);
                 BulletFieldShared.FreeByKey.Add(801, pooledBullet);
 
+                world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<DiscreteEmitExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();

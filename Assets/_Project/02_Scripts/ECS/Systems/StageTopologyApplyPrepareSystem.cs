@@ -940,18 +940,20 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var emitterRefs = em.GetBuffer<SourceHazardEmitterRefBuffer>(sourceEntity);
-            for (int i = 0; i < emitterRefs.Length; i++)
+            using var emitterRefsCopy = emitterRefs.ToNativeArray(Allocator.Temp);
+            for (int i = 0; i < emitterRefsCopy.Length; i++)
             {
-                var emitterEntity = emitterRefs[i].EmitterEntity;
+                var emitterEntity = emitterRefsCopy[i].EmitterEntity;
                 if (!em.Exists(emitterEntity))
                     continue;
 
                 ResetHazardEmitterToBaseline(em, emitterEntity);
 
-                if (TryFindHazardEmitterBinding(hazardEmitterBindings, emitterRefs[i].EmitterId, out var binding))
+                if (TryFindHazardEmitterBinding(hazardEmitterBindings, emitterRefsCopy[i].EmitterId, out var binding))
                     ApplyHazardEmitterBindingOverride(em, emitterEntity, in binding);
 
                 ResetHazardEmitterRuntimeState(em, emitterEntity);
+                ResetHazardEmitterCoordinatorState(em, emitterEntity);
             }
         }
 
@@ -961,9 +963,10 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var emitterRefs = em.GetBuffer<SourceHazardEmitterRefBuffer>(sourceEntity);
-            for (int i = 0; i < emitterRefs.Length; i++)
+            using var emitterRefsCopy = emitterRefs.ToNativeArray(Allocator.Temp);
+            for (int i = 0; i < emitterRefsCopy.Length; i++)
             {
-                var emitterEntity = emitterRefs[i].EmitterEntity;
+                var emitterEntity = emitterRefsCopy[i].EmitterEntity;
                 if (!em.Exists(emitterEntity))
                     continue;
 
@@ -978,6 +981,7 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 ResetHazardEmitterRuntimeState(em, emitterEntity);
+                ResetHazardEmitterCoordinatorState(em, emitterEntity);
             }
         }
 
@@ -1172,6 +1176,19 @@ namespace SweepNDodge.DotsBullets
             {
                 LifecycleState = initialLifecycleState,
                 StateElapsedSec = 0f,
+            });
+        }
+
+        private static void ResetHazardEmitterCoordinatorState(EntityManager em, Entity emitterEntity)
+        {
+            if (!em.HasComponent<HazardEmitterCoordinatorStateComponent>(emitterEntity))
+                em.AddComponentData(emitterEntity, default(HazardEmitterCoordinatorStateComponent));
+
+            em.SetComponentData(emitterEntity, new HazardEmitterCoordinatorStateComponent
+            {
+                ActivationAllowed = 0,
+                SuppressionReasonMask = 0u,
+                LastPlayerDistanceSq = float.MaxValue,
             });
         }
 

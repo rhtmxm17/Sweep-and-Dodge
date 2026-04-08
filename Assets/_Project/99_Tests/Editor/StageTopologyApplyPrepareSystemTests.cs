@@ -269,6 +269,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
                 var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
                 var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+                Assert.That(em.HasComponent<HazardEmitterCoordinatorStateComponent>(emitter), Is.True);
+                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
 
                 Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
                 Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
@@ -284,6 +286,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(emission.CooldownSec, Is.EqualTo(2f).Within(0.001f));
                 Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
                 Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+                Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+                Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
             }
             finally
             {
@@ -342,6 +347,12 @@ namespace SweepNDodge.DotsBullets.Tests
                     LifecycleState = HazardEmitterLifecycleStateId.Cooldown,
                     StateElapsedSec = 2f,
                 });
+                em.SetComponentData(emitter, new HazardEmitterCoordinatorStateComponent
+                {
+                    ActivationAllowed = 1,
+                    SuppressionReasonMask = (uint)HazardEmitterSuppressionReasonFlags.PlayerDistanceBlocked,
+                    LastPlayerDistanceSq = 3f,
+                });
 
                 stageCatalog.Entries[0].Definition = null;
                 PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
@@ -351,6 +362,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
                 var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
                 var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
 
                 Assert.That(appliedConfig.IsEnabled, Is.EqualTo(1));
                 Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(0));
@@ -365,6 +377,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(emission.CooldownSec, Is.EqualTo(1f).Within(0.001f));
                 Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
                 Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+                Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+                Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
             }
             finally
             {
@@ -403,11 +418,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 var emitter = em.GetBuffer<SourceHazardEmitterRefBuffer>(source)[0].EmitterEntity;
                 var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
                 var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+                Assert.That(em.HasComponent<HazardEmitterCoordinatorStateComponent>(emitter), Is.True);
+                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
 
                 Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
                 Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
                 Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
                 Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+                Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+                Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
             }
             finally
             {

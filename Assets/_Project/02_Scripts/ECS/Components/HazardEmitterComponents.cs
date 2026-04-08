@@ -1,5 +1,6 @@
 using Unity.Entities;
 using Unity.Mathematics;
+using System;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -143,6 +144,48 @@ namespace SweepNDodge.DotsBullets
     {
         public HazardEmitterLifecycleStateId LifecycleState;
         public float StateElapsedSec;
+    }
+
+    [Flags]
+    public enum HazardEmitterSuppressionReasonFlags : uint
+    {
+        None = 0,
+        DisabledByAppliedConfig = 1u << 0,
+        SuppressedByAppliedConfig = 1u << 1,
+        MissingSource = 1u << 2,
+        SourcePressureBlocked = 1u << 3,
+        SourceProgressBlocked = 1u << 4,
+        PlayerDistanceBlocked = 1u << 5,
+        MissingPlayer = 1u << 6,
+        GroupSuppressed = 1u << 7,
+    }
+
+    public struct HazardEmitterCoordinatorStateComponent : IComponentData
+    {
+        public byte ActivationAllowed;
+        public uint SuppressionReasonMask;
+        public float LastPlayerDistanceSq;
+    }
+
+    public struct HazardEmitterSourcePressureGateComponent : IComponentData
+    {
+        public byte Enabled;
+        public byte RequirePressureState;
+        public float MinPressureOccupancySec;
+    }
+
+    public struct HazardEmitterPlayerDistanceGateComponent : IComponentData
+    {
+        public byte Enabled;
+        public float MinDistanceSq;
+        public float MaxDistanceSq;
+    }
+
+    public struct HazardEmitterSourceProgressGateComponent : IComponentData
+    {
+        public byte Enabled;
+        public float MinProgress01;
+        public float MaxProgress01;
     }
 
     [InternalBufferCapacity(4)]

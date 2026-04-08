@@ -90,6 +90,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 localOffset: new float3(1f, 0f, -2f));
 
             world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
 
             var requests = GetDiscreteEmitRequests(em);
@@ -135,18 +136,22 @@ namespace SweepNDodge.DotsBullets.Tests
                 localOffset: float3.zero);
 
             var system = world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>();
+            var coordinatorSystem = world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>();
 
             world.SetTime(new TimeData(0.5d, 0.5f));
+            coordinatorSystem.Update(world.Unmanaged);
             system.Update(world.Unmanaged);
             Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(1));
 
             CreateFrameCounter(em, 2u);
             world.SetTime(new TimeData(1d, 0.5f));
+            coordinatorSystem.Update(world.Unmanaged);
             system.Update(world.Unmanaged);
             Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(1));
 
             CreateFrameCounter(em, 3u);
             world.SetTime(new TimeData(1.5d, 0.5f));
+            coordinatorSystem.Update(world.Unmanaged);
             system.Update(world.Unmanaged);
             Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(2));
 
@@ -181,6 +186,7 @@ namespace SweepNDodge.DotsBullets.Tests
             BulletFieldShared.FreeByKey.Add(703, pooledBullet);
 
             world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<DiscreteEmitExecutionSystem>().Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
@@ -192,6 +198,224 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
             Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Cooldown));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_NoGates_AllowsEnabledEmitter()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_NoGates", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 704);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 704,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(1));
+            Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+            Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_AppliedConfigFlags_BlockActivation()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_AppliedFlags", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 705);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 705,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: false,
+                isSuppressed: true,
+                position: float3.zero,
+                localOffset: float3.zero);
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.DisabledByAppliedConfig, Is.Not.EqualTo(0u));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.SuppressedByAppliedConfig, Is.Not.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_PressureGate_RequiresPressureAndHold()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_PressureGate", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithDirector(em, 706, RunDirectorSourceStateId.Baseline, 0.1f, thresholdDepleted: 10, collectedCount: 0);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 706,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            em.AddComponentData(emitter, new HazardEmitterSourcePressureGateComponent
+            {
+                Enabled = 1,
+                RequirePressureState = 1,
+                MinPressureOccupancySec = 0.25f,
+            });
+
+            var system = world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>();
+
+            system.Update(world.Unmanaged);
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.SourcePressureBlocked, Is.Not.EqualTo(0u));
+
+            em.SetComponentData(source, new SourceRunDirectorStateComponent
+            {
+                State = RunDirectorSourceStateId.Pressure,
+                SelectedClipState = SourceStateId.Normal,
+                PressureOccupancySec = 0.3f,
+                DensityScale = 1f,
+                Version = 1u,
+            });
+
+            system.Update(world.Unmanaged);
+            coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(1));
+            Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_PlayerDistanceGate_UsesPlayerPositionAndMissingPlayerReason()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_DistanceGate", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 707);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 707,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: new float3(1f, 0f, 1f),
+                localOffset: float3.zero);
+            em.AddComponentData(emitter, new HazardEmitterPlayerDistanceGateComponent
+            {
+                Enabled = 1,
+                MinDistanceSq = 0f,
+                MaxDistanceSq = 4f,
+            });
+
+            var system = world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>();
+
+            system.Update(world.Unmanaged);
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.MissingPlayer, Is.Not.EqualTo(0u));
+            Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
+
+            CreatePlayer(em, new float3(2f, 0f, 1f));
+            system.Update(world.Unmanaged);
+            coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(1));
+            Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+            Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(1f).Within(0.0001f));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_SourceProgressGate_UsesNormalizedProgressAndSafeThreshold()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_ProgressGate", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithDirector(em, 708, RunDirectorSourceStateId.Baseline, 0f, thresholdDepleted: 0, collectedCount: 0);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 708,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            em.AddComponentData(emitter, new HazardEmitterSourceProgressGateComponent
+            {
+                Enabled = 1,
+                MinProgress01 = 0.5f,
+                MaxProgress01 = 1f,
+            });
+
+            var system = world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>();
+
+            system.Update(world.Unmanaged);
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.SourceProgressBlocked, Is.Not.EqualTo(0u));
+
+            var sourceData = em.GetComponentData<SourceSpawnComponent>(source);
+            sourceData.CollectedCount = 1;
+            em.SetComponentData(source, sourceData);
+
+            system.Update(world.Unmanaged);
+            coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(1));
+            Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterEmitBuild_BlockedCoordinatorState_StaysDormantAndSkipsAppend()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_BlockedCoordinator", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 709);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 709,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            em.SetComponentData(emitter, new HazardEmitterCoordinatorStateComponent
+            {
+                ActivationAllowed = 0,
+                SuppressionReasonMask = (uint)HazardEmitterSuppressionReasonFlags.GroupSuppressed,
+                LastPlayerDistanceSq = float.MaxValue,
+            });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+
+            Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(0));
+            var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+            Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
         }
 
         private static HazardEmitterEmissionProfileSO CreateEmissionProfile()
@@ -303,7 +527,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardEmitterTelegraphProfileComponent),
                 typeof(HazardEmitterEmissionProfileBaselineComponent),
                 typeof(HazardEmitterEmissionProfileComponent),
-                typeof(HazardEmitterRuntimeStateComponent));
+                typeof(HazardEmitterRuntimeStateComponent),
+                typeof(HazardEmitterCoordinatorStateComponent));
 
             em.SetComponentData(entity, LocalTransform.FromPosition(position));
             em.SetComponentData(entity, new LocalToWorld { Value = float4x4.Translate(position) });
@@ -379,7 +604,52 @@ namespace SweepNDodge.DotsBullets.Tests
                 LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                 StateElapsedSec = 0f,
             });
+            em.SetComponentData(entity, new HazardEmitterCoordinatorStateComponent
+            {
+                ActivationAllowed = 0,
+                SuppressionReasonMask = 0u,
+                LastPlayerDistanceSq = float.MaxValue,
+            });
             return entity;
+        }
+
+        private static Entity CreateSourceWithDirector(
+            EntityManager em,
+            int bulletTypeKey,
+            RunDirectorSourceStateId directorState,
+            float pressureOccupancySec,
+            int thresholdDepleted,
+            int collectedCount)
+        {
+            var entity = CreateSourceWithActiveCountBuffer(em, bulletTypeKey);
+            em.AddComponentData(entity, new SourceSpawnComponent
+            {
+                ThresholdWeakened = 0,
+                ThresholdDepleted = thresholdDepleted,
+                CollectedCount = collectedCount,
+                State = SourceStateId.Normal,
+            });
+            em.AddComponentData(entity, new SourceRunDirectorStateComponent
+            {
+                State = directorState,
+                SelectedClipState = SourceStateId.Normal,
+                PressureOccupancySec = pressureOccupancySec,
+                DensityScale = 1f,
+                Version = 1u,
+            });
+            return entity;
+        }
+
+        private static Entity CreatePlayer(EntityManager em, float3 position)
+        {
+            var player = em.CreateEntity(typeof(PlayerTag), typeof(PlayerGoSyncComponent));
+            em.SetComponentData(player, new PlayerGoSyncComponent
+            {
+                Position = position,
+                Rotation = quaternion.identity,
+                SyncRotation = 1,
+            });
+            return player;
         }
 
         private static Entity CreatePooledBullet(EntityManager em, int bulletTypeKey, float speed, float lifetime)

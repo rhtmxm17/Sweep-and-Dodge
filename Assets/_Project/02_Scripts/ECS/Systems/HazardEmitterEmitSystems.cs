@@ -8,6 +8,7 @@ namespace SweepNDodge.DotsBullets
     [UpdateAfter(typeof(RunProgressDirectorSystem))]
     [UpdateAfter(typeof(SourcePollutionUpdateSystem))]
     [UpdateAfter(typeof(SourceClipDiscreteEmitBuildSystem))]
+    [UpdateAfter(typeof(HazardEmitterCoordinatorSystem))]
     [UpdateBefore(typeof(SourceClipRequestBuildSystem))]
     [UpdateBefore(typeof(BulletRequestFencePublishSystem))]
     public partial struct HazardEmitterEmitBuildSystem : ISystem
@@ -23,6 +24,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<HazardEmitterTelegraphProfileComponent>();
             state.RequireForUpdate<HazardEmitterEmissionProfileComponent>();
             state.RequireForUpdate<HazardEmitterRuntimeStateComponent>();
+            state.RequireForUpdate<HazardEmitterCoordinatorStateComponent>();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -49,18 +51,19 @@ namespace SweepNDodge.DotsBullets
             localTransformLookup.Update(ref state);
             localToWorldLookup.Update(ref state);
 
-            foreach (var (emitter, applied, telegraph, emission, runtime, entity) in SystemAPI.Query<
+            foreach (var (emitter, applied, telegraph, emission, coordinator, runtime, entity) in SystemAPI.Query<
                 RefRO<HazardEmitterComponent>,
                 RefRO<HazardEmitterAppliedConfigComponent>,
                 RefRO<HazardEmitterTelegraphProfileComponent>,
                 RefRO<HazardEmitterEmissionProfileComponent>,
+                RefRO<HazardEmitterCoordinatorStateComponent>,
                 RefRW<HazardEmitterRuntimeStateComponent>>().WithEntityAccess())
             {
                 ref readonly var emitterConfig = ref emitter.ValueRO;
                 ref readonly var appliedConfig = ref applied.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
 
-                if (appliedConfig.IsEnabled == 0 || appliedConfig.IsSuppressed != 0)
+                if (coordinator.ValueRO.ActivationAllowed == 0)
                 {
                     runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
                     runtimeState.StateElapsedSec = 0f;

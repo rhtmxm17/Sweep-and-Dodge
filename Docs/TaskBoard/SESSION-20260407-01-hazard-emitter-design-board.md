@@ -28,23 +28,6 @@
 - [ ] Plan E. integration, metrics, 문서 마감
   - 완료 기준: source discrete branch와 emitter branch가 공통 `DiscreteEmit` 경로에서 통합되고 최소 backlog/metrics 및 문서 차이가 정리된다.
   - 검증: compile, console error 0, EditMode 통합 회귀, PlayMode smoke
-- [ ] E2. `HazardEmitterCoordinatorSystem` 계약과 runtime orchestration 구현 계획을 고정한다.
-  - 목표: `HazardEmitter`를 source의 부속 데이터가 아니라 source 소속의 runtime 위험 주체로 보고, source state 외 입력까지 포함한 activation orchestration owner를 분리한다.
-  - 현재 합의:
-    - 명칭은 `HazardEmitterCoordinatorSystem`
-    - 입력 축은 `source state` 외에 `player distance`까지 열어 둔다.
-    - coordinator는 activation/suppression gate만 결정하고, telegraph/cooldown/emit append는 계속 `HazardEmitterEmitBuildSystem`이 소유한다.
-    - 최소 gate 축은 `HazardEmitterSourcePressureGate`, `HazardEmitterPlayerDistanceGate`, `HazardEmitterSourceProgressGate` 조합으로 본다.
-    - 예시 규칙 1: source `Pressure` 상태 + 최소 hold 시간 + player distance 범위가 모두 만족될 때 활성화
-    - 예시 규칙 2: `CollectedCount / ThresholdDepleted` 기반 `progress01`이 지정 구간에 들어오면 활성화
-    - coordinator state 최소 출력은 `ActivationAllowed`, `SuppressionReasonMask`, `LastPlayerDistanceSq`다.
-    - suppression reason mask 1차 축은 `DisabledByAppliedConfig`, `SuppressedByAppliedConfig`, `MissingSource`, `SourcePressureBlocked`, `SourceProgressBlocked`, `PlayerDistanceBlocked`, `MissingPlayer`, `GroupSuppressed`다.
-  - 구현 방향:
-    - `HazardEmitterCoordinatorStateComponent` 또는 동등한 runtime gate state 추가
-    - `HazardEmitterEmitBuildSystem`은 baked/applied config 대신 coordinator 결과를 읽어 상태기계를 진행
-    - 첫 단계 입력은 `stage-applied enable/suppression`, `source state`, `player distance`, `source progress01`로 제한
-    - 권장 update order는 `RunProgressDirectorSystem` 이후, `HazardEmitterEmitBuildSystem` 이전이다.
-  - 검증 기준: source 상태와 플레이어 거리 변화가 emit build ownership을 오염시키지 않고 emitter activation gate에 반영된다.
 
 ## Next
 - [ ] E3. `HazardEmitterBinding`을 반영하는 TD/ADR/TaskBoard 차이 정리를 먼저 수행한다.
@@ -133,8 +116,15 @@
     - `HazardEmitterEmitBuildSystem`은 applied snapshot만 읽도록 전환됐다.
     - `StageDefinitionGenerator`는 새 필드를 빈 배열 기본값으로 유지한다.
     - `EditMode 460/460`, `PlayMode 44/44` 통과, console error 추가 없음 기준으로 회귀 없이 통과했다.
+- [x] E2. `HazardEmitterCoordinatorSystem` runtime orchestration을 구현하고 검증했다.
+  - 검증 결과:
+    - `HazardEmitterCoordinatorStateComponent`, `HazardEmitterSourcePressureGateComponent`, `HazardEmitterPlayerDistanceGateComponent`, `HazardEmitterSourceProgressGateComponent`, `HazardEmitterSuppressionReasonFlags`가 runtime contract로 추가됐다.
+    - `HazardEmitterCoordinatorSystem`이 `RunProgressDirectorSystem` 이후, `HazardEmitterEmitBuildSystem` 이전에서 source pressure / source progress / player distance를 읽어 activation gate를 계산한다.
+    - `HazardEmitterEmitBuildSystem`은 applied config 직접 판정을 제거하고 coordinator 결과만 읽도록 전환됐다.
+    - `StageTopologyApplyPrepareSystem`은 stage apply/disable 시 coordinator state를 deterministic하게 reset한다.
+    - `EditMode 466/466`, `PlayMode 44/44`, console error 0 기준으로 통과했다.
 
 ## End of Session
 - 결과: 진행 중
-- 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics, `HazardEmitterCoordinatorSystem` 구현 세부와 stage-applied gate 확장 여부는 후속 확정이 필요하다.
-- 다음 세션 시작점: `E2` coordinator/runtime orchestration 구현 계획 고정 후 `E5` update order/reason mask를 코드 수준으로 닫는다.
+- 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics, stage-applied gate authoring surface, `GroupSuppressed` 실 producer 연결은 후속 확정이 필요하다.
+- 다음 세션 시작점: `Plan E` integration/metrics/문서 마감과 `E3/E5` 차이 정리를 진행한다.
