@@ -150,14 +150,17 @@ namespace SweepNDodge.DotsBullets
     public enum HazardEmitterSuppressionReasonFlags : uint
     {
         None = 0,
-        DisabledByAppliedConfig = 1u << 0,
-        SuppressedByAppliedConfig = 1u << 1,
-        MissingSource = 1u << 2,
-        SourcePressureBlocked = 1u << 3,
-        SourceProgressBlocked = 1u << 4,
-        PlayerDistanceBlocked = 1u << 5,
-        MissingPlayer = 1u << 6,
-        GroupSuppressed = 1u << 7,
+        DisabledByActorConfig = 1u << 0,
+        SuppressedByActorConfig = 1u << 1,
+        MissingActor = 1u << 2,
+        DisabledByAppliedConfig = 1u << 3,
+        SuppressedByAppliedConfig = 1u << 4,
+        MissingSource = 1u << 5,
+        SourcePressureBlocked = 1u << 6,
+        SourceProgressBlocked = 1u << 7,
+        PlayerDistanceBlocked = 1u << 8,
+        MissingPlayer = 1u << 9,
+        GroupSuppressed = 1u << 10,
     }
 
     public struct HazardEmitterCoordinatorStateComponent : IComponentData

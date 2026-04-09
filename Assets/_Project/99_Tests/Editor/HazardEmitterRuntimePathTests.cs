@@ -276,6 +276,100 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardEmitterCoordinator_ActorAppliedConfigFlags_BlockActivation()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_ActorAppliedFlags", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 705);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 705,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorAppliedConfigComponent
+            {
+                IsEnabled = 0,
+                IsSuppressed = 1,
+            });
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.DisabledByActorConfig, Is.Not.EqualTo(0u));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.SuppressedByActorConfig, Is.Not.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_MissingActor_BlocksActivation()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_MissingActor", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7051);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7051,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var emitterConfig = em.GetComponentData<HazardEmitterComponent>(emitter);
+            emitterConfig.ActorEntity = Entity.Null;
+            em.SetComponentData(emitter, emitterConfig);
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo((uint)HazardEmitterSuppressionReasonFlags.MissingActor));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_HiddenPresenceState_DoesNotBlockActivation()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_HiddenPresenceCompat", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7052);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7052,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Hidden,
+                StateElapsedSec = 5f,
+            });
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(1));
+            Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
+        }
+
+        [Test]
         public void HazardEmitterCoordinator_AppliedConfigFlags_BlockActivation()
         {
             using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_AppliedFlags", out _);
@@ -461,6 +555,45 @@ namespace SweepNDodge.DotsBullets.Tests
             world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
 
             Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(0));
+            var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+            Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void HazardEmitterEmitBuild_DisabledActor_StaysDormantAndSkipsAppend()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_DisabledActor", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7091);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7091,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorAppliedConfigComponent
+            {
+                IsEnabled = 0,
+                IsSuppressed = 0,
+            });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.DisabledByActorConfig, Is.Not.EqualTo(0u));
+            Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(0));
+
             var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
             Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
             Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));

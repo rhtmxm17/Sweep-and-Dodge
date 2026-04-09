@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260408-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-04-08`
+- last_updated: `2026-04-09`
 - related_docs:
   - [./SESSION-20260407-01-hazard-emitter-design-board.md](./SESSION-20260407-01-hazard-emitter-design-board.md)
   - [../TechnicalDesign/TD-028-hazard-emitter-common-contract.md](../TechnicalDesign/TD-028-hazard-emitter-common-contract.md)
@@ -26,7 +26,7 @@
 - 플레이어 경험 기준으로는 emitter가 단순 발사 장치보다 `비공격 대상 몬스터형 hazard actor`에 가깝다는 합의가 형성됐다.
 
 ## Now
-- [ ] Plan HA-4. runtime compatibility migration
+- [x] Plan HA-4. runtime compatibility migration
   - 완료 기준:
     - current runtime systems가 actor hierarchy를 읽도록 최소 migration 된다.
     - coordinator/emit build는 source를 actor를 통해 resolve한다.
@@ -156,6 +156,10 @@
   - omitted actor/emitter는 explicit roster 규칙대로 `disabled + suppressed + runtime reset`으로 정리된다.
   - `SourceHazardEmitterRefBuffer`와 source-direct bake/apply support가 제거됐다.
   - 검증 결과: EditMode `470/470`, PlayMode `44/44`.
+- [x] D29. `Plan HA-4` runtime compatibility migration
+  - `HazardEmitterCoordinatorSystem`이 actor를 필수 runtime context로 보고 actor applied config를 emitter-local gate보다 먼저 평가한다.
+  - `HazardActorAppliedConfigComponent`의 `enabled/suppressed`가 현재 activation truth에 포함되며, `PresenceState`와 selector state는 아직 informational/reset-only로 유지된다.
+  - missing actor, actor disabled/suppressed, hidden presence compatibility, disabled actor emit-build integration coverage가 `HazardEmitterRuntimePathTests`에 추가됐다.
 
 ## End of Session
 - 결과: 진행 중

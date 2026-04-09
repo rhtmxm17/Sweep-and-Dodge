@@ -37,6 +37,7 @@ namespace SweepNDodge.DotsBullets
             var distanceGateLookup = SystemAPI.GetComponentLookup<HazardEmitterPlayerDistanceGateComponent>(true);
             var progressGateLookup = SystemAPI.GetComponentLookup<HazardEmitterSourceProgressGateComponent>(true);
             var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
+            var actorAppliedLookup = SystemAPI.GetComponentLookup<HazardActorAppliedConfigComponent>(true);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var directorLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
             var playerSyncLookup = SystemAPI.GetComponentLookup<PlayerGoSyncComponent>(true);
@@ -47,6 +48,7 @@ namespace SweepNDodge.DotsBullets
             distanceGateLookup.Update(ref state);
             progressGateLookup.Update(ref state);
             actorLookup.Update(ref state);
+            actorAppliedLookup.Update(ref state);
             sourceLookup.Update(ref state);
             directorLookup.Update(ref state);
             playerSyncLookup.Update(ref state);
@@ -75,21 +77,38 @@ namespace SweepNDodge.DotsBullets
                 bool hasProgressGate = progressGateLookup.HasComponent(entity) && progressGateLookup[entity].Enabled != 0;
                 bool hasDistanceGate = distanceGateLookup.HasComponent(entity) && distanceGateLookup[entity].Enabled != 0;
 
-                bool needsSource = hasPressureGate || hasProgressGate;
                 bool hasActor = emitterConfig.ActorEntity != Entity.Null
                     && em.Exists(emitterConfig.ActorEntity)
                     && actorLookup.HasComponent(emitterConfig.ActorEntity);
-                Entity sourceEntity = hasActor
-                    ? actorLookup[emitterConfig.ActorEntity].SourceEntity
-                    : Entity.Null;
-                bool hasSource = sourceEntity != Entity.Null
-                    && em.Exists(sourceEntity);
+                if (!hasActor)
+                {
+                    reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.MissingActor;
+                }
 
-                if (needsSource && !hasSource)
+                Entity sourceEntity = Entity.Null;
+                bool hasSource = false;
+                if (hasActor)
+                {
+                    if (actorAppliedLookup.HasComponent(emitterConfig.ActorEntity))
+                    {
+                        var actorApplied = actorAppliedLookup[emitterConfig.ActorEntity];
+                        if (actorApplied.IsEnabled == 0)
+                            reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.DisabledByActorConfig;
+                        if (actorApplied.IsSuppressed != 0)
+                            reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.SuppressedByActorConfig;
+                    }
+
+                    sourceEntity = actorLookup[emitterConfig.ActorEntity].SourceEntity;
+                    hasSource = sourceEntity != Entity.Null
+                        && em.Exists(sourceEntity);
+                }
+
+                bool needsSource = hasPressureGate || hasProgressGate;
+                if (hasActor && needsSource && !hasSource)
                 {
                     reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.MissingSource;
                 }
-                else if (hasSource)
+                else if (hasActor && hasSource)
                 {
                     if (hasPressureGate)
                     {
@@ -129,7 +148,7 @@ namespace SweepNDodge.DotsBullets
                     }
                 }
 
-                if (hasDistanceGate)
+                if (hasActor && hasDistanceGate)
                 {
                     if (!hasPlayer)
                     {
