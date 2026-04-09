@@ -19,14 +19,14 @@ namespace SweepNDodge.DotsBullets
         public WaveClipSO[] EventClips;
     }
 
-    public enum HazardEmitterEnabledOverrideMode : byte
+    public enum HazardActorEnabledOverrideMode : byte
     {
         Inherit = 0,
         ForceEnabled = 1,
         ForceDisabled = 2,
     }
 
-    public enum HazardEmitterSuppressionOverrideMode : byte
+    public enum HazardActorSuppressionOverrideMode : byte
     {
         Inherit = 0,
         ForceUnsuppressed = 1,
@@ -34,11 +34,18 @@ namespace SweepNDodge.DotsBullets
     }
 
     [Serializable]
+    public struct HazardActorBinding
+    {
+        [Min(1)] public int ActorId;
+        public HazardActorEnabledOverrideMode EnabledMode;
+        public HazardActorSuppressionOverrideMode StartSuppressedMode;
+        public HazardEmitterBinding[] Emitters;
+    }
+
+    [Serializable]
     public struct HazardEmitterBinding
     {
         [Min(1)] public int EmitterId;
-        public HazardEmitterEnabledOverrideMode EnabledMode;
-        public HazardEmitterSuppressionOverrideMode StartSuppressedMode;
         public bool OverrideLocalOffset;
         public Vector3 LocalOffset;
         public HazardEmitterTelegraphProfileSO TelegraphProfileOverride;
@@ -54,7 +61,7 @@ namespace SweepNDodge.DotsBullets
         [Min(0)] public int ThresholdDepleted;
         public SustainSlotBinding[] SustainSlots;
         public EventSlotBinding[] EventSlots;
-        public HazardEmitterBinding[] HazardEmitterBindings;
+        public HazardActorBinding[] HazardActors;
     }
 
     [CreateAssetMenu(menuName = "SweepNDodge/Stage/Stage Definition", fileName = "sd_")]

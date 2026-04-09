@@ -194,4 +194,5 @@ namespace SweepNDodge.DotsBullets
         public Entity EmitterEntity;
         public int EmitterId;
     }
+
 }

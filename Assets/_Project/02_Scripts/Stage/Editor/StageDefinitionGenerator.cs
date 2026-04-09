@@ -218,6 +218,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 ThresholdDepleted = 4000,
                 SustainSlots = Array.Empty<SustainSlotBinding>(),
                 EventSlots = Array.Empty<EventSlotBinding>(),
+                HazardActors = Array.Empty<HazardActorBinding>(),
             };
         }
 
@@ -231,7 +232,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 ThresholdDepleted = Mathf.Max(Mathf.Max(0, authoring.ThresholdWeakened), authoring.ThresholdDepleted),
                 SustainSlots = BuildSustainSlots(authoring.SustainClipSlots),
                 EventSlots = BuildEventSlots(authoring.EventClipSlots),
-                HazardEmitterBindings = Array.Empty<HazardEmitterBinding>(),
+                HazardActors = Array.Empty<HazardActorBinding>(),
             };
         }
 

@@ -26,16 +26,6 @@
 - 플레이어 경험 기준으로는 emitter가 단순 발사 장치보다 `비공격 대상 몬스터형 hazard actor`에 가깝다는 합의가 형성됐다.
 
 ## Now
-- [ ] Plan HA-1. actor schema / binding cutover
-  - 완료 기준:
-    - `HazardActor` runtime component, runtime baseline component, selector state component가 추가된다.
-    - `StageSourceBinding.HazardActors` / `HazardActorBinding` / `HazardEmitterBinding` 최종 스키마가 코드와 generator에 반영된다.
-    - `HazardEmitterBinding`에서 actor-level `EnabledMode`, `StartSuppressedMode`가 제거된다.
-  - 검증:
-    - compile
-    - stage definition / generator / validation 관련 EditMode 회귀
-
-## Next
 - [ ] Plan HA-2. authoring / baker hierarchy migration
   - 완료 기준:
     - `HazardActorAuthoring`가 도입되고 authoring 계층이 `Source -> Actor -> Emitter`로 바뀐다.
@@ -44,6 +34,8 @@
   - 검증:
     - bake/EditMode authoring tests
     - sample prefab hierarchy compile 회귀
+
+## Next
 - [ ] Plan HA-3. stage apply / explicit roster cutover
   - 완료 기준:
     - `StageTopologyApplyPrepareSystem`이 actor 기준 apply/reset 순서로 전환된다.
@@ -161,6 +153,12 @@
     - `TD-030`이 actor hierarchy, binding/ref buffer, authoring/baker, apply/reset owner의 SSOT로 추가됐다.
     - 구현 범위는 `Plan HA-1`부터 `Plan HA-5`까지의 실행 단위로 분해됐다.
     - 현행 actor 보드는 더 이상 개념 논의 목록이 아니라 구현 시작점 기준으로 읽을 수 있게 정리됐다.
+- [x] D26. `Plan HA-1` actor schema / binding cutover를 완료했다.
+  - 검증 결과:
+    - `StageSourceBinding.HazardActors`, `HazardActorBinding`, emitter-local `HazardEmitterBinding` 스키마가 코드와 generator에 반영됐다.
+    - actor 최소 runtime schema와 `SourceHazardActorRefBuffer` / `HazardActorEmitterRefBuffer` 타입이 추가됐다.
+    - source-level emitter stage binding apply path는 제거됐고, actor/emitter actual apply/reset behavior 검증은 `HA-3`로 이관됐다.
+    - `refresh_unity(compile=request, wait_for_ready=true)` 이후 EditMode `465/465`, PlayMode `44/44`를 통과했다.
 
 ## End of Session
 - 결과: 진행 중
