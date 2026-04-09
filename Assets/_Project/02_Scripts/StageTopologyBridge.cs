@@ -150,7 +150,7 @@ namespace SweepNDodge.DotsBullets
 
             var topologyPrefabs = _em.GetComponentData<StageTopologyPrefabCatalogComponent>(topologyCatalogEntity);
             if (topologyPrefabs.SourceTemplate == Entity.Null || !_em.Exists(topologyPrefabs.SourceTemplate))
-                topologyPrefabs.SourceTemplate = StageTopologyTemplateFactory.CreateSourceTemplate(_em);
+                topologyPrefabs.SourceTemplate = StageTopologyTemplateFactory.CreateSourceTemplate(_em, TopologyPrefabCatalog);
             _em.SetComponentData(topologyCatalogEntity, topologyPrefabs);
 
             _warnedCatalogBindingFailure = false;

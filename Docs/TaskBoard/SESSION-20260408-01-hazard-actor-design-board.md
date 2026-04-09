@@ -3,7 +3,7 @@
 ## Metadata
 - doc_id: `SESSION-20260408-01`
 - type: `SessionTaskBoard`
-- status: `active`
+- status: `completed`
 - last_updated: `2026-04-09`
 - related_docs:
   - [./SESSION-20260407-01-hazard-emitter-design-board.md](./SESSION-20260407-01-hazard-emitter-design-board.md)
@@ -26,25 +26,10 @@
 - 플레이어 경험 기준으로는 emitter가 단순 발사 장치보다 `비공격 대상 몬스터형 hazard actor`에 가깝다는 합의가 형성됐다.
 
 ## Now
-- [x] Plan HA-4. runtime compatibility migration
-  - 완료 기준:
-    - current runtime systems가 actor hierarchy를 읽도록 최소 migration 된다.
-    - coordinator/emit build는 source를 actor를 통해 resolve한다.
-    - actor runtime state/selector state는 도입되지만 selector 선택 로직 자체는 아직 구현하지 않는다.
-  - 검증:
-    - existing emitter discrete path regression
-    - coordinator / emit build EditMode regression
-    - PlayMode smoke
+- 없음
 
 ## Next
-- [ ] Plan HA-5. validation / sample / document closeout
-  - 완료 기준:
-    - sample prefab/test fixture/generator/document index가 actor hierarchy 기준으로 정리된다.
-    - `TD-028`, `TD-029`, `TD-030`, TaskBoard 사이 경계가 충돌하지 않는다.
-  - 검증:
-    - console error 0
-    - EditMode full suite
-    - PlayMode smoke full suite
+- follow-up actor behavior(`selector`, `presence gating`, `pattern set runtime`)는 별도 세션에서 시작한다.
 
 ## Blocked
 - 없음
@@ -160,7 +145,17 @@
   - `HazardEmitterCoordinatorSystem`이 actor를 필수 runtime context로 보고 actor applied config를 emitter-local gate보다 먼저 평가한다.
   - `HazardActorAppliedConfigComponent`의 `enabled/suppressed`가 현재 activation truth에 포함되며, `PresenceState`와 selector state는 아직 informational/reset-only로 유지된다.
   - missing actor, actor disabled/suppressed, hidden presence compatibility, disabled actor emit-build integration coverage가 `HazardEmitterRuntimePathTests`에 추가됐다.
+- [x] D30. `Plan HA-5` validation / sample / document closeout
+  - nested hazard binding duplicate/id validation과 operational asset의 test-only hazard/profile/prefab 참조 금지 규칙이 추가됐다.
+  - `PlayModeSmoke_SampleVerification`은 test-only actor sample prefab/topology catalog를 사용하고, `SampleScene` 경로는 operational actor/emitter 최소 샘플을 갖는다.
+  - `TD-028`, `TD-030`, `GD-015`, actor/emitter TaskBoard 간 hierarchy/ownership/sample 전략 차이가 정리됐다.
+  - 최종 검증 결과: console error 0, EditMode `481/481`, PlayMode `45/45`.
 
 ## End of Session
-- 결과: 진행 중
-- 다음 시작점: `Plan HA-3` stage apply / explicit roster cutover부터 시작한다.
+- 결과: 완료
+- 현재 검증 상태:
+  - compile 이후 console error 0
+  - EditMode `481/481 passed`
+  - PlayMode `45/45 passed`
+- 다음 시작점:
+  - 이후 `HazardActor`의 selector / presence-driven runtime 확장 세션으로 넘어간다.

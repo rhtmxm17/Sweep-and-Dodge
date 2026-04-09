@@ -64,13 +64,25 @@ namespace SweepNDodge.DotsBullets
                     LastPatternSlotId = -1,
                     SelectionSequence = 0u,
                 });
-                AddBuffer<HazardActorEmitterRefBuffer>(actorEntity).Clear();
-
-                AppendToBuffer(sourceEntity, new SourceHazardActorRefBuffer
+                var emitterRefs = AddBuffer<HazardActorEmitterRefBuffer>(actorEntity);
+                emitterRefs.Clear();
+                var emitters = authoring.GetComponentsInChildren<HazardEmitterAuthoring>(includeInactive: true);
+                for (int i = 0; i < emitters.Length; i++)
                 {
-                    ActorEntity = actorEntity,
-                    ActorId = actorId,
-                });
+                    var emitter = emitters[i];
+                    if (emitter == null)
+                        continue;
+
+                    var parentActor = emitter.GetComponentInParent<HazardActorAuthoring>(includeInactive: true);
+                    if (parentActor != authoring)
+                        continue;
+
+                    emitterRefs.Add(new HazardActorEmitterRefBuffer
+                    {
+                        EmitterEntity = GetEntity(emitter.gameObject, TransformUsageFlags.Dynamic),
+                        EmitterId = math.max(1, emitter.EmitterId),
+                    });
+                }
             }
         }
     }

@@ -3,8 +3,8 @@
 ## Metadata
 - doc_id: `TD-030`
 - type: `TechnicalDesign`
-- status: `draft`
-- last_updated: `2026-04-08`
+- status: `active`
+- last_updated: `2026-04-09`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
   - [./TD-028-hazard-emitter-common-contract.md](./TD-028-hazard-emitter-common-contract.md)
@@ -213,13 +213,15 @@ SourceRuntimeTemplateAuthoring
   - emitter baker는 actor parent를 요구
 - stage binding 적용, coordinator 계산, selector 결정, runtime motion/presence 전이는 baker 책임 밖이다.
 
-## 6. 플랜 모드 실행 단위
+## 6. 구현 완료 단위
 ### 6.1 Plan HA-1. Actor schema / binding cutover
 - actor runtime component, actor binding type, stage schema, ref buffer type를 추가한다.
 - `StageSourceBinding.HazardActors`로 스키마를 direct cutover 한다.
 - acceptance:
   - compile 성공
   - stage definition / generator / validation이 새 스키마를 인식한다.
+- 구현 상태:
+  - 완료
 
 ### 6.2 Plan HA-2. Authoring / baker hierarchy migration
 - `HazardActorAuthoring`를 도입하고 `HazardEmitterAuthoring` parent를 actor로 바꾼다.
@@ -227,6 +229,8 @@ SourceRuntimeTemplateAuthoring
 - `HazardEmitterComponent`는 `ActorEntity`를 structural owner로 갖도록 전환한다.
 - acceptance:
   - bake 후 source가 actor roster를, actor가 emitter roster를 가진다.
+- 구현 상태:
+  - 완료
 
 ### 6.3 Plan HA-3. Stage apply / explicit roster cutover
 - `StageTopologyApplyPrepareSystem`를 actor 기준 apply/reset 순서로 전환한다.
@@ -234,6 +238,8 @@ SourceRuntimeTemplateAuthoring
 - 기존 source direct emitter apply seam은 제거한다.
 - acceptance:
   - stage 재적용 시 actor/emitter baseline/applied/runtime이 결정적으로 reset된다.
+- 구현 상태:
+  - 완료
 
 ### 6.4 Plan HA-4. Runtime compatibility migration
 - current runtime systems가 actor hierarchy를 읽도록 최소 마이그레이션한다.
@@ -241,13 +247,24 @@ SourceRuntimeTemplateAuthoring
 - actor runtime baseline/state/selector state는 도입하되, selector 선택 로직 자체는 아직 구현하지 않는다.
 - acceptance:
   - existing emitter gameplay behavior는 유지되고, actor entity 존재 하에서도 discrete emit path가 회귀하지 않는다.
+- 구현 상태:
+  - 완료
+- runtime compatibility boundary:
+  - `HazardActorAppliedConfigComponent`는 현재 activation truth에 포함된다.
+  - `PresenceState`와 selector invalid sentinel state는 아직 current emitter runtime을 gate하지 않는다.
 
 ### 6.5 Plan HA-5. Validation / sample / document closeout
-- sample prefab hierarchy, test fixture, generator, document index를 정리한다.
+- validation, sample asset graph, taskboard/TD closeout을 마감한다.
 - actor/emitter hierarchy 기준의 bake/apply/runtime 회귀 테스트를 보강한다.
 - acceptance:
   - compile, console error 0, EditMode, PlayMode smoke 통과
   - TD-028/TD-029/TaskBoard 간 경계가 충돌하지 않는다.
+- 구현 상태:
+  - 완료
+- closeout 결과:
+  - operational `SampleScene` 경로는 `stpc_demo -> pf_stage_source_template -> HazardActor/HazardEmitter` 최소 샘플을 가진다.
+  - `PlayModeSmoke_SampleVerification`은 test-only topology catalog와 test-only actor sample prefab을 사용한다.
+  - validation은 nested hazard binding duplicate/id contract, source template actor/emitter hierarchy integrity, operational asset의 test-only 참조 금지를 포함한다.
 
 ## 7. 검증 계획
 - 문서 기준 검증:

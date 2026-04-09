@@ -3,7 +3,7 @@
 ## Metadata
 - doc_id: `SESSION-20260407-01`
 - type: `SessionTaskBoard`
-- status: `active`
+- status: `completed`
 - last_updated: `2026-04-08`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
@@ -132,6 +132,6 @@
     - actor 관점의 명명, ownership, presence/motion/pattern 확장 논의는 별도 보드로 이관했다.
 
 ## End of Session
-- 결과: 진행 중
+- 결과: emitter/discrete-emit 구현 이력 보드로 보존
 - 남은 리스크: `RotatingSet coordinator` owner, `AnchorRef` wire shape, `SourceRelative` consume semantics, stage-applied gate authoring surface, `GroupSuppressed` 실 producer 연결은 후속 확정이 필요하다.
-- 다음 세션 시작점: `Plan E` integration/metrics/문서 마감은 현행 보드에서 이어가고, actor 상위 개념 논의는 `SESSION-20260408-01`에서 이어간다.
+- 다음 참고 보드: actor hierarchy와 최종 closeout은 [SESSION-20260408-01-hazard-actor-design-board.md](./SESSION-20260408-01-hazard-actor-design-board.md)에서 완료됐다.

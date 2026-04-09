@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using UnityEditor;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Editor
@@ -94,6 +95,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
     public static class ContentValidationRules
     {
+        private const string TestDataRootPath = "Assets/_Project/99_Tests/";
+
         public static List<ContentValidationIssue> Validate(in ContentValidationInput input)
         {
             var issues = new List<ContentValidationIssue>(64);
@@ -107,6 +110,7 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateWaveClipContracts(input.Definitions, input.WaveClips, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
+            ValidateSourceTemplateHazardHierarchy(input.SourceAuthorings, issues);
             ValidateAutoCorrectionWarnings(input.Definitions, input.VisualAuthorings, input.SourceAuthorings, issues);
 
             return issues;
@@ -855,6 +859,124 @@ namespace SweepNDodge.DotsBullets.Editor
                         "CV030",
                         catalogs[i].Location,
                         "StageTopologyPrefabCatalogSO.SourceTemplatePrefab is null."));
+                    continue;
+                }
+
+                string catalogPath = AssetDatabase.GetAssetPath(catalog);
+                if (!IsTestOnlyPath(catalogPath))
+                {
+                    string prefabPath = AssetDatabase.GetAssetPath(catalog.SourceTemplatePrefab);
+                    if (IsTestOnlyPath(prefabPath))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV045",
+                            catalogs[i].Location,
+                            $"Operational StageTopologyPrefabCatalogSO cannot reference test-only SourceTemplatePrefab. asset={prefabPath}"));
+                    }
+                }
+            }
+        }
+
+        private static void ValidateSourceTemplateHazardHierarchy(
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < sourceAuthorings.Count; i++)
+            {
+                var sourceAuthoring = sourceAuthorings[i].Value;
+                if (sourceAuthoring == null)
+                    continue;
+
+                string location = sourceAuthorings[i].Location;
+                var actors = sourceAuthoring.GetComponentsInChildren<HazardActorAuthoring>(true);
+                var emitters = sourceAuthoring.GetComponentsInChildren<HazardEmitterAuthoring>(true);
+                var actorOwners = new Dictionary<int, List<string>>();
+
+                for (int actorIndex = 0; actorIndex < actors.Length; actorIndex++)
+                {
+                    var actor = actors[actorIndex];
+                    if (actor == null)
+                        continue;
+
+                    string actorLocation = $"{location}::HazardActor[{actor.name}]";
+                    if (!actorOwners.TryGetValue(actor.ActorId, out var owners))
+                    {
+                        owners = new List<string>(2);
+                        actorOwners.Add(actor.ActorId, owners);
+                    }
+
+                    owners.Add(actorLocation);
+
+                    var emitterOwners = new Dictionary<int, List<string>>();
+                    for (int emitterIndex = 0; emitterIndex < emitters.Length; emitterIndex++)
+                    {
+                        var emitter = emitters[emitterIndex];
+                        if (emitter == null)
+                            continue;
+
+                        var parentActor = emitter.GetComponentInParent<HazardActorAuthoring>(true);
+                        if (parentActor != actor)
+                            continue;
+
+                        string emitterLocation = $"{actorLocation}/HazardEmitter[{emitter.name}]";
+                        if (!emitterOwners.TryGetValue(emitter.EmitterId, out var emitterOwnerLocations))
+                        {
+                            emitterOwnerLocations = new List<string>(2);
+                            emitterOwners.Add(emitter.EmitterId, emitterOwnerLocations);
+                        }
+
+                        emitterOwnerLocations.Add(emitterLocation);
+                    }
+
+                    foreach (var pair in emitterOwners)
+                    {
+                        if (pair.Value.Count <= 1)
+                            continue;
+
+                        string joined = string.Join(", ", pair.Value);
+                        for (int ownerIndex = 0; ownerIndex < pair.Value.Count; ownerIndex++)
+                        {
+                            issues.Add(new ContentValidationIssue(
+                                ContentValidationSeverity.Error,
+                                "CV043",
+                                pair.Value[ownerIndex],
+                                $"Duplicate HazardEmitterAuthoring.EmitterId detected under one HazardActorAuthoring. emitterId={pair.Key}, owners={joined}"));
+                        }
+                    }
+                }
+
+                foreach (var pair in actorOwners)
+                {
+                    if (pair.Value.Count <= 1)
+                        continue;
+
+                    string joined = string.Join(", ", pair.Value);
+                    for (int ownerIndex = 0; ownerIndex < pair.Value.Count; ownerIndex++)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV042",
+                            pair.Value[ownerIndex],
+                            $"Duplicate HazardActorAuthoring.ActorId detected under one source template. actorId={pair.Key}, owners={joined}"));
+                    }
+                }
+
+                for (int emitterIndex = 0; emitterIndex < emitters.Length; emitterIndex++)
+                {
+                    var emitter = emitters[emitterIndex];
+                    if (emitter == null)
+                        continue;
+
+                    var parentActor = emitter.GetComponentInParent<HazardActorAuthoring>(true);
+                    if (parentActor != null)
+                        continue;
+
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV044",
+                        $"{location}::HazardEmitter[{emitter.name}]",
+                        "HazardEmitterAuthoring under a source template requires a parent HazardActorAuthoring."));
                 }
             }
         }
@@ -1026,6 +1148,14 @@ namespace SweepNDodge.DotsBullets.Editor
                         "PlayerProxyAuthoring.CleanupActionSet is null."));
                 }
             }
+        }
+
+        private static bool IsTestOnlyPath(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+                return false;
+
+            return assetPath.Replace('\\', '/').StartsWith(TestDataRootPath, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void ValidateMovementDefinition(

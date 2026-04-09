@@ -15,6 +15,7 @@ namespace SweepNDodge.DotsBullets.Tests
     {
         private const string DedicatedScenePath = "Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity";
         private const string OperationalScenePath = "Assets/_Project/01_Scenes/SampleScene.unity";
+        private const int LinearHazardTypeKey = 1435459723;
 
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
@@ -23,6 +24,66 @@ namespace SweepNDodge.DotsBullets.Tests
                 scenePath: OperationalScenePath,
                 sceneLabel: "SampleScene_StageCatalog",
                 frameCount: 120);
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_OperationalScene_MinimalHazardActorSample_ExercisesActorOwnedEmitterRuntime()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(OperationalScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null, "DefaultGameObjectInjectionWorld must exist in PlayMode");
+
+            var em = world.EntityManager;
+            DemoShellFlowController shell = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Operational scene did not reach Title for hazard actor sample test.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Operational scene did not reach Lobby for hazard actor sample test.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
+                        && CountByComponentType<HazardActorComponent>(em) > 0
+                        && CountByComponentType<HazardEmitterComponent>(em) > 0;
+                },
+                480,
+                "Operational scene did not create hazard actor/emitter entities in StagePlay.");
+
+            bool sawLinearBullet = false;
+            bool sawEmitterAdvance = false;
+            for (int i = 0; i < 600; i++)
+            {
+                yield return null;
+                sawLinearBullet |= CountActiveBulletsByType(em, LinearHazardTypeKey) > 0;
+                sawEmitterAdvance |= AnyEmitterAdvancedFromDormant(em);
+                if (sawLinearBullet && sawEmitterAdvance)
+                    break;
+            }
+
+            Assert.That(sawEmitterAdvance, Is.True, "Operational sample actor-owned emitter did not advance its runtime state.");
+            Assert.That(sawLinearBullet, Is.True, "Operational sample actor-owned emitter did not produce the sample linear hazard bullet.");
         }
 
         [UnityTest]
@@ -3524,6 +3585,39 @@ namespace SweepNDodge.DotsBullets.Tests
             CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.CalculateEntityCount();
+        }
+
+        private static int CountActiveBulletsByType(EntityManager em, int typeKey)
+        {
+            CompleteTrackedJobs(em);
+            using var query = em.CreateEntityQuery(
+                ComponentType.ReadOnly<BulletTypeKeyComponent>(),
+                ComponentType.ReadOnly<BulletActiveTag>());
+            using var bullets = query.ToComponentDataArray<BulletTypeKeyComponent>(Allocator.Temp);
+
+            int count = 0;
+            for (int i = 0; i < bullets.Length; i++)
+            {
+                if (bullets[i].Value == typeKey)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static bool AnyEmitterAdvancedFromDormant(EntityManager em)
+        {
+            CompleteTrackedJobs(em);
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<HazardEmitterRuntimeStateComponent>());
+            using var emitters = query.ToComponentDataArray<HazardEmitterRuntimeStateComponent>(Allocator.Temp);
+
+            for (int i = 0; i < emitters.Length; i++)
+            {
+                if (emitters[i].LifecycleState != HazardEmitterLifecycleStateId.Dormant || emitters[i].StateElapsedSec > 0f)
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool HasSingleton<T>(EntityManager em) where T : unmanaged, IComponentData

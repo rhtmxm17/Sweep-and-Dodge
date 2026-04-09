@@ -62,13 +62,19 @@ namespace SweepNDodge.DotsBullets.Tests
             SetCarryState(em, load: 0, capacity: 100);
 
             bool sawLinear = false;
+            bool sawActor = false;
+            bool sawEmitter = false;
+            bool sawEmitterProgress = false;
             for (int frame = 0; frame < 1200; frame++)
             {
                 CompleteTrackedJobs(em);
 
                 sawLinear |= CountActiveBulletsByType(em, LinearHazardTypeKey) > 0;
+                sawActor |= CountByComponentType<HazardActorComponent>(em) > 0;
+                sawEmitter |= CountByComponentType<HazardEmitterComponent>(em) > 0;
+                sawEmitterProgress |= AnyEmitterAdvancedFromDormant(em);
 
-                if (sawLinear)
+                if (sawLinear && sawActor && sawEmitter && sawEmitterProgress)
                 {
                     break;
                 }
@@ -77,6 +83,9 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             Assert.That(sawLinear, Is.True, "Linear baseline sample bullet was not observed.");
+            Assert.That(sawActor, Is.True, "Sample verification scene did not create a HazardActor entity.");
+            Assert.That(sawEmitter, Is.True, "Sample verification scene did not create a HazardEmitter entity.");
+            Assert.That(sawEmitterProgress, Is.True, "Sample verification scene did not advance an actor-owned emitter runtime path.");
         }
 
         private static IEnumerator LoadSceneWithSettle(string scenePath, int settleFrames = 4)
@@ -159,6 +168,26 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return count;
+        }
+
+        private static int CountByComponentType<T>(EntityManager em)
+            where T : unmanaged, IComponentData
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            return query.CalculateEntityCount();
+        }
+
+        private static bool AnyEmitterAdvancedFromDormant(EntityManager em)
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<HazardEmitterRuntimeStateComponent>());
+            using var emitters = query.ToComponentDataArray<HazardEmitterRuntimeStateComponent>(Allocator.Temp);
+            for (int i = 0; i < emitters.Length; i++)
+            {
+                if (emitters[i].LifecycleState != HazardEmitterLifecycleStateId.Dormant || emitters[i].StateElapsedSec > 0f)
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool HasSingleton<T>(EntityManager em)

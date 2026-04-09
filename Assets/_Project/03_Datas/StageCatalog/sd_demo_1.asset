@@ -50,3 +50,13 @@ MonoBehaviour:
     - TriggerState: 1
       EventClips:
       - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
+    HazardActors:
+    - ActorId: 1
+      EnabledMode: 0
+      StartSuppressedMode: 0
+      Emitters:
+      - EmitterId: 1
+        OverrideLocalOffset: 0
+        LocalOffset: {x: 0, y: 0, z: 0}
+        TelegraphProfileOverride: {fileID: 0}
+        EmissionProfileOverride: {fileID: 0}

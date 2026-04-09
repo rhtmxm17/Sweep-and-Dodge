@@ -940,25 +940,35 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity);
-            using var actorRefsCopy = actorRefs.ToNativeArray(Allocator.Temp);
-            for (int i = 0; i < actorRefsCopy.Length; i++)
+            var actorRefsCopy = new NativeArray<SourceHazardActorRefBuffer>(actorRefs.Length, Allocator.Temp);
+            try
             {
-                var actorEntity = actorRefsCopy[i].ActorEntity;
-                if (!em.Exists(actorEntity))
-                    continue;
+                for (int i = 0; i < actorRefs.Length; i++)
+                    actorRefsCopy[i] = actorRefs[i];
 
-                bool hasActorBinding = TryFindHazardActorBinding(actorBindings, actorRefsCopy[i].ActorId, out var actorBinding);
-                em.SetEnabled(actorEntity, hasActorBinding);
+                for (int i = 0; i < actorRefsCopy.Length; i++)
+                {
+                    var actorEntity = actorRefsCopy[i].ActorEntity;
+                    if (!em.Exists(actorEntity))
+                        continue;
 
-                ResetHazardActorToBaseline(em, actorEntity);
-                if (hasActorBinding)
-                    ApplyHazardActorBinding(em, actorEntity, in actorBinding);
-                else
-                    DisableHazardActorAppliedConfig(em, actorEntity);
+                    bool hasActorBinding = TryFindHazardActorBinding(actorBindings, actorRefsCopy[i].ActorId, out var actorBinding);
 
-                ResetHazardActorRuntimeState(em, actorEntity);
-                ApplyActorHazardEmitters(em, actorEntity, hasActorBinding ? actorBinding.Emitters : null);
-                ResetHazardActorSelectorState(em, actorEntity);
+                    ResetHazardActorToBaseline(em, actorEntity);
+                    if (hasActorBinding)
+                        ApplyHazardActorBinding(em, actorEntity, in actorBinding);
+                    else
+                        DisableHazardActorAppliedConfig(em, actorEntity);
+
+                    ResetHazardActorRuntimeState(em, actorEntity);
+                    ApplyActorHazardEmitters(em, actorEntity, hasActorBinding ? actorBinding.Emitters : null);
+                    ResetHazardActorSelectorState(em, actorEntity);
+                    em.SetEnabled(actorEntity, hasActorBinding);
+                }
+            }
+            finally
+            {
+                actorRefsCopy.Dispose();
             }
         }
 
@@ -1071,24 +1081,34 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity);
-            using var emitterRefsCopy = emitterRefs.ToNativeArray(Allocator.Temp);
-            for (int i = 0; i < emitterRefsCopy.Length; i++)
+            var emitterRefsCopy = new NativeArray<HazardActorEmitterRefBuffer>(emitterRefs.Length, Allocator.Temp);
+            try
             {
-                var emitterEntity = emitterRefsCopy[i].EmitterEntity;
-                if (!em.Exists(emitterEntity))
-                    continue;
+                for (int i = 0; i < emitterRefs.Length; i++)
+                    emitterRefsCopy[i] = emitterRefs[i];
 
-                bool hasEmitterBinding = TryFindHazardEmitterBinding(emitterBindings, emitterRefsCopy[i].EmitterId, out var emitterBinding);
-                em.SetEnabled(emitterEntity, hasEmitterBinding);
+                for (int i = 0; i < emitterRefsCopy.Length; i++)
+                {
+                    var emitterEntity = emitterRefsCopy[i].EmitterEntity;
+                    if (!em.Exists(emitterEntity))
+                        continue;
 
-                ResetHazardEmitterToBaseline(em, emitterEntity);
-                if (hasEmitterBinding)
-                    ApplyHazardEmitterBinding(em, emitterEntity, in emitterBinding);
-                else
-                    DisableHazardEmitterAppliedConfig(em, emitterEntity);
+                    bool hasEmitterBinding = TryFindHazardEmitterBinding(emitterBindings, emitterRefsCopy[i].EmitterId, out var emitterBinding);
 
-                ResetHazardEmitterRuntimeState(em, emitterEntity);
-                ResetHazardEmitterCoordinatorState(em, emitterEntity);
+                    ResetHazardEmitterToBaseline(em, emitterEntity);
+                    if (hasEmitterBinding)
+                        ApplyHazardEmitterBinding(em, emitterEntity, in emitterBinding);
+                    else
+                        DisableHazardEmitterAppliedConfig(em, emitterEntity);
+
+                    ResetHazardEmitterRuntimeState(em, emitterEntity);
+                    ResetHazardEmitterCoordinatorState(em, emitterEntity);
+                    em.SetEnabled(emitterEntity, hasEmitterBinding);
+                }
+            }
+            finally
+            {
+                emitterRefsCopy.Dispose();
             }
         }
 

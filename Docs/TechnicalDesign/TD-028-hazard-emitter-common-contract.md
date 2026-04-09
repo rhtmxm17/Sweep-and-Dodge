@@ -3,8 +3,8 @@
 ## Metadata
 - doc_id: `TD-028`
 - type: `TechnicalDesign`
-- status: `draft`
-- last_updated: `2026-04-08`
+- status: `active`
+- last_updated: `2026-04-09`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
   - [../ADR/ADR-20260407-01-discrete-emit-bridge-and-spawn-ownership-split.md](../ADR/ADR-20260407-01-discrete-emit-bridge-and-spawn-ownership-split.md)
@@ -183,7 +183,8 @@
 - `HazardEmitter`의 외부 입력 집계 owner는 `HazardEmitterCoordinatorSystem`으로 고정한다.
 - coordinator는 emitter를 source의 부속 데이터로 직접 실행하지 않고, source 소속 emitter 집합에 대한 activation orchestration만 소유한다.
 - coordinator의 책임:
-  - stage-applied baseline(`IsEnabled`, `IsSuppressed`) 읽기
+  - actor-applied baseline(`HazardActorAppliedConfigComponent`) 읽기
+  - emitter-applied baseline(`IsEnabled`, `IsSuppressed`) 읽기
   - source state / source pressure / source progress 입력 읽기
   - player distance 입력 읽기
   - 최종 activation gate와 suppression reason 계산
@@ -199,6 +200,11 @@
   - `ActivationAllowed`
   - `SuppressionReasonMask`
   - `LastPlayerDistanceSq`
+- 현재 suppression reason mask는 actor-level gate를 먼저 포함한다.
+  - `MissingActor`
+  - `DisabledByActorConfig`
+  - `SuppressedByActorConfig`
+  - 이후 emitter applied config / source gate / player distance gate reason이 누적된다.
 - 목적:
   - emit build가 외부 입력 해석을 직접 소유하지 않게 유지
   - source 상태, 거리, future trigger/group gate를 같은 seam으로 확장 가능하게 유지
@@ -390,4 +396,5 @@ Dormant -> Telegraph -> Emit -> Cooldown
 ## 8. 변경 이력
 - 2026-04-07: 초안 작성. `HazardEmitter` 최소 공통 계약을 `유형 기준 + 4정책 + 4상태 + profile ref + emit append` 경계로 고정했다.
 - 2026-04-08: `HazardEmitterCoordinatorSystem`을 activation orchestration owner로 추가하고, `Pressure + player distance`, `Source progress threshold` gate 예시를 공통 계약에 반영했다.
-- 2026-04-08: `HazardEmitterBinding`, baseline/applied/runtime layering, `SourceHazardEmitterRefBuffer`, stage apply reset 규칙, coordinator gate component 최소 필드를 공통 계약에 추가했다.
+- 2026-04-08: `HazardEmitterBinding`, baseline/applied/runtime layering, stage apply reset 규칙, coordinator gate component 최소 필드를 공통 계약에 추가했다.
+- 2026-04-09: actor-aware runtime compatibility migration을 반영해 coordinator가 actor applied config를 activation truth에 포함하도록 정리했고, source-direct wording은 `TD-030` 기준 hierarchy 계약으로 치환했다.

@@ -35,3 +35,13 @@ MonoBehaviour:
       Weights:
       - 1
     EventSlots: []
+    HazardActors:
+    - ActorId: 1
+      EnabledMode: 0
+      StartSuppressedMode: 0
+      Emitters:
+      - EmitterId: 1
+        OverrideLocalOffset: 0
+        LocalOffset: {x: 0, y: 0, z: 0}
+        TelegraphProfileOverride: {fileID: 0}
+        EmissionProfileOverride: {fileID: 0}

@@ -239,6 +239,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
                 ValidateEventSlots(binding.EventSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
+                ValidateHazardBindings(binding.HazardActors, bindingLocation, issues, enforceOperationalReferenceRestrictions);
             }
 
             foreach (var pair in sourceOwners)
@@ -384,6 +385,123 @@ namespace SweepNDodge.DotsBullets.Editor
                             "Operational StageCatalog cannot reference test-only WaveClip assets.",
                             issues);
                     }
+                }
+            }
+        }
+
+        private static void ValidateHazardBindings(
+            HazardActorBinding[] actors,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
+        {
+            if (actors == null)
+                return;
+
+            var actorOwners = new Dictionary<int, List<string>>();
+
+            for (int i = 0; i < actors.Length; i++)
+            {
+                var actor = actors[i];
+                string actorLocation = $"{location}/HazardActors[{i}]";
+                if (actor.ActorId < 1)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC026",
+                        actorLocation,
+                        "HazardActorBinding.ActorId must be >= 1."));
+                }
+
+                if (!actorOwners.TryGetValue(actor.ActorId, out var owners))
+                {
+                    owners = new List<string>(2);
+                    actorOwners.Add(actor.ActorId, owners);
+                }
+
+                owners.Add(actorLocation);
+                ValidateHazardEmitterBindings(actor.Emitters, actorLocation, issues, enforceOperationalReferenceRestrictions);
+            }
+
+            foreach (var pair in actorOwners)
+            {
+                if (pair.Key < 1 || pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC027",
+                        pair.Value[i],
+                        $"Duplicate HazardActorBinding.ActorId detected: {pair.Key}. Owners: {joined}"));
+                }
+            }
+        }
+
+        private static void ValidateHazardEmitterBindings(
+            HazardEmitterBinding[] emitters,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
+        {
+            if (emitters == null)
+                return;
+
+            var emitterOwners = new Dictionary<int, List<string>>();
+
+            for (int i = 0; i < emitters.Length; i++)
+            {
+                var emitter = emitters[i];
+                string emitterLocation = $"{location}/Emitters[{i}]";
+                if (emitter.EmitterId < 1)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC028",
+                        emitterLocation,
+                        "HazardEmitterBinding.EmitterId must be >= 1."));
+                }
+
+                if (!emitterOwners.TryGetValue(emitter.EmitterId, out var owners))
+                {
+                    owners = new List<string>(2);
+                    emitterOwners.Add(emitter.EmitterId, owners);
+                }
+
+                owners.Add(emitterLocation);
+
+                if (!enforceOperationalReferenceRestrictions)
+                    continue;
+
+                ValidateOperationalReference(
+                    emitter.TelegraphProfileOverride,
+                    emitterLocation,
+                    "STC030",
+                    "Operational StageCatalog cannot reference test-only HazardEmitterTelegraphProfile assets through emitter overrides.",
+                    issues);
+                ValidateOperationalReference(
+                    emitter.EmissionProfileOverride,
+                    emitterLocation,
+                    "STC031",
+                    "Operational StageCatalog cannot reference test-only HazardEmitterEmissionProfile assets through emitter overrides.",
+                    issues);
+            }
+
+            foreach (var pair in emitterOwners)
+            {
+                if (pair.Key < 1 || pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC029",
+                        pair.Value[i],
+                        $"Duplicate HazardEmitterBinding.EmitterId detected: {pair.Key}. Owners: {joined}"));
                 }
             }
         }

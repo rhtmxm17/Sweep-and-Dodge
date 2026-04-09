@@ -148,11 +148,6 @@ namespace SweepNDodge.DotsBullets
                     LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     StateElapsedSec = 0f,
                 });
-                AppendToBuffer(actorEntity, new HazardActorEmitterRefBuffer
-                {
-                    EmitterEntity = emitterEntity,
-                    EmitterId = emitterId,
-                });
             }
         }
     }

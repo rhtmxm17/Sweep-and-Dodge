@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!1 &100000
 GameObject:
@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 400000}
   - component: {fileID: 11400000}
   m_Layer: 0
-  m_Name: pf_stage_source_template
+  m_Name: pf_test_hazard_actor_source_template
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -74,7 +74,7 @@ GameObject:
   - component: {fileID: 410000}
   - component: {fileID: 11410000}
   m_Layer: 0
-  m_Name: HazardActor_Sample
+  m_Name: HazardActor_TestSample
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -123,7 +123,7 @@ GameObject:
   - component: {fileID: 420000}
   - component: {fileID: 11420000}
   m_Layer: 0
-  m_Name: HazardEmitter_Sample
+  m_Name: HazardEmitter_TestSample
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -162,7 +162,6 @@ MonoBehaviour:
   Mobility: 0
   IsEnabled: 1
   StartSuppressed: 0
-  LocalOffset: {x: 3.5, y: 0, z: 2.5}
-  TelegraphProfile: {fileID: 11400000, guid: 7c3e4e1a5f8844698e6eaf2f9a5f5101, type: 2}
-  EmissionProfile: {fileID: 11400000, guid: cc2d3d4b7c9a4b5e8f1d2c3b4a5e6102, type: 2}
-
+  LocalOffset: {x: -3, y: 0, z: 2}
+  TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
+  EmissionProfile: {fileID: 11400000, guid: e2a3b4c5d6f74899aa0bb1cc2dd3e402, type: 2}

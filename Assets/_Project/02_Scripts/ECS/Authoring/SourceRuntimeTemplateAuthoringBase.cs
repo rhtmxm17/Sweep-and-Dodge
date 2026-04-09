@@ -123,7 +123,25 @@ namespace SweepNDodge.DotsBullets
             baker.AddBuffer<SourceSustainSlotCandidateBuffer>(e).Clear();
             baker.AddBuffer<SourceSustainRuntimeLaneBuffer>(e).Clear();
             baker.AddBuffer<SourceEventQueueBuffer>(e).Clear();
-            baker.AddBuffer<SourceHazardActorRefBuffer>(e).Clear();
+            var actorRefs = baker.AddBuffer<SourceHazardActorRefBuffer>(e);
+            actorRefs.Clear();
+            var hazardActors = authoring.GetComponentsInChildren<HazardActorAuthoring>(includeInactive: true);
+            for (int i = 0; i < hazardActors.Length; i++)
+            {
+                var hazardActor = hazardActors[i];
+                if (hazardActor == null)
+                    continue;
+
+                var parentSource = hazardActor.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>(includeInactive: true);
+                if (parentSource != authoring)
+                    continue;
+
+                actorRefs.Add(new SourceHazardActorRefBuffer
+                {
+                    ActorEntity = baker.GetEntity(hazardActor.gameObject, TransformUsageFlags.Dynamic),
+                    ActorId = math.max(1, hazardActor.ActorId),
+                });
+            }
 
             baker.AddComponent(e, new SourceSustainRuntimeComponent
             {
