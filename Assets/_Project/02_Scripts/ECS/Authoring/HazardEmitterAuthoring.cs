@@ -25,7 +25,7 @@ namespace SweepNDodge.DotsBullets
         {
             public override void Bake(HazardEmitterAuthoring authoring)
             {
-                if (!HazardEmitterAuthoringValidationUtility.TryValidate(authoring, out var actorAuthoring, out var sourceAuthoring, out var error))
+                if (!HazardEmitterAuthoringValidationUtility.TryValidate(authoring, out var actorAuthoring, out _, out var error))
                 {
                     Debug.LogError($"[HazardEmitterAuthoring] {error}", authoring);
                     return;
@@ -39,7 +39,6 @@ namespace SweepNDodge.DotsBullets
 
                 var emitterEntity = GetEntity(TransformUsageFlags.Dynamic);
                 var actorEntity = GetEntity(actorAuthoring.gameObject, TransformUsageFlags.Dynamic);
-                var sourceEntity = GetEntity(sourceAuthoring.gameObject, TransformUsageFlags.Dynamic);
 
                 int telegraphProfileRefId = authoring.TelegraphProfile != null ? authoring.TelegraphProfile.GetInstanceID() : 0;
                 int emissionProfileRefId = authoring.EmissionProfile != null ? authoring.EmissionProfile.GetInstanceID() : 0;
@@ -150,11 +149,6 @@ namespace SweepNDodge.DotsBullets
                     StateElapsedSec = 0f,
                 });
                 AppendToBuffer(actorEntity, new HazardActorEmitterRefBuffer
-                {
-                    EmitterEntity = emitterEntity,
-                    EmitterId = emitterId,
-                });
-                AppendToBuffer(sourceEntity, new SourceHazardEmitterRefBuffer
                 {
                     EmitterEntity = emitterEntity,
                     EmitterId = emitterId,

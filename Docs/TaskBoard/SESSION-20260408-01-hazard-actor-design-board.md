@@ -26,16 +26,6 @@
 - 플레이어 경험 기준으로는 emitter가 단순 발사 장치보다 `비공격 대상 몬스터형 hazard actor`에 가깝다는 합의가 형성됐다.
 
 ## Now
-- [ ] Plan HA-3. stage apply / explicit roster cutover
-  - 완료 기준:
-    - `StageTopologyApplyPrepareSystem`이 actor 기준 apply/reset 순서로 전환된다.
-    - omitted actor/emitter는 explicit roster 규칙으로 비활성/미적용 처리된다.
-    - 기존 source direct emitter apply seam은 제거된다.
-  - 검증:
-    - apply/reset EditMode tests
-    - stage reapply/disable regression
-
-## Next
 - [ ] Plan HA-4. runtime compatibility migration
   - 완료 기준:
     - current runtime systems가 actor hierarchy를 읽도록 최소 migration 된다.
@@ -45,6 +35,8 @@
     - existing emitter discrete path regression
     - coordinator / emit build EditMode regression
     - PlayMode smoke
+
+## Next
 - [ ] Plan HA-5. validation / sample / document closeout
   - 완료 기준:
     - sample prefab/test fixture/generator/document index가 actor hierarchy 기준으로 정리된다.
@@ -157,6 +149,13 @@
     - `HazardActorAuthoring.Baker`는 source -> actor ref를, `HazardEmitterAuthoring.Baker`는 actor -> emitter ref와 임시 source -> emitter ref를 함께 기록한다.
     - `HazardEmitterComponent`는 `SourceEntity` 대신 `ActorEntity`를 structural owner로 사용하도록 전환됐고, coordinator/emit build는 최소 actor 경유 source resolve를 사용한다.
     - 최종 검증 기준으로 EditMode `467/467`, PlayMode `44/44`를 통과했다.
+
+## Recently Completed
+- [x] D28. `Plan HA-3` stage apply / explicit roster cutover
+  - actor/emitter apply owner가 `SourceHazardActorRefBuffer -> HazardActorEmitterRefBuffer` 계층으로 전환됐다.
+  - omitted actor/emitter는 explicit roster 규칙대로 `disabled + suppressed + runtime reset`으로 정리된다.
+  - `SourceHazardEmitterRefBuffer`와 source-direct bake/apply support가 제거됐다.
+  - 검증 결과: EditMode `470/470`, PlayMode `44/44`.
 
 ## End of Session
 - 결과: 진행 중

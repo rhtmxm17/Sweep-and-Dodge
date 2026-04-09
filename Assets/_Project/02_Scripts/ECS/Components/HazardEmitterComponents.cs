@@ -188,11 +188,4 @@ namespace SweepNDodge.DotsBullets
         public float MaxProgress01;
     }
 
-    [InternalBufferCapacity(4)]
-    public struct SourceHazardEmitterRefBuffer : IBufferElementData
-    {
-        public Entity EmitterEntity;
-        public int EmitterId;
-    }
-
 }
