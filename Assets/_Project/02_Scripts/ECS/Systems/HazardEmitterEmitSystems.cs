@@ -46,8 +46,10 @@ namespace SweepNDodge.DotsBullets
             var channelEntity = SystemAPI.GetSingletonEntity<DiscreteEmitChannelSingletonTag>();
             var discreteRequests = SystemAPI.GetBuffer<DiscreteEmitRequestBuffer>(channelEntity);
 
+            var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
             var localTransformLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             var localToWorldLookup = SystemAPI.GetComponentLookup<LocalToWorld>(true);
+            actorLookup.Update(ref state);
             localTransformLookup.Update(ref state);
             localToWorldLookup.Update(ref state);
 
@@ -100,13 +102,14 @@ namespace SweepNDodge.DotsBullets
                             }
 
                             runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Emit;
+                            Entity sourceEntity = ResolveSourceEntity(emitterConfig.ActorEntity, actorLookup);
                             float3 anchorPosition = ResolveWorldAnchorPosition(
                                 entity,
                                 appliedConfig.LocalOffset,
                                 localTransformLookup,
                                 localToWorldLookup);
                             var seed = DiscreteEmitRequestUtility.BuildDiscreteEmitSeedFromEmitter(
-                                emitterConfig.SourceEntity,
+                                sourceEntity,
                                 entity,
                                 emitterConfig.EmitterId,
                                 in emission.ValueRO,
@@ -157,6 +160,16 @@ namespace SweepNDodge.DotsBullets
                     }
                 }
             }
+        }
+
+        private static Entity ResolveSourceEntity(
+            Entity actorEntity,
+            ComponentLookup<HazardActorComponent> actorLookup)
+        {
+            if (actorEntity == Entity.Null || !actorLookup.HasComponent(actorEntity))
+                return Entity.Null;
+
+            return actorLookup[actorEntity].SourceEntity;
         }
 
         private static float3 ResolveWorldAnchorPosition(

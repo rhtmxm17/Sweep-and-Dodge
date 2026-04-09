@@ -35,7 +35,7 @@ namespace SweepNDodge.DotsBullets
     public struct HazardEmitterComponent : IComponentData
     {
         public int EmitterId;
-        public Entity SourceEntity;
+        public Entity ActorEntity;
         public HazardEmitterActivationPolicyId ActivationPolicy;
         public HazardEmitterLifecycleStateId InitialLifecycleState;
         public HazardEmitterAnchorKindId AnchorKind;

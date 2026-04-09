@@ -17,7 +17,50 @@ namespace SweepNDodge.DotsBullets.Tests
         public void TearDown() => ForceDisposeSharedContainersIfNeeded();
 
         [Test]
-        public void HazardEmitterAuthoringValidation_RequiresParentSourceAuthoring()
+        public void HazardActorAuthoringValidation_RequiresParentSourceAuthoring()
+        {
+            var root = new GameObject("hazard_actor_root");
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var authoring = actorGo.AddComponent<HazardActorAuthoring>();
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var sourceAuthoring, out var error);
+                Assert.That(ok, Is.False);
+                Assert.That(sourceAuthoring, Is.Null);
+                Assert.That(error, Does.Contain("parent SourceRuntimeTemplateAuthoringBase"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void HazardActorAuthoringValidation_AcceptsValidSourceParent()
+        {
+            var root = new GameObject("source_root");
+            var sourceAuthoring = root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var authoring = actorGo.AddComponent<HazardActorAuthoring>();
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var owner, out var error);
+                Assert.That(ok, Is.True);
+                Assert.That(owner, Is.EqualTo(sourceAuthoring));
+                Assert.That(error, Is.Empty);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void HazardEmitterAuthoringValidation_RequiresParentActorAuthoring()
         {
             var root = new GameObject("hazard_emitter_root");
             var emitterGo = new GameObject("hazard_emitter");
@@ -28,10 +71,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
             try
             {
-                bool ok = HazardEmitterAuthoringValidationUtility.TryValidate(authoring, out var sourceAuthoring, out var error);
+                bool ok = HazardEmitterAuthoringValidationUtility.TryValidate(authoring, out var actorAuthoring, out var sourceAuthoring, out var error);
                 Assert.That(ok, Is.False);
+                Assert.That(actorAuthoring, Is.Null);
                 Assert.That(sourceAuthoring, Is.Null);
-                Assert.That(error, Does.Contain("parent SourceRuntimeTemplateAuthoringBase"));
+                Assert.That(error, Does.Contain("parent HazardActorAuthoring"));
             }
             finally
             {
@@ -46,9 +90,12 @@ namespace SweepNDodge.DotsBullets.Tests
         public void HazardEmitterAuthoringValidation_RejectsUnsupportedPolicy()
         {
             var root = new GameObject("source_root");
-            var sourceAuthoring = root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var actorAuthoring = actorGo.AddComponent<HazardActorAuthoring>();
             var emitterGo = new GameObject("hazard_emitter");
-            emitterGo.transform.SetParent(root.transform);
+            emitterGo.transform.SetParent(actorGo.transform);
             var authoring = emitterGo.AddComponent<HazardEmitterAuthoring>();
             authoring.ActivationPolicy = HazardEmitterActivationPolicyId.ProgressReactive;
             authoring.TelegraphProfile = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
@@ -56,9 +103,10 @@ namespace SweepNDodge.DotsBullets.Tests
 
             try
             {
-                bool ok = HazardEmitterAuthoringValidationUtility.TryValidate(authoring, out var owner, out var error);
+                bool ok = HazardEmitterAuthoringValidationUtility.TryValidate(authoring, out var owner, out var sourceOwner, out var error);
                 Assert.That(ok, Is.False);
-                Assert.That(owner, Is.EqualTo(sourceAuthoring));
+                Assert.That(owner, Is.EqualTo(actorAuthoring));
+                Assert.That(sourceOwner, Is.Not.Null);
                 Assert.That(error, Does.Contain(nameof(HazardEmitterActivationPolicyId.AlwaysCycle)));
             }
             finally
@@ -532,10 +580,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
             em.SetComponentData(entity, LocalTransform.FromPosition(position));
             em.SetComponentData(entity, new LocalToWorld { Value = float4x4.Translate(position) });
+            var actor = CreateActor(em, source, actorId: bulletTypeKey);
             em.SetComponentData(entity, new HazardEmitterComponent
             {
                 EmitterId = 1,
-                SourceEntity = source,
+                ActorEntity = actor,
                 ActivationPolicy = HazardEmitterActivationPolicyId.AlwaysCycle,
                 InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
                 AnchorKind = HazardEmitterAnchorKindId.ObjectBound,
@@ -609,6 +658,50 @@ namespace SweepNDodge.DotsBullets.Tests
                 ActivationAllowed = 0,
                 SuppressionReasonMask = 0u,
                 LastPlayerDistanceSq = float.MaxValue,
+            });
+            return entity;
+        }
+
+        private static Entity CreateActor(EntityManager em, Entity source, int actorId)
+        {
+            var entity = em.CreateEntity(
+                typeof(HazardActorComponent),
+                typeof(HazardActorAppliedConfigBaselineComponent),
+                typeof(HazardActorAppliedConfigComponent),
+                typeof(HazardActorRuntimeBaselineComponent),
+                typeof(HazardActorRuntimeStateComponent),
+                typeof(HazardActorPatternSelectorStateComponent));
+
+            em.SetComponentData(entity, new HazardActorComponent
+            {
+                ActorId = actorId,
+                SourceEntity = source,
+            });
+            em.SetComponentData(entity, new HazardActorAppliedConfigBaselineComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(entity, new HazardActorAppliedConfigComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(entity, new HazardActorRuntimeBaselineComponent
+            {
+                InitialPresenceState = HazardActorPresenceStateId.Hidden,
+            });
+            em.SetComponentData(entity, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Hidden,
+                StateElapsedSec = 0f,
+            });
+            em.SetComponentData(entity, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = -1,
+                CurrentPatternSlotId = -1,
+                LastPatternSlotId = -1,
+                SelectionSequence = 0u,
             });
             return entity;
         }

@@ -637,10 +637,57 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddBuffer<SourcePollutionDropRequestBuffer>(entity);
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
             em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
+            em.AddBuffer<SourceHazardActorRefBuffer>(entity);
             em.AddBuffer<SourceHazardEmitterRefBuffer>(entity);
 
-            var linkedGroup = em.GetBuffer<LinkedEntityGroup>(entity);
-            linkedGroup.Add(new LinkedEntityGroup { Value = entity });
+            em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = entity });
+
+            var actor = em.CreateEntity(
+                typeof(Prefab),
+                typeof(HazardActorComponent),
+                typeof(HazardActorAppliedConfigBaselineComponent),
+                typeof(HazardActorAppliedConfigComponent),
+                typeof(HazardActorRuntimeBaselineComponent),
+                typeof(HazardActorRuntimeStateComponent),
+                typeof(HazardActorPatternSelectorStateComponent));
+            em.SetComponentData(actor, new HazardActorComponent
+            {
+                ActorId = 7,
+                SourceEntity = entity,
+            });
+            em.SetComponentData(actor, new HazardActorAppliedConfigBaselineComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(actor, new HazardActorAppliedConfigComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(actor, new HazardActorRuntimeBaselineComponent
+            {
+                InitialPresenceState = HazardActorPresenceStateId.Hidden,
+            });
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Hidden,
+                StateElapsedSec = 0f,
+            });
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = -1,
+                CurrentPatternSlotId = -1,
+                LastPatternSlotId = -1,
+                SelectionSequence = 0u,
+            });
+            em.AddBuffer<HazardActorEmitterRefBuffer>(actor);
+            em.GetBuffer<SourceHazardActorRefBuffer>(entity).Add(new SourceHazardActorRefBuffer
+            {
+                ActorEntity = actor,
+                ActorId = 7,
+            });
+            em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = actor });
 
             var emitter = em.CreateEntity(
                 typeof(Prefab),
@@ -659,7 +706,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(emitter, new HazardEmitterComponent
             {
                 EmitterId = 41,
-                SourceEntity = entity,
+                ActorEntity = actor,
                 ActivationPolicy = HazardEmitterActivationPolicyId.AlwaysCycle,
                 InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
                 AnchorKind = HazardEmitterAnchorKindId.ObjectBound,
@@ -734,7 +781,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 EmitterEntity = emitter,
                 EmitterId = 41,
             });
-            linkedGroup.Add(new LinkedEntityGroup { Value = emitter });
+            em.GetBuffer<HazardActorEmitterRefBuffer>(actor).Add(new HazardActorEmitterRefBuffer
+            {
+                EmitterEntity = emitter,
+                EmitterId = 41,
+            });
+            em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = emitter });
             return entity;
         }
     }

@@ -77,10 +77,11 @@ namespace SweepNDodge.DotsBullets.Tests
                     typeof(HazardEmitterCoordinatorStateComponent));
                 em.SetComponentData(emitter, LocalTransform.FromPosition(new float3(2f, 0f, 1f)));
                 em.SetComponentData(emitter, new LocalToWorld { Value = float4x4.Translate(new float3(2f, 0f, 1f)) });
+                var actor = CreateActor(em, source, actorId: 11);
                 em.SetComponentData(emitter, new HazardEmitterComponent
                 {
                     EmitterId = 11,
-                    SourceEntity = source,
+                    ActorEntity = actor,
                     ActivationPolicy = HazardEmitterActivationPolicyId.AlwaysCycle,
                     InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     AnchorKind = HazardEmitterAnchorKindId.ObjectBound,
@@ -174,6 +175,49 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             yield break;
+        }
+
+        private static Entity CreateActor(EntityManager em, Entity source, int actorId)
+        {
+            var entity = em.CreateEntity(
+                typeof(HazardActorComponent),
+                typeof(HazardActorAppliedConfigBaselineComponent),
+                typeof(HazardActorAppliedConfigComponent),
+                typeof(HazardActorRuntimeBaselineComponent),
+                typeof(HazardActorRuntimeStateComponent),
+                typeof(HazardActorPatternSelectorStateComponent));
+            em.SetComponentData(entity, new HazardActorComponent
+            {
+                ActorId = actorId,
+                SourceEntity = source,
+            });
+            em.SetComponentData(entity, new HazardActorAppliedConfigBaselineComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(entity, new HazardActorAppliedConfigComponent
+            {
+                IsEnabled = 1,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(entity, new HazardActorRuntimeBaselineComponent
+            {
+                InitialPresenceState = HazardActorPresenceStateId.Hidden,
+            });
+            em.SetComponentData(entity, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Hidden,
+                StateElapsedSec = 0f,
+            });
+            em.SetComponentData(entity, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = -1,
+                CurrentPatternSlotId = -1,
+                LastPatternSlotId = -1,
+                SelectionSequence = 0u,
+            });
+            return entity;
         }
 
         private static Entity CreatePooledBullet(EntityManager em, int bulletTypeKey, float speed, float lifetime)

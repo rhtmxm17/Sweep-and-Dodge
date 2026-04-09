@@ -36,6 +36,7 @@ namespace SweepNDodge.DotsBullets
             var pressureGateLookup = SystemAPI.GetComponentLookup<HazardEmitterSourcePressureGateComponent>(true);
             var distanceGateLookup = SystemAPI.GetComponentLookup<HazardEmitterPlayerDistanceGateComponent>(true);
             var progressGateLookup = SystemAPI.GetComponentLookup<HazardEmitterSourceProgressGateComponent>(true);
+            var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var directorLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
             var playerSyncLookup = SystemAPI.GetComponentLookup<PlayerGoSyncComponent>(true);
@@ -45,6 +46,7 @@ namespace SweepNDodge.DotsBullets
             pressureGateLookup.Update(ref state);
             distanceGateLookup.Update(ref state);
             progressGateLookup.Update(ref state);
+            actorLookup.Update(ref state);
             sourceLookup.Update(ref state);
             directorLookup.Update(ref state);
             playerSyncLookup.Update(ref state);
@@ -74,8 +76,14 @@ namespace SweepNDodge.DotsBullets
                 bool hasDistanceGate = distanceGateLookup.HasComponent(entity) && distanceGateLookup[entity].Enabled != 0;
 
                 bool needsSource = hasPressureGate || hasProgressGate;
-                bool hasSource = emitterConfig.SourceEntity != Entity.Null
-                    && em.Exists(emitterConfig.SourceEntity);
+                bool hasActor = emitterConfig.ActorEntity != Entity.Null
+                    && em.Exists(emitterConfig.ActorEntity)
+                    && actorLookup.HasComponent(emitterConfig.ActorEntity);
+                Entity sourceEntity = hasActor
+                    ? actorLookup[emitterConfig.ActorEntity].SourceEntity
+                    : Entity.Null;
+                bool hasSource = sourceEntity != Entity.Null
+                    && em.Exists(sourceEntity);
 
                 if (needsSource && !hasSource)
                 {
@@ -86,13 +94,13 @@ namespace SweepNDodge.DotsBullets
                     if (hasPressureGate)
                     {
                         var pressureGate = pressureGateLookup[entity];
-                        if (!directorLookup.HasComponent(emitterConfig.SourceEntity))
+                        if (!directorLookup.HasComponent(sourceEntity))
                         {
                             reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.MissingSource;
                         }
                         else
                         {
-                            var director = directorLookup[emitterConfig.SourceEntity];
+                            var director = directorLookup[sourceEntity];
                             if (pressureGate.RequirePressureState != 0
                                 && director.State != RunDirectorSourceStateId.Pressure)
                             {
@@ -107,13 +115,13 @@ namespace SweepNDodge.DotsBullets
                     if (hasProgressGate)
                     {
                         var progressGate = progressGateLookup[entity];
-                        if (!sourceLookup.HasComponent(emitterConfig.SourceEntity))
+                        if (!sourceLookup.HasComponent(sourceEntity))
                         {
                             reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.MissingSource;
                         }
                         else
                         {
-                            var source = sourceLookup[emitterConfig.SourceEntity];
+                            var source = sourceLookup[sourceEntity];
                             float progress01 = math.saturate((float)source.CollectedCount / math.max(1, source.ThresholdDepleted));
                             if (progress01 < progressGate.MinProgress01 || progress01 > progressGate.MaxProgress01)
                                 reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.SourceProgressBlocked;

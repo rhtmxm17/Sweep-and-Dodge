@@ -6,9 +6,11 @@ namespace SweepNDodge.DotsBullets
     {
         public static bool TryValidate(
             HazardEmitterAuthoring authoring,
+            out HazardActorAuthoring actorAuthoring,
             out SourceRuntimeTemplateAuthoringBase sourceAuthoring,
             out string error)
         {
+            actorAuthoring = null;
             sourceAuthoring = null;
             error = string.Empty;
 
@@ -18,10 +20,17 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            sourceAuthoring = authoring.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>(includeInactive: true);
+            actorAuthoring = authoring.GetComponentInParent<HazardActorAuthoring>(includeInactive: true);
+            if (actorAuthoring == null)
+            {
+                error = "HazardEmitterAuthoring requires a parent HazardActorAuthoring.";
+                return false;
+            }
+
+            sourceAuthoring = actorAuthoring.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>(includeInactive: true);
             if (sourceAuthoring == null)
             {
-                error = "HazardEmitterAuthoring requires a parent SourceRuntimeTemplateAuthoringBase.";
+                error = "HazardEmitterAuthoring requires its parent HazardActorAuthoring to be under a SourceRuntimeTemplateAuthoringBase.";
                 return false;
             }
 

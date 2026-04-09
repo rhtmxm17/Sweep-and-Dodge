@@ -26,16 +26,6 @@
 - 플레이어 경험 기준으로는 emitter가 단순 발사 장치보다 `비공격 대상 몬스터형 hazard actor`에 가깝다는 합의가 형성됐다.
 
 ## Now
-- [ ] Plan HA-2. authoring / baker hierarchy migration
-  - 완료 기준:
-    - `HazardActorAuthoring`가 도입되고 authoring 계층이 `Source -> Actor -> Emitter`로 바뀐다.
-    - `HazardActorAuthoring.Baker`가 source -> actor ref를, `HazardEmitterAuthoring.Baker`가 actor -> emitter ref를 기록한다.
-    - `HazardEmitterComponent`는 `ActorEntity`를 structural owner로 사용한다.
-  - 검증:
-    - bake/EditMode authoring tests
-    - sample prefab hierarchy compile 회귀
-
-## Next
 - [ ] Plan HA-3. stage apply / explicit roster cutover
   - 완료 기준:
     - `StageTopologyApplyPrepareSystem`이 actor 기준 apply/reset 순서로 전환된다.
@@ -44,6 +34,8 @@
   - 검증:
     - apply/reset EditMode tests
     - stage reapply/disable regression
+
+## Next
 - [ ] Plan HA-4. runtime compatibility migration
   - 완료 기준:
     - current runtime systems가 actor hierarchy를 읽도록 최소 migration 된다.
@@ -159,7 +151,13 @@
     - actor 최소 runtime schema와 `SourceHazardActorRefBuffer` / `HazardActorEmitterRefBuffer` 타입이 추가됐다.
     - source-level emitter stage binding apply path는 제거됐고, actor/emitter actual apply/reset behavior 검증은 `HA-3`로 이관됐다.
     - `refresh_unity(compile=request, wait_for_ready=true)` 이후 EditMode `465/465`, PlayMode `44/44`를 통과했다.
+- [x] D27. `Plan HA-2` authoring / baker hierarchy migration을 완료했다.
+  - 검증 결과:
+    - `HazardActorAuthoring`와 actor validation helper가 추가됐고, authoring 계층이 `Source -> Actor -> Emitter` 기준으로 전환됐다.
+    - `HazardActorAuthoring.Baker`는 source -> actor ref를, `HazardEmitterAuthoring.Baker`는 actor -> emitter ref와 임시 source -> emitter ref를 함께 기록한다.
+    - `HazardEmitterComponent`는 `SourceEntity` 대신 `ActorEntity`를 structural owner로 사용하도록 전환됐고, coordinator/emit build는 최소 actor 경유 source resolve를 사용한다.
+    - 최종 검증 기준으로 EditMode `467/467`, PlayMode `44/44`를 통과했다.
 
 ## End of Session
 - 결과: 진행 중
-- 다음 시작점: `Plan HA-1` actor schema / binding cutover부터 시작한다.
+- 다음 시작점: `Plan HA-3` stage apply / explicit roster cutover부터 시작한다.
