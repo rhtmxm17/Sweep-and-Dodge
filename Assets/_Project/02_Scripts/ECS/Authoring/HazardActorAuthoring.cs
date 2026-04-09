@@ -47,6 +47,13 @@ namespace SweepNDodge.DotsBullets
                     IsEnabled = baselineConfig.IsEnabled,
                     IsSuppressed = baselineConfig.IsSuppressed,
                 });
+                AddComponent(actorEntity, new HazardActorPresencePolicyComponent
+                {
+                    ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                    ActivationDurationSec = 0f,
+                    RetireTrigger = HazardActorPresenceTriggerMode.None,
+                    RetireDurationSec = 0f,
+                });
 
                 AddComponent(actorEntity, new HazardActorRuntimeBaselineComponent
                 {

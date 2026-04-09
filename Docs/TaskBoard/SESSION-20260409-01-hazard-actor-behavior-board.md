@@ -29,12 +29,12 @@
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- actor behavior 확장을 위한 문서 범위 확인
-- `PresenceState`, `PatternSelector`, `Emitter execution seam`의 다음 논의 순서 정리
+- `HB-1A. Presence runtime owner` 완료
+- 다음 구현 단위는 `HB-1B. Presence gate integration`
 
 ## Next
-- `PresenceState` runtime owner와 update order를 먼저 닫는다.
-- 이어서 selector-emitter execution seam과 blueprint vertical slice 범위를 닫는다.
+- `HB-1B. Presence gate integration` 실행 플랜을 수립한다.
+- 이후 `HB-1C. Blueprint trigger seed`로 room-entry activation seed를 붙인다.
 
 ## Blocked
 - 없음
@@ -51,8 +51,18 @@
   - 이유: 이전 actor 세션은 migration closeout까지 완료된 상태라, behavior 확장 논의를 같은 보드에 누적하면 완료 범위와 신규 범위가 섞이게 된다.
 - [x] D3. 목표 청사진 시나리오를 별도 `GD-016`으로 분리하고, `GD-015`의 `HazardActor` 용어 보정을 반영했다.
   - 이유: 행동 확장 출발점은 player-facing blueprint이므로 기획 문서 기준의 별도 기록이 필요하고, `GD-015`도 구현 상위 개념과의 관계가 명시돼야 이후 TD와 용어가 어긋나지 않는다.
+- [x] D4. `HB-1` presence 확장은 단일 구현 플랜이 아니라 3개 실행 단위로 분리하기로 고정했다.
+  - `HB-1A. Presence runtime owner`
+  - `HB-1B. Presence gate integration`
+  - `HB-1C. Blueprint trigger seed`
+  - 이유: presence owner 도입, runtime activation truth 변경, room-entry activation seed는 서로 다른 위험도를 가지며, 특히 room-entry activation은 청사진 vertical slice 성격이 강해 별도 단계로 다루는 편이 안전하다.
+- [x] D5. `HB-1A. Presence runtime owner` 구현을 완료했다.
+  - `HazardActorPresencePolicyComponent`와 `HazardActorPresenceSystem`이 추가됐다.
+  - actor presence는 이제 reset-only가 아니라 실제 runtime progression state로 동작한다.
+  - 기본 policy는 `Immediate activation / no retire`로 seed되고, current emitter compatibility gate는 유지된다.
+  - 검증 결과: console blocking error 없음, EditMode `485/485`, PlayMode `45/45`.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `PresenceState` runtime 전이와 actor activation truth의 결합 범위를 먼저 논의한다.
+  - `PresenceState`를 activation truth에 결합하는 `HB-1B` 범위를 먼저 논의한다.

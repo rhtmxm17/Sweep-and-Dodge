@@ -28,6 +28,22 @@ namespace SweepNDodge.DotsBullets
         public byte IsSuppressed;
     }
 
+    public enum HazardActorPresenceTriggerMode : byte
+    {
+        None = 0,
+        Immediate = 1,
+        SourceAvailable = 2,
+        SourceDepleted = 3,
+    }
+
+    public struct HazardActorPresencePolicyComponent : IComponentData
+    {
+        public HazardActorPresenceTriggerMode ActivationTrigger;
+        public float ActivationDurationSec;
+        public HazardActorPresenceTriggerMode RetireTrigger;
+        public float RetireDurationSec;
+    }
+
     public struct HazardActorRuntimeBaselineComponent : IComponentData
     {
         public HazardActorPresenceStateId InitialPresenceState;

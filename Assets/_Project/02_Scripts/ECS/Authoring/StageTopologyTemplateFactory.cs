@@ -184,6 +184,13 @@ namespace SweepNDodge.DotsBullets
                     IsEnabled = actorEnabled,
                     IsSuppressed = actorSuppressed,
                 });
+                em.AddComponentData(actorEntity, new HazardActorPresencePolicyComponent
+                {
+                    ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                    ActivationDurationSec = 0f,
+                    RetireTrigger = HazardActorPresenceTriggerMode.None,
+                    RetireDurationSec = 0f,
+                });
                 em.SetComponentData(actorEntity, new HazardActorRuntimeBaselineComponent
                 {
                     InitialPresenceState = actorAuthoring.InitialPresenceState,

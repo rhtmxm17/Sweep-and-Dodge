@@ -119,6 +119,122 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardActorPresence_DefaultImmediatePolicy_TransitionsHiddenToActive()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_DefaultImmediate", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7000);
+            var actor = CreateActor(em, source, actorId: 7000);
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Active));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void HazardActorPresence_ActivationDuration_KeepsActorInActivatingUntilElapsed()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_ActivationDuration", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.25f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7001);
+            var actor = CreateActor(em, source, actorId: 7001);
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                ActivationDurationSec = 0.5f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
+
+            var system = world.GetOrCreateSystem<HazardActorPresenceSystem>();
+
+            system.Update(world.Unmanaged);
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Activating));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+
+            system.Update(world.Unmanaged);
+            runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Activating));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0.25f).Within(0.0001f));
+
+            system.Update(world.Unmanaged);
+            runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Active));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void HazardActorPresence_SourceDepletedRetireTrigger_TransitionsActiveToHiddenThroughRetiring()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_SourceDepletedRetire", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.5f);
+
+            var source = CreateSourceWithDirector(
+                em,
+                7002,
+                RunDirectorSourceStateId.Baseline,
+                0f,
+                thresholdDepleted: 5,
+                collectedCount: 5);
+            var actor = CreateActor(em, source, actorId: 7002);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.SourceDepleted,
+                RetireDurationSec = 0.5f,
+            });
+
+            var system = world.GetOrCreateSystem<HazardActorPresenceSystem>();
+
+            system.Update(world.Unmanaged);
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Retiring));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+
+            system.Update(world.Unmanaged);
+            runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void HazardActorPresence_SourceAvailableActivation_DoesNotFireWhenSourceIsMissing()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_SourceAvailableMissingSource", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var actor = CreateActor(em, Entity.Null, actorId: 7003);
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.SourceAvailable,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
         public void HazardEmitterEmitBuild_AlwaysCycle_ZeroTelegraph_AppendsHazardEmitterDiscreteRequest()
         {
             using var world = CreateDefaultTestWorld("HazardEmitter_ZeroTelegraph", out _);
@@ -801,6 +917,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorComponent),
                 typeof(HazardActorAppliedConfigBaselineComponent),
                 typeof(HazardActorAppliedConfigComponent),
+                typeof(HazardActorPresencePolicyComponent),
                 typeof(HazardActorRuntimeBaselineComponent),
                 typeof(HazardActorRuntimeStateComponent),
                 typeof(HazardActorPatternSelectorStateComponent));
@@ -819,6 +936,13 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 IsEnabled = 1,
                 IsSuppressed = 0,
+            });
+            em.SetComponentData(entity, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
             });
             em.SetComponentData(entity, new HazardActorRuntimeBaselineComponent
             {

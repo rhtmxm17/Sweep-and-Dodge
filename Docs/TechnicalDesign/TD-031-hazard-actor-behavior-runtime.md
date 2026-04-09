@@ -104,6 +104,16 @@
 - 첫 설계 질문:
   - 어떤 owner가 `Hidden -> Activating -> Active -> Retiring`를 전이시키는가
   - activation gate와 presence gate를 어디서 결합하는가
+- 현재 구현 상태:
+  - `HazardActorPresenceSystem`이 presence progression owner다.
+  - `HazardActorPresencePolicyComponent`
+    - `ActivationTrigger`
+    - `ActivationDurationSec`
+    - `RetireTrigger`
+    - `RetireDurationSec`
+    를 사용해 `Hidden / Activating / Active / Retiring` 전이를 수행한다.
+  - 현재 기본 seed는 `Immediate activation / no retire`다.
+  - `PresenceState`는 아직 activation truth에 포함되지 않는다. 이 결합은 `HB-1B` 범위다.
 
 ### 5.2 PatternSelector runtime
 - actor가 실제로 emitter slot을 선택하도록 만든다.
@@ -139,6 +149,11 @@
 ### 7.1 HB-1. Presence runtime owner
 - `PresenceState`를 실제 runtime progression으로 승격
 - current actor gate와의 결합 위치 설계
+- 구현 상태:
+  - `HB-1A. Presence runtime owner` 완료
+  - 남은 하위 단위:
+    - `HB-1B. Presence gate integration`
+    - `HB-1C. Blueprint trigger seed`
 
 ### 7.2 HB-2. PatternSet / selector runtime seam
 - selector가 emitter-slot `1쌍`을 실제로 선택
