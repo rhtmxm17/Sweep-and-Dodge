@@ -18,7 +18,7 @@
 ## 1. 문제 정의
 - 현재 runtime은 `HazardActor`를 hierarchy와 activation gate의 상위 owner로만 인식한다.
 - 그러나 actor의 플레이어 경험은 아직 기존 emitter compatibility path에 머물러 있다.
-  - `PresenceState`는 reset-only
+  - `PresenceState`는 actor activation truth에 결합됐지만, room-entry activation과 상위 presentation은 아직 없다.
   - `PatternSelector`는 invalid sentinel 상태만 가짐
   - emitter는 사실상 단일 pattern always-cycle path를 유지
 - 이 상태로 기능을 계속 추가하면, actor 도입의 목적이었던 "개체처럼 읽히는 위험 주체"가 다시 emitter 수준의 단순 발사 장치로 축소된다.
@@ -86,17 +86,19 @@
   - `BaseWeight`
   - `AvailabilityFlags`
 
-### 4.5 HA-4 compatibility boundary
-- 현재 runtime은 actor-aware지만 actor-behavior-aware는 아니다.
+### 4.5 Current compatibility boundary
+- 현재 runtime은 actor-aware seed를 넘어, actor behavior의 첫 gate까지 결합된 상태다.
 - 현재 activation truth에 포함되는 것은:
   - `HazardActorAppliedConfigComponent.IsEnabled`
   - `HazardActorAppliedConfigComponent.IsSuppressed`
+  - `PresenceState == Active`
   - emitter applied config
   - existing source/player gate
 - 아직 activation truth에 포함되지 않는 것은:
-  - `PresenceState`
   - selector invalid sentinel state
   - pattern-slot execution seam
+  - room-entry activation trigger
+  - presence presentation hook
 
 ## 5. 이번 확장 범위의 핵심 축
 ### 5.1 Presence runtime
@@ -113,7 +115,8 @@
     - `RetireDurationSec`
     를 사용해 `Hidden / Activating / Active / Retiring` 전이를 수행한다.
   - 현재 기본 seed는 `Immediate activation / no retire`다.
-  - `PresenceState`는 아직 activation truth에 포함되지 않는다. 이 결합은 `HB-1B` 범위다.
+  - `HB-1B` 이후 `PresenceState != Active`는 actor activation truth를 차단한다.
+  - actor `disabled/suppressed`는 presence system이 `Hidden`으로 clamp하고 selector invalid sentinel을 강제한다.
 
 ### 5.2 PatternSelector runtime
 - actor가 실제로 emitter slot을 선택하도록 만든다.
@@ -151,8 +154,8 @@
 - current actor gate와의 결합 위치 설계
 - 구현 상태:
   - `HB-1A. Presence runtime owner` 완료
+  - `HB-1B. Presence gate integration` 완료
   - 남은 하위 단위:
-    - `HB-1B. Presence gate integration`
     - `HB-1C. Blueprint trigger seed`
 
 ### 7.2 HB-2. PatternSet / selector runtime seam
@@ -172,13 +175,12 @@
   - `TD-030`과 ownership 충돌 없음
   - `TD-028` emitter local contract와 역할 충돌 없음
 - 구현 기준:
-  - current actor-aware compatibility path가 유지된다
+  - current actor-aware single-pattern path가 presence gate 통합 이후에도 유지된다
   - presence/selector 도입 후에도 compile, console error 0, EditMode, PlayMode smoke를 통과한다
 - gameplay 기준:
   - actor가 플레이어 입장에서 "발사 장치"보다 "행동하는 위험 개체"로 읽히는 최소 vertical slice를 제공한다
 
 ## 9. 오픈 이슈
-- `PresenceState`를 coordinator가 해석할지, 별도 `HazardActorPresenceSystem`이 소유할지
 - selector가 slot을 매 frame 재평가할지, state transition 시점에만 갱신할지
 - state escalation을 selector policy 변경으로 볼지, actor-level presentation + slot-set swap으로 볼지
 - 이후 motion/path 축을 actor behavior TD에 포함할지, 별도 TD로 분리할지

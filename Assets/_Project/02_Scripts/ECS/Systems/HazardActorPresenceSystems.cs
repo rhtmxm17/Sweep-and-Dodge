@@ -40,24 +40,31 @@ namespace SweepNDodge.DotsBullets
             sourceLookup.Update(ref state);
 
             var em = state.EntityManager;
-            foreach (var (actor, applied, policy, runtime) in SystemAPI.Query<
+            foreach (var (actor, applied, policy, runtime, actorEntity) in SystemAPI.Query<
                 RefRO<HazardActorComponent>,
                 RefRO<HazardActorAppliedConfigComponent>,
                 RefRO<HazardActorPresencePolicyComponent>,
-                RefRW<HazardActorRuntimeStateComponent>>())
+                RefRW<HazardActorRuntimeStateComponent>>().WithEntityAccess())
             {
                 ref readonly var actorConfig = ref actor.ValueRO;
                 ref readonly var appliedConfig = ref applied.ValueRO;
                 ref readonly var presencePolicy = ref policy.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
 
+                if (appliedConfig.IsEnabled == 0 || appliedConfig.IsSuppressed != 0)
+                {
+                    runtimeState.PresenceState = HazardActorPresenceStateId.Hidden;
+                    runtimeState.StateElapsedSec = 0f;
+                    ResetSelectorState(em, actorEntity);
+                    continue;
+                }
+
                 switch (runtimeState.PresenceState)
                 {
                     case HazardActorPresenceStateId.Hidden:
                     {
                         runtimeState.StateElapsedSec = 0f;
-                        if (appliedConfig.IsEnabled == 0 || appliedConfig.IsSuppressed != 0)
-                            break;
+                        ResetSelectorState(em, actorEntity);
 
                         if (!IsPresenceTriggerSatisfied(
                                 presencePolicy.ActivationTrigger,
@@ -81,6 +88,7 @@ namespace SweepNDodge.DotsBullets
 
                     case HazardActorPresenceStateId.Activating:
                     {
+                        ResetSelectorState(em, actorEntity);
                         runtimeState.StateElapsedSec = math.max(0f, runtimeState.StateElapsedSec + deltaTime);
                         if (runtimeState.StateElapsedSec >= math.max(0f, presencePolicy.ActivationDurationSec))
                         {
@@ -116,6 +124,7 @@ namespace SweepNDodge.DotsBullets
 
                     case HazardActorPresenceStateId.Retiring:
                     {
+                        ResetSelectorState(em, actorEntity);
                         runtimeState.StateElapsedSec = math.max(0f, runtimeState.StateElapsedSec + deltaTime);
                         if (runtimeState.StateElapsedSec >= math.max(0f, presencePolicy.RetireDurationSec))
                         {
@@ -129,9 +138,24 @@ namespace SweepNDodge.DotsBullets
                     default:
                         runtimeState.PresenceState = HazardActorPresenceStateId.Hidden;
                         runtimeState.StateElapsedSec = 0f;
+                        ResetSelectorState(em, actorEntity);
                         break;
                 }
             }
+        }
+
+        private static void ResetSelectorState(EntityManager em, Entity actorEntity)
+        {
+            if (actorEntity == Entity.Null || !em.Exists(actorEntity) || !em.HasComponent<HazardActorPatternSelectorStateComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = -1,
+                CurrentPatternSlotId = -1,
+                LastPatternSlotId = -1,
+                SelectionSequence = 0u,
+            });
         }
 
         private static bool IsPresenceTriggerSatisfied(

@@ -183,6 +183,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorComponent),
                 typeof(HazardActorAppliedConfigBaselineComponent),
                 typeof(HazardActorAppliedConfigComponent),
+                typeof(HazardActorPresencePolicyComponent),
                 typeof(HazardActorRuntimeBaselineComponent),
                 typeof(HazardActorRuntimeStateComponent),
                 typeof(HazardActorPatternSelectorStateComponent));
@@ -201,13 +202,20 @@ namespace SweepNDodge.DotsBullets.Tests
                 IsEnabled = 1,
                 IsSuppressed = 0,
             });
+            em.SetComponentData(entity, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
             em.SetComponentData(entity, new HazardActorRuntimeBaselineComponent
             {
-                InitialPresenceState = HazardActorPresenceStateId.Hidden,
+                InitialPresenceState = HazardActorPresenceStateId.Active,
             });
             em.SetComponentData(entity, new HazardActorRuntimeStateComponent
             {
-                PresenceState = HazardActorPresenceStateId.Hidden,
+                PresenceState = HazardActorPresenceStateId.Active,
                 StateElapsedSec = 0f,
             });
             em.SetComponentData(entity, new HazardActorPatternSelectorStateComponent

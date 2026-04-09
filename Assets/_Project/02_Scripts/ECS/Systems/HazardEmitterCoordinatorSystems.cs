@@ -38,6 +38,7 @@ namespace SweepNDodge.DotsBullets
             var progressGateLookup = SystemAPI.GetComponentLookup<HazardEmitterSourceProgressGateComponent>(true);
             var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
             var actorAppliedLookup = SystemAPI.GetComponentLookup<HazardActorAppliedConfigComponent>(true);
+            var actorRuntimeLookup = SystemAPI.GetComponentLookup<HazardActorRuntimeStateComponent>(true);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var directorLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
             var playerSyncLookup = SystemAPI.GetComponentLookup<PlayerGoSyncComponent>(true);
@@ -49,6 +50,7 @@ namespace SweepNDodge.DotsBullets
             progressGateLookup.Update(ref state);
             actorLookup.Update(ref state);
             actorAppliedLookup.Update(ref state);
+            actorRuntimeLookup.Update(ref state);
             sourceLookup.Update(ref state);
             directorLookup.Update(ref state);
             playerSyncLookup.Update(ref state);
@@ -96,6 +98,23 @@ namespace SweepNDodge.DotsBullets
                             reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.DisabledByActorConfig;
                         if (actorApplied.IsSuppressed != 0)
                             reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.SuppressedByActorConfig;
+                    }
+
+                    if (actorRuntimeLookup.HasComponent(emitterConfig.ActorEntity))
+                    {
+                        var actorRuntime = actorRuntimeLookup[emitterConfig.ActorEntity];
+                        switch (actorRuntime.PresenceState)
+                        {
+                            case HazardActorPresenceStateId.Hidden:
+                                reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceHidden;
+                                break;
+                            case HazardActorPresenceStateId.Activating:
+                                reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceActivating;
+                                break;
+                            case HazardActorPresenceStateId.Retiring:
+                                reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceRetiring;
+                                break;
+                        }
                     }
 
                     sourceEntity = actorLookup[emitterConfig.ActorEntity].SourceEntity;

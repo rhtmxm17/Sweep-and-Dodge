@@ -454,9 +454,9 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void HazardEmitterCoordinator_HiddenPresenceState_DoesNotBlockActivation()
+        public void HazardEmitterCoordinator_HiddenPresenceState_BlocksActivation()
         {
-            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_HiddenPresenceCompat", out _);
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_HiddenPresenceBlocked", out _);
             var em = world.EntityManager;
             InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
 
@@ -476,6 +476,102 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 PresenceState = HazardActorPresenceStateId.Hidden,
                 StateElapsedSec = 5f,
+            });
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceHidden, Is.Not.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_ActivatingPresenceState_BlocksActivation()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_ActivatingPresenceBlocked", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7053);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7053,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Activating,
+                StateElapsedSec = 0.1f,
+            });
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceActivating, Is.Not.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_RetiringPresenceState_BlocksActivation()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_RetiringPresenceBlocked", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7054);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7054,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Retiring,
+                StateElapsedSec = 0.1f,
+            });
+
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceRetiring, Is.Not.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterCoordinator_ActivePresenceState_AllowsExistingGatePath()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_Coordinator_ActivePresenceAllows", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7055);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7055,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
             });
 
             world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
@@ -715,6 +811,121 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
         }
 
+        [Test]
+        public void HazardActorPresence_DisabledActor_ClampsToHiddenAndResetsSelector()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_DisabledActorClamp", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7092);
+            var actor = CreateActor(em, source, actorId: 7092);
+            em.SetComponentData(actor, new HazardActorAppliedConfigComponent
+            {
+                IsEnabled = 0,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 3f,
+            });
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = 4,
+                CurrentPatternSlotId = 5,
+                LastPatternSlotId = 6,
+                SelectionSequence = 7u,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardActorPresence_NonActiveState_ResetsSelector()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_NonActiveSelectorReset", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.1f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7093);
+            var actor = CreateActor(em, source, actorId: 7093);
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                ActivationDurationSec = 1f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = 1,
+                CurrentPatternSlotId = 2,
+                LastPatternSlotId = 3,
+                SelectionSequence = 4u,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Activating));
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardEmitterEmitBuild_HiddenActorPresence_StaysDormantAndSkipsAppend()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_HiddenPresence", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7094);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7094,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Hidden,
+                StateElapsedSec = 0f,
+            });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceHidden, Is.Not.EqualTo(0u));
+            Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(0));
+
+            var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+            Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
         private static HazardEmitterEmissionProfileSO CreateEmissionProfile()
         {
             var bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -830,6 +1041,11 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, LocalTransform.FromPosition(position));
             em.SetComponentData(entity, new LocalToWorld { Value = float4x4.Translate(position) });
             var actor = CreateActor(em, source, actorId: bulletTypeKey);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
             em.SetComponentData(entity, new HazardEmitterComponent
             {
                 EmitterId = 1,

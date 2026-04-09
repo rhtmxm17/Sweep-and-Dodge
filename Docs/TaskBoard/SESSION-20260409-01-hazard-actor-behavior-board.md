@@ -23,18 +23,18 @@
 
 ## Inherited Context
 - `TD-030` 기준 `Source -> HazardActor -> HazardEmitter` hierarchy, binding, authoring/baker, stage apply/reset은 구현 완료 상태다.
-- current runtime은 actor-aware compatibility까지만 완료됐다.
-  - actor applied config는 activation truth에 포함
-  - `PresenceState`와 selector state는 아직 reset-only/informational
+- current runtime은 actor-aware behavior seed까지 완료됐다.
+  - actor applied config와 `PresenceState`는 activation truth에 포함
+  - selector state는 아직 invalid sentinel cleanup/invariant만 가진다.
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- `HB-1A. Presence runtime owner` 완료
-- 다음 구현 단위는 `HB-1B. Presence gate integration`
+- `HB-1B. Presence gate integration` 완료
+- 다음 구현 단위는 `HB-1C. Blueprint trigger seed`
 
 ## Next
-- `HB-1B. Presence gate integration` 실행 플랜을 수립한다.
-- 이후 `HB-1C. Blueprint trigger seed`로 room-entry activation seed를 붙인다.
+- `HB-1C. Blueprint trigger seed` 실행 플랜을 수립한다.
+- room-entry activation seed와 presence presentation hook seam을 닫는다.
 
 ## Blocked
 - 없음
@@ -61,8 +61,13 @@
   - actor presence는 이제 reset-only가 아니라 실제 runtime progression state로 동작한다.
   - 기본 policy는 `Immediate activation / no retire`로 seed되고, current emitter compatibility gate는 유지된다.
   - 검증 결과: console blocking error 없음, EditMode `485/485`, PlayMode `45/45`.
+- [x] D6. `HB-1B. Presence gate integration` 구현을 완료했다.
+  - `PresenceState != Active`가 actor activation truth에 결합됐다.
+  - actor `disabled/suppressed`는 presence system이 `Hidden`으로 clamp하고, non-`Active` actor는 selector invalid sentinel을 유지한다.
+  - coordinator는 `ActorPresenceHidden`, `ActorPresenceActivating`, `ActorPresenceRetiring` reason을 사용해 차단한다.
+  - 검증 결과: console blocking error 없음, EditMode `491/491`, PlayMode `45/45`.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `PresenceState`를 activation truth에 결합하는 `HB-1B` 범위를 먼저 논의한다.
+  - `HB-1C. Blueprint trigger seed` 범위를 room-entry activation 기준으로 닫는다.
