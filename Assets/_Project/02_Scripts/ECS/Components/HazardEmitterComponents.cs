@@ -200,6 +200,11 @@ namespace SweepNDodge.DotsBullets
         public int AppliedPatternSlotId;
     }
 
+    public struct HazardEmitterCycleSignalComponent : IComponentData
+    {
+        public uint CompletedVersion;
+    }
+
     [Flags]
     public enum HazardEmitterSuppressionReasonFlags : uint
     {

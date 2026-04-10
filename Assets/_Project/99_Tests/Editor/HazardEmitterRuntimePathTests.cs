@@ -26,7 +26,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             try
             {
-                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var sourceAuthoring, out var error);
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var sourceAuthoring, out _, out var error);
                 Assert.That(ok, Is.False);
                 Assert.That(sourceAuthoring, Is.Null);
                 Assert.That(error, Does.Contain("parent SourceRuntimeTemplateAuthoringBase"));
@@ -48,7 +48,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             try
             {
-                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var owner, out var error);
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var owner, out _, out var error);
                 Assert.That(ok, Is.True);
                 Assert.That(owner, Is.EqualTo(sourceAuthoring));
                 Assert.That(error, Is.Empty);
@@ -71,7 +71,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             try
             {
-                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var owner, out var error);
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var owner, out _, out var error);
                 Assert.That(ok, Is.False);
                 Assert.That(owner, Is.EqualTo(root.GetComponent<SourceRuntimeTemplateAuthoring>()));
                 Assert.That(error, Does.Contain("ActivationDurationSec >= 0"));
@@ -79,13 +79,182 @@ namespace SweepNDodge.DotsBullets.Tests
                 authoring.ActivationDurationSec = 0f;
                 authoring.RetireDurationSec = -0.25f;
 
-                ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out owner, out error);
+                ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out owner, out _, out error);
                 Assert.That(ok, Is.False);
                 Assert.That(owner, Is.EqualTo(root.GetComponent<SourceRuntimeTemplateAuthoring>()));
                 Assert.That(error, Does.Contain("RetireDurationSec >= 0"));
             }
             finally
             {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void HazardActorAuthoringValidation_ExplicitPhasePolicies_BuildsSelectorSeed()
+        {
+            var root = new GameObject("source_root");
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var emitterGo = new GameObject("hazard_emitter");
+            emitterGo.transform.SetParent(actorGo.transform);
+            var actor = actorGo.AddComponent<HazardActorAuthoring>();
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+
+            emitter.EmitterId = 11;
+            emitter.Slots = CreatePatternSlots(
+                (1, telegraph, emission, 1f, 0u),
+                (2, telegraph, emission, 1f, 0u),
+                (3, telegraph, emission, 1f, 0u));
+            actor.InitialPhaseId = 2;
+            actor.PhaseSelectorPolicies = new[]
+            {
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[]
+                    {
+                        new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 11, PatternSlotId = 1 },
+                        new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 11, PatternSlotId = 3 },
+                    },
+                },
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[]
+                    {
+                        new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 11, PatternSlotId = 1 },
+                        new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 11, PatternSlotId = 2 },
+                    },
+                },
+            };
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(actor, out _, out var seed, out var error);
+                Assert.That(ok, Is.True);
+                Assert.That(error, Is.Empty);
+                Assert.That(seed.InitialPhaseId, Is.EqualTo(2));
+                Assert.That(seed.Policies.Length, Is.EqualTo(2));
+                Assert.That(seed.Policies[0].PhaseId, Is.EqualTo(1));
+                Assert.That(seed.Policies[1].PhaseId, Is.EqualTo(2));
+                Assert.That(seed.Candidates.Length, Is.EqualTo(4));
+                Assert.That(seed.Candidates[0].PhaseId, Is.EqualTo(1));
+                Assert.That(seed.Candidates[0].OrderIndex, Is.EqualTo(0));
+                Assert.That(seed.Candidates[1].PatternSlotId, Is.EqualTo(2));
+                Assert.That(seed.Candidates[2].PhaseId, Is.EqualTo(2));
+                Assert.That(seed.Candidates[3].PatternSlotId, Is.EqualTo(3));
+            }
+            finally
+            {
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void HazardActorAuthoringValidation_ExplicitPhasePolicies_RejectsDuplicatePhaseId()
+        {
+            var root = new GameObject("source_root");
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var emitterGo = new GameObject("hazard_emitter");
+            emitterGo.transform.SetParent(actorGo.transform);
+            var actor = actorGo.AddComponent<HazardActorAuthoring>();
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+
+            emitter.EmitterId = 1;
+            emitter.Slots = CreatePatternSlots((1, telegraph, emission, 1f, 0u));
+            actor.PhaseSelectorPolicies = new[]
+            {
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 1, PatternSlotId = 1 } },
+                },
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 1, PatternSlotId = 1 } },
+                },
+            };
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(actor, out _, out _, out var error);
+                Assert.That(ok, Is.False);
+                Assert.That(error, Does.Contain("duplicates PhaseId 1"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void HazardActorAuthoringValidation_WithoutExplicitPolicy_AutoSeedsCompatibilitySelector()
+        {
+            var root = new GameObject("source_root");
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var actor = actorGo.AddComponent<HazardActorAuthoring>();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+
+            try
+            {
+                var emitterLow = new GameObject("emitter_low");
+                emitterLow.transform.SetParent(actorGo.transform);
+                var emitterLowAuthoring = emitterLow.AddComponent<HazardEmitterAuthoring>();
+                emitterLowAuthoring.EmitterId = 3;
+                emitterLowAuthoring.Slots = CreatePatternSlots(
+                    (8, telegraph, emission, 1f, 0u),
+                    (2, telegraph, emission, 1f, 0u));
+
+                var emitterHigh = new GameObject("emitter_high");
+                emitterHigh.transform.SetParent(actorGo.transform);
+                var emitterHighAuthoring = emitterHigh.AddComponent<HazardEmitterAuthoring>();
+                emitterHighAuthoring.EmitterId = 9;
+                emitterHighAuthoring.Slots = CreatePatternSlots(
+                    (7, telegraph, emission, 1f, 0u),
+                    (4, telegraph, emission, 1f, 0u));
+
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(actor, out _, out var seed, out var error);
+                Assert.That(ok, Is.True);
+                Assert.That(error, Is.Empty);
+                Assert.That(seed.InitialPhaseId, Is.EqualTo(1));
+                Assert.That(seed.Policies.Length, Is.EqualTo(1));
+                Assert.That(seed.Policies[0].SelectionMode, Is.EqualTo(HazardActorSelectionModeId.OrderedPriority));
+                Assert.That(seed.Candidates.Length, Is.EqualTo(2));
+                Assert.That(seed.Candidates[0].EmitterId, Is.EqualTo(3));
+                Assert.That(seed.Candidates[0].PatternSlotId, Is.EqualTo(2));
+                Assert.That(seed.Candidates[1].EmitterId, Is.EqualTo(9));
+                Assert.That(seed.Candidates[1].PatternSlotId, Is.EqualTo(4));
+
+                Object.DestroyImmediate(emitterHigh);
+                Object.DestroyImmediate(emitterLow);
+            }
+            finally
+            {
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
                 Object.DestroyImmediate(root);
             }
         }
@@ -1393,6 +1562,269 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardActorPatternSelector_OrderedCycle_NaturalCompletion_AdvancesNextCandidate()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_OrderedCycle_Advance", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 709451);
+            var actor = CreateActor(em, source, actorId: 709451);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 709451,
+                emitterId: 5,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var nextEmitter = CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 709451,
+                emitterId: 9,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: new float3(1f, 0f, 0f),
+                localOffset: float3.zero);
+
+            SetActorPhaseSelectorPolicies(
+                em,
+                actor,
+                1,
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 0,
+                    EmitterId = 5,
+                    PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 1,
+                    EmitterId = 9,
+                    PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
+                });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            var selectorSystem = world.GetOrCreateSystem<HazardActorPatternSelectorSystem>();
+            selectorSystem.Update(world.Unmanaged);
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(5));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(1u));
+
+            em.SetComponentData(FindActorEmitterById(em, actor, 5), new HazardEmitterCycleSignalComponent
+            {
+                CompletedVersion = 1u,
+            });
+
+            selectorSystem.Update(world.Unmanaged);
+            selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(9));
+            Assert.That(selector.CurrentCandidateOrder, Is.EqualTo(1));
+            Assert.That(selector.LastConsumedCycleVersion, Is.EqualTo(1u));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(2u));
+            Assert.That(nextEmitter, Is.Not.EqualTo(Entity.Null));
+        }
+
+        [Test]
+        public void HazardActorPatternSelector_OrderedCycle_PhaseChange_FreshSelectsPhaseEntry()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_OrderedCycle_PhaseChange", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 709452);
+            var actor = CreateActor(em, source, actorId: 709452);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            var emitter = CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 709452,
+                emitterId: 12,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            ReplaceEmitterPatternSlots(
+                em,
+                emitter,
+                CreateExecutionSlot(em, emitter, 1, telegraphProfileRefId: 1, emissionProfileRefId: 1, telegraphDurationSec: 0f, bulletTypeKey: 709452, cooldownSec: 1f, baseAngleDeg: 0f),
+                CreateExecutionSlot(em, emitter, 2, telegraphProfileRefId: 2, emissionProfileRefId: 2, telegraphDurationSec: 0f, bulletTypeKey: 709453, cooldownSec: 1f, baseAngleDeg: 15f),
+                CreateExecutionSlot(em, emitter, 3, telegraphProfileRefId: 3, emissionProfileRefId: 3, telegraphDurationSec: 0f, bulletTypeKey: 709454, cooldownSec: 1f, baseAngleDeg: 30f));
+            SetActorPhaseSelectorPolicies(
+                em,
+                actor,
+                1,
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 0,
+                    EmitterId = 12,
+                    PatternSlotId = 1,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 1,
+                    EmitterId = 12,
+                    PatternSlotId = 2,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 2,
+                    OrderIndex = 0,
+                    EmitterId = 12,
+                    PatternSlotId = 1,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 2,
+                    OrderIndex = 1,
+                    EmitterId = 12,
+                    PatternSlotId = 3,
+                });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            var selectorSystem = world.GetOrCreateSystem<HazardActorPatternSelectorSystem>();
+            selectorSystem.Update(world.Unmanaged);
+            em.SetComponentData(emitter, new HazardEmitterCycleSignalComponent { CompletedVersion = 1u });
+            selectorSystem.Update(world.Unmanaged);
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(2));
+
+            em.SetComponentData(actor, new HazardActorBehaviorPhaseStateComponent
+            {
+                CurrentPhaseId = 2,
+                PreviousPhaseId = 1,
+                PhaseVersion = 1u,
+            });
+
+            selectorSystem.Update(world.Unmanaged);
+            selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(12));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(1));
+            Assert.That(selector.CurrentCandidateOrder, Is.EqualTo(0));
+            Assert.That(selector.LastResolvedPhaseVersion, Is.EqualTo(1u));
+        }
+
+        [Test]
+        public void HazardActorPatternSelector_PhaseChange_SameResult_DoesNotIncrementSequence()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_PhaseChange_SameResult", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 709453);
+            var actor = CreateActor(em, source, actorId: 709453);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 709453,
+                emitterId: 4,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+
+            SetActorPhaseSelectorPolicies(
+                em,
+                actor,
+                1,
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 0,
+                    EmitterId = 4,
+                    PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 2,
+                    OrderIndex = 0,
+                    EmitterId = 4,
+                    PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
+                });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            var selectorSystem = world.GetOrCreateSystem<HazardActorPatternSelectorSystem>();
+            selectorSystem.Update(world.Unmanaged);
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.SelectionSequence, Is.EqualTo(1u));
+
+            em.SetComponentData(actor, new HazardActorBehaviorPhaseStateComponent
+            {
+                CurrentPhaseId = 2,
+                PreviousPhaseId = 1,
+                PhaseVersion = 1u,
+            });
+
+            selectorSystem.Update(world.Unmanaged);
+            selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(4));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(1u));
+            Assert.That(selector.LastResolvedPhaseVersion, Is.EqualTo(1u));
+        }
+
+        [Test]
         public void HazardEmitterEmitBuild_HiddenActorPresence_StaysDormantAndSkipsAppend()
         {
             using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_HiddenPresence", out _);
@@ -1606,6 +2038,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
             var selectedPattern = em.GetComponentData<HazardEmitterSelectedPatternRuntimeComponent>(emitter);
             var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+            var cycleSignal = em.GetComponentData<HazardEmitterCycleSignalComponent>(emitter);
 
             Assert.That(telegraph.ProfileId, Is.EqualTo(2));
             Assert.That(telegraph.TelegraphDurationSec, Is.EqualTo(0.6f).Within(0.0001f));
@@ -1616,7 +2049,56 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(selectedPattern.AppliedPatternSlotId, Is.EqualTo(2));
             Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
             Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+            Assert.That(cycleSignal.CompletedVersion, Is.EqualTo(0u));
             Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void HazardEmitterEmitBuild_NaturalCompletion_IncrementsCycleSignalOnlyOnCompletion()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_CycleSignal", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.1f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 709484);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 709484,
+                telegraphDurationSec: 0f,
+                cooldownSec: 0f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            var coordinatorSystem = world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>();
+            var selectorSystem = world.GetOrCreateSystem<HazardActorPatternSelectorSystem>();
+            var emitSystem = world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>();
+
+            world.SetTime(new TimeData(0.1d, 0.1f));
+            coordinatorSystem.Update(world.Unmanaged);
+            selectorSystem.Update(world.Unmanaged);
+            emitSystem.Update(world.Unmanaged);
+
+            var cycleSignal = em.GetComponentData<HazardEmitterCycleSignalComponent>(emitter);
+            Assert.That(cycleSignal.CompletedVersion, Is.EqualTo(0u));
+
+            world.SetTime(new TimeData(0.2d, 0.1f));
+            coordinatorSystem.Update(world.Unmanaged);
+            selectorSystem.Update(world.Unmanaged);
+            emitSystem.Update(world.Unmanaged);
+
+            cycleSignal = em.GetComponentData<HazardEmitterCycleSignalComponent>(emitter);
+            var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+            Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+            Assert.That(cycleSignal.CompletedVersion, Is.EqualTo(1u));
         }
 
         [Test]
@@ -1971,6 +2453,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardEmitterEmissionProfileComponent),
                 typeof(HazardEmitterRuntimeStateComponent),
                 typeof(HazardEmitterSelectedPatternRuntimeComponent),
+                typeof(HazardEmitterCycleSignalComponent),
                 typeof(HazardEmitterCoordinatorStateComponent));
 
             em.SetComponentData(entity, LocalTransform.FromPosition(position));
@@ -2051,6 +2534,10 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
             });
+            em.SetComponentData(entity, new HazardEmitterCycleSignalComponent
+            {
+                CompletedVersion = 0u,
+            });
             em.SetComponentData(entity, new HazardEmitterCoordinatorStateComponent
             {
                 ActivationAllowed = 0,
@@ -2074,6 +2561,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 EmitterEntity = entity,
                 EmitterId = emitterId,
             });
+            AddOrUpdateCompatibilitySelectorCandidate(
+                em,
+                actor,
+                emitterId,
+                HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId);
             return entity;
         }
 
@@ -2085,7 +2577,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorAppliedConfigComponent),
                 typeof(HazardActorPresencePolicyComponent),
                 typeof(HazardActorRuntimeBaselineComponent),
+                typeof(HazardActorBehaviorPhaseBaselineComponent),
                 typeof(HazardActorRuntimeStateComponent),
+                typeof(HazardActorBehaviorPhaseStateComponent),
                 typeof(HazardActorPatternSelectorStateComponent),
                 typeof(HazardActorPresencePresentationSignalComponent));
 
@@ -2115,10 +2609,20 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 InitialPresenceState = HazardActorPresenceStateId.Hidden,
             });
+            em.SetComponentData(entity, new HazardActorBehaviorPhaseBaselineComponent
+            {
+                InitialPhaseId = 1,
+            });
             em.SetComponentData(entity, new HazardActorRuntimeStateComponent
             {
                 PresenceState = HazardActorPresenceStateId.Hidden,
                 StateElapsedSec = 0f,
+            });
+            em.SetComponentData(entity, new HazardActorBehaviorPhaseStateComponent
+            {
+                CurrentPhaseId = 1,
+                PreviousPhaseId = 1,
+                PhaseVersion = 0u,
             });
             em.SetComponentData(entity, new HazardActorPatternSelectorStateComponent
             {
@@ -2126,6 +2630,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 CurrentPatternSlotId = -1,
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
+                CurrentCandidateOrder = -1,
+                LastResolvedPhaseVersion = 0u,
+                LastConsumedCycleVersion = 0u,
             });
             em.SetComponentData(entity, new HazardActorPresencePresentationSignalComponent
             {
@@ -2133,7 +2640,61 @@ namespace SweepNDodge.DotsBullets.Tests
                 Cue = HazardActorPresencePresentationCueId.None,
             });
             em.AddBuffer<HazardActorEmitterRefBuffer>(entity);
+            var policies = em.AddBuffer<HazardActorPhaseSelectorPolicyBuffer>(entity);
+            policies.Add(new HazardActorPhaseSelectorPolicyBuffer
+            {
+                PhaseId = 1,
+                SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+            });
+            em.AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(entity);
             return entity;
+        }
+
+        private static void AddOrUpdateCompatibilitySelectorCandidate(
+            EntityManager em,
+            Entity actor,
+            int emitterId,
+            int patternSlotId)
+        {
+            if (!em.HasBuffer<HazardActorPhaseSelectorCandidateBuffer>(actor))
+                return;
+
+            var candidates = em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actor);
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (candidates[i].PhaseId != 1 || candidates[i].EmitterId != emitterId)
+                    continue;
+
+                candidates[i] = new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = candidates[i].OrderIndex,
+                    EmitterId = emitterId,
+                    PatternSlotId = patternSlotId,
+                };
+                return;
+            }
+
+            int insertIndex = candidates.Length;
+            while (insertIndex > 0 && candidates[insertIndex - 1].EmitterId > emitterId)
+            {
+                insertIndex--;
+            }
+
+            candidates.Insert(insertIndex, new HazardActorPhaseSelectorCandidateBuffer
+            {
+                PhaseId = 1,
+                OrderIndex = insertIndex,
+                EmitterId = emitterId,
+                PatternSlotId = patternSlotId,
+            });
+
+            for (int i = insertIndex + 1; i < candidates.Length; i++)
+            {
+                var candidate = candidates[i];
+                candidate.OrderIndex = i;
+                candidates[i] = candidate;
+            }
         }
 
         private static Entity FindActorEmitterById(EntityManager em, Entity actor, int emitterId)
@@ -2146,6 +2707,42 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return Entity.Null;
+        }
+
+        private static void SetActorPhaseSelectorPolicies(
+            EntityManager em,
+            Entity actor,
+            int initialPhaseId,
+            params object[] entries)
+        {
+            em.SetComponentData(actor, new HazardActorBehaviorPhaseBaselineComponent
+            {
+                InitialPhaseId = initialPhaseId,
+            });
+            em.SetComponentData(actor, new HazardActorBehaviorPhaseStateComponent
+            {
+                CurrentPhaseId = initialPhaseId,
+                PreviousPhaseId = initialPhaseId,
+                PhaseVersion = 0u,
+            });
+
+            var policies = em.GetBuffer<HazardActorPhaseSelectorPolicyBuffer>(actor);
+            policies.Clear();
+            var candidates = em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actor);
+            candidates.Clear();
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                switch (entries[i])
+                {
+                    case HazardActorPhaseSelectorPolicyBuffer policy:
+                        policies.Add(policy);
+                        break;
+                    case HazardActorPhaseSelectorCandidateBuffer candidate:
+                        candidates.Add(candidate);
+                        break;
+                }
+            }
         }
 
         private static HazardEmitterPatternSlotAuthoring[] CreatePatternSlots(

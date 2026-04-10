@@ -180,6 +180,9 @@ namespace SweepNDodge.DotsBullets
                 CurrentPatternSlotId = -1,
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
+                CurrentCandidateOrder = -1,
+                LastResolvedPhaseVersion = 0u,
+                LastConsumedCycleVersion = 0u,
             });
         }
 

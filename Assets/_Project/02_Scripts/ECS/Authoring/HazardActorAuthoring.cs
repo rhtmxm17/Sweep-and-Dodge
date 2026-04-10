@@ -4,6 +4,21 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets
 {
+    [System.Serializable]
+    public struct HazardActorPhaseSelectorCandidateAuthoring
+    {
+        [Min(1)] public int EmitterId;
+        [Min(1)] public int PatternSlotId;
+    }
+
+    [System.Serializable]
+    public struct HazardActorPhaseSelectorPolicyAuthoring
+    {
+        [Min(1)] public int PhaseId;
+        public HazardActorSelectionModeId SelectionMode;
+        public HazardActorPhaseSelectorCandidateAuthoring[] Candidates;
+    }
+
     public class HazardActorAuthoring : MonoBehaviour
     {
         [Header("Identity")]
@@ -20,11 +35,15 @@ namespace SweepNDodge.DotsBullets
         public HazardActorPresenceTriggerMode RetireTrigger = HazardActorPresenceTriggerMode.None;
         [Min(0f)] public float RetireDurationSec = 0f;
 
+        [Header("Phase Selector")]
+        [Min(1)] public int InitialPhaseId = 1;
+        public HazardActorPhaseSelectorPolicyAuthoring[] PhaseSelectorPolicies;
+
         private sealed class Baker : Baker<HazardActorAuthoring>
         {
             public override void Bake(HazardActorAuthoring authoring)
             {
-                if (!HazardActorAuthoringValidationUtility.TryValidate(authoring, out var sourceAuthoring, out var error))
+                if (!HazardActorAuthoringValidationUtility.TryValidate(authoring, out var sourceAuthoring, out var compatibilitySeed, out var error))
                 {
                     Debug.LogError($"[HazardActorAuthoring] {error}", authoring);
                     return;
@@ -65,10 +84,20 @@ namespace SweepNDodge.DotsBullets
                 {
                     InitialPresenceState = authoring.InitialPresenceState,
                 });
+                AddComponent(actorEntity, new HazardActorBehaviorPhaseBaselineComponent
+                {
+                    InitialPhaseId = compatibilitySeed.InitialPhaseId,
+                });
                 AddComponent(actorEntity, new HazardActorRuntimeStateComponent
                 {
                     PresenceState = authoring.InitialPresenceState,
                     StateElapsedSec = 0f,
+                });
+                AddComponent(actorEntity, new HazardActorBehaviorPhaseStateComponent
+                {
+                    CurrentPhaseId = compatibilitySeed.InitialPhaseId,
+                    PreviousPhaseId = compatibilitySeed.InitialPhaseId,
+                    PhaseVersion = 0u,
                 });
                 AddComponent(actorEntity, new HazardActorPatternSelectorStateComponent
                 {
@@ -76,12 +105,30 @@ namespace SweepNDodge.DotsBullets
                     CurrentPatternSlotId = -1,
                     LastPatternSlotId = -1,
                     SelectionSequence = 0u,
+                    CurrentCandidateOrder = -1,
+                    LastResolvedPhaseVersion = 0u,
+                    LastConsumedCycleVersion = 0u,
                 });
                 AddComponent(actorEntity, new HazardActorPresencePresentationSignalComponent
                 {
                     Version = 0u,
                     Cue = HazardActorPresencePresentationCueId.None,
                 });
+
+                var selectorPolicies = AddBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity);
+                selectorPolicies.Clear();
+                for (int i = 0; i < compatibilitySeed.Policies.Length; i++)
+                {
+                    selectorPolicies.Add(compatibilitySeed.Policies[i]);
+                }
+
+                var selectorCandidates = AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity);
+                selectorCandidates.Clear();
+                for (int i = 0; i < compatibilitySeed.Candidates.Length; i++)
+                {
+                    selectorCandidates.Add(compatibilitySeed.Candidates[i]);
+                }
+
                 var emitterRefs = AddBuffer<HazardActorEmitterRefBuffer>(actorEntity);
                 emitterRefs.Clear();
                 var emitters = authoring.GetComponentsInChildren<HazardEmitterAuthoring>(includeInactive: true);

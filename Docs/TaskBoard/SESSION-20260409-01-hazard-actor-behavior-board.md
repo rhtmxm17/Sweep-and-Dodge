@@ -30,23 +30,26 @@
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- `HB-3A. Multi-slot authoring and runtime slot execution`의 최종 검증을 닫았다.
+- `HB-3B. Blueprint selector policy and actor phase` 구현과 검증을 닫았다.
 - 현재 상태:
-  - `HazardEmitterAuthoring`는 slots-only shape로 전환됐다.
-  - `HazardEmitterPatternExecutionSlotBuffer`와 `HazardEmitterSelectedPatternRuntimeComponent`를 기준으로 slot-specific execution snapshot seam이 추가됐다.
-  - single-slot emitter에 대해서만 stage emitter-level profile override mirror를 유지하고, multi-slot emitter override는 apply 단계에서 error로 거부한다.
+  - actor는 `HazardActorBehaviorPhaseBaselineComponent` / `HazardActorBehaviorPhaseStateComponent`를 가진다.
+  - actor-owned `HazardActorPhaseSelectorPolicyBuffer` / `HazardActorPhaseSelectorCandidateBuffer`가 selector policy SSOT가 됐다.
+  - selector mode는 `OrderedPriority`와 `OrderedCycle`을 지원한다.
+  - explicit phase-policy가 없는 actor는 compatibility seed(`InitialPhaseId = 1`, `OrderedPriority`, emitterId asc + lowest slot`)를 자동 생성한다.
+  - `StageTopologyTemplateFactory` 경로도 baker와 같은 phase/policy contract로 맞춰 operational/sample scene가 동일한 runtime path를 사용한다.
+  - emitter natural cycle completion signal은 `HazardEmitterCycleSignalComponent.CompletedVersion`으로 publish된다.
 - 검증 결과:
   - Unity MCP `refresh_unity(compile=request)` 이후 compile ready 확인
-  - `EditMode 517/517 passed`
-  - `PlayMode 48/48 passed`
+  - `EditMode 526/526 passed`
+  - `PlayMode 49/49 passed`
   - `result.summary.resultState`는 EditMode / PlayMode 모두 `Failed(Child)`로 보였지만 failed count는 0이었다.
-  - PlayMode suite 실행 중 MCP polling을 섞으면 disposed `NetworkStream` noise가 재유입될 수 있어, 최종 통과 판정은 mid-run polling 없이 재실행한 결과를 기준으로 닫았다.
+  - console `error` 조회에는 여전히 `MCP-FOR-UNITY` disposed `NetworkStream` noise와, 의도적으로 남기는 multi-slot emitter override rejection test log가 섞여 들어올 수 있다.
 - 남은 일:
-  - `HB-3B. Blueprint selector policy and actor phase` 설계/구현 착수
+  - `HB-3C. Escalation signal and progress-threshold transition` 설계/구현 착수
 
 ## Next
-- `HB-3B. Blueprint selector policy and actor phase`의 실행 계약을 문서 기준으로 고정하고 구현에 들어간다.
-- `HB-3C`와 `HB-3D`는 `HB-3B` 결과가 닫힌 뒤 순차로 연다.
+- `HB-3C. Escalation signal and progress-threshold transition`의 실행 계약을 문서 기준으로 고정하고 구현에 들어간다.
+- `HB-3D`는 `HB-3C` 결과가 닫힌 뒤 sample content / verification closeout으로 연다.
 
 ## Blocked
 - 로컬 `SweepNDodge.EditModeTests.csproj`는 기존 누락 파일 `Assets/_Project/99_Tests/EditMode/CarryBinRulesTests.cs` 때문에 단독 빌드가 막혀 있다.
@@ -181,8 +184,31 @@
   - 관찰:
     - PlayMode suite 실행 중 MCP polling을 섞으면 disposed `NetworkStream` noise가 다시 test run에 유입될 수 있었다.
     - mid-run polling 없이 충분히 대기한 뒤 결과만 회수하면 full PlayMode smoke는 안정적으로 통과했다.
+- [x] D17. `HB-3B. Blueprint selector policy and actor phase` 구현을 완료했다.
+  - actor phase runtime state가 추가됐다.
+    - `HazardActorBehaviorPhaseBaselineComponent`
+    - `HazardActorBehaviorPhaseStateComponent`
+  - actor-owned selector policy/candidate buffer가 추가됐다.
+    - `HazardActorPhaseSelectorPolicyBuffer`
+    - `HazardActorPhaseSelectorCandidateBuffer`
+  - selector mode는 `OrderedPriority`와 `OrderedCycle`을 지원한다.
+    - `OrderedPriority`는 기존 `lowest eligible emitter / lowest slot` 의미를 compatibility path로 유지한다.
+    - `OrderedCycle`은 phase entry에서 첫 eligible candidate를 고르고, same-phase natural cycle completion edge에서만 다음 candidate로 advance한다.
+    - phase change는 hard boundary이며, 새 phase selection은 이전 selection을 입력으로 사용하지 않는다.
+  - explicit phase-policy가 없는 actor는 authoring / runtime template factory에서 compatibility seed를 자동 생성한다.
+  - `HazardEmitterCycleSignalComponent.CompletedVersion`이 추가돼 `OrderedCycle`의 in-phase progression edge를 emitter runtime에서 publish한다.
+  - `StageTopologyApplyPrepareSystem`은 actor phase state, selector state, emitter cycle signal을 baseline으로 reset한다.
+  - `ContentValidationRules`는 invalid actor phase selector policy를 `CV091`로 보고한다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 526/526 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 보였지만 failed count는 0이었다.
+  - 관찰:
+    - console `error` 조회에는 `MCP-FOR-UNITY` disposed `NetworkStream` noise가 여전히 섞일 수 있다.
+    - PlayMode 최종 판정은 long wait 후 결과만 회수한 run을 기준으로 닫았다.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `HB-3B. Blueprint selector policy and actor phase` 설계/구현으로 넘어간다.
+  - `HB-3C. Escalation signal and progress-threshold transition` 설계/구현으로 넘어간다.

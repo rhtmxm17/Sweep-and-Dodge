@@ -52,11 +52,13 @@ namespace SweepNDodge.DotsBullets
 
             var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
             var selectorLookup = SystemAPI.GetComponentLookup<HazardActorPatternSelectorStateComponent>(true);
+            var cycleSignalLookup = SystemAPI.GetComponentLookup<HazardEmitterCycleSignalComponent>(false);
             var localTransformLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             var localToWorldLookup = SystemAPI.GetComponentLookup<LocalToWorld>(true);
             var executionSlotLookup = SystemAPI.GetBufferLookup<HazardEmitterPatternExecutionSlotBuffer>(true);
             actorLookup.Update(ref state);
             selectorLookup.Update(ref state);
+            cycleSignalLookup.Update(ref state);
             localTransformLookup.Update(ref state);
             localToWorldLookup.Update(ref state);
             executionSlotLookup.Update(ref state);
@@ -73,6 +75,8 @@ namespace SweepNDodge.DotsBullets
                 ref readonly var emitterConfig = ref emitter.ValueRO;
                 ref readonly var appliedConfig = ref applied.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
+
+                bool hasCycleSignal = cycleSignalLookup.HasComponent(entity);
 
                 if (coordinator.ValueRO.ActivationAllowed == 0)
                 {
@@ -173,6 +177,7 @@ namespace SweepNDodge.DotsBullets
                             {
                                 runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
                                 runtimeState.StateElapsedSec = 0f;
+                                IncrementCycleCompletedVersion(cycleSignalLookup, entity, hasCycleSignal);
                             }
 
                             guard = 4;
@@ -195,6 +200,7 @@ namespace SweepNDodge.DotsBullets
 
                             runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
                             runtimeState.StateElapsedSec = 0f;
+                            IncrementCycleCompletedVersion(cycleSignalLookup, entity, hasCycleSignal);
                             if (emittedThisFrame)
                                 guard = 4;
                             break;
@@ -266,6 +272,21 @@ namespace SweepNDodge.DotsBullets
 
             slot = default;
             return false;
+        }
+
+        private static void IncrementCycleCompletedVersion(
+            ComponentLookup<HazardEmitterCycleSignalComponent> cycleSignalLookup,
+            Entity entity,
+            bool hasCycleSignal)
+        {
+            if (!hasCycleSignal)
+                return;
+
+            var cycleSignal = cycleSignalLookup[entity];
+            cycleSignal.CompletedVersion = cycleSignal.CompletedVersion >= uint.MaxValue
+                ? 1u
+                : cycleSignal.CompletedVersion + 1u;
+            cycleSignalLookup[entity] = cycleSignal;
         }
     }
 }

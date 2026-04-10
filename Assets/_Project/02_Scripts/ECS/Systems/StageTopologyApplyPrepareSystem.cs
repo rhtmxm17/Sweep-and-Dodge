@@ -961,6 +961,7 @@ namespace SweepNDodge.DotsBullets
                         DisableHazardActorAppliedConfig(em, actorEntity);
 
                     ResetHazardActorRuntimeState(em, actorEntity);
+                    ResetHazardActorPhaseState(em, actorEntity);
                     ApplyActorHazardEmitters(em, actorEntity, hasActorBinding ? actorBinding.Emitters : null);
                     ResetHazardActorSelectorState(em, actorEntity);
                     ResetHazardActorPresentationSignalState(em, actorEntity);
@@ -1073,6 +1074,26 @@ namespace SweepNDodge.DotsBullets
                 CurrentPatternSlotId = -1,
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
+                CurrentCandidateOrder = -1,
+                LastResolvedPhaseVersion = 0u,
+                LastConsumedCycleVersion = 0u,
+            });
+        }
+
+        private static void ResetHazardActorPhaseState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorBehaviorPhaseStateComponent>(actorEntity))
+                return;
+
+            int initialPhaseId = 1;
+            if (em.HasComponent<HazardActorBehaviorPhaseBaselineComponent>(actorEntity))
+                initialPhaseId = math.max(1, em.GetComponentData<HazardActorBehaviorPhaseBaselineComponent>(actorEntity).InitialPhaseId);
+
+            em.SetComponentData(actorEntity, new HazardActorBehaviorPhaseStateComponent
+            {
+                CurrentPhaseId = initialPhaseId,
+                PreviousPhaseId = initialPhaseId,
+                PhaseVersion = 0u,
             });
         }
 
@@ -1333,6 +1354,14 @@ namespace SweepNDodge.DotsBullets
                 em.SetComponentData(emitterEntity, new HazardEmitterSelectedPatternRuntimeComponent
                 {
                     AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
+                });
+            }
+
+            if (em.HasComponent<HazardEmitterCycleSignalComponent>(emitterEntity))
+            {
+                em.SetComponentData(emitterEntity, new HazardEmitterCycleSignalComponent
+                {
+                    CompletedVersion = 0u,
                 });
             }
         }

@@ -64,17 +64,42 @@
 
 ### 4.3 PatternSelector 최소 계약
 - `PatternSelector`는 actor owner다.
+- actor phase runtime:
+  - `HazardActorBehaviorPhaseBaselineComponent.InitialPhaseId`
+  - `HazardActorBehaviorPhaseStateComponent.CurrentPhaseId`
+  - `HazardActorBehaviorPhaseStateComponent.PreviousPhaseId`
+  - `HazardActorBehaviorPhaseStateComponent.PhaseVersion`
+- actor-owned selector policy:
+  - `HazardActorPhaseSelectorPolicyBuffer`
+    - `PhaseId`
+    - `SelectionMode`
+  - `HazardActorPhaseSelectorCandidateBuffer`
+    - `PhaseId`
+    - `OrderIndex`
+    - `EmitterId`
+    - `PatternSlotId`
 - selector runtime state:
   - `TargetEmitterId`
   - `CurrentPatternSlotId`
   - `LastPatternSlotId`
   - `SelectionSequence`
+  - `CurrentCandidateOrder`
+  - `LastResolvedPhaseVersion`
+  - `LastConsumedCycleVersion`
 - invalid sentinel:
   - `TargetEmitterId = -1`
   - `CurrentPatternSlotId = -1`
   - `LastPatternSlotId = -1`
   - `SelectionSequence = 0`
 - selector는 first contract에서 emitter-slot `1쌍`만 선택한다.
+- selection mode:
+  - `OrderedPriority`
+    - current phase 후보군 중 첫 eligible candidate를 계속 선택한다.
+    - 기존 `lowest eligible emitter / lowest slot` compatibility 의미를 유지한다.
+  - `OrderedCycle`
+    - phase entry에서 첫 eligible candidate를 선택한다.
+    - same-phase natural cycle completion edge에서만 다음 candidate로 advance한다.
+    - phase change는 hard boundary이며, 새 phase selection은 이전 selection을 입력으로 사용하지 않는다.
 
 ### 4.4 PatternSet / emitter seam
 - pattern data owner는 emitter다.
@@ -92,6 +117,7 @@
     - baked/runtime slot buffer는 `PatternSlotId` 오름차순으로 정규화된다.
   - `HazardEmitterPatternExecutionSlotBuffer`가 추가돼 slot별 execution snapshot을 별도 runtime layer로 보유한다.
   - `HazardEmitterSelectedPatternRuntimeComponent.AppliedPatternSlotId`가 현재 emitter runtime에 적용된 slot을 추적한다.
+  - `HazardEmitterCycleSignalComponent.CompletedVersion`가 추가돼 selected emitter의 natural cycle completion edge를 publish한다.
   - stage emitter-level profile override는 single-slot emitter에만 허용된다.
     - multi-slot emitter에서 `TelegraphProfileOverride` 또는 `EmissionProfileOverride`를 사용하면 apply 단계에서 error로 거부한다.
 
@@ -141,13 +167,17 @@
 - 현재 구현 상태:
   - `HB-2B`에서 `HazardActorPatternSelectorSystem`이 selector state의 첫 runtime writer로 추가됐다.
   - update order는 `HazardEmitterCoordinatorSystem` 이후, `HazardEmitterEmitBuildSystem` 이전이다.
-  - 현재 deterministic selection policy:
-    - actor `PresenceState == Active`
-    - emitter coordinator `ActivationAllowed == 1`
-    - emitter slot buffer non-empty
-    를 만족하는 emitter 중 `EmitterId`가 가장 낮은 emitter를 선택한다.
-  - 선택 slot은 그 emitter의 `PatternSlotId`가 가장 낮은 slot이다.
-  - current compatibility layer에서는 사실상 `EmitterId lowest + PatternSlotId = 1`을 고른다.
+  - `HB-3B` 이후 selector는 current phase policy/candidate buffer만 읽는다.
+  - explicit phase-policy가 없는 actor는 compatibility seed를 자동 생성한다.
+    - `InitialPhaseId = 1`
+    - phase 1 policy = `OrderedPriority`
+    - candidate = actor 소유 emitter별 lowest `PatternSlotId`
+    - candidate order = `EmitterId` 오름차순
+  - `OrderedPriority`는 current phase 후보군 중 첫 eligible candidate를 지속 선택한다.
+  - `OrderedCycle`은 phase entry에서 첫 eligible candidate를 고르고, selected emitter의 `HazardEmitterCycleSignalComponent.CompletedVersion` edge를 소비할 때만 다음 candidate로 advance한다.
+  - phase change는 hard boundary다.
+    - selector는 새 phase policy/candidate 집합만으로 fresh select 한다.
+    - 이전 selection은 새 phase selection의 입력으로 사용하지 않는다.
   - actor가 `Active`지만 eligible emitter/slot이 없으면 `TargetEmitterId`와 `CurrentPatternSlotId`만 invalid로 비우고, `LastPatternSlotId`는 최근 valid 선택 이력으로 유지한다.
   - non-`Active` actor의 selector reset owner는 계속 `HazardActorPresenceSystem`이다.
 
@@ -170,8 +200,9 @@
     - `AppliedPatternSlotId != selectedSlotId`면 current `HazardEmitterTelegraphProfileComponent` / `HazardEmitterEmissionProfileComponent`를 selected slot snapshot으로 갱신한다.
     - 같은 emitter 안에서 selected slot이 바뀌면 lifecycle은 `Dormant + timer 0`으로 hard reset된다.
     - snapshot 갱신이 일어난 frame에는 즉시 새 cycle을 시작하지 않는다.
-  - 단, actor phase와 blueprint-aware selector policy는 아직 없다.
-    - 현재 selector는 여전히 lowest-emitter / lowest-slot deterministic policy다.
+  - `HB-3B`에서 emitter natural cycle completion edge가 추가됐다.
+    - selected slot이 유지된 상태에서 cycle이 자연 종료되어 `Dormant`로 돌아오면 `CompletedVersion`이 증가한다.
+    - slot cutover / deselection / reset으로 인한 forced dormant에서는 증가하지 않는다.
 
 ### 5.4 State escalation / encounter presentation
 - 청사진을 달성하려면 actor에는 발사 전조와 별개의 상위 존재 연출이 필요하다.
@@ -220,7 +251,17 @@
     - `PlayMode 48/48 passed`
     - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
     - PlayMode suite 실행 중 Unity MCP polling을 섞으면 disposed `NetworkStream` noise가 재유입될 수 있으므로, 최종 smoke 판정은 mid-run polling 없이 재실행한 결과를 기준으로 삼는다.
-  - `HB-3B/C/D`는 아직 시작 전
+  - `HB-3B. Blueprint selector policy and actor phase` 구현 완료
+    - actor phase state와 phase-aware selector policy/candidate buffer가 추가됐다.
+    - selector mode는 `OrderedPriority` / `OrderedCycle`을 지원한다.
+    - compatibility seed path와 runtime template factory 경로가 모두 같은 phase/policy contract를 사용한다.
+    - `ContentValidationRules`는 invalid actor phase selector policy를 `CV091`로 보고한다.
+  - `HB-3B` 검증 결과
+    - Unity MCP 기준 compile ready 확인
+    - `EditMode 526/526 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+  - `HB-3C/D`는 아직 시작 전
 
 ### 7.4 HB-4. Validation / sample update
 - operational sample과 test-only verification path를 actor behavior 기준으로 확장
@@ -236,6 +277,5 @@
   - actor가 플레이어 입장에서 "발사 장치"보다 "행동하는 위험 개체"로 읽히는 최소 vertical slice를 제공한다
 
 ## 9. 오픈 이슈
-- selector가 slot을 매 frame 재평가할지, state transition 시점에만 갱신할지
 - state escalation을 selector policy 변경으로 볼지, actor-level presentation + slot-set swap으로 볼지
 - 이후 motion/path 축을 actor behavior TD에 포함할지, 별도 TD로 분리할지

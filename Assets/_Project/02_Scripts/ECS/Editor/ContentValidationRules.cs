@@ -908,6 +908,15 @@ namespace SweepNDodge.DotsBullets.Editor
 
                     owners.Add(actorLocation);
 
+                    if (!HazardActorAuthoringValidationUtility.TryValidate(actor, out _, out _, out var actorError))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV091",
+                            actorLocation,
+                            actorError));
+                    }
+
                     var emitterOwners = new Dictionary<int, List<string>>();
                     for (int emitterIndex = 0; emitterIndex < emitters.Length; emitterIndex++)
                     {

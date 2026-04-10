@@ -75,6 +75,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     typeof(HazardEmitterEmissionProfileComponent),
                     typeof(HazardEmitterRuntimeStateComponent),
                     typeof(HazardEmitterSelectedPatternRuntimeComponent),
+                    typeof(HazardEmitterCycleSignalComponent),
                     typeof(HazardEmitterCoordinatorStateComponent));
                 em.SetComponentData(emitter, LocalTransform.FromPosition(new float3(2f, 0f, 1f)));
                 em.SetComponentData(emitter, new LocalToWorld { Value = float4x4.Translate(new float3(2f, 0f, 1f)) });
@@ -155,6 +156,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
                 });
+                em.SetComponentData(emitter, new HazardEmitterCycleSignalComponent
+                {
+                    CompletedVersion = 0u,
+                });
                 em.SetComponentData(emitter, new HazardEmitterCoordinatorStateComponent
                 {
                     ActivationAllowed = 0,
@@ -176,6 +181,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     EmitterEntity = emitter,
                     EmitterId = 11,
+                });
+                em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actor).Add(new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 0,
+                    EmitterId = 11,
+                    PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
                 });
 
                 var pooledBullet = CreatePooledBullet(em, 801, 4f, 6f);
@@ -219,7 +231,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorAppliedConfigComponent),
                 typeof(HazardActorPresencePolicyComponent),
                 typeof(HazardActorRuntimeBaselineComponent),
+                typeof(HazardActorBehaviorPhaseBaselineComponent),
                 typeof(HazardActorRuntimeStateComponent),
+                typeof(HazardActorBehaviorPhaseStateComponent),
                 typeof(HazardActorPatternSelectorStateComponent),
                 typeof(HazardActorPresencePresentationSignalComponent));
             em.SetComponentData(entity, new HazardActorComponent
@@ -248,10 +262,20 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 InitialPresenceState = HazardActorPresenceStateId.Active,
             });
+            em.SetComponentData(entity, new HazardActorBehaviorPhaseBaselineComponent
+            {
+                InitialPhaseId = 1,
+            });
             em.SetComponentData(entity, new HazardActorRuntimeStateComponent
             {
                 PresenceState = HazardActorPresenceStateId.Active,
                 StateElapsedSec = 0f,
+            });
+            em.SetComponentData(entity, new HazardActorBehaviorPhaseStateComponent
+            {
+                CurrentPhaseId = 1,
+                PreviousPhaseId = 1,
+                PhaseVersion = 0u,
             });
             em.SetComponentData(entity, new HazardActorPatternSelectorStateComponent
             {
@@ -259,6 +283,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 CurrentPatternSlotId = -1,
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
+                CurrentCandidateOrder = -1,
+                LastResolvedPhaseVersion = 0u,
+                LastConsumedCycleVersion = 0u,
             });
             em.SetComponentData(entity, new HazardActorPresencePresentationSignalComponent
             {
@@ -266,6 +293,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 Cue = HazardActorPresencePresentationCueId.None,
             });
             em.AddBuffer<HazardActorEmitterRefBuffer>(entity);
+            var policies = em.AddBuffer<HazardActorPhaseSelectorPolicyBuffer>(entity);
+            policies.Add(new HazardActorPhaseSelectorPolicyBuffer
+            {
+                PhaseId = 1,
+                SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+            });
+            em.AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(entity);
             return entity;
         }
 

@@ -125,6 +125,10 @@ namespace SweepNDodge.DotsBullets
                 {
                     AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
                 });
+                AddComponent(emitterEntity, new HazardEmitterCycleSignalComponent
+                {
+                    CompletedVersion = 0u,
+                });
                 AddBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
                 AddBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitterEntity);
                 var patternSlots = SetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);

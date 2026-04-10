@@ -56,12 +56,49 @@ namespace SweepNDodge.DotsBullets
         public float StateElapsedSec;
     }
 
+    public enum HazardActorSelectionModeId : byte
+    {
+        OrderedPriority = 0,
+        OrderedCycle = 1,
+    }
+
+    public struct HazardActorBehaviorPhaseBaselineComponent : IComponentData
+    {
+        public int InitialPhaseId;
+    }
+
+    public struct HazardActorBehaviorPhaseStateComponent : IComponentData
+    {
+        public int CurrentPhaseId;
+        public int PreviousPhaseId;
+        public uint PhaseVersion;
+    }
+
+    [InternalBufferCapacity(2)]
+    public struct HazardActorPhaseSelectorPolicyBuffer : IBufferElementData
+    {
+        public int PhaseId;
+        public HazardActorSelectionModeId SelectionMode;
+    }
+
+    [InternalBufferCapacity(4)]
+    public struct HazardActorPhaseSelectorCandidateBuffer : IBufferElementData
+    {
+        public int PhaseId;
+        public int OrderIndex;
+        public int EmitterId;
+        public int PatternSlotId;
+    }
+
     public struct HazardActorPatternSelectorStateComponent : IComponentData
     {
         public int TargetEmitterId;
         public int CurrentPatternSlotId;
         public int LastPatternSlotId;
         public uint SelectionSequence;
+        public int CurrentCandidateOrder;
+        public uint LastResolvedPhaseVersion;
+        public uint LastConsumedCycleVersion;
     }
 
     public enum HazardActorPresencePresentationCueId : byte
