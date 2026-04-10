@@ -156,6 +156,16 @@ namespace SweepNDodge.DotsBullets.Tests
                     SuppressionReasonMask = 0u,
                     LastPlayerDistanceSq = float.MaxValue,
                 });
+                var patternSlots = em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitter);
+                HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
+                    ref patternSlots,
+                    telegraphProfileRefId: 1,
+                    emissionProfileRefId: 1);
+                em.GetBuffer<HazardActorEmitterRefBuffer>(actor).Add(new HazardActorEmitterRefBuffer
+                {
+                    EmitterEntity = emitter,
+                    EmitterId = 11,
+                });
 
                 var pooledBullet = CreatePooledBullet(em, 801, 4f, 6f);
                 BulletFieldShared.FreeByKey.Add(801, pooledBullet);
@@ -186,7 +196,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorPresencePolicyComponent),
                 typeof(HazardActorRuntimeBaselineComponent),
                 typeof(HazardActorRuntimeStateComponent),
-                typeof(HazardActorPatternSelectorStateComponent));
+                typeof(HazardActorPatternSelectorStateComponent),
+                typeof(HazardActorPresencePresentationSignalComponent));
             em.SetComponentData(entity, new HazardActorComponent
             {
                 ActorId = actorId,
@@ -225,6 +236,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
             });
+            em.SetComponentData(entity, new HazardActorPresencePresentationSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPresencePresentationCueId.None,
+            });
+            em.AddBuffer<HazardActorEmitterRefBuffer>(entity);
             return entity;
         }
 

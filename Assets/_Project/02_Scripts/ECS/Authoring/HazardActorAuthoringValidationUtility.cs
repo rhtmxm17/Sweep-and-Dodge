@@ -31,6 +31,18 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
+            if (authoring.ActivationDurationSec < 0f)
+            {
+                error = "HazardActorAuthoring requires ActivationDurationSec >= 0.";
+                return false;
+            }
+
+            if (authoring.RetireDurationSec < 0f)
+            {
+                error = "HazardActorAuthoring requires RetireDurationSec >= 0.";
+                return false;
+            }
+
             return true;
         }
     }

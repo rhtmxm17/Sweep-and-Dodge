@@ -146,6 +146,16 @@ namespace SweepNDodge.DotsBullets
         public float StateElapsedSec;
     }
 
+    [InternalBufferCapacity(1)]
+    public struct HazardEmitterPatternSlotBuffer : IBufferElementData
+    {
+        public int PatternSlotId;
+        public int TelegraphProfileRefId;
+        public int EmissionProfileRefId;
+        public float BaseWeight;
+        public uint AvailabilityFlags;
+    }
+
     [Flags]
     public enum HazardEmitterSuppressionReasonFlags : uint
     {
@@ -192,6 +202,42 @@ namespace SweepNDodge.DotsBullets
         public byte Enabled;
         public float MinProgress01;
         public float MaxProgress01;
+    }
+
+    public static class HazardEmitterPatternSetCompatibilityUtility
+    {
+        public const int CompatibilityPatternSlotId = 1;
+        public const float CompatibilityBaseWeight = 1f;
+        public const uint CompatibilityAvailabilityFlags = 0u;
+
+        public static void ReseedSingleCompatibilitySlot(
+            ref DynamicBuffer<HazardEmitterPatternSlotBuffer> slots,
+            int telegraphProfileRefId,
+            int emissionProfileRefId)
+        {
+            slots.Clear();
+            slots.Add(new HazardEmitterPatternSlotBuffer
+            {
+                PatternSlotId = CompatibilityPatternSlotId,
+                TelegraphProfileRefId = telegraphProfileRefId,
+                EmissionProfileRefId = emissionProfileRefId,
+                BaseWeight = CompatibilityBaseWeight,
+                AvailabilityFlags = CompatibilityAvailabilityFlags,
+            });
+        }
+
+        public static void ReseedSingleCompatibilitySlot(EntityManager em, Entity emitterEntity)
+        {
+            if (emitterEntity == Entity.Null || !em.Exists(emitterEntity) || !em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+                return;
+
+            if (!em.HasBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity))
+                em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+
+            var applied = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
+            var slots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+            ReseedSingleCompatibilitySlot(ref slots, applied.TelegraphProfileRefId, applied.EmissionProfileRefId);
+        }
     }
 
 }

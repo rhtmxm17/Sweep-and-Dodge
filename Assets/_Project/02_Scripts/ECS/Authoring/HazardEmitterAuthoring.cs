@@ -148,6 +148,11 @@ namespace SweepNDodge.DotsBullets
                     LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     StateElapsedSec = 0f,
                 });
+                var patternSlots = AddBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+                HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
+                    ref patternSlots,
+                    baselineConfig.TelegraphProfileRefId,
+                    baselineConfig.EmissionProfileRefId);
             }
         }
     }

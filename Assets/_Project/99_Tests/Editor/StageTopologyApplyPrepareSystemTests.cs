@@ -280,6 +280,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
                 var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
                 var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
+                var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
                 var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
                 var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
 
@@ -299,6 +300,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(appliedConfig.LocalOffset.z, Is.EqualTo(-1f).Within(0.001f));
                 Assert.That(appliedConfig.TelegraphProfileRefId, Is.EqualTo(binding.TelegraphProfileOverride.GetInstanceID()));
                 Assert.That(appliedConfig.EmissionProfileRefId, Is.EqualTo(binding.EmissionProfileOverride.GetInstanceID()));
+                Assert.That(patternSlots.Length, Is.EqualTo(1));
+                Assert.That(patternSlots[0].PatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+                Assert.That(patternSlots[0].TelegraphProfileRefId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
+                Assert.That(patternSlots[0].EmissionProfileRefId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
+                Assert.That(patternSlots[0].BaseWeight, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityBaseWeight));
+                Assert.That(patternSlots[0].AvailabilityFlags, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityAvailabilityFlags));
                 Assert.That(telegraph.ProfileId, Is.EqualTo(binding.TelegraphProfileOverride.GetInstanceID()));
                 Assert.That(telegraph.TelegraphDurationSec, Is.EqualTo(0.75f).Within(0.001f));
                 Assert.That(emission.ProfileId, Is.EqualTo(binding.EmissionProfileOverride.GetInstanceID()));
@@ -339,6 +346,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var emitter = FindEmitterForActor(em, actor);
                 var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
                 var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
+                var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
 
                 Assert.That(em.IsEnabled(source), Is.True);
                 Assert.That(em.IsEnabled(actor), Is.False);
@@ -347,6 +355,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(actorApplied.IsSuppressed, Is.EqualTo(1));
                 Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
                 Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
+                Assert.That(patternSlots.Length, Is.EqualTo(1));
+                Assert.That(patternSlots[0].PatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+                Assert.That(patternSlots[0].TelegraphProfileRefId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
+                Assert.That(patternSlots[0].EmissionProfileRefId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
             }
             finally
             {
@@ -381,6 +393,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var emitter = FindEmitterForActor(em, actor);
                 var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
                 var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
+                var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
                 var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
                 var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
 
@@ -390,6 +403,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(em.IsEnabled(emitter), Is.False);
                 Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
                 Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
+                Assert.That(patternSlots.Length, Is.EqualTo(1));
+                Assert.That(patternSlots[0].PatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+                Assert.That(patternSlots[0].TelegraphProfileRefId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
+                Assert.That(patternSlots[0].EmissionProfileRefId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
                 Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
                 Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
                 Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
@@ -795,7 +812,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorAppliedConfigComponent),
                 typeof(HazardActorRuntimeBaselineComponent),
                 typeof(HazardActorRuntimeStateComponent),
-                typeof(HazardActorPatternSelectorStateComponent));
+                typeof(HazardActorPatternSelectorStateComponent),
+                typeof(HazardActorPresencePresentationSignalComponent));
             em.SetComponentData(actor, new HazardActorComponent
             {
                 ActorId = 7,
@@ -826,6 +844,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 CurrentPatternSlotId = -1,
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
+            });
+            em.SetComponentData(actor, new HazardActorPresencePresentationSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPresencePresentationCueId.None,
             });
             em.AddBuffer<HazardActorEmitterRefBuffer>(actor);
             em.GetBuffer<SourceHazardActorRefBuffer>(entity).Add(new SourceHazardActorRefBuffer
@@ -921,6 +944,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                 StateElapsedSec = 0f,
             });
+            var patternSlots = em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitter);
+            HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
+                ref patternSlots,
+                telegraphProfileRefId: 10,
+                emissionProfileRefId: 20);
 
             em.GetBuffer<HazardActorEmitterRefBuffer>(actor).Add(new HazardActorEmitterRefBuffer
             {

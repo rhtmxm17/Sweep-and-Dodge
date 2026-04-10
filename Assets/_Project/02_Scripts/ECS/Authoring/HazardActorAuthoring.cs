@@ -14,6 +14,12 @@ namespace SweepNDodge.DotsBullets
         public bool StartSuppressed = false;
         public HazardActorPresenceStateId InitialPresenceState = HazardActorPresenceStateId.Hidden;
 
+        [Header("Presence Policy")]
+        public HazardActorPresenceTriggerMode ActivationTrigger = HazardActorPresenceTriggerMode.Immediate;
+        [Min(0f)] public float ActivationDurationSec = 0f;
+        public HazardActorPresenceTriggerMode RetireTrigger = HazardActorPresenceTriggerMode.None;
+        [Min(0f)] public float RetireDurationSec = 0f;
+
         private sealed class Baker : Baker<HazardActorAuthoring>
         {
             public override void Bake(HazardActorAuthoring authoring)
@@ -49,10 +55,10 @@ namespace SweepNDodge.DotsBullets
                 });
                 AddComponent(actorEntity, new HazardActorPresencePolicyComponent
                 {
-                    ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
-                    ActivationDurationSec = 0f,
-                    RetireTrigger = HazardActorPresenceTriggerMode.None,
-                    RetireDurationSec = 0f,
+                    ActivationTrigger = authoring.ActivationTrigger,
+                    ActivationDurationSec = math.max(0f, authoring.ActivationDurationSec),
+                    RetireTrigger = authoring.RetireTrigger,
+                    RetireDurationSec = math.max(0f, authoring.RetireDurationSec),
                 });
 
                 AddComponent(actorEntity, new HazardActorRuntimeBaselineComponent
@@ -70,6 +76,11 @@ namespace SweepNDodge.DotsBullets
                     CurrentPatternSlotId = -1,
                     LastPatternSlotId = -1,
                     SelectionSequence = 0u,
+                });
+                AddComponent(actorEntity, new HazardActorPresencePresentationSignalComponent
+                {
+                    Version = 0u,
+                    Cue = HazardActorPresencePresentationCueId.None,
                 });
                 var emitterRefs = AddBuffer<HazardActorEmitterRefBuffer>(actorEntity);
                 emitterRefs.Clear();

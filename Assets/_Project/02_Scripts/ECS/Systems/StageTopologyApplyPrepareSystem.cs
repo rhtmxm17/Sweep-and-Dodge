@@ -963,6 +963,7 @@ namespace SweepNDodge.DotsBullets
                     ResetHazardActorRuntimeState(em, actorEntity);
                     ApplyActorHazardEmitters(em, actorEntity, hasActorBinding ? actorBinding.Emitters : null);
                     ResetHazardActorSelectorState(em, actorEntity);
+                    ResetHazardActorPresentationSignalState(em, actorEntity);
                     em.SetEnabled(actorEntity, hasActorBinding);
                 }
             }
@@ -1075,6 +1076,18 @@ namespace SweepNDodge.DotsBullets
             });
         }
 
+        private static void ResetHazardActorPresentationSignalState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorPresencePresentationSignalComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorPresencePresentationSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPresencePresentationCueId.None,
+            });
+        }
+
         private static void ApplyActorHazardEmitters(EntityManager em, Entity actorEntity, HazardEmitterBinding[] emitterBindings)
         {
             if (!em.Exists(actorEntity) || !em.HasBuffer<HazardActorEmitterRefBuffer>(actorEntity))
@@ -1101,6 +1114,7 @@ namespace SweepNDodge.DotsBullets
                     else
                         DisableHazardEmitterAppliedConfig(em, emitterEntity);
 
+                    HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(em, emitterEntity);
                     ResetHazardEmitterRuntimeState(em, emitterEntity);
                     ResetHazardEmitterCoordinatorState(em, emitterEntity);
                     em.SetEnabled(emitterEntity, hasEmitterBinding);

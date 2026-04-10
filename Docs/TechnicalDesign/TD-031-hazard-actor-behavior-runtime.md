@@ -4,7 +4,7 @@
 - doc_id: `TD-031`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-04-09`
+- last_updated: `2026-04-11`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
   - [../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md](../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md)
@@ -18,7 +18,7 @@
 ## 1. 문제 정의
 - 현재 runtime은 `HazardActor`를 hierarchy와 activation gate의 상위 owner로만 인식한다.
 - 그러나 actor의 플레이어 경험은 아직 기존 emitter compatibility path에 머물러 있다.
-  - `PresenceState`는 actor activation truth에 결합됐지만, room-entry activation과 상위 presentation은 아직 없다.
+  - `PresenceState`는 actor activation truth에 결합됐고 room-entry activation seed도 시작됐지만, 상위 presentation bridge와 selector-driven behavior는 아직 없다.
   - `PatternSelector`는 invalid sentinel 상태만 가짐
   - emitter는 사실상 단일 pattern always-cycle path를 유지
 - 이 상태로 기능을 계속 추가하면, actor 도입의 목적이었던 "개체처럼 읽히는 위험 주체"가 다시 emitter 수준의 단순 발사 장치로 축소된다.
@@ -85,6 +85,15 @@
   - `EmissionProfileRefId`
   - `BaseWeight`
   - `AvailabilityFlags`
+- 현재 구현 상태:
+  - `HB-2A`에서 `HazardEmitterPatternSlotBuffer`가 compatibility runtime layer로 추가됐다.
+  - 현재 emitter마다 slot은 정확히 1개만 존재한다.
+    - `PatternSlotId = 1`
+    - `BaseWeight = 1`
+    - `AvailabilityFlags = 0`
+  - slot ref는 emitter의 final applied `TelegraphProfileRefId` / `EmissionProfileRefId`를 mirror한다.
+  - 이 slot buffer는 별도 baseline/applied owner를 갖지 않고, bake/stage apply에서 emitter applied truth로부터 derived reseed된다.
+  - selector writer와 emit-build seam cutover는 아직 구현되지 않았다.
 
 ### 4.5 Current compatibility boundary
 - 현재 runtime은 actor-aware seed를 넘어, actor behavior의 첫 gate까지 결합된 상태다.
@@ -97,8 +106,8 @@
 - 아직 activation truth에 포함되지 않는 것은:
   - selector invalid sentinel state
   - pattern-slot execution seam
-  - room-entry activation trigger
-  - presence presentation hook
+  - room-entry activation의 one-shot latch 정책
+  - presence presentation bridge/asset schema
 
 ## 5. 이번 확장 범위의 핵심 축
 ### 5.1 Presence runtime
@@ -115,8 +124,13 @@
     - `RetireDurationSec`
     를 사용해 `Hidden / Activating / Active / Retiring` 전이를 수행한다.
   - 현재 기본 seed는 `Immediate activation / no retire`다.
+  - `HB-1C` 이후 `SourceOccupied` activation trigger가 추가됐고, room-entry seed는 `SourceDirectorPressureInputBuffer.InfluenceOccupancy`를 읽는다.
   - `HB-1B` 이후 `PresenceState != Active`는 actor activation truth를 차단한다.
   - actor `disabled/suppressed`는 presence system이 `Hidden`으로 clamp하고 selector invalid sentinel을 강제한다.
+  - `HazardActorPresencePresentationSignalComponent`
+    - `ActivationStarted`
+    - `RetireStarted`
+    를 통해 actor-level presentation hook이 ECS signal로 노출된다.
 
 ### 5.2 PatternSelector runtime
 - actor가 실제로 emitter slot을 선택하도록 만든다.
@@ -124,6 +138,18 @@
   - selector가 언제 selection을 갱신하는가
   - `PresenceState == Active`와 어떤 순서로 결합하는가
   - selector 결과를 emitter execution이 어떤 seam으로 읽는가
+- 현재 구현 상태:
+  - `HB-2B`에서 `HazardActorPatternSelectorSystem`이 selector state의 첫 runtime writer로 추가됐다.
+  - update order는 `HazardEmitterCoordinatorSystem` 이후, `HazardEmitterEmitBuildSystem` 이전이다.
+  - 현재 deterministic selection policy:
+    - actor `PresenceState == Active`
+    - emitter coordinator `ActivationAllowed == 1`
+    - emitter slot buffer non-empty
+    를 만족하는 emitter 중 `EmitterId`가 가장 낮은 emitter를 선택한다.
+  - 선택 slot은 그 emitter의 `PatternSlotId`가 가장 낮은 slot이다.
+  - current compatibility layer에서는 사실상 `EmitterId lowest + PatternSlotId = 1`을 고른다.
+  - actor가 `Active`지만 eligible emitter/slot이 없으면 `TargetEmitterId`와 `CurrentPatternSlotId`만 invalid로 비우고, `LastPatternSlotId`는 최근 valid 선택 이력으로 유지한다.
+  - non-`Active` actor의 selector reset owner는 계속 `HazardActorPresenceSystem`이다.
 
 ### 5.3 Emitter execution seam
 - `HazardEmitterEmitBuildSystem`은 여전히 emitter-owned execution owner로 유지한다.
@@ -137,7 +163,9 @@
 - 예:
   - room-entry activation presentation
   - progress-threshold escalation presentation
-- 첫 단계에서는 presentation asset schema를 닫지 않고, owner와 state seam만 닫는다.
+- 현재 상태:
+  - `HB-1C`에서 actor-level presentation hook은 ECS signal seam까지 구현됐다.
+  - presentation asset schema와 bridge는 아직 닫지 않는다.
 
 ## 6. 작업 시작 전에 문서로 먼저 닫아야 할 항목
 - `PresenceState` 실제 전이 owner와 update order
@@ -155,12 +183,15 @@
 - 구현 상태:
   - `HB-1A. Presence runtime owner` 완료
   - `HB-1B. Presence gate integration` 완료
-  - 남은 하위 단위:
-    - `HB-1C. Blueprint trigger seed`
+  - `HB-1C. Blueprint trigger seed` 완료
 
 ### 7.2 HB-2. PatternSet / selector runtime seam
 - selector가 emitter-slot `1쌍`을 실제로 선택
 - emitter execution이 selector 결과를 읽는 seam 도입
+- 구현 상태:
+  - `HB-2A. PatternSet compatibility data layer` 구현 완료
+  - `HB-2B. PatternSelector runtime owner` 구현 완료
+  - `HB-2C. Emit-build selector seam cutover` 미구현
 
 ### 7.3 HB-3. Blueprint vertical slice
 - room-entry activation presentation

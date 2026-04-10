@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260409-01`
 - type: `SessionTaskBoard`
 - status: `in_progress`
-- last_updated: `2026-04-09`
+- last_updated: `2026-04-11`
 - related_docs:
   - [./SESSION-20260408-01-hazard-actor-design-board.md](./SESSION-20260408-01-hazard-actor-design-board.md)
   - [../TechnicalDesign/TD-028-hazard-emitter-common-contract.md](../TechnicalDesign/TD-028-hazard-emitter-common-contract.md)
@@ -23,21 +23,21 @@
 
 ## Inherited Context
 - `TD-030` 기준 `Source -> HazardActor -> HazardEmitter` hierarchy, binding, authoring/baker, stage apply/reset은 구현 완료 상태다.
-- current runtime은 actor-aware behavior seed까지 완료됐다.
+- current runtime은 actor-aware presence seed까지 완료됐다.
   - actor applied config와 `PresenceState`는 activation truth에 포함
+  - room-entry activation seed는 `SourceDirectorPressureInputBuffer.InfluenceOccupancy` 기반으로 시작됐다.
   - selector state는 아직 invalid sentinel cleanup/invariant만 가진다.
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- `HB-1B. Presence gate integration` 완료
-- 다음 구현 단위는 `HB-1C. Blueprint trigger seed`
+- `HB-2B. PatternSelector runtime owner` 구현 및 Unity MCP 검증 재시도 완료
+- 다음 구현 단위는 `HB-2C. Emit-build selector seam cutover`
 
 ## Next
-- `HB-1C. Blueprint trigger seed` 실행 플랜을 수립한다.
-- room-entry activation seed와 presence presentation hook seam을 닫는다.
+- `HB-2C. Emit-build selector seam cutover` 실행 플랜을 수립한다.
 
 ## Blocked
-- 없음
+- Unity MCP `EditMode` 검증 시 MCP client exit 로그가 테스트 오라클에 걸려 일부 테스트가 실패함
 
 ## Parking Lot
 - [ ] P1. multi-emitter coordinated action contract를 언제 여는지
@@ -66,8 +66,47 @@
   - actor `disabled/suppressed`는 presence system이 `Hidden`으로 clamp하고, non-`Active` actor는 selector invalid sentinel을 유지한다.
   - coordinator는 `ActorPresenceHidden`, `ActorPresenceActivating`, `ActorPresenceRetiring` reason을 사용해 차단한다.
   - 검증 결과: console blocking error 없음, EditMode `491/491`, PlayMode `45/45`.
+- [x] D7. `HB-1C. Blueprint trigger seed` 구현을 완료했다.
+  - `HazardActorPresenceTriggerMode.SourceOccupied`가 추가됐고, room-entry activation seed는 `SourceDirectorPressureInputBuffer.InfluenceOccupancy`를 읽는다.
+  - `HazardActorAuthoring`는 이제 presence policy 전체를 노출하고, authoring/factory는 그 값을 runtime policy로 seed한다.
+  - `HazardActorPresencePresentationSignalComponent`가 추가돼 actor-level activation/retire 시작을 ECS signal로 관측할 수 있다.
+  - 검증 결과: console blocking error 없음, EditMode `497/497`, PlayMode `45/45`.
+- [x] D8. `HB-2` 범위는 단일 구현 플랜이 아니라 3개 실행 단위로 분리하기로 고정했다.
+  - `HB-2A. PatternSet compatibility data layer`
+  - `HB-2B. PatternSelector runtime owner`
+  - `HB-2C. Emit-build selector seam cutover`
+  - 이유: 현재 repo에는 selector state만 있고 실제 pattern data layer와 selector writer, emit-build seam이 모두 비어 있어, 한 단계에 묶으면 구현 중 결정이 다시 생길 가능성이 크다.
+  - 운영 원칙:
+    - `HB-2`에서는 multi-slot authoring을 열지 않는다.
+    - `HB-2`에서는 weighted/random selection을 넣지 않는다.
+    - `HB-2`의 첫 목적은 selector-emitter seam을 current single-pattern compatibility path 위에 성립시키는 것이다.
+- [x] D9. `HB-2A. PatternSet compatibility data layer` 구현을 완료했다.
+  - emitter-owned `HazardEmitterPatternSlotBuffer`가 추가됐다.
+  - 현재는 emitter당 slot 1개만 유지하며, `PatternSlotId = 1`, `BaseWeight = 1`, `AvailabilityFlags = 0`을 사용한다.
+  - slot ref는 emitter final applied `TelegraphProfileRefId` / `EmissionProfileRefId`를 mirror한다.
+  - bake, fallback template factory, stage apply에서 compatibility slot reseed를 수행하도록 맞췄다.
+  - 수동 runtime fixture와 stage-apply tests에도 slot buffer mirror assertion을 추가했다.
+  - 검증 결과:
+    - Unity MCP `refresh_unity(compile=request)` 요청 후 PlayMode `45/45 passed`
+    - Unity MCP EditMode는 `MCP-FOR-UNITY` client exit 로그가 테스트 오라클에 걸려 실패
+    - `read_console(error)`는 MCP client exit 로그와 기존 `SpawnBacklog` 테스트 로그 노이즈를 포함해 반환했다.
+  - 해석:
+    - gameplay regression과 PlayMode path는 회귀 없음
+    - EditMode 실패는 현재 코드 contract가 아니라 MCP 로그 노이즈 영향으로 분리 기록한다.
+- [x] D10. `HB-2B. PatternSelector runtime owner` 구현을 완료했다.
+  - `HazardActorPatternSelectorSystem`이 추가됐고, selector state의 첫 runtime writer가 됐다.
+  - 현재 deterministic policy는 `PresenceState == Active`, `ActivationAllowed == 1`, slot buffer non-empty를 만족하는 emitter 중 `EmitterId`가 가장 낮은 emitter를 고르는 방식이다.
+  - selected pair가 바뀔 때만 `SelectionSequence`를 증가시키고, no-eligible 상태에서는 current만 invalid로 비우고 `LastPatternSlotId`는 최근 valid 선택 이력으로 유지한다.
+  - non-`Active` actor의 selector reset owner는 계속 `HazardActorPresenceSystem`으로 둔다.
+  - 검증 결과:
+    - Unity MCP `refresh_unity(compile=request)` 요청 후 PlayMode `45/45 passed`
+    - Unity MCP EditMode는 다시 `MCP-FOR-UNITY` client exit 로그가 테스트 오라클에 걸려 실패
+    - `read_console(error)`에도 동일한 MCP client exit 로그가 포함됐다.
+  - 해석:
+    - selector writer 도입 이후 gameplay regression은 관측되지 않았다.
+    - EditMode 실패는 여전히 MCP 로그 노이즈로 분리 기록한다.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `HB-1C. Blueprint trigger seed` 범위를 room-entry activation 기준으로 닫는다.
+  - `HB-2C. Emit-build selector seam cutover` 실행 플랜을 수립한다.

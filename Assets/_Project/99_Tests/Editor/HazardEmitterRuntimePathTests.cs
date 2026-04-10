@@ -60,6 +60,37 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardActorAuthoringValidation_RejectsNegativePresenceDurations()
+        {
+            var root = new GameObject("source_root");
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var authoring = actorGo.AddComponent<HazardActorAuthoring>();
+            authoring.ActivationDurationSec = -0.1f;
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out var owner, out var error);
+                Assert.That(ok, Is.False);
+                Assert.That(owner, Is.EqualTo(root.GetComponent<SourceRuntimeTemplateAuthoring>()));
+                Assert.That(error, Does.Contain("ActivationDurationSec >= 0"));
+
+                authoring.ActivationDurationSec = 0f;
+                authoring.RetireDurationSec = -0.25f;
+
+                ok = HazardActorAuthoringValidationUtility.TryValidate(authoring, out owner, out error);
+                Assert.That(ok, Is.False);
+                Assert.That(owner, Is.EqualTo(root.GetComponent<SourceRuntimeTemplateAuthoring>()));
+                Assert.That(error, Does.Contain("RetireDurationSec >= 0"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void HazardEmitterAuthoringValidation_RequiresParentActorAuthoring()
         {
             var root = new GameObject("hazard_emitter_root");
@@ -232,6 +263,128 @@ namespace SweepNDodge.DotsBullets.Tests
             var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
             Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
             Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void HazardActorPresence_SourceOccupiedActivation_DoesNotFireWithoutOccupancyInput()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_SourceOccupiedMissingInput", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70031);
+            var actor = CreateActor(em, source, actorId: 70031);
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.SourceOccupied,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void HazardActorPresence_SourceOccupiedActivation_FiresWhenOccupancyInputIsOne()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_SourceOccupiedActivation", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70032);
+            var pressureInputs = em.AddBuffer<SourceDirectorPressureInputBuffer>(source);
+            pressureInputs.Add(new SourceDirectorPressureInputBuffer
+            {
+                Slot = RunDirectorPressureInputSlotId.InfluenceOccupancy,
+                Value = 1f,
+            });
+            pressureInputs.Add(new SourceDirectorPressureInputBuffer
+            {
+                Slot = RunDirectorPressureInputSlotId.InfluenceHoldSec,
+                Value = 0f,
+            });
+
+            var actor = CreateActor(em, source, actorId: 70032);
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.SourceOccupied,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Active));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void HazardActorPresence_ZeroDurationActivation_EmitsActivationStartedSignalOnce()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_ActivationSignal", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70033);
+            var actor = CreateActor(em, source, actorId: 70033);
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            var signal = em.GetComponentData<HazardActorPresencePresentationSignalComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Active));
+            Assert.That(signal.Version, Is.EqualTo(1u));
+            Assert.That(signal.Cue, Is.EqualTo(HazardActorPresencePresentationCueId.ActivationStarted));
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            signal = em.GetComponentData<HazardActorPresencePresentationSignalComponent>(actor);
+            Assert.That(signal.Version, Is.EqualTo(1u));
+            Assert.That(signal.Cue, Is.EqualTo(HazardActorPresencePresentationCueId.ActivationStarted));
+        }
+
+        [Test]
+        public void HazardEmitterPatternSetCompatibility_CreateEmitter_SeedsSingleMirrorSlot()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitterPatternSetCompatibility_CreateEmitter", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 7095);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 7095,
+                telegraphDurationSec: 0.25f,
+                cooldownSec: 1.5f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: new float3(0.5f, 0f, -0.25f));
+
+            var applied = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
+            var slots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
+
+            Assert.That(slots.Length, Is.EqualTo(1));
+            Assert.That(slots[0].PatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+            Assert.That(slots[0].TelegraphProfileRefId, Is.EqualTo(applied.TelegraphProfileRefId));
+            Assert.That(slots[0].EmissionProfileRefId, Is.EqualTo(applied.EmissionProfileRefId));
+            Assert.That(slots[0].BaseWeight, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityBaseWeight));
+            Assert.That(slots[0].AvailabilityFlags, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityAvailabilityFlags));
         }
 
         [Test]
@@ -852,6 +1005,33 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardActorPresence_DisabledActorClamp_DoesNotBumpPresentationSignalVersion()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_DisabledClampNoSignal", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70921);
+            var actor = CreateActor(em, source, actorId: 70921);
+            em.SetComponentData(actor, new HazardActorAppliedConfigComponent
+            {
+                IsEnabled = 0,
+                IsSuppressed = 0,
+            });
+            em.SetComponentData(actor, new HazardActorPresencePresentationSignalComponent
+            {
+                Version = 3u,
+                Cue = HazardActorPresencePresentationCueId.ActivationStarted,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var signal = em.GetComponentData<HazardActorPresencePresentationSignalComponent>(actor);
+            Assert.That(signal.Version, Is.EqualTo(3u));
+            Assert.That(signal.Cue, Is.EqualTo(HazardActorPresencePresentationCueId.ActivationStarted));
+        }
+
+        [Test]
         public void HazardActorPresence_NonActiveState_ResetsSelector()
         {
             using var world = CreateDefaultTestWorld("HazardActorPresence_NonActiveSelectorReset", out _);
@@ -876,6 +1056,269 @@ namespace SweepNDodge.DotsBullets.Tests
             });
 
             world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Activating));
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardActorPresence_SourceDepletedRetireTrigger_EmitsRetireStartedSignalOnce()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPresence_RetireSignal", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.5f);
+
+            var source = CreateSourceWithDirector(
+                em,
+                70931,
+                RunDirectorSourceStateId.Baseline,
+                0f,
+                thresholdDepleted: 5,
+                collectedCount: 5);
+            var actor = CreateActor(em, source, actorId: 70931);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.None,
+                ActivationDurationSec = 0f,
+                RetireTrigger = HazardActorPresenceTriggerMode.SourceDepleted,
+                RetireDurationSec = 0f,
+            });
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
+            var signal = em.GetComponentData<HazardActorPresencePresentationSignalComponent>(actor);
+            Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+            Assert.That(signal.Version, Is.EqualTo(1u));
+            Assert.That(signal.Cue, Is.EqualTo(HazardActorPresencePresentationCueId.RetireStarted));
+
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+
+            signal = em.GetComponentData<HazardActorPresencePresentationSignalComponent>(actor);
+            Assert.That(signal.Version, Is.EqualTo(1u));
+            Assert.That(signal.Cue, Is.EqualTo(HazardActorPresencePresentationCueId.RetireStarted));
+        }
+
+        [Test]
+        public void HazardActorPatternSelector_ActiveAllowedEmitter_SelectsCompatibilitySlot()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_SelectsCompatibilitySlot", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70941);
+            var actor = CreateActor(em, source, actorId: 70941);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 70941,
+                emitterId: 11,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(11));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+            Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(1u));
+        }
+
+        [Test]
+        public void HazardActorPatternSelector_SameSelection_DoesNotIncrementSequence()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_SameSelectionStable", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70942);
+            var actor = CreateActor(em, source, actorId: 70942);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 70942,
+                emitterId: 9,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            var selectorSystem = world.GetOrCreateSystem<HazardActorPatternSelectorSystem>();
+            selectorSystem.Update(world.Unmanaged);
+            selectorSystem.Update(world.Unmanaged);
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(9));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(1u));
+        }
+
+        [Test]
+        public void HazardActorPatternSelector_MultipleEligibleEmitters_SelectsLowestEmitterId()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_LowestEmitterId", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70943);
+            var actor = CreateActor(em, source, actorId: 70943);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 70943,
+                emitterId: 22,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: new float3(1f, 0f, 0f),
+                localOffset: float3.zero);
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 70943,
+                emitterId: 3,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: new float3(-1f, 0f, 0f),
+                localOffset: float3.zero);
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(3));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+        }
+
+        [Test]
+        public void HazardActorPatternSelector_NoEligibleEmitter_ClearsCurrentAndPreservesRecentLast()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_NoEligibleClearsCurrent", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70944);
+            var actor = CreateActor(em, source, actorId: 70944);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = 7,
+                CurrentPatternSlotId = 1,
+                LastPatternSlotId = 99,
+                SelectionSequence = 4u,
+            });
+
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 70944,
+                emitterId: 7,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: false,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
+            Assert.That(selector.LastPatternSlotId, Is.EqualTo(1));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(5u));
+        }
+
+        [Test]
+        public void HazardActorPatternSelector_NonActiveActor_DoesNotOverwritePresenceResetResult()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPatternSelector_NonActiveNoOp", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.25f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 70945);
+            var actor = CreateActor(em, source, actorId: 70945);
+            em.SetComponentData(actor, new HazardActorPresencePolicyComponent
+            {
+                ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
+                ActivationDurationSec = 1f,
+                RetireTrigger = HazardActorPresenceTriggerMode.None,
+                RetireDurationSec = 0f,
+            });
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = 5,
+                CurrentPatternSlotId = 6,
+                LastPatternSlotId = 7,
+                SelectionSequence = 8u,
+            });
+
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 70945,
+                emitterId: 5,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+
+            world.SetTime(new TimeData(0.25d, 0.25f));
+            world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
 
             var runtime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
             Assert.That(runtime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Activating));
@@ -1025,6 +1468,37 @@ namespace SweepNDodge.DotsBullets.Tests
             float3 position,
             float3 localOffset)
         {
+            var actor = CreateActor(em, source, actorId: bulletTypeKey);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+            return CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey,
+                emitterId: 1,
+                telegraphDurationSec,
+                cooldownSec,
+                isEnabled,
+                isSuppressed,
+                position,
+                localOffset);
+        }
+
+        private static Entity CreateEmitterForActor(
+            EntityManager em,
+            Entity actor,
+            int bulletTypeKey,
+            int emitterId,
+            float telegraphDurationSec,
+            float cooldownSec,
+            bool isEnabled,
+            bool isSuppressed,
+            float3 position,
+            float3 localOffset)
+        {
             var entity = em.CreateEntity(
                 typeof(LocalTransform),
                 typeof(LocalToWorld),
@@ -1040,15 +1514,9 @@ namespace SweepNDodge.DotsBullets.Tests
 
             em.SetComponentData(entity, LocalTransform.FromPosition(position));
             em.SetComponentData(entity, new LocalToWorld { Value = float4x4.Translate(position) });
-            var actor = CreateActor(em, source, actorId: bulletTypeKey);
-            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
-            {
-                PresenceState = HazardActorPresenceStateId.Active,
-                StateElapsedSec = 0f,
-            });
             em.SetComponentData(entity, new HazardEmitterComponent
             {
-                EmitterId = 1,
+                EmitterId = emitterId,
                 ActorEntity = actor,
                 ActivationPolicy = HazardEmitterActivationPolicyId.AlwaysCycle,
                 InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
@@ -1124,6 +1592,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 SuppressionReasonMask = 0u,
                 LastPlayerDistanceSq = float.MaxValue,
             });
+            var patternSlots = em.AddBuffer<HazardEmitterPatternSlotBuffer>(entity);
+            HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
+                ref patternSlots,
+                telegraphProfileRefId: 1,
+                emissionProfileRefId: 1);
+            var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actor);
+            emitterRefs.Add(new HazardActorEmitterRefBuffer
+            {
+                EmitterEntity = entity,
+                EmitterId = emitterId,
+            });
             return entity;
         }
 
@@ -1136,7 +1615,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorPresencePolicyComponent),
                 typeof(HazardActorRuntimeBaselineComponent),
                 typeof(HazardActorRuntimeStateComponent),
-                typeof(HazardActorPatternSelectorStateComponent));
+                typeof(HazardActorPatternSelectorStateComponent),
+                typeof(HazardActorPresencePresentationSignalComponent));
 
             em.SetComponentData(entity, new HazardActorComponent
             {
@@ -1176,6 +1656,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
             });
+            em.SetComponentData(entity, new HazardActorPresencePresentationSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPresencePresentationCueId.None,
+            });
+            em.AddBuffer<HazardActorEmitterRefBuffer>(entity);
             return entity;
         }
 

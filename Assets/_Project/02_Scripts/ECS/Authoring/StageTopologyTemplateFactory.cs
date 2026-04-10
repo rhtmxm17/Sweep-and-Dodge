@@ -163,7 +163,8 @@ namespace SweepNDodge.DotsBullets
                     typeof(HazardActorAppliedConfigComponent),
                     typeof(HazardActorRuntimeBaselineComponent),
                     typeof(HazardActorRuntimeStateComponent),
-                    typeof(HazardActorPatternSelectorStateComponent));
+                    typeof(HazardActorPatternSelectorStateComponent),
+                    typeof(HazardActorPresencePresentationSignalComponent));
 
                 int actorId = math.max(1, actorAuthoring.ActorId);
                 byte actorEnabled = actorAuthoring.Enabled ? (byte)1 : (byte)0;
@@ -186,10 +187,10 @@ namespace SweepNDodge.DotsBullets
                 });
                 em.AddComponentData(actorEntity, new HazardActorPresencePolicyComponent
                 {
-                    ActivationTrigger = HazardActorPresenceTriggerMode.Immediate,
-                    ActivationDurationSec = 0f,
-                    RetireTrigger = HazardActorPresenceTriggerMode.None,
-                    RetireDurationSec = 0f,
+                    ActivationTrigger = actorAuthoring.ActivationTrigger,
+                    ActivationDurationSec = math.max(0f, actorAuthoring.ActivationDurationSec),
+                    RetireTrigger = actorAuthoring.RetireTrigger,
+                    RetireDurationSec = math.max(0f, actorAuthoring.RetireDurationSec),
                 });
                 em.SetComponentData(actorEntity, new HazardActorRuntimeBaselineComponent
                 {
@@ -206,6 +207,11 @@ namespace SweepNDodge.DotsBullets
                     CurrentPatternSlotId = -1,
                     LastPatternSlotId = -1,
                     SelectionSequence = 0u,
+                });
+                em.SetComponentData(actorEntity, new HazardActorPresencePresentationSignalComponent
+                {
+                    Version = 0u,
+                    Cue = HazardActorPresencePresentationCueId.None,
                 });
                 em.AddBuffer<HazardActorEmitterRefBuffer>(actorEntity).Clear();
 
@@ -354,6 +360,11 @@ namespace SweepNDodge.DotsBullets
                         LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                         StateElapsedSec = 0f,
                     });
+                    var patternSlots = em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+                    HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
+                        ref patternSlots,
+                        baselineConfig.TelegraphProfileRefId,
+                        baselineConfig.EmissionProfileRefId);
 
                     em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity).Add(new HazardActorEmitterRefBuffer
                     {

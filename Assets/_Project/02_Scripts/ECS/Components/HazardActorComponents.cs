@@ -34,6 +34,7 @@ namespace SweepNDodge.DotsBullets
         Immediate = 1,
         SourceAvailable = 2,
         SourceDepleted = 3,
+        SourceOccupied = 4,
     }
 
     public struct HazardActorPresencePolicyComponent : IComponentData
@@ -61,6 +62,19 @@ namespace SweepNDodge.DotsBullets
         public int CurrentPatternSlotId;
         public int LastPatternSlotId;
         public uint SelectionSequence;
+    }
+
+    public enum HazardActorPresencePresentationCueId : byte
+    {
+        None = 0,
+        ActivationStarted = 1,
+        RetireStarted = 2,
+    }
+
+    public struct HazardActorPresencePresentationSignalComponent : IComponentData
+    {
+        public uint Version;
+        public HazardActorPresencePresentationCueId Cue;
     }
 
     [InternalBufferCapacity(4)]

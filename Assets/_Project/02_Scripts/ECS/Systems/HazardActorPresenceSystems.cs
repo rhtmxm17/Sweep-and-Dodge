@@ -37,7 +37,9 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
+            var pressureInputLookup = SystemAPI.GetBufferLookup<SourceDirectorPressureInputBuffer>(true);
             sourceLookup.Update(ref state);
+            pressureInputLookup.Update(ref state);
 
             var em = state.EntityManager;
             foreach (var (actor, applied, policy, runtime, actorEntity) in SystemAPI.Query<
@@ -70,11 +72,13 @@ namespace SweepNDodge.DotsBullets
                                 presencePolicy.ActivationTrigger,
                                 actorConfig.SourceEntity,
                                 em,
-                                sourceLookup))
+                                sourceLookup,
+                                pressureInputLookup))
                         {
                             break;
                         }
 
+                        EmitPresenceSignal(em, actorEntity, HazardActorPresencePresentationCueId.ActivationStarted);
                         runtimeState.PresenceState = HazardActorPresenceStateId.Activating;
                         runtimeState.StateElapsedSec = 0f;
                         if (presencePolicy.ActivationDurationSec <= 0f)
@@ -106,11 +110,13 @@ namespace SweepNDodge.DotsBullets
                                 presencePolicy.RetireTrigger,
                                 actorConfig.SourceEntity,
                                 em,
-                                sourceLookup))
+                                sourceLookup,
+                                pressureInputLookup))
                         {
                             break;
                         }
 
+                        EmitPresenceSignal(em, actorEntity, HazardActorPresencePresentationCueId.RetireStarted);
                         runtimeState.PresenceState = HazardActorPresenceStateId.Retiring;
                         runtimeState.StateElapsedSec = 0f;
                         if (presencePolicy.RetireDurationSec <= 0f)
@@ -144,6 +150,25 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
+        private static void EmitPresenceSignal(
+            EntityManager em,
+            Entity actorEntity,
+            HazardActorPresencePresentationCueId cue)
+        {
+            if (cue == HazardActorPresencePresentationCueId.None
+                || actorEntity == Entity.Null
+                || !em.Exists(actorEntity)
+                || !em.HasComponent<HazardActorPresencePresentationSignalComponent>(actorEntity))
+            {
+                return;
+            }
+
+            var signal = em.GetComponentData<HazardActorPresencePresentationSignalComponent>(actorEntity);
+            signal.Version = signal.Version >= uint.MaxValue ? 1u : signal.Version + 1u;
+            signal.Cue = cue;
+            em.SetComponentData(actorEntity, signal);
+        }
+
         private static void ResetSelectorState(EntityManager em, Entity actorEntity)
         {
             if (actorEntity == Entity.Null || !em.Exists(actorEntity) || !em.HasComponent<HazardActorPatternSelectorStateComponent>(actorEntity))
@@ -162,7 +187,8 @@ namespace SweepNDodge.DotsBullets
             HazardActorPresenceTriggerMode trigger,
             Entity sourceEntity,
             EntityManager em,
-            ComponentLookup<SourceSpawnComponent> sourceLookup)
+            ComponentLookup<SourceSpawnComponent> sourceLookup,
+            BufferLookup<SourceDirectorPressureInputBuffer> pressureInputLookup)
         {
             switch (trigger)
             {
@@ -182,6 +208,21 @@ namespace SweepNDodge.DotsBullets
                     var source = sourceLookup[sourceEntity];
                     return source.State == SourceStateId.Depleted
                         || source.CollectedCount >= math.max(1, source.ThresholdDepleted);
+
+                case HazardActorPresenceTriggerMode.SourceOccupied:
+                    if (sourceEntity == Entity.Null || !em.Exists(sourceEntity) || !pressureInputLookup.HasBuffer(sourceEntity))
+                        return false;
+
+                    var pressureInputs = pressureInputLookup[sourceEntity];
+                    for (int i = 0; i < pressureInputs.Length; i++)
+                    {
+                        if (pressureInputs[i].Slot != RunDirectorPressureInputSlotId.InfluenceOccupancy)
+                            continue;
+
+                        return pressureInputs[i].Value > 0.5f;
+                    }
+
+                    return false;
 
                 default:
                     return false;
