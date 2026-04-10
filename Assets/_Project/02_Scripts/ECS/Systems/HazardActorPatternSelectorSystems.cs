@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Collections;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -31,22 +32,36 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             var emitterLookup = SystemAPI.GetComponentLookup<HazardEmitterComponent>(true);
+            var runtimeLookup = SystemAPI.GetComponentLookup<HazardActorRuntimeStateComponent>(true);
+            var selectorStateLookup = SystemAPI.GetComponentLookup<HazardActorPatternSelectorStateComponent>(false);
             var coordinatorLookup = SystemAPI.GetComponentLookup<HazardEmitterCoordinatorStateComponent>(true);
+            var emitterRefLookup = SystemAPI.GetBufferLookup<HazardActorEmitterRefBuffer>(true);
             var slotLookup = SystemAPI.GetBufferLookup<HazardEmitterPatternSlotBuffer>(true);
             emitterLookup.Update(ref state);
+            runtimeLookup.Update(ref state);
+            selectorStateLookup.Update(ref state);
             coordinatorLookup.Update(ref state);
+            emitterRefLookup.Update(ref state);
             slotLookup.Update(ref state);
 
-            foreach (var (runtime, selector, emitterRefs) in SystemAPI.Query<
-                RefRO<HazardActorRuntimeStateComponent>,
-                RefRW<HazardActorPatternSelectorStateComponent>,
-                DynamicBuffer<HazardActorEmitterRefBuffer>>())
+            using var actorQuery = state.EntityManager.CreateEntityQuery(
+                ComponentType.ReadOnly<HazardActorRuntimeStateComponent>(),
+                ComponentType.ReadWrite<HazardActorPatternSelectorStateComponent>());
+            using var actorEntities = actorQuery.ToEntityArray(Allocator.Temp);
+
+            for (int actorIndex = 0; actorIndex < actorEntities.Length; actorIndex++)
             {
-                if (runtime.ValueRO.PresenceState != HazardActorPresenceStateId.Active)
+                Entity actorEntity = actorEntities[actorIndex];
+                if (!runtimeLookup.HasComponent(actorEntity) || !selectorStateLookup.HasComponent(actorEntity))
+                    continue;
+                if (runtimeLookup[actorEntity].PresenceState != HazardActorPresenceStateId.Active)
+                    continue;
+                if (!emitterRefLookup.HasBuffer(actorEntity))
                     continue;
 
                 int selectedEmitterId = -1;
                 int selectedSlotId = -1;
+                var emitterRefs = emitterRefLookup[actorEntity];
 
                 for (int i = 0; i < emitterRefs.Length; i++)
                 {
@@ -81,7 +96,7 @@ namespace SweepNDodge.DotsBullets
                     }
                 }
 
-                ref var selectorState = ref selector.ValueRW;
+                var selectorState = selectorStateLookup[actorEntity];
                 int previousEmitterId = selectorState.TargetEmitterId;
                 int previousCurrentSlotId = selectorState.CurrentPatternSlotId;
 
@@ -97,6 +112,7 @@ namespace SweepNDodge.DotsBullets
                     selectorState.SelectionSequence = selectorState.SelectionSequence >= uint.MaxValue
                         ? 1u
                         : selectorState.SelectionSequence + 1u;
+                    selectorStateLookup[actorEntity] = selectorState;
                     continue;
                 }
 
@@ -110,6 +126,7 @@ namespace SweepNDodge.DotsBullets
                 selectorState.SelectionSequence = selectorState.SelectionSequence >= uint.MaxValue
                     ? 1u
                     : selectorState.SelectionSequence + 1u;
+                selectorStateLookup[actorEntity] = selectorState;
             }
         }
 

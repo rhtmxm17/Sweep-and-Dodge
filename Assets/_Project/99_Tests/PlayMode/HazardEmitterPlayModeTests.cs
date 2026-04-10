@@ -74,6 +74,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     typeof(HazardEmitterEmissionProfileBaselineComponent),
                     typeof(HazardEmitterEmissionProfileComponent),
                     typeof(HazardEmitterRuntimeStateComponent),
+                    typeof(HazardEmitterSelectedPatternRuntimeComponent),
                     typeof(HazardEmitterCoordinatorStateComponent));
                 em.SetComponentData(emitter, LocalTransform.FromPosition(new float3(2f, 0f, 1f)));
                 em.SetComponentData(emitter, new LocalToWorld { Value = float4x4.Translate(new float3(2f, 0f, 1f)) });
@@ -150,17 +151,27 @@ namespace SweepNDodge.DotsBullets.Tests
                     LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     StateElapsedSec = 0f,
                 });
+                em.SetComponentData(emitter, new HazardEmitterSelectedPatternRuntimeComponent
+                {
+                    AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
+                });
                 em.SetComponentData(emitter, new HazardEmitterCoordinatorStateComponent
                 {
                     ActivationAllowed = 0,
                     SuppressionReasonMask = 0u,
                     LastPlayerDistanceSq = float.MaxValue,
                 });
-                var patternSlots = em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitter);
+                em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitter);
+                em.AddBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
+                var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
+                var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
+                var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
                 HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
                     ref patternSlots,
+                    ref executionSlots,
                     telegraphProfileRefId: 1,
-                    emissionProfileRefId: 1);
+                    telegraphDurationSec: 0f,
+                    in emission);
                 em.GetBuffer<HazardActorEmitterRefBuffer>(actor).Add(new HazardActorEmitterRefBuffer
                 {
                     EmitterEntity = emitter,
@@ -169,6 +180,18 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var pooledBullet = CreatePooledBullet(em, 801, 4f, 6f);
                 BulletFieldShared.FreeByKey.Add(801, pooledBullet);
+
+                world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                var selectedPattern = em.GetComponentData<HazardEmitterSelectedPatternRuntimeComponent>(emitter);
+                var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+                Assert.That(selectedPattern.AppliedPatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
+                Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+                Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+                Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
 
                 world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);

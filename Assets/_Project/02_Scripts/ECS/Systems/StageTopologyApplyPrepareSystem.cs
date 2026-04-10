@@ -1114,7 +1114,8 @@ namespace SweepNDodge.DotsBullets
                     else
                         DisableHazardEmitterAppliedConfig(em, emitterEntity);
 
-                    HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(em, emitterEntity);
+                    if (HasSinglePatternSlot(em, emitterEntity))
+                        HazardEmitterPatternSetCompatibilityUtility.TryMirrorCurrentProfilesIntoSingleExistingSlot(em, emitterEntity);
                     ResetHazardEmitterRuntimeState(em, emitterEntity);
                     ResetHazardEmitterCoordinatorState(em, emitterEntity);
                     em.SetEnabled(emitterEntity, hasEmitterBinding);
@@ -1146,22 +1147,25 @@ namespace SweepNDodge.DotsBullets
 
         private static void ApplyHazardEmitterBinding(EntityManager em, Entity emitterEntity, in HazardEmitterBinding binding)
         {
+            bool canApplyProfileOverrides = CanApplyEmitterProfileOverrides(em, emitterEntity, in binding);
+
             if (em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
             {
                 var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
                 if (binding.OverrideLocalOffset)
                     appliedConfig.LocalOffset = binding.LocalOffset;
 
-                if (binding.TelegraphProfileOverride != null)
+                if (canApplyProfileOverrides && binding.TelegraphProfileOverride != null)
                     appliedConfig.TelegraphProfileRefId = binding.TelegraphProfileOverride.GetInstanceID();
 
-                if (binding.EmissionProfileOverride != null)
+                if (canApplyProfileOverrides && binding.EmissionProfileOverride != null)
                     appliedConfig.EmissionProfileRefId = binding.EmissionProfileOverride.GetInstanceID();
 
                 em.SetComponentData(emitterEntity, appliedConfig);
             }
 
-            if (binding.TelegraphProfileOverride != null
+            if (canApplyProfileOverrides
+                && binding.TelegraphProfileOverride != null
                 && em.HasComponent<HazardEmitterTelegraphProfileComponent>(emitterEntity))
             {
                 em.SetComponentData(emitterEntity, new HazardEmitterTelegraphProfileComponent
@@ -1171,7 +1175,8 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
-            if (binding.EmissionProfileOverride != null
+            if (canApplyProfileOverrides
+                && binding.EmissionProfileOverride != null
                 && em.HasComponent<HazardEmitterEmissionProfileComponent>(emitterEntity))
             {
                 if (!HazardEmitterProfileResolver.TryResolve(binding.EmissionProfileOverride, out var resolvedEmission, out var error))
@@ -1210,6 +1215,28 @@ namespace SweepNDodge.DotsBullets
                     CooldownSec = resolvedEmission.CooldownSec,
                 });
             }
+        }
+
+        private static bool CanApplyEmitterProfileOverrides(EntityManager em, Entity emitterEntity, in HazardEmitterBinding binding)
+        {
+            if ((binding.TelegraphProfileOverride == null && binding.EmissionProfileOverride == null)
+                || !em.HasBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity))
+            {
+                return true;
+            }
+
+            var slots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+            if (slots.Length <= 1)
+                return true;
+
+            Debug.LogError($"[StageTopologyApply] Multi-slot HazardEmitter cannot use emitter-level Telegraph/Emission profile overrides. emitterId={binding.EmitterId}, slotCount={slots.Length}");
+            return false;
+        }
+
+        private static bool HasSinglePatternSlot(EntityManager em, Entity emitterEntity)
+        {
+            return em.HasBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity)
+                && em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity).Length == 1;
         }
 
         private static void DisableHazardEmitterAppliedConfig(EntityManager em, Entity emitterEntity)
@@ -1300,6 +1327,14 @@ namespace SweepNDodge.DotsBullets
                 LifecycleState = initialLifecycleState,
                 StateElapsedSec = 0f,
             });
+
+            if (em.HasComponent<HazardEmitterSelectedPatternRuntimeComponent>(emitterEntity))
+            {
+                em.SetComponentData(emitterEntity, new HazardEmitterSelectedPatternRuntimeComponent
+                {
+                    AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
+                });
+            }
         }
 
         private static void ResetHazardEmitterCoordinatorState(EntityManager em, Entity emitterEntity)

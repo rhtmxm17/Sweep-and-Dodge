@@ -30,19 +30,31 @@
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- `HB-2C. Emit-build selector seam cutover` 구현 및 Unity MCP 검증 재시도 완료
-- 다음 논의/구현 시작점은 `HB-3. Blueprint vertical slice`
+- `HB-3A. Multi-slot authoring and runtime slot execution`의 최종 검증을 닫았다.
+- 현재 상태:
+  - `HazardEmitterAuthoring`는 slots-only shape로 전환됐다.
+  - `HazardEmitterPatternExecutionSlotBuffer`와 `HazardEmitterSelectedPatternRuntimeComponent`를 기준으로 slot-specific execution snapshot seam이 추가됐다.
+  - single-slot emitter에 대해서만 stage emitter-level profile override mirror를 유지하고, multi-slot emitter override는 apply 단계에서 error로 거부한다.
+- 검증 결과:
+  - Unity MCP `refresh_unity(compile=request)` 이후 compile ready 확인
+  - `EditMode 517/517 passed`
+  - `PlayMode 48/48 passed`
+  - `result.summary.resultState`는 EditMode / PlayMode 모두 `Failed(Child)`로 보였지만 failed count는 0이었다.
+  - PlayMode suite 실행 중 MCP polling을 섞으면 disposed `NetworkStream` noise가 재유입될 수 있어, 최종 통과 판정은 mid-run polling 없이 재실행한 결과를 기준으로 닫았다.
+- 남은 일:
+  - `HB-3B. Blueprint selector policy and actor phase` 설계/구현 착수
 
 ## Next
-- `HB-3. Blueprint vertical slice`의 첫 실행 단위를 설계한다.
+- `HB-3B. Blueprint selector policy and actor phase`의 실행 계약을 문서 기준으로 고정하고 구현에 들어간다.
+- `HB-3C`와 `HB-3D`는 `HB-3B` 결과가 닫힌 뒤 순차로 연다.
 
 ## Blocked
-- `read_console(error)`는 여전히 `Client handler exited`와 `SpawnBacklog` 테스트 로그 노이즈를 섞어 반환함
+- 로컬 `SweepNDodge.EditModeTests.csproj`는 기존 누락 파일 `Assets/_Project/99_Tests/EditMode/CarryBinRulesTests.cs` 때문에 단독 빌드가 막혀 있다.
 
 ## Parking Lot
 - [ ] P1. multi-emitter coordinated action contract를 언제 여는지
 - [ ] P2. actor-level motion/path를 같은 TD에 넣을지 분리할지
-- [ ] P3. state escalation을 presence 축으로 볼지 selector/pattern-set swap 축으로 볼지
+- [ ] P3. firing 중 지속 retarget을 `HB-3` 본체에 넣지 않고 후속 단계로 미루는 현재 범위를 유지할지
 
 ## Done
 - [x] D1. 행동 확장 범위를 hierarchy/apply 완료 문서(`TD-030`)와 분리해 별도 TD(`TD-031`)로 시작했다.
@@ -131,8 +143,46 @@
   - 해석:
     - selector seam cutover 이후 runtime/gameplay regression은 관측되지 않았다.
     - EditMode 실패는 여전히 MCP 로그 노이즈로 분리 기록한다.
+- [x] D13. `HB-3. Blueprint vertical slice`의 첫 설계 원칙을 고정했다.
+  - actor-owned phase가 selector rule을 바꾸는 구조를 채택한다.
+  - 목표 시나리오의 first slice는 actor가 `slot A`, `slot B`, `slot B'`를 모두 가지는 형태로 본다.
+  - `Phase 1`은 `A/B` 교대, `Phase 2`는 `A/B'` 교대 규칙을 사용한다.
+  - escalation은 slot data mutation이 아니라 actor-level phase 변화로 해석한다.
+  - `slot B`와 `slot B'`는 phase-conditioned variant가 아니라 별도 slot으로 둔다.
+- [x] D14. `HB-3`는 단일 구현 플랜이 아니라 4개 실행 단위로 분리하기로 고정했다.
+  - `HB-3A. Multi-slot authoring and runtime slot execution`
+  - `HB-3B. Blueprint selector policy and actor phase`
+  - `HB-3C. Escalation signal and progress-threshold transition`
+  - `HB-3D. Blueprint sample content / verification closeout`
+  - 이유:
+    - first vertical slice를 성립시키려면 먼저 multi-slot execution seam이 필요하다.
+    - selector policy와 actor phase, escalation trigger/signal, sample verification은 서로 다른 소유권과 위험도를 가진다.
+    - `continuous retarget while firing`은 이 분해 기준에서는 본체 범위 밖으로 두고 후속 단계에서 다루는 편이 안전하다.
+- [x] D15. `HB-3A. Multi-slot authoring and runtime slot execution`의 코드 경로를 반영했다.
+  - `HazardEmitterAuthoring`는 slots-only SSOT로 전환됐다.
+  - `HazardEmitterPatternExecutionSlotBuffer`가 추가돼 slot별 execution snapshot을 runtime에서 직접 보유한다.
+  - `HazardEmitterEmitBuildSystem`은 selected slot snapshot을 runtime component에 적용하고, slot 변경 시 `Dormant + timer 0` hard reset을 수행한다.
+  - single-slot emitter는 stage override mirror를 유지하고, multi-slot emitter의 emitter-level profile override는 apply 단계에서 error로 거부한다.
+  - operational/test hazard source prefab도 slots-only 직렬화로 맞췄다.
+  - 로컬 검증 결과:
+    - `dotnet build SweepNDodge.Runtime.csproj` 통과
+    - `dotnet build SweepNDodge.PlayModeTests.csproj` 통과
+    - `dotnet build SweepNDodge.EditModeTests.csproj`는 기존 누락 파일 `Assets/_Project/99_Tests/EditMode/CarryBinRulesTests.cs` 때문에 실패
+  - 해석:
+    - runtime / playmode compile 경계에서는 HB-3A 변경이 수용됐다.
+    - full Unity validation loop는 다음 세션 또는 Unity MCP 가능 세션에서 재실행이 필요하다.
+- [x] D16. `HB-3A`의 Unity validation loop를 현재 코드 기준으로 닫았다.
+  - `HazardEmitterPlayModeTests.PlayMode_AlwaysCycleHazardEmitter_AppendsAndConsumesDiscreteEmit`는 first selected-slot cutover frame이 `Dormant + timer 0` hard reset만 수행한다는 현재 HB-3A 계약에 맞게 조정했다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 517/517 passed`
+    - `PlayMode 48/48 passed`
+    - EditMode / PlayMode 모두 `result.summary.resultState`는 `Failed(Child)`로 보였지만 failed count는 0이었다.
+  - 관찰:
+    - PlayMode suite 실행 중 MCP polling을 섞으면 disposed `NetworkStream` noise가 다시 test run에 유입될 수 있었다.
+    - mid-run polling 없이 충분히 대기한 뒤 결과만 회수하면 full PlayMode smoke는 안정적으로 통과했다.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `HB-3. Blueprint vertical slice`의 첫 실행 단위를 설계한다.
+  - `HB-3B. Blueprint selector policy and actor phase` 설계/구현으로 넘어간다.

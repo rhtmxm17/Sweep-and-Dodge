@@ -87,13 +87,13 @@
   - `AvailabilityFlags`
 - 현재 구현 상태:
   - `HB-2A`에서 `HazardEmitterPatternSlotBuffer`가 compatibility runtime layer로 추가됐다.
-  - 현재 emitter마다 slot은 정확히 1개만 존재한다.
-    - `PatternSlotId = 1`
-    - `BaseWeight = 1`
-    - `AvailabilityFlags = 0`
-  - slot ref는 emitter의 final applied `TelegraphProfileRefId` / `EmissionProfileRefId`를 mirror한다.
-  - 이 slot buffer는 별도 baseline/applied owner를 갖지 않고, bake/stage apply에서 emitter applied truth로부터 derived reseed된다.
-  - selector writer와 emit-build seam cutover는 아직 구현되지 않았다.
+  - `HB-3A`에서 emitter authoring은 slots-only shape로 전환됐다.
+    - `HazardEmitterAuthoring`는 이제 `PatternSlotId / TelegraphProfile / EmissionProfile / BaseWeight / AvailabilityFlags` 배열을 SSOT로 가진다.
+    - baked/runtime slot buffer는 `PatternSlotId` 오름차순으로 정규화된다.
+  - `HazardEmitterPatternExecutionSlotBuffer`가 추가돼 slot별 execution snapshot을 별도 runtime layer로 보유한다.
+  - `HazardEmitterSelectedPatternRuntimeComponent.AppliedPatternSlotId`가 현재 emitter runtime에 적용된 slot을 추적한다.
+  - stage emitter-level profile override는 single-slot emitter에만 허용된다.
+    - multi-slot emitter에서 `TelegraphProfileOverride` 또는 `EmissionProfileOverride`를 사용하면 apply 단계에서 error로 거부한다.
 
 ### 4.5 Current compatibility boundary
 - 현재 runtime은 actor-aware seed를 넘어, actor behavior의 첫 gate까지 결합된 상태다.
@@ -165,9 +165,13 @@
     - selector `TargetEmitterId == emitter.EmitterId`
     - selector `CurrentPatternSlotId`가 emitter의 slot buffer 안에 실제로 존재
   - selector가 이 emitter를 가리키지 않거나 selected slot이 없으면, emitter lifecycle은 즉시 `Dormant + timer 0`으로 강제된다.
-  - 다만 실제 execution payload는 아직 slot별 profile resolve를 하지 않는다.
-    - selected slot은 execution eligibility contract로만 사용
-    - 실제 emit은 계속 emitter applied `HazardEmitterTelegraphProfileComponent` / `HazardEmitterEmissionProfileComponent`를 직접 읽는다.
+  - `HB-3A`에서 selected slot은 execution snapshot source까지 맡게 됐다.
+    - emit-build는 `HazardEmitterPatternExecutionSlotBuffer`에서 selected slot을 resolve한다.
+    - `AppliedPatternSlotId != selectedSlotId`면 current `HazardEmitterTelegraphProfileComponent` / `HazardEmitterEmissionProfileComponent`를 selected slot snapshot으로 갱신한다.
+    - 같은 emitter 안에서 selected slot이 바뀌면 lifecycle은 `Dormant + timer 0`으로 hard reset된다.
+    - snapshot 갱신이 일어난 frame에는 즉시 새 cycle을 시작하지 않는다.
+  - 단, actor phase와 blueprint-aware selector policy는 아직 없다.
+    - 현재 selector는 여전히 lowest-emitter / lowest-slot deterministic policy다.
 
 ### 5.4 State escalation / encounter presentation
 - 청사진을 달성하려면 actor에는 발사 전조와 별개의 상위 존재 연출이 필요하다.
@@ -208,6 +212,15 @@
 - room-entry activation presentation
 - two-pattern selection
 - progress-threshold escalation
+- 구현 상태:
+  - `HB-3A. Multi-slot authoring and runtime slot execution` 코드 반영 완료
+  - `HB-3A` 최종 검증 완료
+    - Unity MCP 기준 compile ready 확인
+    - `EditMode 517/517 passed`
+    - `PlayMode 48/48 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+    - PlayMode suite 실행 중 Unity MCP polling을 섞으면 disposed `NetworkStream` noise가 재유입될 수 있으므로, 최종 smoke 판정은 mid-run polling 없이 재실행한 결과를 기준으로 삼는다.
+  - `HB-3B/C/D`는 아직 시작 전
 
 ### 7.4 HB-4. Validation / sample update
 - operational sample과 test-only verification path를 actor behavior 기준으로 확장

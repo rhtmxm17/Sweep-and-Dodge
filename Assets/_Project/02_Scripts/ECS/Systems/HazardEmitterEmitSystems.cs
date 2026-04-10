@@ -25,9 +25,10 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<HazardEmitterTelegraphProfileComponent>();
             state.RequireForUpdate<HazardEmitterEmissionProfileComponent>();
             state.RequireForUpdate<HazardEmitterRuntimeStateComponent>();
+            state.RequireForUpdate<HazardEmitterSelectedPatternRuntimeComponent>();
             state.RequireForUpdate<HazardEmitterCoordinatorStateComponent>();
             state.RequireForUpdate<HazardActorPatternSelectorStateComponent>();
-            state.RequireForUpdate<HazardEmitterPatternSlotBuffer>();
+            state.RequireForUpdate<HazardEmitterPatternExecutionSlotBuffer>();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -51,20 +52,21 @@ namespace SweepNDodge.DotsBullets
 
             var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
             var selectorLookup = SystemAPI.GetComponentLookup<HazardActorPatternSelectorStateComponent>(true);
-            var slotLookup = SystemAPI.GetBufferLookup<HazardEmitterPatternSlotBuffer>(true);
             var localTransformLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             var localToWorldLookup = SystemAPI.GetComponentLookup<LocalToWorld>(true);
+            var executionSlotLookup = SystemAPI.GetBufferLookup<HazardEmitterPatternExecutionSlotBuffer>(true);
             actorLookup.Update(ref state);
             selectorLookup.Update(ref state);
-            slotLookup.Update(ref state);
             localTransformLookup.Update(ref state);
             localToWorldLookup.Update(ref state);
+            executionSlotLookup.Update(ref state);
 
-            foreach (var (emitter, applied, telegraph, emission, coordinator, runtime, entity) in SystemAPI.Query<
+            foreach (var (emitter, applied, telegraph, emission, selectedPattern, coordinator, runtime, entity) in SystemAPI.Query<
                 RefRO<HazardEmitterComponent>,
                 RefRO<HazardEmitterAppliedConfigComponent>,
-                RefRO<HazardEmitterTelegraphProfileComponent>,
-                RefRO<HazardEmitterEmissionProfileComponent>,
+                RefRW<HazardEmitterTelegraphProfileComponent>,
+                RefRW<HazardEmitterEmissionProfileComponent>,
+                RefRW<HazardEmitterSelectedPatternRuntimeComponent>,
                 RefRO<HazardEmitterCoordinatorStateComponent>,
                 RefRW<HazardEmitterRuntimeStateComponent>>().WithEntityAccess())
             {
@@ -72,14 +74,47 @@ namespace SweepNDodge.DotsBullets
                 ref readonly var appliedConfig = ref applied.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
 
-                if (coordinator.ValueRO.ActivationAllowed == 0
-                    || !IsEmitterSelectedForExecution(
-                        emitterConfig.ActorEntity,
-                        emitterConfig.EmitterId,
-                        entity,
-                        selectorLookup,
-                        slotLookup))
+                if (coordinator.ValueRO.ActivationAllowed == 0)
                 {
+                    selectedPattern.ValueRW.AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId;
+                    runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
+                    runtimeState.StateElapsedSec = 0f;
+                    continue;
+                }
+
+                int selectedSlotId = GetSelectedPatternSlotIdForEmitter(
+                    emitterConfig.ActorEntity,
+                    emitterConfig.EmitterId,
+                    selectorLookup);
+                if (!executionSlotLookup.HasBuffer(entity))
+                {
+                    selectedPattern.ValueRW.AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId;
+                    runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
+                    runtimeState.StateElapsedSec = 0f;
+                    continue;
+                }
+
+                var executionSlots = executionSlotLookup[entity];
+                if (selectedSlotId < 0
+                    || !TryFindExecutionSlot(executionSlots, selectedSlotId, out var executionSlot))
+                {
+                    selectedPattern.ValueRW.AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId;
+                    runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
+                    runtimeState.StateElapsedSec = 0f;
+                    continue;
+                }
+
+                if (selectedPattern.ValueRO.AppliedPatternSlotId != selectedSlotId)
+                {
+                    var telegraphRuntime = telegraph.ValueRO;
+                    var emissionRuntime = emission.ValueRO;
+                    HazardEmitterPatternSetCompatibilityUtility.ApplyExecutionSlotToRuntime(
+                        in executionSlot,
+                        ref telegraphRuntime,
+                        ref emissionRuntime);
+                    telegraph.ValueRW = telegraphRuntime;
+                    emission.ValueRW = emissionRuntime;
+                    selectedPattern.ValueRW.AppliedPatternSlotId = selectedSlotId;
                     runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
                     runtimeState.StateElapsedSec = 0f;
                     continue;
@@ -200,30 +235,36 @@ namespace SweepNDodge.DotsBullets
             return localOffset;
         }
 
-        private static bool IsEmitterSelectedForExecution(
+        private static int GetSelectedPatternSlotIdForEmitter(
             Entity actorEntity,
             int emitterId,
-            Entity emitterEntity,
-            ComponentLookup<HazardActorPatternSelectorStateComponent> selectorLookup,
-            BufferLookup<HazardEmitterPatternSlotBuffer> slotLookup)
+            ComponentLookup<HazardActorPatternSelectorStateComponent> selectorLookup)
         {
             if (actorEntity == Entity.Null || !selectorLookup.HasComponent(actorEntity))
-                return false;
+                return HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId;
 
             var selector = selectorLookup[actorEntity];
             if (selector.TargetEmitterId != emitterId || selector.CurrentPatternSlotId < 0)
-                return false;
+                return HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId;
 
-            if (!slotLookup.HasBuffer(emitterEntity))
-                return false;
+            return selector.CurrentPatternSlotId;
+        }
 
-            var slots = slotLookup[emitterEntity];
-            for (int i = 0; i < slots.Length; i++)
+        private static bool TryFindExecutionSlot(
+            DynamicBuffer<HazardEmitterPatternExecutionSlotBuffer> executionSlots,
+            int patternSlotId,
+            out HazardEmitterPatternExecutionSlotBuffer slot)
+        {
+            for (int i = 0; i < executionSlots.Length; i++)
             {
-                if (slots[i].PatternSlotId == selector.CurrentPatternSlotId)
-                    return true;
+                if (executionSlots[i].PatternSlotId != patternSlotId)
+                    continue;
+
+                slot = executionSlots[i];
+                return true;
             }
 
+            slot = default;
             return false;
         }
     }

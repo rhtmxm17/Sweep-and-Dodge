@@ -97,8 +97,9 @@ namespace SweepNDodge.DotsBullets.Tests
             var emitterGo = new GameObject("hazard_emitter");
             emitterGo.transform.SetParent(root.transform);
             var authoring = emitterGo.AddComponent<HazardEmitterAuthoring>();
-            authoring.TelegraphProfile = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
-            authoring.EmissionProfile = CreateEmissionProfile();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+            authoring.Slots = CreatePatternSlots((1, telegraph, emission, 1f, 0u));
 
             try
             {
@@ -110,9 +111,9 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
-                Object.DestroyImmediate(authoring.TelegraphProfile);
-                Object.DestroyImmediate(authoring.EmissionProfile.Bullet);
-                Object.DestroyImmediate(authoring.EmissionProfile);
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
                 Object.DestroyImmediate(root);
             }
         }
@@ -129,8 +130,9 @@ namespace SweepNDodge.DotsBullets.Tests
             emitterGo.transform.SetParent(actorGo.transform);
             var authoring = emitterGo.AddComponent<HazardEmitterAuthoring>();
             authoring.ActivationPolicy = HazardEmitterActivationPolicyId.ProgressReactive;
-            authoring.TelegraphProfile = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
-            authoring.EmissionProfile = CreateEmissionProfile();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+            authoring.Slots = CreatePatternSlots((1, telegraph, emission, 1f, 0u));
 
             try
             {
@@ -142,9 +144,46 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
-                Object.DestroyImmediate(authoring.TelegraphProfile);
-                Object.DestroyImmediate(authoring.EmissionProfile.Bullet);
-                Object.DestroyImmediate(authoring.EmissionProfile);
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void HazardEmitterAuthoringValidation_RejectsDuplicatePatternSlotIds()
+        {
+            var root = new GameObject("source_root");
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            actorGo.AddComponent<HazardActorAuthoring>();
+            var emitterGo = new GameObject("hazard_emitter");
+            emitterGo.transform.SetParent(actorGo.transform);
+            var authoring = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            var telegraphA = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emissionA = CreateEmissionProfile();
+            var telegraphB = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emissionB = CreateEmissionProfile();
+            authoring.Slots = CreatePatternSlots(
+                (1, telegraphA, emissionA, 1f, 0u),
+                (1, telegraphB, emissionB, 1f, 0u));
+
+            try
+            {
+                bool ok = HazardEmitterAuthoringValidationUtility.TryValidate(authoring, out _, out _, out var error);
+                Assert.That(ok, Is.False);
+                Assert.That(error, Does.Contain("duplicate PatternSlotId"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(telegraphA);
+                Object.DestroyImmediate(emissionA.Bullet);
+                Object.DestroyImmediate(emissionA);
+                Object.DestroyImmediate(telegraphB);
+                Object.DestroyImmediate(emissionB.Bullet);
+                Object.DestroyImmediate(emissionB);
                 Object.DestroyImmediate(root);
             }
         }
@@ -410,6 +449,11 @@ namespace SweepNDodge.DotsBullets.Tests
             world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+            CreateFrameCounter(em, 2u);
+            world.SetTime(new TimeData(2d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
 
             var requests = GetDiscreteEmitRequests(em);
             Assert.That(requests.Length, Is.EqualTo(1));
@@ -461,8 +505,6 @@ namespace SweepNDodge.DotsBullets.Tests
             coordinatorSystem.Update(world.Unmanaged);
             selectorSystem.Update(world.Unmanaged);
             system.Update(world.Unmanaged);
-            Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(1));
-
             CreateFrameCounter(em, 2u);
             world.SetTime(new TimeData(1d, 0.5f));
             coordinatorSystem.Update(world.Unmanaged);
@@ -472,6 +514,13 @@ namespace SweepNDodge.DotsBullets.Tests
 
             CreateFrameCounter(em, 3u);
             world.SetTime(new TimeData(1.5d, 0.5f));
+            coordinatorSystem.Update(world.Unmanaged);
+            selectorSystem.Update(world.Unmanaged);
+            system.Update(world.Unmanaged);
+            Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(1));
+
+            CreateFrameCounter(em, 4u);
+            world.SetTime(new TimeData(2d, 0.5f));
             coordinatorSystem.Update(world.Unmanaged);
             selectorSystem.Update(world.Unmanaged);
             system.Update(world.Unmanaged);
@@ -508,6 +557,11 @@ namespace SweepNDodge.DotsBullets.Tests
             BulletFieldShared.FreeByKey.Add(703, pooledBullet);
 
             world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+            CreateFrameCounter(em, 2u);
+            world.SetTime(new TimeData(2d / 60d, 1f / 60f));
             world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
@@ -1420,6 +1474,11 @@ namespace SweepNDodge.DotsBullets.Tests
             world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
             world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+            CreateFrameCounter(em, 2u);
+            world.SetTime(new TimeData(2d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
 
             var requests = GetDiscreteEmitRequests(em);
             Assert.That(requests.Length, Is.EqualTo(1));
@@ -1508,6 +1567,129 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardEmitterEmitBuild_SelectedSlotExecutionCutover_AppliesSnapshotAndResetsDormant()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_SelectedSlotCutover", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 1f / 60f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 709481);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 709481,
+                telegraphDurationSec: 0.1f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            ReplaceEmitterPatternSlots(
+                em,
+                emitter,
+                CreateExecutionSlot(em, emitter, 1, telegraphProfileRefId: 1, emissionProfileRefId: 1, telegraphDurationSec: 0.1f, bulletTypeKey: 709481, cooldownSec: 1f, baseAngleDeg: 0f),
+                CreateExecutionSlot(em, emitter, 2, telegraphProfileRefId: 2, emissionProfileRefId: 2, telegraphDurationSec: 0.6f, bulletTypeKey: 709482, cooldownSec: 2f, baseAngleDeg: 35f));
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = 1,
+                CurrentPatternSlotId = 2,
+                LastPatternSlotId = -1,
+                SelectionSequence = 1u,
+            });
+
+            world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
+
+            var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
+            var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
+            var selectedPattern = em.GetComponentData<HazardEmitterSelectedPatternRuntimeComponent>(emitter);
+            var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+
+            Assert.That(telegraph.ProfileId, Is.EqualTo(2));
+            Assert.That(telegraph.TelegraphDurationSec, Is.EqualTo(0.6f).Within(0.0001f));
+            Assert.That(emission.ProfileId, Is.EqualTo(2));
+            Assert.That(emission.BulletTypeKey, Is.EqualTo(709482));
+            Assert.That(emission.BaseAngleDeg, Is.EqualTo(35f).Within(0.0001f));
+            Assert.That(emission.CooldownSec, Is.EqualTo(2f).Within(0.0001f));
+            Assert.That(selectedPattern.AppliedPatternSlotId, Is.EqualTo(2));
+            Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+            Assert.That(GetDiscreteEmitRequests(em).Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void HazardEmitterEmitBuild_SameEmitterSlotChange_DuringCooldown_ForcesImmediateDormant()
+        {
+            using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_SameEmitterSlotChange", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.1f);
+
+            var source = CreateSourceWithActiveCountBuffer(em, 709482);
+            var emitter = CreateEmitter(
+                em,
+                source,
+                bulletTypeKey: 709482,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            var actor = em.GetComponentData<HazardEmitterComponent>(emitter).ActorEntity;
+            ReplaceEmitterPatternSlots(
+                em,
+                emitter,
+                CreateExecutionSlot(em, emitter, 1, telegraphProfileRefId: 1, emissionProfileRefId: 1, telegraphDurationSec: 0f, bulletTypeKey: 709482, cooldownSec: 1f, baseAngleDeg: 0f),
+                CreateExecutionSlot(em, emitter, 2, telegraphProfileRefId: 2, emissionProfileRefId: 2, telegraphDurationSec: 0.25f, bulletTypeKey: 709483, cooldownSec: 2f, baseAngleDeg: 55f));
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = 1,
+                CurrentPatternSlotId = 1,
+                LastPatternSlotId = -1,
+                SelectionSequence = 1u,
+            });
+
+            var coordinatorSystem = world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>();
+            var emitSystem = world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>();
+
+            world.SetTime(new TimeData(0.1d, 0.1f));
+            coordinatorSystem.Update(world.Unmanaged);
+            emitSystem.Update(world.Unmanaged); // apply slot 1 snapshot, dormant
+
+            world.SetTime(new TimeData(0.2d, 0.1f));
+            coordinatorSystem.Update(world.Unmanaged);
+            emitSystem.Update(world.Unmanaged); // start cycle for slot 1 -> cooldown
+
+            var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+            Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Cooldown));
+
+            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = 1,
+                CurrentPatternSlotId = 2,
+                LastPatternSlotId = 1,
+                SelectionSequence = 2u,
+            });
+
+            world.SetTime(new TimeData(0.3d, 0.1f));
+            coordinatorSystem.Update(world.Unmanaged);
+            emitSystem.Update(world.Unmanaged);
+
+            var selectedPattern = em.GetComponentData<HazardEmitterSelectedPatternRuntimeComponent>(emitter);
+            var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
+            var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
+            runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
+
+            Assert.That(selectedPattern.AppliedPatternSlotId, Is.EqualTo(2));
+            Assert.That(telegraph.ProfileId, Is.EqualTo(2));
+            Assert.That(emission.ProfileId, Is.EqualTo(2));
+            Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
+            Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
+        }
+
+        [Test]
         public void HazardEmitterEmitBuild_DeselectionDuringTelegraph_ForcesImmediateDormant()
         {
             using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_DeselectTelegraph", out _);
@@ -1553,6 +1735,11 @@ namespace SweepNDodge.DotsBullets.Tests
             coordinatorSystem.Update(world.Unmanaged);
             selectorSystem.Update(world.Unmanaged);
             emitSystem.Update(world.Unmanaged);
+            CreateFrameCounter(em, 2u);
+            world.SetTime(new TimeData(0.2d, 0.1f));
+            coordinatorSystem.Update(world.Unmanaged);
+            selectorSystem.Update(world.Unmanaged);
+            emitSystem.Update(world.Unmanaged);
 
             var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(selectedEmitter);
             Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Telegraph));
@@ -1562,7 +1749,7 @@ namespace SweepNDodge.DotsBullets.Tests
             lowerApplied.IsEnabled = 1;
             em.SetComponentData(lowerEmitter, lowerApplied);
 
-            world.SetTime(new TimeData(0.2d, 0.1f));
+            world.SetTime(new TimeData(0.3d, 0.1f));
             coordinatorSystem.Update(world.Unmanaged);
             selectorSystem.Update(world.Unmanaged);
             emitSystem.Update(world.Unmanaged);
@@ -1618,6 +1805,11 @@ namespace SweepNDodge.DotsBullets.Tests
             coordinatorSystem.Update(world.Unmanaged);
             selectorSystem.Update(world.Unmanaged);
             emitSystem.Update(world.Unmanaged);
+            CreateFrameCounter(em, 2u);
+            world.SetTime(new TimeData(0.2d, 0.1f));
+            coordinatorSystem.Update(world.Unmanaged);
+            selectorSystem.Update(world.Unmanaged);
+            emitSystem.Update(world.Unmanaged);
 
             var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(selectedEmitter);
             Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Cooldown));
@@ -1627,7 +1819,7 @@ namespace SweepNDodge.DotsBullets.Tests
             lowerApplied.IsEnabled = 1;
             em.SetComponentData(lowerEmitter, lowerApplied);
 
-            world.SetTime(new TimeData(0.2d, 0.1f));
+            world.SetTime(new TimeData(0.3d, 0.1f));
             coordinatorSystem.Update(world.Unmanaged);
             selectorSystem.Update(world.Unmanaged);
             emitSystem.Update(world.Unmanaged);
@@ -1778,6 +1970,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardEmitterEmissionProfileBaselineComponent),
                 typeof(HazardEmitterEmissionProfileComponent),
                 typeof(HazardEmitterRuntimeStateComponent),
+                typeof(HazardEmitterSelectedPatternRuntimeComponent),
                 typeof(HazardEmitterCoordinatorStateComponent));
 
             em.SetComponentData(entity, LocalTransform.FromPosition(position));
@@ -1854,17 +2047,27 @@ namespace SweepNDodge.DotsBullets.Tests
                 LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                 StateElapsedSec = 0f,
             });
+            em.SetComponentData(entity, new HazardEmitterSelectedPatternRuntimeComponent
+            {
+                AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
+            });
             em.SetComponentData(entity, new HazardEmitterCoordinatorStateComponent
             {
                 ActivationAllowed = 0,
                 SuppressionReasonMask = 0u,
                 LastPlayerDistanceSq = float.MaxValue,
             });
-            var patternSlots = em.AddBuffer<HazardEmitterPatternSlotBuffer>(entity);
+            em.AddBuffer<HazardEmitterPatternSlotBuffer>(entity);
+            em.AddBuffer<HazardEmitterPatternExecutionSlotBuffer>(entity);
+            var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(entity);
+            var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(entity);
+            var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(entity);
             HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
                 ref patternSlots,
+                ref executionSlots,
                 telegraphProfileRefId: 1,
-                emissionProfileRefId: 1);
+                telegraphDurationSec,
+                in emission);
             var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actor);
             emitterRefs.Add(new HazardActorEmitterRefBuffer
             {
@@ -1943,6 +2146,72 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             return Entity.Null;
+        }
+
+        private static HazardEmitterPatternSlotAuthoring[] CreatePatternSlots(
+            params (int patternSlotId, HazardEmitterTelegraphProfileSO telegraph, HazardEmitterEmissionProfileSO emission, float baseWeight, uint availabilityFlags)[] slots)
+        {
+            var result = new HazardEmitterPatternSlotAuthoring[slots.Length];
+            for (int i = 0; i < slots.Length; i++)
+            {
+                result[i] = new HazardEmitterPatternSlotAuthoring
+                {
+                    PatternSlotId = slots[i].patternSlotId,
+                    TelegraphProfile = slots[i].telegraph,
+                    EmissionProfile = slots[i].emission,
+                    BaseWeight = slots[i].baseWeight,
+                    AvailabilityFlags = slots[i].availabilityFlags,
+                };
+            }
+
+            return result;
+        }
+
+        private static void ReplaceEmitterPatternSlots(
+            EntityManager em,
+            Entity emitter,
+            params HazardEmitterPatternExecutionSlotBuffer[] executionSlots)
+        {
+            var metadataSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
+            var runtimeExecutionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
+            metadataSlots.Clear();
+            runtimeExecutionSlots.Clear();
+
+            for (int i = 0; i < executionSlots.Length; i++)
+            {
+                metadataSlots.Add(new HazardEmitterPatternSlotBuffer
+                {
+                    PatternSlotId = executionSlots[i].PatternSlotId,
+                    TelegraphProfileRefId = executionSlots[i].TelegraphProfileRefId,
+                    EmissionProfileRefId = executionSlots[i].EmissionProfileRefId,
+                    BaseWeight = 1f,
+                    AvailabilityFlags = 0u,
+                });
+                runtimeExecutionSlots.Add(executionSlots[i]);
+            }
+        }
+
+        private static HazardEmitterPatternExecutionSlotBuffer CreateExecutionSlot(
+            EntityManager em,
+            Entity emitter,
+            int patternSlotId,
+            int telegraphProfileRefId,
+            int emissionProfileRefId,
+            float telegraphDurationSec,
+            int bulletTypeKey,
+            float cooldownSec,
+            float baseAngleDeg)
+        {
+            var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
+            emission.ProfileId = emissionProfileRefId;
+            emission.BulletTypeKey = bulletTypeKey;
+            emission.BaseAngleDeg = baseAngleDeg;
+            emission.CooldownSec = cooldownSec;
+            return HazardEmitterPatternSetCompatibilityUtility.CreateExecutionSlot(
+                patternSlotId,
+                telegraphProfileRefId,
+                telegraphDurationSec,
+                in emission);
         }
 
         private static Entity CreateSourceWithDirector(

@@ -927,6 +927,7 @@ namespace SweepNDodge.DotsBullets.Editor
                         }
 
                         emitterOwnerLocations.Add(emitterLocation);
+                        ValidateHazardEmitterSlots(emitter, emitterLocation, issues);
                     }
 
                     foreach (var pair in emitterOwners)
@@ -977,6 +978,81 @@ namespace SweepNDodge.DotsBullets.Editor
                         "CV044",
                         $"{location}::HazardEmitter[{emitter.name}]",
                         "HazardEmitterAuthoring under a source template requires a parent HazardActorAuthoring."));
+                }
+            }
+        }
+
+        private static void ValidateHazardEmitterSlots(
+            HazardEmitterAuthoring emitter,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            var slots = emitter.Slots ?? Array.Empty<HazardEmitterPatternSlotAuthoring>();
+            if (slots.Length <= 0)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV046",
+                    location,
+                    "HazardEmitterAuthoring requires at least one pattern slot."));
+                return;
+            }
+
+            var slotOwners = new Dictionary<int, List<string>>();
+            for (int slotIndex = 0; slotIndex < slots.Length; slotIndex++)
+            {
+                var slot = slots[slotIndex];
+                string slotLocation = $"{location}/Slots[{slotIndex}]";
+
+                if (slot.PatternSlotId < 1)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV047",
+                        slotLocation,
+                        $"HazardEmitter pattern slot requires PatternSlotId >= 1. current={slot.PatternSlotId}"));
+                }
+
+                if (slot.BaseWeight < 0f)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV049",
+                        slotLocation,
+                        $"HazardEmitter pattern slot requires BaseWeight >= 0. current={slot.BaseWeight}"));
+                }
+
+                if (slot.TelegraphProfile == null || slot.EmissionProfile == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV049",
+                        slotLocation,
+                        "HazardEmitter pattern slot requires non-null TelegraphProfile and EmissionProfile."));
+                }
+
+                if (!slotOwners.TryGetValue(slot.PatternSlotId, out var owners))
+                {
+                    owners = new List<string>(2);
+                    slotOwners.Add(slot.PatternSlotId, owners);
+                }
+
+                owners.Add(slotLocation);
+            }
+
+            foreach (var pair in slotOwners)
+            {
+                if (pair.Key < 1 || pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int ownerIndex = 0; ownerIndex < pair.Value.Count; ownerIndex++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV048",
+                        pair.Value[ownerIndex],
+                        $"Duplicate HazardEmitter pattern slot id detected under one emitter. patternSlotId={pair.Key}, owners={joined}"));
                 }
             }
         }

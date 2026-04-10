@@ -17,9 +17,16 @@ namespace SweepNDodge.DotsBullets
         public bool StartSuppressed = false;
         public Vector3 LocalOffset = Vector3.zero;
 
-        [Header("Profiles")]
-        public HazardEmitterTelegraphProfileSO TelegraphProfile;
-        public HazardEmitterEmissionProfileSO EmissionProfile;
+        [Header("Pattern Slots")]
+        public HazardEmitterPatternSlotAuthoring[] Slots =
+        {
+            new HazardEmitterPatternSlotAuthoring
+            {
+                PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
+                BaseWeight = HazardEmitterPatternSetCompatibilityUtility.CompatibilityBaseWeight,
+                AvailabilityFlags = HazardEmitterPatternSetCompatibilityUtility.CompatibilityAvailabilityFlags,
+            }
+        };
 
         private sealed class Baker : Baker<HazardEmitterAuthoring>
         {
@@ -31,62 +38,28 @@ namespace SweepNDodge.DotsBullets
                     return;
                 }
 
-                if (!HazardEmitterProfileResolver.TryResolve(authoring.EmissionProfile, out var resolvedEmission, out error))
+                var emitterEntity = GetEntity(TransformUsageFlags.Dynamic);
+                var actorEntity = GetEntity(actorAuthoring.gameObject, TransformUsageFlags.Dynamic);
+                if (!HazardEmitterPatternSlotAuthoringUtility.TryResolveSlots(authoring.Slots, out var resolvedSlots, out error))
                 {
                     Debug.LogError($"[HazardEmitterAuthoring] {error}", authoring);
                     return;
                 }
 
-                var emitterEntity = GetEntity(TransformUsageFlags.Dynamic);
-                var actorEntity = GetEntity(actorAuthoring.gameObject, TransformUsageFlags.Dynamic);
-
-                int telegraphProfileRefId = authoring.TelegraphProfile != null ? authoring.TelegraphProfile.GetInstanceID() : 0;
-                int emissionProfileRefId = authoring.EmissionProfile != null ? authoring.EmissionProfile.GetInstanceID() : 0;
                 byte isEnabled = authoring.IsEnabled ? (byte)1 : (byte)0;
                 byte isSuppressed = authoring.StartSuppressed ? (byte)1 : (byte)0;
                 int emitterId = math.max(1, authoring.EmitterId);
+                var firstSlot = resolvedSlots[0];
+                var baselineTelegraph = HazardEmitterPatternSlotAuthoringUtility.CreateBaselineTelegraph(resolvedSlots);
+                var baselineEmission = HazardEmitterPatternSlotAuthoringUtility.CreateBaselineEmission(resolvedSlots);
 
                 var baselineConfig = new HazardEmitterAppliedConfigBaselineComponent
                 {
                     IsEnabled = isEnabled,
                     IsSuppressed = isSuppressed,
                     LocalOffset = authoring.LocalOffset,
-                    TelegraphProfileRefId = telegraphProfileRefId,
-                    EmissionProfileRefId = emissionProfileRefId,
-                };
-                var baselineTelegraph = new HazardEmitterTelegraphProfileBaselineComponent
-                {
-                    ProfileId = telegraphProfileRefId,
-                    TelegraphDurationSec = math.max(0f, authoring.TelegraphProfile.TelegraphDurationSec),
-                };
-                var baselineEmission = new HazardEmitterEmissionProfileBaselineComponent
-                {
-                    ProfileId = emissionProfileRefId,
-                    BulletTypeKey = resolvedEmission.Bullet.DefinitionId,
-                    PositionPatternMode = resolvedEmission.PositionPatternMode,
-                    SpawnOffset = resolvedEmission.SpawnOffset,
-                    LineStart = resolvedEmission.LineStart,
-                    LineEnd = resolvedEmission.LineEnd,
-                    SampleSpacing = resolvedEmission.SampleSpacing,
-                    PointSetCount = resolvedEmission.PointSetCount,
-                    Point0 = resolvedEmission.Point0,
-                    Point1 = resolvedEmission.Point1,
-                    Point2 = resolvedEmission.Point2,
-                    Point3 = resolvedEmission.Point3,
-                    AimMode = resolvedEmission.AimMode,
-                    AimSnapshotTiming = resolvedEmission.AimSnapshotTiming,
-                    BaseAngleDeg = resolvedEmission.BaseAngleDeg,
-                    AimAngleOffsetDeg = resolvedEmission.AimAngleOffsetDeg,
-                    LineNormalSide = resolvedEmission.LineNormalSide,
-                    LineNormalAngleOffsetDeg = resolvedEmission.LineNormalAngleOffsetDeg,
-                    SpiralStepDeg = resolvedEmission.SpiralStepDeg,
-                    ShotPatternMode = resolvedEmission.ShotPatternMode,
-                    ShotCount = resolvedEmission.ShotCount,
-                    NWayAngleSpacingDeg = resolvedEmission.NWayAngleSpacingDeg,
-                    EventShotSchedule = resolvedEmission.EventShotSchedule,
-                    EventShotIntervalSec = resolvedEmission.EventShotIntervalSec,
-                    EventRepeatCount = resolvedEmission.EventRepeatCount,
-                    CooldownSec = resolvedEmission.CooldownSec,
+                    TelegraphProfileRefId = firstSlot.Metadata.TelegraphProfileRefId,
+                    EmissionProfileRefId = firstSlot.Metadata.EmissionProfileRefId,
                 };
 
                 AddComponent(emitterEntity, new HazardEmitterComponent
@@ -148,11 +121,18 @@ namespace SweepNDodge.DotsBullets
                     LifecycleState = HazardEmitterLifecycleStateId.Dormant,
                     StateElapsedSec = 0f,
                 });
-                var patternSlots = AddBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
-                HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
+                AddComponent(emitterEntity, new HazardEmitterSelectedPatternRuntimeComponent
+                {
+                    AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
+                });
+                AddBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+                AddBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitterEntity);
+                var patternSlots = SetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+                var executionSlots = SetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitterEntity);
+                HazardEmitterPatternSlotAuthoringUtility.ApplyResolvedSlotsToBuffers(
+                    resolvedSlots,
                     ref patternSlots,
-                    baselineConfig.TelegraphProfileRefId,
-                    baselineConfig.EmissionProfileRefId);
+                    ref executionSlots);
             }
         }
     }

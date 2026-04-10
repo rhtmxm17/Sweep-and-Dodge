@@ -163,5 +163,9 @@ MonoBehaviour:
   IsEnabled: 1
   StartSuppressed: 0
   LocalOffset: {x: -3, y: 0, z: 2}
-  TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
-  EmissionProfile: {fileID: 11400000, guid: e2a3b4c5d6f74899aa0bb1cc2dd3e402, type: 2}
+  Slots:
+  - PatternSlotId: 1
+    TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
+    EmissionProfile: {fileID: 11400000, guid: e2a3b4c5d6f74899aa0bb1cc2dd3e402, type: 2}
+    BaseWeight: 1
+    AvailabilityFlags: 0

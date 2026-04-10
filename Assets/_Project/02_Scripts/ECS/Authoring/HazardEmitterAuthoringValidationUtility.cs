@@ -52,25 +52,7 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            if (authoring.TelegraphProfile == null)
-            {
-                error = "HazardEmitterAuthoring is missing TelegraphProfile.";
-                return false;
-            }
-
-            if (authoring.EmissionProfile == null)
-            {
-                error = "HazardEmitterAuthoring is missing EmissionProfile.";
-                return false;
-            }
-
-            if (authoring.TelegraphProfile.TelegraphDurationSec < 0f)
-            {
-                error = "Hazard emitter telegraph duration must be non-negative.";
-                return false;
-            }
-
-            if (!HazardEmitterProfileResolver.TryResolve(authoring.EmissionProfile, out _, out error))
+            if (!HazardEmitterPatternSlotAuthoringUtility.TryResolveSlots(authoring.Slots, out _, out error))
                 return false;
 
             return true;
