@@ -171,6 +171,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 BulletFieldShared.FreeByKey.Add(801, pooledBullet);
 
                 world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<HazardEmitterEmitBuildSystem>().Update(world.Unmanaged);
                 world.GetOrCreateSystem<DiscreteEmitExecutionSystem>().Update(world.Unmanaged);
                 em.CompleteAllTrackedJobs();

@@ -9,6 +9,7 @@ namespace SweepNDodge.DotsBullets
     [UpdateAfter(typeof(SourcePollutionUpdateSystem))]
     [UpdateAfter(typeof(SourceClipDiscreteEmitBuildSystem))]
     [UpdateAfter(typeof(HazardEmitterCoordinatorSystem))]
+    [UpdateAfter(typeof(HazardActorPatternSelectorSystem))]
     [UpdateBefore(typeof(SourceClipRequestBuildSystem))]
     [UpdateBefore(typeof(BulletRequestFencePublishSystem))]
     public partial struct HazardEmitterEmitBuildSystem : ISystem
@@ -25,6 +26,8 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<HazardEmitterEmissionProfileComponent>();
             state.RequireForUpdate<HazardEmitterRuntimeStateComponent>();
             state.RequireForUpdate<HazardEmitterCoordinatorStateComponent>();
+            state.RequireForUpdate<HazardActorPatternSelectorStateComponent>();
+            state.RequireForUpdate<HazardEmitterPatternSlotBuffer>();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -47,9 +50,13 @@ namespace SweepNDodge.DotsBullets
             var discreteRequests = SystemAPI.GetBuffer<DiscreteEmitRequestBuffer>(channelEntity);
 
             var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
+            var selectorLookup = SystemAPI.GetComponentLookup<HazardActorPatternSelectorStateComponent>(true);
+            var slotLookup = SystemAPI.GetBufferLookup<HazardEmitterPatternSlotBuffer>(true);
             var localTransformLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             var localToWorldLookup = SystemAPI.GetComponentLookup<LocalToWorld>(true);
             actorLookup.Update(ref state);
+            selectorLookup.Update(ref state);
+            slotLookup.Update(ref state);
             localTransformLookup.Update(ref state);
             localToWorldLookup.Update(ref state);
 
@@ -65,7 +72,13 @@ namespace SweepNDodge.DotsBullets
                 ref readonly var appliedConfig = ref applied.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
 
-                if (coordinator.ValueRO.ActivationAllowed == 0)
+                if (coordinator.ValueRO.ActivationAllowed == 0
+                    || !IsEmitterSelectedForExecution(
+                        emitterConfig.ActorEntity,
+                        emitterConfig.EmitterId,
+                        entity,
+                        selectorLookup,
+                        slotLookup))
                 {
                     runtimeState.LifecycleState = HazardEmitterLifecycleStateId.Dormant;
                     runtimeState.StateElapsedSec = 0f;
@@ -185,6 +198,33 @@ namespace SweepNDodge.DotsBullets
                 return localTransformLookup[emitterEntity].Position + localOffset;
 
             return localOffset;
+        }
+
+        private static bool IsEmitterSelectedForExecution(
+            Entity actorEntity,
+            int emitterId,
+            Entity emitterEntity,
+            ComponentLookup<HazardActorPatternSelectorStateComponent> selectorLookup,
+            BufferLookup<HazardEmitterPatternSlotBuffer> slotLookup)
+        {
+            if (actorEntity == Entity.Null || !selectorLookup.HasComponent(actorEntity))
+                return false;
+
+            var selector = selectorLookup[actorEntity];
+            if (selector.TargetEmitterId != emitterId || selector.CurrentPatternSlotId < 0)
+                return false;
+
+            if (!slotLookup.HasBuffer(emitterEntity))
+                return false;
+
+            var slots = slotLookup[emitterEntity];
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i].PatternSlotId == selector.CurrentPatternSlotId)
+                    return true;
+            }
+
+            return false;
         }
     }
 }

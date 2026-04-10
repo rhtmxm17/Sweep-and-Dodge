@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260409-01`
 - type: `SessionTaskBoard`
 - status: `in_progress`
-- last_updated: `2026-04-11`
+- last_updated: `2026-04-10`
 - related_docs:
   - [./SESSION-20260408-01-hazard-actor-design-board.md](./SESSION-20260408-01-hazard-actor-design-board.md)
   - [../TechnicalDesign/TD-028-hazard-emitter-common-contract.md](../TechnicalDesign/TD-028-hazard-emitter-common-contract.md)
@@ -30,11 +30,11 @@
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- `HB-2B. PatternSelector runtime owner` 구현 및 Unity MCP 검증 재시도 완료
-- 다음 구현 단위는 `HB-2C. Emit-build selector seam cutover`
+- `HB-2C. Emit-build selector seam cutover` 구현 및 Unity MCP 검증 재시도 완료
+- 다음 논의/구현 시작점은 `HB-3. Blueprint vertical slice`
 
 ## Next
-- `HB-2C. Emit-build selector seam cutover` 실행 플랜을 수립한다.
+- `HB-3. Blueprint vertical slice`의 첫 실행 단위를 설계한다.
 
 ## Blocked
 - `read_console(error)`는 여전히 `Client handler exited`와 `SpawnBacklog` 테스트 로그 노이즈를 섞어 반환함
@@ -116,8 +116,23 @@
   - 해석:
     - disposed-stream noise에 대한 EditMode / PlayMode harness 안정화는 완료됐다.
     - 남은 콘솔 노이즈는 `Client handler exited`와 기존 `SpawnBacklog` 테스트 로그이며, 이번 안정화 범위에는 포함하지 않는다.
+- [x] D12. `HB-2C. Emit-build selector seam cutover` 구현을 완료했다.
+  - `HazardEmitterEmitBuildSystem`이 이제 actor-owned selector result를 실제 execution gate로 읽는다.
+  - emit-build는 `TargetEmitterId == emitter.EmitterId`와 `CurrentPatternSlotId`의 실제 slot 존재를 모두 요구한다.
+  - 선택되지 않은 emitter 또는 selected slot이 없는 emitter는 즉시 `Dormant + timer 0`으로 강제된다.
+  - execution payload는 아직 compatibility path를 유지한다.
+    - selected slot은 execution eligibility contract로만 쓰이고
+    - 실제 emit은 계속 emitter applied telegraph/emission component를 직접 읽는다.
+  - 검증 결과:
+    - Unity MCP `refresh_unity(compile=request)` 요청 후 PlayMode `48/48 passed`
+    - `result.summary.resultState`는 `Failed(Child)`로 표시됐지만, progress와 summary의 failed count는 0이었다.
+    - Unity MCP EditMode는 다시 `MCP-FOR-UNITY` disposed `NetworkStream` 로그가 테스트 오라클에 걸려 실패
+    - `read_console(error)`에도 동일한 MCP client exit/error 로그가 포함됐다.
+  - 해석:
+    - selector seam cutover 이후 runtime/gameplay regression은 관측되지 않았다.
+    - EditMode 실패는 여전히 MCP 로그 노이즈로 분리 기록한다.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `HB-2C. Emit-build selector seam cutover` 실행 플랜을 수립한다.
+  - `HB-3. Blueprint vertical slice`의 첫 실행 단위를 설계한다.

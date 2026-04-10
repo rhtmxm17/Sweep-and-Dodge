@@ -4,7 +4,7 @@
 - doc_id: `TD-031`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-04-11`
+- last_updated: `2026-04-10`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
   - [../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md](../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md)
@@ -157,6 +157,17 @@
 - 첫 설계 질문:
   - 현재 applied telegraph/emission snapshot을 slot 실행과 어떻게 연결하는가
   - slot resolve는 emitter build owner가 수행하는가
+- 현재 구현 상태:
+  - `HB-2C`에서 `HazardEmitterEmitBuildSystem`이 selector-aware로 전환됐다.
+  - emit-build는 이제 아래 조건을 모두 만족할 때만 emitter를 진행시킨다.
+    - coordinator `ActivationAllowed == 1`
+    - actor selector state 존재
+    - selector `TargetEmitterId == emitter.EmitterId`
+    - selector `CurrentPatternSlotId`가 emitter의 slot buffer 안에 실제로 존재
+  - selector가 이 emitter를 가리키지 않거나 selected slot이 없으면, emitter lifecycle은 즉시 `Dormant + timer 0`으로 강제된다.
+  - 다만 실제 execution payload는 아직 slot별 profile resolve를 하지 않는다.
+    - selected slot은 execution eligibility contract로만 사용
+    - 실제 emit은 계속 emitter applied `HazardEmitterTelegraphProfileComponent` / `HazardEmitterEmissionProfileComponent`를 직접 읽는다.
 
 ### 5.4 State escalation / encounter presentation
 - 청사진을 달성하려면 actor에는 발사 전조와 별개의 상위 존재 연출이 필요하다.
@@ -191,7 +202,7 @@
 - 구현 상태:
   - `HB-2A. PatternSet compatibility data layer` 구현 완료
   - `HB-2B. PatternSelector runtime owner` 구현 완료
-  - `HB-2C. Emit-build selector seam cutover` 미구현
+  - `HB-2C. Emit-build selector seam cutover` 구현 완료
 
 ### 7.3 HB-3. Blueprint vertical slice
 - room-entry activation presentation
