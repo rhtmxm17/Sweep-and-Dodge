@@ -37,7 +37,7 @@
 - `HB-2C. Emit-build selector seam cutover` 실행 플랜을 수립한다.
 
 ## Blocked
-- Unity MCP `EditMode` 검증 시 MCP client exit 로그가 테스트 오라클에 걸려 일부 테스트가 실패함
+- `read_console(error)`는 여전히 `Client handler exited`와 `SpawnBacklog` 테스트 로그 노이즈를 섞어 반환함
 
 ## Parking Lot
 - [ ] P1. multi-emitter coordinated action contract를 언제 여는지
@@ -105,6 +105,17 @@
   - 해석:
     - selector writer 도입 이후 gameplay regression은 관측되지 않았다.
     - EditMode 실패는 여전히 MCP 로그 노이즈로 분리 기록한다.
+- [x] D11. `PlayMode` MCP disposed-stream noise filter를 추가해 PlayMode test harness를 안정화했다.
+  - `SetUpFixture` 기반으로 PlayMode suite 전체에서도 failing log를 직접 수집한다.
+  - 허용 대상은 `MCP-FOR-UNITY` disposed `NetworkStream` error 한 종류만으로 제한했다.
+  - 나머지 `Error / Assert / Exception`은 suite 종료 시 한 번에 실패시키도록 유지했다.
+  - Unity MCP 검증 결과:
+    - compile 이후 `EditMode 506/506 passed`
+    - `PlayMode 48/48 passed` (`resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다)
+    - 기존 실패 케이스였던 `BulletPlayModeSmokeTests.PlayMode_OperationalScene_DemoShell_ResultRetry_ReentersSameStage`도 더 이상 MCP disposed-stream noise로 실패하지 않았다.
+  - 해석:
+    - disposed-stream noise에 대한 EditMode / PlayMode harness 안정화는 완료됐다.
+    - 남은 콘솔 노이즈는 `Client handler exited`와 기존 `SpawnBacklog` 테스트 로그이며, 이번 안정화 범위에는 포함하지 않는다.
 
 ## End of Session
 - 결과: 진행 중
