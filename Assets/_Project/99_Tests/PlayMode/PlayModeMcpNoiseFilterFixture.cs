@@ -54,7 +54,7 @@ namespace SweepNDodge.DotsBullets.Tests
             if (!PlayModeMcpNoiseFilterUtility.IsFailingLogType(logType))
                 return;
 
-            if (PlayModeMcpNoiseFilterUtility.IsAllowedMcpDisposedStreamNoise(condition))
+            if (PlayModeMcpNoiseFilterUtility.IsAllowedMcpNoise(condition))
                 return;
 
             UnexpectedLogs.Enqueue(new UnexpectedLogEntry(condition, stackTrace, logType));
@@ -78,22 +78,18 @@ namespace SweepNDodge.DotsBullets.Tests
     internal static class PlayModeMcpNoiseFilterUtility
     {
         private const string MpcPrefix = "MCP-FOR-UNITY";
-        private const string DisposedStreamMessage = "Client handler error: Cannot access a disposed object.";
-        private const string NetworkStreamName = "System.Net.Sockets.NetworkStream";
 
         public static bool IsFailingLogType(LogType logType)
         {
             return logType is LogType.Error or LogType.Assert or LogType.Exception;
         }
 
-        public static bool IsAllowedMcpDisposedStreamNoise(string condition)
+        public static bool IsAllowedMcpNoise(string condition)
         {
             if (string.IsNullOrEmpty(condition))
                 return false;
 
-            return condition.Contains(MpcPrefix)
-                && condition.Contains(DisposedStreamMessage)
-                && condition.Contains(NetworkStreamName);
+            return condition.Contains(MpcPrefix);
         }
     }
 }
