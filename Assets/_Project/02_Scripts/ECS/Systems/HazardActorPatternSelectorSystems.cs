@@ -15,6 +15,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<HazardActorRuntimeStateComponent>();
             state.RequireForUpdate<HazardActorBehaviorPhaseStateComponent>();
             state.RequireForUpdate<HazardActorPatternSelectorStateComponent>();
+            state.RequireForUpdate<HazardActorPhaseTransitionRuntimeComponent>();
             state.RequireForUpdate<HazardActorEmitterRefBuffer>();
             state.RequireForUpdate<HazardActorPhaseSelectorPolicyBuffer>();
             state.RequireForUpdate<HazardActorPhaseSelectorCandidateBuffer>();
@@ -37,6 +38,7 @@ namespace SweepNDodge.DotsBullets
             var emitterLookup = SystemAPI.GetComponentLookup<HazardEmitterComponent>(true);
             var runtimeLookup = SystemAPI.GetComponentLookup<HazardActorRuntimeStateComponent>(true);
             var phaseStateLookup = SystemAPI.GetComponentLookup<HazardActorBehaviorPhaseStateComponent>(true);
+            var transitionRuntimeLookup = SystemAPI.GetComponentLookup<HazardActorPhaseTransitionRuntimeComponent>(true);
             var selectorStateLookup = SystemAPI.GetComponentLookup<HazardActorPatternSelectorStateComponent>(false);
             var coordinatorLookup = SystemAPI.GetComponentLookup<HazardEmitterCoordinatorStateComponent>(true);
             var cycleSignalLookup = SystemAPI.GetComponentLookup<HazardEmitterCycleSignalComponent>(true);
@@ -47,6 +49,7 @@ namespace SweepNDodge.DotsBullets
             emitterLookup.Update(ref state);
             runtimeLookup.Update(ref state);
             phaseStateLookup.Update(ref state);
+            transitionRuntimeLookup.Update(ref state);
             selectorStateLookup.Update(ref state);
             coordinatorLookup.Update(ref state);
             cycleSignalLookup.Update(ref state);
@@ -66,6 +69,7 @@ namespace SweepNDodge.DotsBullets
                 Entity actorEntity = actorEntities[actorIndex];
                 if (!runtimeLookup.HasComponent(actorEntity)
                     || !phaseStateLookup.HasComponent(actorEntity)
+                    || !transitionRuntimeLookup.HasComponent(actorEntity)
                     || !selectorStateLookup.HasComponent(actorEntity)
                     || !emitterRefLookup.HasBuffer(actorEntity)
                     || !policyLookup.HasBuffer(actorEntity)
@@ -75,6 +79,9 @@ namespace SweepNDodge.DotsBullets
                 }
 
                 if (runtimeLookup[actorEntity].PresenceState != HazardActorPresenceStateId.Active)
+                    continue;
+
+                if (transitionRuntimeLookup[actorEntity].State == HazardActorPhaseTransitionStateId.Preparing)
                     continue;
 
                 ref var selectorState = ref selectorStateLookup.GetRefRW(actorEntity).ValueRW;

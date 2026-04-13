@@ -277,6 +277,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
                 var actorRuntime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
                 var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
+                var actorTransitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
+                var actorTransitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
                 var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
 
                 var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
@@ -298,6 +300,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(actorPhase.CurrentPhaseId, Is.EqualTo(1));
                 Assert.That(actorPhase.PreviousPhaseId, Is.EqualTo(1));
                 Assert.That(actorPhase.PhaseVersion, Is.EqualTo(0u));
+                Assert.That(actorTransitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+                Assert.That(actorTransitionRuntime.PendingFromPhaseId, Is.EqualTo(-1));
+                Assert.That(actorTransitionRuntime.PendingToPhaseId, Is.EqualTo(-1));
+                Assert.That(actorTransitionRuntime.ElapsedSec, Is.EqualTo(0f));
+                Assert.That(actorTransitionRuntime.DurationSec, Is.EqualTo(0f));
+                Assert.That(actorTransitionRuntime.TransitionVersion, Is.EqualTo(0u));
+                Assert.That(actorTransitionSignal.Version, Is.EqualTo(0u));
+                Assert.That(actorTransitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.None));
+                Assert.That(actorTransitionSignal.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(actorTransitionSignal.CurrentPhaseId, Is.EqualTo(1));
+                Assert.That(actorTransitionSignal.PendingToPhaseId, Is.EqualTo(-1));
                 Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
                 Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
                 Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
@@ -590,6 +603,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
                 var actorRuntime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
                 var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
+                var actorTransitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
+                var actorTransitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
                 var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
                 var emitter = FindEmitterForActor(em, actor);
                 var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
@@ -606,6 +621,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(actorPhase.CurrentPhaseId, Is.EqualTo(1));
                 Assert.That(actorPhase.PreviousPhaseId, Is.EqualTo(1));
                 Assert.That(actorPhase.PhaseVersion, Is.EqualTo(0u));
+                Assert.That(actorTransitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+                Assert.That(actorTransitionRuntime.PendingFromPhaseId, Is.EqualTo(-1));
+                Assert.That(actorTransitionRuntime.PendingToPhaseId, Is.EqualTo(-1));
+                Assert.That(actorTransitionRuntime.ElapsedSec, Is.EqualTo(0f));
+                Assert.That(actorTransitionRuntime.DurationSec, Is.EqualTo(0f));
+                Assert.That(actorTransitionRuntime.TransitionVersion, Is.EqualTo(0u));
+                Assert.That(actorTransitionSignal.Version, Is.EqualTo(0u));
+                Assert.That(actorTransitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.None));
+                Assert.That(actorTransitionSignal.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(actorTransitionSignal.CurrentPhaseId, Is.EqualTo(1));
+                Assert.That(actorTransitionSignal.PendingToPhaseId, Is.EqualTo(-1));
                 Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
                 Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
                 Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
@@ -995,6 +1021,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorRuntimeStateComponent),
                 typeof(HazardActorBehaviorPhaseStateComponent),
                 typeof(HazardActorPatternSelectorStateComponent),
+                typeof(HazardActorPhaseTransitionRuntimeComponent),
+                typeof(HazardActorPhaseTransitionSignalComponent),
                 typeof(HazardActorPresencePresentationSignalComponent));
             em.SetComponentData(actor, new HazardActorComponent
             {
@@ -1040,6 +1068,24 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastResolvedPhaseVersion = 0u,
                 LastConsumedCycleVersion = 0u,
             });
+            em.SetComponentData(actor, new HazardActorPhaseTransitionRuntimeComponent
+            {
+                State = HazardActorPhaseTransitionStateId.Idle,
+                PendingFromPhaseId = -1,
+                PendingToPhaseId = -1,
+                ElapsedSec = 0f,
+                DurationSec = 0f,
+                TransitionVersion = 0u,
+            });
+            em.SetComponentData(actor, new HazardActorPhaseTransitionSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPhaseTransitionSignalCueId.None,
+                Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                PreviousPhaseId = 1,
+                CurrentPhaseId = 1,
+                PendingToPhaseId = -1,
+            });
             em.SetComponentData(actor, new HazardActorPresencePresentationSignalComponent
             {
                 Version = 0u,
@@ -1053,6 +1099,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SelectionMode = HazardActorSelectionModeId.OrderedPriority,
             });
             em.AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(actor);
+            em.AddBuffer<HazardActorPhaseProgressTransitionBuffer>(actor);
             em.GetBuffer<SourceHazardActorRefBuffer>(entity).Add(new SourceHazardActorRefBuffer
             {
                 ActorEntity = actor,

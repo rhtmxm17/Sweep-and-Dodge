@@ -223,6 +223,7 @@ namespace SweepNDodge.DotsBullets
         PlayerDistanceBlocked = 1u << 11,
         MissingPlayer = 1u << 12,
         GroupSuppressed = 1u << 13,
+        ActorPhaseTransitionPreparing = 1u << 14,
     }
 
     public struct HazardEmitterCoordinatorStateComponent : IComponentData

@@ -19,6 +19,15 @@ namespace SweepNDodge.DotsBullets
         public HazardActorPhaseSelectorCandidateAuthoring[] Candidates;
     }
 
+    [System.Serializable]
+    public struct HazardActorPhaseProgressTransitionAuthoring
+    {
+        [Min(1)] public int FromPhaseId;
+        [Min(1)] public int ToPhaseId;
+        [Range(0f, 1f)] public float ProgressThresholdNormalized;
+        [Min(0f)] public float TransitionLeadInSec;
+    }
+
     public class HazardActorAuthoring : MonoBehaviour
     {
         [Header("Identity")]
@@ -39,11 +48,20 @@ namespace SweepNDodge.DotsBullets
         [Min(1)] public int InitialPhaseId = 1;
         public HazardActorPhaseSelectorPolicyAuthoring[] PhaseSelectorPolicies;
 
+        [Header("Phase Transition")]
+        public HazardActorPhaseProgressTransitionAuthoring[] PhaseProgressTransitions;
+
         private sealed class Baker : Baker<HazardActorAuthoring>
         {
             public override void Bake(HazardActorAuthoring authoring)
             {
-                if (!HazardActorAuthoringValidationUtility.TryValidate(authoring, out var sourceAuthoring, out var compatibilitySeed, out var error))
+                if (!HazardActorAuthoringValidationUtility.TryValidate(
+                        authoring,
+                        out var sourceAuthoring,
+                        out var compatibilitySeed,
+                        out var phaseTransitions,
+                        out _,
+                        out var error))
                 {
                     Debug.LogError($"[HazardActorAuthoring] {error}", authoring);
                     return;
@@ -109,6 +127,24 @@ namespace SweepNDodge.DotsBullets
                     LastResolvedPhaseVersion = 0u,
                     LastConsumedCycleVersion = 0u,
                 });
+                AddComponent(actorEntity, new HazardActorPhaseTransitionRuntimeComponent
+                {
+                    State = HazardActorPhaseTransitionStateId.Idle,
+                    PendingFromPhaseId = -1,
+                    PendingToPhaseId = -1,
+                    ElapsedSec = 0f,
+                    DurationSec = 0f,
+                    TransitionVersion = 0u,
+                });
+                AddComponent(actorEntity, new HazardActorPhaseTransitionSignalComponent
+                {
+                    Version = 0u,
+                    Cue = HazardActorPhaseTransitionSignalCueId.None,
+                    Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                    PreviousPhaseId = compatibilitySeed.InitialPhaseId,
+                    CurrentPhaseId = compatibilitySeed.InitialPhaseId,
+                    PendingToPhaseId = -1,
+                });
                 AddComponent(actorEntity, new HazardActorPresencePresentationSignalComponent
                 {
                     Version = 0u,
@@ -127,6 +163,13 @@ namespace SweepNDodge.DotsBullets
                 for (int i = 0; i < compatibilitySeed.Candidates.Length; i++)
                 {
                     selectorCandidates.Add(compatibilitySeed.Candidates[i]);
+                }
+
+                var transitionBuffer = AddBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
+                transitionBuffer.Clear();
+                for (int i = 0; i < phaseTransitions.Length; i++)
+                {
+                    transitionBuffer.Add(phaseTransitions[i]);
                 }
 
                 var emitterRefs = AddBuffer<HazardActorEmitterRefBuffer>(actorEntity);

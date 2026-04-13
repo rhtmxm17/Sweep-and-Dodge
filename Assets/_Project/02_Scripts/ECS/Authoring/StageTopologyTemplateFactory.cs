@@ -156,7 +156,13 @@ namespace SweepNDodge.DotsBullets
                 if (parentSource != sourceAuthoring)
                     continue;
 
-                if (!HazardActorAuthoringValidationUtility.TryValidate(actorAuthoring, out _, out var compatibilitySeed, out var actorError))
+                if (!HazardActorAuthoringValidationUtility.TryValidate(
+                        actorAuthoring,
+                        out _,
+                        out var compatibilitySeed,
+                        out var phaseTransitions,
+                        out _,
+                        out var actorError))
                 {
                     Debug.LogWarning($"[StageTopologyTemplateFactory] Failed to resolve HazardActor selector policy while creating runtime template. actor={actorAuthoring.name}, error={actorError}", actorAuthoring);
                     continue;
@@ -172,6 +178,8 @@ namespace SweepNDodge.DotsBullets
                     typeof(HazardActorRuntimeStateComponent),
                     typeof(HazardActorBehaviorPhaseStateComponent),
                     typeof(HazardActorPatternSelectorStateComponent),
+                    typeof(HazardActorPhaseTransitionRuntimeComponent),
+                    typeof(HazardActorPhaseTransitionSignalComponent),
                     typeof(HazardActorPresencePresentationSignalComponent));
 
                 int actorId = math.max(1, actorAuthoring.ActorId);
@@ -229,6 +237,24 @@ namespace SweepNDodge.DotsBullets
                     LastResolvedPhaseVersion = 0u,
                     LastConsumedCycleVersion = 0u,
                 });
+                em.SetComponentData(actorEntity, new HazardActorPhaseTransitionRuntimeComponent
+                {
+                    State = HazardActorPhaseTransitionStateId.Idle,
+                    PendingFromPhaseId = -1,
+                    PendingToPhaseId = -1,
+                    ElapsedSec = 0f,
+                    DurationSec = 0f,
+                    TransitionVersion = 0u,
+                });
+                em.SetComponentData(actorEntity, new HazardActorPhaseTransitionSignalComponent
+                {
+                    Version = 0u,
+                    Cue = HazardActorPhaseTransitionSignalCueId.None,
+                    Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                    PreviousPhaseId = compatibilitySeed.InitialPhaseId,
+                    CurrentPhaseId = compatibilitySeed.InitialPhaseId,
+                    PendingToPhaseId = -1,
+                });
                 em.SetComponentData(actorEntity, new HazardActorPresencePresentationSignalComponent
                 {
                     Version = 0u,
@@ -244,6 +270,11 @@ namespace SweepNDodge.DotsBullets
                 selectorCandidates.Clear();
                 for (int candidateIndex = 0; candidateIndex < compatibilitySeed.Candidates.Length; candidateIndex++)
                     selectorCandidates.Add(compatibilitySeed.Candidates[candidateIndex]);
+
+                var transitionBuffer = em.AddBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
+                transitionBuffer.Clear();
+                for (int transitionIndex = 0; transitionIndex < phaseTransitions.Length; transitionIndex++)
+                    transitionBuffer.Add(phaseTransitions[transitionIndex]);
 
                 em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).Add(new SourceHazardActorRefBuffer
                 {

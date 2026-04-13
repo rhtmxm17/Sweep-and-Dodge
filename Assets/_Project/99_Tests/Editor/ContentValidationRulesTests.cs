@@ -292,6 +292,107 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SourceTemplate_HazardActorInvalidPhaseTransition_IsError()
+        {
+            var sourceRoot = new GameObject("source_root");
+            var sourceAuthoring = sourceRoot.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("actor");
+            var emitterGo = new GameObject("emitter");
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            var bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+
+            try
+            {
+                bullet.Editor_SetDefinitionId(2202);
+                emission.Bullet = bullet;
+                emission.PositionPattern = new SinglePointPositionPatternAuthoring();
+                emission.Aim = new FixedAimAuthoring();
+                emission.ShotPattern = new SingleShotPatternAuthoring();
+
+                actorGo.transform.SetParent(sourceRoot.transform, false);
+                emitterGo.transform.SetParent(actorGo.transform, false);
+
+                var actor = actorGo.AddComponent<HazardActorAuthoring>();
+                actor.ActorId = 1;
+                actor.InitialPhaseId = 1;
+                actor.PhaseSelectorPolicies = new[]
+                {
+                    new HazardActorPhaseSelectorPolicyAuthoring
+                    {
+                        PhaseId = 1,
+                        SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                        Candidates = new[]
+                        {
+                            new HazardActorPhaseSelectorCandidateAuthoring
+                            {
+                                EmitterId = 1,
+                                PatternSlotId = 1,
+                            }
+                        },
+                    },
+                    new HazardActorPhaseSelectorPolicyAuthoring
+                    {
+                        PhaseId = 2,
+                        SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                        Candidates = new[]
+                        {
+                            new HazardActorPhaseSelectorCandidateAuthoring
+                            {
+                                EmitterId = 1,
+                                PatternSlotId = 1,
+                            }
+                        },
+                    }
+                };
+                actor.PhaseProgressTransitions = new[]
+                {
+                    new HazardActorPhaseProgressTransitionAuthoring
+                    {
+                        FromPhaseId = 2,
+                        ToPhaseId = 1,
+                        ProgressThresholdNormalized = 0.5f,
+                        TransitionLeadInSec = 0.1f,
+                    }
+                };
+
+                var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+                emitter.EmitterId = 1;
+                emitter.Slots = new[]
+                {
+                    new HazardEmitterPatternSlotAuthoring
+                    {
+                        PatternSlotId = 1,
+                        TelegraphProfile = telegraph,
+                        EmissionProfile = emission,
+                        BaseWeight = 1f,
+                        AvailabilityFlags = 0u,
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>
+                    {
+                        new ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>(sourceAuthoring, "source"),
+                    },
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV092"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(sourceRoot);
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission);
+                Object.DestroyImmediate(bullet);
+            }
+        }
+
+        [Test]
         public void SourceTemplate_HazardEmitterWithoutPatternSlots_IsError()
         {
             var sourceRoot = new GameObject("source_root");

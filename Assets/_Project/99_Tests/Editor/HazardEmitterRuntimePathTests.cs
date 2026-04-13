@@ -207,6 +207,145 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardActorAuthoringValidation_ExplicitPhaseTransitions_BuildsTransitionSeed()
+        {
+            var root = new GameObject("source_root");
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var emitterGo = new GameObject("hazard_emitter");
+            emitterGo.transform.SetParent(actorGo.transform);
+            var actor = actorGo.AddComponent<HazardActorAuthoring>();
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+
+            emitter.EmitterId = 11;
+            emitter.Slots = CreatePatternSlots(
+                (1, telegraph, emission, 1f, 0u),
+                (2, telegraph, emission, 1f, 0u));
+            actor.InitialPhaseId = 1;
+            actor.PhaseSelectorPolicies = new[]
+            {
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 11, PatternSlotId = 1 } },
+                },
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 11, PatternSlotId = 2 } },
+                },
+            };
+            actor.PhaseProgressTransitions = new[]
+            {
+                new HazardActorPhaseProgressTransitionAuthoring
+                {
+                    FromPhaseId = 1,
+                    ToPhaseId = 2,
+                    ProgressThresholdNormalized = 0.5f,
+                    TransitionLeadInSec = 0.75f,
+                },
+            };
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(
+                    actor,
+                    out _,
+                    out var seed,
+                    out var transitions,
+                    out var errorKind,
+                    out var error);
+                Assert.That(ok, Is.True);
+                Assert.That(errorKind, Is.EqualTo(HazardActorAuthoringValidationErrorKind.None));
+                Assert.That(error, Is.Empty);
+                Assert.That(seed.Policies.Length, Is.EqualTo(2));
+                Assert.That(transitions.Length, Is.EqualTo(1));
+                Assert.That(transitions[0].FromPhaseId, Is.EqualTo(1));
+                Assert.That(transitions[0].ToPhaseId, Is.EqualTo(2));
+                Assert.That(transitions[0].ProgressThresholdNormalized, Is.EqualTo(0.5f));
+                Assert.That(transitions[0].TransitionLeadInSec, Is.EqualTo(0.75f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void HazardActorAuthoringValidation_PhaseTransitions_RejectUnknownTargetPhase()
+        {
+            var root = new GameObject("source_root");
+            root.AddComponent<SourceRuntimeTemplateAuthoring>();
+            var actorGo = new GameObject("hazard_actor");
+            actorGo.transform.SetParent(root.transform);
+            var emitterGo = new GameObject("hazard_emitter");
+            emitterGo.transform.SetParent(actorGo.transform);
+            var actor = actorGo.AddComponent<HazardActorAuthoring>();
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+
+            emitter.EmitterId = 5;
+            emitter.Slots = CreatePatternSlots(
+                (1, telegraph, emission, 1f, 0u),
+                (2, telegraph, emission, 1f, 0u));
+            actor.PhaseSelectorPolicies = new[]
+            {
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 5, PatternSlotId = 1 } },
+                },
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 5, PatternSlotId = 2 } },
+                },
+            };
+            actor.PhaseProgressTransitions = new[]
+            {
+                new HazardActorPhaseProgressTransitionAuthoring
+                {
+                    FromPhaseId = 1,
+                    ToPhaseId = 3,
+                    ProgressThresholdNormalized = 0.5f,
+                    TransitionLeadInSec = 0.1f,
+                },
+            };
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidate(
+                    actor,
+                    out _,
+                    out _,
+                    out _,
+                    out var errorKind,
+                    out var error);
+                Assert.That(ok, Is.False);
+                Assert.That(errorKind, Is.EqualTo(HazardActorAuthoringValidationErrorKind.PhaseTransition));
+                Assert.That(error, Does.Contain("unknown ToPhaseId 3"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void HazardActorAuthoringValidation_WithoutExplicitPolicy_AutoSeedsCompatibilitySelector()
         {
             var root = new GameObject("source_root");
@@ -1825,6 +1964,319 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardActorPhaseTransition_ThresholdHit_EntersPreparing_AndFreezesSelector()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPhaseTransition_Preparing", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.1f);
+
+            var source = CreateSourceWithDirector(
+                em,
+                bulletTypeKey: 709454,
+                directorState: RunDirectorSourceStateId.Baseline,
+                pressureOccupancySec: 0f,
+                thresholdDepleted: 10,
+                collectedCount: 5);
+            var actor = CreateActor(em, source, actorId: 709454);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            var emitter = CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 709454,
+                emitterId: 14,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            ReplaceEmitterPatternSlots(
+                em,
+                emitter,
+                CreateExecutionSlot(em, emitter, 1, telegraphProfileRefId: 1, emissionProfileRefId: 1, telegraphDurationSec: 0f, bulletTypeKey: 709454, cooldownSec: 1f, baseAngleDeg: 0f),
+                CreateExecutionSlot(em, emitter, 2, telegraphProfileRefId: 2, emissionProfileRefId: 2, telegraphDurationSec: 0f, bulletTypeKey: 709455, cooldownSec: 1f, baseAngleDeg: 30f));
+            SetActorPhaseSelectorPolicies(
+                em,
+                actor,
+                1,
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 0,
+                    EmitterId = 14,
+                    PatternSlotId = 1,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 2,
+                    OrderIndex = 0,
+                    EmitterId = 14,
+                    PatternSlotId = 2,
+                });
+            SetActorPhaseTransitions(
+                em,
+                actor,
+                new HazardActorPhaseProgressTransitionBuffer
+                {
+                    FromPhaseId = 1,
+                    ToPhaseId = 2,
+                    ProgressThresholdNormalized = 0.5f,
+                    TransitionLeadInSec = 0.25f,
+                });
+
+            world.SetTime(new TimeData(0.1d, 0.1f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+
+            var selectorBefore = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            Assert.That(selectorBefore.CurrentPatternSlotId, Is.EqualTo(1));
+
+            world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+
+            var transitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
+            var transitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
+            var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
+            var selectorAfter = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+
+            Assert.That(transitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Preparing));
+            Assert.That(transitionRuntime.PendingFromPhaseId, Is.EqualTo(1));
+            Assert.That(transitionRuntime.PendingToPhaseId, Is.EqualTo(2));
+            Assert.That(transitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.PreparingStarted));
+            Assert.That(transitionSignal.PreviousPhaseId, Is.EqualTo(1));
+            Assert.That(transitionSignal.CurrentPhaseId, Is.EqualTo(1));
+            Assert.That(transitionSignal.PendingToPhaseId, Is.EqualTo(2));
+            Assert.That(actorPhase.CurrentPhaseId, Is.EqualTo(1));
+            Assert.That(selectorAfter.TargetEmitterId, Is.EqualTo(selectorBefore.TargetEmitterId));
+            Assert.That(selectorAfter.CurrentPatternSlotId, Is.EqualTo(selectorBefore.CurrentPatternSlotId));
+            Assert.That(selectorAfter.SelectionSequence, Is.EqualTo(selectorBefore.SelectionSequence));
+            Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+            Assert.That(coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPhaseTransitionPreparing, Is.Not.EqualTo(0u));
+        }
+
+        [Test]
+        public void HazardActorPhaseTransition_PreparingElapsed_CommitsPhase_AndSelectorFreshSelectsNewPhase()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPhaseTransition_Commit", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.3f);
+
+            var source = CreateSourceWithDirector(
+                em,
+                bulletTypeKey: 709455,
+                directorState: RunDirectorSourceStateId.Baseline,
+                pressureOccupancySec: 0f,
+                thresholdDepleted: 10,
+                collectedCount: 6);
+            var actor = CreateActor(em, source, actorId: 709455);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            var emitter = CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 709455,
+                emitterId: 15,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            ReplaceEmitterPatternSlots(
+                em,
+                emitter,
+                CreateExecutionSlot(em, emitter, 1, telegraphProfileRefId: 1, emissionProfileRefId: 1, telegraphDurationSec: 0f, bulletTypeKey: 709455, cooldownSec: 1f, baseAngleDeg: 0f),
+                CreateExecutionSlot(em, emitter, 2, telegraphProfileRefId: 2, emissionProfileRefId: 2, telegraphDurationSec: 0f, bulletTypeKey: 709456, cooldownSec: 1f, baseAngleDeg: 45f));
+            SetActorPhaseSelectorPolicies(
+                em,
+                actor,
+                1,
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 0,
+                    EmitterId = 15,
+                    PatternSlotId = 1,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 2,
+                    OrderIndex = 0,
+                    EmitterId = 15,
+                    PatternSlotId = 2,
+                });
+            SetActorPhaseTransitions(
+                em,
+                actor,
+                new HazardActorPhaseProgressTransitionBuffer
+                {
+                    FromPhaseId = 1,
+                    ToPhaseId = 2,
+                    ProgressThresholdNormalized = 0.5f,
+                    TransitionLeadInSec = 0.25f,
+                });
+
+            world.SetTime(new TimeData(0.3d, 0.3f));
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+
+            var transitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
+            Assert.That(transitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Preparing));
+
+            world.SetTime(new TimeData(0.6d, 0.3f));
+            world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+            world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+
+            var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
+            var transitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
+            var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+            transitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
+
+            Assert.That(transitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+            Assert.That(actorPhase.CurrentPhaseId, Is.EqualTo(2));
+            Assert.That(actorPhase.PreviousPhaseId, Is.EqualTo(1));
+            Assert.That(actorPhase.PhaseVersion, Is.EqualTo(1u));
+            Assert.That(transitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.PhaseCommitted));
+            Assert.That(transitionSignal.PreviousPhaseId, Is.EqualTo(1));
+            Assert.That(transitionSignal.CurrentPhaseId, Is.EqualTo(2));
+            Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(2));
+            Assert.That(selector.SelectionSequence, Is.EqualTo(2u));
+            Assert.That(selector.LastResolvedPhaseVersion, Is.EqualTo(1u));
+        }
+
+        [Test]
+        public void HazardActorPhaseTransition_PreparingCancelled_WhenPresenceLeavesActive()
+        {
+            using var world = CreateDefaultTestWorld("HazardActorPhaseTransition_Cancel", out _);
+            var em = world.EntityManager;
+            InitializeBuildWorld(em, RunDirectorStageStateId.Running, 0.1f);
+
+            var source = CreateSourceWithDirector(
+                em,
+                bulletTypeKey: 709456,
+                directorState: RunDirectorSourceStateId.Baseline,
+                pressureOccupancySec: 0f,
+                thresholdDepleted: 10,
+                collectedCount: 6);
+            var actor = CreateActor(em, source, actorId: 709456);
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Active,
+                StateElapsedSec = 0f,
+            });
+
+            CreateEmitterForActor(
+                em,
+                actor,
+                bulletTypeKey: 709456,
+                emitterId: 16,
+                telegraphDurationSec: 0f,
+                cooldownSec: 1f,
+                isEnabled: true,
+                isSuppressed: false,
+                position: float3.zero,
+                localOffset: float3.zero);
+            SetActorPhaseSelectorPolicies(
+                em,
+                actor,
+                1,
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorPolicyBuffer
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 1,
+                    OrderIndex = 0,
+                    EmitterId = 16,
+                    PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
+                },
+                new HazardActorPhaseSelectorCandidateBuffer
+                {
+                    PhaseId = 2,
+                    OrderIndex = 0,
+                    EmitterId = 16,
+                    PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
+                });
+            SetActorPhaseTransitions(
+                em,
+                actor,
+                new HazardActorPhaseProgressTransitionBuffer
+                {
+                    FromPhaseId = 1,
+                    ToPhaseId = 2,
+                    ProgressThresholdNormalized = 0.5f,
+                    TransitionLeadInSec = 0.5f,
+                });
+
+            world.SetTime(new TimeData(0.1d, 0.1f));
+            world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+
+            var signal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
+            Assert.That(signal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.PreparingStarted));
+            Assert.That(signal.Version, Is.EqualTo(1u));
+
+            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = HazardActorPresenceStateId.Hidden,
+                StateElapsedSec = 0f,
+            });
+
+            world.SetTime(new TimeData(0.2d, 0.1f));
+            world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+
+            var runtime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
+            signal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
+            var phaseState = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
+
+            Assert.That(runtime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+            Assert.That(runtime.PendingToPhaseId, Is.EqualTo(-1));
+            Assert.That(signal.Version, Is.EqualTo(1u));
+            Assert.That(signal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.PreparingStarted));
+            Assert.That(phaseState.CurrentPhaseId, Is.EqualTo(1));
+            Assert.That(phaseState.PhaseVersion, Is.EqualTo(0u));
+        }
+
+        [Test]
         public void HazardEmitterEmitBuild_HiddenActorPresence_StaysDormantAndSkipsAppend()
         {
             using var world = CreateDefaultTestWorld("HazardEmitter_EmitBuild_HiddenPresence", out _);
@@ -2581,6 +3033,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorRuntimeStateComponent),
                 typeof(HazardActorBehaviorPhaseStateComponent),
                 typeof(HazardActorPatternSelectorStateComponent),
+                typeof(HazardActorPhaseTransitionRuntimeComponent),
+                typeof(HazardActorPhaseTransitionSignalComponent),
                 typeof(HazardActorPresencePresentationSignalComponent));
 
             em.SetComponentData(entity, new HazardActorComponent
@@ -2634,6 +3088,24 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastResolvedPhaseVersion = 0u,
                 LastConsumedCycleVersion = 0u,
             });
+            em.SetComponentData(entity, new HazardActorPhaseTransitionRuntimeComponent
+            {
+                State = HazardActorPhaseTransitionStateId.Idle,
+                PendingFromPhaseId = -1,
+                PendingToPhaseId = -1,
+                ElapsedSec = 0f,
+                DurationSec = 0f,
+                TransitionVersion = 0u,
+            });
+            em.SetComponentData(entity, new HazardActorPhaseTransitionSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPhaseTransitionSignalCueId.None,
+                Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                PreviousPhaseId = 1,
+                CurrentPhaseId = 1,
+                PendingToPhaseId = -1,
+            });
             em.SetComponentData(entity, new HazardActorPresencePresentationSignalComponent
             {
                 Version = 0u,
@@ -2647,6 +3119,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SelectionMode = HazardActorSelectionModeId.OrderedPriority,
             });
             em.AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(entity);
+            em.AddBuffer<HazardActorPhaseProgressTransitionBuffer>(entity);
             return entity;
         }
 
@@ -2725,6 +3198,24 @@ namespace SweepNDodge.DotsBullets.Tests
                 PreviousPhaseId = initialPhaseId,
                 PhaseVersion = 0u,
             });
+            em.SetComponentData(actor, new HazardActorPhaseTransitionRuntimeComponent
+            {
+                State = HazardActorPhaseTransitionStateId.Idle,
+                PendingFromPhaseId = -1,
+                PendingToPhaseId = -1,
+                ElapsedSec = 0f,
+                DurationSec = 0f,
+                TransitionVersion = 0u,
+            });
+            em.SetComponentData(actor, new HazardActorPhaseTransitionSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPhaseTransitionSignalCueId.None,
+                Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                PreviousPhaseId = initialPhaseId,
+                CurrentPhaseId = initialPhaseId,
+                PendingToPhaseId = -1,
+            });
 
             var policies = em.GetBuffer<HazardActorPhaseSelectorPolicyBuffer>(actor);
             policies.Clear();
@@ -2743,6 +3234,17 @@ namespace SweepNDodge.DotsBullets.Tests
                         break;
                 }
             }
+        }
+
+        private static void SetActorPhaseTransitions(
+            EntityManager em,
+            Entity actor,
+            params HazardActorPhaseProgressTransitionBuffer[] transitions)
+        {
+            var buffer = em.GetBuffer<HazardActorPhaseProgressTransitionBuffer>(actor);
+            buffer.Clear();
+            for (int i = 0; i < transitions.Length; i++)
+                buffer.Add(transitions[i]);
         }
 
         private static HazardEmitterPatternSlotAuthoring[] CreatePatternSlots(

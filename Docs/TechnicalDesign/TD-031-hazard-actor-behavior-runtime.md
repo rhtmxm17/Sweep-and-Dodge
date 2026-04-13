@@ -4,7 +4,7 @@
 - doc_id: `TD-031`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-04-10`
+- last_updated: `2026-04-13`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
   - [../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md](../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md)
@@ -101,7 +101,46 @@
     - same-phase natural cycle completion edge에서만 다음 candidate로 advance한다.
     - phase change는 hard boundary이며, 새 phase selection은 이전 selection을 입력으로 사용하지 않는다.
 
-### 4.4 PatternSet / emitter seam
+### 4.4 Phase transition 최소 계약
+- actor phase escalation은 `PresenceState` 확장이 아니라 별도 staging runtime으로 표현한다.
+- actor-owned transition rule:
+  - `HazardActorPhaseProgressTransitionBuffer`
+    - `FromPhaseId`
+    - `ToPhaseId`
+    - `ProgressThresholdNormalized`
+    - `TransitionLeadInSec`
+- actor transition runtime:
+  - `HazardActorPhaseTransitionRuntimeComponent`
+    - `State`
+      - `Idle`
+      - `Preparing`
+    - `PendingFromPhaseId`
+    - `PendingToPhaseId`
+    - `ElapsedSec`
+    - `DurationSec`
+    - `TransitionVersion`
+- actor transition signal:
+  - `HazardActorPhaseTransitionSignalComponent`
+    - `Version`
+    - `Cue`
+      - `PreparingStarted`
+      - `PhaseCommitted`
+    - `Reason`
+      - `ProgressThreshold`
+    - `PreviousPhaseId`
+    - `CurrentPhaseId`
+    - `PendingToPhaseId`
+- progress truth:
+  - `progress01 = saturate(CollectedCount / max(1, ThresholdDepleted))`
+- runtime contract:
+  - threshold 평가는 `PresenceState == Active` actor에만 수행한다.
+  - threshold hit 시 즉시 phase를 바꾸지 않고 `Preparing`에 진입한다.
+  - `Preparing` 동안 selector는 invalidate되지 않고 freeze된다.
+  - `Preparing` 동안 actor-owned emitter는 coordinator에서 `ActorPhaseTransitionPreparing` reason으로 차단된다.
+  - `TransitionLeadInSec`이 끝나면 phase commit이 일어나고, selector는 새 phase policy로 fresh select 한다.
+  - first implementation은 한 번의 commit당 한 단계 transition만 허용한다.
+
+### 4.5 PatternSet / emitter seam
 - pattern data owner는 emitter다.
 - runtime 표현은 `buffer of slot metadata + profile ref`를 사용한다.
 - 최소 slot metadata:
@@ -121,7 +160,7 @@
   - stage emitter-level profile override는 single-slot emitter에만 허용된다.
     - multi-slot emitter에서 `TelegraphProfileOverride` 또는 `EmissionProfileOverride`를 사용하면 apply 단계에서 error로 거부한다.
 
-### 4.5 Current compatibility boundary
+### 4.6 Current compatibility boundary
 - 현재 runtime은 actor-aware seed를 넘어, actor behavior의 첫 gate까지 결합된 상태다.
 - 현재 activation truth에 포함되는 것은:
   - `HazardActorAppliedConfigComponent.IsEnabled`
@@ -211,6 +250,7 @@
   - progress-threshold escalation presentation
 - 현재 상태:
   - `HB-1C`에서 actor-level presentation hook은 ECS signal seam까지 구현됐다.
+  - `HB-3C`에서 progress-threshold escalation staging runtime과 dual cue signal seam이 추가됐다.
   - presentation asset schema와 bridge는 아직 닫지 않는다.
 
 ## 6. 작업 시작 전에 문서로 먼저 닫아야 할 항목
@@ -261,7 +301,19 @@
     - `EditMode 526/526 passed`
     - `PlayMode 49/49 passed`
     - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
-  - `HB-3C/D`는 아직 시작 전
+  - `HB-3C. Escalation signal and progress-threshold transition` 구현 완료
+    - actor-owned progress-threshold transition buffer가 추가됐다.
+    - `HazardActorPhaseTransitionSystem`이 `Idle -> Preparing -> commit` 흐름의 runtime owner다.
+    - `Preparing` 동안 selector는 freeze되고 coordinator가 emitter 공격을 차단한다.
+    - transition signal cue는 `PreparingStarted` / `PhaseCommitted`를 사용한다.
+    - invalid actor phase transition authoring은 `CV092`로 보고한다.
+  - `HB-3C` 검증 결과
+    - Unity MCP 기준 compile ready 확인
+    - `EditMode 532/532 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+    - final console clear 후 `read_console(error)`에는 project code error 없이 `MCP-FOR-UNITY` client exit noise만 남았다.
+  - `HB-3D`는 아직 시작 전
 
 ### 7.4 HB-4. Validation / sample update
 - operational sample과 test-only verification path를 actor behavior 기준으로 확장

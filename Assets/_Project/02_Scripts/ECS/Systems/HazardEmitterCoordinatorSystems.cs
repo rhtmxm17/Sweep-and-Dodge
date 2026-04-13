@@ -39,6 +39,7 @@ namespace SweepNDodge.DotsBullets
             var actorLookup = SystemAPI.GetComponentLookup<HazardActorComponent>(true);
             var actorAppliedLookup = SystemAPI.GetComponentLookup<HazardActorAppliedConfigComponent>(true);
             var actorRuntimeLookup = SystemAPI.GetComponentLookup<HazardActorRuntimeStateComponent>(true);
+            var actorTransitionLookup = SystemAPI.GetComponentLookup<HazardActorPhaseTransitionRuntimeComponent>(true);
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var directorLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
             var playerSyncLookup = SystemAPI.GetComponentLookup<PlayerGoSyncComponent>(true);
@@ -51,6 +52,7 @@ namespace SweepNDodge.DotsBullets
             actorLookup.Update(ref state);
             actorAppliedLookup.Update(ref state);
             actorRuntimeLookup.Update(ref state);
+            actorTransitionLookup.Update(ref state);
             sourceLookup.Update(ref state);
             directorLookup.Update(ref state);
             playerSyncLookup.Update(ref state);
@@ -115,6 +117,12 @@ namespace SweepNDodge.DotsBullets
                                 reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceRetiring;
                                 break;
                         }
+                    }
+
+                    if (actorTransitionLookup.HasComponent(emitterConfig.ActorEntity)
+                        && actorTransitionLookup[emitterConfig.ActorEntity].State == HazardActorPhaseTransitionStateId.Preparing)
+                    {
+                        reasonMask |= (uint)HazardEmitterSuppressionReasonFlags.ActorPhaseTransitionPreparing;
                     }
 
                     sourceEntity = actorLookup[emitterConfig.ActorEntity].SourceEntity;

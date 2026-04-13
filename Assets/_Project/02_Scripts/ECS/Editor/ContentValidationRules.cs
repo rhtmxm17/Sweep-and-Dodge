@@ -908,11 +908,11 @@ namespace SweepNDodge.DotsBullets.Editor
 
                     owners.Add(actorLocation);
 
-                    if (!HazardActorAuthoringValidationUtility.TryValidate(actor, out _, out _, out var actorError))
+                    if (!HazardActorAuthoringValidationUtility.TryValidate(actor, out _, out _, out _, out var actorErrorKind, out var actorError))
                     {
                         issues.Add(new ContentValidationIssue(
                             ContentValidationSeverity.Error,
-                            "CV091",
+                            actorErrorKind == HazardActorAuthoringValidationErrorKind.PhaseTransition ? "CV092" : "CV091",
                             actorLocation,
                             actorError));
                     }

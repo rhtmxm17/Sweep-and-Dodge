@@ -235,6 +235,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(HazardActorRuntimeStateComponent),
                 typeof(HazardActorBehaviorPhaseStateComponent),
                 typeof(HazardActorPatternSelectorStateComponent),
+                typeof(HazardActorPhaseTransitionRuntimeComponent),
+                typeof(HazardActorPhaseTransitionSignalComponent),
                 typeof(HazardActorPresencePresentationSignalComponent));
             em.SetComponentData(entity, new HazardActorComponent
             {
@@ -287,6 +289,24 @@ namespace SweepNDodge.DotsBullets.Tests
                 LastResolvedPhaseVersion = 0u,
                 LastConsumedCycleVersion = 0u,
             });
+            em.SetComponentData(entity, new HazardActorPhaseTransitionRuntimeComponent
+            {
+                State = HazardActorPhaseTransitionStateId.Idle,
+                PendingFromPhaseId = -1,
+                PendingToPhaseId = -1,
+                ElapsedSec = 0f,
+                DurationSec = 0f,
+                TransitionVersion = 0u,
+            });
+            em.SetComponentData(entity, new HazardActorPhaseTransitionSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPhaseTransitionSignalCueId.None,
+                Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                PreviousPhaseId = 1,
+                CurrentPhaseId = 1,
+                PendingToPhaseId = -1,
+            });
             em.SetComponentData(entity, new HazardActorPresencePresentationSignalComponent
             {
                 Version = 0u,
@@ -300,6 +320,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 SelectionMode = HazardActorSelectionModeId.OrderedPriority,
             });
             em.AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(entity);
+            em.AddBuffer<HazardActorPhaseProgressTransitionBuffer>(entity);
             return entity;
         }
 

@@ -101,6 +101,53 @@ namespace SweepNDodge.DotsBullets
         public uint LastConsumedCycleVersion;
     }
 
+    public enum HazardActorPhaseTransitionStateId : byte
+    {
+        Idle = 0,
+        Preparing = 1,
+    }
+
+    public enum HazardActorPhaseTransitionReasonId : byte
+    {
+        ProgressThreshold = 0,
+    }
+
+    public enum HazardActorPhaseTransitionSignalCueId : byte
+    {
+        None = 0,
+        PreparingStarted = 1,
+        PhaseCommitted = 2,
+    }
+
+    [InternalBufferCapacity(1)]
+    public struct HazardActorPhaseProgressTransitionBuffer : IBufferElementData
+    {
+        public int FromPhaseId;
+        public int ToPhaseId;
+        public float ProgressThresholdNormalized;
+        public float TransitionLeadInSec;
+    }
+
+    public struct HazardActorPhaseTransitionRuntimeComponent : IComponentData
+    {
+        public HazardActorPhaseTransitionStateId State;
+        public int PendingFromPhaseId;
+        public int PendingToPhaseId;
+        public float ElapsedSec;
+        public float DurationSec;
+        public uint TransitionVersion;
+    }
+
+    public struct HazardActorPhaseTransitionSignalComponent : IComponentData
+    {
+        public uint Version;
+        public HazardActorPhaseTransitionSignalCueId Cue;
+        public HazardActorPhaseTransitionReasonId Reason;
+        public int PreviousPhaseId;
+        public int CurrentPhaseId;
+        public int PendingToPhaseId;
+    }
+
     public enum HazardActorPresencePresentationCueId : byte
     {
         None = 0,

@@ -962,8 +962,10 @@ namespace SweepNDodge.DotsBullets
 
                     ResetHazardActorRuntimeState(em, actorEntity);
                     ResetHazardActorPhaseState(em, actorEntity);
+                    ResetHazardActorPhaseTransitionRuntimeState(em, actorEntity);
                     ApplyActorHazardEmitters(em, actorEntity, hasActorBinding ? actorBinding.Emitters : null);
                     ResetHazardActorSelectorState(em, actorEntity);
+                    ResetHazardActorPhaseTransitionSignalState(em, actorEntity);
                     ResetHazardActorPresentationSignalState(em, actorEntity);
                     em.SetEnabled(actorEntity, hasActorBinding);
                 }
@@ -1106,6 +1108,42 @@ namespace SweepNDodge.DotsBullets
             {
                 Version = 0u,
                 Cue = HazardActorPresencePresentationCueId.None,
+            });
+        }
+
+        private static void ResetHazardActorPhaseTransitionRuntimeState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorPhaseTransitionRuntimeComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorPhaseTransitionRuntimeComponent
+            {
+                State = HazardActorPhaseTransitionStateId.Idle,
+                PendingFromPhaseId = -1,
+                PendingToPhaseId = -1,
+                ElapsedSec = 0f,
+                DurationSec = 0f,
+                TransitionVersion = 0u,
+            });
+        }
+
+        private static void ResetHazardActorPhaseTransitionSignalState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorPhaseTransitionSignalComponent>(actorEntity))
+                return;
+
+            int currentPhaseId = 1;
+            if (em.HasComponent<HazardActorBehaviorPhaseBaselineComponent>(actorEntity))
+                currentPhaseId = math.max(1, em.GetComponentData<HazardActorBehaviorPhaseBaselineComponent>(actorEntity).InitialPhaseId);
+
+            em.SetComponentData(actorEntity, new HazardActorPhaseTransitionSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPhaseTransitionSignalCueId.None,
+                Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                PreviousPhaseId = currentPhaseId,
+                CurrentPhaseId = currentPhaseId,
+                PendingToPhaseId = -1,
             });
         }
 

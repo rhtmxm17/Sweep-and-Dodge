@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260409-01`
 - type: `SessionTaskBoard`
 - status: `in_progress`
-- last_updated: `2026-04-10`
+- last_updated: `2026-04-13`
 - related_docs:
   - [./SESSION-20260408-01-hazard-actor-design-board.md](./SESSION-20260408-01-hazard-actor-design-board.md)
   - [../TechnicalDesign/TD-028-hazard-emitter-common-contract.md](../TechnicalDesign/TD-028-hazard-emitter-common-contract.md)
@@ -30,26 +30,25 @@
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- `HB-3B. Blueprint selector policy and actor phase` 구현과 검증을 닫았다.
+- `HB-3C. Escalation signal and progress-threshold transition` 구현과 검증을 닫았다.
 - 현재 상태:
-  - actor는 `HazardActorBehaviorPhaseBaselineComponent` / `HazardActorBehaviorPhaseStateComponent`를 가진다.
-  - actor-owned `HazardActorPhaseSelectorPolicyBuffer` / `HazardActorPhaseSelectorCandidateBuffer`가 selector policy SSOT가 됐다.
-  - selector mode는 `OrderedPriority`와 `OrderedCycle`을 지원한다.
-  - explicit phase-policy가 없는 actor는 compatibility seed(`InitialPhaseId = 1`, `OrderedPriority`, emitterId asc + lowest slot`)를 자동 생성한다.
-  - `StageTopologyTemplateFactory` 경로도 baker와 같은 phase/policy contract로 맞춰 operational/sample scene가 동일한 runtime path를 사용한다.
-  - emitter natural cycle completion signal은 `HazardEmitterCycleSignalComponent.CompletedVersion`으로 publish된다.
+  - actor는 progress-threshold 기반 phase transition rule을 `HazardActorPhaseProgressTransitionBuffer`로 가진다.
+  - escalation staging runtime은 `HazardActorPhaseTransitionRuntimeComponent` / `HazardActorPhaseTransitionSignalComponent`로 분리됐다.
+  - `Preparing` 동안 actor-owned emitter는 coordinator에서 `ActorPhaseTransitionPreparing` reason으로 차단된다.
+  - selector는 `Preparing` 동안 invalidate되지 않고 freeze되며, phase commit 이후 `HB-3B` 규칙대로 fresh select 한다.
+  - `StageTopologyTemplateFactory`와 baker 모두 transition buffer/runtime/signal contract를 동일하게 seed한다.
 - 검증 결과:
   - Unity MCP `refresh_unity(compile=request)` 이후 compile ready 확인
-  - `EditMode 526/526 passed`
+  - `EditMode 532/532 passed`
   - `PlayMode 49/49 passed`
-  - `result.summary.resultState`는 EditMode / PlayMode 모두 `Failed(Child)`로 보였지만 failed count는 0이었다.
-  - console `error` 조회에는 여전히 `MCP-FOR-UNITY` disposed `NetworkStream` noise와, 의도적으로 남기는 multi-slot emitter override rejection test log가 섞여 들어올 수 있다.
+  - EditMode / PlayMode 모두 `result.summary.resultState`는 `Failed(Child)`로 보였지만 failed count는 0이었다.
+  - 최종 console `error` 조회는 project code error 없이 `MCP-FOR-UNITY` client exit noise만 남았다.
 - 남은 일:
-  - `HB-3C. Escalation signal and progress-threshold transition` 설계/구현 착수
+  - `HB-3D. Blueprint sample content / verification closeout`
 
 ## Next
-- `HB-3C. Escalation signal and progress-threshold transition`의 실행 계약을 문서 기준으로 고정하고 구현에 들어간다.
-- `HB-3D`는 `HB-3C` 결과가 닫힌 뒤 sample content / verification closeout으로 연다.
+- `HB-3D. Blueprint sample content / verification closeout` 범위를 고정하고 sample/content verification closeout으로 넘어간다.
+- 필요 시 `GD-016` 청사진 샘플과 operational/sample content parity를 확인한다.
 
 ## Blocked
 - 로컬 `SweepNDodge.EditModeTests.csproj`는 기존 누락 파일 `Assets/_Project/99_Tests/EditMode/CarryBinRulesTests.cs` 때문에 단독 빌드가 막혀 있다.
@@ -207,8 +206,31 @@
   - 관찰:
     - console `error` 조회에는 `MCP-FOR-UNITY` disposed `NetworkStream` noise가 여전히 섞일 수 있다.
     - PlayMode 최종 판정은 long wait 후 결과만 회수한 run을 기준으로 닫았다.
+- [x] D18. `HB-3C. Escalation signal and progress-threshold transition` 구현을 완료했다.
+  - actor-owned `HazardActorPhaseProgressTransitionBuffer`가 추가됐다.
+    - `FromPhaseId`
+    - `ToPhaseId`
+    - `ProgressThresholdNormalized`
+    - `TransitionLeadInSec`
+  - escalation staging runtime이 추가됐다.
+    - `HazardActorPhaseTransitionRuntimeComponent`
+    - `HazardActorPhaseTransitionSignalComponent`
+    - signal cue는 `PreparingStarted` / `PhaseCommitted`를 사용한다.
+  - `HazardActorPhaseTransitionSystem`이 source progress truth(`CollectedCount / ThresholdDepleted`)를 읽어 `Idle -> Preparing -> commit` 흐름을 owner로 관리한다.
+  - threshold 평가는 `PresenceState == Active` actor에만 수행된다.
+  - `Preparing` 동안 selector는 freeze되고, coordinator는 `ActorPhaseTransitionPreparing` suppression reason으로 emitter 공격을 차단한다.
+  - `StageTopologyApplyPrepareSystem`은 actor transition runtime/signal을 baseline idle로 reset한다.
+  - `ContentValidationRules`는 invalid actor phase transition authoring을 `CV092`로 보고한다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 532/532 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+  - 관찰:
+    - full test run 중 console에는 `SpawnBacklog` intentional error logs와 `MCP-FOR-UNITY` noise가 섞일 수 있다.
+    - final console clear 후에는 project code error 없이 `MCP-FOR-UNITY` client exit noise만 남았다.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `HB-3C. Escalation signal and progress-threshold transition` 설계/구현으로 넘어간다.
+  - `HB-3D. Blueprint sample content / verification closeout`으로 넘어간다.
