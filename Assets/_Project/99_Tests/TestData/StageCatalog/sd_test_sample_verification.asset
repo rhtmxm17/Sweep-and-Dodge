@@ -19,8 +19,8 @@ MonoBehaviour:
   SourceBindings:
   - SourceStableId: 1001
     InitialSourceState: 0
-    ThresholdWeakened: 999999
-    ThresholdDepleted: 999999
+    ThresholdWeakened: 4
+    ThresholdDepleted: 8
     SustainSlots:
     - State: 0
       Lane: 1
@@ -29,6 +29,18 @@ MonoBehaviour:
       Weights:
       - 1
     - State: 0
+      Lane: 0
+      Clips:
+      - {fileID: 11400000, guid: 8163f2f0a1f84530a25ff2ea1f2298c1, type: 2}
+      Weights:
+      - 1
+    - State: 1
+      Lane: 1
+      Clips:
+      - {fileID: 11400000, guid: 3f0cf490a0ab49bfb0caee9477f3bf12, type: 2}
+      Weights:
+      - 1
+    - State: 1
       Lane: 0
       Clips:
       - {fileID: 11400000, guid: 8163f2f0a1f84530a25ff2ea1f2298c1, type: 2}

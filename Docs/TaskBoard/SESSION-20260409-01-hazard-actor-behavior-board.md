@@ -30,25 +30,29 @@
 - `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
 
 ## Now
-- `HB-3C. Escalation signal and progress-threshold transition` 구현과 검증을 닫았다.
+- `HB-3D. Blueprint sample content / verification closeout` 구현과 검증을 닫았다.
 - 현재 상태:
-  - actor는 progress-threshold 기반 phase transition rule을 `HazardActorPhaseProgressTransitionBuffer`로 가진다.
-  - escalation staging runtime은 `HazardActorPhaseTransitionRuntimeComponent` / `HazardActorPhaseTransitionSignalComponent`로 분리됐다.
-  - `Preparing` 동안 actor-owned emitter는 coordinator에서 `ActorPhaseTransitionPreparing` reason으로 차단된다.
-  - selector는 `Preparing` 동안 invalidate되지 않고 freeze되며, phase commit 이후 `HB-3B` 규칙대로 fresh select 한다.
-  - `StageTopologyTemplateFactory`와 baker 모두 transition buffer/runtime/signal contract를 동일하게 seed한다.
+  - test/operational source-template prefab이 모두 blueprint baseline content로 uplift됐다.
+    - actor 1, emitter 1, slots `A/B/B'`
+    - phase 1 policy: `OrderedCycle` with `[A, B]`
+    - phase 2 policy: `OrderedCycle` with `[A, B']`
+    - phase transition: `Phase1 -> Phase2 @ progress 0.5` with prefab-owned lead-in
+  - sample verification 전용 stage asset은 bounded escalation verification용 threshold/tuning으로 정렬됐다.
+    - test-only stage는 `Weakened` lane clip 누락 없이 half-progress escalation을 재현한다.
+  - sample verification PlayMode는 cleanup-driven source progress로 `PreparingStarted -> attack blocked -> PhaseCommitted -> phase 2 restart from A -> B'`를 실제 관찰한다.
+  - operational SampleScene smoke는 blueprint prefab parity + runtime slot/policy/transition reflection까지 확인한다.
 - 검증 결과:
   - Unity MCP `refresh_unity(compile=request)` 이후 compile ready 확인
-  - `EditMode 532/532 passed`
+  - `EditMode 533/533 passed`
   - `PlayMode 49/49 passed`
   - EditMode / PlayMode 모두 `result.summary.resultState`는 `Failed(Child)`로 보였지만 failed count는 0이었다.
-  - 최종 console `error` 조회는 project code error 없이 `MCP-FOR-UNITY` client exit noise만 남았다.
+  - final console `error` 조회에는 project code error 없이 `MCP-FOR-UNITY` disposed-stream / client-exit noise만 남았다.
 - 남은 일:
-  - `HB-3D. Blueprint sample content / verification closeout`
+  - `HB-4. Validation / sample update` 이후 범위 또는 후속 actor motion/path 논의
 
 ## Next
-- `HB-3D. Blueprint sample content / verification closeout` 범위를 고정하고 sample/content verification closeout으로 넘어간다.
-- 필요 시 `GD-016` 청사진 샘플과 operational/sample content parity를 확인한다.
+- 후속 범위를 새로 열기 전 `HB-3` 종료 상태를 기준선으로 유지한다.
+- 필요 시 `GD-016` 청사진과 sample/operational content parity drift만 점검한다.
 
 ## Blocked
 - 로컬 `SweepNDodge.EditModeTests.csproj`는 기존 누락 파일 `Assets/_Project/99_Tests/EditMode/CarryBinRulesTests.cs` 때문에 단독 빌드가 막혀 있다.
@@ -229,8 +233,31 @@
   - 관찰:
     - full test run 중 console에는 `SpawnBacklog` intentional error logs와 `MCP-FOR-UNITY` noise가 섞일 수 있다.
     - final console clear 후에는 project code error 없이 `MCP-FOR-UNITY` client exit noise만 남았다.
+- [x] D19. `HB-3D. Blueprint sample content / verification closeout` 구현을 완료했다.
+  - test/operational source-template prefab을 동일한 blueprint baseline content로 정렬했다.
+    - actor phase selector policy는 `phase 1: [A, B]`, `phase 2: [A, B']`의 `OrderedCycle`을 사용한다.
+    - actor phase transition은 `Phase1 -> Phase2 @ progress 0.5`와 prefab-owned lead-in을 사용한다.
+    - emitter는 single-slot sample에서 `A/B/B'` 3-slot sample로 uplift됐다.
+  - test-only stage asset은 bounded escalation verification을 위해 tuning을 조정했다.
+    - half-progress escalation verification이 가능한 threshold로 낮췄다.
+    - `Weakened` sustain lane clip 누락을 보강해 state transition 중 validation/log regression을 제거했다.
+  - sample verification PlayMode는 direct `CollectedCount` injection 없이 cleanup-driven source progress로 escalation을 검증한다.
+    - `PreparingStarted`
+    - `ActorPhaseTransitionPreparing` suppression
+    - `PhaseCommitted`
+    - phase 2 entry `A`
+    - phase 2 follow-up `B'`
+  - operational SampleScene smoke는 runtime entity가 blueprint slot/policy/transition buffer를 실제로 반영하는지까지 확인한다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 533/533 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+  - 관찰:
+    - full PlayMode는 mid-run polling 없이 장시간 대기 후 결과만 회수한 run을 기준으로 닫았다.
+    - final console `error` 조회에는 project code error 없이 `MCP-FOR-UNITY` disposed-stream / client-exit noise만 남았다.
 
 ## End of Session
 - 결과: 진행 중
 - 다음 시작점:
-  - `HB-3D. Blueprint sample content / verification closeout`으로 넘어간다.
+  - `HB-4. Validation / sample update` 또는 후속 actor behavior 확장 논의로 넘어간다.

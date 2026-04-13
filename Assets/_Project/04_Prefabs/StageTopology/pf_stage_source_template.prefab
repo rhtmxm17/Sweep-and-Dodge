@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!1 &100000
 GameObject:
@@ -46,9 +46,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.SourceRuntimeTemplateAuthoring
   StableIdOverride: 0
-  FieldShape: 0
-  FieldRadius: 8
-  FieldSize: {x: 12, y: 8}
+  Shape: 0
+  Radius: 8
+  Size: {x: 12, y: 8}
   SustainClipSlots: []
   EventClipSlots: []
   ThresholdWeakened: 2000
@@ -61,6 +61,12 @@ MonoBehaviour:
   PollutionRegenPerSec: 0.08
   PollutionDropPerCollect: 0.12
   PollutionTopKSampleCount: 6
+  PollutionActiveRatioThreshold: 0.35
+  PollutionRecoveryCooldownFrames: 45
+  PollutionRecoveryWaveSeedCount: 2
+  PollutionRecoveryWaveClusterSize: 4
+  PollutionRecoveryRestoreValue: 0.4
+  PollutionRecoveryRecentCleanBiasFrames: 90
   DrawGizmo: 0
   DrawGizmoWhenNotSelected: 0
 --- !u!1 &110000
@@ -112,6 +118,31 @@ MonoBehaviour:
   Enabled: 1
   StartSuppressed: 0
   InitialPresenceState: 2
+  ActivationTrigger: 1
+  ActivationDurationSec: 0
+  RetireTrigger: 0
+  RetireDurationSec: 0
+  InitialPhaseId: 1
+  PhaseSelectorPolicies:
+  - PhaseId: 1
+    SelectionMode: 1
+    Candidates:
+    - EmitterId: 1
+      PatternSlotId: 1
+    - EmitterId: 1
+      PatternSlotId: 2
+  - PhaseId: 2
+    SelectionMode: 1
+    Candidates:
+    - EmitterId: 1
+      PatternSlotId: 1
+    - EmitterId: 1
+      PatternSlotId: 3
+  PhaseProgressTransitions:
+  - FromPhaseId: 1
+    ToPhaseId: 2
+    ProgressThresholdNormalized: 0.5
+    TransitionLeadInSec: 0.35
 --- !u!1 &120000
 GameObject:
   m_ObjectHideFlags: 0
@@ -169,4 +200,13 @@ MonoBehaviour:
     EmissionProfile: {fileID: 11400000, guid: cc2d3d4b7c9a4b5e8f1d2c3b4a5e6102, type: 2}
     BaseWeight: 1
     AvailabilityFlags: 0
-
+  - PatternSlotId: 2
+    TelegraphProfile: {fileID: 11400000, guid: 7c3e4e1a5f8844698e6eaf2f9a5f5101, type: 2}
+    EmissionProfile: {fileID: 11400000, guid: 3d2232c8b9f66eb4f93a500026cfe63b, type: 2}
+    BaseWeight: 1
+    AvailabilityFlags: 0
+  - PatternSlotId: 3
+    TelegraphProfile: {fileID: 11400000, guid: 7c3e4e1a5f8844698e6eaf2f9a5f5101, type: 2}
+    EmissionProfile: {fileID: 11400000, guid: 9565913a705a2f5429627bcd6dff45e8, type: 2}
+    BaseWeight: 1
+    AvailabilityFlags: 0

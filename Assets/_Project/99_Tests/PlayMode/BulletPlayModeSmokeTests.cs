@@ -57,19 +57,47 @@ namespace SweepNDodge.DotsBullets.Tests
                 "Operational scene did not reach Lobby for hazard actor sample test.");
 
             Assert.That(shell.RequestSelectStageById(1), Is.True);
+            Entity actorEntity = Entity.Null;
+            Entity emitterEntity = Entity.Null;
             yield return WaitForStagePlayRunning(
                 () =>
                 {
                     shell = FindDemoShell();
-                    return shell != null
-                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                    if (shell == null)
+                        return false;
+
+                    bool ready = shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && shell.CurrentStageId == 1
                         && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
                         && CountByComponentType<HazardActorComponent>(em) > 0
                         && CountByComponentType<HazardEmitterComponent>(em) > 0;
+                    if (!ready)
+                        return false;
+
+                    actorEntity = FindFirstEntity<HazardActorComponent>(em);
+                    emitterEntity = FindFirstEntity<HazardEmitterComponent>(em);
+                    return actorEntity != Entity.Null
+                        && emitterEntity != Entity.Null
+                        && em.HasBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity)
+                        && em.HasBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity)
+                        && em.HasBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity)
+                        && em.HasBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
                 },
                 480,
                 "Operational scene did not create hazard actor/emitter entities in StagePlay.");
+
+            CompleteTrackedJobs(em);
+            var selectorPolicies = em.GetBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity);
+            var selectorCandidates = em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity);
+            var transitions = em.GetBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
+            var slots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+            Assert.That(selectorPolicies.Length, Is.EqualTo(2), "Operational blueprint actor must expose two phase selector policies.");
+            Assert.That(selectorCandidates.Length, Is.EqualTo(4), "Operational blueprint actor must expose four ordered selector candidates.");
+            Assert.That(transitions.Length, Is.EqualTo(1), "Operational blueprint actor must expose one progress transition.");
+            Assert.That(slots.Length, Is.EqualTo(3), "Operational blueprint emitter must expose A/B/B' slots.");
+            Assert.That(slots[0].PatternSlotId, Is.EqualTo(1));
+            Assert.That(slots[1].PatternSlotId, Is.EqualTo(2));
+            Assert.That(slots[2].PatternSlotId, Is.EqualTo(3));
 
             bool sawLinearBullet = false;
             bool sawEmitterAdvance = false;
@@ -3585,6 +3613,14 @@ namespace SweepNDodge.DotsBullets.Tests
             CompleteTrackedJobs(em);
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.CalculateEntityCount();
+        }
+
+        private static Entity FindFirstEntity<T>(EntityManager em) where T : unmanaged, IComponentData
+        {
+            CompleteTrackedJobs(em);
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
         }
 
         private static int CountActiveBulletsByType(EntityManager em, int typeKey)

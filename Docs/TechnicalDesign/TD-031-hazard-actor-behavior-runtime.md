@@ -313,7 +313,29 @@
     - `PlayMode 49/49 passed`
     - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
     - final console clear 후 `read_console(error)`에는 project code error 없이 `MCP-FOR-UNITY` client exit noise만 남았다.
-  - `HB-3D`는 아직 시작 전
+  - `HB-3D. Blueprint sample content / verification closeout` 구현 완료
+    - test/operational source-template prefab 모두 blueprint baseline content로 uplift됐다.
+      - emitter slots: `A / B / B'`
+      - phase 1 selector policy: `OrderedCycle` with `[A, B]`
+      - phase 2 selector policy: `OrderedCycle` with `[A, B']`
+      - actor transition: `Phase1 -> Phase2 @ progress 0.5` with prefab-owned lead-in
+    - sample verification 전용 stage asset은 bounded escalation verification용 threshold/tuning으로 정렬됐다.
+      - direct `CollectedCount` injection 대신 cleanup-driven source progress로 half-progress transition을 재현한다.
+      - `Weakened` sustain lane clip 누락을 보강해 source state transition 중 sample verification log regression을 제거했다.
+    - PlayMode sample verification contract:
+      - phase 1 `A -> B`
+      - `PreparingStarted`
+      - `ActorPhaseTransitionPreparing` suppression으로 공격 차단
+      - `PhaseCommitted`
+      - phase 2 entry `A`
+      - phase 2 follow-up `B'`
+    - operational SampleScene smoke는 runtime entity가 blueprint slot/policy/transition buffer를 실제로 반영하는지까지 확인한다.
+  - `HB-3D` 검증 결과
+    - Unity MCP 기준 compile ready 확인
+    - `EditMode 533/533 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+    - final console `error` 조회에는 project code error 없이 `MCP-FOR-UNITY` disposed-stream / client-exit noise만 남았다.
 
 ### 7.4 HB-4. Validation / sample update
 - operational sample과 test-only verification path를 actor behavior 기준으로 확장

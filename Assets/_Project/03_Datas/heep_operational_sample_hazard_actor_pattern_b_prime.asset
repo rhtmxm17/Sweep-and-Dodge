@@ -10,31 +10,30 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 96b729550b95e4048b5973a3e3324a5e, type: 3}
-  m_Name: heep_operational_sample_hazard_actor
+  m_Name: heep_operational_sample_hazard_actor_pattern_b_prime
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.HazardEmitterEmissionProfileSO
   Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
-  EventRepeatCount: 2
+  EventRepeatCount: 7
   EventShotSchedule: 1
-  EventShotIntervalSec: 0.18
+  EventShotIntervalSec: 0.08
   CooldownSec: 0.5
   PositionPattern:
-    rid: 6141543494856999008
+    rid: 6141543494856999005
   Aim:
-    rid: 6141543494856999009
+    rid: 6141543494856999006
   ShotPattern:
-    rid: 6141543494856999010
+    rid: 6141543494856999007
   references:
     version: 2
     RefIds:
-    - rid: 6141543494856999008
+    - rid: 6141543494856999005
       type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
-    - rid: 6141543494856999009
-      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+    - rid: 6141543494856999006
+      type: {class: PlayerPositionAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        BaseAngleDeg: 180
-    - rid: 6141543494856999010
-      type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        ShotCount: 4
-        AngleSpacingDeg: 30
+        AngleOffsetDeg: 0
+        SnapshotTiming: 1
+    - rid: 6141543494856999007
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 

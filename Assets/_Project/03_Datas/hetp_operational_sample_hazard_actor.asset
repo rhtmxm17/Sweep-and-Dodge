@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4aba302dd55f2546b6ff1bc4104b0aa, type: 3}
   m_Name: hetp_operational_sample_hazard_actor
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.HazardEmitterTelegraphProfileSO
-  TelegraphDurationSec: 0.15
+  TelegraphDurationSec: 0.1

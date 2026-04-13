@@ -13,26 +13,28 @@ MonoBehaviour:
   m_Name: heep_test_sample_hazard_actor
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.HazardEmitterEmissionProfileSO
   Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
-  EventRepeatCount: 1
-  EventShotSchedule: 0
-  EventShotIntervalSec: 0
-  CooldownSec: 0.6
+  EventRepeatCount: 2
+  EventShotSchedule: 1
+  EventShotIntervalSec: 0.18
+  CooldownSec: 0.5
   PositionPattern:
-    rid: 3201
+    rid: 6141543494856999017
   Aim:
-    rid: 3202
+    rid: 6141543494856999018
   ShotPattern:
-    rid: 3203
+    rid: 6141543494856999019
   references:
     version: 2
     RefIds:
-    - rid: 3201
+    - rid: 6141543494856999017
       type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 3202
+      data: 
+    - rid: 6141543494856999018
       type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        BaseAngleDeg: 210
-    - rid: 3203
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
+        BaseAngleDeg: 180
+    - rid: 6141543494856999019
+      type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        ShotCount: 4
+        AngleSpacingDeg: 30

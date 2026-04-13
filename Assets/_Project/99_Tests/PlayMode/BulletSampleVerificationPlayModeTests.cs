@@ -2,6 +2,8 @@ using System.Collections;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -24,6 +26,10 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var em = world.EntityManager;
             DemoShellFlowController shell = null;
+            Entity actorEntity = Entity.Null;
+            Entity emitterEntity = Entity.Null;
+            Entity sourceEntity = Entity.Null;
+            Entity playerEntity = Entity.Null;
             yield return WaitForCondition(
                 () =>
                 {
@@ -59,33 +65,152 @@ namespace SweepNDodge.DotsBullets.Tests
                 480,
                 "Sample verification scene did not reach StagePlay/Running in time.");
 
+            CompleteTrackedJobs(em);
+            actorEntity = FindFirstEntity<HazardActorComponent>(em);
+            emitterEntity = FindFirstEntity<HazardEmitterComponent>(em);
+            playerEntity = GetSingletonEntity<PlayerTag>(em);
+            Assert.That(actorEntity, Is.Not.EqualTo(Entity.Null), "Sample verification scene did not create a HazardActor entity.");
+            Assert.That(emitterEntity, Is.Not.EqualTo(Entity.Null), "Sample verification scene did not create a HazardEmitter entity.");
+            Assert.That(playerEntity, Is.Not.EqualTo(Entity.Null), "Sample verification scene did not create a Player entity.");
+            sourceEntity = em.GetComponentData<HazardActorComponent>(actorEntity).SourceEntity;
+            Assert.That(sourceEntity, Is.Not.EqualTo(Entity.Null), "Hazard actor must point to a source entity.");
+
+            var selectorPolicies = em.GetBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity);
+            var selectorCandidates = em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity);
+            var transitions = em.GetBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
+            var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+            Assert.That(selectorPolicies.Length, Is.EqualTo(2), "Blueprint sample actor must expose two phase selector policies.");
+            Assert.That(selectorCandidates.Length, Is.EqualTo(4), "Blueprint sample actor must expose four ordered selector candidates.");
+            Assert.That(transitions.Length, Is.EqualTo(1), "Blueprint sample actor must expose one phase transition.");
+            Assert.That(patternSlots.Length, Is.EqualTo(3), "Blueprint sample emitter must expose A/B/B' pattern slots.");
+
             SetCarryState(em, load: 0, capacity: 100);
 
-            bool sawLinear = false;
-            bool sawActor = false;
-            bool sawEmitter = false;
-            bool sawEmitterProgress = false;
-            for (int frame = 0; frame < 1200; frame++)
+            yield return WaitForCondition(
+                () =>
+                {
+                    CompleteTrackedJobs(em);
+                    if (!em.Exists(actorEntity) || !em.Exists(emitterEntity))
+                        return false;
+
+                    var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actorEntity);
+                    var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actorEntity);
+                    return actorPhase.CurrentPhaseId == 1
+                        && selector.CurrentPatternSlotId == 1
+                        && CountActiveBulletsByType(em, LinearHazardTypeKey) > 0
+                        && AnyEmitterAdvancedFromDormant(em);
+                },
+                600,
+                "Sample verification scene did not start phase 1 entry pattern A in time.");
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    CompleteTrackedJobs(em);
+                    if (!em.Exists(actorEntity))
+                        return false;
+
+                    var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actorEntity);
+                    var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actorEntity);
+                    return actorPhase.CurrentPhaseId == 1
+                        && selector.CurrentPatternSlotId == 2
+                        && selector.SelectionSequence > 0u;
+                },
+                600,
+                "Sample verification scene did not alternate to phase 1 pattern B in time.");
+
+            bool preparingStarted = false;
+            int preparingSlotId = -1;
+            uint preparingSequence = 0u;
+            int preparingProgress = 0;
+            uint preparingSignalVersion = 0u;
+            for (int frame = 0; frame < 900; frame++)
             {
+                DriveCleanupTowardSource(em, playerEntity, sourceEntity);
+                yield return null;
                 CompleteTrackedJobs(em);
 
-                sawLinear |= CountActiveBulletsByType(em, LinearHazardTypeKey) > 0;
-                sawActor |= CountByComponentType<HazardActorComponent>(em) > 0;
-                sawEmitter |= CountByComponentType<HazardEmitterComponent>(em) > 0;
-                sawEmitterProgress |= AnyEmitterAdvancedFromDormant(em);
+                if (!em.Exists(actorEntity))
+                    continue;
 
-                if (sawLinear && sawActor && sawEmitter && sawEmitterProgress)
+                var signal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actorEntity);
+                var transitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actorEntity);
+                if (transitionRuntime.State != HazardActorPhaseTransitionStateId.Preparing
+                    || signal.Cue != HazardActorPhaseTransitionSignalCueId.PreparingStarted)
                 {
-                    break;
+                    continue;
                 }
 
-                yield return null;
+                var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actorEntity);
+                preparingStarted = true;
+                preparingSlotId = selector.CurrentPatternSlotId;
+                preparingSequence = selector.SelectionSequence;
+                preparingProgress = em.GetComponentData<SourceSpawnComponent>(sourceEntity).CollectedCount;
+                preparingSignalVersion = signal.Version;
+                break;
             }
 
-            Assert.That(sawLinear, Is.True, "Linear baseline sample bullet was not observed.");
-            Assert.That(sawActor, Is.True, "Sample verification scene did not create a HazardActor entity.");
-            Assert.That(sawEmitter, Is.True, "Sample verification scene did not create a HazardEmitter entity.");
-            Assert.That(sawEmitterProgress, Is.True, "Sample verification scene did not advance an actor-owned emitter runtime path.");
+            Assert.That(preparingStarted, Is.True, "Blueprint sample did not enter Preparing after reaching half progress.");
+            var sourceAtPreparing = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+            float preparingProgress01 = math.saturate((float)preparingProgress / math.max(1, sourceAtPreparing.ThresholdDepleted));
+            Assert.That(preparingProgress01, Is.GreaterThanOrEqualTo(0.5f), "Preparing must start after gameplay-driven source progress crosses the half-progress threshold.");
+
+            bool sawPreparingSuppression = false;
+            for (int frame = 0; frame < 60; frame++)
+            {
+                yield return null;
+                CompleteTrackedJobs(em);
+
+                var transitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actorEntity);
+                if (transitionRuntime.State != HazardActorPhaseTransitionStateId.Preparing)
+                    break;
+
+                var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actorEntity);
+                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitterEntity);
+                Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(preparingSlotId), "Selector must freeze while the actor is Preparing.");
+                Assert.That(selector.SelectionSequence, Is.EqualTo(preparingSequence), "Selector sequence must freeze while the actor is Preparing.");
+
+                if (coordinator.ActivationAllowed == 0
+                    && (coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPhaseTransitionPreparing) != 0u)
+                {
+                    sawPreparingSuppression = true;
+                }
+            }
+
+            Assert.That(sawPreparingSuppression, Is.True, "Preparing must block emitter activation through the actor transition suppression flag.");
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    CompleteTrackedJobs(em);
+                    if (!em.Exists(actorEntity))
+                        return false;
+
+                    var phase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actorEntity);
+                    var signal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actorEntity);
+                    var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actorEntity);
+                    return phase.CurrentPhaseId == 2
+                        && signal.Cue == HazardActorPhaseTransitionSignalCueId.PhaseCommitted
+                        && signal.Version > preparingSignalVersion
+                        && selector.CurrentPatternSlotId == 1;
+                },
+                300,
+                "Blueprint sample did not commit phase 2 and restart from entry slot A in time.");
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    CompleteTrackedJobs(em);
+                    if (!em.Exists(actorEntity))
+                        return false;
+
+                    var phase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actorEntity);
+                    var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actorEntity);
+                    return phase.CurrentPhaseId == 2
+                        && selector.CurrentPatternSlotId == 3;
+                },
+                600,
+                "Blueprint sample did not advance to strengthened phase 2 pattern B' in time.");
         }
 
         private static IEnumerator LoadSceneWithSettle(string scenePath, int settleFrames = 4)
@@ -153,6 +278,66 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(carryEntity, carry);
         }
 
+        private static void DriveCleanupTowardSource(EntityManager em, Entity playerEntity, Entity sourceEntity)
+        {
+            if (!TryResolveWorldPosition(em, sourceEntity, out float3 sourcePosition))
+                return;
+
+            float3 playerPosition = sourcePosition + new float3(0f, 0f, -0.25f);
+
+            if (em.HasComponent<LocalTransform>(playerEntity))
+            {
+                var tx = em.GetComponentData<LocalTransform>(playerEntity);
+                tx.Position = playerPosition;
+                em.SetComponentData(playerEntity, tx);
+            }
+
+            if (em.HasComponent<PlayerGoSyncComponent>(playerEntity))
+            {
+                var sync = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
+                sync.Position = playerPosition;
+                sync.Rotation = quaternion.identity;
+                sync.SyncRotation = 0;
+                sync.VacuumRequested = 1;
+                sync.CleanupActionRequested = 1;
+                sync.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary;
+                em.SetComponentData(playerEntity, sync);
+            }
+
+            if (em.HasComponent<PlayerInputIntentComponent>(playerEntity))
+            {
+                var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
+                intent.MoveAxis = float2.zero;
+                intent.AimWorldXZ = new float2(sourcePosition.x, sourcePosition.z);
+                intent.HasAimWorldPoint = 1;
+                intent.VacuumRequested = 1;
+                intent.CleanupActionRequested = 1;
+                intent.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary;
+                intent.Sequence += 1u;
+                em.SetComponentData(playerEntity, intent);
+            }
+
+            if (em.HasComponent<PlayerResolvedInputSnapshotComponent>(playerEntity))
+            {
+                var snapshot = em.GetComponentData<PlayerResolvedInputSnapshotComponent>(playerEntity);
+                snapshot.MoveAxis = float2.zero;
+                snapshot.AimWorldXZ = new float2(sourcePosition.x, sourcePosition.z);
+                snapshot.HasAimWorldPoint = 1;
+                snapshot.VacuumRequested = 1;
+                snapshot.CleanupActionRequested = 1;
+                snapshot.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary;
+                snapshot.Sequence += 1u;
+                em.SetComponentData(playerEntity, snapshot);
+            }
+
+            if (em.HasComponent<VacuumRuntimeStateComponent>(playerEntity))
+            {
+                var vacuum = em.GetComponentData<VacuumRuntimeStateComponent>(playerEntity);
+                vacuum.ActivateRequested = 1;
+                em.SetComponentData(playerEntity, vacuum);
+            }
+        }
+
         private static int CountActiveBulletsByType(EntityManager em, int typeKey)
         {
             using var query = em.CreateEntityQuery(
@@ -175,6 +360,14 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
             return query.CalculateEntityCount();
+        }
+
+        private static Entity FindFirstEntity<T>(EntityManager em)
+            where T : unmanaged, IComponentData
+        {
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
         }
 
         private static bool AnyEmitterAdvancedFromDormant(EntityManager em)
@@ -214,6 +407,30 @@ namespace SweepNDodge.DotsBullets.Tests
         private static void CompleteTrackedJobs(EntityManager em)
         {
             em.CompleteAllTrackedJobs();
+        }
+
+        private static bool TryResolveWorldPosition(EntityManager em, Entity entity, out float3 position)
+        {
+            if (entity == Entity.Null || !em.Exists(entity))
+            {
+                position = float3.zero;
+                return false;
+            }
+
+            if (em.HasComponent<LocalToWorld>(entity))
+            {
+                position = em.GetComponentData<LocalToWorld>(entity).Value.c3.xyz;
+                return true;
+            }
+
+            if (em.HasComponent<LocalTransform>(entity))
+            {
+                position = em.GetComponentData<LocalTransform>(entity).Position;
+                return true;
+            }
+
+            position = float3.zero;
+            return false;
         }
 
         private static void ClearDemoShellStaging()
