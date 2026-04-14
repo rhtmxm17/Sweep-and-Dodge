@@ -5,12 +5,33 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
     public class HazardEmitterPlayModeTests
     {
+        private sealed class HazardActorArchetypeFixture : System.IDisposable
+        {
+            public GameObject Root;
+            public HazardEmitterTelegraphProfileSO Telegraph;
+            public HazardEmitterEmissionProfileSO Emission;
+            public BulletDefinitionSO Bullet;
+
+            public void Dispose()
+            {
+                if (Root != null)
+                    Object.DestroyImmediate(Root);
+                if (Telegraph != null)
+                    Object.DestroyImmediate(Telegraph);
+                if (Emission != null)
+                    Object.DestroyImmediate(Emission);
+                if (Bullet != null)
+                    Object.DestroyImmediate(Bullet);
+            }
+        }
+
         [UnityTest]
         public IEnumerator PlayMode_AlwaysCycleHazardEmitter_AppendsAndConsumesDiscreteEmit()
         {
@@ -223,6 +244,63 @@ namespace SweepNDodge.DotsBullets.Tests
             yield break;
         }
 
+        [UnityTest]
+        public IEnumerator PlayMode_PlacementDeliveredHazardActor_RemainsHiddenWithoutOrchestration()
+        {
+            using var archetype = CreateHazardActorArchetype("placement_actor_playmode", actorId: 31, emitterId: 41);
+            var stageCatalog = CreatePlacementStageCatalog(archetype.Root);
+
+            try
+            {
+                using var world = new World("PlayMode_HazardPlacement_Hidden");
+                var em = world.EntityManager;
+
+                world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+
+                var requestEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).GetSingletonEntity();
+                var prefabCatalogEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).GetSingletonEntity();
+                em.SetComponentData(prefabCatalogEntity, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                });
+
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var source = FindAppliedSource(em);
+                var actor = FindActorForPlacement(em, source, placementInstanceId: 101);
+                var emitter = em.GetBuffer<HazardActorEmitterRefBuffer>(actor)[0].EmitterEntity;
+
+                Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Running,
+                });
+                world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+                var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+
+                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
+                Assert.That((coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPresenceHidden) != 0u, Is.True);
+                Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
+                Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(stageCatalog);
+            }
+
+            yield break;
+        }
+
         private static Entity CreateActor(EntityManager em, Entity source, int actorId)
         {
             var entity = em.CreateEntity(
@@ -357,6 +435,100 @@ namespace SweepNDodge.DotsBullets.Tests
             return entity;
         }
 
+        private static Entity CreateSourceTemplate(EntityManager em)
+        {
+            var entity = em.CreateEntity(
+                typeof(Prefab),
+                typeof(LinkedEntityGroup),
+                typeof(SourceStableIdComponent),
+                typeof(SourceSpawnComponent),
+                typeof(SourceSpawnRuntimeComponent),
+                typeof(SourceAnchorComponent),
+                typeof(BulletFieldAreaComponent),
+                typeof(Shape2DComponent),
+                typeof(SourceShapeDerivedComponent),
+                typeof(SourcePollutionConfigComponent),
+                typeof(SourcePollutionGridComponent),
+                typeof(SourceSustainRuntimeComponent),
+                typeof(SourceEventRuntimeComponent),
+                typeof(SourceRunDirectorStateComponent),
+                typeof(LocalTransform));
+
+            em.SetComponentData(entity, new SourceStableIdComponent { Value = 1u });
+            em.SetComponentData(entity, new SourceSpawnComponent
+            {
+                ThresholdWeakened = 2,
+                ThresholdDepleted = 4,
+                CollectedCount = 0,
+                State = SourceStateId.Normal,
+            });
+            em.SetComponentData(entity, new SourceSpawnRuntimeComponent { SpawnSequence = 1u });
+            em.SetComponentData(entity, new SourceAnchorComponent { Position = float3.zero });
+            em.SetComponentData(entity, new Shape2DComponent
+            {
+                Kind = Shape2DKind.Circle,
+                Radius = 2f,
+                Size = float2.zero,
+            });
+            em.SetComponentData(entity, new SourceShapeDerivedComponent
+            {
+                ComputedArea = math.PI * 4f,
+                HalfExtents = new float2(2f, 2f),
+            });
+            em.SetComponentData(entity, new SourcePollutionConfigComponent
+            {
+                MinValue = 0f,
+                MaxValue = 1f,
+                RegenPerSec = 0.1f,
+                DropPerCollect = 0.1f,
+                TopKSampleCount = 1,
+            });
+            em.SetComponentData(entity, new SourcePollutionGridComponent
+            {
+                CellSize = 1f,
+                InvCellSize = 1f,
+                HalfExtents = new float2(2f, 2f),
+                OriginX = -2f,
+                OriginZ = -2f,
+                Cols = 1,
+                Rows = 1,
+            });
+            em.SetComponentData(entity, new SourceSustainRuntimeComponent { ActiveState = SourceStateId.Normal });
+            em.SetComponentData(entity, new SourceEventRuntimeComponent
+            {
+                IsPlaying = 0,
+                ActiveEventClipId = 0,
+                TriggerState = SourceStateId.Normal,
+                ElapsedSec = 0f,
+                SelectionSequence = 1u,
+            });
+            em.SetComponentData(entity, new SourceRunDirectorStateComponent
+            {
+                State = RunDirectorSourceStateId.Baseline,
+                SelectedClipState = SourceStateId.Normal,
+                PressureOccupancySec = 0f,
+                DensityScale = 1f,
+                Version = 1u,
+            });
+            em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 1f));
+
+            em.AddBuffer<SourceSpawnRequestBuffer>(entity);
+            em.AddBuffer<SourceClipPatternBuffer>(entity);
+            em.AddBuffer<SourceSustainSlotCandidateBuffer>(entity);
+            em.AddBuffer<SourceSustainRuntimeLaneBuffer>(entity);
+            em.AddBuffer<SourceEventQueueBuffer>(entity);
+            em.AddBuffer<SourceActiveBulletCountBuffer>(entity);
+            em.AddBuffer<SourceDirectorPressureInputBuffer>(entity);
+            em.AddBuffer<SourcePollutionCellBuffer>(entity);
+            em.AddBuffer<SourcePollutionDropRequestBuffer>(entity);
+            em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
+            em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
+            em.AddBuffer<SourceHazardActorPlacementRefBuffer>(entity);
+            em.AddBuffer<SourceHazardActorRefBuffer>(entity);
+            em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = entity });
+            return entity;
+        }
+
         private static void InitializeSharedContainers(int capacity = 128)
         {
             BulletFieldShared.FreeByKey = new NativeParallelMultiHashMap<int, Entity>(capacity, Allocator.Persistent);
@@ -388,8 +560,161 @@ namespace SweepNDodge.DotsBullets.Tests
         private static void SetSingleton<T>(EntityManager em, T value)
             where T : unmanaged, IComponentData
         {
-            var entity = em.CreateEntity(typeof(T));
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+            Entity entity = query.IsEmptyIgnoreFilter ? em.CreateEntity(typeof(T)) : query.GetSingletonEntity();
             em.SetComponentData(entity, value);
+        }
+
+        private static StageCatalogSO CreatePlacementStageCatalog(GameObject archetypePrefab)
+        {
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            layout.StageId = 1;
+            layout.SchemaVersion = 2;
+            layout.Grid = new StageGridSpec
+            {
+                Width = 1,
+                Height = 1,
+                CellSize = 1f,
+                Origin = Vector3.zero,
+            };
+            layout.Cells = new[]
+            {
+                new StageCellLayoutData { SourceRegionId = 1001u }
+            };
+            layout.SourceRegions = new[]
+            {
+                new StageSourceRegionLayoutData
+                {
+                    StableId = 1001u,
+                    Active = true,
+                    AnchorCell = Vector2Int.zero,
+                    AnchorOffset = Vector2.zero,
+                }
+            };
+            layout.DepositRegions = System.Array.Empty<StageDepositRegionLayoutData>();
+            layout.PlayerStart = new StagePlayerStartLayoutData
+            {
+                Active = true,
+                AnchorCell = Vector2Int.zero,
+                AnchorOffset = Vector2.zero,
+                YawDeg = 0f,
+            };
+            layout.Presentations = System.Array.Empty<StagePresentationLayoutData>();
+
+            var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
+            definition.StageId = 1;
+            definition.SourceBindings = new[]
+            {
+                new StageSourceBinding
+                {
+                    SourceStableId = 1001u,
+                    InitialSourceState = SourceStateId.Normal,
+                    ThresholdWeakened = 0,
+                    ThresholdDepleted = 0,
+                    SustainSlots = System.Array.Empty<SustainSlotBinding>(),
+                    EventSlots = System.Array.Empty<EventSlotBinding>(),
+                    HazardActors = System.Array.Empty<HazardActorBinding>(),
+                    HazardActorPlacements = new[]
+                    {
+                        new HazardActorPlacementBinding
+                        {
+                            PlacementInstanceId = 101,
+                            ActorArchetypePrefab = archetypePrefab,
+                            LocalOffset = new Vector3(2f, 0f, 0f),
+                        }
+                    },
+                }
+            };
+
+            var catalog = ScriptableObject.CreateInstance<StageCatalogSO>();
+            catalog.Entries = new[]
+            {
+                new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "playmode_placement",
+                    Definition = definition,
+                    Layout = layout,
+                }
+            };
+            return catalog;
+        }
+
+        private static void PublishCatalogAndRequest(EntityManager em, Entity requestEntity, StageCatalogSO stageCatalog, int stageId)
+        {
+            using var runtimeQuery = em.CreateEntityQuery(ComponentType.ReadOnly<StageCatalogRuntimeComponent>());
+            var runtimeEntity = runtimeQuery.GetSingletonEntity();
+            em.GetComponentObject<StageCatalogRuntimeComponent>(runtimeEntity).Catalog = stageCatalog;
+
+            em.SetComponentData(requestEntity, new StageTopologyRequestComponent
+            {
+                ApplyRequested = 1,
+                RequestedStageId = stageId,
+            });
+        }
+
+        private static Entity FindAppliedSource(EntityManager em)
+        {
+            using var sourceQuery = em.CreateEntityQuery(
+                ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                ComponentType.ReadOnly<StageTopologySourceTag>(),
+                ComponentType.ReadOnly<SourceStableIdComponent>());
+            using var sources = sourceQuery.ToEntityArray(Allocator.Temp);
+            Assert.That(sources.Length, Is.EqualTo(1));
+            return sources[0];
+        }
+
+        private static Entity FindActorForPlacement(EntityManager em, Entity source, int placementInstanceId)
+        {
+            var placementRefs = em.GetBuffer<SourceHazardActorPlacementRefBuffer>(source);
+            for (int i = 0; i < placementRefs.Length; i++)
+            {
+                if (placementRefs[i].PlacementInstanceId == placementInstanceId)
+                    return placementRefs[i].ActorEntity;
+            }
+
+            Assert.Fail($"Placement actor not found. placementInstanceId={placementInstanceId}");
+            return Entity.Null;
+        }
+
+        private static HazardActorArchetypeFixture CreateHazardActorArchetype(string name, int actorId, int emitterId)
+        {
+            var fixture = new HazardActorArchetypeFixture();
+            fixture.Root = new GameObject(name);
+            var actor = fixture.Root.AddComponent<HazardActorAuthoring>();
+            actor.ActorId = actorId;
+
+            var emitterGo = new GameObject("emitter");
+            emitterGo.transform.SetParent(fixture.Root.transform);
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            emitter.EmitterId = emitterId;
+
+            fixture.Telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            fixture.Bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            fixture.Bullet.Editor_SetDefinitionId(9000 + emitterId);
+            fixture.Emission = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            fixture.Emission.Bullet = fixture.Bullet;
+            fixture.Emission.PositionPattern = new SinglePointPositionPatternAuthoring();
+            fixture.Emission.Aim = new FixedAimAuthoring();
+            fixture.Emission.ShotPattern = new SingleShotPatternAuthoring();
+            fixture.Emission.EventRepeatCount = 1;
+            fixture.Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
+            fixture.Emission.EventShotIntervalSec = 0f;
+            fixture.Emission.CooldownSec = 1f;
+
+            emitter.Slots = new[]
+            {
+                new HazardEmitterPatternSlotAuthoring
+                {
+                    PatternSlotId = 1,
+                    TelegraphProfile = fixture.Telegraph,
+                    EmissionProfile = fixture.Emission,
+                    BaseWeight = 1f,
+                    AvailabilityFlags = 0u,
+                }
+            };
+
+            return fixture;
         }
     }
 }

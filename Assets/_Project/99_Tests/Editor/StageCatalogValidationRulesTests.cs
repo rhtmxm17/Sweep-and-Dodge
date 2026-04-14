@@ -13,6 +13,26 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string GeneratedOperationalRoot = "Assets/__GeneratedStageCatalogValidation";
         private const string GeneratedTestRoot = "Assets/_Project/99_Tests/TestData/__GeneratedStageCatalogValidation";
 
+        private sealed class HazardActorArchetypeFixture : IDisposable
+        {
+            public GameObject Root;
+            public HazardEmitterTelegraphProfileSO Telegraph;
+            public HazardEmitterEmissionProfileSO Emission;
+            public BulletDefinitionSO Bullet;
+
+            public void Dispose()
+            {
+                if (Root != null)
+                    UnityEngine.Object.DestroyImmediate(Root);
+                if (Telegraph != null)
+                    UnityEngine.Object.DestroyImmediate(Telegraph);
+                if (Emission != null)
+                    UnityEngine.Object.DestroyImmediate(Emission);
+                if (Bullet != null)
+                    UnityEngine.Object.DestroyImmediate(Bullet);
+            }
+        }
+
         [Test]
         public void ValidateCatalog_NullReferences_AreReportedAsErrors()
         {
@@ -528,6 +548,132 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ValidateCatalog_HazardActorPlacements_DuplicatePlacementIds_AreReportedAsErrors()
+        {
+            var created = new List<ScriptableObject>();
+            using var archetypeA = CreateHazardActorArchetype("archetype_a", actorId: 1, emitterId: 11);
+            using var archetypeB = CreateHazardActorArchetype("archetype_b", actorId: 2, emitterId: 22);
+
+            try
+            {
+                var definition = CreateDefinition(created, stageId: 12);
+                definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1201u,
+                        InitialSourceState = SourceStateId.Normal,
+                        ThresholdWeakened = 0,
+                        ThresholdDepleted = 0,
+                        SustainSlots = Array.Empty<SustainSlotBinding>(),
+                        EventSlots = Array.Empty<EventSlotBinding>(),
+                        HazardActorPlacements = new[]
+                        {
+                            new HazardActorPlacementBinding
+                            {
+                                PlacementInstanceId = 5,
+                                ActorArchetypePrefab = archetypeA.Root,
+                                LocalOffset = new Vector3(1f, 0f, 0f),
+                            }
+                        },
+                    },
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1202u,
+                        InitialSourceState = SourceStateId.Normal,
+                        ThresholdWeakened = 0,
+                        ThresholdDepleted = 0,
+                        SustainSlots = Array.Empty<SustainSlotBinding>(),
+                        EventSlots = Array.Empty<EventSlotBinding>(),
+                        HazardActorPlacements = new[]
+                        {
+                            new HazardActorPlacementBinding
+                            {
+                                PlacementInstanceId = 5,
+                                ActorArchetypePrefab = archetypeB.Root,
+                                LocalOffset = new Vector3(-1f, 0f, 0f),
+                            }
+                        },
+                    },
+                };
+
+                var layout = CreateLayout(created, stageId: 12);
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_12",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(HasIssue(issues, "STC036", ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                DestroyAll(created);
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_HazardActorPlacements_NullPrefabAndMixedLegacyUsage_AreReportedAsErrors()
+        {
+            var created = new List<ScriptableObject>();
+            try
+            {
+                var definition = CreateDefinition(created, stageId: 13);
+                definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1301u,
+                        InitialSourceState = SourceStateId.Normal,
+                        ThresholdWeakened = 0,
+                        ThresholdDepleted = 0,
+                        SustainSlots = Array.Empty<SustainSlotBinding>(),
+                        EventSlots = Array.Empty<EventSlotBinding>(),
+                        HazardActors = new[]
+                        {
+                            new HazardActorBinding
+                            {
+                                ActorId = 1,
+                                EnabledMode = HazardActorEnabledOverrideMode.Inherit,
+                                StartSuppressedMode = HazardActorSuppressionOverrideMode.Inherit,
+                                Emitters = Array.Empty<HazardEmitterBinding>(),
+                            }
+                        },
+                        HazardActorPlacements = new[]
+                        {
+                            new HazardActorPlacementBinding
+                            {
+                                PlacementInstanceId = 7,
+                                ActorArchetypePrefab = null,
+                                LocalOffset = Vector3.zero,
+                            }
+                        },
+                    }
+                };
+
+                var layout = CreateLayout(created, stageId: 13);
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_13",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(HasIssue(issues, "STC033", ContentValidationSeverity.Error), Is.True);
+                Assert.That(HasIssue(issues, "STC035", ContentValidationSeverity.Error), Is.True);
+            }
+            finally
+            {
+                DestroyAll(created);
+            }
+        }
+
+        [Test]
         public void ValidateCatalog_OperationalCatalogReferencingTestOnlyHazardOverrideAssets_IsReportedAsError()
         {
             string scope = System.Guid.NewGuid().ToString("N");
@@ -816,6 +962,46 @@ namespace SweepNDodge.DotsBullets.Tests
             }
 
             created.Clear();
+        }
+
+        private static HazardActorArchetypeFixture CreateHazardActorArchetype(string name, int actorId, int emitterId)
+        {
+            var fixture = new HazardActorArchetypeFixture();
+            fixture.Root = new GameObject(name);
+            var actor = fixture.Root.AddComponent<HazardActorAuthoring>();
+            actor.ActorId = actorId;
+
+            var emitterGo = new GameObject("emitter");
+            emitterGo.transform.SetParent(fixture.Root.transform);
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            emitter.EmitterId = emitterId;
+
+            fixture.Telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            fixture.Bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            fixture.Bullet.Editor_SetDefinitionId(5000 + emitterId);
+            fixture.Emission = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            fixture.Emission.Bullet = fixture.Bullet;
+            fixture.Emission.PositionPattern = new SinglePointPositionPatternAuthoring();
+            fixture.Emission.Aim = new FixedAimAuthoring();
+            fixture.Emission.ShotPattern = new SingleShotPatternAuthoring();
+            fixture.Emission.EventRepeatCount = 1;
+            fixture.Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
+            fixture.Emission.EventShotIntervalSec = 0f;
+            fixture.Emission.CooldownSec = 1f;
+
+            emitter.Slots = new[]
+            {
+                new HazardEmitterPatternSlotAuthoring
+                {
+                    PatternSlotId = 1,
+                    TelegraphProfile = fixture.Telegraph,
+                    EmissionProfile = fixture.Emission,
+                    BaseWeight = 1f,
+                    AvailabilityFlags = 0u,
+                }
+            };
+
+            return fixture;
         }
     }
 }

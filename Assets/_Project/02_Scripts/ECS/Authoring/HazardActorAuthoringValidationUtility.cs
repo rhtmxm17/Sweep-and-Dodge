@@ -56,6 +56,75 @@ namespace SweepNDodge.DotsBullets
             out HazardActorAuthoringValidationErrorKind errorKind,
             out string error)
         {
+            return TryValidateInternal(
+                authoring,
+                requireSourceParent: true,
+                out sourceAuthoring,
+                out compatibilitySeed,
+                out phaseTransitions,
+                out errorKind,
+                out error);
+        }
+
+        public static bool TryValidateStandalone(
+            HazardActorAuthoring authoring,
+            out HazardActorPhaseSelectorCompatibilitySeed compatibilitySeed,
+            out string error)
+        {
+            return TryValidateStandalone(
+                authoring,
+                out compatibilitySeed,
+                out _,
+                out _,
+                out error);
+        }
+
+        public static bool TryValidateStandalone(
+            HazardActorAuthoring authoring,
+            out HazardActorPhaseSelectorCompatibilitySeed compatibilitySeed,
+            out HazardActorPhaseProgressTransitionBuffer[] phaseTransitions,
+            out HazardActorAuthoringValidationErrorKind errorKind,
+            out string error)
+        {
+            return TryValidateInternal(
+                authoring,
+                requireSourceParent: false,
+                out _,
+                out compatibilitySeed,
+                out phaseTransitions,
+                out errorKind,
+                out error);
+        }
+
+        private static HazardEmitterAuthoring[] CollectOwnedEmitters(HazardActorAuthoring authoring)
+        {
+            var emitters = authoring.GetComponentsInChildren<HazardEmitterAuthoring>(includeInactive: true);
+            var owned = new List<HazardEmitterAuthoring>(emitters.Length);
+            for (int i = 0; i < emitters.Length; i++)
+            {
+                var emitter = emitters[i];
+                if (emitter == null)
+                    continue;
+
+                var parentActor = emitter.GetComponentInParent<HazardActorAuthoring>(includeInactive: true);
+                if (parentActor != authoring)
+                    continue;
+
+                owned.Add(emitter);
+            }
+
+            return owned.ToArray();
+        }
+
+        private static bool TryValidateInternal(
+            HazardActorAuthoring authoring,
+            bool requireSourceParent,
+            out SourceRuntimeTemplateAuthoringBase sourceAuthoring,
+            out HazardActorPhaseSelectorCompatibilitySeed compatibilitySeed,
+            out HazardActorPhaseProgressTransitionBuffer[] phaseTransitions,
+            out HazardActorAuthoringValidationErrorKind errorKind,
+            out string error)
+        {
             sourceAuthoring = null;
             compatibilitySeed = default;
             phaseTransitions = Array.Empty<HazardActorPhaseProgressTransitionBuffer>();
@@ -70,7 +139,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             sourceAuthoring = authoring.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>(includeInactive: true);
-            if (sourceAuthoring == null)
+            if (requireSourceParent && sourceAuthoring == null)
             {
                 errorKind = HazardActorAuthoringValidationErrorKind.General;
                 error = "HazardActorAuthoring requires a parent SourceRuntimeTemplateAuthoringBase.";
@@ -122,26 +191,6 @@ namespace SweepNDodge.DotsBullets
                 out phaseTransitions,
                 out errorKind,
                 out error);
-        }
-
-        private static HazardEmitterAuthoring[] CollectOwnedEmitters(HazardActorAuthoring authoring)
-        {
-            var emitters = authoring.GetComponentsInChildren<HazardEmitterAuthoring>(includeInactive: true);
-            var owned = new List<HazardEmitterAuthoring>(emitters.Length);
-            for (int i = 0; i < emitters.Length; i++)
-            {
-                var emitter = emitters[i];
-                if (emitter == null)
-                    continue;
-
-                var parentActor = emitter.GetComponentInParent<HazardActorAuthoring>(includeInactive: true);
-                if (parentActor != authoring)
-                    continue;
-
-                owned.Add(emitter);
-            }
-
-            return owned.ToArray();
         }
 
         private static bool TryBuildTransitions(

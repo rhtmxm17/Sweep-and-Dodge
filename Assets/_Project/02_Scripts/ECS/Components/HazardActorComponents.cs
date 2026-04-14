@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
@@ -161,11 +162,24 @@ namespace SweepNDodge.DotsBullets
         public HazardActorPresencePresentationCueId Cue;
     }
 
+    public struct HazardActorPlacementComponent : IComponentData
+    {
+        public int PlacementInstanceId;
+        public float3 LocalOffset;
+    }
+
     [InternalBufferCapacity(4)]
     public struct SourceHazardActorRefBuffer : IBufferElementData
     {
         public Entity ActorEntity;
         public int ActorId;
+    }
+
+    [InternalBufferCapacity(4)]
+    public struct SourceHazardActorPlacementRefBuffer : IBufferElementData
+    {
+        public int PlacementInstanceId;
+        public Entity ActorEntity;
     }
 
     [InternalBufferCapacity(4)]

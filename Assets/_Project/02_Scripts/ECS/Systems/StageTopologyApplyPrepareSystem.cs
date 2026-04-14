@@ -875,6 +875,8 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            if (HasPlacementDeliveredHazardActors(em, entity))
+                RemoveAllHazardActorsFromSource(em, entity);
             ApplySourceHazardActors(em, entity, null);
         }
 
@@ -931,7 +933,74 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+
+            bool hasLegacyActorBindings = HasLegacyHazardBindings(binding.HazardActors);
+            bool hasPlacements = HasHazardPlacements(binding.HazardActorPlacements);
+            if (hasLegacyActorBindings && hasPlacements)
+            {
+                Debug.LogError($"[StageTopologyApply] StageSourceBinding cannot use HazardActors and HazardActorPlacements together. sourceStableId={binding.SourceStableId}");
+                RemoveAllHazardActorsFromSource(em, entity);
+                return;
+            }
+
+            if (hasPlacements)
+            {
+                ApplySourceHazardPlacements(em, entity, binding.SourceStableId, binding.HazardActorPlacements);
+                return;
+            }
+
+            if (HasPlacementDeliveredHazardActors(em, entity))
+                RemoveAllHazardActorsFromSource(em, entity);
+
             ApplySourceHazardActors(em, entity, binding.HazardActors);
+        }
+
+        private static bool HasLegacyHazardBindings(HazardActorBinding[] actorBindings)
+        {
+            return actorBindings != null && actorBindings.Length > 0;
+        }
+
+        private static bool HasHazardPlacements(HazardActorPlacementBinding[] placements)
+        {
+            return placements != null && placements.Length > 0;
+        }
+
+        private static bool HasPlacementDeliveredHazardActors(EntityManager em, Entity sourceEntity)
+        {
+            return em.Exists(sourceEntity)
+                && em.HasBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity)
+                && em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity).Length > 0;
+        }
+
+        private static void ApplySourceHazardPlacements(
+            EntityManager em,
+            Entity sourceEntity,
+            uint sourceStableId,
+            HazardActorPlacementBinding[] placements)
+        {
+            RemoveAllHazardActorsFromSource(em, sourceEntity);
+            if (!em.Exists(sourceEntity))
+                return;
+
+            if (placements == null || placements.Length <= 0)
+                return;
+
+            for (int i = 0; i < placements.Length; i++)
+            {
+                var placement = placements[i];
+                if (!StageTopologyTemplateFactory.TryAttachHazardPlacementArchetype(
+                        em,
+                        sourceEntity,
+                        placement.PlacementInstanceId,
+                        placement.ActorArchetypePrefab,
+                        (float3)placement.LocalOffset,
+                        out var error))
+                {
+                    Debug.LogError(
+                        $"[StageTopologyApply] Failed to attach HazardActor placement. sourceStableId={sourceStableId}, placementInstanceId={placement.PlacementInstanceId}, error={error}",
+                        placement.ActorArchetypePrefab);
+                }
+            }
         }
 
         private static void ApplySourceHazardActors(EntityManager em, Entity sourceEntity, HazardActorBinding[] actorBindings)
@@ -973,6 +1042,87 @@ namespace SweepNDodge.DotsBullets
             finally
             {
                 actorRefsCopy.Dispose();
+            }
+        }
+
+        private static void RemoveAllHazardActorsFromSource(EntityManager em, Entity sourceEntity)
+        {
+            if (!em.Exists(sourceEntity))
+                return;
+
+            NativeArray<SourceHazardActorRefBuffer> actorRefsCopy = default;
+            try
+            {
+                if (em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
+                {
+                    var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity);
+                    actorRefsCopy = new NativeArray<SourceHazardActorRefBuffer>(actorRefs.Length, Allocator.Temp);
+                    for (int i = 0; i < actorRefs.Length; i++)
+                        actorRefsCopy[i] = actorRefs[i];
+
+                    for (int actorIndex = 0; actorIndex < actorRefsCopy.Length; actorIndex++)
+                    {
+                        var actorEntity = actorRefsCopy[actorIndex].ActorEntity;
+                        if (!em.Exists(actorEntity))
+                            continue;
+
+                        if (em.HasBuffer<HazardActorEmitterRefBuffer>(actorEntity))
+                        {
+                            var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity);
+                            for (int emitterIndex = 0; emitterIndex < emitterRefs.Length; emitterIndex++)
+                            {
+                                var emitterEntity = emitterRefs[emitterIndex].EmitterEntity;
+                                if (em.Exists(emitterEntity))
+                                    em.DestroyEntity(emitterEntity);
+                            }
+                        }
+
+                        if (em.Exists(actorEntity))
+                            em.DestroyEntity(actorEntity);
+                    }
+
+                    actorRefs.Clear();
+                }
+
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity).Clear();
+
+                if (em.Exists(sourceEntity) && em.HasBuffer<LinkedEntityGroup>(sourceEntity))
+                    PruneSourceLinkedEntityGroup(em, sourceEntity);
+            }
+            finally
+            {
+                if (actorRefsCopy.IsCreated)
+                    actorRefsCopy.Dispose();
+            }
+        }
+
+        private static void PruneSourceLinkedEntityGroup(EntityManager em, Entity sourceEntity)
+        {
+            if (!em.Exists(sourceEntity) || !em.HasBuffer<LinkedEntityGroup>(sourceEntity))
+                return;
+
+            var linkedGroup = em.GetBuffer<LinkedEntityGroup>(sourceEntity);
+            var surviving = new NativeList<LinkedEntityGroup>(linkedGroup.Length + 1, Allocator.Temp);
+            try
+            {
+                surviving.Add(new LinkedEntityGroup { Value = sourceEntity });
+                for (int i = 0; i < linkedGroup.Length; i++)
+                {
+                    var value = linkedGroup[i].Value;
+                    if (value == sourceEntity || !em.Exists(value))
+                        continue;
+
+                    surviving.Add(new LinkedEntityGroup { Value = value });
+                }
+
+                linkedGroup.Clear();
+                for (int i = 0; i < surviving.Length; i++)
+                    linkedGroup.Add(surviving[i]);
+            }
+            finally
+            {
+                surviving.Dispose();
             }
         }
 
@@ -1476,6 +1626,8 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            if (HasPlacementDeliveredHazardActors(em, entity))
+                RemoveAllHazardActorsFromSource(em, entity);
             ApplySourceHazardActors(em, entity, null);
         }
 

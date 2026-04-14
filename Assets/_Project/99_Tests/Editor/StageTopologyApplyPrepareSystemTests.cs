@@ -3,12 +3,33 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
     public class StageTopologyApplyPrepareSystemTests
     {
+        private sealed class HazardActorArchetypeFixture : System.IDisposable
+        {
+            public GameObject Root;
+            public HazardEmitterTelegraphProfileSO Telegraph;
+            public HazardEmitterEmissionProfileSO Emission;
+            public BulletDefinitionSO Bullet;
+
+            public void Dispose()
+            {
+                if (Root != null)
+                    UnityEngine.Object.DestroyImmediate(Root);
+                if (Telegraph != null)
+                    UnityEngine.Object.DestroyImmediate(Telegraph);
+                if (Emission != null)
+                    UnityEngine.Object.DestroyImmediate(Emission);
+                if (Bullet != null)
+                    UnityEngine.Object.DestroyImmediate(Bullet);
+            }
+        }
+
         [Test]
         public void StageTopologyBootstrap_CreatesTopologySingletons_WithoutBulletBootstrap()
         {
@@ -655,6 +676,106 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void StageTopologyApply_PlacementDelivery_CreatesPlacementResolveSeam_AndForcesHiddenPresence()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_PlacementSingle", out var em, out var requestEntity, out _, includeLegacyHazardHierarchy: false);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
+            using var archetype = CreateHazardActorArchetype("placement_actor_single", actorId: 99, emitterId: 41);
+
+            try
+            {
+                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActorPlacements = new[]
+                {
+                    new HazardActorPlacementBinding
+                    {
+                        PlacementInstanceId = 101,
+                        ActorArchetypePrefab = archetype.Root,
+                        LocalOffset = new UnityEngine.Vector3(3f, 0f, -2f),
+                    }
+                };
+                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = System.Array.Empty<HazardActorBinding>();
+
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var source = FindAppliedSource(em);
+                Assert.That(em.HasBuffer<SourceHazardActorPlacementRefBuffer>(source), Is.True);
+                var placementRefs = em.GetBuffer<SourceHazardActorPlacementRefBuffer>(source);
+                Assert.That(placementRefs.Length, Is.EqualTo(1));
+                Assert.That(placementRefs[0].PlacementInstanceId, Is.EqualTo(101));
+
+                var actor = placementRefs[0].ActorEntity;
+                Assert.That(em.Exists(actor), Is.True);
+                Assert.That(em.GetComponentData<HazardActorComponent>(actor).ActorId, Is.EqualTo(101));
+                Assert.That(em.HasComponent<HazardActorPlacementComponent>(actor), Is.True);
+                var placement = em.GetComponentData<HazardActorPlacementComponent>(actor);
+                Assert.That(placement.PlacementInstanceId, Is.EqualTo(101));
+                Assert.That(placement.LocalOffset.x, Is.EqualTo(3f).Within(0.001f));
+                Assert.That(placement.LocalOffset.z, Is.EqualTo(-2f).Within(0.001f));
+                Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+
+                var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(source);
+                Assert.That(actorRefs.Length, Is.EqualTo(1));
+                Assert.That(actorRefs[0].ActorEntity, Is.EqualTo(actor));
+                Assert.That(actorRefs[0].ActorId, Is.EqualTo(101));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_PlacementDelivery_AllowsMultipleInstancesFromSameArchetype()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_PlacementMulti", out var em, out var requestEntity, out _, includeLegacyHazardHierarchy: false);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
+            using var archetype = CreateHazardActorArchetype("placement_actor_multi", actorId: 99, emitterId: 41);
+
+            try
+            {
+                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActorPlacements = new[]
+                {
+                    new HazardActorPlacementBinding
+                    {
+                        PlacementInstanceId = 201,
+                        ActorArchetypePrefab = archetype.Root,
+                        LocalOffset = new UnityEngine.Vector3(1f, 0f, 0f),
+                    },
+                    new HazardActorPlacementBinding
+                    {
+                        PlacementInstanceId = 202,
+                        ActorArchetypePrefab = archetype.Root,
+                        LocalOffset = new UnityEngine.Vector3(-1f, 0f, 0f),
+                    }
+                };
+                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = System.Array.Empty<HazardActorBinding>();
+
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var source = FindAppliedSource(em);
+                var placementRefs = em.GetBuffer<SourceHazardActorPlacementRefBuffer>(source);
+                Assert.That(placementRefs.Length, Is.EqualTo(2));
+
+                var actorA = FindActorForPlacement(em, source, 201);
+                var actorB = FindActorForPlacement(em, source, 202);
+                Assert.That(actorA, Is.Not.EqualTo(actorB));
+
+                var placementA = em.GetComponentData<HazardActorPlacementComponent>(actorA);
+                var placementB = em.GetComponentData<HazardActorPlacementComponent>(actorB);
+                Assert.That(placementA.LocalOffset.x, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(placementB.LocalOffset.x, Is.EqualTo(-1f).Within(0.001f));
+                Assert.That(em.GetComponentData<HazardActorComponent>(actorA).ActorId, Is.EqualTo(201));
+                Assert.That(em.GetComponentData<HazardActorComponent>(actorB).ActorId, Is.EqualTo(202));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
         public void StageTopologyApply_InvalidPlayerStart_KeepsTopologyNotReady()
         {
             using var world = CreatePreparedWorld("StageTopologyApply_InvalidPlayerStart", out var em, out var requestEntity, out var topologyStateEntity);
@@ -687,7 +808,7 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
-        private static World CreatePreparedWorld(string name, out EntityManager em, out Entity requestEntity, out Entity topologyStateEntity)
+        private static World CreatePreparedWorld(string name, out EntityManager em, out Entity requestEntity, out Entity topologyStateEntity, bool includeLegacyHazardHierarchy = true)
         {
             var world = new World(name);
             em = world.EntityManager;
@@ -706,7 +827,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var prefabCatalogEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).GetSingletonEntity();
             em.SetComponentData(prefabCatalogEntity, new StageTopologyPrefabCatalogComponent
             {
-                SourceTemplate = CreateSourceTemplate(em),
+                SourceTemplate = CreateSourceTemplate(em, includeLegacyHazardHierarchy),
             });
 
             return world;
@@ -919,7 +1040,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, value);
         }
 
-        private static Entity CreateSourceTemplate(EntityManager em)
+        private static Entity CreateSourceTemplate(EntityManager em, bool includeLegacyHazardHierarchy = true)
         {
             var entity = em.CreateEntity(
                 typeof(Prefab),
@@ -1007,9 +1128,13 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddBuffer<SourcePollutionDropRequestBuffer>(entity);
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
             em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
+            em.AddBuffer<SourceHazardActorPlacementRefBuffer>(entity);
             em.AddBuffer<SourceHazardActorRefBuffer>(entity);
 
             em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = entity });
+
+            if (!includeLegacyHazardHierarchy)
+                return entity;
 
             var actor = em.CreateEntity(
                 typeof(Prefab),
@@ -1237,11 +1362,64 @@ namespace SweepNDodge.DotsBullets.Tests
             return actorRefs[0].ActorEntity;
         }
 
+        private static Entity FindActorForPlacement(EntityManager em, Entity source, int placementInstanceId)
+        {
+            var placementRefs = em.GetBuffer<SourceHazardActorPlacementRefBuffer>(source);
+            for (int i = 0; i < placementRefs.Length; i++)
+            {
+                if (placementRefs[i].PlacementInstanceId == placementInstanceId)
+                    return placementRefs[i].ActorEntity;
+            }
+
+            Assert.Fail($"Placement actor not found. placementInstanceId={placementInstanceId}");
+            return Entity.Null;
+        }
+
         private static Entity FindEmitterForActor(EntityManager em, Entity actor)
         {
             var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actor);
             Assert.That(emitterRefs.Length, Is.GreaterThanOrEqualTo(1));
             return emitterRefs[0].EmitterEntity;
+        }
+
+        private static HazardActorArchetypeFixture CreateHazardActorArchetype(string name, int actorId, int emitterId)
+        {
+            var fixture = new HazardActorArchetypeFixture();
+            fixture.Root = new GameObject(name);
+            var actor = fixture.Root.AddComponent<HazardActorAuthoring>();
+            actor.ActorId = actorId;
+
+            var emitterGo = new GameObject("emitter");
+            emitterGo.transform.SetParent(fixture.Root.transform);
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            emitter.EmitterId = emitterId;
+
+            fixture.Telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            fixture.Bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            fixture.Bullet.Editor_SetDefinitionId(7000 + emitterId);
+            fixture.Emission = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            fixture.Emission.Bullet = fixture.Bullet;
+            fixture.Emission.PositionPattern = new SinglePointPositionPatternAuthoring();
+            fixture.Emission.Aim = new FixedAimAuthoring();
+            fixture.Emission.ShotPattern = new SingleShotPatternAuthoring();
+            fixture.Emission.EventRepeatCount = 1;
+            fixture.Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
+            fixture.Emission.EventShotIntervalSec = 0f;
+            fixture.Emission.CooldownSec = 1f;
+
+            emitter.Slots = new[]
+            {
+                new HazardEmitterPatternSlotAuthoring
+                {
+                    PatternSlotId = 1,
+                    TelegraphProfile = fixture.Telegraph,
+                    EmissionProfile = fixture.Emission,
+                    BaseWeight = 1f,
+                    AvailabilityFlags = 0u,
+                }
+            };
+
+            return fixture;
         }
     }
 }

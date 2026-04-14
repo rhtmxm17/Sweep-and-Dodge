@@ -53,6 +53,14 @@ namespace SweepNDodge.DotsBullets
     }
 
     [Serializable]
+    public struct HazardActorPlacementBinding
+    {
+        [Min(1)] public int PlacementInstanceId;
+        public GameObject ActorArchetypePrefab;
+        public Vector3 LocalOffset;
+    }
+
+    [Serializable]
     public struct StageSourceBinding
     {
         [Min(1)] public uint SourceStableId;
@@ -62,6 +70,7 @@ namespace SweepNDodge.DotsBullets
         public SustainSlotBinding[] SustainSlots;
         public EventSlotBinding[] EventSlots;
         public HazardActorBinding[] HazardActors;
+        public HazardActorPlacementBinding[] HazardActorPlacements;
     }
 
     [CreateAssetMenu(menuName = "SweepNDodge/Stage/Stage Definition", fileName = "sd_")]

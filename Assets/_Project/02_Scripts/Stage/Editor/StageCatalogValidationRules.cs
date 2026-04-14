@@ -207,6 +207,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var bindings = definition.SourceBindings ?? Array.Empty<StageSourceBinding>();
             var sourceOwners = new Dictionary<uint, List<int>>();
+            var placementOwners = new Dictionary<int, List<string>>();
 
             for (int i = 0; i < bindings.Length; i++)
             {
@@ -239,7 +240,19 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
                 ValidateEventSlots(binding.EventSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
+                bool hasLegacyHazards = binding.HazardActors != null && binding.HazardActors.Length > 0;
+                bool hasPlacements = binding.HazardActorPlacements != null && binding.HazardActorPlacements.Length > 0;
+                if (hasLegacyHazards && hasPlacements)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC035",
+                        bindingLocation,
+                        "StageSourceBinding cannot use HazardActors and HazardActorPlacements together."));
+                }
+
                 ValidateHazardBindings(binding.HazardActors, bindingLocation, issues, enforceOperationalReferenceRestrictions);
+                ValidateHazardPlacements(binding.HazardActorPlacements, bindingLocation, issues, enforceOperationalReferenceRestrictions, placementOwners);
             }
 
             foreach (var pair in sourceOwners)
@@ -252,6 +265,22 @@ namespace SweepNDodge.DotsBullets.Editor
                     "STC012",
                     location,
                     $"Duplicate SourceStableId in StageDefinition. stableId={pair.Key}"));
+            }
+
+            foreach (var pair in placementOwners)
+            {
+                if (pair.Key < 1 || pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC036",
+                        pair.Value[i],
+                        $"Duplicate HazardActorPlacementBinding.PlacementInstanceId detected: {pair.Key}. Owners: {joined}"));
+                }
             }
         }
 
@@ -502,6 +531,84 @@ namespace SweepNDodge.DotsBullets.Editor
                         "STC029",
                         pair.Value[i],
                         $"Duplicate HazardEmitterBinding.EmitterId detected: {pair.Key}. Owners: {joined}"));
+                }
+            }
+        }
+
+        private static void ValidateHazardPlacements(
+            HazardActorPlacementBinding[] placements,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions,
+            Dictionary<int, List<string>> placementOwners)
+        {
+            if (placements == null)
+                return;
+
+            for (int i = 0; i < placements.Length; i++)
+            {
+                var placement = placements[i];
+                string placementLocation = $"{location}/HazardActorPlacements[{i}]";
+
+                if (placement.PlacementInstanceId < 1)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC032",
+                        placementLocation,
+                        "HazardActorPlacementBinding.PlacementInstanceId must be >= 1."));
+                }
+
+                if (!placementOwners.TryGetValue(placement.PlacementInstanceId, out var owners))
+                {
+                    owners = new List<string>(2);
+                    placementOwners.Add(placement.PlacementInstanceId, owners);
+                }
+                owners.Add(placementLocation);
+
+                if (placement.ActorArchetypePrefab == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC033",
+                        placementLocation,
+                        "HazardActorPlacementBinding.ActorArchetypePrefab is null."));
+                    continue;
+                }
+
+                if (enforceOperationalReferenceRestrictions)
+                {
+                    ValidateOperationalReference(
+                        placement.ActorArchetypePrefab,
+                        placementLocation,
+                        "STC037",
+                        "Operational StageCatalog cannot reference test-only HazardActor archetype prefabs through placements.",
+                        issues);
+                }
+
+                var actorAuthorings = placement.ActorArchetypePrefab.GetComponentsInChildren<HazardActorAuthoring>(true);
+                if (actorAuthorings == null || actorAuthorings.Length != 1)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC034",
+                        placementLocation,
+                        $"HazardActorPlacementBinding.ActorArchetypePrefab must contain exactly one HazardActorAuthoring. found={actorAuthorings?.Length ?? 0}"));
+                    continue;
+                }
+
+                if (!HazardActorAuthoringValidationUtility.TryValidateStandalone(
+                        actorAuthorings[0],
+                        out _,
+                        out _,
+                        out _,
+                        out var error))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC034",
+                        placementLocation,
+                        error));
                 }
             }
         }

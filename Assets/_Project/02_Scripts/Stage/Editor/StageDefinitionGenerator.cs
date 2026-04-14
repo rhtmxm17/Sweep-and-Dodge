@@ -219,6 +219,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 SustainSlots = Array.Empty<SustainSlotBinding>(),
                 EventSlots = Array.Empty<EventSlotBinding>(),
                 HazardActors = Array.Empty<HazardActorBinding>(),
+                HazardActorPlacements = Array.Empty<HazardActorPlacementBinding>(),
             };
         }
 
@@ -233,6 +234,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 SustainSlots = BuildSustainSlots(authoring.SustainClipSlots),
                 EventSlots = BuildEventSlots(authoring.EventClipSlots),
                 HazardActors = Array.Empty<HazardActorBinding>(),
+                HazardActorPlacements = Array.Empty<HazardActorPlacementBinding>(),
             };
         }
 

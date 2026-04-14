@@ -60,6 +60,39 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardActorAuthoringValidation_StandaloneArchetype_AcceptsActorWithoutSourceParent()
+        {
+            var actorGo = new GameObject("hazard_actor");
+            var emitterGo = new GameObject("hazard_emitter");
+            emitterGo.transform.SetParent(actorGo.transform);
+            var actor = actorGo.AddComponent<HazardActorAuthoring>();
+            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            var emission = CreateEmissionProfile();
+
+            emitter.EmitterId = 21;
+            emitter.Slots = CreatePatternSlots((1, telegraph, emission, 1f, 0u));
+
+            try
+            {
+                bool ok = HazardActorAuthoringValidationUtility.TryValidateStandalone(actor, out var seed, out var error);
+                Assert.That(ok, Is.True);
+                Assert.That(error, Is.Empty);
+                Assert.That(seed.InitialPhaseId, Is.EqualTo(1));
+                Assert.That(seed.Policies.Length, Is.EqualTo(1));
+                Assert.That(seed.Candidates.Length, Is.EqualTo(1));
+                Assert.That(seed.Candidates[0].EmitterId, Is.EqualTo(21));
+            }
+            finally
+            {
+                Object.DestroyImmediate(telegraph);
+                Object.DestroyImmediate(emission.Bullet);
+                Object.DestroyImmediate(emission);
+                Object.DestroyImmediate(actorGo);
+            }
+        }
+
+        [Test]
         public void HazardActorAuthoringValidation_RejectsNegativePresenceDurations()
         {
             var root = new GameObject("source_root");
