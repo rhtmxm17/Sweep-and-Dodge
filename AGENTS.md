@@ -1,4 +1,4 @@
-﻿# AGENTS.md
+# AGENTS.md
 > Portfolio mini-game (Unity + C#, DOTS 중심). 설계 대화 기반으로 반복적으로 구조를 조정하며 구현한다.
 
 ## 0. TL;DR (프로젝트 요약)
@@ -18,29 +18,6 @@
 - 불필요한 전면 리라이트 금지(특히 DOTS 파이프라인 핵심부)
 - 기능 추가를 위해 패키지/의존성 무분별 추가 금지(정당화 필요)
 - 성능 문제를 "감으로 수정"하는 방식 지양: 근거(프로파일/측정) 기반
-
----
-
-## 3. 실행/빌드/테스트(Commands)
-- Unity 버전: `Unity 6000.3.6f1`
-- 빌드/실행:
-  - Unity Editor에서 Play Mode / Standalone Build
-- 테스트:
-  - `PlayMode` 테스트는 작업 완료마다 `전용 PlayMode 테스트 씬` 스모크를 강제 실행한다.
-  - PlayMode 1차 판정은 `기동/루프 정상성`으로 하고, 성능 임계치 초과는 추적 항목으로 기록한다.
-- 프로파일링:
-  - Profiler(Entities Profiler 포함), Frame Debugger(필요 시)
-- 코드 생성/수정 후 기본 검증 절차(MCP 연결 시):
-  1. `refresh_unity(compile=request, wait_for_ready=true)`로 컴파일 요청
-  2. `read_console(action=get, types=["error"], include_stacktrace=true)`로 에러 확인
-  3. `EditMode` 테스트 실행
-  4. `PlayMode` 전용 씬 스모크 실행
-  5. 에러/실패가 있으면 수정 후 1~4 반복
-  6. 에러 0건 + 테스트 통과 시 작업 완료 보고
-- 테스트 예외:
-  - 테스트 과정에서 생성되는 `Assets/InitTestScene*.unity` 및 대응 `.meta` 파일은 임시 산출물로 간주한다.
-  - 위 파일은 작업 중 unexpected change로 취급하지 않고 무시할 수 있다.
-  - 단, 작업 완료 직전에는 해당 파일을 삭제한 뒤 최종 상태를 보고한다.
 
 ---
 
@@ -82,7 +59,7 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 병렬 Job에서의 플래그 토글:
 - 기본: `EnabledRefRW<T>` 사용
 - enableable 쿼리 주의:
-  - `IJobEntity` 파라미터에 enableable 컴포넌트를 포함하면 기본적으로 “enabled만” 잡힌다.
+  - `IJobEntity` 파라미터에 enableable 컴포넌트를 포함하면 기본적으로 "enabled만" 잡힌다.
   - "disabled 상태라도 write가 필요"하면 `EntityQueryOptions.IgnoreComponentEnabledState`(또는 WithOptions)를 **명시**한다.
   - 병렬 Job에서 "현재 엔티티 외 다른 엔티티"에 대해 enable/disable(write)가 필요하면,
     - **ECB.ParallelWriter를 사용**하거나(권장),
@@ -153,131 +130,12 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 
 ---
 
-## 8. 문서 관련 규칙
-### 8.1 문서/결정 기록(ADR)
-- 아래 조건 중 하나 이상에 해당하는 **중요 결정**만 `Docs/ADR/ADR-YYYYMMDD-NN-*.md`에 기록한다(해당하지 않는 결정에 대해서는 의무가 아니다):
-  - 되돌리기 비용이 큰 구조/소유권/업데이트 순서 결정
-  - 여러 시스템/문서에 파급되는 규칙 변경
-  - 대안 비교와 근거를 남겨야 재논의 비용이 줄어드는 선택
-  - 성능/안정성/운영 리스크에 직접 영향을 주는 결정
-- 문서 포맷 강제는 최소화한다.
-  - **필수**: 파일명 규칙, Metadata
-  - **권장(세션 제안)**: 본문 섹션 구성/순서, 예시 템플릿
-- ADR 본문 기본 구성(권장):
-  - 문제(왜), 결정(무엇), 대안(비교), 결과(리스크/후속)
-  - 권장 구성을 맞추기 위해, 논의된 적이 없고 기록 가치가 낮은 내용을 임의로 추가하는 것을 금지한다.
-- AGENTS.md는 "현재 합의된 기준"만 유지, 상세 논의는 ADR로 분리
-- ADR 파일 규칙
-  - 파일명(필수): `ADR-YYYYMMDD-NN-kebab-case.md`
-  - NN 논리 의존순, 제목/요약 라인, 본문 구성은 탐색성과 일관성을 위한 권장 규칙이다.
-  - 예시:
-
-```markdown
-# ADR-20260212-01-ecb-vs-flag-state
-> 대량 엔티티 상태 전환에서 ECB 대신 Flag 기반 접근을 채택한 결정
-
-## 배경
-...
-```
-
-### 8.2 기술 설계 문서(TD)
-- TD는 항상 최신 설계와 설계 계획을 반영하는 작업 기준 문서로 유지한다.
-- ADR은 결정 기록, TD는 현재 실행 기준(SSOT)으로 역할을 분리한다.
-- 1. TD 생성 기준
-  - 2개 이상 시스템/그룹에 영향을 주는 기능
-  - 소유권/업데이트 순서/Fence 규칙이 등장하거나 변경되는 기능
-  - 성능 예산(프레임/할당)에 직접 영향을 주는 기능
-  - 구현 범위가 크거나 작업 분해가 필요한 기능
-- 2. TD 편집 기준
-  - 요구사항 변경
-  - 채택 설계안 변경(대안 전환 포함)
-  - 작업 분해/구현 계획 변경
-  - 코드와 TD 간 불일치 발생
-  - 검증/성능 기준 변경
-- 3. TD 갱신 시점
-  - 구현 시작 전 최신화
-  - 구현 중 의미 있는 설계 변경 발생 시 동시 갱신
-  - 구현 완료 후 검증 결과 반영
-- 4. TD 필수 항목
-  - 목표/비목표
-  - 소유권(Writer/Owner)
-  - 업데이트 순서(ExecutionBegin → Simulation → Request → ExecutionEnd)
-  - 데이터 구조/제약(Enableable, Structural Change 최소화, Fence)
-  - 작업 분해/진행 상태
-  - 검증 계획/합격 기준
-  - 관련 ADR 링크
-- 5. ADR 연동 기준
-  - 되돌리기 비용이 큰 결정은 ADR로 기록한다.
-  - TD에는 현재 채택안만 유지하고 근거/대안은 ADR로 링크한다.
-  - ADR과 TD가 충돌하면 ADR 기준으로 TD를 즉시 갱신한다.
-- 6. 운영 가드레일
-  - TD가 최신이 아니면 구현보다 TD 갱신이 우선이다.
-
-### 8.3 세션 작업 보드(TaskBoard)
-- TaskBoard는 진행 중인 대화 세션의 작업 추적용 운영 문서로 사용한다.
-- TaskBoard의 목적은 현재 작업, 다음 작업, 차단 사항, 남은 이슈를 세션 단위로 짧게 유지하는 것이다.
-- 진행 중인 세션의 TaskBoard는 작업 진행에 따라 Agent가 수시로 갱신하는 것을 권장한다.
-- TaskBoard 갱신은 상태 추적과 범위 가시화에 한정한다.
-  - 현재 진행 상황 반영
-  - `Now/Next/Done/Blocked/Parking Lot` 이동
-  - 검증 결과 및 다음 시작점 반영
-- TaskBoard 갱신을 근거로 작업 범위를 새로 확장하거나, 사용자와 합의되지 않은 결정 사항을 확정하지 않는다.
-- 명시적 근거가 없는 항목은 TaskBoard에 새로 만들어 기록하지 않는다.
-
-### 8.4 UI 레이아웃 워크플로우
-- UI 레이아웃 작업은 기본적으로 `기능 중심 대화 -> Penpot 초안 -> 사용자 직접 조작 -> Agent 재해석 -> 승인 후 Unity 반영` 순서를 따른다.
-- Penpot은 협업용 시각 캔버스이며, 구현 SSOT는 repo 내부 문서/JSON/Prefab으로 유지한다.
-- Exploration 보드와 Approved 보드를 분리한다.
-  - Exploration: 빠른 배치 실험, 대안 비교, 코멘트 중심
-  - Approved: 구현 반영 기준안
-- Penpot에서 `Board`는 화면/레이어/패널처럼 구현 대응이 있는 단위를 표현하는 기본 컨테이너로 사용한다.
-- `Group`은 비교, 임시 이동, 묶음 조작 같은 작업 보조 단위로 제한한다.
-- 필요 시 `WorkArea Board -> Viewport Board -> Layer Board -> Panel Board` 순서로 계층화한다.
-  - `Viewport Board` 내부의 구현 대응형 `Board`만 Unity 반영 후보로 본다.
-  - 메모, 질문, 비교안은 `WorkArea`의 `NotesBoard`/`OpenQuestionsBoard` 등으로 분리하고 반영 대상에서 제외한다.
-  - 사용자는 위치/크기/그룹 의도를 가능한 한 Penpot 객체 조작으로 표현하고, 코멘트는 "왜 바꾸는가"에 집중한다.
-  - `Approved` 보드의 실제 반영 후보는 각 위젯의 `screen attach intent`가 Unity의 `Anchor + Pivot`으로 번역 가능하도록 표현한다.
-  - 레이아웃 반영 판단 시에는 `어느 부모 프레임에 붙는가(parent frame)`와 내부 배치가 `manual / stretch / layout-driven` 중 무엇인지도 함께 본다.
-  - Penpot에서 attach intent를 남길 때는 `constraints + REF__ 기준선 + SPEC__Attach/SPEC__Layout` 조합을 기본값으로 사용한다.
-  - Agent는 Penpot 변경사항을 재해석할 때 레이아웃 변화, 의도 변화, 구현 영향, 남은 open question을 분리해서 정리한다.
-  - 위치/정렬/점유 비율 의도가 구조 데이터만으로 충분히 전달되지 않으면, Agent는 선택 상태와 무관하게 `Viewport Board` 또는 `Approved` 보드를 직접 export한 단일 이미지(PNG/SVG)를 함께 사용해 판단을 보조한다.
-  - Unity UI 반영 전에는 가능하면 `보드 구조 데이터 + Viewport/Approved 보드 export 이미지`를 함께 확인해 위치/정렬 오해를 줄인다.
-  - Penpot, 관련 문서, 현재 Unity 상태만으로 `Anchor / Pivot / parent frame / 배치 소유 방식`을 단일하게 결정할 수 없으면, Agent는 임의 적용하지 않고 필요한 확인 사항을 사용자에게 보고한 뒤 작업을 중단한다.
-  - 공용 UI 구조 변경은 Penpot 승인안만으로 바로 씬 인스턴스를 수정하지 않는다.
-    - 구현 전 `RuntimeUiRoot` prefab SSOT, TD, 관련 운영 문서와의 정합성을 먼저 확인한다.
-  - UI 워크플로우 상세 절차는 아래 문서를 따른다.
-    - `Docs/UI/UI-Workflow.md`
-
----
-
 ## 9. 보안/권한(코딩 에이전트 운영)
 - 모든 .md 파일과 Assets/_Project 아래 .cs 파일을 읽을 때는 UTF-8로 강제(Get-Content -Encoding UTF8).
 - 보고에서 프로젝트 내부 파일을 언급할 때는 웹 링크를 사용하지 않는다.
 - 기본 모드: read-only
 - 파일 수정/명령 실행이 필요한 경우에만 권한 상승(최소 권한 원칙)
 - 네트워크/외부 업로드는 기본 금지(필요 시 명시적 승인)
-- `RuntimeUiRoot`와 유사한 공용 UI 루트는 prefab SSOT로 관리한다.
-  - Agent는 공통 UI 구조/레이아웃/presenter 변경 시 씬 인스턴스를 직접 수정하지 않고 prefab 자산을 우선 수정한다.
-  - scene 수정은 scene-specific binding 또는 배치처럼 씬 소유 값에 한정한다.
-  - 예외적으로 scene override가 필요하면 완료 보고에 이유와 범위를 명시한다.
-
----
-
-## 10. MCP 사용 원칙 (MCP 연결 시)
-- Unity MCP 기본 사용 범위:
-  - 관측(Observability): 콘솔, 씬 상태, 에셋 참조 관계 조회
-  - 반영(Apply): 프리팹, 씬, ScriptableObject 변경 적용
-  - 검증(Verify): refresh, 콘솔 확인, 테스트 실행
-- Penpot MCP 사용 범위:
-  - 관측(Observability): 페이지/보드/선택 요소 구조 조회, 시각 자료 export, 레이아웃 상태 확인
-  - 반영(Apply): UI 레이아웃 초안 생성, 시각 자료 배치 조정, 협업용 보드 갱신
-  - 협업(Collaboration): 사용자 조작 이후 변경 해석, Exploration/Approved 보드 운영 지원
-  - 제한(Limit): Penpot 변경은 설계/협업 산출물로 취급하며, Unity 코드/프리팹 반영의 SSOT로 직접 사용하지 않는다
-- 공통 규칙:
-  - Penpot 변경은 설계/협업 산출물로 취급하며, 코드/프리팹 반영 전 승인 게이트와 문서 정합성 확인을 유지한다.
-  - 위치/정렬 판단이 중요한 UI 작업에서는 구조 조회만으로 충분하다고 가정하지 않고, 필요 시 보드 export 이미지를 함께 확인한다.
-- 예외: 사용자가 명시적으로 요청하면 범위를 확장할 수 있다.
-- 스크립트 편집은 MCP 대상에서 제외하고 일반 파일 편집 워크플로우를 사용한다.
 
 ---
 
@@ -285,81 +143,6 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 ### 11.1 적용 원칙
 - "빠른 실행"을 기본값으로 하되, 리스크가 커질 때만 절차를 강화한다.
 - 절차 준수보다 결과(안정성/검증 가능성/회귀 방지)를 우선한다.
-
-### 11.2 표준 절차(1~6)
-1. 설계 목표 제시
-  - 사용자가 기능/요구사항을 제시하고, Agent는 필요 시 목표를 구체화하는 질문을 추가한다.
-  - 작업 시작 시 목표/요구사항을 3~5줄로 요약한다.
-2. 설계 방안 논의
-  - 요구사항 기반으로 설계 방안을 논의한다.
-  - 고영향 변경은 최소 2개 방안을 비교(장점/리스크/선택 이유)한 뒤 진행한다.
-3. 문서화
-  - 필요 시 설계 방안과 논의 내용을 문서화한다.
-  - ADR/TD 기준은 8장 규칙을 따른다.
-4. 작업 분해
-  - 작업 규모가 크면 작업을 분해하여 임시 문서로 기록한다.
-  - 분해된 작업 단위별로 5~6단계를 순차 반복한다.
-5. 구현 계획 점검
-  - 이전 단계 설계가 명료하면 생략 가능하다.
-  - 설계가 불명확하거나 파급이 큰 경우 사용자 점검을 거친다.
-6. 코드 구현
-  - 합의된 설계와 문서를 기준으로 구현한다.
-  - 구현 중 설계 편차가 발생하면 코드를 진행하기 전에 문서를 먼저 갱신한다.
-
-### 11.2.1 실행 가능한 플랜 기준
-- 코드 구현에 사용하는 플랜은 "아이디어 메모"가 아니라 "실행 계약"이어야 한다.
-- 실행 가능한 플랜에는 아래 항목을 포함하는 것을 원칙으로 한다.
-  - 목표/비목표
-  - 이번 단계의 채택 설계 요약과 SSOT 문서(TD/ADR/기존 플랜) 기준
-  - 구현 범위와 비범위(out-of-scope)
-  - 생성/수정 대상 타입, 시스템, 테스트, 문서
-  - 예상 수정 파일 또는 탐색 앵커(정확한 타입/시스템명)
-  - 소유권(Writer/Owner), 업데이트 순서, Fence, Enableable 규칙
-  - 검증 계획과 합격 기준
-  - 충돌 시 임의 결정 금지 항목과 보고 조건
-- 플랜에 다중 해석 여지가 남아 있거나, 구현자가 설계를 새로 결정해야만 진행 가능한 상태라면 실행 가능한 플랜으로 간주하지 않는다.
-- 구현 중 문서를 수정해야 하는 경우, 어떤 문서를 어느 범위까지 갱신할지 플랜에 명시한다.
-
-### 11.2.2 플랜 첨부 구현 요청 / Subagent 구현 규칙
-- 사용자가 "플랜 첨부 + 구현 요청" 형태로 요청하면, 첨부 플랜을 현재 단계의 SSOT로 간주하고 구현한다.
-- Agent 또는 `Subagent`는 로컬 코드베이스 탐색을 통해 파일 위치, 기존 네이밍, 배치 방식 같은 로컬 세부사항만 보완한다.
-- 첨부 플랜에 없는 설계 확장, 범위 추가, 소유권/업데이트 순서 재해석은 기본적으로 금지한다.
-- 플랜과 실제 코드가 충돌하거나, 플랜만으로 단일한 구현 결정을 내릴 수 없으면 임의 구현 대신 차이점, 차단 사유, 필요한 확인 사항만 보고한다.
-- 구현 시작 전에는 승인 문구와 적용 범위를 1~3줄로 재확인하고, "첨부 플랜을 SSOT로 보고 이번 단계만 구현한다"는 취지를 분명히 한다.
-- 구현 완료 보고에는 최소한 아래를 포함한다.
-  - 변경 내용 요약
-  - 검증 결과
-  - 플랜 대비 차이 또는 미반영 항목
-  - 남은 리스크 및 후속 문서 반영 필요 사항
-- 위 규칙은 `Subagent`를 사용할 때도 그대로 적용한다.
-- 반복 사용이 필요하면 위 규칙을 프로젝트 전용 `Custom Subagent`의 `developer_instructions` 또는 spawn 시 전달하는 고정 구현 지침으로 옮겨 사용한다.
-
-### 11.2.3 Subagent 시범 운영 규칙
-- 플랜 기반의 중규모 이상 코드 구현은 기본적으로 `Subagent` 사용을 우선 권장한다.
-- Subagent는 parent에서 spawn된 시점에 delegation 요청이 이미 소비된 것으로 간주한다. child는 추가 delegation을 다시 시도하지 않는다.
-- 시범 운영 기간에는 "설계 세션 + Subagent 구현 worker" 흐름을 기본값으로 삼고, 별도 thread/new session 기반 자동화 개선 작업은 보류 상태로 둔다.
-- `Subagent` 적용 결과는 최소한 아래 관점으로 관찰한다.
-  - 설계 세션 컨텍스트 유지성
-  - 구현 품질과 검증 완료율
-  - 차단/질문 회수 빈도
-- 독립 세션이 여전히 필요한 작업 유형
-- 소규모 수정, 단일 파일 정리, 짧은 버그 수정은 현재 세션에서 직접 처리할 수 있다.
-- `Subagent`만으로 목적을 달성하기 어려운 경우에만 별도 구현 세션 오케스트레이션 설계를 재개한다.
-
-### 11.2.4 권장 Subagent 프로파일
-- `ecs_explorer`
-  - 목적: DOTS ownership, update order, fence, 기존 테스트/진입점 탐색
-  - 기본 규칙: read-only, 구현/설계 확정 금지, 파일/심볼 근거 중심 보고
-- `unity_worker`
-  - 목적: 승인된 플랜 기반의 중규모 이상 Unity/DOTS 구현
-  - 기본 규칙: 플랜을 SSOT로 간주, 설계 확장 금지, 변경 요약/검증 결과/차이점/리스크 보고
-- `verification_runner`
-  - 목적: compile, console, EditMode, PlayMode smoke 검증 전담
-  - 기본 규칙: 소스 수정 금지, 실패 단계/증상/가능한 owning area만 간결히 보고
-- 병렬화 기본값:
-  - write 가능한 구현 worker는 기본 1개만 사용한다.
-  - 병렬화는 우선 read-only explorer끼리만 허용한다.
-  - 검증은 별도 `verification_runner` 1개가 순차적으로 수행한다.
 
 ### 11.3 고영향 변경(승인 권장)
 - 아래 중 하나에 해당하면 구현 전 짧은 계획 공유 후 승인받는다.
@@ -373,14 +156,6 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - 저영향 변경이라도 11.6의 명시 승인 게이트를 먼저 통과해야 한다.
 - 승인 이후에는 별도 추가 승인 없이 즉시 진행 가능하다.
 
-### 11.5 검증 및 완료 보고
-- 완료 전 검증은 3장 절차를 기본으로 한다.
-  - `compile -> console error 0 -> EditMode -> PlayMode 스모크`
-- 완료 보고에는 아래를 포함한다.
-  - 변경 내용 요약
-  - 검증 결과
-  - 남은 리스크 또는 미검증 사유/범위
-
 ### 11.6 수정 게이트(Explicit Approval Gate)
 - 기본 원칙: Agent는 기본적으로 read-only로 동작하며, 사용자 명시 승인 전에는 문서/코드/에셋을 수정하지 않는다.
 - 수정 허용 조건: 사용자가 현재 컨텍스트에서 명시적으로 수정 승인을 요청한 경우에만 수행한다.
@@ -391,3 +166,14 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - TaskBoard 예외는 범위 변경까지 자동 승인하는 의미가 아니다. 새로운 작업 범위 추가, 설계 결정 변경, 코드/문서 본문 수정은 기존 승인 게이트를 그대로 따른다.
 - 승인 전 허용 작업: 분석, 설계/플랜 작성, 영향도 검토, 패치 초안(diff) 제시, 읽기 전용 명령 실행.
 - 승인 후 실행 규칙: 수정 시작 전에 "승인 문구"와 "적용 범위"를 1~3줄로 재확인한 뒤 구현한다.
+
+---
+
+## 작업별 세부 지침
+
+| 상황 | 참조 파일 |
+| ------ | ----------- |
+| 코드 생성/수정 및 MCP 검증 시 | [mcp-workflow.md](Docs/AGENTS/mcp-workflow.md) |
+| TD/ADR 문서 작성 시 | [docs-workflow.md](Docs/AGENTS/docs-workflow.md) |
+| UI 레이아웃 및 Penpot 작업 시 | [ui-workflow.md](Docs/AGENTS/ui-workflow.md) |
+| 플랜 수립 및 Subagent 운영 시 | [agent-ops.md](Docs/AGENTS/agent-ops.md) |

@@ -203,8 +203,10 @@ Unity 반영 전 아래 중 하나 이상을 갱신한다.
 - 필요 시 Penpot 기준안과 구현 차이 비교
 
 ## 6. 문서화 기준
-### 6.1 AGENTS.md에 남길 것
-- 운영 원칙
+### 6.1 Docs/AGENTS/ui-workflow.md에 남길 것
+- Penpot MCP 사용 원칙
+- prefab/scene 규칙
+- UI 레이아웃 워크플로우 운영 원칙
 - 가드레일
 - 승인 게이트
 
