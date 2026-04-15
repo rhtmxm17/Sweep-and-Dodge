@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "unityMCP": {
+      "command": "<PATH_TO_UVX>",
+      "args": ["--from", "mcpforunityserver==9.6.6", "mcp-for-unity", "--transport", "stdio"],
+      "env": {
+        "SystemRoot": "C:\\Windows"
+      },
+      "timeout": 60000
+    },
+    "penpot": {
+      "type": "sse",
+      "url": "http://localhost:<PORT>/mcp"
+    }
+  }
+}

@@ -81,6 +81,11 @@ crashlytics-build.properties
 # Local Codex override config
 .codex/
 
+# Claude Code
+.mcp.json
+.claude/
+memory/
+
 # Non-redistributable resource files
 /Assets/_Project/05_Content/**
 !/Assets/_Project/05_Content/README.md
