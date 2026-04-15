@@ -441,7 +441,7 @@ namespace SweepNDodge.DotsBullets
                 }
                 else
                 {
-                    ApplySourceDefinition(em, sourceEntity, in binding);
+                    ApplySourceDefinition(em, sourceEntity, definition, in binding);
                 }
 
                 if (em.IsEnabled(sourceEntity))
@@ -875,9 +875,12 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            SeedSourceHazardActorOrchestration(em, entity, null, null);
+            if (HasPlacementDeliveredHazardActors(em, entity))
+                RemoveAllHazardActorsFromSource(em, entity);
         }
 
-        private static void ApplySourceDefinition(EntityManager em, Entity entity, in StageSourceBinding binding)
+        private static void ApplySourceDefinition(EntityManager em, Entity entity, StageDefinitionSO definition, in StageSourceBinding binding)
         {
             int thresholdWeakened = math.max(0, binding.ThresholdWeakened);
             int thresholdDepleted = math.max(thresholdWeakened, binding.ThresholdDepleted);
@@ -930,6 +933,470 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+
+            bool hasPlacements = HasHazardPlacements(binding.HazardActorPlacements);
+
+            if (hasPlacements)
+            {
+                ApplySourceHazardPlacements(em, entity, binding.SourceStableId, binding.HazardActorPlacements);
+                SeedSourceHazardActorOrchestration(em, entity, binding.HazardActorPlacements, definition != null ? definition.HazardActorOrchestrationRules : null);
+                return;
+            }
+
+            if (HasPlacementDeliveredHazardActors(em, entity))
+                RemoveAllHazardActorsFromSource(em, entity);
+
+            SeedSourceHazardActorOrchestration(em, entity, null, null);
+        }
+
+        private static bool HasHazardPlacements(HazardActorPlacementBinding[] placements)
+        {
+            return placements != null && placements.Length > 0;
+        }
+
+        private static bool HasPlacementDeliveredHazardActors(EntityManager em, Entity sourceEntity)
+        {
+            return em.Exists(sourceEntity)
+                && em.HasBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity)
+                && em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity).Length > 0;
+        }
+
+        private static void SeedSourceHazardActorOrchestration(
+            EntityManager em,
+            Entity sourceEntity,
+            HazardActorPlacementBinding[] placements,
+            HazardActorOrchestrationRuleBinding[] rules)
+        {
+            if (!em.Exists(sourceEntity))
+                return;
+
+            if (!em.HasBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity))
+                em.AddBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity);
+            if (!em.HasBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity))
+                em.AddBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity);
+
+            var ruleBuffer = em.GetBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity);
+            var ruleStates = em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity);
+            ruleBuffer.Clear();
+            ruleStates.Clear();
+
+            if (placements == null || placements.Length <= 0 || rules == null || rules.Length <= 0)
+                return;
+
+            var ownedPlacementIds = new HashSet<int>();
+            for (int i = 0; i < placements.Length; i++)
+            {
+                if (placements[i].PlacementInstanceId > 0)
+                    ownedPlacementIds.Add(placements[i].PlacementInstanceId);
+            }
+
+            if (ownedPlacementIds.Count <= 0)
+                return;
+
+            for (int i = 0; i < rules.Length; i++)
+            {
+                var rule = rules[i];
+                if (!ownedPlacementIds.Contains(rule.TargetPlacementInstanceId))
+                    continue;
+
+                ruleBuffer.Add(new SourceHazardActorOrchestrationRuleBuffer
+                {
+                    RuleId = rule.RuleId,
+                    TargetPlacementInstanceId = rule.TargetPlacementInstanceId,
+                    ActionType = rule.ActionType,
+                    TriggerType = rule.TriggerType,
+                    TriggerThresholdNormalized = rule.TriggerThresholdNormalized,
+                    TargetPhaseId = rule.TargetPhaseId,
+                });
+                ruleStates.Add(new SourceHazardActorOrchestrationRuleStateBuffer
+                {
+                    RuleId = rule.RuleId,
+                    HasFired = 0,
+                });
+            }
+        }
+
+        private static void ApplySourceHazardPlacements(
+            EntityManager em,
+            Entity sourceEntity,
+            uint sourceStableId,
+            HazardActorPlacementBinding[] placements)
+        {
+            RemoveAllHazardActorsFromSource(em, sourceEntity);
+            if (!em.Exists(sourceEntity))
+                return;
+
+            if (placements == null || placements.Length <= 0)
+                return;
+
+            for (int i = 0; i < placements.Length; i++)
+            {
+                var placement = placements[i];
+                if (!StageTopologyTemplateFactory.TryAttachHazardPlacementArchetype(
+                        em,
+                        sourceEntity,
+                        placement.PlacementInstanceId,
+                        placement.ActorArchetypePrefab,
+                        (float3)placement.LocalOffset,
+                        out var error))
+                {
+                    Debug.LogError(
+                        $"[StageTopologyApply] Failed to attach HazardActor placement. sourceStableId={sourceStableId}, placementInstanceId={placement.PlacementInstanceId}, error={error}",
+                        placement.ActorArchetypePrefab);
+                }
+            }
+        }
+
+        private static void RemoveAllHazardActorsFromSource(EntityManager em, Entity sourceEntity)
+        {
+            if (!em.Exists(sourceEntity))
+                return;
+
+            NativeArray<SourceHazardActorRefBuffer> actorRefsCopy = default;
+            NativeList<Entity> emitterEntitiesToDestroy = default;
+            NativeList<Entity> actorEntitiesToDestroy = default;
+            try
+            {
+                emitterEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
+                actorEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
+
+                if (em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
+                {
+                    var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity);
+                    actorRefsCopy = new NativeArray<SourceHazardActorRefBuffer>(actorRefs.Length, Allocator.Temp);
+                    for (int i = 0; i < actorRefs.Length; i++)
+                        actorRefsCopy[i] = actorRefs[i];
+
+                    for (int actorIndex = 0; actorIndex < actorRefsCopy.Length; actorIndex++)
+                    {
+                        var actorEntity = actorRefsCopy[actorIndex].ActorEntity;
+                        if (!em.Exists(actorEntity))
+                            continue;
+
+                        if (em.HasBuffer<HazardActorEmitterRefBuffer>(actorEntity))
+                        {
+                            var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity);
+                            for (int emitterIndex = 0; emitterIndex < emitterRefs.Length; emitterIndex++)
+                            {
+                                var emitterEntity = emitterRefs[emitterIndex].EmitterEntity;
+                                if (em.Exists(emitterEntity))
+                                    emitterEntitiesToDestroy.Add(emitterEntity);
+                            }
+                        }
+
+                        actorEntitiesToDestroy.Add(actorEntity);
+                    }
+                }
+
+                for (int emitterIndex = 0; emitterIndex < emitterEntitiesToDestroy.Length; emitterIndex++)
+                {
+                    var emitterEntity = emitterEntitiesToDestroy[emitterIndex];
+                    if (em.Exists(emitterEntity))
+                        em.DestroyEntity(emitterEntity);
+                }
+
+                for (int actorIndex = 0; actorIndex < actorEntitiesToDestroy.Length; actorIndex++)
+                {
+                    var actorEntity = actorEntitiesToDestroy[actorIndex];
+                    if (em.Exists(actorEntity))
+                        em.DestroyEntity(actorEntity);
+                }
+
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).Clear();
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity).Clear();
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity).Clear();
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity).Clear();
+
+                if (em.Exists(sourceEntity) && em.HasBuffer<LinkedEntityGroup>(sourceEntity))
+                    PruneSourceLinkedEntityGroup(em, sourceEntity);
+            }
+            finally
+            {
+                if (actorRefsCopy.IsCreated)
+                    actorRefsCopy.Dispose();
+                if (emitterEntitiesToDestroy.IsCreated)
+                    emitterEntitiesToDestroy.Dispose();
+                if (actorEntitiesToDestroy.IsCreated)
+                    actorEntitiesToDestroy.Dispose();
+            }
+        }
+
+        private static void PruneSourceLinkedEntityGroup(EntityManager em, Entity sourceEntity)
+        {
+            if (!em.Exists(sourceEntity) || !em.HasBuffer<LinkedEntityGroup>(sourceEntity))
+                return;
+
+            var linkedGroup = em.GetBuffer<LinkedEntityGroup>(sourceEntity);
+            var surviving = new NativeList<LinkedEntityGroup>(linkedGroup.Length + 1, Allocator.Temp);
+            try
+            {
+                surviving.Add(new LinkedEntityGroup { Value = sourceEntity });
+                for (int i = 0; i < linkedGroup.Length; i++)
+                {
+                    var value = linkedGroup[i].Value;
+                    if (value == sourceEntity || !em.Exists(value))
+                        continue;
+
+                    surviving.Add(new LinkedEntityGroup { Value = value });
+                }
+
+                linkedGroup.Clear();
+                for (int i = 0; i < surviving.Length; i++)
+                    linkedGroup.Add(surviving[i]);
+            }
+            finally
+            {
+                surviving.Dispose();
+            }
+        }
+
+        private static void ResetHazardActorToBaseline(EntityManager em, Entity actorEntity)
+        {
+            if (em.HasComponent<HazardActorAppliedConfigBaselineComponent>(actorEntity)
+                && em.HasComponent<HazardActorAppliedConfigComponent>(actorEntity))
+            {
+                var baseline = em.GetComponentData<HazardActorAppliedConfigBaselineComponent>(actorEntity);
+                em.SetComponentData(actorEntity, new HazardActorAppliedConfigComponent
+                {
+                    IsEnabled = baseline.IsEnabled,
+                    IsSuppressed = baseline.IsSuppressed,
+                });
+            }
+        }
+
+        private static void ResetHazardActorRuntimeState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorRuntimeStateComponent>(actorEntity))
+                return;
+
+            var initialPresenceState = HazardActorPresenceStateId.Hidden;
+            if (em.HasComponent<HazardActorRuntimeBaselineComponent>(actorEntity))
+                initialPresenceState = em.GetComponentData<HazardActorRuntimeBaselineComponent>(actorEntity).InitialPresenceState;
+
+            em.SetComponentData(actorEntity, new HazardActorRuntimeStateComponent
+            {
+                PresenceState = initialPresenceState,
+                StateElapsedSec = 0f,
+            });
+        }
+
+        private static void ResetHazardActorSelectorState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorPatternSelectorStateComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorPatternSelectorStateComponent
+            {
+                TargetEmitterId = -1,
+                CurrentPatternSlotId = -1,
+                LastPatternSlotId = -1,
+                SelectionSequence = 0u,
+                CurrentCandidateOrder = -1,
+                LastResolvedPhaseVersion = 0u,
+                LastConsumedCycleVersion = 0u,
+            });
+        }
+
+        private static void ResetHazardActorPhaseState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorBehaviorPhaseStateComponent>(actorEntity))
+                return;
+
+            int initialPhaseId = 1;
+            if (em.HasComponent<HazardActorBehaviorPhaseBaselineComponent>(actorEntity))
+                initialPhaseId = math.max(1, em.GetComponentData<HazardActorBehaviorPhaseBaselineComponent>(actorEntity).InitialPhaseId);
+
+            em.SetComponentData(actorEntity, new HazardActorBehaviorPhaseStateComponent
+            {
+                CurrentPhaseId = initialPhaseId,
+                PreviousPhaseId = initialPhaseId,
+                PhaseVersion = 0u,
+            });
+        }
+
+        private static void ResetHazardActorPresentationSignalState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorPresencePresentationSignalComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorPresencePresentationSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPresencePresentationCueId.None,
+            });
+        }
+
+        private static void ResetHazardActorPhaseTransitionRuntimeState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorPhaseTransitionRuntimeComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorPhaseTransitionRuntimeComponent
+            {
+                State = HazardActorPhaseTransitionStateId.Idle,
+                PendingFromPhaseId = -1,
+                PendingToPhaseId = -1,
+                ElapsedSec = 0f,
+                DurationSec = 0f,
+                TransitionVersion = 0u,
+            });
+        }
+
+        private static void ResetHazardActorPhaseTransitionSignalState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorPhaseTransitionSignalComponent>(actorEntity))
+                return;
+
+            int currentPhaseId = 1;
+            if (em.HasComponent<HazardActorBehaviorPhaseBaselineComponent>(actorEntity))
+                currentPhaseId = math.max(1, em.GetComponentData<HazardActorBehaviorPhaseBaselineComponent>(actorEntity).InitialPhaseId);
+
+            em.SetComponentData(actorEntity, new HazardActorPhaseTransitionSignalComponent
+            {
+                Version = 0u,
+                Cue = HazardActorPhaseTransitionSignalCueId.None,
+                Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
+                PreviousPhaseId = currentPhaseId,
+                CurrentPhaseId = currentPhaseId,
+                PendingToPhaseId = -1,
+            });
+        }
+
+        private static void ResetHazardActorOrchestrationRequestSignalState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorOrchestrationRequestSignalComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorOrchestrationRequestSignalComponent
+            {
+                Version = 0u,
+                ActionType = HazardActorOrchestrationActionId.None,
+                TargetPhaseId = -1,
+            });
+        }
+
+        private static void ResetHazardActorOrchestrationRequestConsumptionState(EntityManager em, Entity actorEntity)
+        {
+            if (!em.HasComponent<HazardActorOrchestrationRequestConsumptionComponent>(actorEntity))
+                return;
+
+            em.SetComponentData(actorEntity, new HazardActorOrchestrationRequestConsumptionComponent
+            {
+                LastPresenceRequestVersion = 0u,
+                LastPhaseRequestVersion = 0u,
+            });
+        }
+
+        private static void ResetHazardEmitterToBaseline(EntityManager em, Entity emitterEntity)
+        {
+            if (em.HasComponent<HazardEmitterAppliedConfigBaselineComponent>(emitterEntity)
+                && em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+            {
+                var baselineConfig = em.GetComponentData<HazardEmitterAppliedConfigBaselineComponent>(emitterEntity);
+                em.SetComponentData(emitterEntity, new HazardEmitterAppliedConfigComponent
+                {
+                    IsEnabled = baselineConfig.IsEnabled,
+                    IsSuppressed = baselineConfig.IsSuppressed,
+                    LocalOffset = baselineConfig.LocalOffset,
+                    TelegraphProfileRefId = baselineConfig.TelegraphProfileRefId,
+                    EmissionProfileRefId = baselineConfig.EmissionProfileRefId,
+                });
+            }
+
+            if (em.HasComponent<HazardEmitterTelegraphProfileBaselineComponent>(emitterEntity)
+                && em.HasComponent<HazardEmitterTelegraphProfileComponent>(emitterEntity))
+            {
+                var baselineTelegraph = em.GetComponentData<HazardEmitterTelegraphProfileBaselineComponent>(emitterEntity);
+                em.SetComponentData(emitterEntity, new HazardEmitterTelegraphProfileComponent
+                {
+                    ProfileId = baselineTelegraph.ProfileId,
+                    TelegraphDurationSec = baselineTelegraph.TelegraphDurationSec,
+                });
+            }
+
+            if (em.HasComponent<HazardEmitterEmissionProfileBaselineComponent>(emitterEntity)
+                && em.HasComponent<HazardEmitterEmissionProfileComponent>(emitterEntity))
+            {
+                var baselineEmission = em.GetComponentData<HazardEmitterEmissionProfileBaselineComponent>(emitterEntity);
+                em.SetComponentData(emitterEntity, new HazardEmitterEmissionProfileComponent
+                {
+                    ProfileId = baselineEmission.ProfileId,
+                    BulletTypeKey = baselineEmission.BulletTypeKey,
+                    PositionPatternMode = baselineEmission.PositionPatternMode,
+                    SpawnOffset = baselineEmission.SpawnOffset,
+                    LineStart = baselineEmission.LineStart,
+                    LineEnd = baselineEmission.LineEnd,
+                    SampleSpacing = baselineEmission.SampleSpacing,
+                    PointSetCount = baselineEmission.PointSetCount,
+                    Point0 = baselineEmission.Point0,
+                    Point1 = baselineEmission.Point1,
+                    Point2 = baselineEmission.Point2,
+                    Point3 = baselineEmission.Point3,
+                    AimMode = baselineEmission.AimMode,
+                    AimSnapshotTiming = baselineEmission.AimSnapshotTiming,
+                    BaseAngleDeg = baselineEmission.BaseAngleDeg,
+                    AimAngleOffsetDeg = baselineEmission.AimAngleOffsetDeg,
+                    LineNormalSide = baselineEmission.LineNormalSide,
+                    LineNormalAngleOffsetDeg = baselineEmission.LineNormalAngleOffsetDeg,
+                    SpiralStepDeg = baselineEmission.SpiralStepDeg,
+                    ShotPatternMode = baselineEmission.ShotPatternMode,
+                    ShotCount = baselineEmission.ShotCount,
+                    NWayAngleSpacingDeg = baselineEmission.NWayAngleSpacingDeg,
+                    EventShotSchedule = baselineEmission.EventShotSchedule,
+                    EventShotIntervalSec = baselineEmission.EventShotIntervalSec,
+                    EventRepeatCount = baselineEmission.EventRepeatCount,
+                    CooldownSec = baselineEmission.CooldownSec,
+                });
+            }
+        }
+
+        private static void ResetHazardEmitterRuntimeState(EntityManager em, Entity emitterEntity)
+        {
+            if (!em.HasComponent<HazardEmitterRuntimeStateComponent>(emitterEntity))
+                return;
+
+            var initialLifecycleState = HazardEmitterLifecycleStateId.Dormant;
+            if (em.HasComponent<HazardEmitterComponent>(emitterEntity))
+                initialLifecycleState = em.GetComponentData<HazardEmitterComponent>(emitterEntity).InitialLifecycleState;
+
+            em.SetComponentData(emitterEntity, new HazardEmitterRuntimeStateComponent
+            {
+                LifecycleState = initialLifecycleState,
+                StateElapsedSec = 0f,
+            });
+
+            if (em.HasComponent<HazardEmitterSelectedPatternRuntimeComponent>(emitterEntity))
+            {
+                em.SetComponentData(emitterEntity, new HazardEmitterSelectedPatternRuntimeComponent
+                {
+                    AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
+                });
+            }
+
+            if (em.HasComponent<HazardEmitterCycleSignalComponent>(emitterEntity))
+            {
+                em.SetComponentData(emitterEntity, new HazardEmitterCycleSignalComponent
+                {
+                    CompletedVersion = 0u,
+                });
+            }
+        }
+
+        private static void ResetHazardEmitterCoordinatorState(EntityManager em, Entity emitterEntity)
+        {
+            if (!em.HasComponent<HazardEmitterCoordinatorStateComponent>(emitterEntity))
+                em.AddComponentData(emitterEntity, default(HazardEmitterCoordinatorStateComponent));
+
+            em.SetComponentData(emitterEntity, new HazardEmitterCoordinatorStateComponent
+            {
+                ActivationAllowed = 0,
+                SuppressionReasonMask = 0u,
+                LastPlayerDistanceSq = float.MaxValue,
+            });
         }
 
         private static void DisableSourceInstance(EntityManager em, Entity entity)
@@ -991,6 +1458,9 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            SeedSourceHazardActorOrchestration(em, entity, null, null);
+            if (HasPlacementDeliveredHazardActors(em, entity))
+                RemoveAllHazardActorsFromSource(em, entity);
         }
 
         private static Entity ResolveFirstEntity(EntityQuery query)

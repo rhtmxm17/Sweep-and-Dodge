@@ -2693,7 +2693,19 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var requestsAfter = em.GetBuffer<SourceSpawnRequestBuffer>(source);
                 Assert.That(HasPendingForPhase(requestsAfter, SourceWavePhaseId.Sustain), Is.False, "Hard preemption must remove pending sustain requests");
-                Assert.That(HasPendingForPhase(requestsAfter, SourceWavePhaseId.OnStateEnterOnce), Is.True, "Event clip requests should remain pending");
+                var discreteChannel = em.CreateEntityQuery(ComponentType.ReadOnly<DiscreteEmitChannelSingletonTag>()).GetSingletonEntity();
+                var discreteRequests = em.GetBuffer<DiscreteEmitRequestBuffer>(discreteChannel);
+                bool hasPendingDiscrete = false;
+                for (int i = 0; i < discreteRequests.Length; i++)
+                {
+                    if (discreteRequests[i].SourceEntity != source)
+                        continue;
+
+                    hasPendingDiscrete = true;
+                    break;
+                }
+
+                Assert.That(hasPendingDiscrete, Is.True, "Event clip requests should remain pending");
 
                 var laneAfter = em.GetBuffer<SourceSustainRuntimeLaneBuffer>(source)[0];
                 Assert.That(laneAfter.ActiveClipId, Is.EqualTo(0), "Sustain lane must be interrupted while event clip is active");

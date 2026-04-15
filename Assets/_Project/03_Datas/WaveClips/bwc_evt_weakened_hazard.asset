@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -30,7 +30,7 @@ MonoBehaviour:
         SpawnSampleBudget: 24
         PlayerNoSpawnRadius: 2.2
         Anchor:
-          rid: 7141543268140187717
+          rid: 6141543358369366086
         AreaSampler:
           rid: 8141543268140187717
       PositionPattern:
@@ -79,20 +79,11 @@ MonoBehaviour:
       data:
         Points:
         - {x: 0, y: 0}
-    - rid: 7141543268140187717
-      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 8141543268140187717
-      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187718
       type: {class: SpiralAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 0
         SpiralStepDeg: 15
-    - rid: 9141543268140187718
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187719
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -107,17 +98,25 @@ MonoBehaviour:
       type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         BaseAngleDeg: 15
+    - rid: 6141543335094648918
+      type: {class: UniformFieldAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 6141543358369366086
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 7141543335094648918
+      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 8141543268140187717
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 8141543335094648918
+      type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 9141543268140187718
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
     - rid: 9141543335094648915
       type: {class: RadialShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         ShotCount: 8
-    - rid: 6141543335094648918
-      type: {class: UniformFieldAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 7141543335094648918
-      type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 8141543335094648918
-      type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-

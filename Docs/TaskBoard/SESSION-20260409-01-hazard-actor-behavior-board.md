@@ -1,0 +1,263 @@
+# SESSION-20260409-01
+
+## Metadata
+- doc_id: `SESSION-20260409-01`
+- type: `SessionTaskBoard`
+- status: `in_progress`
+- last_updated: `2026-04-13`
+- related_docs:
+  - [./SESSION-20260408-01-hazard-actor-design-board.md](./SESSION-20260408-01-hazard-actor-design-board.md)
+  - [../TechnicalDesign/TD-028-hazard-emitter-common-contract.md](../TechnicalDesign/TD-028-hazard-emitter-common-contract.md)
+  - [../TechnicalDesign/TD-029-discrete-emit-spawn-bridge-contract.md](../TechnicalDesign/TD-029-discrete-emit-spawn-bridge-contract.md)
+  - [../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md](../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md)
+  - [../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md](../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md)
+  - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
+  - [../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md](../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md)
+
+## Session Goal
+- 한 줄 목표: `HazardActor`를 실제로 행동하는 위험 개체로 확장하기 위해, `Presence + PatternSelector + Emitter execution seam`의 구현 범위를 문서와 작업 단위 기준으로 닫는다.
+- 완료 기준:
+  - current actor-aware compatibility path에서 actor behavior runtime으로 넘어가는 경계가 문서 기준으로 단일 해석 가능하다.
+  - 청사진 vertical slice의 최소 구현 범위가 분해돼 있다.
+  - 구현 착수를 위한 다음 plan 단위가 정리돼 있다.
+
+## Inherited Context
+- `TD-030` 기준 `Source -> HazardActor -> HazardEmitter` hierarchy, binding, authoring/baker, stage apply/reset은 구현 완료 상태다.
+- current runtime은 actor-aware presence seed까지 완료됐다.
+  - actor applied config와 `PresenceState`는 activation truth에 포함
+  - room-entry activation seed는 `SourceDirectorPressureInputBuffer.InfluenceOccupancy` 기반으로 시작됐다.
+  - selector state는 아직 invalid sentinel cleanup/invariant만 가진다.
+- `HazardEmitter`는 여전히 single-pattern compatibility path를 유지한다.
+
+## Now
+- `HB-3D. Blueprint sample content / verification closeout` 구현과 검증을 닫았다.
+- 현재 상태:
+  - test/operational source-template prefab이 모두 blueprint baseline content로 uplift됐다.
+    - actor 1, emitter 1, slots `A/B/B'`
+    - phase 1 policy: `OrderedCycle` with `[A, B]`
+    - phase 2 policy: `OrderedCycle` with `[A, B']`
+    - phase transition: `Phase1 -> Phase2 @ progress 0.5` with prefab-owned lead-in
+  - sample verification 전용 stage asset은 bounded escalation verification용 threshold/tuning으로 정렬됐다.
+    - test-only stage는 `Weakened` lane clip 누락 없이 half-progress escalation을 재현한다.
+  - sample verification PlayMode는 cleanup-driven source progress로 `PreparingStarted -> attack blocked -> PhaseCommitted -> phase 2 restart from A -> B'`를 실제 관찰한다.
+  - operational SampleScene smoke는 blueprint prefab parity + runtime slot/policy/transition reflection까지 확인한다.
+- 검증 결과:
+  - Unity MCP `refresh_unity(compile=request)` 이후 compile ready 확인
+  - `EditMode 533/533 passed`
+  - `PlayMode 49/49 passed`
+  - EditMode / PlayMode 모두 `result.summary.resultState`는 `Failed(Child)`로 보였지만 failed count는 0이었다.
+  - final console `error` 조회에는 project code error 없이 `MCP-FOR-UNITY` disposed-stream / client-exit noise만 남았다.
+- 남은 일:
+  - `HB-4. Validation / sample update` 이후 범위 또는 후속 actor motion/path 논의
+
+## Next
+- 후속 범위를 새로 열기 전 `HB-3` 종료 상태를 기준선으로 유지한다.
+- 필요 시 `GD-016` 청사진과 sample/operational content parity drift만 점검한다.
+
+## Blocked
+- 로컬 `SweepNDodge.EditModeTests.csproj`는 기존 누락 파일 `Assets/_Project/99_Tests/EditMode/CarryBinRulesTests.cs` 때문에 단독 빌드가 막혀 있다.
+
+## Parking Lot
+- [ ] P1. multi-emitter coordinated action contract를 언제 여는지
+- [ ] P2. actor-level motion/path를 같은 TD에 넣을지 분리할지
+- [ ] P3. firing 중 지속 retarget을 `HB-3` 본체에 넣지 않고 후속 단계로 미루는 현재 범위를 유지할지
+
+## Done
+- [x] D1. 행동 확장 범위를 hierarchy/apply 완료 문서(`TD-030`)와 분리해 별도 TD(`TD-031`)로 시작했다.
+  - 이유: `TD-030`은 계층/적용 ownership SSOT로 닫혀 있어야 하고, behavior 확장은 별도 설계 축으로 관리하는 편이 안전하다.
+- [x] D2. 이번 세션의 운영 보드를 별도로 생성했다.
+  - 이유: 이전 actor 세션은 migration closeout까지 완료된 상태라, behavior 확장 논의를 같은 보드에 누적하면 완료 범위와 신규 범위가 섞이게 된다.
+- [x] D3. 목표 청사진 시나리오를 별도 `GD-016`으로 분리하고, `GD-015`의 `HazardActor` 용어 보정을 반영했다.
+  - 이유: 행동 확장 출발점은 player-facing blueprint이므로 기획 문서 기준의 별도 기록이 필요하고, `GD-015`도 구현 상위 개념과의 관계가 명시돼야 이후 TD와 용어가 어긋나지 않는다.
+- [x] D4. `HB-1` presence 확장은 단일 구현 플랜이 아니라 3개 실행 단위로 분리하기로 고정했다.
+  - `HB-1A. Presence runtime owner`
+  - `HB-1B. Presence gate integration`
+  - `HB-1C. Blueprint trigger seed`
+  - 이유: presence owner 도입, runtime activation truth 변경, room-entry activation seed는 서로 다른 위험도를 가지며, 특히 room-entry activation은 청사진 vertical slice 성격이 강해 별도 단계로 다루는 편이 안전하다.
+- [x] D5. `HB-1A. Presence runtime owner` 구현을 완료했다.
+  - `HazardActorPresencePolicyComponent`와 `HazardActorPresenceSystem`이 추가됐다.
+  - actor presence는 이제 reset-only가 아니라 실제 runtime progression state로 동작한다.
+  - 기본 policy는 `Immediate activation / no retire`로 seed되고, current emitter compatibility gate는 유지된다.
+  - 검증 결과: console blocking error 없음, EditMode `485/485`, PlayMode `45/45`.
+- [x] D6. `HB-1B. Presence gate integration` 구현을 완료했다.
+  - `PresenceState != Active`가 actor activation truth에 결합됐다.
+  - actor `disabled/suppressed`는 presence system이 `Hidden`으로 clamp하고, non-`Active` actor는 selector invalid sentinel을 유지한다.
+  - coordinator는 `ActorPresenceHidden`, `ActorPresenceActivating`, `ActorPresenceRetiring` reason을 사용해 차단한다.
+  - 검증 결과: console blocking error 없음, EditMode `491/491`, PlayMode `45/45`.
+- [x] D7. `HB-1C. Blueprint trigger seed` 구현을 완료했다.
+  - `HazardActorPresenceTriggerMode.SourceOccupied`가 추가됐고, room-entry activation seed는 `SourceDirectorPressureInputBuffer.InfluenceOccupancy`를 읽는다.
+  - `HazardActorAuthoring`는 이제 presence policy 전체를 노출하고, authoring/factory는 그 값을 runtime policy로 seed한다.
+  - `HazardActorPresencePresentationSignalComponent`가 추가돼 actor-level activation/retire 시작을 ECS signal로 관측할 수 있다.
+  - 검증 결과: console blocking error 없음, EditMode `497/497`, PlayMode `45/45`.
+- [x] D8. `HB-2` 범위는 단일 구현 플랜이 아니라 3개 실행 단위로 분리하기로 고정했다.
+  - `HB-2A. PatternSet compatibility data layer`
+  - `HB-2B. PatternSelector runtime owner`
+  - `HB-2C. Emit-build selector seam cutover`
+  - 이유: 현재 repo에는 selector state만 있고 실제 pattern data layer와 selector writer, emit-build seam이 모두 비어 있어, 한 단계에 묶으면 구현 중 결정이 다시 생길 가능성이 크다.
+  - 운영 원칙:
+    - `HB-2`에서는 multi-slot authoring을 열지 않는다.
+    - `HB-2`에서는 weighted/random selection을 넣지 않는다.
+    - `HB-2`의 첫 목적은 selector-emitter seam을 current single-pattern compatibility path 위에 성립시키는 것이다.
+- [x] D9. `HB-2A. PatternSet compatibility data layer` 구현을 완료했다.
+  - emitter-owned `HazardEmitterPatternSlotBuffer`가 추가됐다.
+  - 현재는 emitter당 slot 1개만 유지하며, `PatternSlotId = 1`, `BaseWeight = 1`, `AvailabilityFlags = 0`을 사용한다.
+  - slot ref는 emitter final applied `TelegraphProfileRefId` / `EmissionProfileRefId`를 mirror한다.
+  - bake, fallback template factory, stage apply에서 compatibility slot reseed를 수행하도록 맞췄다.
+  - 수동 runtime fixture와 stage-apply tests에도 slot buffer mirror assertion을 추가했다.
+  - 검증 결과:
+    - Unity MCP `refresh_unity(compile=request)` 요청 후 PlayMode `45/45 passed`
+    - Unity MCP EditMode는 `MCP-FOR-UNITY` client exit 로그가 테스트 오라클에 걸려 실패
+    - `read_console(error)`는 MCP client exit 로그와 기존 `SpawnBacklog` 테스트 로그 노이즈를 포함해 반환했다.
+  - 해석:
+    - gameplay regression과 PlayMode path는 회귀 없음
+    - EditMode 실패는 현재 코드 contract가 아니라 MCP 로그 노이즈 영향으로 분리 기록한다.
+- [x] D10. `HB-2B. PatternSelector runtime owner` 구현을 완료했다.
+  - `HazardActorPatternSelectorSystem`이 추가됐고, selector state의 첫 runtime writer가 됐다.
+  - 현재 deterministic policy는 `PresenceState == Active`, `ActivationAllowed == 1`, slot buffer non-empty를 만족하는 emitter 중 `EmitterId`가 가장 낮은 emitter를 고르는 방식이다.
+  - selected pair가 바뀔 때만 `SelectionSequence`를 증가시키고, no-eligible 상태에서는 current만 invalid로 비우고 `LastPatternSlotId`는 최근 valid 선택 이력으로 유지한다.
+  - non-`Active` actor의 selector reset owner는 계속 `HazardActorPresenceSystem`으로 둔다.
+  - 검증 결과:
+    - Unity MCP `refresh_unity(compile=request)` 요청 후 PlayMode `45/45 passed`
+    - Unity MCP EditMode는 다시 `MCP-FOR-UNITY` client exit 로그가 테스트 오라클에 걸려 실패
+    - `read_console(error)`에도 동일한 MCP client exit 로그가 포함됐다.
+  - 해석:
+    - selector writer 도입 이후 gameplay regression은 관측되지 않았다.
+    - EditMode 실패는 여전히 MCP 로그 노이즈로 분리 기록한다.
+- [x] D11. `PlayMode` MCP disposed-stream noise filter를 추가해 PlayMode test harness를 안정화했다.
+  - `SetUpFixture` 기반으로 PlayMode suite 전체에서도 failing log를 직접 수집한다.
+  - 허용 대상은 `MCP-FOR-UNITY` disposed `NetworkStream` error 한 종류만으로 제한했다.
+  - 나머지 `Error / Assert / Exception`은 suite 종료 시 한 번에 실패시키도록 유지했다.
+  - Unity MCP 검증 결과:
+    - compile 이후 `EditMode 506/506 passed`
+    - `PlayMode 48/48 passed` (`resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다)
+    - 기존 실패 케이스였던 `BulletPlayModeSmokeTests.PlayMode_OperationalScene_DemoShell_ResultRetry_ReentersSameStage`도 더 이상 MCP disposed-stream noise로 실패하지 않았다.
+  - 해석:
+    - disposed-stream noise에 대한 EditMode / PlayMode harness 안정화는 완료됐다.
+    - 남은 콘솔 노이즈는 `Client handler exited`와 기존 `SpawnBacklog` 테스트 로그이며, 이번 안정화 범위에는 포함하지 않는다.
+- [x] D12. `HB-2C. Emit-build selector seam cutover` 구현을 완료했다.
+  - `HazardEmitterEmitBuildSystem`이 이제 actor-owned selector result를 실제 execution gate로 읽는다.
+  - emit-build는 `TargetEmitterId == emitter.EmitterId`와 `CurrentPatternSlotId`의 실제 slot 존재를 모두 요구한다.
+  - 선택되지 않은 emitter 또는 selected slot이 없는 emitter는 즉시 `Dormant + timer 0`으로 강제된다.
+  - execution payload는 아직 compatibility path를 유지한다.
+    - selected slot은 execution eligibility contract로만 쓰이고
+    - 실제 emit은 계속 emitter applied telegraph/emission component를 직접 읽는다.
+  - 검증 결과:
+    - Unity MCP `refresh_unity(compile=request)` 요청 후 PlayMode `48/48 passed`
+    - `result.summary.resultState`는 `Failed(Child)`로 표시됐지만, progress와 summary의 failed count는 0이었다.
+    - Unity MCP EditMode는 다시 `MCP-FOR-UNITY` disposed `NetworkStream` 로그가 테스트 오라클에 걸려 실패
+    - `read_console(error)`에도 동일한 MCP client exit/error 로그가 포함됐다.
+  - 해석:
+    - selector seam cutover 이후 runtime/gameplay regression은 관측되지 않았다.
+    - EditMode 실패는 여전히 MCP 로그 노이즈로 분리 기록한다.
+- [x] D13. `HB-3. Blueprint vertical slice`의 첫 설계 원칙을 고정했다.
+  - actor-owned phase가 selector rule을 바꾸는 구조를 채택한다.
+  - 목표 시나리오의 first slice는 actor가 `slot A`, `slot B`, `slot B'`를 모두 가지는 형태로 본다.
+  - `Phase 1`은 `A/B` 교대, `Phase 2`는 `A/B'` 교대 규칙을 사용한다.
+  - escalation은 slot data mutation이 아니라 actor-level phase 변화로 해석한다.
+  - `slot B`와 `slot B'`는 phase-conditioned variant가 아니라 별도 slot으로 둔다.
+- [x] D14. `HB-3`는 단일 구현 플랜이 아니라 4개 실행 단위로 분리하기로 고정했다.
+  - `HB-3A. Multi-slot authoring and runtime slot execution`
+  - `HB-3B. Blueprint selector policy and actor phase`
+  - `HB-3C. Escalation signal and progress-threshold transition`
+  - `HB-3D. Blueprint sample content / verification closeout`
+  - 이유:
+    - first vertical slice를 성립시키려면 먼저 multi-slot execution seam이 필요하다.
+    - selector policy와 actor phase, escalation trigger/signal, sample verification은 서로 다른 소유권과 위험도를 가진다.
+    - `continuous retarget while firing`은 이 분해 기준에서는 본체 범위 밖으로 두고 후속 단계에서 다루는 편이 안전하다.
+- [x] D15. `HB-3A. Multi-slot authoring and runtime slot execution`의 코드 경로를 반영했다.
+  - `HazardEmitterAuthoring`는 slots-only SSOT로 전환됐다.
+  - `HazardEmitterPatternExecutionSlotBuffer`가 추가돼 slot별 execution snapshot을 runtime에서 직접 보유한다.
+  - `HazardEmitterEmitBuildSystem`은 selected slot snapshot을 runtime component에 적용하고, slot 변경 시 `Dormant + timer 0` hard reset을 수행한다.
+  - single-slot emitter는 stage override mirror를 유지하고, multi-slot emitter의 emitter-level profile override는 apply 단계에서 error로 거부한다.
+  - operational/test hazard source prefab도 slots-only 직렬화로 맞췄다.
+  - 로컬 검증 결과:
+    - `dotnet build SweepNDodge.Runtime.csproj` 통과
+    - `dotnet build SweepNDodge.PlayModeTests.csproj` 통과
+    - `dotnet build SweepNDodge.EditModeTests.csproj`는 기존 누락 파일 `Assets/_Project/99_Tests/EditMode/CarryBinRulesTests.cs` 때문에 실패
+  - 해석:
+    - runtime / playmode compile 경계에서는 HB-3A 변경이 수용됐다.
+    - full Unity validation loop는 다음 세션 또는 Unity MCP 가능 세션에서 재실행이 필요하다.
+- [x] D16. `HB-3A`의 Unity validation loop를 현재 코드 기준으로 닫았다.
+  - `HazardEmitterPlayModeTests.PlayMode_AlwaysCycleHazardEmitter_AppendsAndConsumesDiscreteEmit`는 first selected-slot cutover frame이 `Dormant + timer 0` hard reset만 수행한다는 현재 HB-3A 계약에 맞게 조정했다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 517/517 passed`
+    - `PlayMode 48/48 passed`
+    - EditMode / PlayMode 모두 `result.summary.resultState`는 `Failed(Child)`로 보였지만 failed count는 0이었다.
+  - 관찰:
+    - PlayMode suite 실행 중 MCP polling을 섞으면 disposed `NetworkStream` noise가 다시 test run에 유입될 수 있었다.
+    - mid-run polling 없이 충분히 대기한 뒤 결과만 회수하면 full PlayMode smoke는 안정적으로 통과했다.
+- [x] D17. `HB-3B. Blueprint selector policy and actor phase` 구현을 완료했다.
+  - actor phase runtime state가 추가됐다.
+    - `HazardActorBehaviorPhaseBaselineComponent`
+    - `HazardActorBehaviorPhaseStateComponent`
+  - actor-owned selector policy/candidate buffer가 추가됐다.
+    - `HazardActorPhaseSelectorPolicyBuffer`
+    - `HazardActorPhaseSelectorCandidateBuffer`
+  - selector mode는 `OrderedPriority`와 `OrderedCycle`을 지원한다.
+    - `OrderedPriority`는 기존 `lowest eligible emitter / lowest slot` 의미를 compatibility path로 유지한다.
+    - `OrderedCycle`은 phase entry에서 첫 eligible candidate를 고르고, same-phase natural cycle completion edge에서만 다음 candidate로 advance한다.
+    - phase change는 hard boundary이며, 새 phase selection은 이전 selection을 입력으로 사용하지 않는다.
+  - explicit phase-policy가 없는 actor는 authoring / runtime template factory에서 compatibility seed를 자동 생성한다.
+  - `HazardEmitterCycleSignalComponent.CompletedVersion`이 추가돼 `OrderedCycle`의 in-phase progression edge를 emitter runtime에서 publish한다.
+  - `StageTopologyApplyPrepareSystem`은 actor phase state, selector state, emitter cycle signal을 baseline으로 reset한다.
+  - `ContentValidationRules`는 invalid actor phase selector policy를 `CV091`로 보고한다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 526/526 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 보였지만 failed count는 0이었다.
+  - 관찰:
+    - console `error` 조회에는 `MCP-FOR-UNITY` disposed `NetworkStream` noise가 여전히 섞일 수 있다.
+    - PlayMode 최종 판정은 long wait 후 결과만 회수한 run을 기준으로 닫았다.
+- [x] D18. `HB-3C. Escalation signal and progress-threshold transition` 구현을 완료했다.
+  - actor-owned `HazardActorPhaseProgressTransitionBuffer`가 추가됐다.
+    - `FromPhaseId`
+    - `ToPhaseId`
+    - `ProgressThresholdNormalized`
+    - `TransitionLeadInSec`
+  - escalation staging runtime이 추가됐다.
+    - `HazardActorPhaseTransitionRuntimeComponent`
+    - `HazardActorPhaseTransitionSignalComponent`
+    - signal cue는 `PreparingStarted` / `PhaseCommitted`를 사용한다.
+  - `HazardActorPhaseTransitionSystem`이 source progress truth(`CollectedCount / ThresholdDepleted`)를 읽어 `Idle -> Preparing -> commit` 흐름을 owner로 관리한다.
+  - threshold 평가는 `PresenceState == Active` actor에만 수행된다.
+  - `Preparing` 동안 selector는 freeze되고, coordinator는 `ActorPhaseTransitionPreparing` suppression reason으로 emitter 공격을 차단한다.
+  - `StageTopologyApplyPrepareSystem`은 actor transition runtime/signal을 baseline idle로 reset한다.
+  - `ContentValidationRules`는 invalid actor phase transition authoring을 `CV092`로 보고한다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 532/532 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+  - 관찰:
+    - full test run 중 console에는 `SpawnBacklog` intentional error logs와 `MCP-FOR-UNITY` noise가 섞일 수 있다.
+    - final console clear 후에는 project code error 없이 `MCP-FOR-UNITY` client exit noise만 남았다.
+- [x] D19. `HB-3D. Blueprint sample content / verification closeout` 구현을 완료했다.
+  - test/operational source-template prefab을 동일한 blueprint baseline content로 정렬했다.
+    - actor phase selector policy는 `phase 1: [A, B]`, `phase 2: [A, B']`의 `OrderedCycle`을 사용한다.
+    - actor phase transition은 `Phase1 -> Phase2 @ progress 0.5`와 prefab-owned lead-in을 사용한다.
+    - emitter는 single-slot sample에서 `A/B/B'` 3-slot sample로 uplift됐다.
+  - test-only stage asset은 bounded escalation verification을 위해 tuning을 조정했다.
+    - half-progress escalation verification이 가능한 threshold로 낮췄다.
+    - `Weakened` sustain lane clip 누락을 보강해 state transition 중 validation/log regression을 제거했다.
+  - sample verification PlayMode는 direct `CollectedCount` injection 없이 cleanup-driven source progress로 escalation을 검증한다.
+    - `PreparingStarted`
+    - `ActorPhaseTransitionPreparing` suppression
+    - `PhaseCommitted`
+    - phase 2 entry `A`
+    - phase 2 follow-up `B'`
+  - operational SampleScene smoke는 runtime entity가 blueprint slot/policy/transition buffer를 실제로 반영하는지까지 확인한다.
+  - Unity MCP 검증 결과:
+    - compile ready 확인
+    - `EditMode 533/533 passed`
+    - `PlayMode 49/49 passed`
+    - EditMode / PlayMode summary의 `resultState`는 `Failed(Child)`로 표기됐지만 failed count는 0이었다.
+  - 관찰:
+    - full PlayMode는 mid-run polling 없이 장시간 대기 후 결과만 회수한 run을 기준으로 닫았다.
+    - final console `error` 조회에는 project code error 없이 `MCP-FOR-UNITY` disposed-stream / client-exit noise만 남았다.
+
+## End of Session
+- 결과: 진행 중
+- 다음 시작점:
+  - `HB-4. Validation / sample update` 또는 후속 actor behavior 확장 논의로 넘어간다.

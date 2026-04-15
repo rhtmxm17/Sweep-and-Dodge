@@ -4,14 +4,17 @@
 - doc_id: `GD-015`
 - type: `GameDesign`
 - status: `draft`
-- last_updated: `2026-04-07`
+- last_updated: `2026-04-09`
 - related_docs:
   - [GD-002-source-based-spawn-and-depletion.md](./GD-002-source-based-spawn-and-depletion.md)
   - [GD-003-stage-cleaning-route-mvp.md](./GD-003-stage-cleaning-route-mvp.md)
   - [GD-006-hazard-conditional-capture-system.md](./GD-006-hazard-conditional-capture-system.md)
+  - [./GD-016-hazard-actor-blueprint-scenarios.md](./GD-016-hazard-actor-blueprint-scenarios.md)
   - [../TechnicalDesign/TD-028-hazard-emitter-common-contract.md](../TechnicalDesign/TD-028-hazard-emitter-common-contract.md)
+  - [../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md](../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md)
+  - [../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md](../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md)
 
-> `Source`를 "청소 대상이자 오염을 생성하는 방"으로 두고, `Hazard`는 방 내부의 개별 발화점 `HazardEmitter`를 중심으로 발생시켜 플레이어가 위험의 원인, 전조, 진입 타이밍을 읽게 만드는 방향 문서.
+> `Source`를 "청소 대상이자 오염을 생성하는 방"으로 두고, `Hazard`는 방 내부의 개별 발화점 `HazardEmitter`를 중심으로 발생시켜 플레이어가 위험의 원인, 전조, 진입 타이밍을 읽게 만드는 방향 문서. 구현 상위 개념은 `HazardActor`를 사용한다.
 
 ## 1. 목적
 - 공간 좌표 기반 Hazard 생성이 주는 어색함과 기습감을 줄인다.
@@ -23,6 +26,7 @@
 - `HazardEmitter`의 경험 목표, 설계 원칙, 역할 분류
 - 전조 규칙, 방 진행도 연동, 플레이어 유도 방식
 - 데모 스테이지 적용 방향과 MVP 권장 범위
+- `HazardActor` 도입 이후에도 유지할 gameplay-facing 용어 기준
 
 ## 3. 비범위
 - ECS 소유권, 업데이트 순서, 데이터 구조, Fence 등 구현 계약
@@ -61,6 +65,21 @@
 - 시각적, 행동적 전조를 통해 Hazard 발생을 예고함
 - 일정 규칙에 따라 Hazard를 생성함
 - 플레이어가 방 안에서 우선 관찰해야 하는 "문제 오브젝트" 또는 "위험 지점" 역할을 맡음
+- 구현 개념 보정:
+  - gameplay-facing design term은 계속 `HazardEmitter`를 사용한다.
+  - 구현 상위 개념은 `HazardActor`이며, `HazardEmitter`는 actor의 발사 ability slice로 본다.
+
+### 5.5 HazardActor
+- `HazardEmitter`를 포함하는 구현 상위 개념
+- 플레이어 입장에서는 "행동하는 위험 개체"처럼 읽히는 존재를 설명하기 위한 구현 레이어
+- 현재 상위 책임:
+  - presence/lifetime
+  - activation orchestration
+  - pattern selection
+  - future motion/retire
+- 관계:
+  - gameplay-facing 문서와 설명은 계속 `HazardEmitter` 중심으로 유지할 수 있다.
+  - 단, 구현과 문서 연결 시 "이 `HazardEmitter`는 `HazardActor`의 발사 ability slice"라는 점을 함께 본다.
 
 ## 6. 경험 목표
 
@@ -414,5 +433,11 @@ Hazard가 어디서 왜 나오는지를 설명한다.
 - 청소 진척도에 따른 활성 변화 방식
 - 방별 리듬 차별화 방안
 
+### 18.4 HazardActor 청사진 시나리오
+- 고정 actor, 반응형 actor, 순회 actor 같은 청사진 사례
+- 존재 연출, 패턴 반복, 상태 강화가 플레이어 경험에서 어떻게 읽혀야 하는지
+- 상세 시나리오는 [GD-016](./GD-016-hazard-actor-blueprint-scenarios.md)를 참조한다.
+
 ## 19. 변경 이력
 - 2026-04-07: 메타데이터, 요약 블록, 섹션 계층을 최근 GD 문서 포맷에 맞춰 정리했다. 기존 기획 내용은 유지하고 논의 순서가 드러나도록 재배치했다.
+- 2026-04-09: `HazardActor`를 구현 상위 개념으로 명시하고, 목표 청사진 시나리오를 별도 문서([GD-016](./GD-016-hazard-actor-blueprint-scenarios.md))로 분리했다.

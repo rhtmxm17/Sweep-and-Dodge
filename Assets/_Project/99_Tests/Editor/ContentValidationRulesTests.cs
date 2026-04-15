@@ -3,6 +3,7 @@ using System.Linq;
 using System;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
+using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -10,6 +11,9 @@ namespace SweepNDodge.DotsBullets.Tests
 {
     public class ContentValidationRulesTests
     {
+        private const string GeneratedOperationalRoot = "Assets/__GeneratedContentValidation";
+        private const string GeneratedTestRoot = "Assets/_Project/99_Tests/TestData/__GeneratedContentValidation";
+
         [Test]
         public void DuplicateDefinitionId_IsTreatedAsError()
         {
@@ -104,6 +108,47 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 Object.DestroyImmediate(catalog.SourceTemplatePrefab);
                 Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void OperationalTopologyCatalog_ReferencingTestOnlySourceTemplatePrefab_IsError()
+        {
+            string scope = Guid.NewGuid().ToString("N");
+            string operationalRoot = EnsureFolder($"{GeneratedOperationalRoot}/{scope}");
+            string testRoot = EnsureFolder($"{GeneratedTestRoot}/{scope}");
+
+            var operationalCatalog = ScriptableObject.CreateInstance<StageTopologyPrefabCatalogSO>();
+            var prefabRoot = new GameObject("source_template");
+
+            try
+            {
+                string prefabPath = $"{testRoot}/pf_test_only.prefab";
+                PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+                operationalCatalog.SourceTemplatePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                AssetDatabase.CreateAsset(operationalCatalog, $"{operationalRoot}/stpc_operational.asset");
+                AssetDatabase.SaveAssets();
+
+                var reloadedCatalog = AssetDatabase.LoadAssetAtPath<StageTopologyPrefabCatalogSO>($"{operationalRoot}/stpc_operational.asset");
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    new List<ContentValidationRecord<StageTopologyPrefabCatalogSO>>
+                    {
+                        new ContentValidationRecord<StageTopologyPrefabCatalogSO>(reloadedCatalog, "topology_catalog"),
+                    },
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV045"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(prefabRoot);
+                DeleteAssetFolder($"{GeneratedOperationalRoot}/{scope}");
+                DeleteAssetFolder($"{GeneratedTestRoot}/{scope}");
             }
         }
 
@@ -1992,6 +2037,35 @@ namespace SweepNDodge.DotsBullets.Tests
                 if (profiles[i] != null)
                     Object.DestroyImmediate(profiles[i]);
             }
+        }
+
+        private static string EnsureFolder(string assetPath)
+        {
+            string normalized = assetPath.Replace('\\', '/');
+            if (AssetDatabase.IsValidFolder(normalized))
+                return normalized;
+
+            string[] parts = normalized.Split('/');
+            string current = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string next = $"{current}/{parts[i]}";
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(current, parts[i]);
+                current = next;
+            }
+
+            return normalized;
+        }
+
+        private static void DeleteAssetFolder(string assetPath)
+        {
+            string normalized = assetPath.Replace('\\', '/');
+            if (!AssetDatabase.IsValidFolder(normalized))
+                return;
+
+            AssetDatabase.DeleteAsset(normalized);
+            AssetDatabase.Refresh();
         }
     }
 }

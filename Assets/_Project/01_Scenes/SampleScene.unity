@@ -483,6 +483,15 @@ MonoBehaviour:
   ImpulseVisualLossScale: 0.03
   ImpulseVisualPerFrameMax: 0.2
   ImpulseMaxOffset: 0.35
+  EnableBroomSweepGizmos: 1
+  DrawOnlyWhenSelected: 1
+  DrawSearchRadius: 1
+  DrawStateLabel: 1
+  DrawCandidateBullets: 0
+  CandidateBulletMarkerLimit: 64
+  GizmoHeightOffset: 0.05
+  FullPathStepCount: 24
+  BandStepCount: 12
 --- !u!114 &352435933
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2144,6 +2153,7 @@ GameObject:
   - component: {fileID: 2015128787}
   - component: {fileID: 2015128788}
   - component: {fileID: 2015128789}
+  - component: {fileID: 2015128790}
   m_Layer: 0
   m_Name: RunDirectorStageBridge
   m_TagString: Untagged
@@ -2684,6 +2694,19 @@ MonoBehaviour:
   PauseBridge: {fileID: 2015128784}
   HintBridge: {fileID: 2015128785}
   LogBindWarnings: 1
+--- !u!114 &2015128790
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 922542402af5783458c5439e12c01c4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageTopologyPrefabCatalogAuthoring
+  Catalog: {fileID: 11400000, guid: 3023896e72d43dd4fbbdf17556c9259c, type: 2}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

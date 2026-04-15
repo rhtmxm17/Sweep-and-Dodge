@@ -141,4 +141,87 @@ namespace SweepNDodge.DotsBullets
         public int LastFrameExpiredByAge;
         public int LastFrameBudgetUsed;
     }
+
+    public struct DiscreteEmitChannelSingletonTag : IComponentData { }
+
+    public enum DiscreteEmitProducerKind : byte
+    {
+        WaveClipEvent = 0,
+        HazardEmitter = 1,
+    }
+
+    public enum DiscreteEmitAnchorMode : byte
+    {
+        FixedWorld = 0,
+        SourceRelative = 1,
+    }
+
+    [InternalBufferCapacity(32)]
+    public struct DiscreteEmitRequestBuffer : IBufferElementData
+    {
+        public DiscreteEmitProducerKind ProducerKind;
+        public Entity SourceEntity;
+        public Entity ProducerEntity;
+        public int EmissionId;
+        public int BulletTypeKey;
+
+        public DiscreteEmitAnchorMode AnchorMode;
+        public Entity AnchorEntity;
+        public float3 AnchorPosition;
+        public float3 AnchorLocalOffset;
+
+        public WavePositionPatternModeId PositionPatternMode;
+        public float2 SpawnOffset;
+        public float2 LineStart;
+        public float2 LineEnd;
+        public float SampleSpacing;
+        public int PointSetCount;
+        public float2 Point0;
+        public float2 Point1;
+        public float2 Point2;
+        public float2 Point3;
+
+        public WaveAimModeId AimMode;
+        public WaveAimSnapshotTimingId AimSnapshotTiming;
+        public float BaseAngleDeg;
+        public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
+        public float SpiralStepDeg;
+
+        public WaveShotPatternModeId ShotPatternMode;
+        public int ShotCount;
+        public float NWayAngleSpacingDeg;
+
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        public float EventShotIntervalSec;
+        public int RemainingRepeats;
+        public uint RepeatSequence;
+
+        public byte EventAimInitialized;
+        public float3 EventAimTargetPosition;
+        public float EventShotElapsedSec;
+
+        public byte Priority;
+        public uint OldestFrame;
+    }
+
+    public struct DiscreteEmitPolicyComponent : IComponentData
+    {
+        public int BudgetPerFrame;
+        public int MaxPendingCount;
+        public uint MaxPendingAgeFrames;
+    }
+
+    public struct DiscreteEmitBacklogMetricsComponent : IComponentData
+    {
+        public int PendingCount;
+        public int DeferredByBudget;
+        public int DeferredByPool;
+        public int DroppedByCapacity;
+        public int ExpiredByAge;
+        public int LastFrameDroppedByCapacity;
+        public int LastFrameExpiredByAge;
+        public int LastFrameBudgetUsed;
+    }
 }

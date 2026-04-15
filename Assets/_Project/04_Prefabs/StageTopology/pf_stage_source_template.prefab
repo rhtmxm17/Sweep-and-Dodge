@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!1 &100000
 GameObject:
@@ -45,9 +45,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweepNDodge.DotsBullets.SourceRuntimeTemplateAuthoring
   StableIdOverride: 0
-  FieldShape: 0
-  FieldRadius: 8
-  FieldSize: {x: 12, y: 8}
+  Shape: 0
+  Radius: 8
+  Size: {x: 12, y: 8}
   SustainClipSlots: []
   EventClipSlots: []
   ThresholdWeakened: 2000
@@ -60,6 +60,11 @@ MonoBehaviour:
   PollutionRegenPerSec: 0.08
   PollutionDropPerCollect: 0.12
   PollutionTopKSampleCount: 6
+  PollutionActiveRatioThreshold: 0.35
+  PollutionRecoveryCooldownFrames: 45
+  PollutionRecoveryWaveSeedCount: 2
+  PollutionRecoveryWaveClusterSize: 4
+  PollutionRecoveryRestoreValue: 0.4
+  PollutionRecoveryRecentCleanBiasFrames: 90
   DrawGizmo: 0
   DrawGizmoWhenNotSelected: 0
-

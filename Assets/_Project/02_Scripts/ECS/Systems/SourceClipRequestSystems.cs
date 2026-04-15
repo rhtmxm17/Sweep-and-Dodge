@@ -1,4 +1,3 @@
-﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -16,6 +15,7 @@ namespace SweepNDodge.DotsBullets
         {
             state.RequireForUpdate<BulletFrameCounterComponent>();
             state.RequireForUpdate<SpawnRequestPolicyComponent>();
+            state.RequireForUpdate<DiscreteEmitChannelSingletonTag>();
             state.RequireForUpdate<SpawnBacklogMetricsComponent>();
             state.RequireForUpdate<SpawnRunSeedComponent>();
             state.RequireForUpdate<SourceSpawnComponent>();
@@ -26,9 +26,7 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceClipPatternBuffer>();
             state.RequireForUpdate<SourceSustainSlotCandidateBuffer>();
             state.RequireForUpdate<SourceSustainRuntimeLaneBuffer>();
-            state.RequireForUpdate<SourceSustainRuntimeComponent>();
             state.RequireForUpdate<SourceEventRuntimeComponent>();
-            state.RequireForUpdate<SourceEventQueueBuffer>();
             state.RequireForUpdate<SourceActiveBulletCountBuffer>();
             state.RequireForUpdate<SourceSpawnRequestBuffer>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
@@ -55,6 +53,8 @@ namespace SweepNDodge.DotsBullets
                 return;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
             uint runSeed = math.max(1u, SystemAPI.GetSingleton<SpawnRunSeedComponent>().Value);
+            var discreteChannelEntity = SystemAPI.GetSingletonEntity<DiscreteEmitChannelSingletonTag>();
+            var discreteRequests = SystemAPI.GetBuffer<DiscreteEmitRequestBuffer>(discreteChannelEntity);
 
             int pendingTotal = 0;
             foreach (var requests in SystemAPI.Query<DynamicBuffer<SourceSpawnRequestBuffer>>())
@@ -69,12 +69,10 @@ namespace SweepNDodge.DotsBullets
             var stableIdLookup = SystemAPI.GetComponentLookup<SourceStableIdComponent>(true);
             var derivedLookup = SystemAPI.GetComponentLookup<SourceShapeDerivedComponent>(true);
             var directorStateLookup = SystemAPI.GetComponentLookup<SourceRunDirectorStateComponent>(true);
-            var sustainRuntimeLookup = SystemAPI.GetComponentLookup<SourceSustainRuntimeComponent>(false);
-            var eventRuntimeLookup = SystemAPI.GetComponentLookup<SourceEventRuntimeComponent>(false);
+            var eventRuntimeLookup = SystemAPI.GetComponentLookup<SourceEventRuntimeComponent>(true);
             var clipPatternLookup = SystemAPI.GetBufferLookup<SourceClipPatternBuffer>(false);
             var sustainCandidateLookup = SystemAPI.GetBufferLookup<SourceSustainSlotCandidateBuffer>(false);
             var sustainLaneLookup = SystemAPI.GetBufferLookup<SourceSustainRuntimeLaneBuffer>(false);
-            var eventQueueLookup = SystemAPI.GetBufferLookup<SourceEventQueueBuffer>(false);
             var activeCountLookup = SystemAPI.GetBufferLookup<SourceActiveBulletCountBuffer>(false);
             var requestLookup = SystemAPI.GetBufferLookup<SourceSpawnRequestBuffer>(false);
             var pollutionCellsLookup = SystemAPI.GetBufferLookup<SourcePollutionCellBuffer>(true);
@@ -82,12 +80,10 @@ namespace SweepNDodge.DotsBullets
             stableIdLookup.Update(ref state);
             derivedLookup.Update(ref state);
             directorStateLookup.Update(ref state);
-            sustainRuntimeLookup.Update(ref state);
             eventRuntimeLookup.Update(ref state);
             clipPatternLookup.Update(ref state);
             sustainCandidateLookup.Update(ref state);
             sustainLaneLookup.Update(ref state);
-            eventQueueLookup.Update(ref state);
             activeCountLookup.Update(ref state);
             requestLookup.Update(ref state);
             pollutionCellsLookup.Update(ref state);
@@ -98,12 +94,10 @@ namespace SweepNDodge.DotsBullets
                 .WithAll<SourceStableIdComponent>()
                 .WithAll<BulletFieldAreaComponent>()
                 .WithAll<SourceShapeDerivedComponent>()
-                .WithAll<SourceSustainRuntimeComponent>()
-                .WithAll<SourceEventRuntimeComponent>()
                 .WithAll<SourceClipPatternBuffer>()
                 .WithAll<SourceSustainSlotCandidateBuffer>()
                 .WithAll<SourceSustainRuntimeLaneBuffer>()
-                .WithAll<SourceEventQueueBuffer>()
+                .WithAll<SourceEventRuntimeComponent>()
                 .WithAll<SourceActiveBulletCountBuffer>()
                 .WithAll<SourceSpawnRequestBuffer>()
                 .Build();
@@ -118,10 +112,8 @@ namespace SweepNDodge.DotsBullets
                 var clipPatterns = clipPatternLookup[sourceEntity];
                 var sustainCandidates = sustainCandidateLookup[sourceEntity];
                 var sustainLanes = sustainLaneLookup[sourceEntity];
-                var eventQueue = eventQueueLookup[sourceEntity];
                 var activeCounts = activeCountLookup[sourceEntity];
                 var requests = requestLookup[sourceEntity];
-                var sustainRuntime = sustainRuntimeLookup[sourceEntity];
                 var eventRuntime = eventRuntimeLookup[sourceEntity];
 
                 if (clipPatterns.Length <= 0)
@@ -133,76 +125,37 @@ namespace SweepNDodge.DotsBullets
                 float fieldSamplingAreaScale = ResolveFieldSamplingAreaScale(sourceEntity, ref pollutionCellsLookup);
                 bool restrictFinishToTrashLane = directorState.State == RunDirectorSourceStateId.Finish;
                 var sustainLanesRW = sustainLanes;
-                var eventQueueRW = eventQueue;
                 var clipPatternsRW = clipPatterns;
                 var requestsRW = requests;
 
-                if (clipState != sustainRuntime.ActiveState)
+                if (eventRuntime.IsPlaying != 0)
                 {
-                    sustainRuntime.ActiveState = clipState;
-                    StopAllSustain(ref sustainLanesRW, preserveLastClip: true);
-                    QueueEventIfNeeded(ref eventQueueRW, in eventRuntime, clipState, frame);
+                    SpawnRequestCommonUtility.CompactRequestBuffer(requestsRW);
+                    continue;
                 }
 
-                TryStartQueuedEvent(
+                ProcessSustainLanes(
                     sourceEntity,
+                    clipState,
                     runSeed,
                     sourceStableId,
                     frame,
+                    deltaTime,
+                    derived.ComputedArea,
+                    fieldSamplingAreaScale,
+                    densityScale,
+                    restrictFinishToTrashLane,
                     ref clipPatternsRW,
-                    ref eventQueueRW,
-                    ref eventRuntime,
+                    ref sustainCandidates,
                     ref sustainLanesRW,
+                    ref activeCounts,
                     ref requestsRW,
+                    discreteRequests,
                     ref pendingTotal,
-                    ref remainingCapacity);
-
-                if (eventRuntime.IsPlaying != 0)
-                {
-                    ProcessActiveEventClip(
-                        sourceEntity,
-                        clipState,
-                        runSeed,
-                        sourceStableId,
-                        frame,
-                        deltaTime,
-                        derived.ComputedArea,
-                        fieldSamplingAreaScale,
-                        densityScale,
-                        ref clipPatternsRW,
-                        ref activeCounts,
-                        ref requestsRW,
-                        ref eventRuntime,
-                        ref pendingTotal,
-                        ref remainingCapacity,
-                        ref droppedByCapacity);
-                }
-                else
-                {
-                    ProcessSustainLanes(
-                        sourceEntity,
-                        clipState,
-                        runSeed,
-                        sourceStableId,
-                        frame,
-                        deltaTime,
-                        derived.ComputedArea,
-                        fieldSamplingAreaScale,
-                        densityScale,
-                        restrictFinishToTrashLane,
-                        ref clipPatternsRW,
-                        ref sustainCandidates,
-                        ref sustainLanesRW,
-                        ref activeCounts,
-                        ref requestsRW,
-                        ref pendingTotal,
-                        ref remainingCapacity,
-                        ref droppedByCapacity);
-                }
+                    ref remainingCapacity,
+                    ref droppedByCapacity);
 
                 SpawnRequestCommonUtility.CompactRequestBuffer(requestsRW);
-                sustainRuntimeLookup[sourceEntity] = sustainRuntime;
-                eventRuntimeLookup[sourceEntity] = eventRuntime;
             }
 
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
@@ -237,206 +190,6 @@ namespace SweepNDodge.DotsBullets
             return math.max(0f, directorState.DensityScale);
         }
 
-        private static void QueueEventIfNeeded(
-            ref DynamicBuffer<SourceEventQueueBuffer> queue,
-            in SourceEventRuntimeComponent eventRuntime,
-            SourceStateId triggerState,
-            uint frame)
-        {
-            if (eventRuntime.IsPlaying != 0 && eventRuntime.TriggerState == triggerState)
-                return;
-
-            for (int i = 0; i < queue.Length; i++)
-            {
-                if (queue[i].TriggerState == triggerState)
-                    return;
-            }
-
-            queue.Add(new SourceEventQueueBuffer
-            {
-                TriggerState = triggerState,
-                QueuedFrame = frame
-            });
-        }
-
-        private static void TryStartQueuedEvent(
-            Entity sourceEntity,
-            uint runSeed,
-            uint stableId,
-            uint frame,
-            ref DynamicBuffer<SourceClipPatternBuffer> patterns,
-            ref DynamicBuffer<SourceEventQueueBuffer> eventQueue,
-            ref SourceEventRuntimeComponent eventRuntime,
-            ref DynamicBuffer<SourceSustainRuntimeLaneBuffer> sustainLanes,
-            ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            ref int pendingTotal,
-            ref int remainingCapacity)
-        {
-            if (eventRuntime.IsPlaying != 0 || eventQueue.Length <= 0)
-                return;
-
-            while (eventQueue.Length > 0)
-            {
-                var queued = eventQueue[0];
-                eventQueue.RemoveAt(0);
-
-                if (!TrySelectEventClipId(
-                        runSeed,
-                        stableId,
-                        queued.TriggerState,
-                        ref patterns,
-                        ref eventRuntime,
-                        out int selectedClipId))
-                {
-                    if (queued.TriggerState != SourceStateId.Depleted)
-                    {
-                        Debug.LogWarning(
-                            $"[WaveClipV3] Event trigger has no clip. source={sourceEntity.Index}, state={queued.TriggerState}");
-                    }
-                    continue;
-                }
-
-                eventRuntime.IsPlaying = 1;
-                eventRuntime.ActiveEventClipId = selectedClipId;
-                eventRuntime.TriggerState = queued.TriggerState;
-                eventRuntime.ElapsedSec = 0f;
-
-                ResetClipAccumulators(
-                    ref patterns,
-                    selectedClipId,
-                    SourceWavePhaseId.OnStateEnterOnce,
-                    queued.TriggerState,
-                    default,
-                    useLaneFilter: false);
-
-                StopAllSustain(ref sustainLanes, preserveLastClip: true);
-
-                int removed = RemoveSustainPendingRequests(ref requests);
-                if (removed > 0)
-                {
-                    pendingTotal = math.max(0, pendingTotal - removed);
-                    remainingCapacity = SpawnRequestCommonUtility.SafeAdd(remainingCapacity, removed);
-                }
-
-                break;
-            }
-        }
-
-        private static bool TrySelectEventClipId(
-            uint runSeed,
-            uint stableId,
-            SourceStateId triggerState,
-            ref DynamicBuffer<SourceClipPatternBuffer> patterns,
-            ref SourceEventRuntimeComponent eventRuntime,
-            out int clipId)
-        {
-            clipId = 0;
-            using var clipCandidates = new NativeList<int>(Allocator.Temp);
-            for (int i = 0; i < patterns.Length; i++)
-            {
-                var p = patterns[i];
-                if (p.Phase != SourceWavePhaseId.OnStateEnterOnce)
-                    continue;
-                if (p.TriggerState != triggerState)
-                    continue;
-
-                if (!ContainsClipId(clipCandidates, p.ClipId))
-                    clipCandidates.Add(p.ClipId);
-            }
-
-            if (clipCandidates.Length <= 0)
-                return false;
-
-            uint slotKey = math.hash(new uint4((uint)triggerState, (uint)SourceWavePhaseId.OnStateEnterOnce, 0u, 0x7F4A7C15u));
-            var random = CreateSelectionRandom(runSeed, stableId, slotKey, eventRuntime.SelectionSequence);
-            eventRuntime.SelectionSequence += 1u;
-            int idx = random.NextInt(0, clipCandidates.Length);
-            clipId = clipCandidates[idx];
-            return true;
-        }
-
-        private static void ProcessActiveEventClip(
-            Entity sourceEntity,
-            SourceStateId sourceState,
-            uint runSeed,
-            uint sourceStableId,
-            uint frame,
-            float deltaTime,
-            float fullArea,
-            float fieldSamplingAreaScale,
-            float densityScale,
-            ref DynamicBuffer<SourceClipPatternBuffer> patterns,
-            ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
-            ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
-            ref SourceEventRuntimeComponent eventRuntime,
-            ref int pendingTotal,
-            ref int remainingCapacity,
-            ref int droppedByCapacity)
-        {
-            if (eventRuntime.IsPlaying == 0 || eventRuntime.ActiveEventClipId <= 0)
-                return;
-
-            float elapsed = eventRuntime.ElapsedSec;
-            float maxEnd = 0f;
-            float clipDurationSec = 0f;
-            bool hasAnySegment = false;
-            for (int i = 0; i < patterns.Length; i++)
-            {
-                var pattern = patterns[i];
-                if (pattern.Phase != SourceWavePhaseId.OnStateEnterOnce)
-                    continue;
-                if (pattern.ClipId != eventRuntime.ActiveEventClipId)
-                    continue;
-                if (pattern.TriggerState != eventRuntime.TriggerState)
-                    continue;
-
-                hasAnySegment = true;
-                maxEnd = math.max(maxEnd, pattern.LocalEndSec);
-                clipDurationSec = math.max(clipDurationSec, pattern.ClipDurationSec);
-                if (elapsed < pattern.LocalStartSec || elapsed >= pattern.LocalEndSec)
-                {
-                    patterns[i] = pattern;
-                    continue;
-                }
-
-                int requested = ResolveSpawnCount(
-                    ref pattern,
-                    runSeed,
-                    sourceStableId,
-                    frame,
-                    activeCounts,
-                    requests,
-                    fullArea,
-                    fieldSamplingAreaScale,
-                    deltaTime,
-                    densityScale);
-                patterns[i] = pattern;
-                if (requested <= 0)
-                    continue;
-
-                int accepted = math.min(requested, remainingCapacity);
-                if (accepted > 0)
-                {
-                    AddOrMergeRequest(requests, in pattern, accepted, frame);
-                    pendingTotal = SpawnRequestCommonUtility.SafeAdd(pendingTotal, accepted);
-                    remainingCapacity -= accepted;
-                }
-
-                int dropped = requested - accepted;
-                if (dropped > 0)
-                    droppedByCapacity = SpawnRequestCommonUtility.SafeAdd(droppedByCapacity, dropped);
-            }
-
-            eventRuntime.ElapsedSec += deltaTime;
-            float clipEndSec = clipDurationSec > 0f ? clipDurationSec : maxEnd;
-            if (!hasAnySegment || eventRuntime.ElapsedSec >= clipEndSec || sourceState != eventRuntime.TriggerState)
-            {
-                eventRuntime.IsPlaying = 0;
-                eventRuntime.ActiveEventClipId = 0;
-                eventRuntime.ElapsedSec = 0f;
-            }
-        }
-
         private static void ProcessSustainLanes(
             Entity sourceEntity,
             SourceStateId sourceState,
@@ -453,6 +206,7 @@ namespace SweepNDodge.DotsBullets
             ref DynamicBuffer<SourceSustainRuntimeLaneBuffer> sustainLanes,
             ref DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
             ref int pendingTotal,
             ref int remainingCapacity,
             ref int droppedByCapacity)
@@ -525,12 +279,14 @@ namespace SweepNDodge.DotsBullets
                     }
 
                     int requested = ResolveSpawnCount(
+                        sourceEntity,
                         ref pattern,
                         runSeed,
                         stableId,
                         frame,
                         activeCounts,
                         requests,
+                        discreteRequests,
                         fullArea,
                         fieldSamplingAreaScale,
                         deltaTime,
@@ -660,12 +416,14 @@ namespace SweepNDodge.DotsBullets
         }
 
         private static int ResolveSpawnCount(
+            Entity sourceEntity,
             ref SourceClipPatternBuffer pattern,
             uint runSeed,
             uint sourceStableId,
             uint frame,
             DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
             DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
             float fullArea,
             float fieldSamplingAreaScale,
             float deltaTime,
@@ -680,7 +438,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             float effectiveArea = ResolveEffectiveSpawnArea(in pattern, fullArea, fieldSamplingAreaScale);
-            return SpawnRequestCommonUtility.ResolveSpawnCountCore(
+            int requested = SpawnRequestCommonUtility.ResolveSpawnCountCore(
                 ref pattern.SpawnAccumulator,
                 ref pattern.BurstEventsEmitted,
                 pattern.EmissionMode,
@@ -703,6 +461,25 @@ namespace SweepNDodge.DotsBullets
                 effectiveArea,
                 deltaTime,
                 0xD8A89AF5u);
+
+            if (requested <= 0 || pattern.SpawnMode != SourceSpawnModeId.CapAndMaxDensity)
+                return requested;
+
+            int active = ResolveActiveCount(activeCounts, pattern.BulletTypeKey);
+            int combinedPending = ResolveCombinedPendingForSourceType(
+                sourceEntity,
+                pattern.BulletTypeKey,
+                requests,
+                discreteRequests);
+            int maxActive = (int)math.floor(math.max(0f, pattern.MaxActiveDensityPerArea) * effectiveArea);
+            int room = math.max(0, maxActive - active - combinedPending);
+            if (!SpawnRequestCommonUtility.UsesDiscreteEventIdentity(in pattern))
+                return math.min(requested, room);
+
+            int shotsPerEvent = math.max(1, SpawnRequestCommonUtility.ResolvePerEventBulletCount(in pattern));
+            int roomEventCount = room / shotsPerEvent;
+            int requestedEventCount = requested / shotsPerEvent;
+            return math.max(0, math.min(requestedEventCount, roomEventCount)) * shotsPerEvent;
         }
 
         private static float ResolveFieldSamplingAreaScale(
@@ -749,22 +526,6 @@ namespace SweepNDodge.DotsBullets
                 || areaSamplerMode == WaveAreaSamplerModeId.PollutionTopK;
         }
 
-        private static int RemoveSustainPendingRequests(ref DynamicBuffer<SourceSpawnRequestBuffer> requests)
-        {
-            int removed = 0;
-            for (int i = requests.Length - 1; i >= 0; i--)
-            {
-                var item = requests[i];
-                if (item.Count <= 0 || item.Phase != SourceWavePhaseId.Sustain)
-                    continue;
-
-                removed = SpawnRequestCommonUtility.SafeAdd(removed, item.Count);
-                requests.RemoveAtSwapBack(i);
-            }
-
-            return removed;
-        }
-
         private static int RemoveSustainPendingRequestsExceptLane(
             ref DynamicBuffer<SourceSpawnRequestBuffer> requests,
             SourceSpawnLaneId allowedLane)
@@ -783,20 +544,6 @@ namespace SweepNDodge.DotsBullets
             }
 
             return removed;
-        }
-
-        private static void StopAllSustain(ref DynamicBuffer<SourceSustainRuntimeLaneBuffer> sustainLanes, bool preserveLastClip)
-        {
-            for (int i = 0; i < sustainLanes.Length; i++)
-            {
-                var lane = sustainLanes[i];
-                if (preserveLastClip && lane.ActiveClipId > 0)
-                    lane.LastClipId = lane.ActiveClipId;
-
-                lane.ActiveClipId = 0;
-                lane.ElapsedSec = 0f;
-                sustainLanes[i] = lane;
-            }
         }
 
         private static void ResetClipAccumulators(
@@ -866,17 +613,6 @@ namespace SweepNDodge.DotsBullets
             SpawnRequestCommonUtility.AddOrMergeRequest(requests, in template, count, frame);
         }
 
-        private static bool ContainsClipId(NativeList<int> list, int value)
-        {
-            for (int i = 0; i < list.Length; i++)
-            {
-                if (list[i] == value)
-                    return true;
-            }
-
-            return false;
-        }
-
         private static Unity.Mathematics.Random CreateSelectionRandom(
             uint runSeed,
             uint stableId,
@@ -887,6 +623,65 @@ namespace SweepNDodge.DotsBullets
             return Unity.Mathematics.Random.CreateFromIndex(math.max(1u, seed));
         }
 
+        private static int ResolveCombinedPendingForSourceType(
+            Entity sourceEntity,
+            int bulletTypeKey,
+            DynamicBuffer<SourceSpawnRequestBuffer> legacyRequests,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests)
+        {
+            return SpawnRequestCommonUtility.SafeAdd(
+                ResolveLegacyPendingCount(legacyRequests, bulletTypeKey),
+                ResolvePendingDiscreteBulletEquivalent(discreteRequests, sourceEntity, bulletTypeKey));
+        }
+
+        private static int ResolvePendingDiscreteBulletEquivalent(
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
+            Entity sourceEntity,
+            int bulletTypeKey)
+        {
+            int pending = 0;
+            for (int i = 0; i < discreteRequests.Length; i++)
+            {
+                var item = discreteRequests[i];
+                if (item.SourceEntity != sourceEntity || item.BulletTypeKey != bulletTypeKey)
+                    continue;
+
+                pending = SpawnRequestCommonUtility.SafeAdd(
+                    pending,
+                    DiscreteEmitRequestUtility.ResolvePendingBulletEquivalent(in item));
+            }
+
+            return pending;
+        }
+
+        private static int ResolveLegacyPendingCount(
+            DynamicBuffer<SourceSpawnRequestBuffer> requests,
+            int bulletTypeKey)
+        {
+            int pending = 0;
+            for (int i = 0; i < requests.Length; i++)
+            {
+                var item = requests[i];
+                if (item.BulletTypeKey != bulletTypeKey || item.Count <= 0)
+                    continue;
+
+                pending = SpawnRequestCommonUtility.SafeAdd(pending, item.Count);
+            }
+
+            return pending;
+        }
+
+        private static int ResolveActiveCount(
+            DynamicBuffer<SourceActiveBulletCountBuffer> activeCounts,
+            int bulletTypeKey)
+        {
+            for (int i = 0; i < activeCounts.Length; i++)
+            {
+                if (activeCounts[i].BulletTypeKey == bulletTypeKey)
+                    return activeCounts[i].ActiveCount;
+            }
+
+            return 0;
+        }
     }
 }
-

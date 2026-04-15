@@ -18,3 +18,5 @@
 - [GD-012-characterized-hud-toast-direction.md](GD-012-characterized-hud-toast-direction.md): 플레이 도중 비차단형 캐릭터형 HUD 토스트 방향
 - [GD-013-visual-tone-keyword-board.md](GD-013-visual-tone-keyword-board.md): 세션 레퍼런스 이미지 기반 비주얼 톤 키워드와 적용 힌트
 - [GD-014-cleaning-trace-recovery-loop.md](GD-014-cleaning-trace-recovery-loop.md): 청소 흔적 복구를 공간 순환 규칙으로 확장하는 방향 문서
+- [GD-015-hazard-emitter-design.md](GD-015-hazard-emitter-design.md): `HazardEmitter` gameplay-facing 위험 발화점 설계와 `HazardActor` 구현 상위 개념 연결 문서
+- [GD-016-hazard-actor-blueprint-scenarios.md](GD-016-hazard-actor-blueprint-scenarios.md): `HazardActor` 행동 확장의 발화점이 된 청사진 시나리오와 일반화 범위

@@ -146,6 +146,7 @@ namespace SweepNDodge.DotsBullets.Editor
             if (stageNode.TargetDefinition.StageTimeLimitSec <= 0f)
                 stageNode.TargetDefinition.StageTimeLimitSec = 150f;
             stageNode.TargetDefinition.SourceBindings = sourceBindings.ToArray();
+            stageNode.TargetDefinition.HazardActorOrchestrationRules ??= Array.Empty<HazardActorOrchestrationRuleBinding>();
             EditorUtility.SetDirty(stageNode.TargetDefinition);
             if (saveAssets)
                 AssetDatabase.SaveAssets();
@@ -218,6 +219,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 ThresholdDepleted = 4000,
                 SustainSlots = Array.Empty<SustainSlotBinding>(),
                 EventSlots = Array.Empty<EventSlotBinding>(),
+                HazardActorPlacements = Array.Empty<HazardActorPlacementBinding>(),
             };
         }
 
@@ -231,6 +233,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 ThresholdDepleted = Mathf.Max(Mathf.Max(0, authoring.ThresholdWeakened), authoring.ThresholdDepleted),
                 SustainSlots = BuildSustainSlots(authoring.SustainClipSlots),
                 EventSlots = BuildEventSlots(authoring.EventClipSlots),
+                HazardActorPlacements = Array.Empty<HazardActorPlacementBinding>(),
             };
         }
 

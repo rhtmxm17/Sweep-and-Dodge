@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using UnityEditor;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Editor
@@ -94,6 +95,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
     public static class ContentValidationRules
     {
+        private const string TestDataRootPath = "Assets/_Project/99_Tests/";
+
         public static List<ContentValidationIssue> Validate(in ContentValidationInput input)
         {
             var issues = new List<ContentValidationIssue>(64);
@@ -855,6 +858,21 @@ namespace SweepNDodge.DotsBullets.Editor
                         "CV030",
                         catalogs[i].Location,
                         "StageTopologyPrefabCatalogSO.SourceTemplatePrefab is null."));
+                    continue;
+                }
+
+                string catalogPath = AssetDatabase.GetAssetPath(catalog);
+                if (!IsTestOnlyPath(catalogPath))
+                {
+                    string prefabPath = AssetDatabase.GetAssetPath(catalog.SourceTemplatePrefab);
+                    if (IsTestOnlyPath(prefabPath))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV045",
+                            catalogs[i].Location,
+                            $"Operational StageTopologyPrefabCatalogSO cannot reference test-only SourceTemplatePrefab. asset={prefabPath}"));
+                    }
                 }
             }
         }
@@ -1026,6 +1044,14 @@ namespace SweepNDodge.DotsBullets.Editor
                         "PlayerProxyAuthoring.CleanupActionSet is null."));
                 }
             }
+        }
+
+        private static bool IsTestOnlyPath(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+                return false;
+
+            return assetPath.Replace('\\', '/').StartsWith(TestDataRootPath, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void ValidateMovementDefinition(

@@ -123,6 +123,10 @@ namespace SweepNDodge.DotsBullets
             baker.AddBuffer<SourceSustainSlotCandidateBuffer>(e).Clear();
             baker.AddBuffer<SourceSustainRuntimeLaneBuffer>(e).Clear();
             baker.AddBuffer<SourceEventQueueBuffer>(e).Clear();
+            baker.AddBuffer<SourceHazardActorPlacementRefBuffer>(e).Clear();
+            baker.AddBuffer<SourceHazardActorOrchestrationRuleBuffer>(e).Clear();
+            baker.AddBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(e).Clear();
+            baker.AddBuffer<SourceHazardActorRefBuffer>(e).Clear();
 
             baker.AddComponent(e, new SourceSustainRuntimeComponent
             {
