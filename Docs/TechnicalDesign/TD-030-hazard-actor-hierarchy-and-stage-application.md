@@ -4,14 +4,14 @@
 - doc_id: `TD-030`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-09`
+- last_updated: `2026-04-14`
 - related_docs:
   - [../GameDesign/GD-015-hazard-emitter-design.md](../GameDesign/GD-015-hazard-emitter-design.md)
   - [./TD-028-hazard-emitter-common-contract.md](./TD-028-hazard-emitter-common-contract.md)
   - [./TD-029-discrete-emit-spawn-bridge-contract.md](./TD-029-discrete-emit-spawn-bridge-contract.md)
   - [../TaskBoard/SESSION-20260408-01-hazard-actor-design-board.md](../TaskBoard/SESSION-20260408-01-hazard-actor-design-board.md)
 
-> `HazardEmitter`를 `HazardActor`의 발사 ability slice로 재해석하기 위해, `Source -> HazardActor -> HazardEmitter` 계층, stage-applied binding, ref buffer, authoring/baker, apply/reset owner를 actor 기준으로 고정한다.
+> `HazardEmitter`를 `HazardActor`의 발사 ability slice로 재해석하기 위해, `Source -> HazardActor -> HazardEmitter` 계층, ref buffer, authoring/baker, apply/reset owner를 actor 기준으로 고정한다. stage actor delivery/orchestration SSOT는 `TD-032`가 소유한다.
 
 ## 1. 문제 정의
 - 현재 구현은 source가 emitter를 직접 소유하는 구조다.
@@ -26,9 +26,8 @@
 - 목표:
   - `HazardActor`를 runtime/authoring/stage apply 상위 개념으로 고정한다.
   - `Source -> HazardActor -> HazardEmitter` 계층과 ref buffer lookup seam을 고정한다.
-  - actor/emitter binding 분리와 explicit roster 규칙을 고정한다.
   - actor baseline/applied/runtime/selector 최소 계층과 stage apply/reset 순서를 고정한다.
-  - 구현 범위를 플랜 모드 실행 단위로 분해해 바로 착수 가능한 상태로 만든다.
+  - hierarchy/authoring 기준선과 stage placement/orchestration 경계를 명확히 분리한다.
 - 비목표:
   - motion/path policy 구현
   - pattern selector 실제 선택 로직 구현
@@ -116,30 +115,13 @@ Source
   - `AvailabilityFlags`
 - `PatternSlotId`는 stable id 기반으로 사용한다.
 
-## 4. Stage Binding / Ref Buffer / Apply
-### 4.1 Stage binding 최종 스키마
-- `StageSourceBinding`은 아래 actor 기준 중첩 구조를 사용한다.
-  - `HazardActorBinding[] HazardActors`
-- `HazardActorBinding`
-  - `ActorId`
-  - `EnabledMode`
-  - `StartSuppressedMode`
-  - `HazardEmitterBinding[] Emitters`
-- `HazardEmitterBinding`
-  - `EmitterId`
-  - `OverrideLocalOffset`
-  - `LocalOffset`
-  - `TelegraphProfileOverride`
-  - `EmissionProfileOverride`
+## 4. Ref Buffer / Apply
+### 4.1 Current stage delivery ownership
+- stage actor delivery/orchestration의 current SSOT는 `TD-032`의 `HazardActorPlacements + HazardActorOrchestrationRules`다.
+- `HazardActorBinding` / `HazardEmitterBinding` 기반 stage actor path는 `SP-4` direct cutover에서 제거됐다.
+- source template prefab은 actor-free baseline을 유지하고, actor archetype attach는 placement path 전용 helper가 담당한다.
 
-### 4.2 Explicit roster 규칙
-- actor와 emitter 모두 stage binding에서 명시적으로 관리한다.
-- `StageSourceBinding.HazardActors`에 없는 actor는 비활성/미적용으로 정리한다.
-- `HazardActorBinding.Emitters`에 없는 emitter도 비활성/미적용으로 정리한다.
-- `HazardActorBinding.Emitters == []`는 유효하다.
-  - 의미: actor는 존재하지만 이 stage에서 활성 emitter ability는 없다.
-
-### 4.3 Ref buffer 계약
+### 4.2 Ref buffer 계약
 - source root는 아래 버퍼를 가진다.
 
 ```csharp
@@ -156,30 +138,25 @@ HazardActorEmitterRefBuffer
 - int EmitterId
 ```
 
-- 기존 source 직하 emitter lookup seam은 direct cutover로 제거한다.
-  - `StageSourceBinding.HazardEmitterBindings`
-  - `SourceHazardEmitterRefBuffer`
+- `SourceHazardActorRefBuffer`는 hierarchy/roster 유지용 internal seam으로 남을 수 있다.
+- stage targeting seam은 `PlacementInstanceId -> ActorEntity` placement ref buffer가 소유한다.
 
-### 4.4 Stage apply/reset owner와 순서
+### 4.3 Stage apply/reset owner와 순서
 - `StageTopologyApplyPrepareSystem`가 stage-applied layer reset/override owner다.
 - apply 순서는 아래로 고정한다.
-  1. actor baseline 복원
-  2. actor binding 적용
+  1. source placement actor hierarchy pre-attach / reconcile
+  2. actor baseline 복원
   3. actor runtime reset
   4. emitter baseline 복원
-  5. emitter binding 적용
-  6. emitter runtime reset
+  5. emitter runtime reset
+  6. source-owned orchestration/runtime state reset
   7. coordinator/selector state reset
 - actor runtime reset은 아래를 포함한다.
   - `PresenceState = InitialPresenceState`
   - `StateElapsedSec = 0`
 - selector reset은 invalid sentinel 규칙을 사용한다.
-- stage apply는 설정과 초기 상태만 적용한다.
-  - coordinator 계산
-  - selector 결정
-  - emit progression
-  - discrete backlog 정리
-  는 stage apply owner 범위 밖이다.
+- stage apply는 hierarchy reconcile과 baseline/runtime reset만 적용한다.
+- stage orchestration request 발행은 `TD-032` 범위다.
 
 ## 5. Authoring / Baker
 ### 5.1 Authoring hierarchy
@@ -262,9 +239,10 @@ SourceRuntimeTemplateAuthoring
 - 구현 상태:
   - 완료
 - closeout 결과:
-  - operational `SampleScene` 경로는 `stpc_demo -> pf_stage_source_template -> HazardActor/HazardEmitter` 최소 샘플을 가진다.
-  - `PlayModeSmoke_SampleVerification`은 test-only topology catalog와 test-only actor sample prefab을 사용한다.
-  - validation은 nested hazard binding duplicate/id contract, source template actor/emitter hierarchy integrity, operational asset의 test-only 참조 금지를 포함한다.
+  - operational/test source template prefab은 actor-free baseline이다.
+  - actor sample은 standalone archetype prefab으로 유지된다.
+  - stage/sample asset은 placement/orchestration으로 actor를 attach하고 제어한다.
+  - validation은 hierarchy/internal seam과 placement/orchestration seam을 분리해 본다.
 
 ## 7. 검증 계획
 - 문서 기준 검증:

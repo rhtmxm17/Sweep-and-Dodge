@@ -15,11 +15,7 @@ namespace SweepNDodge.DotsBullets
 
         public static Entity CreateSourceTemplate(EntityManager em, StageTopologyPrefabCatalogSO catalog)
         {
-            var entity = CreateDefaultSourceTemplate(em);
-            if (catalog != null && catalog.SourceTemplatePrefab != null)
-                TryAttachHazardHierarchyFromCatalogPrefab(em, entity, catalog.SourceTemplatePrefab);
-
-            return entity;
+            return CreateDefaultSourceTemplate(em);
         }
 
         private static Entity CreateDefaultSourceTemplate(EntityManager em)
@@ -116,6 +112,8 @@ namespace SweepNDodge.DotsBullets
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity).Clear();
             em.AddBuffer<SourceRegionCellIndexBuffer>(entity).Clear();
             em.AddBuffer<SourceHazardActorPlacementRefBuffer>(entity).Clear();
+            em.AddBuffer<SourceHazardActorOrchestrationRuleBuffer>(entity).Clear();
+            em.AddBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(entity).Clear();
             em.AddBuffer<SourceHazardActorRefBuffer>(entity).Clear();
             var linkedEntities = em.AddBuffer<LinkedEntityGroup>(entity);
             linkedEntities.Add(entity);
@@ -176,303 +174,6 @@ namespace SweepNDodge.DotsBullets
                 compatibilitySeed,
                 phaseTransitions,
                 out error);
-        }
-
-        private static bool TryAttachHazardHierarchyFromCatalogPrefab(
-            EntityManager em,
-            Entity sourceEntity,
-            GameObject sourceTemplatePrefab)
-        {
-            if (sourceEntity == Entity.Null || !em.Exists(sourceEntity) || sourceTemplatePrefab == null)
-                return false;
-
-            var sourceAuthoring = sourceTemplatePrefab.GetComponentInChildren<SourceRuntimeTemplateAuthoringBase>(true);
-            if (sourceAuthoring == null)
-                return false;
-
-            if (!em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
-                em.AddBuffer<SourceHazardActorRefBuffer>(sourceEntity);
-            if (!em.HasBuffer<LinkedEntityGroup>(sourceEntity))
-            {
-                var linked = em.AddBuffer<LinkedEntityGroup>(sourceEntity);
-                linked.Add(sourceEntity);
-            }
-
-            em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).Clear();
-            var sourceLinkedGroup = em.GetBuffer<LinkedEntityGroup>(sourceEntity);
-            if (sourceLinkedGroup.Length == 0)
-                sourceLinkedGroup.Add(sourceEntity);
-
-            var actors = sourceAuthoring.GetComponentsInChildren<HazardActorAuthoring>(true);
-            for (int i = 0; i < actors.Length; i++)
-            {
-                var actorAuthoring = actors[i];
-                if (actorAuthoring == null)
-                    continue;
-
-                var parentSource = actorAuthoring.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>(true);
-                if (parentSource != sourceAuthoring)
-                    continue;
-
-                if (!HazardActorAuthoringValidationUtility.TryValidate(
-                        actorAuthoring,
-                        out _,
-                        out var compatibilitySeed,
-                        out var phaseTransitions,
-                        out _,
-                        out var actorError))
-                {
-                    Debug.LogWarning($"[StageTopologyTemplateFactory] Failed to resolve HazardActor selector policy while creating runtime template. actor={actorAuthoring.name}, error={actorError}", actorAuthoring);
-                    continue;
-                }
-
-                var actorEntity = em.CreateEntity(
-                    typeof(Prefab),
-                    typeof(HazardActorComponent),
-                    typeof(HazardActorAppliedConfigBaselineComponent),
-                    typeof(HazardActorAppliedConfigComponent),
-                    typeof(HazardActorRuntimeBaselineComponent),
-                    typeof(HazardActorBehaviorPhaseBaselineComponent),
-                    typeof(HazardActorRuntimeStateComponent),
-                    typeof(HazardActorBehaviorPhaseStateComponent),
-                    typeof(HazardActorPatternSelectorStateComponent),
-                    typeof(HazardActorPhaseTransitionRuntimeComponent),
-                    typeof(HazardActorPhaseTransitionSignalComponent),
-                    typeof(HazardActorPresencePresentationSignalComponent));
-
-                int actorId = math.max(1, actorAuthoring.ActorId);
-                byte actorEnabled = actorAuthoring.Enabled ? (byte)1 : (byte)0;
-                byte actorSuppressed = actorAuthoring.StartSuppressed ? (byte)1 : (byte)0;
-
-                em.SetComponentData(actorEntity, new HazardActorComponent
-                {
-                    ActorId = actorId,
-                    SourceEntity = sourceEntity,
-                });
-                em.SetComponentData(actorEntity, new HazardActorAppliedConfigBaselineComponent
-                {
-                    IsEnabled = actorEnabled,
-                    IsSuppressed = actorSuppressed,
-                });
-                em.SetComponentData(actorEntity, new HazardActorAppliedConfigComponent
-                {
-                    IsEnabled = actorEnabled,
-                    IsSuppressed = actorSuppressed,
-                });
-                em.AddComponentData(actorEntity, new HazardActorPresencePolicyComponent
-                {
-                    ActivationTrigger = actorAuthoring.ActivationTrigger,
-                    ActivationDurationSec = math.max(0f, actorAuthoring.ActivationDurationSec),
-                    RetireTrigger = actorAuthoring.RetireTrigger,
-                    RetireDurationSec = math.max(0f, actorAuthoring.RetireDurationSec),
-                });
-                em.SetComponentData(actorEntity, new HazardActorRuntimeBaselineComponent
-                {
-                    InitialPresenceState = actorAuthoring.InitialPresenceState,
-                });
-                em.SetComponentData(actorEntity, new HazardActorBehaviorPhaseBaselineComponent
-                {
-                    InitialPhaseId = compatibilitySeed.InitialPhaseId,
-                });
-                em.SetComponentData(actorEntity, new HazardActorRuntimeStateComponent
-                {
-                    PresenceState = actorAuthoring.InitialPresenceState,
-                    StateElapsedSec = 0f,
-                });
-                em.SetComponentData(actorEntity, new HazardActorBehaviorPhaseStateComponent
-                {
-                    CurrentPhaseId = compatibilitySeed.InitialPhaseId,
-                    PreviousPhaseId = compatibilitySeed.InitialPhaseId,
-                    PhaseVersion = 0u,
-                });
-                em.SetComponentData(actorEntity, new HazardActorPatternSelectorStateComponent
-                {
-                    TargetEmitterId = -1,
-                    CurrentPatternSlotId = -1,
-                    LastPatternSlotId = -1,
-                    SelectionSequence = 0u,
-                    CurrentCandidateOrder = -1,
-                    LastResolvedPhaseVersion = 0u,
-                    LastConsumedCycleVersion = 0u,
-                });
-                em.SetComponentData(actorEntity, new HazardActorPhaseTransitionRuntimeComponent
-                {
-                    State = HazardActorPhaseTransitionStateId.Idle,
-                    PendingFromPhaseId = -1,
-                    PendingToPhaseId = -1,
-                    ElapsedSec = 0f,
-                    DurationSec = 0f,
-                    TransitionVersion = 0u,
-                });
-                em.SetComponentData(actorEntity, new HazardActorPhaseTransitionSignalComponent
-                {
-                    Version = 0u,
-                    Cue = HazardActorPhaseTransitionSignalCueId.None,
-                    Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
-                    PreviousPhaseId = compatibilitySeed.InitialPhaseId,
-                    CurrentPhaseId = compatibilitySeed.InitialPhaseId,
-                    PendingToPhaseId = -1,
-                });
-                em.SetComponentData(actorEntity, new HazardActorPresencePresentationSignalComponent
-                {
-                    Version = 0u,
-                    Cue = HazardActorPresencePresentationCueId.None,
-                });
-                em.AddBuffer<HazardActorEmitterRefBuffer>(actorEntity).Clear();
-                var selectorPolicies = em.AddBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity);
-                selectorPolicies.Clear();
-                for (int policyIndex = 0; policyIndex < compatibilitySeed.Policies.Length; policyIndex++)
-                    selectorPolicies.Add(compatibilitySeed.Policies[policyIndex]);
-
-                var selectorCandidates = em.AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity);
-                selectorCandidates.Clear();
-                for (int candidateIndex = 0; candidateIndex < compatibilitySeed.Candidates.Length; candidateIndex++)
-                    selectorCandidates.Add(compatibilitySeed.Candidates[candidateIndex]);
-
-                var transitionBuffer = em.AddBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
-                transitionBuffer.Clear();
-                for (int transitionIndex = 0; transitionIndex < phaseTransitions.Length; transitionIndex++)
-                    transitionBuffer.Add(phaseTransitions[transitionIndex]);
-
-                em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).Add(new SourceHazardActorRefBuffer
-                {
-                    ActorEntity = actorEntity,
-                    ActorId = actorId,
-                });
-                em.GetBuffer<LinkedEntityGroup>(sourceEntity).Add(actorEntity);
-
-                var emitters = actorAuthoring.GetComponentsInChildren<HazardEmitterAuthoring>(true);
-                for (int emitterIndex = 0; emitterIndex < emitters.Length; emitterIndex++)
-                {
-                    var emitterAuthoring = emitters[emitterIndex];
-                    if (emitterAuthoring == null)
-                        continue;
-
-                    var parentActor = emitterAuthoring.GetComponentInParent<HazardActorAuthoring>(true);
-                    if (parentActor != actorAuthoring)
-                        continue;
-
-                    if (!HazardEmitterPatternSlotAuthoringUtility.TryResolveSlots(emitterAuthoring.Slots, out var resolvedSlots, out var error))
-                    {
-                        Debug.LogWarning($"[StageTopologyTemplateFactory] Failed to resolve HazardEmitter profile while creating runtime template. emitter={emitterAuthoring.name}, error={error}", emitterAuthoring);
-                        continue;
-                    }
-
-                    byte emitterEnabled = emitterAuthoring.IsEnabled ? (byte)1 : (byte)0;
-                    byte emitterSuppressed = emitterAuthoring.StartSuppressed ? (byte)1 : (byte)0;
-                    int emitterId = math.max(1, emitterAuthoring.EmitterId);
-                    var firstSlot = resolvedSlots[0];
-                    var baselineTelegraph = HazardEmitterPatternSlotAuthoringUtility.CreateBaselineTelegraph(resolvedSlots);
-                    var baselineEmission = HazardEmitterPatternSlotAuthoringUtility.CreateBaselineEmission(resolvedSlots);
-
-                    var emitterEntity = em.CreateEntity(
-                        typeof(Prefab),
-                        typeof(HazardEmitterComponent),
-                        typeof(HazardEmitterAppliedConfigBaselineComponent),
-                        typeof(HazardEmitterAppliedConfigComponent),
-                        typeof(HazardEmitterTelegraphProfileBaselineComponent),
-                        typeof(HazardEmitterTelegraphProfileComponent),
-                        typeof(HazardEmitterEmissionProfileBaselineComponent),
-                        typeof(HazardEmitterEmissionProfileComponent),
-                        typeof(HazardEmitterRuntimeStateComponent),
-                        typeof(HazardEmitterSelectedPatternRuntimeComponent),
-                        typeof(HazardEmitterCycleSignalComponent));
-
-                    var baselineConfig = new HazardEmitterAppliedConfigBaselineComponent
-                    {
-                        IsEnabled = emitterEnabled,
-                        IsSuppressed = emitterSuppressed,
-                        LocalOffset = emitterAuthoring.LocalOffset,
-                        TelegraphProfileRefId = firstSlot.Metadata.TelegraphProfileRefId,
-                        EmissionProfileRefId = firstSlot.Metadata.EmissionProfileRefId,
-                    };
-
-                    em.SetComponentData(emitterEntity, new HazardEmitterComponent
-                    {
-                        EmitterId = emitterId,
-                        ActorEntity = actorEntity,
-                        ActivationPolicy = emitterAuthoring.ActivationPolicy,
-                        InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
-                        AnchorKind = emitterAuthoring.AnchorKind,
-                        Mobility = emitterAuthoring.Mobility,
-                    });
-                    em.SetComponentData(emitterEntity, baselineConfig);
-                    em.SetComponentData(emitterEntity, new HazardEmitterAppliedConfigComponent
-                    {
-                        IsEnabled = baselineConfig.IsEnabled,
-                        IsSuppressed = baselineConfig.IsSuppressed,
-                        LocalOffset = baselineConfig.LocalOffset,
-                        TelegraphProfileRefId = baselineConfig.TelegraphProfileRefId,
-                        EmissionProfileRefId = baselineConfig.EmissionProfileRefId,
-                    });
-                    em.SetComponentData(emitterEntity, baselineTelegraph);
-                    em.SetComponentData(emitterEntity, new HazardEmitterTelegraphProfileComponent
-                    {
-                        ProfileId = baselineTelegraph.ProfileId,
-                        TelegraphDurationSec = baselineTelegraph.TelegraphDurationSec,
-                    });
-                    em.SetComponentData(emitterEntity, baselineEmission);
-                    em.SetComponentData(emitterEntity, new HazardEmitterEmissionProfileComponent
-                    {
-                        ProfileId = baselineEmission.ProfileId,
-                        BulletTypeKey = baselineEmission.BulletTypeKey,
-                        PositionPatternMode = baselineEmission.PositionPatternMode,
-                        SpawnOffset = baselineEmission.SpawnOffset,
-                        LineStart = baselineEmission.LineStart,
-                        LineEnd = baselineEmission.LineEnd,
-                        SampleSpacing = baselineEmission.SampleSpacing,
-                        PointSetCount = baselineEmission.PointSetCount,
-                        Point0 = baselineEmission.Point0,
-                        Point1 = baselineEmission.Point1,
-                        Point2 = baselineEmission.Point2,
-                        Point3 = baselineEmission.Point3,
-                        AimMode = baselineEmission.AimMode,
-                        AimSnapshotTiming = baselineEmission.AimSnapshotTiming,
-                        BaseAngleDeg = baselineEmission.BaseAngleDeg,
-                        AimAngleOffsetDeg = baselineEmission.AimAngleOffsetDeg,
-                        LineNormalSide = baselineEmission.LineNormalSide,
-                        LineNormalAngleOffsetDeg = baselineEmission.LineNormalAngleOffsetDeg,
-                        SpiralStepDeg = baselineEmission.SpiralStepDeg,
-                        ShotPatternMode = baselineEmission.ShotPatternMode,
-                        ShotCount = baselineEmission.ShotCount,
-                        NWayAngleSpacingDeg = baselineEmission.NWayAngleSpacingDeg,
-                        EventShotSchedule = baselineEmission.EventShotSchedule,
-                        EventShotIntervalSec = baselineEmission.EventShotIntervalSec,
-                        EventRepeatCount = baselineEmission.EventRepeatCount,
-                        CooldownSec = baselineEmission.CooldownSec,
-                    });
-                    em.SetComponentData(emitterEntity, new HazardEmitterRuntimeStateComponent
-                    {
-                        LifecycleState = HazardEmitterLifecycleStateId.Dormant,
-                        StateElapsedSec = 0f,
-                    });
-                    em.SetComponentData(emitterEntity, new HazardEmitterSelectedPatternRuntimeComponent
-                    {
-                        AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
-                    });
-                    em.SetComponentData(emitterEntity, new HazardEmitterCycleSignalComponent
-                    {
-                        CompletedVersion = 0u,
-                    });
-                    em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
-                    em.AddBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitterEntity);
-                    var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
-                    var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitterEntity);
-                    HazardEmitterPatternSlotAuthoringUtility.ApplyResolvedSlotsToBuffers(
-                        resolvedSlots,
-                        ref patternSlots,
-                        ref executionSlots);
-
-                    em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity).Add(new HazardActorEmitterRefBuffer
-                    {
-                        EmitterEntity = emitterEntity,
-                        EmitterId = emitterId,
-                    });
-                    em.GetBuffer<LinkedEntityGroup>(sourceEntity).Add(emitterEntity);
-                }
-            }
-
-            return em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).Length > 0;
         }
 
         private static bool TryResolveStandaloneActorAuthoring(
@@ -537,7 +238,9 @@ namespace SweepNDodge.DotsBullets
                 typeof(HazardActorPatternSelectorStateComponent),
                 typeof(HazardActorPhaseTransitionRuntimeComponent),
                 typeof(HazardActorPhaseTransitionSignalComponent),
-                typeof(HazardActorPresencePresentationSignalComponent));
+                typeof(HazardActorPresencePresentationSignalComponent),
+                typeof(HazardActorOrchestrationRequestSignalComponent),
+                typeof(HazardActorOrchestrationRequestConsumptionComponent));
             createdEntities.Add(actorEntity);
 
             byte actorEnabled = actorAuthoring.Enabled ? (byte)1 : (byte)0;
@@ -621,6 +324,17 @@ namespace SweepNDodge.DotsBullets
             {
                 Version = 0u,
                 Cue = HazardActorPresencePresentationCueId.None,
+            });
+            em.SetComponentData(actorEntity, new HazardActorOrchestrationRequestSignalComponent
+            {
+                Version = 0u,
+                ActionType = HazardActorOrchestrationActionId.None,
+                TargetPhaseId = -1,
+            });
+            em.SetComponentData(actorEntity, new HazardActorOrchestrationRequestConsumptionComponent
+            {
+                LastPresenceRequestVersion = 0u,
+                LastPhaseRequestVersion = 0u,
             });
             em.AddBuffer<HazardActorEmitterRefBuffer>(actorEntity).Clear();
 

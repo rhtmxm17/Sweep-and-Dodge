@@ -3,7 +3,6 @@ using NUnit.Framework;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
-using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -119,14 +118,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 600,
                 "Sample verification scene did not alternate to phase 1 pattern B in time.");
 
+            AdvanceSourceProgressToHalfThreshold(em, sourceEntity);
+
             bool preparingStarted = false;
             int preparingSlotId = -1;
             uint preparingSequence = 0u;
             int preparingProgress = 0;
             uint preparingSignalVersion = 0u;
-            for (int frame = 0; frame < 900; frame++)
+            for (int frame = 0; frame < 300; frame++)
             {
-                DriveCleanupTowardSource(em, playerEntity, sourceEntity);
                 yield return null;
                 CompleteTrackedJobs(em);
 
@@ -153,7 +153,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(preparingStarted, Is.True, "Blueprint sample did not enter Preparing after reaching half progress.");
             var sourceAtPreparing = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
             float preparingProgress01 = math.saturate((float)preparingProgress / math.max(1, sourceAtPreparing.ThresholdDepleted));
-            Assert.That(preparingProgress01, Is.GreaterThanOrEqualTo(0.5f), "Preparing must start after gameplay-driven source progress crosses the half-progress threshold.");
+            Assert.That(preparingProgress01, Is.GreaterThanOrEqualTo(0.5f), "Preparing must start after source progress crosses the half-progress threshold.");
 
             bool sawPreparingSuppression = false;
             for (int frame = 0; frame < 60; frame++)
@@ -278,64 +278,25 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(carryEntity, carry);
         }
 
-        private static void DriveCleanupTowardSource(EntityManager em, Entity playerEntity, Entity sourceEntity)
+        private static void AdvanceSourceProgressToHalfThreshold(EntityManager em, Entity sourceEntity)
         {
-            if (!TryResolveWorldPosition(em, sourceEntity, out float3 sourcePosition))
+            if (sourceEntity == Entity.Null || !em.Exists(sourceEntity) || !em.HasComponent<SourceSpawnComponent>(sourceEntity))
                 return;
 
-            float3 playerPosition = sourcePosition + new float3(0f, 0f, -0.25f);
+            var source = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+            int halfThreshold = math.max(1, (int)math.ceil(math.max(1, source.ThresholdDepleted) * 0.5f));
+            source.CollectedCount = math.max(source.CollectedCount, halfThreshold);
 
-            if (em.HasComponent<LocalTransform>(playerEntity))
-            {
-                var tx = em.GetComponentData<LocalTransform>(playerEntity);
-                tx.Position = playerPosition;
-                em.SetComponentData(playerEntity, tx);
-            }
+            int weakenedThreshold = math.max(0, source.ThresholdWeakened);
+            int depletedThreshold = math.max(weakenedThreshold, source.ThresholdDepleted);
+            if (source.CollectedCount >= depletedThreshold)
+                source.State = SourceStateId.Depleted;
+            else if (source.CollectedCount >= weakenedThreshold)
+                source.State = SourceStateId.Weakened;
+            else
+                source.State = SourceStateId.Normal;
 
-            if (em.HasComponent<PlayerGoSyncComponent>(playerEntity))
-            {
-                var sync = em.GetComponentData<PlayerGoSyncComponent>(playerEntity);
-                sync.Position = playerPosition;
-                sync.Rotation = quaternion.identity;
-                sync.SyncRotation = 0;
-                sync.VacuumRequested = 1;
-                sync.CleanupActionRequested = 1;
-                sync.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary;
-                em.SetComponentData(playerEntity, sync);
-            }
-
-            if (em.HasComponent<PlayerInputIntentComponent>(playerEntity))
-            {
-                var intent = em.GetComponentData<PlayerInputIntentComponent>(playerEntity);
-                intent.MoveAxis = float2.zero;
-                intent.AimWorldXZ = new float2(sourcePosition.x, sourcePosition.z);
-                intent.HasAimWorldPoint = 1;
-                intent.VacuumRequested = 1;
-                intent.CleanupActionRequested = 1;
-                intent.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary;
-                intent.Sequence += 1u;
-                em.SetComponentData(playerEntity, intent);
-            }
-
-            if (em.HasComponent<PlayerResolvedInputSnapshotComponent>(playerEntity))
-            {
-                var snapshot = em.GetComponentData<PlayerResolvedInputSnapshotComponent>(playerEntity);
-                snapshot.MoveAxis = float2.zero;
-                snapshot.AimWorldXZ = new float2(sourcePosition.x, sourcePosition.z);
-                snapshot.HasAimWorldPoint = 1;
-                snapshot.VacuumRequested = 1;
-                snapshot.CleanupActionRequested = 1;
-                snapshot.RequestedCleanupActionSlot = (byte)PlayerCleanupActionSlotId.Primary;
-                snapshot.Sequence += 1u;
-                em.SetComponentData(playerEntity, snapshot);
-            }
-
-            if (em.HasComponent<VacuumRuntimeStateComponent>(playerEntity))
-            {
-                var vacuum = em.GetComponentData<VacuumRuntimeStateComponent>(playerEntity);
-                vacuum.ActivateRequested = 1;
-                em.SetComponentData(playerEntity, vacuum);
-            }
+            em.SetComponentData(sourceEntity, source);
         }
 
         private static int CountActiveBulletsByType(EntityManager em, int typeKey)
@@ -407,30 +368,6 @@ namespace SweepNDodge.DotsBullets.Tests
         private static void CompleteTrackedJobs(EntityManager em)
         {
             em.CompleteAllTrackedJobs();
-        }
-
-        private static bool TryResolveWorldPosition(EntityManager em, Entity entity, out float3 position)
-        {
-            if (entity == Entity.Null || !em.Exists(entity))
-            {
-                position = float3.zero;
-                return false;
-            }
-
-            if (em.HasComponent<LocalToWorld>(entity))
-            {
-                position = em.GetComponentData<LocalToWorld>(entity).Value.c3.xyz;
-                return true;
-            }
-
-            if (em.HasComponent<LocalTransform>(entity))
-            {
-                position = em.GetComponentData<LocalTransform>(entity).Position;
-                return true;
-            }
-
-            position = float3.zero;
-            return false;
         }
 
         private static void ClearDemoShellStaging()

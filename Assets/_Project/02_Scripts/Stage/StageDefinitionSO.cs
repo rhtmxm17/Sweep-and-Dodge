@@ -19,45 +19,38 @@ namespace SweepNDodge.DotsBullets
         public WaveClipSO[] EventClips;
     }
 
-    public enum HazardActorEnabledOverrideMode : byte
-    {
-        Inherit = 0,
-        ForceEnabled = 1,
-        ForceDisabled = 2,
-    }
-
-    public enum HazardActorSuppressionOverrideMode : byte
-    {
-        Inherit = 0,
-        ForceUnsuppressed = 1,
-        ForceSuppressed = 2,
-    }
-
-    [Serializable]
-    public struct HazardActorBinding
-    {
-        [Min(1)] public int ActorId;
-        public HazardActorEnabledOverrideMode EnabledMode;
-        public HazardActorSuppressionOverrideMode StartSuppressedMode;
-        public HazardEmitterBinding[] Emitters;
-    }
-
-    [Serializable]
-    public struct HazardEmitterBinding
-    {
-        [Min(1)] public int EmitterId;
-        public bool OverrideLocalOffset;
-        public Vector3 LocalOffset;
-        public HazardEmitterTelegraphProfileSO TelegraphProfileOverride;
-        public HazardEmitterEmissionProfileSO EmissionProfileOverride;
-    }
-
     [Serializable]
     public struct HazardActorPlacementBinding
     {
         [Min(1)] public int PlacementInstanceId;
         public GameObject ActorArchetypePrefab;
         public Vector3 LocalOffset;
+    }
+
+    public enum HazardActorOrchestrationActionId : byte
+    {
+        None = 0,
+        Spawn = 1,
+        PhaseSet = 2,
+        Retire = 3,
+    }
+
+    public enum HazardActorOrchestrationTriggerId : byte
+    {
+        None = 0,
+        OnStageStart = 1,
+        OnSourceProgressAtOrAbove = 2,
+    }
+
+    [Serializable]
+    public struct HazardActorOrchestrationRuleBinding
+    {
+        [Min(1)] public int RuleId;
+        [Min(1)] public int TargetPlacementInstanceId;
+        public HazardActorOrchestrationActionId ActionType;
+        public HazardActorOrchestrationTriggerId TriggerType;
+        [Range(0f, 1f)] public float TriggerThresholdNormalized;
+        [Min(1)] public int TargetPhaseId;
     }
 
     [Serializable]
@@ -69,7 +62,6 @@ namespace SweepNDodge.DotsBullets
         [Min(0)] public int ThresholdDepleted;
         public SustainSlotBinding[] SustainSlots;
         public EventSlotBinding[] EventSlots;
-        public HazardActorBinding[] HazardActors;
         public HazardActorPlacementBinding[] HazardActorPlacements;
     }
 
@@ -81,5 +73,6 @@ namespace SweepNDodge.DotsBullets
         public bool IsFinalStage;
         [Min(0.01f)] public float StageTimeLimitSec = 150f;
         public StageSourceBinding[] SourceBindings;
+        public HazardActorOrchestrationRuleBinding[] HazardActorOrchestrationRules;
     }
 }

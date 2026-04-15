@@ -23,6 +23,8 @@ namespace SweepNDodge.DotsBullets.Tests
         private const string TestStageCatalogPath = "Assets/_Project/99_Tests/TestData/StageCatalog/sc_test_sample_verification.asset";
         private const string TestHazardSourceTemplatePrefabPath = "Assets/_Project/99_Tests/TestData/pf_test_hazard_actor_source_template.prefab";
         private const string OperationalHazardSourceTemplatePrefabPath = "Assets/_Project/04_Prefabs/StageTopology/pf_stage_source_template.prefab";
+        private const string TestHazardArchetypePrefabPath = "Assets/_Project/99_Tests/TestData/pf_test_hazard_actor_archetype.prefab";
+        private const string OperationalHazardArchetypePrefabPath = "Assets/_Project/04_Prefabs/StageTopology/pf_stage_hazard_actor_archetype.prefab";
         private static readonly string[] WaveClipSearchRoots =
         {
             "Assets/_Project/03_Datas/WaveClips",
@@ -125,11 +127,13 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void HazardActorSourceTemplatePrefabs_KeepBlueprintParity()
+        public void HazardActorAssets_KeepBlueprintParityAndActorFreeSources()
         {
-            ValidateHazardActorSourceTemplatePrefabParity(
-                TestHazardSourceTemplatePrefabPath,
-                OperationalHazardSourceTemplatePrefabPath);
+            ValidateActorFreeSourceTemplatePrefab(TestHazardSourceTemplatePrefabPath);
+            ValidateActorFreeSourceTemplatePrefab(OperationalHazardSourceTemplatePrefabPath);
+            ValidateHazardActorArchetypePrefabParity(
+                TestHazardArchetypePrefabPath,
+                OperationalHazardArchetypePrefabPath);
         }
 
         [Test]
@@ -318,7 +322,25 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(actual.z, Is.EqualTo(expected.z).Within(0.001f), $"{message} (z)");
         }
 
-        private static void ValidateHazardActorSourceTemplatePrefabParity(string lhsPrefabPath, string rhsPrefabPath)
+        private static void ValidateActorFreeSourceTemplatePrefab(string prefabPath)
+        {
+            var root = PrefabUtility.LoadPrefabContents(prefabPath);
+
+            try
+            {
+                var actor = root.GetComponentInChildren<HazardActorAuthoring>(true);
+                var emitter = root.GetComponentInChildren<HazardEmitterAuthoring>(true);
+
+                Assert.That(actor, Is.Null, $"{prefabPath} must stay actor-free after SP-4 cutover.");
+                Assert.That(emitter, Is.Null, $"{prefabPath} must stay actor-free after SP-4 cutover.");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        private static void ValidateHazardActorArchetypePrefabParity(string lhsPrefabPath, string rhsPrefabPath)
         {
             var lhsRoot = PrefabUtility.LoadPrefabContents(lhsPrefabPath);
             var rhsRoot = PrefabUtility.LoadPrefabContents(rhsPrefabPath);

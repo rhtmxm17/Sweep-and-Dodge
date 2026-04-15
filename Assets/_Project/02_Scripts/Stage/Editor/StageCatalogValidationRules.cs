@@ -9,6 +9,14 @@ namespace SweepNDodge.DotsBullets.Editor
     {
         private const string TestDataRootPath = "Assets/_Project/99_Tests/";
 
+        private sealed class HazardActorPlacementValidationData
+        {
+            public uint SourceStableId;
+            public int InitialPhaseId;
+            public HashSet<int> ValidPhaseIds;
+            public HazardActorPhaseProgressTransitionBuffer[] PhaseTransitions;
+        }
+
         public static void ValidateCatalogRecords(
             IReadOnlyList<ContentValidationRecord<StageCatalogSO>> catalogs,
             List<ContentValidationIssue> issues)
@@ -208,6 +216,7 @@ namespace SweepNDodge.DotsBullets.Editor
             var bindings = definition.SourceBindings ?? Array.Empty<StageSourceBinding>();
             var sourceOwners = new Dictionary<uint, List<int>>();
             var placementOwners = new Dictionary<int, List<string>>();
+            var placementDataById = new Dictionary<int, HazardActorPlacementValidationData>();
 
             for (int i = 0; i < bindings.Length; i++)
             {
@@ -240,19 +249,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
                 ValidateEventSlots(binding.EventSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
-                bool hasLegacyHazards = binding.HazardActors != null && binding.HazardActors.Length > 0;
-                bool hasPlacements = binding.HazardActorPlacements != null && binding.HazardActorPlacements.Length > 0;
-                if (hasLegacyHazards && hasPlacements)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC035",
-                        bindingLocation,
-                        "StageSourceBinding cannot use HazardActors and HazardActorPlacements together."));
-                }
-
-                ValidateHazardBindings(binding.HazardActors, bindingLocation, issues, enforceOperationalReferenceRestrictions);
-                ValidateHazardPlacements(binding.HazardActorPlacements, bindingLocation, issues, enforceOperationalReferenceRestrictions, placementOwners);
+                ValidateHazardPlacements(binding, bindingLocation, issues, enforceOperationalReferenceRestrictions, placementOwners, placementDataById);
             }
 
             foreach (var pair in sourceOwners)
@@ -282,6 +279,12 @@ namespace SweepNDodge.DotsBullets.Editor
                         $"Duplicate HazardActorPlacementBinding.PlacementInstanceId detected: {pair.Key}. Owners: {joined}"));
                 }
             }
+
+            ValidateHazardActorOrchestrationRules(
+                definition.HazardActorOrchestrationRules,
+                location,
+                issues,
+                placementDataById);
         }
 
         private static void ValidateSustainSlots(
@@ -418,130 +421,15 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateHazardBindings(
-            HazardActorBinding[] actors,
-            string location,
-            List<ContentValidationIssue> issues,
-            bool enforceOperationalReferenceRestrictions)
-        {
-            if (actors == null)
-                return;
-
-            var actorOwners = new Dictionary<int, List<string>>();
-
-            for (int i = 0; i < actors.Length; i++)
-            {
-                var actor = actors[i];
-                string actorLocation = $"{location}/HazardActors[{i}]";
-                if (actor.ActorId < 1)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC026",
-                        actorLocation,
-                        "HazardActorBinding.ActorId must be >= 1."));
-                }
-
-                if (!actorOwners.TryGetValue(actor.ActorId, out var owners))
-                {
-                    owners = new List<string>(2);
-                    actorOwners.Add(actor.ActorId, owners);
-                }
-
-                owners.Add(actorLocation);
-                ValidateHazardEmitterBindings(actor.Emitters, actorLocation, issues, enforceOperationalReferenceRestrictions);
-            }
-
-            foreach (var pair in actorOwners)
-            {
-                if (pair.Key < 1 || pair.Value.Count <= 1)
-                    continue;
-
-                string joined = string.Join(", ", pair.Value);
-                for (int i = 0; i < pair.Value.Count; i++)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC027",
-                        pair.Value[i],
-                        $"Duplicate HazardActorBinding.ActorId detected: {pair.Key}. Owners: {joined}"));
-                }
-            }
-        }
-
-        private static void ValidateHazardEmitterBindings(
-            HazardEmitterBinding[] emitters,
-            string location,
-            List<ContentValidationIssue> issues,
-            bool enforceOperationalReferenceRestrictions)
-        {
-            if (emitters == null)
-                return;
-
-            var emitterOwners = new Dictionary<int, List<string>>();
-
-            for (int i = 0; i < emitters.Length; i++)
-            {
-                var emitter = emitters[i];
-                string emitterLocation = $"{location}/Emitters[{i}]";
-                if (emitter.EmitterId < 1)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC028",
-                        emitterLocation,
-                        "HazardEmitterBinding.EmitterId must be >= 1."));
-                }
-
-                if (!emitterOwners.TryGetValue(emitter.EmitterId, out var owners))
-                {
-                    owners = new List<string>(2);
-                    emitterOwners.Add(emitter.EmitterId, owners);
-                }
-
-                owners.Add(emitterLocation);
-
-                if (!enforceOperationalReferenceRestrictions)
-                    continue;
-
-                ValidateOperationalReference(
-                    emitter.TelegraphProfileOverride,
-                    emitterLocation,
-                    "STC030",
-                    "Operational StageCatalog cannot reference test-only HazardEmitterTelegraphProfile assets through emitter overrides.",
-                    issues);
-                ValidateOperationalReference(
-                    emitter.EmissionProfileOverride,
-                    emitterLocation,
-                    "STC031",
-                    "Operational StageCatalog cannot reference test-only HazardEmitterEmissionProfile assets through emitter overrides.",
-                    issues);
-            }
-
-            foreach (var pair in emitterOwners)
-            {
-                if (pair.Key < 1 || pair.Value.Count <= 1)
-                    continue;
-
-                string joined = string.Join(", ", pair.Value);
-                for (int i = 0; i < pair.Value.Count; i++)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC029",
-                        pair.Value[i],
-                        $"Duplicate HazardEmitterBinding.EmitterId detected: {pair.Key}. Owners: {joined}"));
-                }
-            }
-        }
-
         private static void ValidateHazardPlacements(
-            HazardActorPlacementBinding[] placements,
+            StageSourceBinding binding,
             string location,
             List<ContentValidationIssue> issues,
             bool enforceOperationalReferenceRestrictions,
-            Dictionary<int, List<string>> placementOwners)
+            Dictionary<int, List<string>> placementOwners,
+            Dictionary<int, HazardActorPlacementValidationData> placementDataById)
         {
+            var placements = binding.HazardActorPlacements;
             if (placements == null)
                 return;
 
@@ -599,8 +487,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 if (!HazardActorAuthoringValidationUtility.TryValidateStandalone(
                         actorAuthorings[0],
-                        out _,
-                        out _,
+                        out var selectorSeed,
+                        out var phaseTransitions,
                         out _,
                         out var error))
                 {
@@ -609,8 +497,209 @@ namespace SweepNDodge.DotsBullets.Editor
                         "STC034",
                         placementLocation,
                         error));
+                    continue;
+                }
+
+                placementDataById[placement.PlacementInstanceId] = new HazardActorPlacementValidationData
+                {
+                    SourceStableId = binding.SourceStableId,
+                    InitialPhaseId = selectorSeed.InitialPhaseId,
+                    ValidPhaseIds = CollectValidPhaseIds(selectorSeed),
+                    PhaseTransitions = phaseTransitions ?? Array.Empty<HazardActorPhaseProgressTransitionBuffer>(),
+                };
+
+                if (actorAuthorings[0].ActivationTrigger != HazardActorPresenceTriggerMode.None
+                    || actorAuthorings[0].RetireTrigger != HazardActorPresenceTriggerMode.None)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Warning,
+                        "STC044",
+                        placementLocation,
+                        $"Placement-delivered HazardActor archetype self-trigger fields are ignored by stage orchestration. activation={actorAuthorings[0].ActivationTrigger}, retire={actorAuthorings[0].RetireTrigger}"));
                 }
             }
+        }
+
+        private static void ValidateHazardActorOrchestrationRules(
+            HazardActorOrchestrationRuleBinding[] rules,
+            string location,
+            List<ContentValidationIssue> issues,
+            Dictionary<int, HazardActorPlacementValidationData> placementDataById)
+        {
+            if (rules == null || rules.Length <= 0)
+                return;
+
+            var ruleOwners = new Dictionary<int, List<string>>();
+            var conflictOwners = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            var expectedPhaseByPlacement = new Dictionary<int, int>();
+            foreach (var pair in placementDataById)
+                expectedPhaseByPlacement[pair.Key] = pair.Value.InitialPhaseId;
+
+            for (int i = 0; i < rules.Length; i++)
+            {
+                var rule = rules[i];
+                string ruleLocation = $"{location}/HazardActorOrchestrationRules[{i}]";
+
+                if (rule.RuleId < 1)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC038",
+                        ruleLocation,
+                        "HazardActorOrchestrationRuleBinding.RuleId must be >= 1."));
+                }
+                else
+                {
+                    if (!ruleOwners.TryGetValue(rule.RuleId, out var owners))
+                    {
+                        owners = new List<string>(2);
+                        ruleOwners.Add(rule.RuleId, owners);
+                    }
+
+                    owners.Add(ruleLocation);
+                }
+
+                if (rule.ActionType == HazardActorOrchestrationActionId.None)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC046",
+                        ruleLocation,
+                        "HazardActorOrchestrationRuleBinding.ActionType must be a concrete action."));
+                }
+
+                if (rule.TriggerType == HazardActorOrchestrationTriggerId.None)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC047",
+                        ruleLocation,
+                        "HazardActorOrchestrationRuleBinding.TriggerType must be a concrete trigger."));
+                }
+
+                if (!placementDataById.TryGetValue(rule.TargetPlacementInstanceId, out var placementData))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC040",
+                        ruleLocation,
+                        $"HazardActorOrchestrationRuleBinding targets missing PlacementInstanceId {rule.TargetPlacementInstanceId}."));
+                    continue;
+                }
+
+                if (rule.TriggerType == HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove
+                    && (rule.TriggerThresholdNormalized < 0f || rule.TriggerThresholdNormalized > 1f))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC041",
+                        ruleLocation,
+                        $"HazardActorOrchestrationRuleBinding.TriggerThresholdNormalized must be within [0,1]. current={rule.TriggerThresholdNormalized}"));
+                }
+
+                string conflictKey = BuildOrchestrationConflictKey(rule);
+                if (!conflictOwners.TryGetValue(conflictKey, out var conflicts))
+                {
+                    conflicts = new List<string>(2);
+                    conflictOwners.Add(conflictKey, conflicts);
+                }
+
+                conflicts.Add(ruleLocation);
+
+                if (rule.ActionType != HazardActorOrchestrationActionId.PhaseSet)
+                    continue;
+
+                if (!placementData.ValidPhaseIds.Contains(rule.TargetPhaseId))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC042",
+                        ruleLocation,
+                        $"HazardActorOrchestrationRuleBinding.PhaseSet targets invalid phase {rule.TargetPhaseId} for PlacementInstanceId {rule.TargetPlacementInstanceId}."));
+                    continue;
+                }
+
+                int currentExpectedPhase = expectedPhaseByPlacement.TryGetValue(rule.TargetPlacementInstanceId, out var expected)
+                    ? expected
+                    : placementData.InitialPhaseId;
+                if (!HasTransitionBaseline(placementData.PhaseTransitions, currentExpectedPhase, rule.TargetPhaseId))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC045",
+                        ruleLocation,
+                        $"HazardActorOrchestrationRuleBinding.PhaseSet requires a matching archetype transition baseline. fromPhaseId={currentExpectedPhase}, targetPhaseId={rule.TargetPhaseId}, placementInstanceId={rule.TargetPlacementInstanceId}"));
+                    continue;
+                }
+
+                expectedPhaseByPlacement[rule.TargetPlacementInstanceId] = rule.TargetPhaseId;
+            }
+
+            foreach (var pair in ruleOwners)
+            {
+                if (pair.Key < 1 || pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC039",
+                        pair.Value[i],
+                        $"Duplicate HazardActorOrchestrationRuleBinding.RuleId detected: {pair.Key}. Owners: {joined}"));
+                }
+            }
+
+            foreach (var pair in conflictOwners)
+            {
+                if (pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Warning,
+                        "STC043",
+                        pair.Value[i],
+                        $"HazardActorOrchestrationRuleBinding has same-instance exact-same-trigger conflicts and will serialize by declaration order. Owners: {joined}"));
+                }
+            }
+        }
+
+        private static HashSet<int> CollectValidPhaseIds(HazardActorPhaseSelectorCompatibilitySeed selectorSeed)
+        {
+            var validPhaseIds = new HashSet<int>();
+            for (int i = 0; i < selectorSeed.Policies.Length; i++)
+                validPhaseIds.Add(selectorSeed.Policies[i].PhaseId);
+
+            return validPhaseIds;
+        }
+
+        private static bool HasTransitionBaseline(
+            HazardActorPhaseProgressTransitionBuffer[] transitions,
+            int fromPhaseId,
+            int toPhaseId)
+        {
+            if (transitions == null)
+                return false;
+
+            for (int i = 0; i < transitions.Length; i++)
+            {
+                if (transitions[i].FromPhaseId == fromPhaseId && transitions[i].ToPhaseId == toPhaseId)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static string BuildOrchestrationConflictKey(HazardActorOrchestrationRuleBinding rule)
+        {
+            int triggerBits = rule.TriggerType == HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove
+                ? BitConverter.SingleToInt32Bits(rule.TriggerThresholdNormalized)
+                : 0;
+            return $"{rule.TargetPlacementInstanceId}:{(int)rule.TriggerType}:{triggerBits}";
         }
 
         private static void ValidateSourceCrossMapping(

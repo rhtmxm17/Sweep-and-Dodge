@@ -259,426 +259,9 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void StageTopologyApply_AppliesHazardActorAndEmitterOverrides_Deterministically()
-        {
-            using var world = CreatePreparedWorld("StageTopologyApply_HazardEmitterOverride", out var em, out var requestEntity, out _);
-            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
-
-            try
-            {
-                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = new[]
-                {
-                    new HazardActorBinding
-                    {
-                        ActorId = 7,
-                        EnabledMode = HazardActorEnabledOverrideMode.ForceDisabled,
-                        StartSuppressedMode = HazardActorSuppressionOverrideMode.ForceSuppressed,
-                        Emitters = new[]
-                        {
-                            new HazardEmitterBinding
-                            {
-                                EmitterId = 41,
-                                OverrideLocalOffset = true,
-                                LocalOffset = new UnityEngine.Vector3(2f, 0f, -1f),
-                                TelegraphProfileOverride = CreateTelegraphProfile(55, 0.75f),
-                                EmissionProfileOverride = CreateEmissionProfile(66, 902, 30f, 2f),
-                            }
-                        },
-                    }
-                };
-                var binding = stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors[0].Emitters[0];
-
-                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                Entity source = FindAppliedSource(em);
-                var actor = FindActorForSource(em, source);
-                var emitter = FindEmitterForActor(em, actor);
-
-                var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
-                var actorRuntime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
-                var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
-                var actorTransitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
-                var actorTransitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
-                var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
-
-                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
-                var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
-                var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
-                var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
-                var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
-                var selectedPattern = em.GetComponentData<HazardEmitterSelectedPatternRuntimeComponent>(emitter);
-                var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
-                var cycleSignal = em.GetComponentData<HazardEmitterCycleSignalComponent>(emitter);
-                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
-
-                Assert.That(em.IsEnabled(actor), Is.True);
-                Assert.That(em.IsEnabled(emitter), Is.True);
-                Assert.That(actorApplied.IsEnabled, Is.EqualTo(0));
-                Assert.That(actorApplied.IsSuppressed, Is.EqualTo(1));
-                Assert.That(actorRuntime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
-                Assert.That(actorRuntime.StateElapsedSec, Is.EqualTo(0f));
-                Assert.That(actorPhase.CurrentPhaseId, Is.EqualTo(1));
-                Assert.That(actorPhase.PreviousPhaseId, Is.EqualTo(1));
-                Assert.That(actorPhase.PhaseVersion, Is.EqualTo(0u));
-                Assert.That(actorTransitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
-                Assert.That(actorTransitionRuntime.PendingFromPhaseId, Is.EqualTo(-1));
-                Assert.That(actorTransitionRuntime.PendingToPhaseId, Is.EqualTo(-1));
-                Assert.That(actorTransitionRuntime.ElapsedSec, Is.EqualTo(0f));
-                Assert.That(actorTransitionRuntime.DurationSec, Is.EqualTo(0f));
-                Assert.That(actorTransitionRuntime.TransitionVersion, Is.EqualTo(0u));
-                Assert.That(actorTransitionSignal.Version, Is.EqualTo(0u));
-                Assert.That(actorTransitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.None));
-                Assert.That(actorTransitionSignal.PreviousPhaseId, Is.EqualTo(1));
-                Assert.That(actorTransitionSignal.CurrentPhaseId, Is.EqualTo(1));
-                Assert.That(actorTransitionSignal.PendingToPhaseId, Is.EqualTo(-1));
-                Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
-                Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
-                Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
-                Assert.That(selector.SelectionSequence, Is.EqualTo(0u));
-                Assert.That(selector.CurrentCandidateOrder, Is.EqualTo(-1));
-                Assert.That(selector.LastResolvedPhaseVersion, Is.EqualTo(0u));
-                Assert.That(selector.LastConsumedCycleVersion, Is.EqualTo(0u));
-                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(1));
-                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(0));
-                Assert.That(appliedConfig.LocalOffset.x, Is.EqualTo(2f).Within(0.001f));
-                Assert.That(appliedConfig.LocalOffset.z, Is.EqualTo(-1f).Within(0.001f));
-                Assert.That(appliedConfig.TelegraphProfileRefId, Is.EqualTo(binding.TelegraphProfileOverride.GetInstanceID()));
-                Assert.That(appliedConfig.EmissionProfileRefId, Is.EqualTo(binding.EmissionProfileOverride.GetInstanceID()));
-                Assert.That(patternSlots.Length, Is.EqualTo(1));
-                Assert.That(patternSlots[0].PatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
-                Assert.That(patternSlots[0].TelegraphProfileRefId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
-                Assert.That(patternSlots[0].EmissionProfileRefId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
-                Assert.That(patternSlots[0].BaseWeight, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityBaseWeight));
-                Assert.That(patternSlots[0].AvailabilityFlags, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityAvailabilityFlags));
-                Assert.That(executionSlots.Length, Is.EqualTo(1));
-                Assert.That(executionSlots[0].PatternSlotId, Is.EqualTo(patternSlots[0].PatternSlotId));
-                Assert.That(executionSlots[0].TelegraphProfileRefId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
-                Assert.That(executionSlots[0].EmissionProfileRefId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
-                Assert.That(telegraph.ProfileId, Is.EqualTo(binding.TelegraphProfileOverride.GetInstanceID()));
-                Assert.That(telegraph.TelegraphDurationSec, Is.EqualTo(0.75f).Within(0.001f));
-                Assert.That(emission.ProfileId, Is.EqualTo(binding.EmissionProfileOverride.GetInstanceID()));
-                Assert.That(emission.BulletTypeKey, Is.EqualTo(902));
-                Assert.That(emission.BaseAngleDeg, Is.EqualTo(30f).Within(0.001f));
-                Assert.That(emission.CooldownSec, Is.EqualTo(2f).Within(0.001f));
-                Assert.That(selectedPattern.AppliedPatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId));
-                Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
-                Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
-                Assert.That(cycleSignal.CompletedVersion, Is.EqualTo(0u));
-                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
-                Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
-                Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
-            }
-            finally
-            {
-                var binding = stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors[0].Emitters[0];
-                UnityEngine.Object.DestroyImmediate(binding.TelegraphProfileOverride);
-                UnityEngine.Object.DestroyImmediate(binding.EmissionProfileOverride.Bullet);
-                UnityEngine.Object.DestroyImmediate(binding.EmissionProfileOverride);
-                UnityEngine.Object.DestroyImmediate(stageCatalog);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_OmittedActor_DisablesActorAndEmitterDeterministically()
-        {
-            using var world = CreatePreparedWorld("StageTopologyApply_OmittedActorRoster", out var em, out var requestEntity, out _);
-            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
-
-            try
-            {
-                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = System.Array.Empty<HazardActorBinding>();
-
-                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var source = FindAppliedSource(em);
-                var actor = FindActorForSource(em, source);
-                var emitter = FindEmitterForActor(em, actor);
-                var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
-                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
-                var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
-                var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
-
-                Assert.That(em.IsEnabled(source), Is.True);
-                Assert.That(em.IsEnabled(actor), Is.False);
-                Assert.That(em.IsEnabled(emitter), Is.False);
-                Assert.That(actorApplied.IsEnabled, Is.EqualTo(0));
-                Assert.That(actorApplied.IsSuppressed, Is.EqualTo(1));
-                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
-                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
-                Assert.That(patternSlots.Length, Is.EqualTo(1));
-                Assert.That(patternSlots[0].PatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
-                Assert.That(patternSlots[0].TelegraphProfileRefId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
-                Assert.That(patternSlots[0].EmissionProfileRefId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
-                Assert.That(executionSlots.Length, Is.EqualTo(1));
-                Assert.That(executionSlots[0].PatternSlotId, Is.EqualTo(patternSlots[0].PatternSlotId));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(stageCatalog);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_EmptyEmitterRoster_DisablesEmitterDeterministically()
-        {
-            using var world = CreatePreparedWorld("StageTopologyApply_EmptyEmitterRoster", out var em, out var requestEntity, out _);
-            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
-
-            try
-            {
-                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = new[]
-                {
-                    new HazardActorBinding
-                    {
-                        ActorId = 7,
-                        EnabledMode = HazardActorEnabledOverrideMode.ForceEnabled,
-                        StartSuppressedMode = HazardActorSuppressionOverrideMode.ForceUnsuppressed,
-                        Emitters = System.Array.Empty<HazardEmitterBinding>(),
-                    }
-                };
-
-                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var source = FindAppliedSource(em);
-                var actor = FindActorForSource(em, source);
-                var emitter = FindEmitterForActor(em, actor);
-                var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
-                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
-                var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
-                var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
-                var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
-                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
-
-                Assert.That(em.IsEnabled(actor), Is.True);
-                Assert.That(actorApplied.IsEnabled, Is.EqualTo(1));
-                Assert.That(actorApplied.IsSuppressed, Is.EqualTo(0));
-                Assert.That(em.IsEnabled(emitter), Is.False);
-                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
-                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
-                Assert.That(patternSlots.Length, Is.EqualTo(1));
-                Assert.That(patternSlots[0].PatternSlotId, Is.EqualTo(HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId));
-                Assert.That(patternSlots[0].TelegraphProfileRefId, Is.EqualTo(appliedConfig.TelegraphProfileRefId));
-                Assert.That(patternSlots[0].EmissionProfileRefId, Is.EqualTo(appliedConfig.EmissionProfileRefId));
-                Assert.That(executionSlots.Length, Is.EqualTo(1));
-                Assert.That(executionSlots[0].PatternSlotId, Is.EqualTo(patternSlots[0].PatternSlotId));
-                Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
-                Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
-                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
-                Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
-                Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(stageCatalog);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_MultiSlotEmitterProfileOverride_IsRejectedAndKeepsAuthoredSlots()
-        {
-            using var world = CreatePreparedWorld("StageTopologyApply_MultiSlotEmitterOverrideRejected", out var em, out var requestEntity, out _);
-            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
-
-            try
-            {
-                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = new[]
-                {
-                    new HazardActorBinding
-                    {
-                        ActorId = 7,
-                        EnabledMode = HazardActorEnabledOverrideMode.Inherit,
-                        StartSuppressedMode = HazardActorSuppressionOverrideMode.Inherit,
-                        Emitters = new[]
-                        {
-                            new HazardEmitterBinding
-                            {
-                                EmitterId = 41,
-                                TelegraphProfileOverride = CreateTelegraphProfile(155, 1.25f),
-                                EmissionProfileOverride = CreateEmissionProfile(166, 1902, 60f, 3f),
-                            }
-                        },
-                    }
-                };
-
-                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                Entity source = FindAppliedSource(em);
-                var actor = FindActorForSource(em, source);
-                var emitter = FindEmitterForActor(em, actor);
-                ReplaceEmitterPatternSlots(
-                    em,
-                    emitter,
-                    CreateExecutionSlot(1, 11, 0.1f, 1101, 10f, 1f),
-                    CreateExecutionSlot(2, 22, 0.2f, 2202, 20f, 2f));
-
-                LogAssert.Expect(
-                    UnityEngine.LogType.Error,
-                    new System.Text.RegularExpressions.Regex(@"\[StageTopologyApply\] Multi-slot HazardEmitter cannot use emitter-level Telegraph/Emission profile overrides\..*"));
-
-                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
-                var telegraph = em.GetComponentData<HazardEmitterTelegraphProfileComponent>(emitter);
-                var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
-                var metadataSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
-                var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
-
-                Assert.That(metadataSlots.Length, Is.EqualTo(2));
-                Assert.That(executionSlots.Length, Is.EqualTo(2));
-                Assert.That(metadataSlots[0].PatternSlotId, Is.EqualTo(1));
-                Assert.That(metadataSlots[0].TelegraphProfileRefId, Is.EqualTo(11));
-                Assert.That(metadataSlots[0].EmissionProfileRefId, Is.EqualTo(1101));
-                Assert.That(metadataSlots[1].PatternSlotId, Is.EqualTo(2));
-                Assert.That(metadataSlots[1].TelegraphProfileRefId, Is.EqualTo(22));
-                Assert.That(metadataSlots[1].EmissionProfileRefId, Is.EqualTo(2202));
-                Assert.That(executionSlots[0].PatternSlotId, Is.EqualTo(1));
-                Assert.That(executionSlots[0].TelegraphProfileRefId, Is.EqualTo(11));
-                Assert.That(executionSlots[0].EmissionProfileRefId, Is.EqualTo(1101));
-                Assert.That(executionSlots[1].PatternSlotId, Is.EqualTo(2));
-                Assert.That(executionSlots[1].TelegraphProfileRefId, Is.EqualTo(22));
-                Assert.That(executionSlots[1].EmissionProfileRefId, Is.EqualTo(2202));
-                Assert.That(appliedConfig.TelegraphProfileRefId, Is.Not.EqualTo(stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors[0].Emitters[0].TelegraphProfileOverride.GetInstanceID()));
-                Assert.That(appliedConfig.EmissionProfileRefId, Is.Not.EqualTo(stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors[0].Emitters[0].EmissionProfileOverride.GetInstanceID()));
-                Assert.That(telegraph.ProfileId, Is.EqualTo(10));
-                Assert.That(telegraph.TelegraphDurationSec, Is.EqualTo(0.25f).Within(0.001f));
-                Assert.That(emission.ProfileId, Is.EqualTo(20));
-                Assert.That(emission.BulletTypeKey, Is.EqualTo(901));
-                Assert.That(emission.BaseAngleDeg, Is.EqualTo(15f).Within(0.001f));
-                Assert.That(emission.CooldownSec, Is.EqualTo(1f).Within(0.001f));
-            }
-            finally
-            {
-                LogAssert.NoUnexpectedReceived();
-                UnityEngine.Object.DestroyImmediate(stageCatalog);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_LayoutOnly_DisablesAllHazardActorsAndEmitters()
-        {
-            using var world = CreatePreparedWorld("StageTopologyApply_LayoutOnlyHazards", out var em, out var requestEntity, out _);
-            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
-
-            try
-            {
-                UnityEngine.Object.DestroyImmediate(stageCatalog.Entries[0].Definition);
-                stageCatalog.Entries[0].Definition = null;
-
-                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                var source = FindAppliedSource(em);
-                var actor = FindActorForSource(em, source);
-                var emitter = FindEmitterForActor(em, actor);
-                var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
-                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
-
-                Assert.That(em.IsEnabled(source), Is.True);
-                Assert.That(em.IsEnabled(actor), Is.False);
-                Assert.That(em.IsEnabled(emitter), Is.False);
-                Assert.That(actorApplied.IsEnabled, Is.EqualTo(0));
-                Assert.That(actorApplied.IsSuppressed, Is.EqualTo(1));
-                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
-                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(stageCatalog);
-            }
-        }
-
-        [Test]
-        public void StageTopologyApply_MissingSourceBinding_DisablesHazardActorAndEmitterDeterministically()
-        {
-            using var world = CreatePreparedWorld("StageTopologyApply_HazardEmitterDisable", out var em, out var requestEntity, out _);
-            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
-
-            try
-            {
-                stageCatalog.Entries[0].Definition.SourceBindings = System.Array.Empty<StageSourceBinding>();
-                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
-                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
-
-                using var sourceQuery = em.CreateEntityQuery(new EntityQueryDesc
-                {
-                    All = new[]
-                    {
-                        ComponentType.ReadOnly<StageTopologyOwnedTag>(),
-                        ComponentType.ReadOnly<StageTopologySourceTag>(),
-                        ComponentType.ReadOnly<SourceStableIdComponent>(),
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities,
-                });
-                using var sources = sourceQuery.ToEntityArray(Allocator.Temp);
-                Assert.That(sources.Length, Is.EqualTo(1));
-
-                var source = sources[0];
-                Assert.That(em.IsEnabled(source), Is.False);
-
-                var actor = FindActorForSource(em, source);
-                var actorApplied = em.GetComponentData<HazardActorAppliedConfigComponent>(actor);
-                var actorRuntime = em.GetComponentData<HazardActorRuntimeStateComponent>(actor);
-                var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
-                var actorTransitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
-                var actorTransitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
-                var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
-                var emitter = FindEmitterForActor(em, actor);
-                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitter);
-                var runtime = em.GetComponentData<HazardEmitterRuntimeStateComponent>(emitter);
-                var cycleSignal = em.GetComponentData<HazardEmitterCycleSignalComponent>(emitter);
-                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
-
-                Assert.That(em.IsEnabled(actor), Is.False);
-                Assert.That(em.IsEnabled(emitter), Is.False);
-                Assert.That(actorApplied.IsEnabled, Is.EqualTo(0));
-                Assert.That(actorApplied.IsSuppressed, Is.EqualTo(1));
-                Assert.That(actorRuntime.PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
-                Assert.That(actorRuntime.StateElapsedSec, Is.EqualTo(0f));
-                Assert.That(actorPhase.CurrentPhaseId, Is.EqualTo(1));
-                Assert.That(actorPhase.PreviousPhaseId, Is.EqualTo(1));
-                Assert.That(actorPhase.PhaseVersion, Is.EqualTo(0u));
-                Assert.That(actorTransitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
-                Assert.That(actorTransitionRuntime.PendingFromPhaseId, Is.EqualTo(-1));
-                Assert.That(actorTransitionRuntime.PendingToPhaseId, Is.EqualTo(-1));
-                Assert.That(actorTransitionRuntime.ElapsedSec, Is.EqualTo(0f));
-                Assert.That(actorTransitionRuntime.DurationSec, Is.EqualTo(0f));
-                Assert.That(actorTransitionRuntime.TransitionVersion, Is.EqualTo(0u));
-                Assert.That(actorTransitionSignal.Version, Is.EqualTo(0u));
-                Assert.That(actorTransitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.None));
-                Assert.That(actorTransitionSignal.PreviousPhaseId, Is.EqualTo(1));
-                Assert.That(actorTransitionSignal.CurrentPhaseId, Is.EqualTo(1));
-                Assert.That(actorTransitionSignal.PendingToPhaseId, Is.EqualTo(-1));
-                Assert.That(selector.TargetEmitterId, Is.EqualTo(-1));
-                Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(-1));
-                Assert.That(selector.LastPatternSlotId, Is.EqualTo(-1));
-                Assert.That(selector.SelectionSequence, Is.EqualTo(0u));
-                Assert.That(selector.CurrentCandidateOrder, Is.EqualTo(-1));
-                Assert.That(selector.LastResolvedPhaseVersion, Is.EqualTo(0u));
-                Assert.That(selector.LastConsumedCycleVersion, Is.EqualTo(0u));
-                Assert.That(appliedConfig.IsEnabled, Is.EqualTo(0));
-                Assert.That(appliedConfig.IsSuppressed, Is.EqualTo(1));
-                Assert.That(runtime.LifecycleState, Is.EqualTo(HazardEmitterLifecycleStateId.Dormant));
-                Assert.That(runtime.StateElapsedSec, Is.EqualTo(0f));
-                Assert.That(cycleSignal.CompletedVersion, Is.EqualTo(0u));
-                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(0));
-                Assert.That(coordinator.SuppressionReasonMask, Is.EqualTo(0u));
-                Assert.That(coordinator.LastPlayerDistanceSq, Is.EqualTo(float.MaxValue));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(stageCatalog);
-            }
-        }
-
-        [Test]
         public void StageTopologyApply_PlacementDelivery_CreatesPlacementResolveSeam_AndForcesHiddenPresence()
         {
-            using var world = CreatePreparedWorld("StageTopologyApply_PlacementSingle", out var em, out var requestEntity, out _, includeLegacyHazardHierarchy: false);
+            using var world = CreatePreparedWorld("StageTopologyApply_PlacementSingle", out var em, out var requestEntity, out _);
             var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
             using var archetype = CreateHazardActorArchetype("placement_actor_single", actorId: 99, emitterId: 41);
 
@@ -693,7 +276,6 @@ namespace SweepNDodge.DotsBullets.Tests
                         LocalOffset = new UnityEngine.Vector3(3f, 0f, -2f),
                     }
                 };
-                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = System.Array.Empty<HazardActorBinding>();
 
                 PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
                 world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
@@ -728,7 +310,7 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void StageTopologyApply_PlacementDelivery_AllowsMultipleInstancesFromSameArchetype()
         {
-            using var world = CreatePreparedWorld("StageTopologyApply_PlacementMulti", out var em, out var requestEntity, out _, includeLegacyHazardHierarchy: false);
+            using var world = CreatePreparedWorld("StageTopologyApply_PlacementMulti", out var em, out var requestEntity, out _);
             var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
             using var archetype = CreateHazardActorArchetype("placement_actor_multi", actorId: 99, emitterId: 41);
 
@@ -749,7 +331,6 @@ namespace SweepNDodge.DotsBullets.Tests
                         LocalOffset = new UnityEngine.Vector3(-1f, 0f, 0f),
                     }
                 };
-                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActors = System.Array.Empty<HazardActorBinding>();
 
                 PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
                 world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
@@ -768,6 +349,72 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(placementB.LocalOffset.x, Is.EqualTo(-1f).Within(0.001f));
                 Assert.That(em.GetComponentData<HazardActorComponent>(actorA).ActorId, Is.EqualTo(201));
                 Assert.That(em.GetComponentData<HazardActorComponent>(actorB).ActorId, Is.EqualTo(202));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(stageCatalog);
+            }
+        }
+
+        [Test]
+        public void StageTopologyApply_PlacementDelivery_SeedsSourceOwnedOrchestrationBuffers()
+        {
+            using var world = CreatePreparedWorld("StageTopologyApply_PlacementOrchestrationSeed", out var em, out var requestEntity, out _);
+            var stageCatalog = CreateStageCatalog(includeSourceLayout: true);
+            using var archetype = CreateHazardActorArchetype("placement_actor_orchestration", actorId: 99, emitterId: 41);
+
+            try
+            {
+                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActorPlacements = new[]
+                {
+                    new HazardActorPlacementBinding
+                    {
+                        PlacementInstanceId = 301,
+                        ActorArchetypePrefab = archetype.Root,
+                        LocalOffset = UnityEngine.Vector3.zero,
+                    }
+                };
+                stageCatalog.Entries[0].Definition.HazardActorOrchestrationRules = new[]
+                {
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 1,
+                        TargetPlacementInstanceId = 301,
+                        ActionType = HazardActorOrchestrationActionId.Spawn,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 2,
+                        TargetPlacementInstanceId = 999,
+                        ActionType = HazardActorOrchestrationActionId.Retire,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                };
+
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var source = FindAppliedSource(em);
+                var rules = em.GetBuffer<SourceHazardActorOrchestrationRuleBuffer>(source);
+                var states = em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(source);
+                Assert.That(rules.Length, Is.EqualTo(1));
+                Assert.That(states.Length, Is.EqualTo(1));
+                Assert.That(rules[0].RuleId, Is.EqualTo(1));
+                Assert.That(rules[0].TargetPlacementInstanceId, Is.EqualTo(301));
+                Assert.That(rules[0].ActionType, Is.EqualTo(HazardActorOrchestrationActionId.Spawn));
+                Assert.That(rules[0].TriggerType, Is.EqualTo(HazardActorOrchestrationTriggerId.OnStageStart));
+                Assert.That(states[0].RuleId, Is.EqualTo(1));
+                Assert.That(states[0].HasFired, Is.EqualTo(0));
+
+                var actor = FindActorForPlacement(em, source, 301);
+                var signal = em.GetComponentData<HazardActorOrchestrationRequestSignalComponent>(actor);
+                var consumption = em.GetComponentData<HazardActorOrchestrationRequestConsumptionComponent>(actor);
+                Assert.That(signal.Version, Is.EqualTo(0u));
+                Assert.That(signal.ActionType, Is.EqualTo(HazardActorOrchestrationActionId.None));
+                Assert.That(signal.TargetPhaseId, Is.EqualTo(-1));
+                Assert.That(consumption.LastPresenceRequestVersion, Is.EqualTo(0u));
+                Assert.That(consumption.LastPhaseRequestVersion, Is.EqualTo(0u));
             }
             finally
             {
@@ -808,7 +455,7 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
-        private static World CreatePreparedWorld(string name, out EntityManager em, out Entity requestEntity, out Entity topologyStateEntity, bool includeLegacyHazardHierarchy = true)
+        private static World CreatePreparedWorld(string name, out EntityManager em, out Entity requestEntity, out Entity topologyStateEntity)
         {
             var world = new World(name);
             em = world.EntityManager;
@@ -827,7 +474,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var prefabCatalogEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).GetSingletonEntity();
             em.SetComponentData(prefabCatalogEntity, new StageTopologyPrefabCatalogComponent
             {
-                SourceTemplate = CreateSourceTemplate(em, includeLegacyHazardHierarchy),
+                SourceTemplate = CreateSourceTemplate(em),
             });
 
             return world;
@@ -941,98 +588,6 @@ namespace SweepNDodge.DotsBullets.Tests
             return entities[0];
         }
 
-        private static HazardEmitterTelegraphProfileSO CreateTelegraphProfile(int id, float telegraphDurationSec)
-        {
-            var profile = UnityEngine.ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
-            profile.name = $"hetp_test_{id}";
-            profile.TelegraphDurationSec = telegraphDurationSec;
-            return profile;
-        }
-
-        private static HazardEmitterEmissionProfileSO CreateEmissionProfile(int id, int bulletTypeKey, float baseAngleDeg, float cooldownSec)
-        {
-            var bullet = UnityEngine.ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            bullet.Editor_SetDefinitionId(bulletTypeKey);
-
-            var profile = UnityEngine.ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
-            profile.name = $"heep_test_{id}";
-            profile.Bullet = bullet;
-            profile.PositionPattern = new SinglePointPositionPatternAuthoring();
-            profile.Aim = new FixedAimAuthoring { BaseAngleDeg = baseAngleDeg };
-            profile.ShotPattern = new SingleShotPatternAuthoring();
-            profile.EventRepeatCount = 1;
-            profile.EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
-            profile.EventShotIntervalSec = 0f;
-            profile.CooldownSec = cooldownSec;
-            return profile;
-        }
-
-        private static void ReplaceEmitterPatternSlots(
-            EntityManager em,
-            Entity emitter,
-            params HazardEmitterPatternExecutionSlotBuffer[] executionSlots)
-        {
-            var metadataSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
-            var runtimeExecutionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
-            metadataSlots.Clear();
-            runtimeExecutionSlots.Clear();
-
-            for (int i = 0; i < executionSlots.Length; i++)
-            {
-                metadataSlots.Add(new HazardEmitterPatternSlotBuffer
-                {
-                    PatternSlotId = executionSlots[i].PatternSlotId,
-                    TelegraphProfileRefId = executionSlots[i].TelegraphProfileRefId,
-                    EmissionProfileRefId = executionSlots[i].EmissionProfileRefId,
-                    BaseWeight = 1f,
-                    AvailabilityFlags = 0u,
-                });
-                runtimeExecutionSlots.Add(executionSlots[i]);
-            }
-        }
-
-        private static HazardEmitterPatternExecutionSlotBuffer CreateExecutionSlot(
-            int patternSlotId,
-            int telegraphProfileRefId,
-            float telegraphDurationSec,
-            int bulletTypeKey,
-            float baseAngleDeg,
-            float cooldownSec)
-        {
-            return new HazardEmitterPatternExecutionSlotBuffer
-            {
-                PatternSlotId = patternSlotId,
-                TelegraphProfileRefId = telegraphProfileRefId,
-                EmissionProfileRefId = bulletTypeKey,
-                TelegraphDurationSec = telegraphDurationSec,
-                BulletTypeKey = bulletTypeKey,
-                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
-                SpawnOffset = float2.zero,
-                LineStart = float2.zero,
-                LineEnd = float2.zero,
-                SampleSpacing = 0f,
-                PointSetCount = 0,
-                Point0 = float2.zero,
-                Point1 = float2.zero,
-                Point2 = float2.zero,
-                Point3 = float2.zero,
-                AimMode = WaveAimModeId.Fixed,
-                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
-                BaseAngleDeg = baseAngleDeg,
-                AimAngleOffsetDeg = 0f,
-                LineNormalSide = WaveLineNormalSideId.Left,
-                LineNormalAngleOffsetDeg = 0f,
-                SpiralStepDeg = 0f,
-                ShotPatternMode = WaveShotPatternModeId.Single,
-                ShotCount = 1,
-                NWayAngleSpacingDeg = 0f,
-                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
-                EventShotIntervalSec = 0f,
-                EventRepeatCount = 1,
-                CooldownSec = cooldownSec,
-            };
-        }
-
         private static void SetSingleton<T>(EntityManager em, T value) where T : unmanaged, IComponentData
         {
             using var query = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
@@ -1040,7 +595,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, value);
         }
 
-        private static Entity CreateSourceTemplate(EntityManager em, bool includeLegacyHazardHierarchy = true)
+        private static Entity CreateSourceTemplate(EntityManager em)
         {
             var entity = em.CreateEntity(
                 typeof(Prefab),
@@ -1129,237 +684,12 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
             em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
             em.AddBuffer<SourceHazardActorPlacementRefBuffer>(entity);
+            em.AddBuffer<SourceHazardActorOrchestrationRuleBuffer>(entity);
+            em.AddBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(entity);
             em.AddBuffer<SourceHazardActorRefBuffer>(entity);
 
             em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = entity });
-
-            if (!includeLegacyHazardHierarchy)
-                return entity;
-
-            var actor = em.CreateEntity(
-                typeof(Prefab),
-                typeof(HazardActorComponent),
-                typeof(HazardActorAppliedConfigBaselineComponent),
-                typeof(HazardActorAppliedConfigComponent),
-                typeof(HazardActorRuntimeBaselineComponent),
-                typeof(HazardActorBehaviorPhaseBaselineComponent),
-                typeof(HazardActorRuntimeStateComponent),
-                typeof(HazardActorBehaviorPhaseStateComponent),
-                typeof(HazardActorPatternSelectorStateComponent),
-                typeof(HazardActorPhaseTransitionRuntimeComponent),
-                typeof(HazardActorPhaseTransitionSignalComponent),
-                typeof(HazardActorPresencePresentationSignalComponent));
-            em.SetComponentData(actor, new HazardActorComponent
-            {
-                ActorId = 7,
-                SourceEntity = entity,
-            });
-            em.SetComponentData(actor, new HazardActorAppliedConfigBaselineComponent
-            {
-                IsEnabled = 1,
-                IsSuppressed = 0,
-            });
-            em.SetComponentData(actor, new HazardActorAppliedConfigComponent
-            {
-                IsEnabled = 1,
-                IsSuppressed = 0,
-            });
-            em.SetComponentData(actor, new HazardActorRuntimeBaselineComponent
-            {
-                InitialPresenceState = HazardActorPresenceStateId.Hidden,
-            });
-            em.SetComponentData(actor, new HazardActorBehaviorPhaseBaselineComponent
-            {
-                InitialPhaseId = 1,
-            });
-            em.SetComponentData(actor, new HazardActorRuntimeStateComponent
-            {
-                PresenceState = HazardActorPresenceStateId.Hidden,
-                StateElapsedSec = 0f,
-            });
-            em.SetComponentData(actor, new HazardActorBehaviorPhaseStateComponent
-            {
-                CurrentPhaseId = 1,
-                PreviousPhaseId = 1,
-                PhaseVersion = 0u,
-            });
-            em.SetComponentData(actor, new HazardActorPatternSelectorStateComponent
-            {
-                TargetEmitterId = -1,
-                CurrentPatternSlotId = -1,
-                LastPatternSlotId = -1,
-                SelectionSequence = 0u,
-                CurrentCandidateOrder = -1,
-                LastResolvedPhaseVersion = 0u,
-                LastConsumedCycleVersion = 0u,
-            });
-            em.SetComponentData(actor, new HazardActorPhaseTransitionRuntimeComponent
-            {
-                State = HazardActorPhaseTransitionStateId.Idle,
-                PendingFromPhaseId = -1,
-                PendingToPhaseId = -1,
-                ElapsedSec = 0f,
-                DurationSec = 0f,
-                TransitionVersion = 0u,
-            });
-            em.SetComponentData(actor, new HazardActorPhaseTransitionSignalComponent
-            {
-                Version = 0u,
-                Cue = HazardActorPhaseTransitionSignalCueId.None,
-                Reason = HazardActorPhaseTransitionReasonId.ProgressThreshold,
-                PreviousPhaseId = 1,
-                CurrentPhaseId = 1,
-                PendingToPhaseId = -1,
-            });
-            em.SetComponentData(actor, new HazardActorPresencePresentationSignalComponent
-            {
-                Version = 0u,
-                Cue = HazardActorPresencePresentationCueId.None,
-            });
-            em.AddBuffer<HazardActorEmitterRefBuffer>(actor);
-            var actorPolicies = em.AddBuffer<HazardActorPhaseSelectorPolicyBuffer>(actor);
-            actorPolicies.Add(new HazardActorPhaseSelectorPolicyBuffer
-            {
-                PhaseId = 1,
-                SelectionMode = HazardActorSelectionModeId.OrderedPriority,
-            });
-            em.AddBuffer<HazardActorPhaseSelectorCandidateBuffer>(actor);
-            em.AddBuffer<HazardActorPhaseProgressTransitionBuffer>(actor);
-            em.GetBuffer<SourceHazardActorRefBuffer>(entity).Add(new SourceHazardActorRefBuffer
-            {
-                ActorEntity = actor,
-                ActorId = 7,
-            });
-            em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = actor });
-
-            var emitter = em.CreateEntity(
-                typeof(Prefab),
-                typeof(LocalTransform),
-                typeof(LocalToWorld),
-                typeof(HazardEmitterComponent),
-                typeof(HazardEmitterAppliedConfigBaselineComponent),
-                typeof(HazardEmitterAppliedConfigComponent),
-                typeof(HazardEmitterTelegraphProfileBaselineComponent),
-                typeof(HazardEmitterTelegraphProfileComponent),
-                typeof(HazardEmitterEmissionProfileBaselineComponent),
-                typeof(HazardEmitterEmissionProfileComponent),
-                typeof(HazardEmitterRuntimeStateComponent),
-                typeof(HazardEmitterCycleSignalComponent));
-            em.SetComponentData(emitter, LocalTransform.FromPosition(float3.zero));
-            em.SetComponentData(emitter, new LocalToWorld { Value = float4x4.identity });
-            em.SetComponentData(emitter, new HazardEmitterComponent
-            {
-                EmitterId = 41,
-                ActorEntity = actor,
-                ActivationPolicy = HazardEmitterActivationPolicyId.AlwaysCycle,
-                InitialLifecycleState = HazardEmitterLifecycleStateId.Dormant,
-                AnchorKind = HazardEmitterAnchorKindId.ObjectBound,
-                Mobility = HazardEmitterMobilityId.Static,
-            });
-            em.SetComponentData(emitter, new HazardEmitterAppliedConfigBaselineComponent
-            {
-                IsEnabled = 1,
-                IsSuppressed = 0,
-                LocalOffset = new float3(0.5f, 0f, 0f),
-                TelegraphProfileRefId = 10,
-                EmissionProfileRefId = 20,
-            });
-            em.SetComponentData(emitter, new HazardEmitterAppliedConfigComponent
-            {
-                IsEnabled = 1,
-                IsSuppressed = 0,
-                LocalOffset = new float3(0.5f, 0f, 0f),
-                TelegraphProfileRefId = 10,
-                EmissionProfileRefId = 20,
-            });
-            em.SetComponentData(emitter, new HazardEmitterTelegraphProfileBaselineComponent
-            {
-                ProfileId = 10,
-                TelegraphDurationSec = 0.25f,
-            });
-            em.SetComponentData(emitter, new HazardEmitterTelegraphProfileComponent
-            {
-                ProfileId = 10,
-                TelegraphDurationSec = 0.25f,
-            });
-            em.SetComponentData(emitter, new HazardEmitterEmissionProfileBaselineComponent
-            {
-                ProfileId = 20,
-                BulletTypeKey = 901,
-                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
-                AimMode = WaveAimModeId.Fixed,
-                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
-                BaseAngleDeg = 15f,
-                LineNormalSide = WaveLineNormalSideId.Left,
-                ShotPatternMode = WaveShotPatternModeId.Single,
-                ShotCount = 1,
-                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
-                EventShotIntervalSec = 0f,
-                EventRepeatCount = 1,
-                CooldownSec = 1f,
-            });
-            em.SetComponentData(emitter, new HazardEmitterEmissionProfileComponent
-            {
-                ProfileId = 20,
-                BulletTypeKey = 901,
-                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
-                AimMode = WaveAimModeId.Fixed,
-                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
-                BaseAngleDeg = 15f,
-                LineNormalSide = WaveLineNormalSideId.Left,
-                ShotPatternMode = WaveShotPatternModeId.Single,
-                ShotCount = 1,
-                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
-                EventShotIntervalSec = 0f,
-                EventRepeatCount = 1,
-                CooldownSec = 1f,
-            });
-            em.SetComponentData(emitter, new HazardEmitterRuntimeStateComponent
-            {
-                LifecycleState = HazardEmitterLifecycleStateId.Dormant,
-                StateElapsedSec = 0f,
-            });
-            em.AddComponentData(emitter, new HazardEmitterSelectedPatternRuntimeComponent
-            {
-                AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
-            });
-            em.AddComponentData(emitter, new HazardEmitterCycleSignalComponent
-            {
-                CompletedVersion = 0u,
-            });
-            em.AddBuffer<HazardEmitterPatternSlotBuffer>(emitter);
-            em.AddBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
-            var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitter);
-            var executionSlots = em.GetBuffer<HazardEmitterPatternExecutionSlotBuffer>(emitter);
-            var emission = em.GetComponentData<HazardEmitterEmissionProfileComponent>(emitter);
-            HazardEmitterPatternSetCompatibilityUtility.ReseedSingleCompatibilitySlot(
-                ref patternSlots,
-                ref executionSlots,
-                telegraphProfileRefId: 10,
-                telegraphDurationSec: 0.5f,
-                in emission);
-
-            em.GetBuffer<HazardActorEmitterRefBuffer>(actor).Add(new HazardActorEmitterRefBuffer
-            {
-                EmitterEntity = emitter,
-                EmitterId = 41,
-            });
-            em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actor).Add(new HazardActorPhaseSelectorCandidateBuffer
-            {
-                PhaseId = 1,
-                OrderIndex = 0,
-                EmitterId = 41,
-                PatternSlotId = HazardEmitterPatternSetCompatibilityUtility.CompatibilityPatternSlotId,
-            });
-            em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = emitter });
             return entity;
-        }
-
-        private static Entity FindActorForSource(EntityManager em, Entity source)
-        {
-            var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(source);
-            Assert.That(actorRefs.Length, Is.GreaterThanOrEqualTo(1));
-            return actorRefs[0].ActorEntity;
         }
 
         private static Entity FindActorForPlacement(EntityManager em, Entity source, int placementInstanceId)

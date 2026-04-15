@@ -50,13 +50,20 @@ MonoBehaviour:
     - TriggerState: 1
       EventClips:
       - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
-    HazardActors:
-    - ActorId: 1
-      EnabledMode: 0
-      StartSuppressedMode: 0
-      Emitters:
-      - EmitterId: 1
-        OverrideLocalOffset: 0
-        LocalOffset: {x: 0, y: 0, z: 0}
-        TelegraphProfileOverride: {fileID: 0}
-        EmissionProfileOverride: {fileID: 0}
+    HazardActorPlacements:
+    - PlacementInstanceId: 1
+      ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
+      LocalOffset: {x: 0, y: 0, z: 0}
+  HazardActorOrchestrationRules:
+  - RuleId: 1
+    TargetPlacementInstanceId: 1
+    ActionType: 1
+    TriggerType: 1
+    TriggerThresholdNormalized: 0
+    TargetPhaseId: 0
+  - RuleId: 2
+    TargetPlacementInstanceId: 1
+    ActionType: 2
+    TriggerType: 2
+    TriggerThresholdNormalized: 0.5
+    TargetPhaseId: 2

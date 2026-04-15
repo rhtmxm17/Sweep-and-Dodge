@@ -441,7 +441,7 @@ namespace SweepNDodge.DotsBullets
                 }
                 else
                 {
-                    ApplySourceDefinition(em, sourceEntity, in binding);
+                    ApplySourceDefinition(em, sourceEntity, definition, in binding);
                 }
 
                 if (em.IsEnabled(sourceEntity))
@@ -875,12 +875,12 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            SeedSourceHazardActorOrchestration(em, entity, null, null);
             if (HasPlacementDeliveredHazardActors(em, entity))
                 RemoveAllHazardActorsFromSource(em, entity);
-            ApplySourceHazardActors(em, entity, null);
         }
 
-        private static void ApplySourceDefinition(EntityManager em, Entity entity, in StageSourceBinding binding)
+        private static void ApplySourceDefinition(EntityManager em, Entity entity, StageDefinitionSO definition, in StageSourceBinding binding)
         {
             int thresholdWeakened = math.max(0, binding.ThresholdWeakened);
             int thresholdDepleted = math.max(thresholdWeakened, binding.ThresholdDepleted);
@@ -934,30 +934,19 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
 
-            bool hasLegacyActorBindings = HasLegacyHazardBindings(binding.HazardActors);
             bool hasPlacements = HasHazardPlacements(binding.HazardActorPlacements);
-            if (hasLegacyActorBindings && hasPlacements)
-            {
-                Debug.LogError($"[StageTopologyApply] StageSourceBinding cannot use HazardActors and HazardActorPlacements together. sourceStableId={binding.SourceStableId}");
-                RemoveAllHazardActorsFromSource(em, entity);
-                return;
-            }
 
             if (hasPlacements)
             {
                 ApplySourceHazardPlacements(em, entity, binding.SourceStableId, binding.HazardActorPlacements);
+                SeedSourceHazardActorOrchestration(em, entity, binding.HazardActorPlacements, definition != null ? definition.HazardActorOrchestrationRules : null);
                 return;
             }
 
             if (HasPlacementDeliveredHazardActors(em, entity))
                 RemoveAllHazardActorsFromSource(em, entity);
 
-            ApplySourceHazardActors(em, entity, binding.HazardActors);
-        }
-
-        private static bool HasLegacyHazardBindings(HazardActorBinding[] actorBindings)
-        {
-            return actorBindings != null && actorBindings.Length > 0;
+            SeedSourceHazardActorOrchestration(em, entity, null, null);
         }
 
         private static bool HasHazardPlacements(HazardActorPlacementBinding[] placements)
@@ -970,6 +959,61 @@ namespace SweepNDodge.DotsBullets
             return em.Exists(sourceEntity)
                 && em.HasBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity)
                 && em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity).Length > 0;
+        }
+
+        private static void SeedSourceHazardActorOrchestration(
+            EntityManager em,
+            Entity sourceEntity,
+            HazardActorPlacementBinding[] placements,
+            HazardActorOrchestrationRuleBinding[] rules)
+        {
+            if (!em.Exists(sourceEntity))
+                return;
+
+            if (!em.HasBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity))
+                em.AddBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity);
+            if (!em.HasBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity))
+                em.AddBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity);
+
+            var ruleBuffer = em.GetBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity);
+            var ruleStates = em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity);
+            ruleBuffer.Clear();
+            ruleStates.Clear();
+
+            if (placements == null || placements.Length <= 0 || rules == null || rules.Length <= 0)
+                return;
+
+            var ownedPlacementIds = new HashSet<int>();
+            for (int i = 0; i < placements.Length; i++)
+            {
+                if (placements[i].PlacementInstanceId > 0)
+                    ownedPlacementIds.Add(placements[i].PlacementInstanceId);
+            }
+
+            if (ownedPlacementIds.Count <= 0)
+                return;
+
+            for (int i = 0; i < rules.Length; i++)
+            {
+                var rule = rules[i];
+                if (!ownedPlacementIds.Contains(rule.TargetPlacementInstanceId))
+                    continue;
+
+                ruleBuffer.Add(new SourceHazardActorOrchestrationRuleBuffer
+                {
+                    RuleId = rule.RuleId,
+                    TargetPlacementInstanceId = rule.TargetPlacementInstanceId,
+                    ActionType = rule.ActionType,
+                    TriggerType = rule.TriggerType,
+                    TriggerThresholdNormalized = rule.TriggerThresholdNormalized,
+                    TargetPhaseId = rule.TargetPhaseId,
+                });
+                ruleStates.Add(new SourceHazardActorOrchestrationRuleStateBuffer
+                {
+                    RuleId = rule.RuleId,
+                    HasFired = 0,
+                });
+            }
         }
 
         private static void ApplySourceHazardPlacements(
@@ -1003,56 +1047,19 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static void ApplySourceHazardActors(EntityManager em, Entity sourceEntity, HazardActorBinding[] actorBindings)
-        {
-            if (!em.Exists(sourceEntity) || !em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
-                return;
-
-            var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity);
-            var actorRefsCopy = new NativeArray<SourceHazardActorRefBuffer>(actorRefs.Length, Allocator.Temp);
-            try
-            {
-                for (int i = 0; i < actorRefs.Length; i++)
-                    actorRefsCopy[i] = actorRefs[i];
-
-                for (int i = 0; i < actorRefsCopy.Length; i++)
-                {
-                    var actorEntity = actorRefsCopy[i].ActorEntity;
-                    if (!em.Exists(actorEntity))
-                        continue;
-
-                    bool hasActorBinding = TryFindHazardActorBinding(actorBindings, actorRefsCopy[i].ActorId, out var actorBinding);
-
-                    ResetHazardActorToBaseline(em, actorEntity);
-                    if (hasActorBinding)
-                        ApplyHazardActorBinding(em, actorEntity, in actorBinding);
-                    else
-                        DisableHazardActorAppliedConfig(em, actorEntity);
-
-                    ResetHazardActorRuntimeState(em, actorEntity);
-                    ResetHazardActorPhaseState(em, actorEntity);
-                    ResetHazardActorPhaseTransitionRuntimeState(em, actorEntity);
-                    ApplyActorHazardEmitters(em, actorEntity, hasActorBinding ? actorBinding.Emitters : null);
-                    ResetHazardActorSelectorState(em, actorEntity);
-                    ResetHazardActorPhaseTransitionSignalState(em, actorEntity);
-                    ResetHazardActorPresentationSignalState(em, actorEntity);
-                    em.SetEnabled(actorEntity, hasActorBinding);
-                }
-            }
-            finally
-            {
-                actorRefsCopy.Dispose();
-            }
-        }
-
         private static void RemoveAllHazardActorsFromSource(EntityManager em, Entity sourceEntity)
         {
             if (!em.Exists(sourceEntity))
                 return;
 
             NativeArray<SourceHazardActorRefBuffer> actorRefsCopy = default;
+            NativeList<Entity> emitterEntitiesToDestroy = default;
+            NativeList<Entity> actorEntitiesToDestroy = default;
             try
             {
+                emitterEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
+                actorEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
+
                 if (em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
                 {
                     var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity);
@@ -1073,19 +1080,36 @@ namespace SweepNDodge.DotsBullets
                             {
                                 var emitterEntity = emitterRefs[emitterIndex].EmitterEntity;
                                 if (em.Exists(emitterEntity))
-                                    em.DestroyEntity(emitterEntity);
+                                    emitterEntitiesToDestroy.Add(emitterEntity);
                             }
                         }
 
-                        if (em.Exists(actorEntity))
-                            em.DestroyEntity(actorEntity);
+                        actorEntitiesToDestroy.Add(actorEntity);
                     }
-
-                    actorRefs.Clear();
                 }
 
+                for (int emitterIndex = 0; emitterIndex < emitterEntitiesToDestroy.Length; emitterIndex++)
+                {
+                    var emitterEntity = emitterEntitiesToDestroy[emitterIndex];
+                    if (em.Exists(emitterEntity))
+                        em.DestroyEntity(emitterEntity);
+                }
+
+                for (int actorIndex = 0; actorIndex < actorEntitiesToDestroy.Length; actorIndex++)
+                {
+                    var actorEntity = actorEntitiesToDestroy[actorIndex];
+                    if (em.Exists(actorEntity))
+                        em.DestroyEntity(actorEntity);
+                }
+
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).Clear();
                 if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity))
                     em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity).Clear();
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorOrchestrationRuleBuffer>(sourceEntity).Clear();
+                if (em.Exists(sourceEntity) && em.HasBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity))
+                    em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(sourceEntity).Clear();
 
                 if (em.Exists(sourceEntity) && em.HasBuffer<LinkedEntityGroup>(sourceEntity))
                     PruneSourceLinkedEntityGroup(em, sourceEntity);
@@ -1094,6 +1118,10 @@ namespace SweepNDodge.DotsBullets
             {
                 if (actorRefsCopy.IsCreated)
                     actorRefsCopy.Dispose();
+                if (emitterEntitiesToDestroy.IsCreated)
+                    emitterEntitiesToDestroy.Dispose();
+                if (actorEntitiesToDestroy.IsCreated)
+                    actorEntitiesToDestroy.Dispose();
             }
         }
 
@@ -1126,24 +1154,6 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        private static bool TryFindHazardActorBinding(HazardActorBinding[] actorBindings, int actorId, out HazardActorBinding binding)
-        {
-            if (actorBindings != null)
-            {
-                for (int i = 0; i < actorBindings.Length; i++)
-                {
-                    if (actorBindings[i].ActorId != actorId)
-                        continue;
-
-                    binding = actorBindings[i];
-                    return true;
-                }
-            }
-
-            binding = default;
-            return false;
-        }
-
         private static void ResetHazardActorToBaseline(EntityManager em, Entity actorEntity)
         {
             if (em.HasComponent<HazardActorAppliedConfigBaselineComponent>(actorEntity)
@@ -1156,47 +1166,6 @@ namespace SweepNDodge.DotsBullets
                     IsSuppressed = baseline.IsSuppressed,
                 });
             }
-        }
-
-        private static void ApplyHazardActorBinding(EntityManager em, Entity actorEntity, in HazardActorBinding binding)
-        {
-            if (!em.HasComponent<HazardActorAppliedConfigComponent>(actorEntity))
-                return;
-
-            var applied = em.GetComponentData<HazardActorAppliedConfigComponent>(actorEntity);
-            switch (binding.EnabledMode)
-            {
-                case HazardActorEnabledOverrideMode.ForceEnabled:
-                    applied.IsEnabled = 1;
-                    break;
-                case HazardActorEnabledOverrideMode.ForceDisabled:
-                    applied.IsEnabled = 0;
-                    break;
-            }
-
-            switch (binding.StartSuppressedMode)
-            {
-                case HazardActorSuppressionOverrideMode.ForceUnsuppressed:
-                    applied.IsSuppressed = 0;
-                    break;
-                case HazardActorSuppressionOverrideMode.ForceSuppressed:
-                    applied.IsSuppressed = 1;
-                    break;
-            }
-
-            em.SetComponentData(actorEntity, applied);
-        }
-
-        private static void DisableHazardActorAppliedConfig(EntityManager em, Entity actorEntity)
-        {
-            if (!em.HasComponent<HazardActorAppliedConfigComponent>(actorEntity))
-                return;
-
-            em.SetComponentData(actorEntity, new HazardActorAppliedConfigComponent
-            {
-                IsEnabled = 0,
-                IsSuppressed = 1,
-            });
         }
 
         private static void ResetHazardActorRuntimeState(EntityManager em, Entity actorEntity)
@@ -1297,166 +1266,29 @@ namespace SweepNDodge.DotsBullets
             });
         }
 
-        private static void ApplyActorHazardEmitters(EntityManager em, Entity actorEntity, HazardEmitterBinding[] emitterBindings)
+        private static void ResetHazardActorOrchestrationRequestSignalState(EntityManager em, Entity actorEntity)
         {
-            if (!em.Exists(actorEntity) || !em.HasBuffer<HazardActorEmitterRefBuffer>(actorEntity))
+            if (!em.HasComponent<HazardActorOrchestrationRequestSignalComponent>(actorEntity))
                 return;
 
-            var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity);
-            var emitterRefsCopy = new NativeArray<HazardActorEmitterRefBuffer>(emitterRefs.Length, Allocator.Temp);
-            try
+            em.SetComponentData(actorEntity, new HazardActorOrchestrationRequestSignalComponent
             {
-                for (int i = 0; i < emitterRefs.Length; i++)
-                    emitterRefsCopy[i] = emitterRefs[i];
-
-                for (int i = 0; i < emitterRefsCopy.Length; i++)
-                {
-                    var emitterEntity = emitterRefsCopy[i].EmitterEntity;
-                    if (!em.Exists(emitterEntity))
-                        continue;
-
-                    bool hasEmitterBinding = TryFindHazardEmitterBinding(emitterBindings, emitterRefsCopy[i].EmitterId, out var emitterBinding);
-
-                    ResetHazardEmitterToBaseline(em, emitterEntity);
-                    if (hasEmitterBinding)
-                        ApplyHazardEmitterBinding(em, emitterEntity, in emitterBinding);
-                    else
-                        DisableHazardEmitterAppliedConfig(em, emitterEntity);
-
-                    if (HasSinglePatternSlot(em, emitterEntity))
-                        HazardEmitterPatternSetCompatibilityUtility.TryMirrorCurrentProfilesIntoSingleExistingSlot(em, emitterEntity);
-                    ResetHazardEmitterRuntimeState(em, emitterEntity);
-                    ResetHazardEmitterCoordinatorState(em, emitterEntity);
-                    em.SetEnabled(emitterEntity, hasEmitterBinding);
-                }
-            }
-            finally
-            {
-                emitterRefsCopy.Dispose();
-            }
+                Version = 0u,
+                ActionType = HazardActorOrchestrationActionId.None,
+                TargetPhaseId = -1,
+            });
         }
 
-        private static bool TryFindHazardEmitterBinding(HazardEmitterBinding[] emitterBindings, int emitterId, out HazardEmitterBinding binding)
+        private static void ResetHazardActorOrchestrationRequestConsumptionState(EntityManager em, Entity actorEntity)
         {
-            if (emitterBindings != null)
-            {
-                for (int i = 0; i < emitterBindings.Length; i++)
-                {
-                    if (emitterBindings[i].EmitterId != emitterId)
-                        continue;
-
-                    binding = emitterBindings[i];
-                    return true;
-                }
-            }
-
-            binding = default;
-            return false;
-        }
-
-        private static void ApplyHazardEmitterBinding(EntityManager em, Entity emitterEntity, in HazardEmitterBinding binding)
-        {
-            bool canApplyProfileOverrides = CanApplyEmitterProfileOverrides(em, emitterEntity, in binding);
-
-            if (em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
-            {
-                var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
-                if (binding.OverrideLocalOffset)
-                    appliedConfig.LocalOffset = binding.LocalOffset;
-
-                if (canApplyProfileOverrides && binding.TelegraphProfileOverride != null)
-                    appliedConfig.TelegraphProfileRefId = binding.TelegraphProfileOverride.GetInstanceID();
-
-                if (canApplyProfileOverrides && binding.EmissionProfileOverride != null)
-                    appliedConfig.EmissionProfileRefId = binding.EmissionProfileOverride.GetInstanceID();
-
-                em.SetComponentData(emitterEntity, appliedConfig);
-            }
-
-            if (canApplyProfileOverrides
-                && binding.TelegraphProfileOverride != null
-                && em.HasComponent<HazardEmitterTelegraphProfileComponent>(emitterEntity))
-            {
-                em.SetComponentData(emitterEntity, new HazardEmitterTelegraphProfileComponent
-                {
-                    ProfileId = binding.TelegraphProfileOverride.GetInstanceID(),
-                    TelegraphDurationSec = math.max(0f, binding.TelegraphProfileOverride.TelegraphDurationSec),
-                });
-            }
-
-            if (canApplyProfileOverrides
-                && binding.EmissionProfileOverride != null
-                && em.HasComponent<HazardEmitterEmissionProfileComponent>(emitterEntity))
-            {
-                if (!HazardEmitterProfileResolver.TryResolve(binding.EmissionProfileOverride, out var resolvedEmission, out var error))
-                {
-                    Debug.LogWarning($"[StageTopologyApply] Failed to resolve hazard emitter emission override. emitterId={binding.EmitterId}, error={error}");
-                    return;
-                }
-
-                em.SetComponentData(emitterEntity, new HazardEmitterEmissionProfileComponent
-                {
-                    ProfileId = binding.EmissionProfileOverride.GetInstanceID(),
-                    BulletTypeKey = resolvedEmission.Bullet.DefinitionId,
-                    PositionPatternMode = resolvedEmission.PositionPatternMode,
-                    SpawnOffset = resolvedEmission.SpawnOffset,
-                    LineStart = resolvedEmission.LineStart,
-                    LineEnd = resolvedEmission.LineEnd,
-                    SampleSpacing = resolvedEmission.SampleSpacing,
-                    PointSetCount = resolvedEmission.PointSetCount,
-                    Point0 = resolvedEmission.Point0,
-                    Point1 = resolvedEmission.Point1,
-                    Point2 = resolvedEmission.Point2,
-                    Point3 = resolvedEmission.Point3,
-                    AimMode = resolvedEmission.AimMode,
-                    AimSnapshotTiming = resolvedEmission.AimSnapshotTiming,
-                    BaseAngleDeg = resolvedEmission.BaseAngleDeg,
-                    AimAngleOffsetDeg = resolvedEmission.AimAngleOffsetDeg,
-                    LineNormalSide = resolvedEmission.LineNormalSide,
-                    LineNormalAngleOffsetDeg = resolvedEmission.LineNormalAngleOffsetDeg,
-                    SpiralStepDeg = resolvedEmission.SpiralStepDeg,
-                    ShotPatternMode = resolvedEmission.ShotPatternMode,
-                    ShotCount = resolvedEmission.ShotCount,
-                    NWayAngleSpacingDeg = resolvedEmission.NWayAngleSpacingDeg,
-                    EventShotSchedule = resolvedEmission.EventShotSchedule,
-                    EventShotIntervalSec = resolvedEmission.EventShotIntervalSec,
-                    EventRepeatCount = resolvedEmission.EventRepeatCount,
-                    CooldownSec = resolvedEmission.CooldownSec,
-                });
-            }
-        }
-
-        private static bool CanApplyEmitterProfileOverrides(EntityManager em, Entity emitterEntity, in HazardEmitterBinding binding)
-        {
-            if ((binding.TelegraphProfileOverride == null && binding.EmissionProfileOverride == null)
-                || !em.HasBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity))
-            {
-                return true;
-            }
-
-            var slots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
-            if (slots.Length <= 1)
-                return true;
-
-            Debug.LogError($"[StageTopologyApply] Multi-slot HazardEmitter cannot use emitter-level Telegraph/Emission profile overrides. emitterId={binding.EmitterId}, slotCount={slots.Length}");
-            return false;
-        }
-
-        private static bool HasSinglePatternSlot(EntityManager em, Entity emitterEntity)
-        {
-            return em.HasBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity)
-                && em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity).Length == 1;
-        }
-
-        private static void DisableHazardEmitterAppliedConfig(EntityManager em, Entity emitterEntity)
-        {
-            if (!em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
+            if (!em.HasComponent<HazardActorOrchestrationRequestConsumptionComponent>(actorEntity))
                 return;
 
-            var appliedConfig = em.GetComponentData<HazardEmitterAppliedConfigComponent>(emitterEntity);
-            appliedConfig.IsEnabled = 0;
-            appliedConfig.IsSuppressed = 1;
-            em.SetComponentData(emitterEntity, appliedConfig);
+            em.SetComponentData(actorEntity, new HazardActorOrchestrationRequestConsumptionComponent
+            {
+                LastPresenceRequestVersion = 0u,
+                LastPhaseRequestVersion = 0u,
+            });
         }
 
         private static void ResetHazardEmitterToBaseline(EntityManager em, Entity emitterEntity)
@@ -1626,9 +1458,9 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
+            SeedSourceHazardActorOrchestration(em, entity, null, null);
             if (HasPlacementDeliveredHazardActors(em, entity))
                 RemoveAllHazardActorsFromSource(em, entity);
-            ApplySourceHazardActors(em, entity, null);
         }
 
         private static Entity ResolveFirstEntity(EntityQuery query)

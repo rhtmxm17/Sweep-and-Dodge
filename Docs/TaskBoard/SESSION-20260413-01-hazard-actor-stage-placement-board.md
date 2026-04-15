@@ -3,8 +3,8 @@
 ## Metadata
 - doc_id: `SESSION-20260413-01`
 - type: `SessionTaskBoard`
-- status: `in_progress`
-- last_updated: `2026-04-13`
+- status: `completed`
+- last_updated: `2026-04-14`
 - related_docs:
   - [../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md](../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md)
   - [../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md](../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md)
@@ -25,33 +25,13 @@
 - current `StageDefinitionSO.HazardActorBinding`은 actor roster on/off와 emitter override 중심이라, stage별 actor archetype placement/orchestration을 표현하는 장기 프레임으로는 부족하다.
 
 ## Now
-- `TD-032` 초안에서 아래를 고정했다.
-  - actor archetype / placement / orchestration의 용어 분리
-  - source-owned runtime lifecycle과 content authoring 관점의 actor unit을 동시에 유지하는 방향
-  - 대표 요구 시나리오
-  - first-pass 비범위와 open question 경계
-  - placement / orchestration 분리
-  - instance-only orchestration target
-  - `Spawn / PhaseSet / Retire` request semantic
-  - `OnStageStart / OnSourceProgressAtOrAbove` one-shot trigger
-  - direct prefab reference + source-owned pre-attach delivery
-  - stage-global `PlacementInstanceId`
-  - `LocalOffset` authoritative placement
-  - source-owned placement ref buffer + versioned orchestration request signal
-- 구현 단계 분리 초안을 아래로 정리했다.
-  - `SP-1. Actor Archetype Delivery`
-  - `SP-2. Placement Instance Schema`
-  - `SP-3. Instance Orchestration`
-  - `SP-4. Validation / Sample / Migration`
+- 없음
 
 ## Next
-- `SP-4` 논의로 이동한다.
-- 다음 설계 세션에서 아래를 좁힌다.
-  - validation 경계
-  - sample content uplift 순서
-  - migration 단계와 compatibility 유지 범위
-  - `SourceHazardActorRefBuffer` 대체 가능성 점검 조건
-- 이후 `SP-4` acceptance와 closeout 기준을 닫는다.
+- 후속 설계가 필요하면 아래를 별도 세션에서 다룬다.
+  - `SourceHazardActorRefBuffer` 축소/제거 조건
+  - group targeting 도입 시점
+  - lookup indirection(catalog key) 필요성
 
 ## Blocked
 - 없음
@@ -84,8 +64,15 @@
   - source는 별도 placement ref buffer로 `PlacementInstanceId -> ActorEntity` resolve seam을 가진다.
   - actor root는 unified versioned orchestration request signal과 owner별 last-consumed version을 가진다.
   - source-owned orchestration runtime은 `RuleId + HasFired` fired-state buffer로 시작한다.
+- [x] D6. `SP-1`부터 `SP-4`까지 direct cutover를 구현했다.
+  - source template prefab의 actor child baseline을 제거하고 standalone actor archetype prefab으로 분리했다.
+  - stage asset은 `HazardActorPlacements + HazardActorOrchestrationRules`만 사용하도록 전환됐다.
+  - legacy `HazardActorBinding` stage path와 source child actor scan path는 제거됐다.
+  - placement/orchestration validation, sample asset, apply/reset owner가 새 frame 기준으로 정리됐다.
+  - sample verification과 operational smoke는 새 placement/orchestration frame 기준으로 통과한다.
+  - full EditMode/PlayMode suite의 잔여 실패는 `MCP-FOR-UNITY NetworkStream disposed` noise뿐이며, project code failure는 없다.
 
 ## End of Session
-- 결과: 진행 중
+- 결과: 완료
 - 다음 시작점:
-  - `TD-032`를 기준으로 `SP-4 Validation / Sample / Migration` 논의를 진행한다.
+  - placement/orchestration frame 위에서 후속 확장 요구를 별도 세션으로 다룬다.

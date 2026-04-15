@@ -168,6 +168,19 @@ namespace SweepNDodge.DotsBullets
         public float3 LocalOffset;
     }
 
+    public struct HazardActorOrchestrationRequestSignalComponent : IComponentData
+    {
+        public uint Version;
+        public HazardActorOrchestrationActionId ActionType;
+        public int TargetPhaseId;
+    }
+
+    public struct HazardActorOrchestrationRequestConsumptionComponent : IComponentData
+    {
+        public uint LastPresenceRequestVersion;
+        public uint LastPhaseRequestVersion;
+    }
+
     [InternalBufferCapacity(4)]
     public struct SourceHazardActorRefBuffer : IBufferElementData
     {
@@ -180,6 +193,24 @@ namespace SweepNDodge.DotsBullets
     {
         public int PlacementInstanceId;
         public Entity ActorEntity;
+    }
+
+    [InternalBufferCapacity(4)]
+    public struct SourceHazardActorOrchestrationRuleBuffer : IBufferElementData
+    {
+        public int RuleId;
+        public int TargetPlacementInstanceId;
+        public HazardActorOrchestrationActionId ActionType;
+        public HazardActorOrchestrationTriggerId TriggerType;
+        public float TriggerThresholdNormalized;
+        public int TargetPhaseId;
+    }
+
+    [InternalBufferCapacity(4)]
+    public struct SourceHazardActorOrchestrationRuleStateBuffer : IBufferElementData
+    {
+        public int RuleId;
+        public byte HasFired;
     }
 
     [InternalBufferCapacity(4)]

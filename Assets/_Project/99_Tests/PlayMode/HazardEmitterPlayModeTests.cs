@@ -301,6 +301,220 @@ namespace SweepNDodge.DotsBullets.Tests
             yield break;
         }
 
+        [UnityTest]
+        public IEnumerator PlayMode_PlacementDeliveredHazardActor_OnStageStartSpawnAndPhaseSet_SerializesAcrossFrames()
+        {
+            using var archetype = CreateHazardActorArchetype("placement_actor_orchestrated", actorId: 32, emitterId: 42);
+            ConfigureTwoPhaseArchetype(archetype, emitterId: 42, activationDurationSec: 0.05f, retireDurationSec: 0f, transitionLeadInSec: 0.05f);
+            var stageCatalog = CreatePlacementStageCatalog(
+                archetype.Root,
+                new[]
+                {
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 1,
+                        TargetPlacementInstanceId = 101,
+                        ActionType = HazardActorOrchestrationActionId.Spawn,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 2,
+                        TargetPlacementInstanceId = 101,
+                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                        TargetPhaseId = 2,
+                    },
+                });
+
+            try
+            {
+                using var world = new World("PlayMode_HazardPlacement_Orchestration");
+                var em = world.EntityManager;
+
+                world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+                SetSingleton(em, new FixedTickStepRuntimeComponent
+                {
+                    FrameDeltaTime = 0.05f,
+                    LogicDeltaTime = 0.05f,
+                    LogicStepCount = 1,
+                    HasStep = 1,
+                    UsingFixedTick = 0,
+                });
+
+                var requestEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).GetSingletonEntity();
+                var prefabCatalogEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).GetSingletonEntity();
+                em.SetComponentData(prefabCatalogEntity, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                });
+
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var source = FindAppliedSource(em);
+                var actor = FindActorForPlacement(em, source, placementInstanceId: 101);
+                var emitter = em.GetBuffer<HazardActorEmitterRefBuffer>(actor)[0].EmitterEntity;
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Running,
+                });
+
+                world.GetOrCreateSystem<HazardActorOrchestrationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                var ruleStates = em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(source);
+                Assert.That(ruleStates[0].HasFired, Is.EqualTo(1));
+                Assert.That(ruleStates[1].HasFired, Is.EqualTo(0));
+                Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Activating));
+
+                world.GetOrCreateSystem<HazardActorOrchestrationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                ruleStates = em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(source);
+                Assert.That(ruleStates[1].HasFired, Is.EqualTo(0));
+                Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Active));
+
+                world.GetOrCreateSystem<HazardActorOrchestrationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                var transitionRuntime = em.GetComponentData<HazardActorPhaseTransitionRuntimeComponent>(actor);
+                var transitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
+                ruleStates = em.GetBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(source);
+                Assert.That(ruleStates[1].HasFired, Is.EqualTo(1));
+                Assert.That(transitionRuntime.State, Is.EqualTo(HazardActorPhaseTransitionStateId.Preparing));
+                Assert.That(transitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.PreparingStarted));
+                Assert.That(transitionSignal.PendingToPhaseId, Is.EqualTo(2));
+
+                world.GetOrCreateSystem<HazardActorOrchestrationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPhaseTransitionSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardEmitterCoordinatorSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPatternSelectorSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                var phaseState = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actor);
+                var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actor);
+                transitionSignal = em.GetComponentData<HazardActorPhaseTransitionSignalComponent>(actor);
+                Assert.That(phaseState.CurrentPhaseId, Is.EqualTo(2));
+                Assert.That(transitionSignal.Cue, Is.EqualTo(HazardActorPhaseTransitionSignalCueId.PhaseCommitted));
+                Assert.That(selector.TargetEmitterId, Is.EqualTo(42));
+                Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(1));
+                Assert.That(selector.LastResolvedPhaseVersion, Is.EqualTo(phaseState.PhaseVersion));
+
+                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitter);
+                Assert.That(coordinator.ActivationAllowed, Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(stageCatalog);
+            }
+
+            yield break;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayMode_PlacementDeliveredHazardActor_RetireRequest_DrivesRetiringToHidden()
+        {
+            using var archetype = CreateHazardActorArchetype("placement_actor_retire", actorId: 33, emitterId: 43);
+            ConfigureTwoPhaseArchetype(archetype, emitterId: 43, activationDurationSec: 0f, retireDurationSec: 0.05f, transitionLeadInSec: 0f);
+            var stageCatalog = CreatePlacementStageCatalog(
+                archetype.Root,
+                new[]
+                {
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 1,
+                        TargetPlacementInstanceId = 101,
+                        ActionType = HazardActorOrchestrationActionId.Spawn,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 2,
+                        TargetPlacementInstanceId = 101,
+                        ActionType = HazardActorOrchestrationActionId.Retire,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                        TriggerThresholdNormalized = 0.5f,
+                    },
+                });
+            stageCatalog.Entries[0].Definition.SourceBindings[0].ThresholdDepleted = 4;
+
+            try
+            {
+                using var world = new World("PlayMode_HazardPlacement_Retire");
+                var em = world.EntityManager;
+
+                world.GetOrCreateSystem<StageTopologyBootstrapSystem>().Update(world.Unmanaged);
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Idle,
+                });
+                SetSingleton(em, new FixedTickStepRuntimeComponent
+                {
+                    FrameDeltaTime = 0.05f,
+                    LogicDeltaTime = 0.05f,
+                    LogicStepCount = 1,
+                    HasStep = 1,
+                    UsingFixedTick = 0,
+                });
+
+                var requestEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyRequestComponent>()).GetSingletonEntity();
+                var prefabCatalogEntity = em.CreateEntityQuery(ComponentType.ReadOnly<StageTopologyPrefabCatalogComponent>()).GetSingletonEntity();
+                em.SetComponentData(prefabCatalogEntity, new StageTopologyPrefabCatalogComponent
+                {
+                    SourceTemplate = CreateSourceTemplate(em),
+                });
+
+                PublishCatalogAndRequest(em, requestEntity, stageCatalog, stageId: 1);
+                world.GetOrCreateSystem<StageTopologyApplyPrepareSystem>().Update(world.Unmanaged);
+
+                var source = FindAppliedSource(em);
+                var actor = FindActorForPlacement(em, source, placementInstanceId: 101);
+                SetSingleton(em, new RunDirectorStageStateComponent
+                {
+                    State = RunDirectorStageStateId.Running,
+                });
+
+                world.GetOrCreateSystem<HazardActorOrchestrationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+                Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Active));
+
+                var sourceSpawn = em.GetComponentData<SourceSpawnComponent>(source);
+                sourceSpawn.CollectedCount = 2;
+                em.SetComponentData(source, sourceSpawn);
+
+                world.GetOrCreateSystem<HazardActorOrchestrationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Retiring));
+
+                world.GetOrCreateSystem<HazardActorOrchestrationSystem>().Update(world.Unmanaged);
+                world.GetOrCreateSystem<HazardActorPresenceSystem>().Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+
+                Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
+            }
+            finally
+            {
+                Object.DestroyImmediate(stageCatalog);
+            }
+
+            yield break;
+        }
+
         private static Entity CreateActor(EntityManager em, Entity source, int actorId)
         {
             var entity = em.CreateEntity(
@@ -524,6 +738,8 @@ namespace SweepNDodge.DotsBullets.Tests
             em.AddBuffer<SourcePollutionValidCellIndexBuffer>(entity);
             em.AddBuffer<SourceRegionCellIndexBuffer>(entity);
             em.AddBuffer<SourceHazardActorPlacementRefBuffer>(entity);
+            em.AddBuffer<SourceHazardActorOrchestrationRuleBuffer>(entity);
+            em.AddBuffer<SourceHazardActorOrchestrationRuleStateBuffer>(entity);
             em.AddBuffer<SourceHazardActorRefBuffer>(entity);
             em.GetBuffer<LinkedEntityGroup>(entity).Add(new LinkedEntityGroup { Value = entity });
             return entity;
@@ -565,7 +781,9 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, value);
         }
 
-        private static StageCatalogSO CreatePlacementStageCatalog(GameObject archetypePrefab)
+        private static StageCatalogSO CreatePlacementStageCatalog(
+            GameObject archetypePrefab,
+            HazardActorOrchestrationRuleBinding[] orchestrationRules = null)
         {
             var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
             layout.StageId = 1;
@@ -603,6 +821,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
             definition.StageId = 1;
+            definition.HazardActorOrchestrationRules = orchestrationRules ?? System.Array.Empty<HazardActorOrchestrationRuleBinding>();
             definition.SourceBindings = new[]
             {
                 new StageSourceBinding
@@ -613,7 +832,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     ThresholdDepleted = 0,
                     SustainSlots = System.Array.Empty<SustainSlotBinding>(),
                     EventSlots = System.Array.Empty<EventSlotBinding>(),
-                    HazardActors = System.Array.Empty<HazardActorBinding>(),
                     HazardActorPlacements = new[]
                     {
                         new HazardActorPlacementBinding
@@ -675,6 +893,52 @@ namespace SweepNDodge.DotsBullets.Tests
 
             Assert.Fail($"Placement actor not found. placementInstanceId={placementInstanceId}");
             return Entity.Null;
+        }
+
+        private static void ConfigureTwoPhaseArchetype(
+            HazardActorArchetypeFixture fixture,
+            int emitterId,
+            float activationDurationSec,
+            float retireDurationSec,
+            float transitionLeadInSec)
+        {
+            var actor = fixture.Root.GetComponent<HazardActorAuthoring>();
+            actor.InitialPhaseId = 1;
+            actor.ActivationTrigger = HazardActorPresenceTriggerMode.None;
+            actor.RetireTrigger = HazardActorPresenceTriggerMode.None;
+            actor.ActivationDurationSec = activationDurationSec;
+            actor.RetireDurationSec = retireDurationSec;
+            actor.PhaseSelectorPolicies = new[]
+            {
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+                    Candidates = new[]
+                    {
+                        new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = emitterId, PatternSlotId = 1 },
+                    },
+                },
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+                    Candidates = new[]
+                    {
+                        new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = emitterId, PatternSlotId = 1 },
+                    },
+                },
+            };
+            actor.PhaseProgressTransitions = new[]
+            {
+                new HazardActorPhaseProgressTransitionAuthoring
+                {
+                    FromPhaseId = 1,
+                    ToPhaseId = 2,
+                    ProgressThresholdNormalized = 0.5f,
+                    TransitionLeadInSec = transitionLeadInSec,
+                }
+            };
         }
 
         private static HazardActorArchetypeFixture CreateHazardActorArchetype(string name, int actorId, int emitterId)

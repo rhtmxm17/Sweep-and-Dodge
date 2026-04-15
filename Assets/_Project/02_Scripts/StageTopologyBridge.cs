@@ -69,6 +69,32 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
+        /// <summary>
+        /// Scene reload 전에 runtime hazard actor/emitter attachment를 먼저 제거해
+        /// SubScene unload가 source LinkedEntityGroup의 dangling reference로 실패하지 않도록 한다.
+        /// </summary>
+        public void CleanupOwnedRuntimeHazardsBeforeSceneReload()
+        {
+            if (!TryBind())
+                return;
+
+            _em.CompleteAllTrackedJobs();
+
+            using var sourceQuery = _em.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<StageTopologyOwnedTag>(),
+                    ComponentType.ReadOnly<StageTopologySourceTag>(),
+                    ComponentType.ReadOnly<SourceHazardActorRefBuffer>(),
+                },
+                Options = EntityQueryOptions.IncludeDisabledEntities,
+            });
+            using var sourceEntities = sourceQuery.ToEntityArray(Allocator.Temp);
+            for (int i = 0; i < sourceEntities.Length; i++)
+                CleanupRuntimeHazardsFromSource(sourceEntities[i]);
+        }
+
         private bool TryBind()
         {
             if (!EnsureSceneOwnership())
@@ -231,6 +257,77 @@ namespace SweepNDodge.DotsBullets
 
             using var entities = query.ToEntityArray(Allocator.Temp);
             return entities.Length > 0 ? entities[0] : Entity.Null;
+        }
+
+        private void CleanupRuntimeHazardsFromSource(Entity sourceEntity)
+        {
+            if (sourceEntity == Entity.Null || !_em.Exists(sourceEntity) || !_em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
+                return;
+
+            using var actorRefsCopy = _em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).ToNativeArray(Allocator.Temp);
+            using var emitterEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
+            using var actorEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
+
+            for (int actorIndex = 0; actorIndex < actorRefsCopy.Length; actorIndex++)
+            {
+                var actorEntity = actorRefsCopy[actorIndex].ActorEntity;
+                if (!_em.Exists(actorEntity))
+                    continue;
+
+                if (_em.HasBuffer<HazardActorEmitterRefBuffer>(actorEntity))
+                {
+                    var emitterRefs = _em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity);
+                    for (int emitterIndex = 0; emitterIndex < emitterRefs.Length; emitterIndex++)
+                    {
+                        var emitterEntity = emitterRefs[emitterIndex].EmitterEntity;
+                        if (_em.Exists(emitterEntity))
+                            emitterEntitiesToDestroy.Add(emitterEntity);
+                    }
+                }
+
+                actorEntitiesToDestroy.Add(actorEntity);
+            }
+
+            for (int emitterIndex = 0; emitterIndex < emitterEntitiesToDestroy.Length; emitterIndex++)
+            {
+                var emitterEntity = emitterEntitiesToDestroy[emitterIndex];
+                if (_em.Exists(emitterEntity))
+                    _em.DestroyEntity(emitterEntity);
+            }
+
+            for (int actorIndex = 0; actorIndex < actorEntitiesToDestroy.Length; actorIndex++)
+            {
+                var actorEntity = actorEntitiesToDestroy[actorIndex];
+                if (_em.Exists(actorEntity))
+                    _em.DestroyEntity(actorEntity);
+            }
+
+            if (_em.Exists(sourceEntity) && _em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
+                _em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).Clear();
+            if (_em.Exists(sourceEntity) && _em.HasBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity))
+                _em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sourceEntity).Clear();
+            if (_em.Exists(sourceEntity) && _em.HasBuffer<LinkedEntityGroup>(sourceEntity))
+                PruneLinkedEntityGroup(sourceEntity);
+        }
+
+        private void PruneLinkedEntityGroup(Entity sourceEntity)
+        {
+            var linkedGroup = _em.GetBuffer<LinkedEntityGroup>(sourceEntity);
+            using var surviving = new NativeList<LinkedEntityGroup>(linkedGroup.Length + 1, Allocator.Temp);
+
+            surviving.Add(new LinkedEntityGroup { Value = sourceEntity });
+            for (int i = 0; i < linkedGroup.Length; i++)
+            {
+                var value = linkedGroup[i].Value;
+                if (value == sourceEntity || !_em.Exists(value))
+                    continue;
+
+                surviving.Add(new LinkedEntityGroup { Value = value });
+            }
+
+            linkedGroup.Clear();
+            for (int i = 0; i < surviving.Length; i++)
+                linkedGroup.Add(surviving[i]);
         }
 
         private bool TryAcquireSceneOwnership()

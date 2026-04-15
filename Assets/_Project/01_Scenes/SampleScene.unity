@@ -483,6 +483,15 @@ MonoBehaviour:
   ImpulseVisualLossScale: 0.03
   ImpulseVisualPerFrameMax: 0.2
   ImpulseMaxOffset: 0.35
+  EnableBroomSweepGizmos: 1
+  DrawOnlyWhenSelected: 1
+  DrawSearchRadius: 1
+  DrawStateLabel: 1
+  DrawCandidateBullets: 0
+  CandidateBulletMarkerLimit: 64
+  GizmoHeightOffset: 0.05
+  FullPathStepCount: 24
+  BandStepCount: 12
 --- !u!114 &352435933
 MonoBehaviour:
   m_ObjectHideFlags: 0

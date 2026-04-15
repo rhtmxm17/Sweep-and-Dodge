@@ -427,127 +427,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void ValidateCatalog_DuplicateHazardActorAndEmitterIds_AreReportedAsErrors()
-        {
-            var created = new List<ScriptableObject>();
-            try
-            {
-                var definition = CreateDefinition(created, stageId: 9);
-                definition.SourceBindings = new[]
-                {
-                    new StageSourceBinding
-                    {
-                        SourceStableId = 901u,
-                        InitialSourceState = SourceStateId.Normal,
-                        ThresholdWeakened = 0,
-                        ThresholdDepleted = 0,
-                        SustainSlots = Array.Empty<SustainSlotBinding>(),
-                        EventSlots = Array.Empty<EventSlotBinding>(),
-                        HazardActors = new[]
-                        {
-                            new HazardActorBinding
-                            {
-                                ActorId = 1,
-                                EnabledMode = HazardActorEnabledOverrideMode.Inherit,
-                                StartSuppressedMode = HazardActorSuppressionOverrideMode.Inherit,
-                                Emitters = new[]
-                                {
-                                    new HazardEmitterBinding
-                                    {
-                                        EmitterId = 1,
-                                    },
-                                    new HazardEmitterBinding
-                                    {
-                                        EmitterId = 1,
-                                    },
-                                },
-                            },
-                            new HazardActorBinding
-                            {
-                                ActorId = 1,
-                                EnabledMode = HazardActorEnabledOverrideMode.Inherit,
-                                StartSuppressedMode = HazardActorSuppressionOverrideMode.Inherit,
-                                Emitters = Array.Empty<HazardEmitterBinding>(),
-                            },
-                        },
-                    }
-                };
-
-                var layout = CreateLayout(created, stageId: 9);
-                var catalog = CreateCatalog(created, new StageCatalogEntry
-                {
-                    Enabled = true,
-                    EntryKey = "stage_09",
-                    Definition = definition,
-                    Layout = layout,
-                });
-
-                var issues = ValidateCatalog(catalog);
-                Assert.That(HasIssue(issues, "STC027", ContentValidationSeverity.Error), Is.True);
-                Assert.That(HasIssue(issues, "STC029", ContentValidationSeverity.Error), Is.True);
-            }
-            finally
-            {
-                DestroyAll(created);
-            }
-        }
-
-        [Test]
-        public void ValidateCatalog_InvalidHazardActorAndEmitterIds_AreReportedAsErrors()
-        {
-            var created = new List<ScriptableObject>();
-            try
-            {
-                var definition = CreateDefinition(created, stageId: 10);
-                definition.SourceBindings = new[]
-                {
-                    new StageSourceBinding
-                    {
-                        SourceStableId = 1001u,
-                        InitialSourceState = SourceStateId.Normal,
-                        ThresholdWeakened = 0,
-                        ThresholdDepleted = 0,
-                        SustainSlots = Array.Empty<SustainSlotBinding>(),
-                        EventSlots = Array.Empty<EventSlotBinding>(),
-                        HazardActors = new[]
-                        {
-                            new HazardActorBinding
-                            {
-                                ActorId = 0,
-                                EnabledMode = HazardActorEnabledOverrideMode.Inherit,
-                                StartSuppressedMode = HazardActorSuppressionOverrideMode.Inherit,
-                                Emitters = new[]
-                                {
-                                    new HazardEmitterBinding
-                                    {
-                                        EmitterId = 0,
-                                    },
-                                },
-                            },
-                        },
-                    }
-                };
-
-                var layout = CreateLayout(created, stageId: 10);
-                var catalog = CreateCatalog(created, new StageCatalogEntry
-                {
-                    Enabled = true,
-                    EntryKey = "stage_10",
-                    Definition = definition,
-                    Layout = layout,
-                });
-
-                var issues = ValidateCatalog(catalog);
-                Assert.That(HasIssue(issues, "STC026", ContentValidationSeverity.Error), Is.True);
-                Assert.That(HasIssue(issues, "STC028", ContentValidationSeverity.Error), Is.True);
-            }
-            finally
-            {
-                DestroyAll(created);
-            }
-        }
-
-        [Test]
         public void ValidateCatalog_HazardActorPlacements_DuplicatePlacementIds_AreReportedAsErrors()
         {
             var created = new List<ScriptableObject>();
@@ -616,7 +495,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void ValidateCatalog_HazardActorPlacements_NullPrefabAndMixedLegacyUsage_AreReportedAsErrors()
+        public void ValidateCatalog_HazardActorPlacements_NullPrefab_IsReportedAsError()
         {
             var created = new List<ScriptableObject>();
             try
@@ -632,16 +511,6 @@ namespace SweepNDodge.DotsBullets.Tests
                         ThresholdDepleted = 0,
                         SustainSlots = Array.Empty<SustainSlotBinding>(),
                         EventSlots = Array.Empty<EventSlotBinding>(),
-                        HazardActors = new[]
-                        {
-                            new HazardActorBinding
-                            {
-                                ActorId = 1,
-                                EnabledMode = HazardActorEnabledOverrideMode.Inherit,
-                                StartSuppressedMode = HazardActorSuppressionOverrideMode.Inherit,
-                                Emitters = Array.Empty<HazardEmitterBinding>(),
-                            }
-                        },
                         HazardActorPlacements = new[]
                         {
                             new HazardActorPlacementBinding
@@ -665,7 +534,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var issues = ValidateCatalog(catalog);
                 Assert.That(HasIssue(issues, "STC033", ContentValidationSeverity.Error), Is.True);
-                Assert.That(HasIssue(issues, "STC035", ContentValidationSeverity.Error), Is.True);
             }
             finally
             {
@@ -674,69 +542,192 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void ValidateCatalog_OperationalCatalogReferencingTestOnlyHazardOverrideAssets_IsReportedAsError()
+        public void ValidateCatalog_HazardActorOrchestration_InvalidRuleTargetsAndThresholds_AreReported()
         {
-            string scope = System.Guid.NewGuid().ToString("N");
-            string operationalRoot = EnsureFolder($"{GeneratedOperationalRoot}/{scope}");
-            string testRoot = EnsureFolder($"{GeneratedTestRoot}/{scope}");
+            var created = new List<ScriptableObject>();
+            using var archetype = CreateHazardActorArchetype("orchestration_phase_archetype", actorId: 3, emitterId: 33);
 
             try
             {
-                var telegraphProfile = CreateTelegraphProfileAsset($"{testRoot}/hetp_test.asset");
-                var emissionProfile = CreateEmissionProfileAsset($"{testRoot}/heep_test.asset");
-                var definition = CreateDefinitionAsset($"{operationalRoot}/sd_operational.asset", stageId: 11);
+                var actor = archetype.Root.GetComponent<HazardActorAuthoring>();
+                actor.ActivationTrigger = HazardActorPresenceTriggerMode.Immediate;
+                actor.PhaseSelectorPolicies = new[]
+                {
+                    new HazardActorPhaseSelectorPolicyAuthoring
+                    {
+                        PhaseId = 1,
+                        SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+                        Candidates = new[]
+                        {
+                            new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 33, PatternSlotId = 1 },
+                        },
+                    },
+                    new HazardActorPhaseSelectorPolicyAuthoring
+                    {
+                        PhaseId = 2,
+                        SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+                        Candidates = new[]
+                        {
+                            new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 33, PatternSlotId = 1 },
+                        },
+                    },
+                };
+                actor.PhaseProgressTransitions = new[]
+                {
+                    new HazardActorPhaseProgressTransitionAuthoring
+                    {
+                        FromPhaseId = 1,
+                        ToPhaseId = 2,
+                        ProgressThresholdNormalized = 0.5f,
+                        TransitionLeadInSec = 0.25f,
+                    }
+                };
+
+                var definition = CreateDefinition(created, stageId: 13);
                 definition.SourceBindings = new[]
                 {
                     new StageSourceBinding
                     {
-                        SourceStableId = 1101u,
+                        SourceStableId = 1301u,
                         InitialSourceState = SourceStateId.Normal,
                         ThresholdWeakened = 0,
-                        ThresholdDepleted = 0,
+                        ThresholdDepleted = 4,
                         SustainSlots = Array.Empty<SustainSlotBinding>(),
                         EventSlots = Array.Empty<EventSlotBinding>(),
-                        HazardActors = new[]
+                        HazardActorPlacements = new[]
                         {
-                            new HazardActorBinding
+                            new HazardActorPlacementBinding
                             {
-                                ActorId = 1,
-                                EnabledMode = HazardActorEnabledOverrideMode.Inherit,
-                                StartSuppressedMode = HazardActorSuppressionOverrideMode.Inherit,
-                                Emitters = new[]
-                                {
-                                    new HazardEmitterBinding
-                                    {
-                                        EmitterId = 1,
-                                        TelegraphProfileOverride = telegraphProfile,
-                                        EmissionProfileOverride = emissionProfile,
-                                    },
-                                },
-                            },
+                                PlacementInstanceId = 41,
+                                ActorArchetypePrefab = archetype.Root,
+                                LocalOffset = Vector3.zero,
+                            }
                         },
                     }
                 };
-                EditorUtility.SetDirty(definition);
-                AssetDatabase.SaveAssets();
-
-                var layout = CreateLayoutAsset($"{operationalRoot}/sl_operational.asset", stageId: 11);
-                var catalog = CreateCatalogAsset(
-                    $"{operationalRoot}/sc_operational.asset",
-                    new StageCatalogEntry
+                definition.HazardActorOrchestrationRules = new[]
+                {
+                    new HazardActorOrchestrationRuleBinding
                     {
-                        Enabled = true,
-                        EntryKey = "stage_hazard_override_test",
-                        Definition = definition,
-                        Layout = layout,
-                    });
+                        RuleId = 1,
+                        TargetPlacementInstanceId = 999,
+                        ActionType = HazardActorOrchestrationActionId.Spawn,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 2,
+                        TargetPlacementInstanceId = 41,
+                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                        TriggerThresholdNormalized = 1.25f,
+                        TargetPhaseId = 3,
+                    },
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 3,
+                        TargetPlacementInstanceId = 41,
+                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                        TriggerThresholdNormalized = 0.5f,
+                        TargetPhaseId = 2,
+                    },
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 4,
+                        TargetPlacementInstanceId = 41,
+                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                        TriggerThresholdNormalized = 0.75f,
+                        TargetPhaseId = 2,
+                    },
+                };
 
-                var issues = ValidateCatalog(catalog, operationalRoot);
-                Assert.That(HasIssue(issues, "STC030", ContentValidationSeverity.Error), Is.True);
-                Assert.That(HasIssue(issues, "STC031", ContentValidationSeverity.Error), Is.True);
+                var layout = CreateLayout(created, stageId: 13);
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_13",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(HasIssue(issues, "STC040", ContentValidationSeverity.Error), Is.True);
+                Assert.That(HasIssue(issues, "STC041", ContentValidationSeverity.Error), Is.True);
+                Assert.That(HasIssue(issues, "STC042", ContentValidationSeverity.Error), Is.True);
+                Assert.That(HasIssue(issues, "STC045", ContentValidationSeverity.Error), Is.True);
+                Assert.That(HasIssue(issues, "STC044", ContentValidationSeverity.Warning), Is.True);
             }
             finally
             {
-                DeleteAssetFolder($"{GeneratedOperationalRoot}/{scope}");
-                DeleteAssetFolder($"{GeneratedTestRoot}/{scope}");
+                DestroyAll(created);
+            }
+        }
+
+        [Test]
+        public void ValidateCatalog_HazardActorOrchestration_ExactSameTriggerConflicts_AreReportedAsWarning()
+        {
+            var created = new List<ScriptableObject>();
+            using var archetype = CreateHazardActorArchetype("orchestration_conflict_archetype", actorId: 4, emitterId: 44);
+
+            try
+            {
+                var definition = CreateDefinition(created, stageId: 14);
+                definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1401u,
+                        InitialSourceState = SourceStateId.Normal,
+                        ThresholdWeakened = 0,
+                        ThresholdDepleted = 4,
+                        SustainSlots = Array.Empty<SustainSlotBinding>(),
+                        EventSlots = Array.Empty<EventSlotBinding>(),
+                        HazardActorPlacements = new[]
+                        {
+                            new HazardActorPlacementBinding
+                            {
+                                PlacementInstanceId = 51,
+                                ActorArchetypePrefab = archetype.Root,
+                                LocalOffset = Vector3.zero,
+                            }
+                        },
+                    }
+                };
+                definition.HazardActorOrchestrationRules = new[]
+                {
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 1,
+                        TargetPlacementInstanceId = 51,
+                        ActionType = HazardActorOrchestrationActionId.Spawn,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 2,
+                        TargetPlacementInstanceId = 51,
+                        ActionType = HazardActorOrchestrationActionId.Retire,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                };
+
+                var layout = CreateLayout(created, stageId: 14);
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_14",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(HasIssue(issues, "STC043", ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                DestroyAll(created);
             }
         }
 

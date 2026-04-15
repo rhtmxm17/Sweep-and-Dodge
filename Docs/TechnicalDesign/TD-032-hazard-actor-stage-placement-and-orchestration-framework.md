@@ -4,23 +4,23 @@
 - doc_id: `TD-032`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-13`
+- last_updated: `2026-04-14`
 - related_docs:
   - [./TD-030-hazard-actor-hierarchy-and-stage-application.md](./TD-030-hazard-actor-hierarchy-and-stage-application.md)
   - [./TD-031-hazard-actor-behavior-runtime.md](./TD-031-hazard-actor-behavior-runtime.md)
   - [../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md](../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md)
   - [../TaskBoard/SESSION-20260413-01-hazard-actor-stage-placement-board.md](../TaskBoard/SESSION-20260413-01-hazard-actor-stage-placement-board.md)
 
-> `HazardActor`를 재사용 가능한 actor archetype content 단위로 보고, stage는 이를 source에 attach하는 placement/orchestration owner로 다룬다. 이 문서는 schema/wire shape를 확정하는 구현 문서가 아니라, 이후 실행 플랜의 기준이 되는 용어/책임/시나리오/비범위 SSOT다.
+> `HazardActor`를 재사용 가능한 actor archetype content 단위로 보고, stage는 이를 source에 attach하는 placement/orchestration owner로 다룬다. `SP-4` direct cutover 이후 actor stage SSOT는 `HazardActorPlacements + HazardActorOrchestrationRules`이며, legacy `HazardActorBinding` path는 제거됐다.
 
 ## 1. 문제 정의
 - 현재 구현은 `TD-030` 기준으로 `Source -> HazardActor -> HazardEmitter` hierarchy와 stage apply/reset owner를 이미 가진다.
 - `TD-031` 기준으로 actor 내부 behavior runtime도 `presence + phase-aware selector + escalation staging`까지 닫혔다.
-- 그러나 현재 `StageDefinitionSO.HazardActorBinding`은 아래 성격에 머문다.
+- cutover 전의 `HazardActorBinding` path는 아래 성격에 머물렀다.
   - baseline actor roster의 on/off
   - start suppressed
   - emitter-level local offset / single-slot profile override
-- 이 구조는 “스테이지별로 다른 actor archetype을 선택해서 source에 배치하고, instance별 등장/phase 전환/소멸을 orchestration한다”는 content-delivery 프레임을 표현하기 어렵다.
+- `SP-4`에서 이 path는 제거됐고, 현재는 placement/orchestration frame이 정식 actor stage 입력이다.
 - 결과적으로 현재 구조만으로는 아래 요구를 자연스럽게 수용하기 어렵다.
   - 같은 actor archetype을 여러 stage/source에서 재사용
   - 같은 stage 안에서 같은 archetype의 여러 instance를 서로 다른 규칙으로 운용
@@ -97,7 +97,8 @@
 - 따라서 아래 두 문장은 동시에 성립한다.
   - actor는 content authoring 관점에서 “몬스터처럼 취급하는 개체 원형”이다.
   - actor runtime은 source-owned hierarchy로 apply/reset/teardown 된다.
-- 현재 `HazardActorBinding`은 “기존 stage apply binding seam”으로 유지하되, 장기 방향의 최종 placement/orchestration 표현으로 간주하지 않는다.
+- legacy `HazardActorBinding` path는 `SP-4` direct cutover에서 제거됐다.
+- 현재 stage actor delivery/orchestration은 placement/orchestration frame만 사용한다.
 
 ## 6. 대표 요구 시나리오
 ### 6.1 추가 출현 시나리오
@@ -224,7 +225,7 @@
 - validation은 기존 stage catalog rule과 actor archetype authoring rule 사이를 어떻게 분리할지
 - existing `SourceHazardActorRefBuffer`를 placement resolve seam으로 완전히 대체하는 시점과 조건은 무엇인가
 
-## 10. 구현 단계 분리 초안
+## 10. 구현 단계
 - `SP-1. Actor Archetype Delivery`
   - stage가 actor archetype을 source-owned hierarchy에 attach하는 프레임
 - `SP-2. Placement Instance Schema`
@@ -233,12 +234,8 @@
   - instance 대상 `Spawn / PhaseSet / Retire` request와 trigger 모델 정리
 - `SP-4. Validation / Sample / Migration`
   - validation, sample content, migration/closeout 정리
+- 2026-04-14 기준 `SP-1`~`SP-4`는 구현/검증 완료 상태다.
 
 ## 11. 운영 메모
-- 이 TD는 구현 schema를 바로 닫는 문서가 아니다.
-- 이 TD만으로 구현을 시작하지 않는다.
-- 다음 단계는 별도 실행 플랜에서 아래를 decision-complete로 닫는 것이다.
-  - placement/orchestration schema
-  - lookup/reference 방식
-  - validation 경계
-  - apply/reset owner와 runtime instantiation 흐름
+- placement/orchestration frame의 current runtime shape와 migration closeout은 코드가 SSOT다.
+- 후속 설계 논의는 이 문서의 책임/용어 경계를 유지한 채, group targeting, lookup indirection, `SourceHazardActorRefBuffer` 축소 여부 같은 확장 항목만 다룬다.

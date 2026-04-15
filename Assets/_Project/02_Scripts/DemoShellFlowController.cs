@@ -806,6 +806,9 @@ namespace SweepNDodge.DotsBullets
 
         private void ReloadActiveScene()
         {
+            EnsureTopologyBridgeReference();
+            TopologyBridge?.CleanupOwnedRuntimeHazardsBeforeSceneReload();
+
             var active = SceneManager.GetActiveScene();
             if (!active.IsValid())
                 return;

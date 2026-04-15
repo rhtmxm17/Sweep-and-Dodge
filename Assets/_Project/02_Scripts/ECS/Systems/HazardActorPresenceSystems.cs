@@ -38,8 +38,14 @@ namespace SweepNDodge.DotsBullets
 
             var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
             var pressureInputLookup = SystemAPI.GetBufferLookup<SourceDirectorPressureInputBuffer>(true);
+            var placementLookup = SystemAPI.GetComponentLookup<HazardActorPlacementComponent>(true);
+            var orchestrationSignalLookup = SystemAPI.GetComponentLookup<HazardActorOrchestrationRequestSignalComponent>(true);
+            var orchestrationConsumptionLookup = SystemAPI.GetComponentLookup<HazardActorOrchestrationRequestConsumptionComponent>(false);
             sourceLookup.Update(ref state);
             pressureInputLookup.Update(ref state);
+            placementLookup.Update(ref state);
+            orchestrationSignalLookup.Update(ref state);
+            orchestrationConsumptionLookup.Update(ref state);
 
             var em = state.EntityManager;
             foreach (var (actor, applied, policy, runtime, actorEntity) in SystemAPI.Query<
@@ -52,6 +58,7 @@ namespace SweepNDodge.DotsBullets
                 ref readonly var appliedConfig = ref applied.ValueRO;
                 ref readonly var presencePolicy = ref policy.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
+                bool isPlacementDelivered = placementLookup.HasComponent(actorEntity);
 
                 if (appliedConfig.IsEnabled == 0 || appliedConfig.IsSuppressed != 0)
                 {
@@ -68,15 +75,20 @@ namespace SweepNDodge.DotsBullets
                         runtimeState.StateElapsedSec = 0f;
                         ResetSelectorState(em, actorEntity);
 
-                        if (!IsPresenceTriggerSatisfied(
+                        bool shouldActivate = isPlacementDelivered
+                            ? TryConsumePresenceRequest(
+                                actorEntity,
+                                HazardActorOrchestrationActionId.Spawn,
+                                orchestrationSignalLookup,
+                                orchestrationConsumptionLookup)
+                            : IsPresenceTriggerSatisfied(
                                 presencePolicy.ActivationTrigger,
                                 actorConfig.SourceEntity,
                                 em,
                                 sourceLookup,
-                                pressureInputLookup))
-                        {
+                                pressureInputLookup);
+                        if (!shouldActivate)
                             break;
-                        }
 
                         EmitPresenceSignal(em, actorEntity, HazardActorPresencePresentationCueId.ActivationStarted);
                         runtimeState.PresenceState = HazardActorPresenceStateId.Activating;
@@ -106,15 +118,20 @@ namespace SweepNDodge.DotsBullets
                     case HazardActorPresenceStateId.Active:
                     {
                         runtimeState.StateElapsedSec = 0f;
-                        if (!IsPresenceTriggerSatisfied(
+                        bool shouldRetire = isPlacementDelivered
+                            ? TryConsumePresenceRequest(
+                                actorEntity,
+                                HazardActorOrchestrationActionId.Retire,
+                                orchestrationSignalLookup,
+                                orchestrationConsumptionLookup)
+                            : IsPresenceTriggerSatisfied(
                                 presencePolicy.RetireTrigger,
                                 actorConfig.SourceEntity,
                                 em,
                                 sourceLookup,
-                                pressureInputLookup))
-                        {
+                                pressureInputLookup);
+                        if (!shouldRetire)
                             break;
-                        }
 
                         EmitPresenceSignal(em, actorEntity, HazardActorPresencePresentationCueId.RetireStarted);
                         runtimeState.PresenceState = HazardActorPresenceStateId.Retiring;
@@ -184,6 +201,24 @@ namespace SweepNDodge.DotsBullets
                 LastResolvedPhaseVersion = 0u,
                 LastConsumedCycleVersion = 0u,
             });
+        }
+
+        private static bool TryConsumePresenceRequest(
+            Entity actorEntity,
+            HazardActorOrchestrationActionId expectedAction,
+            ComponentLookup<HazardActorOrchestrationRequestSignalComponent> signalLookup,
+            ComponentLookup<HazardActorOrchestrationRequestConsumptionComponent> consumptionLookup)
+        {
+            if (!signalLookup.HasComponent(actorEntity) || !consumptionLookup.HasComponent(actorEntity))
+                return false;
+
+            var signal = signalLookup[actorEntity];
+            ref var consumption = ref consumptionLookup.GetRefRW(actorEntity).ValueRW;
+            if (signal.Version == 0u || signal.Version == consumption.LastPresenceRequestVersion)
+                return false;
+
+            consumption.LastPresenceRequestVersion = signal.Version;
+            return signal.ActionType == expectedAction;
         }
 
         private static bool IsPresenceTriggerSatisfied(
