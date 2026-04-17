@@ -9,7 +9,7 @@ using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class BulletSampleVerificationPlayModeTests
+    public class BulletSampleVerificationPlayModeTests : PlayModeTestBase
     {
         private const string ScenePath = "Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_SampleVerification.unity";
 

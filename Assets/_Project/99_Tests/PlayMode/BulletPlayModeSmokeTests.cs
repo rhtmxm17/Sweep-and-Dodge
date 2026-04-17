@@ -11,7 +11,7 @@ using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class BulletPlayModeSmokeTests
+    public class BulletPlayModeSmokeTests : PlayModeTestBase
     {
         private const string DedicatedScenePath = "Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity";
         private const string OperationalScenePath = "Assets/_Project/01_Scenes/SampleScene.unity";

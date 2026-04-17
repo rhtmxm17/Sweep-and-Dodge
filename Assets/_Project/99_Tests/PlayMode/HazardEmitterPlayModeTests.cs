@@ -10,7 +10,7 @@ using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class HazardEmitterPlayModeTests
+    public class HazardEmitterPlayModeTests : PlayModeTestBase
     {
         private sealed class HazardActorArchetypeFixture : System.IDisposable
         {

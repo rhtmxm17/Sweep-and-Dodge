@@ -3,7 +3,6 @@ using System.Linq;
 using System.Text;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -11,7 +10,6 @@ namespace SweepNDodge.DotsBullets.Tests
     public sealed class PlayModeMcpNoiseFilterFixture
     {
         private static readonly ConcurrentQueue<UnexpectedLogEntry> UnexpectedLogs = new();
-        private static bool _previousIgnoreFailingMessages;
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -20,8 +18,6 @@ namespace SweepNDodge.DotsBullets.Tests
             {
             }
 
-            _previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
-            LogAssert.ignoreFailingMessages = true;
             Application.logMessageReceivedThreaded += HandleLogMessage;
         }
 
@@ -29,7 +25,6 @@ namespace SweepNDodge.DotsBullets.Tests
         public void OneTimeTearDown()
         {
             Application.logMessageReceivedThreaded -= HandleLogMessage;
-            LogAssert.ignoreFailingMessages = _previousIgnoreFailingMessages;
 
             var unexpectedLogs = UnexpectedLogs.ToArray();
             if (unexpectedLogs.Length == 0)

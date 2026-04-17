@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class PlayModeMcpNoiseFilterFixtureTests
+    public class PlayModeMcpNoiseFilterFixtureTests : PlayModeTestBase
     {
         [Test]
         public void IsAllowedMcpNoise_ReturnsTrueForDisposedStreamNoise()

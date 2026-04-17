@@ -9,7 +9,7 @@ using UnityEngine.TestTools;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
-    public class BulletMotionCompletedExplodePlayModeTests
+    public class BulletMotionCompletedExplodePlayModeTests : PlayModeTestBase
     {
         [UnityTest]
         public IEnumerator PlayMode_MotionCompletedExplode_SpawnsSecondaryBulletsNextExecutionBegin()

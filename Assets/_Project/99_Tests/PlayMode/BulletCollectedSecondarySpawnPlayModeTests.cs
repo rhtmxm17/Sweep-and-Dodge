@@ -13,7 +13,7 @@ namespace SweepNDodge.DotsBullets.Tests
     /// Legacy compatibility coverage:
     /// secondary reaction PlayMode fixture는 의도적으로 RadialRing 기반 경로를 유지한다.
     /// </summary>
-    public class BulletCleanupRemovedSecondarySpawnPlayModeTests
+    public class BulletCleanupRemovedSecondarySpawnPlayModeTests : PlayModeTestBase
     {
         private static readonly FixedString64Bytes LegacyRadialProfileKey = "legacy_radial";
         private static readonly FixedString64Bytes LegacyForwardProfileKey = "legacy_forward";
