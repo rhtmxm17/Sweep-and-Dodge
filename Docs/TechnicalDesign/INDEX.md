@@ -29,8 +29,8 @@
 - [TD-025-stage-player-start-position-contract.md](TD-025-stage-player-start-position-contract.md): 스테이지별 플레이어 시작 위치의 layout 소유, prepare owner, authoring/runtime 적용 계약
 - [TD-026-source-pollution-recovery-wave-contract.md](TD-026-source-pollution-recovery-wave-contract.md): `GD-014` 청소 흔적 복구를 `active/inactive + recovery wave` runtime 계약으로 정리
 - [TD-027-hazard-bullet-extension-contract.md](TD-027-hazard-bullet-extension-contract.md): Hazard 확장을 `Movement + Reaction + LifecycleReason` 조합으로 분리하는 초안
-- [TD-028-hazard-emitter-common-contract.md](TD-028-hazard-emitter-common-contract.md): `HazardEmitter` 최소 공통 계약을 `유형 기준 + profile ref + emit append` 경계로 고정하는 초안
-- [TD-029-discrete-emit-spawn-bridge-contract.md](TD-029-discrete-emit-spawn-bridge-contract.md): `WaveClip EventBurst/Poisson`와 `HazardEmitter Emit`을 공통 `DiscreteEmit` 브리지로 내리는 ownership/request/update-order 계약
-- [TD-030-hazard-actor-hierarchy-and-stage-application.md](TD-030-hazard-actor-hierarchy-and-stage-application.md): `HazardActor` 상위 계층, `Source -> Actor -> Emitter` hierarchy, stage-applied binding/apply/reset 계약
-- [TD-031-hazard-actor-behavior-runtime.md](TD-031-hazard-actor-behavior-runtime.md): `HazardActor`의 `Presence + PatternSelector + Emitter execution seam` 기반 행동 확장 설계 작업 기준
-- [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](TD-032-hazard-actor-stage-placement-and-orchestration-framework.md): `HazardActor` archetype을 stage가 source에 attach하고 orchestration하는 content-delivery 프레임 초안
+- [TD-028-hazard-emitter-common-contract.md](TD-028-hazard-emitter-common-contract.md): superseded 기록. `HazardEmitter`를 독립 runtime entity로 보던 초기 계약과 현재 SSOT 링크 정리
+- [TD-029-discrete-emit-spawn-bridge-contract.md](TD-029-discrete-emit-spawn-bridge-contract.md): `WaveClip` discrete branch와 `HazardActor` 직접 발사를 공통 `DiscreteEmit` 브리지로 묶는 현재 producer/request/update-order 계약
+- [TD-030-hazard-actor-hierarchy-and-stage-application.md](TD-030-hazard-actor-hierarchy-and-stage-application.md): 현재 `Source -> HazardActor` hierarchy, actor-owned pattern/emit runtime, stage apply/reset/cleanup 계약
+- [TD-031-hazard-actor-behavior-runtime.md](TD-031-hazard-actor-behavior-runtime.md): `Presence + PhaseTransition + PatternSelector + actor-owned emit runtime` 기준의 현재 behavior SSOT
+- [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](TD-032-hazard-actor-stage-placement-and-orchestration-framework.md): stage가 actor archetype을 actor-only placement/orchestration seam으로 attach/reset/cleanup 하는 current content-delivery 계약
