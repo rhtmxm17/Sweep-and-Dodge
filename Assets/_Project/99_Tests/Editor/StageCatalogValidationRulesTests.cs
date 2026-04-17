@@ -538,7 +538,6 @@ namespace SweepNDodge.DotsBullets.Tests
             try
             {
                 var actor = archetype.Root.GetComponent<HazardActorAuthoring>();
-                actor.ActivationTrigger = HazardActorPresenceTriggerMode.Immediate;
                 actor.PhaseSelectorPolicies = new[]
                 {
                     new HazardActorPhaseSelectorPolicyAuthoring
@@ -645,7 +644,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(HasIssue(issues, "STC041", ContentValidationSeverity.Error), Is.True);
                 Assert.That(HasIssue(issues, "STC042", ContentValidationSeverity.Error), Is.True);
                 Assert.That(HasIssue(issues, "STC045", ContentValidationSeverity.Error), Is.True);
-                Assert.That(HasIssue(issues, "STC044", ContentValidationSeverity.Warning), Is.True);
             }
             finally
             {

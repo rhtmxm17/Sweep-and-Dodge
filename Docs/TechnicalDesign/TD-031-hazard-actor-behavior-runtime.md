@@ -183,13 +183,11 @@
 - 현재 구현 상태:
   - `HazardActorPresenceSystem`이 presence progression owner다.
   - `HazardActorPresencePolicyComponent`
-    - `ActivationTrigger`
     - `ActivationDurationSec`
-    - `RetireTrigger`
     - `RetireDurationSec`
-    를 사용해 `Hidden / Activating / Active / Retiring` 전이를 수행한다.
-  - 현재 기본 seed는 `Immediate activation / no retire`다.
-  - `HB-1C` 이후 `SourceOccupied` activation trigger가 추가됐고, room-entry seed는 `SourceDirectorPressureInputBuffer.InfluenceOccupancy`를 읽는다.
+    를 사용해 activation/retire duration만 정의한다.
+  - `Spawn / Retire` 전이 시작 조건의 owner는 stage orchestration request다.
+  - `HazardActorPresenceSystem`은 `HazardActorOrchestrationRequestSignalComponent`의 `Spawn / Retire` request를 소비해 `Hidden / Activating / Active / Retiring` 전이를 수행한다.
   - `HB-1B` 이후 `PresenceState != Active`는 actor activation truth를 차단한다.
   - actor `disabled/suppressed`는 presence system이 `Hidden`으로 clamp하고 selector invalid sentinel을 강제한다.
   - `HazardActorPresencePresentationSignalComponent`

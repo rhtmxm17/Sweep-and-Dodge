@@ -508,16 +508,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     ValidPhaseIds = CollectValidPhaseIds(selectorSeed),
                     PhaseTransitions = phaseTransitions ?? Array.Empty<HazardActorPhaseProgressTransitionBuffer>(),
                 };
-
-                if (actorAuthorings[0].ActivationTrigger != HazardActorPresenceTriggerMode.None
-                    || actorAuthorings[0].RetireTrigger != HazardActorPresenceTriggerMode.None)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Warning,
-                        "STC044",
-                        placementLocation,
-                        $"Placement-delivered HazardActor archetype self-trigger fields are ignored by stage orchestration. activation={actorAuthorings[0].ActivationTrigger}, retire={actorAuthorings[0].RetireTrigger}"));
-                }
             }
         }
 

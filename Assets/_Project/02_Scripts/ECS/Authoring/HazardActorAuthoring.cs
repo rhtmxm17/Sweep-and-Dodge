@@ -38,9 +38,7 @@ namespace SweepNDodge.DotsBullets
         public HazardActorPresenceStateId InitialPresenceState = HazardActorPresenceStateId.Hidden;
 
         [Header("Presence Policy")]
-        public HazardActorPresenceTriggerMode ActivationTrigger = HazardActorPresenceTriggerMode.Immediate;
         [Min(0f)] public float ActivationDurationSec = 0f;
-        public HazardActorPresenceTriggerMode RetireTrigger = HazardActorPresenceTriggerMode.None;
         [Min(0f)] public float RetireDurationSec = 0f;
 
         [Header("Phase Selector")]
@@ -102,9 +100,7 @@ namespace SweepNDodge.DotsBullets
                 });
                 AddComponent(actorEntity, new HazardActorPresencePolicyComponent
                 {
-                    ActivationTrigger = authoring.ActivationTrigger,
                     ActivationDurationSec = math.max(0f, authoring.ActivationDurationSec),
-                    RetireTrigger = authoring.RetireTrigger,
                     RetireDurationSec = math.max(0f, authoring.RetireDurationSec),
                 });
 

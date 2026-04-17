@@ -48,9 +48,7 @@ MonoBehaviour:
   Enabled: 1
   StartSuppressed: 0
   InitialPresenceState: 2
-  ActivationTrigger: 0
   ActivationDurationSec: 0
-  RetireTrigger: 0
   RetireDurationSec: 0
   InitialPhaseId: 1
   PhaseSelectorPolicies:

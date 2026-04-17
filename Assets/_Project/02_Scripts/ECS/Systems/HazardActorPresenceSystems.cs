@@ -37,29 +37,20 @@ namespace SweepNDodge.DotsBullets
             if (!FixedTickTimeUtility.TryResolveLogicDeltaTime(in fixedTickRuntime, out float deltaTime))
                 return;
 
-            var sourceLookup = SystemAPI.GetComponentLookup<SourceSpawnComponent>(true);
-            var pressureInputLookup = SystemAPI.GetBufferLookup<SourceDirectorPressureInputBuffer>(true);
-            var placementLookup = SystemAPI.GetComponentLookup<HazardActorPlacementComponent>(true);
             var orchestrationSignalLookup = SystemAPI.GetComponentLookup<HazardActorOrchestrationRequestSignalComponent>(true);
             var orchestrationConsumptionLookup = SystemAPI.GetComponentLookup<HazardActorOrchestrationRequestConsumptionComponent>(false);
-            sourceLookup.Update(ref state);
-            pressureInputLookup.Update(ref state);
-            placementLookup.Update(ref state);
             orchestrationSignalLookup.Update(ref state);
             orchestrationConsumptionLookup.Update(ref state);
 
             var em = state.EntityManager;
-            foreach (var (actor, applied, policy, runtime, actorEntity) in SystemAPI.Query<
-                RefRO<HazardActorComponent>,
+            foreach (var (applied, policy, runtime, actorEntity) in SystemAPI.Query<
                 RefRO<HazardActorAppliedConfigComponent>,
                 RefRO<HazardActorPresencePolicyComponent>,
                 RefRW<HazardActorRuntimeStateComponent>>().WithEntityAccess())
             {
-                ref readonly var actorConfig = ref actor.ValueRO;
                 ref readonly var appliedConfig = ref applied.ValueRO;
                 ref readonly var presencePolicy = ref policy.ValueRO;
                 ref var runtimeState = ref runtime.ValueRW;
-                bool isPlacementDelivered = placementLookup.HasComponent(actorEntity);
 
                 if (appliedConfig.IsEnabled == 0 || appliedConfig.IsSuppressed != 0)
                 {
@@ -76,18 +67,11 @@ namespace SweepNDodge.DotsBullets
                         runtimeState.StateElapsedSec = 0f;
                         ResetSelectorState(em, actorEntity);
 
-                        bool shouldActivate = isPlacementDelivered
-                            ? TryConsumePresenceRequest(
-                                actorEntity,
-                                HazardActorOrchestrationActionId.Spawn,
-                                orchestrationSignalLookup,
-                                orchestrationConsumptionLookup)
-                            : IsPresenceTriggerSatisfied(
-                                presencePolicy.ActivationTrigger,
-                                actorConfig.SourceEntity,
-                                em,
-                                sourceLookup,
-                                pressureInputLookup);
+                        bool shouldActivate = TryConsumePresenceRequest(
+                            actorEntity,
+                            HazardActorOrchestrationActionId.Spawn,
+                            orchestrationSignalLookup,
+                            orchestrationConsumptionLookup);
                         if (!shouldActivate)
                             break;
 
@@ -119,18 +103,11 @@ namespace SweepNDodge.DotsBullets
                     case HazardActorPresenceStateId.Active:
                     {
                         runtimeState.StateElapsedSec = 0f;
-                        bool shouldRetire = isPlacementDelivered
-                            ? TryConsumePresenceRequest(
-                                actorEntity,
-                                HazardActorOrchestrationActionId.Retire,
-                                orchestrationSignalLookup,
-                                orchestrationConsumptionLookup)
-                            : IsPresenceTriggerSatisfied(
-                                presencePolicy.RetireTrigger,
-                                actorConfig.SourceEntity,
-                                em,
-                                sourceLookup,
-                                pressureInputLookup);
+                        bool shouldRetire = TryConsumePresenceRequest(
+                            actorEntity,
+                            HazardActorOrchestrationActionId.Retire,
+                            orchestrationSignalLookup,
+                            orchestrationConsumptionLookup);
                         if (!shouldRetire)
                             break;
 
@@ -219,52 +196,6 @@ namespace SweepNDodge.DotsBullets
 
             consumption.LastPresenceRequestVersion = signal.Version;
             return signal.ActionType == expectedAction;
-        }
-
-        private static bool IsPresenceTriggerSatisfied(
-            HazardActorPresenceTriggerMode trigger,
-            Entity sourceEntity,
-            EntityManager em,
-            ComponentLookup<SourceSpawnComponent> sourceLookup,
-            BufferLookup<SourceDirectorPressureInputBuffer> pressureInputLookup)
-        {
-            switch (trigger)
-            {
-                case HazardActorPresenceTriggerMode.None:
-                    return false;
-
-                case HazardActorPresenceTriggerMode.Immediate:
-                    return true;
-
-                case HazardActorPresenceTriggerMode.SourceAvailable:
-                    return sourceEntity != Entity.Null && em.Exists(sourceEntity);
-
-                case HazardActorPresenceTriggerMode.SourceDepleted:
-                    if (sourceEntity == Entity.Null || !em.Exists(sourceEntity) || !sourceLookup.HasComponent(sourceEntity))
-                        return false;
-
-                    var source = sourceLookup[sourceEntity];
-                    return source.State == SourceStateId.Depleted
-                        || source.CollectedCount >= math.max(1, source.ThresholdDepleted);
-
-                case HazardActorPresenceTriggerMode.SourceOccupied:
-                    if (sourceEntity == Entity.Null || !em.Exists(sourceEntity) || !pressureInputLookup.HasBuffer(sourceEntity))
-                        return false;
-
-                    var pressureInputs = pressureInputLookup[sourceEntity];
-                    for (int i = 0; i < pressureInputs.Length; i++)
-                    {
-                        if (pressureInputs[i].Slot != RunDirectorPressureInputSlotId.InfluenceOccupancy)
-                            continue;
-
-                        return pressureInputs[i].Value > 0.5f;
-                    }
-
-                    return false;
-
-                default:
-                    return false;
-            }
         }
     }
 }

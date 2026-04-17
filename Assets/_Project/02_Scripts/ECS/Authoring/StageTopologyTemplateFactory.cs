@@ -276,9 +276,7 @@ namespace SweepNDodge.DotsBullets
             });
             em.AddComponentData(actorEntity, new HazardActorPresencePolicyComponent
             {
-                ActivationTrigger = actorAuthoring.ActivationTrigger,
                 ActivationDurationSec = math.max(0f, actorAuthoring.ActivationDurationSec),
-                RetireTrigger = actorAuthoring.RetireTrigger,
                 RetireDurationSec = math.max(0f, actorAuthoring.RetireDurationSec),
             });
             em.SetComponentData(actorEntity, new HazardActorRuntimeBaselineComponent
