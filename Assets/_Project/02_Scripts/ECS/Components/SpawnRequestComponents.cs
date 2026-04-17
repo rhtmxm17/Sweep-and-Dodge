@@ -147,7 +147,7 @@ namespace SweepNDodge.DotsBullets
     public enum DiscreteEmitProducerKind : byte
     {
         WaveClipEvent = 0,
-        HazardEmitter = 1,
+        HazardActor = 1,
     }
 
     public enum DiscreteEmitAnchorMode : byte

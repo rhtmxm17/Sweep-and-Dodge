@@ -7,46 +7,47 @@ using UnityEngine;
 namespace SweepNDodge.DotsBullets
 {
     [Serializable]
-    public struct HazardEmitterPatternSlotAuthoring
+    public struct HazardActorPatternSlotAuthoring
     {
         [Min(1)] public int PatternSlotId;
         public HazardEmitterTelegraphProfileSO TelegraphProfile;
         public HazardEmitterEmissionProfileSO EmissionProfile;
         [Min(0f)] public float BaseWeight;
         public uint AvailabilityFlags;
+        public Vector3 LocalOffset;
     }
 
-    public readonly struct ResolvedHazardEmitterPatternSlotAuthoring
+    public readonly struct ResolvedHazardActorPatternSlotAuthoring
     {
-        public readonly HazardEmitterPatternSlotBuffer Metadata;
-        public readonly HazardEmitterPatternExecutionSlotBuffer Execution;
+        public readonly HazardActorPatternSlotBuffer Metadata;
+        public readonly HazardActorPatternExecutionSlotBuffer Execution;
 
-        public ResolvedHazardEmitterPatternSlotAuthoring(
-            in HazardEmitterPatternSlotBuffer metadata,
-            in HazardEmitterPatternExecutionSlotBuffer execution)
+        public ResolvedHazardActorPatternSlotAuthoring(
+            in HazardActorPatternSlotBuffer metadata,
+            in HazardActorPatternExecutionSlotBuffer execution)
         {
             Metadata = metadata;
             Execution = execution;
         }
     }
 
-    public static class HazardEmitterPatternSlotAuthoringUtility
+    public static class HazardActorPatternSlotAuthoringUtility
     {
         public static bool TryResolveSlots(
-            HazardEmitterPatternSlotAuthoring[] authoringSlots,
-            out ResolvedHazardEmitterPatternSlotAuthoring[] resolvedSlots,
+            HazardActorPatternSlotAuthoring[] authoringSlots,
+            out ResolvedHazardActorPatternSlotAuthoring[] resolvedSlots,
             out string error)
         {
-            resolvedSlots = Array.Empty<ResolvedHazardEmitterPatternSlotAuthoring>();
+            resolvedSlots = Array.Empty<ResolvedHazardActorPatternSlotAuthoring>();
             error = string.Empty;
 
             if (authoringSlots == null || authoringSlots.Length <= 0)
             {
-                error = "HazardEmitterAuthoring requires at least one pattern slot.";
+                error = "HazardActorAuthoring requires at least one pattern slot.";
                 return false;
             }
 
-            var collected = new List<ResolvedHazardEmitterPatternSlotAuthoring>(authoringSlots.Length);
+            var collected = new List<ResolvedHazardActorPatternSlotAuthoring>(authoringSlots.Length);
             var usedSlotIds = new HashSet<int>();
 
             for (int i = 0; i < authoringSlots.Length; i++)
@@ -54,47 +55,47 @@ namespace SweepNDodge.DotsBullets
                 var slot = authoringSlots[i];
                 if (slot.PatternSlotId < 1)
                 {
-                    error = $"HazardEmitter pattern slot requires PatternSlotId >= 1. index={i}, current={slot.PatternSlotId}.";
+                    error = $"HazardActor pattern slot requires PatternSlotId >= 1. index={i}, current={slot.PatternSlotId}.";
                     return false;
                 }
 
                 if (!usedSlotIds.Add(slot.PatternSlotId))
                 {
-                    error = $"HazardEmitter pattern slot contains duplicate PatternSlotId {slot.PatternSlotId}.";
+                    error = $"HazardActor pattern slot contains duplicate PatternSlotId {slot.PatternSlotId}.";
                     return false;
                 }
 
                 if (slot.TelegraphProfile == null)
                 {
-                    error = $"HazardEmitter pattern slot is missing TelegraphProfile. slotId={slot.PatternSlotId}.";
+                    error = $"HazardActor pattern slot is missing TelegraphProfile. slotId={slot.PatternSlotId}.";
                     return false;
                 }
 
                 if (slot.EmissionProfile == null)
                 {
-                    error = $"HazardEmitter pattern slot is missing EmissionProfile. slotId={slot.PatternSlotId}.";
+                    error = $"HazardActor pattern slot is missing EmissionProfile. slotId={slot.PatternSlotId}.";
                     return false;
                 }
 
                 if (slot.BaseWeight < 0f)
                 {
-                    error = $"HazardEmitter pattern slot requires BaseWeight >= 0. slotId={slot.PatternSlotId}, current={slot.BaseWeight}.";
+                    error = $"HazardActor pattern slot requires BaseWeight >= 0. slotId={slot.PatternSlotId}, current={slot.BaseWeight}.";
                     return false;
                 }
 
                 if (!HazardEmitterProfileResolver.TryResolve(slot.TelegraphProfile, out var resolvedTelegraph))
                 {
-                    error = $"HazardEmitter pattern slot failed to resolve TelegraphProfile. slotId={slot.PatternSlotId}.";
+                    error = $"HazardActor pattern slot failed to resolve TelegraphProfile. slotId={slot.PatternSlotId}.";
                     return false;
                 }
 
                 if (!HazardEmitterProfileResolver.TryResolve(slot.EmissionProfile, out var resolvedEmission, out error))
                 {
-                    error = $"HazardEmitter pattern slot failed to resolve EmissionProfile. slotId={slot.PatternSlotId}. {error}";
+                    error = $"HazardActor pattern slot failed to resolve EmissionProfile. slotId={slot.PatternSlotId}. {error}";
                     return false;
                 }
 
-                var metadata = new HazardEmitterPatternSlotBuffer
+                var metadata = new HazardActorPatternSlotBuffer
                 {
                     PatternSlotId = slot.PatternSlotId,
                     TelegraphProfileRefId = resolvedTelegraph.ProfileId,
@@ -105,9 +106,10 @@ namespace SweepNDodge.DotsBullets
                 var execution = CreateExecutionSlot(
                     slot.PatternSlotId,
                     slot.EmissionProfile.GetInstanceID(),
+                    (float3)slot.LocalOffset,
                     resolvedTelegraph,
                     resolvedEmission);
-                collected.Add(new ResolvedHazardEmitterPatternSlotAuthoring(in metadata, in execution));
+                collected.Add(new ResolvedHazardActorPatternSlotAuthoring(in metadata, in execution));
             }
 
             collected.Sort(static (a, b) => a.Metadata.PatternSlotId.CompareTo(b.Metadata.PatternSlotId));
@@ -116,9 +118,9 @@ namespace SweepNDodge.DotsBullets
         }
 
         public static void ApplyResolvedSlotsToBuffers(
-            ResolvedHazardEmitterPatternSlotAuthoring[] resolvedSlots,
-            ref DynamicBuffer<HazardEmitterPatternSlotBuffer> metadataSlots,
-            ref DynamicBuffer<HazardEmitterPatternExecutionSlotBuffer> executionSlots)
+            ResolvedHazardActorPatternSlotAuthoring[] resolvedSlots,
+            ref DynamicBuffer<HazardActorPatternSlotBuffer> metadataSlots,
+            ref DynamicBuffer<HazardActorPatternExecutionSlotBuffer> executionSlots)
         {
             metadataSlots.Clear();
             executionSlots.Clear();
@@ -130,23 +132,25 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
-        public static HazardEmitterTelegraphProfileBaselineComponent CreateBaselineTelegraph(
-            ResolvedHazardEmitterPatternSlotAuthoring[] resolvedSlots)
+        public static HazardActorEmitActiveTelegraphComponent CreateBaselineTelegraph(
+            ResolvedHazardActorPatternSlotAuthoring[] resolvedSlots)
         {
             var first = resolvedSlots[0].Execution;
-            return new HazardEmitterTelegraphProfileBaselineComponent
+            return new HazardActorEmitActiveTelegraphComponent
             {
+                AppliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId,
                 ProfileId = first.TelegraphProfileRefId,
                 TelegraphDurationSec = first.TelegraphDurationSec,
             };
         }
 
-        public static HazardEmitterEmissionProfileBaselineComponent CreateBaselineEmission(
-            ResolvedHazardEmitterPatternSlotAuthoring[] resolvedSlots)
+        public static HazardActorEmitActiveEmissionComponent CreateBaselineEmission(
+            ResolvedHazardActorPatternSlotAuthoring[] resolvedSlots)
         {
             var first = resolvedSlots[0].Execution;
-            return new HazardEmitterEmissionProfileBaselineComponent
+            return new HazardActorEmitActiveEmissionComponent
             {
+                AppliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId,
                 ProfileId = first.EmissionProfileRefId,
                 BulletTypeKey = first.BulletTypeKey,
                 PositionPatternMode = first.PositionPatternMode,
@@ -176,18 +180,20 @@ namespace SweepNDodge.DotsBullets
             };
         }
 
-        public static HazardEmitterPatternExecutionSlotBuffer CreateExecutionSlot(
+        public static HazardActorPatternExecutionSlotBuffer CreateExecutionSlot(
             int patternSlotId,
             int emissionProfileRefId,
+            float3 localOffset,
             in ResolvedHazardEmitterTelegraphProfileSnapshot telegraph,
             in ResolvedHazardEmitterEmissionProfileSnapshot emission)
         {
-            return new HazardEmitterPatternExecutionSlotBuffer
+            return new HazardActorPatternExecutionSlotBuffer
             {
                 PatternSlotId = patternSlotId,
                 TelegraphProfileRefId = telegraph.ProfileId,
                 EmissionProfileRefId = emissionProfileRefId,
                 TelegraphDurationSec = telegraph.TelegraphDurationSec,
+                LocalOffset = localOffset,
                 BulletTypeKey = emission.Bullet != null ? emission.Bullet.DefinitionId : 0,
                 PositionPatternMode = emission.PositionPatternMode,
                 SpawnOffset = emission.SpawnOffset,

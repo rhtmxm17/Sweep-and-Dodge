@@ -26,7 +26,6 @@ namespace SweepNDodge.DotsBullets.Tests
             var em = world.EntityManager;
             DemoShellFlowController shell = null;
             Entity actorEntity = Entity.Null;
-            Entity emitterEntity = Entity.Null;
             Entity sourceEntity = Entity.Null;
             Entity playerEntity = Entity.Null;
             yield return WaitForCondition(
@@ -66,10 +65,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
             CompleteTrackedJobs(em);
             actorEntity = FindFirstEntity<HazardActorComponent>(em);
-            emitterEntity = FindFirstEntity<HazardEmitterComponent>(em);
             playerEntity = GetSingletonEntity<PlayerTag>(em);
             Assert.That(actorEntity, Is.Not.EqualTo(Entity.Null), "Sample verification scene did not create a HazardActor entity.");
-            Assert.That(emitterEntity, Is.Not.EqualTo(Entity.Null), "Sample verification scene did not create a HazardEmitter entity.");
             Assert.That(playerEntity, Is.Not.EqualTo(Entity.Null), "Sample verification scene did not create a Player entity.");
             sourceEntity = em.GetComponentData<HazardActorComponent>(actorEntity).SourceEntity;
             Assert.That(sourceEntity, Is.Not.EqualTo(Entity.Null), "Hazard actor must point to a source entity.");
@@ -77,11 +74,11 @@ namespace SweepNDodge.DotsBullets.Tests
             var selectorPolicies = em.GetBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity);
             var selectorCandidates = em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity);
             var transitions = em.GetBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
-            var patternSlots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+            var patternSlots = em.GetBuffer<HazardActorPatternSlotBuffer>(actorEntity);
             Assert.That(selectorPolicies.Length, Is.EqualTo(2), "Blueprint sample actor must expose two phase selector policies.");
             Assert.That(selectorCandidates.Length, Is.EqualTo(4), "Blueprint sample actor must expose four ordered selector candidates.");
             Assert.That(transitions.Length, Is.EqualTo(1), "Blueprint sample actor must expose one phase transition.");
-            Assert.That(patternSlots.Length, Is.EqualTo(3), "Blueprint sample emitter must expose A/B/B' pattern slots.");
+            Assert.That(patternSlots.Length, Is.EqualTo(3), "Blueprint sample actor must expose A/B/B' pattern slots.");
 
             SetCarryState(em, load: 0, capacity: 100);
 
@@ -89,7 +86,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 () =>
                 {
                     CompleteTrackedJobs(em);
-                    if (!em.Exists(actorEntity) || !em.Exists(emitterEntity))
+                    if (!em.Exists(actorEntity))
                         return false;
 
                     var actorPhase = em.GetComponentData<HazardActorBehaviorPhaseStateComponent>(actorEntity);
@@ -155,7 +152,6 @@ namespace SweepNDodge.DotsBullets.Tests
             float preparingProgress01 = math.saturate((float)preparingProgress / math.max(1, sourceAtPreparing.ThresholdDepleted));
             Assert.That(preparingProgress01, Is.GreaterThanOrEqualTo(0.5f), "Preparing must start after source progress crosses the half-progress threshold.");
 
-            bool sawPreparingSuppression = false;
             for (int frame = 0; frame < 60; frame++)
             {
                 yield return null;
@@ -166,18 +162,9 @@ namespace SweepNDodge.DotsBullets.Tests
                     break;
 
                 var selector = em.GetComponentData<HazardActorPatternSelectorStateComponent>(actorEntity);
-                var coordinator = em.GetComponentData<HazardEmitterCoordinatorStateComponent>(emitterEntity);
                 Assert.That(selector.CurrentPatternSlotId, Is.EqualTo(preparingSlotId), "Selector must freeze while the actor is Preparing.");
                 Assert.That(selector.SelectionSequence, Is.EqualTo(preparingSequence), "Selector sequence must freeze while the actor is Preparing.");
-
-                if (coordinator.ActivationAllowed == 0
-                    && (coordinator.SuppressionReasonMask & (uint)HazardEmitterSuppressionReasonFlags.ActorPhaseTransitionPreparing) != 0u)
-                {
-                    sawPreparingSuppression = true;
-                }
             }
-
-            Assert.That(sawPreparingSuppression, Is.True, "Preparing must block emitter activation through the actor transition suppression flag.");
 
             yield return WaitForCondition(
                 () =>
@@ -333,11 +320,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static bool AnyEmitterAdvancedFromDormant(EntityManager em)
         {
-            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<HazardEmitterRuntimeStateComponent>());
-            using var emitters = query.ToComponentDataArray<HazardEmitterRuntimeStateComponent>(Allocator.Temp);
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<HazardActorEmitStateComponent>());
+            using var emitters = query.ToComponentDataArray<HazardActorEmitStateComponent>(Allocator.Temp);
             for (int i = 0; i < emitters.Length; i++)
             {
-                if (emitters[i].LifecycleState != HazardEmitterLifecycleStateId.Dormant || emitters[i].StateElapsedSec > 0f)
+                if (emitters[i].LifecycleState != HazardActorEmitLifecycleStateId.Dormant || emitters[i].StateElapsedSec > 0f)
                     return true;
             }
 

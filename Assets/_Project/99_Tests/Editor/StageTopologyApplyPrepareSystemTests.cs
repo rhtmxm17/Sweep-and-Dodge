@@ -698,24 +698,12 @@ namespace SweepNDodge.DotsBullets.Tests
             return Entity.Null;
         }
 
-        private static Entity FindEmitterForActor(EntityManager em, Entity actor)
-        {
-            var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actor);
-            Assert.That(emitterRefs.Length, Is.GreaterThanOrEqualTo(1));
-            return emitterRefs[0].EmitterEntity;
-        }
-
         private static HazardActorArchetypeFixture CreateHazardActorArchetype(string name, int actorId, int emitterId)
         {
             var fixture = new HazardActorArchetypeFixture();
             fixture.Root = new GameObject(name);
             var actor = fixture.Root.AddComponent<HazardActorAuthoring>();
             actor.ActorId = actorId;
-
-            var emitterGo = new GameObject("emitter");
-            emitterGo.transform.SetParent(fixture.Root.transform);
-            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
-            emitter.EmitterId = emitterId;
 
             fixture.Telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
             fixture.Bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -730,9 +718,9 @@ namespace SweepNDodge.DotsBullets.Tests
             fixture.Emission.EventShotIntervalSec = 0f;
             fixture.Emission.CooldownSec = 1f;
 
-            emitter.Slots = new[]
+            actor.PatternSlots = new[]
             {
-                new HazardEmitterPatternSlotAuthoring
+                new HazardActorPatternSlotAuthoring
                 {
                     PatternSlotId = 1,
                     TelegraphProfile = fixture.Telegraph,

@@ -87,19 +87,67 @@ namespace SweepNDodge.DotsBullets
     {
         public int PhaseId;
         public int OrderIndex;
-        public int EmitterId;
         public int PatternSlotId;
     }
 
     public struct HazardActorPatternSelectorStateComponent : IComponentData
     {
-        public int TargetEmitterId;
         public int CurrentPatternSlotId;
         public int LastPatternSlotId;
         public uint SelectionSequence;
         public int CurrentCandidateOrder;
         public uint LastResolvedPhaseVersion;
         public uint LastConsumedCycleVersion;
+    }
+
+    [InternalBufferCapacity(1)]
+    public struct HazardActorPatternSlotBuffer : IBufferElementData
+    {
+        public int PatternSlotId;
+        public int TelegraphProfileRefId;
+        public int EmissionProfileRefId;
+        public float BaseWeight;
+        public uint AvailabilityFlags;
+    }
+
+    [InternalBufferCapacity(1)]
+    public struct HazardActorPatternExecutionSlotBuffer : IBufferElementData
+    {
+        public int PatternSlotId;
+        public int TelegraphProfileRefId;
+        public int EmissionProfileRefId;
+        public float TelegraphDurationSec;
+        public float3 LocalOffset;
+
+        public int BulletTypeKey;
+
+        public WavePositionPatternModeId PositionPatternMode;
+        public float2 SpawnOffset;
+        public float2 LineStart;
+        public float2 LineEnd;
+        public float SampleSpacing;
+        public int PointSetCount;
+        public float2 Point0;
+        public float2 Point1;
+        public float2 Point2;
+        public float2 Point3;
+
+        public WaveAimModeId AimMode;
+        public WaveAimSnapshotTimingId AimSnapshotTiming;
+        public float BaseAngleDeg;
+        public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
+        public float SpiralStepDeg;
+
+        public WaveShotPatternModeId ShotPatternMode;
+        public int ShotCount;
+        public float NWayAngleSpacingDeg;
+
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        public float EventShotIntervalSec;
+        public int EventRepeatCount;
+        public float CooldownSec;
     }
 
     public enum HazardActorPhaseTransitionStateId : byte
@@ -212,12 +260,5 @@ namespace SweepNDodge.DotsBullets
     {
         public int RuleId;
         public byte HasFired;
-    }
-
-    [InternalBufferCapacity(4)]
-    public struct HazardActorEmitterRefBuffer : IBufferElementData
-    {
-        public Entity EmitterEntity;
-        public int EmitterId;
     }
 }

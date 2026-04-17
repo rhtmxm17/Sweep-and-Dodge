@@ -11,7 +11,7 @@ namespace SweepNDodge.DotsBullets
     [UpdateAfter(typeof(SourcePollutionUpdateSystem))]
     [UpdateBefore(typeof(HazardActorPresenceSystem))]
     [UpdateBefore(typeof(HazardActorPhaseTransitionSystem))]
-    [UpdateBefore(typeof(HazardEmitterCoordinatorSystem))]
+    [UpdateBefore(typeof(HazardActorPatternSelectorSystem))]
     public partial struct HazardActorOrchestrationSystem : ISystem
     {
         public void OnCreate(ref SystemState state)

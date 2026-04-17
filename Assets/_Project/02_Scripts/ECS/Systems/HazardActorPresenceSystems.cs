@@ -7,8 +7,9 @@ namespace SweepNDodge.DotsBullets
     [UpdateAfter(typeof(PlayerCarryBinDepositRequestSystem))]
     [UpdateAfter(typeof(RunProgressDirectorSystem))]
     [UpdateAfter(typeof(SourcePollutionUpdateSystem))]
-    [UpdateBefore(typeof(HazardEmitterCoordinatorSystem))]
-    [UpdateBefore(typeof(HazardEmitterEmitBuildSystem))]
+    [UpdateBefore(typeof(HazardActorPhaseTransitionSystem))]
+    [UpdateBefore(typeof(HazardActorPatternSelectorSystem))]
+    [UpdateBefore(typeof(HazardActorEmitSystem))]
     public partial struct HazardActorPresenceSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
@@ -193,7 +194,6 @@ namespace SweepNDodge.DotsBullets
 
             em.SetComponentData(actorEntity, new HazardActorPatternSelectorStateComponent
             {
-                TargetEmitterId = -1,
                 CurrentPatternSlotId = -1,
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,

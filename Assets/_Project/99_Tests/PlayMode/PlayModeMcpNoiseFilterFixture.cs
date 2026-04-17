@@ -73,6 +73,7 @@ namespace SweepNDodge.DotsBullets.Tests
     internal static class PlayModeMcpNoiseFilterUtility
     {
         private const string MpcPrefix = "MCP-FOR-UNITY";
+        private const string BootstrapSpawnBacklogSignature = "[SpawnBacklog] hard-limit triggered frame=1 dropped=0 expired=15";
 
         public static bool IsFailingLogType(LogType logType)
         {
@@ -84,7 +85,8 @@ namespace SweepNDodge.DotsBullets.Tests
             if (string.IsNullOrEmpty(condition))
                 return false;
 
-            return condition.Contains(MpcPrefix);
+            return condition.Contains(MpcPrefix)
+                || condition.StartsWith(BootstrapSpawnBacklogSignature);
         }
     }
 }

@@ -96,26 +96,6 @@ namespace SweepNDodge.DotsBullets
                 out error);
         }
 
-        private static HazardEmitterAuthoring[] CollectOwnedEmitters(HazardActorAuthoring authoring)
-        {
-            var emitters = authoring.GetComponentsInChildren<HazardEmitterAuthoring>(includeInactive: true);
-            var owned = new List<HazardEmitterAuthoring>(emitters.Length);
-            for (int i = 0; i < emitters.Length; i++)
-            {
-                var emitter = emitters[i];
-                if (emitter == null)
-                    continue;
-
-                var parentActor = emitter.GetComponentInParent<HazardActorAuthoring>(includeInactive: true);
-                if (parentActor != authoring)
-                    continue;
-
-                owned.Add(emitter);
-            }
-
-            return owned.ToArray();
-        }
-
         private static bool TryValidateInternal(
             HazardActorAuthoring authoring,
             bool requireSourceParent,
@@ -167,10 +147,18 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            var emitters = CollectOwnedEmitters(authoring);
+            if (!HazardActorPatternSlotAuthoringUtility.TryResolveSlots(
+                    authoring.PatternSlots,
+                    out _,
+                    out error))
+            {
+                errorKind = HazardActorAuthoringValidationErrorKind.General;
+                return false;
+            }
+
             if (authoring.PhaseSelectorPolicies != null && authoring.PhaseSelectorPolicies.Length > 0)
             {
-                if (!TryBuildExplicitSeed(authoring, emitters, out compatibilitySeed, out error))
+                if (!TryBuildExplicitSeed(authoring, out compatibilitySeed, out error))
                 {
                     errorKind = HazardActorAuthoringValidationErrorKind.SelectorPolicy;
                     return false;
@@ -184,7 +172,7 @@ namespace SweepNDodge.DotsBullets
                     out error);
             }
 
-            compatibilitySeed = BuildCompatibilitySeed(emitters);
+            compatibilitySeed = BuildCompatibilitySeed(authoring);
             return TryBuildTransitions(
                 authoring,
                 compatibilitySeed,
@@ -296,7 +284,6 @@ namespace SweepNDodge.DotsBullets
 
         private static bool TryBuildExplicitSeed(
             HazardActorAuthoring authoring,
-            HazardEmitterAuthoring[] emitters,
             out HazardActorPhaseSelectorCompatibilitySeed seed,
             out string error)
         {
@@ -309,15 +296,10 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            var emitterById = new Dictionary<int, HazardEmitterAuthoring>();
-            for (int i = 0; i < emitters.Length; i++)
+            if (authoring.PatternSlots == null || authoring.PatternSlots.Length <= 0)
             {
-                var emitter = emitters[i];
-                if (emitter == null)
-                    continue;
-
-                if (!emitterById.ContainsKey(emitter.EmitterId))
-                    emitterById.Add(emitter.EmitterId, emitter);
+                error = "HazardActorAuthoring requires at least one PatternSlots entry.";
+                return false;
             }
 
             var phaseIds = new HashSet<int>();
@@ -361,12 +343,6 @@ namespace SweepNDodge.DotsBullets
                 for (int candidateIndex = 0; candidateIndex < policy.Candidates.Length; candidateIndex++)
                 {
                     var candidate = policy.Candidates[candidateIndex];
-                    if (candidate.EmitterId < 1)
-                    {
-                        error = $"HazardActorAuthoring PhaseSelectorPolicies[{policyIndex}].Candidates[{candidateIndex}] requires EmitterId >= 1.";
-                        return false;
-                    }
-
                     if (candidate.PatternSlotId < 1)
                     {
                         error = $"HazardActorAuthoring PhaseSelectorPolicies[{policyIndex}].Candidates[{candidateIndex}] requires PatternSlotId >= 1.";
@@ -380,15 +356,9 @@ namespace SweepNDodge.DotsBullets
                         return false;
                     }
 
-                    if (!emitterById.TryGetValue(candidate.EmitterId, out var emitter))
+                    if (!ActorContainsSlot(authoring.PatternSlots, candidate.PatternSlotId))
                     {
-                        error = $"HazardActorAuthoring PhaseSelectorPolicies[{policyIndex}].Candidates[{candidateIndex}] references unknown EmitterId {candidate.EmitterId}.";
-                        return false;
-                    }
-
-                    if (!EmitterContainsSlot(emitter, candidate.PatternSlotId))
-                    {
-                        error = $"HazardActorAuthoring PhaseSelectorPolicies[{policyIndex}].Candidates[{candidateIndex}] references unknown PatternSlotId {candidate.PatternSlotId} on emitter {candidate.EmitterId}.";
+                        error = $"HazardActorAuthoring PhaseSelectorPolicies[{policyIndex}].Candidates[{candidateIndex}] references unknown PatternSlotId {candidate.PatternSlotId}.";
                         return false;
                     }
 
@@ -396,7 +366,6 @@ namespace SweepNDodge.DotsBullets
                     {
                         PhaseId = policy.PhaseId,
                         OrderIndex = candidateIndex,
-                        EmitterId = candidate.EmitterId,
                         PatternSlotId = candidate.PatternSlotId,
                     });
                 }
@@ -432,9 +401,9 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        private static HazardActorPhaseSelectorCompatibilitySeed BuildCompatibilitySeed(HazardEmitterAuthoring[] emitters)
+        private static HazardActorPhaseSelectorCompatibilitySeed BuildCompatibilitySeed(HazardActorAuthoring authoring)
         {
-            if (emitters == null || emitters.Length <= 0)
+            if (authoring == null || authoring.PatternSlots == null || authoring.PatternSlots.Length <= 0)
             {
                 return new HazardActorPhaseSelectorCompatibilitySeed(
                     CompatibilityPhaseId,
@@ -442,25 +411,26 @@ namespace SweepNDodge.DotsBullets
                     Array.Empty<HazardActorPhaseSelectorCandidateBuffer>());
             }
 
-            var orderedEmitters = new List<HazardEmitterAuthoring>(emitters.Length);
-            for (int i = 0; i < emitters.Length; i++)
+            var orderedSlots = new List<HazardActorPatternSlotAuthoring>(authoring.PatternSlots.Length);
+            for (int i = 0; i < authoring.PatternSlots.Length; i++)
             {
-                if (emitters[i] != null)
-                    orderedEmitters.Add(emitters[i]);
+                if (authoring.PatternSlots[i].PatternSlotId >= 1)
+                    orderedSlots.Add(authoring.PatternSlots[i]);
             }
 
-            orderedEmitters.Sort(static (a, b) => a.EmitterId.CompareTo(b.EmitterId));
-            var candidates = new List<HazardActorPhaseSelectorCandidateBuffer>(orderedEmitters.Count);
-            for (int i = 0; i < orderedEmitters.Count; i++)
+            orderedSlots.Sort(static (a, b) => a.PatternSlotId.CompareTo(b.PatternSlotId));
+            var candidates = new List<HazardActorPhaseSelectorCandidateBuffer>(orderedSlots.Count);
+            var usedSlotIds = new HashSet<int>();
+            for (int i = 0; i < orderedSlots.Count; i++)
             {
-                if (!TryGetLowestPatternSlotId(orderedEmitters[i], out int patternSlotId))
+                int patternSlotId = orderedSlots[i].PatternSlotId;
+                if (!usedSlotIds.Add(patternSlotId))
                     continue;
 
                 candidates.Add(new HazardActorPhaseSelectorCandidateBuffer
                 {
                     PhaseId = CompatibilityPhaseId,
                     OrderIndex = candidates.Count,
-                    EmitterId = orderedEmitters[i].EmitterId,
                     PatternSlotId = patternSlotId,
                 });
             }
@@ -486,41 +456,18 @@ namespace SweepNDodge.DotsBullets
                 candidates.ToArray());
         }
 
-        private static bool EmitterContainsSlot(HazardEmitterAuthoring emitter, int patternSlotId)
+        private static bool ActorContainsSlot(HazardActorPatternSlotAuthoring[] patternSlots, int patternSlotId)
         {
-            if (emitter == null || emitter.Slots == null)
+            if (patternSlots == null)
                 return false;
 
-            for (int i = 0; i < emitter.Slots.Length; i++)
+            for (int i = 0; i < patternSlots.Length; i++)
             {
-                if (emitter.Slots[i].PatternSlotId == patternSlotId)
+                if (patternSlots[i].PatternSlotId == patternSlotId)
                     return true;
             }
 
             return false;
-        }
-
-        private static bool TryGetLowestPatternSlotId(HazardEmitterAuthoring emitter, out int patternSlotId)
-        {
-            patternSlotId = 0;
-            if (emitter == null || emitter.Slots == null || emitter.Slots.Length <= 0)
-                return false;
-
-            int selected = int.MaxValue;
-            for (int i = 0; i < emitter.Slots.Length; i++)
-            {
-                int candidate = emitter.Slots[i].PatternSlotId;
-                if (candidate < 1 || candidate >= selected)
-                    continue;
-
-                selected = candidate;
-            }
-
-            if (selected == int.MaxValue)
-                return false;
-
-            patternSlotId = selected;
-            return true;
         }
     }
 }

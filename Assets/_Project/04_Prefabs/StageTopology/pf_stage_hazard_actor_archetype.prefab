@@ -29,8 +29,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 4069771742991801917}
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &4069771742981827789
@@ -58,86 +57,34 @@ MonoBehaviour:
   - PhaseId: 1
     SelectionMode: 1
     Candidates:
-    - EmitterId: 1
-      PatternSlotId: 1
-    - EmitterId: 1
-      PatternSlotId: 2
+    - PatternSlotId: 1
+    - PatternSlotId: 2
   - PhaseId: 2
     SelectionMode: 1
     Candidates:
-    - EmitterId: 1
-      PatternSlotId: 1
-    - EmitterId: 1
-      PatternSlotId: 3
-  PhaseProgressTransitions:
-  - FromPhaseId: 1
-    ToPhaseId: 2
-    ProgressThresholdNormalized: 0.5
-    TransitionLeadInSec: 0.35
---- !u!1 &4069771742991966813
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 4069771742991801917}
-  - component: {fileID: 4069771742981847037}
-  m_Layer: 0
-  m_Name: HazardEmitter_Sample
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &4069771742991801917
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4069771742991966813}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4069771742991808269}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &4069771742981847037
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4069771742991966813}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 34bff1e76651eff4a9d4fc22f3f916e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.HazardEmitterAuthoring
-  EmitterId: 1
-  ActivationPolicy: 0
-  AnchorKind: 0
-  Mobility: 0
-  IsEnabled: 1
-  StartSuppressed: 0
-  LocalOffset: {x: 3.5, y: 0, z: 2.5}
-  Slots:
+    - PatternSlotId: 1
+    - PatternSlotId: 3
+  PatternSlots:
   - PatternSlotId: 1
     TelegraphProfile: {fileID: 11400000, guid: 7c3e4e1a5f8844698e6eaf2f9a5f5101, type: 2}
     EmissionProfile: {fileID: 11400000, guid: cc2d3d4b7c9a4b5e8f1d2c3b4a5e6102, type: 2}
     BaseWeight: 1
     AvailabilityFlags: 0
+    LocalOffset: {x: 3.5, y: 0, z: 2.5}
   - PatternSlotId: 2
     TelegraphProfile: {fileID: 11400000, guid: 7c3e4e1a5f8844698e6eaf2f9a5f5101, type: 2}
     EmissionProfile: {fileID: 11400000, guid: 3d2232c8b9f66eb4f93a500026cfe63b, type: 2}
     BaseWeight: 1
     AvailabilityFlags: 0
+    LocalOffset: {x: 3.5, y: 0, z: 2.5}
   - PatternSlotId: 3
     TelegraphProfile: {fileID: 11400000, guid: 7c3e4e1a5f8844698e6eaf2f9a5f5101, type: 2}
     EmissionProfile: {fileID: 11400000, guid: 9565913a705a2f5429627bcd6dff45e8, type: 2}
     BaseWeight: 1
     AvailabilityFlags: 0
+    LocalOffset: {x: 3.5, y: 0, z: 2.5}
+  PhaseProgressTransitions:
+  - FromPhaseId: 1
+    ToPhaseId: 2
+    ProgressThresholdNormalized: 0.5
+    TransitionLeadInSec: 0.35

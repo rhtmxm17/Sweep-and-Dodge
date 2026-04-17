@@ -58,7 +58,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             Assert.That(shell.RequestSelectStageById(1), Is.True);
             Entity actorEntity = Entity.Null;
-            Entity emitterEntity = Entity.Null;
             yield return WaitForStagePlayRunning(
                 () =>
                 {
@@ -69,32 +68,29 @@ namespace SweepNDodge.DotsBullets.Tests
                     bool ready = shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && shell.CurrentStageId == 1
                         && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
-                        && CountByComponentType<HazardActorComponent>(em) > 0
-                        && CountByComponentType<HazardEmitterComponent>(em) > 0;
+                        && CountByComponentType<HazardActorComponent>(em) > 0;
                     if (!ready)
                         return false;
 
                     actorEntity = FindFirstEntity<HazardActorComponent>(em);
-                    emitterEntity = FindFirstEntity<HazardEmitterComponent>(em);
                     return actorEntity != Entity.Null
-                        && emitterEntity != Entity.Null
                         && em.HasBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity)
                         && em.HasBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity)
                         && em.HasBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity)
-                        && em.HasBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+                        && em.HasBuffer<HazardActorPatternSlotBuffer>(actorEntity);
                 },
                 480,
-                "Operational scene did not create hazard actor/emitter entities in StagePlay.");
+                "Operational scene did not create hazard actor entities in StagePlay.");
 
             CompleteTrackedJobs(em);
             var selectorPolicies = em.GetBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity);
             var selectorCandidates = em.GetBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity);
             var transitions = em.GetBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
-            var slots = em.GetBuffer<HazardEmitterPatternSlotBuffer>(emitterEntity);
+            var slots = em.GetBuffer<HazardActorPatternSlotBuffer>(actorEntity);
             Assert.That(selectorPolicies.Length, Is.EqualTo(2), "Operational blueprint actor must expose two phase selector policies.");
             Assert.That(selectorCandidates.Length, Is.EqualTo(4), "Operational blueprint actor must expose four ordered selector candidates.");
             Assert.That(transitions.Length, Is.EqualTo(1), "Operational blueprint actor must expose one progress transition.");
-            Assert.That(slots.Length, Is.EqualTo(3), "Operational blueprint emitter must expose A/B/B' slots.");
+            Assert.That(slots.Length, Is.EqualTo(3), "Operational blueprint actor must expose A/B/B' slots.");
             Assert.That(slots[0].PatternSlotId, Is.EqualTo(1));
             Assert.That(slots[1].PatternSlotId, Is.EqualTo(2));
             Assert.That(slots[2].PatternSlotId, Is.EqualTo(3));
@@ -3536,7 +3532,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
         private static IEnumerator LoadSceneWithSettle(string scenePath, int settleFrames = 4)
         {
-            bool previousIgnore = LogAssert.ignoreFailingMessages;
             LogAssert.ignoreFailingMessages = true;
 
             SceneManager.LoadScene(scenePath, LoadSceneMode.Single);
@@ -3553,8 +3548,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             for (int i = 0; i < settleFrames; i++)
                 yield return null;
-
-            LogAssert.ignoreFailingMessages = previousIgnore;
         }
 
         private static IEnumerator WaitForStageResultAfterForcedClearReady(System.Func<bool> predicate, int timeoutFrames, string failMessage)
@@ -3644,12 +3637,12 @@ namespace SweepNDodge.DotsBullets.Tests
         private static bool AnyEmitterAdvancedFromDormant(EntityManager em)
         {
             CompleteTrackedJobs(em);
-            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<HazardEmitterRuntimeStateComponent>());
-            using var emitters = query.ToComponentDataArray<HazardEmitterRuntimeStateComponent>(Allocator.Temp);
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<HazardActorEmitStateComponent>());
+            using var emitters = query.ToComponentDataArray<HazardActorEmitStateComponent>(Allocator.Temp);
 
             for (int i = 0; i < emitters.Length; i++)
             {
-                if (emitters[i].LifecycleState != HazardEmitterLifecycleStateId.Dormant || emitters[i].StateElapsedSec > 0f)
+                if (emitters[i].LifecycleState != HazardActorEmitLifecycleStateId.Dormant || emitters[i].StateElapsedSec > 0f)
                     return true;
             }
 
@@ -4528,9 +4521,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
-
-
-
 
 
 

@@ -7,7 +7,6 @@ namespace SweepNDodge.DotsBullets
     [System.Serializable]
     public struct HazardActorPhaseSelectorCandidateAuthoring
     {
-        [Min(1)] public int EmitterId;
         [Min(1)] public int PatternSlotId;
     }
 
@@ -47,6 +46,17 @@ namespace SweepNDodge.DotsBullets
         [Header("Phase Selector")]
         [Min(1)] public int InitialPhaseId = 1;
         public HazardActorPhaseSelectorPolicyAuthoring[] PhaseSelectorPolicies;
+
+        [Header("Pattern Slots")]
+        public HazardActorPatternSlotAuthoring[] PatternSlots =
+        {
+            new HazardActorPatternSlotAuthoring
+            {
+                PatternSlotId = HazardActorPatternRuntimeUtility.CompatibilityPatternSlotId,
+                BaseWeight = HazardActorPatternRuntimeUtility.CompatibilityBaseWeight,
+                AvailabilityFlags = HazardActorPatternRuntimeUtility.CompatibilityAvailabilityFlags,
+            }
+        };
 
         [Header("Phase Transition")]
         public HazardActorPhaseProgressTransitionAuthoring[] PhaseProgressTransitions;
@@ -119,7 +129,6 @@ namespace SweepNDodge.DotsBullets
                 });
                 AddComponent(actorEntity, new HazardActorPatternSelectorStateComponent
                 {
-                    TargetEmitterId = -1,
                     CurrentPatternSlotId = -1,
                     LastPatternSlotId = -1,
                     SelectionSequence = 0u,
@@ -150,6 +159,25 @@ namespace SweepNDodge.DotsBullets
                     Version = 0u,
                     Cue = HazardActorPresencePresentationCueId.None,
                 });
+                AddComponent(actorEntity, new HazardActorEmitStateComponent
+                {
+                    LifecycleState = HazardActorEmitLifecycleStateId.Dormant,
+                    StateElapsedSec = 0f,
+                });
+                AddComponent(actorEntity, new HazardActorEmitActiveTelegraphComponent
+                {
+                    AppliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId,
+                    ProfileId = 0,
+                    TelegraphDurationSec = 0f,
+                });
+                AddComponent(actorEntity, new HazardActorEmitActiveEmissionComponent
+                {
+                    AppliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId,
+                });
+                AddComponent(actorEntity, new HazardActorEmitCycleSignalComponent
+                {
+                    CompletedVersion = 0u,
+                });
 
                 var selectorPolicies = AddBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity);
                 selectorPolicies.Clear();
@@ -165,31 +193,27 @@ namespace SweepNDodge.DotsBullets
                     selectorCandidates.Add(compatibilitySeed.Candidates[i]);
                 }
 
+                if (!HazardActorPatternSlotAuthoringUtility.TryResolveSlots(authoring.PatternSlots, out var resolvedSlots, out var slotError))
+                {
+                    Debug.LogError($"[HazardActorAuthoring] {slotError}", authoring);
+                    return;
+                }
+
+                var patternSlots = AddBuffer<HazardActorPatternSlotBuffer>(actorEntity);
+                var executionSlots = AddBuffer<HazardActorPatternExecutionSlotBuffer>(actorEntity);
+                HazardActorPatternSlotAuthoringUtility.ApplyResolvedSlotsToBuffers(
+                    resolvedSlots,
+                    ref patternSlots,
+                    ref executionSlots);
+
+                SetComponent(actorEntity, HazardActorPatternSlotAuthoringUtility.CreateBaselineTelegraph(resolvedSlots));
+                SetComponent(actorEntity, HazardActorPatternSlotAuthoringUtility.CreateBaselineEmission(resolvedSlots));
+
                 var transitionBuffer = AddBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
                 transitionBuffer.Clear();
                 for (int i = 0; i < phaseTransitions.Length; i++)
                 {
                     transitionBuffer.Add(phaseTransitions[i]);
-                }
-
-                var emitterRefs = AddBuffer<HazardActorEmitterRefBuffer>(actorEntity);
-                emitterRefs.Clear();
-                var emitters = authoring.GetComponentsInChildren<HazardEmitterAuthoring>(includeInactive: true);
-                for (int i = 0; i < emitters.Length; i++)
-                {
-                    var emitter = emitters[i];
-                    if (emitter == null)
-                        continue;
-
-                    var parentActor = emitter.GetComponentInParent<HazardActorAuthoring>(includeInactive: true);
-                    if (parentActor != authoring)
-                        continue;
-
-                    emitterRefs.Add(new HazardActorEmitterRefBuffer
-                    {
-                        EmitterEntity = GetEntity(emitter.gameObject, TransformUsageFlags.Dynamic),
-                        EmitterId = math.max(1, emitter.EmitterId),
-                    });
                 }
             }
         }

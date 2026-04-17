@@ -328,10 +328,10 @@ namespace SweepNDodge.DotsBullets.Tests
             try
             {
                 var actor = root.GetComponentInChildren<HazardActorAuthoring>(true);
-                var emitter = root.GetComponentInChildren<HazardEmitterAuthoring>(true);
+                var patternSlotOwner = root.GetComponentInChildren<HazardActorAuthoring>(true);
 
                 Assert.That(actor, Is.Null, $"{prefabPath} must stay actor-free after SP-4 cutover.");
-                Assert.That(emitter, Is.Null, $"{prefabPath} must stay actor-free after SP-4 cutover.");
+                Assert.That(patternSlotOwner, Is.Null, $"{prefabPath} must stay actor-free after SP-4 cutover.");
             }
             finally
             {
@@ -360,23 +360,12 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(valid, Is.True, $"{prefabPath} standalone actor contract failed. kind={errorKind}, error={error}");
                 Assert.That(selectorSeed.Policies, Is.Not.Null.And.Length.GreaterThan(0), $"{prefabPath} must resolve at least one selector policy.");
 
-                var ownedEmitters = actor.GetComponentsInChildren<HazardEmitterAuthoring>(true)
-                    .Where(x => x != null && x.GetComponentInParent<HazardActorAuthoring>(true) == actor)
-                    .ToArray();
-                Assert.That(ownedEmitters, Is.Not.Empty, $"{prefabPath} must contain at least one owned HazardEmitterAuthoring.");
-
-                for (int i = 0; i < ownedEmitters.Length; i++)
-                {
-                    var emitter = ownedEmitters[i];
-                    Assert.That(emitter.EmitterId, Is.GreaterThan(0), $"{prefabPath} emitter[{i}] requires EmitterId >= 1.");
-
-                    bool slotsResolved = HazardEmitterPatternSlotAuthoringUtility.TryResolveSlots(
-                        emitter.Slots,
-                        out var resolvedSlots,
-                        out var slotError);
-                    Assert.That(slotsResolved, Is.True, $"{prefabPath} emitter[{i}] slot contract failed. error={slotError}");
-                    Assert.That(resolvedSlots, Is.Not.Null.And.Length.GreaterThan(0), $"{prefabPath} emitter[{i}] must resolve at least one slot.");
-                }
+                bool slotsResolved = HazardActorPatternSlotAuthoringUtility.TryResolveSlots(
+                    actor.PatternSlots,
+                    out var resolvedSlots,
+                    out var slotError);
+                Assert.That(slotsResolved, Is.True, $"{prefabPath} pattern slot contract failed. error={slotError}");
+                Assert.That(resolvedSlots, Is.Not.Null.And.Length.GreaterThan(0), $"{prefabPath} must resolve at least one actor pattern slot.");
 
                 if (phaseTransitions.Length > 0)
                 {

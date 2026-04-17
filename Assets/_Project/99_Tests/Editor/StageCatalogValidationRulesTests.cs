@@ -547,7 +547,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         SelectionMode = HazardActorSelectionModeId.OrderedPriority,
                         Candidates = new[]
                         {
-                            new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 33, PatternSlotId = 1 },
+                            new HazardActorPhaseSelectorCandidateAuthoring { PatternSlotId = 1 },
                         },
                     },
                     new HazardActorPhaseSelectorPolicyAuthoring
@@ -556,7 +556,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         SelectionMode = HazardActorSelectionModeId.OrderedPriority,
                         Candidates = new[]
                         {
-                            new HazardActorPhaseSelectorCandidateAuthoring { EmitterId = 33, PatternSlotId = 1 },
+                            new HazardActorPhaseSelectorCandidateAuthoring { PatternSlotId = 1 },
                         },
                     },
                 };
@@ -950,11 +950,6 @@ namespace SweepNDodge.DotsBullets.Tests
             var actor = fixture.Root.AddComponent<HazardActorAuthoring>();
             actor.ActorId = actorId;
 
-            var emitterGo = new GameObject("emitter");
-            emitterGo.transform.SetParent(fixture.Root.transform);
-            var emitter = emitterGo.AddComponent<HazardEmitterAuthoring>();
-            emitter.EmitterId = emitterId;
-
             fixture.Telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
             fixture.Bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             fixture.Bullet.Editor_SetDefinitionId(5000 + emitterId);
@@ -968,9 +963,9 @@ namespace SweepNDodge.DotsBullets.Tests
             fixture.Emission.EventShotIntervalSec = 0f;
             fixture.Emission.CooldownSec = 1f;
 
-            emitter.Slots = new[]
+            actor.PatternSlots = new[]
             {
-                new HazardEmitterPatternSlotAuthoring
+                new HazardActorPatternSlotAuthoring
                 {
                     PatternSlotId = 1,
                     TelegraphProfile = fixture.Telegraph,

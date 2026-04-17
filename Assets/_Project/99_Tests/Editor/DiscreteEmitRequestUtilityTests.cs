@@ -48,7 +48,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var anchorEntity = new Entity { Index = 303, Version = 1 };
             var seed = new DiscreteEmitRequestSeed
             {
-                ProducerKind = DiscreteEmitProducerKind.HazardEmitter,
+                ProducerKind = DiscreteEmitProducerKind.HazardActor,
                 SourceEntity = sourceEntity,
                 ProducerEntity = producerEntity,
                 EmissionId = 77,
@@ -85,7 +85,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var request = DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(seed, 55u);
 
-            Assert.That(request.ProducerKind, Is.EqualTo(DiscreteEmitProducerKind.HazardEmitter));
+            Assert.That(request.ProducerKind, Is.EqualTo(DiscreteEmitProducerKind.HazardActor));
             Assert.That(request.SourceEntity, Is.EqualTo(sourceEntity));
             Assert.That(request.ProducerEntity, Is.EqualTo(producerEntity));
             Assert.That(request.EmissionId, Is.EqualTo(77));

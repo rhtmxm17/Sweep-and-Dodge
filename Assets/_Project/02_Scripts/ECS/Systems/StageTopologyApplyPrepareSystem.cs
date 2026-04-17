@@ -1049,11 +1049,9 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             NativeArray<SourceHazardActorRefBuffer> actorRefsCopy = default;
-            NativeList<Entity> emitterEntitiesToDestroy = default;
             NativeList<Entity> actorEntitiesToDestroy = default;
             try
             {
-                emitterEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
                 actorEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
 
                 if (em.HasBuffer<SourceHazardActorRefBuffer>(sourceEntity))
@@ -1069,26 +1067,8 @@ namespace SweepNDodge.DotsBullets
                         if (!em.Exists(actorEntity))
                             continue;
 
-                        if (em.HasBuffer<HazardActorEmitterRefBuffer>(actorEntity))
-                        {
-                            var emitterRefs = em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity);
-                            for (int emitterIndex = 0; emitterIndex < emitterRefs.Length; emitterIndex++)
-                            {
-                                var emitterEntity = emitterRefs[emitterIndex].EmitterEntity;
-                                if (em.Exists(emitterEntity))
-                                    emitterEntitiesToDestroy.Add(emitterEntity);
-                            }
-                        }
-
                         actorEntitiesToDestroy.Add(actorEntity);
                     }
-                }
-
-                for (int emitterIndex = 0; emitterIndex < emitterEntitiesToDestroy.Length; emitterIndex++)
-                {
-                    var emitterEntity = emitterEntitiesToDestroy[emitterIndex];
-                    if (em.Exists(emitterEntity))
-                        em.DestroyEntity(emitterEntity);
                 }
 
                 for (int actorIndex = 0; actorIndex < actorEntitiesToDestroy.Length; actorIndex++)
@@ -1114,8 +1094,6 @@ namespace SweepNDodge.DotsBullets
             {
                 if (actorRefsCopy.IsCreated)
                     actorRefsCopy.Dispose();
-                if (emitterEntitiesToDestroy.IsCreated)
-                    emitterEntitiesToDestroy.Dispose();
                 if (actorEntitiesToDestroy.IsCreated)
                     actorEntitiesToDestroy.Dispose();
             }
@@ -1187,7 +1165,6 @@ namespace SweepNDodge.DotsBullets
 
             em.SetComponentData(actorEntity, new HazardActorPatternSelectorStateComponent
             {
-                TargetEmitterId = -1,
                 CurrentPatternSlotId = -1,
                 LastPatternSlotId = -1,
                 SelectionSequence = 0u,
@@ -1195,6 +1172,40 @@ namespace SweepNDodge.DotsBullets
                 LastResolvedPhaseVersion = 0u,
                 LastConsumedCycleVersion = 0u,
             });
+        }
+
+        private static void ResetHazardActorEmitRuntimeState(EntityManager em, Entity actorEntity)
+        {
+            if (em.HasComponent<HazardActorEmitStateComponent>(actorEntity))
+            {
+                em.SetComponentData(actorEntity, new HazardActorEmitStateComponent
+                {
+                    LifecycleState = HazardActorEmitLifecycleStateId.Dormant,
+                    StateElapsedSec = 0f,
+                });
+            }
+
+            if (em.HasComponent<HazardActorEmitActiveTelegraphComponent>(actorEntity))
+            {
+                var telegraph = em.GetComponentData<HazardActorEmitActiveTelegraphComponent>(actorEntity);
+                telegraph.AppliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId;
+                em.SetComponentData(actorEntity, telegraph);
+            }
+
+            if (em.HasComponent<HazardActorEmitActiveEmissionComponent>(actorEntity))
+            {
+                var emission = em.GetComponentData<HazardActorEmitActiveEmissionComponent>(actorEntity);
+                emission.AppliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId;
+                em.SetComponentData(actorEntity, emission);
+            }
+
+            if (em.HasComponent<HazardActorEmitCycleSignalComponent>(actorEntity))
+            {
+                em.SetComponentData(actorEntity, new HazardActorEmitCycleSignalComponent
+                {
+                    CompletedVersion = 0u,
+                });
+            }
         }
 
         private static void ResetHazardActorPhaseState(EntityManager em, Entity actorEntity)
@@ -1284,114 +1295,6 @@ namespace SweepNDodge.DotsBullets
             {
                 LastPresenceRequestVersion = 0u,
                 LastPhaseRequestVersion = 0u,
-            });
-        }
-
-        private static void ResetHazardEmitterToBaseline(EntityManager em, Entity emitterEntity)
-        {
-            if (em.HasComponent<HazardEmitterAppliedConfigBaselineComponent>(emitterEntity)
-                && em.HasComponent<HazardEmitterAppliedConfigComponent>(emitterEntity))
-            {
-                var baselineConfig = em.GetComponentData<HazardEmitterAppliedConfigBaselineComponent>(emitterEntity);
-                em.SetComponentData(emitterEntity, new HazardEmitterAppliedConfigComponent
-                {
-                    IsEnabled = baselineConfig.IsEnabled,
-                    IsSuppressed = baselineConfig.IsSuppressed,
-                    LocalOffset = baselineConfig.LocalOffset,
-                    TelegraphProfileRefId = baselineConfig.TelegraphProfileRefId,
-                    EmissionProfileRefId = baselineConfig.EmissionProfileRefId,
-                });
-            }
-
-            if (em.HasComponent<HazardEmitterTelegraphProfileBaselineComponent>(emitterEntity)
-                && em.HasComponent<HazardEmitterTelegraphProfileComponent>(emitterEntity))
-            {
-                var baselineTelegraph = em.GetComponentData<HazardEmitterTelegraphProfileBaselineComponent>(emitterEntity);
-                em.SetComponentData(emitterEntity, new HazardEmitterTelegraphProfileComponent
-                {
-                    ProfileId = baselineTelegraph.ProfileId,
-                    TelegraphDurationSec = baselineTelegraph.TelegraphDurationSec,
-                });
-            }
-
-            if (em.HasComponent<HazardEmitterEmissionProfileBaselineComponent>(emitterEntity)
-                && em.HasComponent<HazardEmitterEmissionProfileComponent>(emitterEntity))
-            {
-                var baselineEmission = em.GetComponentData<HazardEmitterEmissionProfileBaselineComponent>(emitterEntity);
-                em.SetComponentData(emitterEntity, new HazardEmitterEmissionProfileComponent
-                {
-                    ProfileId = baselineEmission.ProfileId,
-                    BulletTypeKey = baselineEmission.BulletTypeKey,
-                    PositionPatternMode = baselineEmission.PositionPatternMode,
-                    SpawnOffset = baselineEmission.SpawnOffset,
-                    LineStart = baselineEmission.LineStart,
-                    LineEnd = baselineEmission.LineEnd,
-                    SampleSpacing = baselineEmission.SampleSpacing,
-                    PointSetCount = baselineEmission.PointSetCount,
-                    Point0 = baselineEmission.Point0,
-                    Point1 = baselineEmission.Point1,
-                    Point2 = baselineEmission.Point2,
-                    Point3 = baselineEmission.Point3,
-                    AimMode = baselineEmission.AimMode,
-                    AimSnapshotTiming = baselineEmission.AimSnapshotTiming,
-                    BaseAngleDeg = baselineEmission.BaseAngleDeg,
-                    AimAngleOffsetDeg = baselineEmission.AimAngleOffsetDeg,
-                    LineNormalSide = baselineEmission.LineNormalSide,
-                    LineNormalAngleOffsetDeg = baselineEmission.LineNormalAngleOffsetDeg,
-                    SpiralStepDeg = baselineEmission.SpiralStepDeg,
-                    ShotPatternMode = baselineEmission.ShotPatternMode,
-                    ShotCount = baselineEmission.ShotCount,
-                    NWayAngleSpacingDeg = baselineEmission.NWayAngleSpacingDeg,
-                    EventShotSchedule = baselineEmission.EventShotSchedule,
-                    EventShotIntervalSec = baselineEmission.EventShotIntervalSec,
-                    EventRepeatCount = baselineEmission.EventRepeatCount,
-                    CooldownSec = baselineEmission.CooldownSec,
-                });
-            }
-        }
-
-        private static void ResetHazardEmitterRuntimeState(EntityManager em, Entity emitterEntity)
-        {
-            if (!em.HasComponent<HazardEmitterRuntimeStateComponent>(emitterEntity))
-                return;
-
-            var initialLifecycleState = HazardEmitterLifecycleStateId.Dormant;
-            if (em.HasComponent<HazardEmitterComponent>(emitterEntity))
-                initialLifecycleState = em.GetComponentData<HazardEmitterComponent>(emitterEntity).InitialLifecycleState;
-
-            em.SetComponentData(emitterEntity, new HazardEmitterRuntimeStateComponent
-            {
-                LifecycleState = initialLifecycleState,
-                StateElapsedSec = 0f,
-            });
-
-            if (em.HasComponent<HazardEmitterSelectedPatternRuntimeComponent>(emitterEntity))
-            {
-                em.SetComponentData(emitterEntity, new HazardEmitterSelectedPatternRuntimeComponent
-                {
-                    AppliedPatternSlotId = HazardEmitterPatternSetCompatibilityUtility.InvalidPatternSlotId,
-                });
-            }
-
-            if (em.HasComponent<HazardEmitterCycleSignalComponent>(emitterEntity))
-            {
-                em.SetComponentData(emitterEntity, new HazardEmitterCycleSignalComponent
-                {
-                    CompletedVersion = 0u,
-                });
-            }
-        }
-
-        private static void ResetHazardEmitterCoordinatorState(EntityManager em, Entity emitterEntity)
-        {
-            if (!em.HasComponent<HazardEmitterCoordinatorStateComponent>(emitterEntity))
-                em.AddComponentData(emitterEntity, default(HazardEmitterCoordinatorStateComponent));
-
-            em.SetComponentData(emitterEntity, new HazardEmitterCoordinatorStateComponent
-            {
-                ActivationAllowed = 0,
-                SuppressionReasonMask = 0u,
-                LastPlayerDistanceSq = float.MaxValue,
             });
         }
 

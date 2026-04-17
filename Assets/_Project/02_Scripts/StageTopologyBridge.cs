@@ -70,7 +70,7 @@ namespace SweepNDodge.DotsBullets
         }
 
         /// <summary>
-        /// Scene reload 전에 runtime hazard actor/emitter attachment를 먼저 제거해
+        /// Scene reload 전에 runtime hazard actor attachment를 먼저 제거해
         /// SubScene unload가 source LinkedEntityGroup의 dangling reference로 실패하지 않도록 한다.
         /// </summary>
         public void CleanupOwnedRuntimeHazardsBeforeSceneReload()
@@ -265,7 +265,6 @@ namespace SweepNDodge.DotsBullets
                 return;
 
             using var actorRefsCopy = _em.GetBuffer<SourceHazardActorRefBuffer>(sourceEntity).ToNativeArray(Allocator.Temp);
-            using var emitterEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
             using var actorEntitiesToDestroy = new NativeList<Entity>(Allocator.Temp);
 
             for (int actorIndex = 0; actorIndex < actorRefsCopy.Length; actorIndex++)
@@ -274,25 +273,7 @@ namespace SweepNDodge.DotsBullets
                 if (!_em.Exists(actorEntity))
                     continue;
 
-                if (_em.HasBuffer<HazardActorEmitterRefBuffer>(actorEntity))
-                {
-                    var emitterRefs = _em.GetBuffer<HazardActorEmitterRefBuffer>(actorEntity);
-                    for (int emitterIndex = 0; emitterIndex < emitterRefs.Length; emitterIndex++)
-                    {
-                        var emitterEntity = emitterRefs[emitterIndex].EmitterEntity;
-                        if (_em.Exists(emitterEntity))
-                            emitterEntitiesToDestroy.Add(emitterEntity);
-                    }
-                }
-
                 actorEntitiesToDestroy.Add(actorEntity);
-            }
-
-            for (int emitterIndex = 0; emitterIndex < emitterEntitiesToDestroy.Length; emitterIndex++)
-            {
-                var emitterEntity = emitterEntitiesToDestroy[emitterIndex];
-                if (_em.Exists(emitterEntity))
-                    _em.DestroyEntity(emitterEntity);
             }
 
             for (int actorIndex = 0; actorIndex < actorEntitiesToDestroy.Length; actorIndex++)

@@ -93,23 +93,23 @@ namespace SweepNDodge.DotsBullets
             };
         }
 
-        public static DiscreteEmitRequestSeed BuildDiscreteEmitSeedFromEmitter(
+        public static DiscreteEmitRequestSeed BuildDiscreteEmitSeedFromHazardActor(
             Entity sourceEntity,
-            Entity emitterEntity,
+            Entity actorEntity,
             int emissionId,
-            in HazardEmitterEmissionProfileComponent emissionProfile,
+            in HazardActorEmitActiveEmissionComponent emissionProfile,
             float3 resolvedAnchorPosition,
             byte priority)
         {
             return new DiscreteEmitRequestSeed
             {
-                ProducerKind = DiscreteEmitProducerKind.HazardEmitter,
+                ProducerKind = DiscreteEmitProducerKind.HazardActor,
                 SourceEntity = sourceEntity,
-                ProducerEntity = emitterEntity,
+                ProducerEntity = actorEntity,
                 EmissionId = emissionId,
                 BulletTypeKey = emissionProfile.BulletTypeKey,
                 AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
-                AnchorEntity = emitterEntity,
+                AnchorEntity = actorEntity,
                 AnchorPosition = resolvedAnchorPosition,
                 AnchorLocalOffset = float3.zero,
                 PositionPatternMode = emissionProfile.PositionPatternMode,

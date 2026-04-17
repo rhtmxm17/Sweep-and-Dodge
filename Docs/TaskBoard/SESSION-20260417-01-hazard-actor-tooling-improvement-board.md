@@ -33,10 +33,9 @@
 
 ## Parking Lot
 
-- [ ] P1. **[HIGH]** Phase→Pattern 연결 투명화
-  - 문제: `HazardActorArchetypeAuthoring.PhaseSelectorPolicies[].Candidates[].EmitterId + PatternSlotId`가 실제로 어떤 `EmissionProfile`을 가리키는지, Inspector에서 3단계 간접 참조(EmitterId → EmitterAuthoring → Slots[PatternSlotId] → EmissionProfile)를 거쳐야만 알 수 있다.
-  - 개선 방향: `HazardActorArchetypeAuthoring` Custom Editor 또는 `PatternSlotCandidate` PropertyDrawer에서 resolve된 Profile 이름을 read-only 레이블로 표시. 또는 `PatternSlotId`를 드롭다운으로 교체하여 자식 Emitter의 실제 Slots를 나열.
-  - 근거: 이번 세션 탐색 중 식별된 참조 투명성 결여
+- [x] P1. **[HIGH]** Phase→Pattern 연결 투명화
+  - 해결: Emitter 계층 제거로 근본 문제 해소. `PhaseSelectorPolicies[].Candidates[].PatternSlotId`가 Actor 직접 소유 `PatternSlots[]` 내 슬롯을 1단계로 참조한다.
+  - 변경: `HazardEmitterAuthoring` 제거, `HazardActorAuthoring.PatternSlots[]` 도입, `EmitterId` 개념 전면 제거
 
 - [ ] P3. **[MEDIUM]** TargetPhaseId 드롭다운/유효성
   - 문제: `HazardActorSourceAuthoringMarker.Rules[].TargetPhaseId`에 정수를 직접 입력하는데, 해당 `ActorArchetypePrefab`의 `HazardActorArchetypeAuthoring`이 정의하는 유효 Phase 목록이 편집 시점에 보이지 않는다. 범위 밖 PhaseId를 입력해도 편집기 수준에서 피드백이 없다.
@@ -93,8 +92,14 @@
   - 상태별 slot summary는 authored `SustainClipSlots[]` 배열 인덱스를 lane 기준으로 묶어 표시하고, 빈 상태는 `none`으로 유지
   - EditMode 테스트 `SourceRuntimeTemplateAuthoringEditorSummaryUtilityTests` 5건 추가 및 통과 확인
 
+- [x] D10. HazardEmitter 계층 제거 — HazardActor 직접 발사 구조 전환 (세션 외 구현)
+  - `HazardEmitterAuthoring` / Emitter 런타임 컴포넌트 / 시스템 경로 전면 제거
+  - `HazardActorAuthoring.PatternSlots[]` 직접 소유, `HazardActorEmitSystem` 신규 도입
+  - `HazardActorComponents`, `HazardActorPatternSelectorSystem`, `StageTopologyTemplateFactory`, `StageTopologyApplyPrepareSystem`, `StageTopologyBridge`, 프리팹/테스트 픽스처 일괄 전환
+  - `DiscreteEmitProducerKind.HazardEmitter` → `HazardActor` 정리 포함
+  - 영향 파일: 34개 (6,456줄 삭제, 598줄 추가)
+
 ## End of Session
-- 결과: 마커 기반 HazardActor 툴링 구현 완료. 후속 개선 후보 4건 중 P2(SustainSlot 상태 구간 표시)를 구현/검증 완료했고, 나머지 후보는 Parking Lot에 유지한다.
-- 검증: `SourceRuntimeTemplateAuthoringEditorSummaryUtilityTests` EditMode 5건 통과. 프로젝트 코드 기준(`Assets/_Project` filter) Unity Console error 0건 확인.
-- 남은 리스크: P1은 `HazardActorArchetypeAuthoring`과 하위 emitter/slot resolve UI를 함께 다뤄야 해서 Custom Editor 범위가 넓다. P3은 prefab 참조 해석이 편집 시점에 필요하여 로드 순서 주의.
-- 다음 세션 시작점: P1(Phase→Pattern 연결 투명화) 또는 P3(TargetPhaseId 드롭다운/유효성) 중 우선순위 확정 후 Custom Inspector/PropertyDrawer 구현.
+- 결과: 마커 기반 HazardActor 툴링 구현 완료 + HazardEmitter 계층 제거로 Phase→Pattern 1단계 참조 구조 전환 완료. P2(SustainSlot 구간 표시) 구현/검증 완료. Parking Lot 잔여: P3(TargetPhaseId 드롭다운), P4(ProgressThreshold Tooltip).
+- 검증: 세션 내 EditMode/PlayMode 통과 확인. D10 구현은 외부 수행 후 점검 완료.
+- 다음 세션 시작점: P3(TargetPhaseId 드롭다운/유효성) PropertyDrawer 구현.
