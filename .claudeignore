@@ -1,0 +1,47 @@
+# Unity 생성 디렉터리
+Library/
+Temp/
+Logs/
+obj/
+Builds/
+UserSettings/
+ProfilerCaptures/
+
+# 자동생성 프로젝트 파일 (수십만 줄, 읽기 무의미)
+*.csproj
+*.sln
+*.slnx
+
+# Unity 메타데이터 (코드 읽기에 불필요)
+*.meta
+
+# 씬 파일 (MCP read_console/manage_scene으로 대체)
+*.unity
+
+# 바이너리 에셋
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.tif
+*.tiff
+*.psd
+*.fbx
+*.FBX
+*.obj
+*.OBJ
+*.ma
+*.MA
+*.wav
+*.mp3
+*.ogg
+*.dll
+*.exe
+*.pdb
+*.mdb
+*.apk
+*.aab
+
+# IDE
+.vs/
+.vscode/
