@@ -47,3 +47,5 @@ MonoBehaviour:
       Weights:
       - 1
     EventSlots: []
+    HazardActorPlacements: []
+    HazardActorOrchestrationRules: []

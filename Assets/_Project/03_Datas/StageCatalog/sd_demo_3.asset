@@ -38,3 +38,5 @@ MonoBehaviour:
     - TriggerState: 1
       EventClips:
       - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
+    HazardActorPlacements: []
+    HazardActorOrchestrationRules: []

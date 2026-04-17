@@ -2670,6 +2670,53 @@ MonoBehaviour:
   AnchorOffset: {x: 0, y: 0}
   YawDeg: 90
   DrawGizmo: 1
+--- !u!1 &598002137
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 598002138}
+  - component: {fileID: 598002139}
+  m_Layer: 0
+  m_Name: HazardActor_Placement_1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &598002138
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 598002137}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1042918358}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &598002139
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 598002137}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 315e08e467e04ffa917c7560b4dfa0ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageHazardActorMarker
+  PlacementInstanceId: 1
+  ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
+  LocalYawDeg: 0
 --- !u!1 &610918852
 GameObject:
   m_ObjectHideFlags: 0
@@ -3180,6 +3227,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1042918358}
   - component: {fileID: 1042918360}
+  - component: {fileID: 1042918362}
+  - component: {fileID: 1042918361}
   m_Layer: 0
   m_Name: Source_1001
   m_TagString: Untagged
@@ -3199,7 +3248,8 @@ Transform:
   m_LocalPosition: {x: 9.5, y: 0, z: 6.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 598002138}
   m_Father: {fileID: 691910719}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1042918360
@@ -3221,6 +3271,94 @@ MonoBehaviour:
   AnchorCell: {x: 9, y: 6}
   AnchorOffset: {x: 0, y: 0}
   DrawGizmo: 1
+--- !u!114 &1042918361
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1042918357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1c2cff9125d4a50ba3e5136524af30d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.HazardActorSourceAuthoringMarker
+  Rules:
+  - RuleId: 101
+    TargetPlacementInstanceIds: 01000000
+    ActionType: 1
+    TriggerType: 1
+    TriggerThresholdNormalized: 0
+    TargetPhaseId: 0
+  - RuleId: 102
+    TargetPlacementInstanceIds: 01000000
+    ActionType: 2
+    TriggerType: 2
+    TriggerThresholdNormalized: 0.6
+    TargetPhaseId: 2
+--- !u!114 &1042918362
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1042918357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f8302ab77e984e43813a742bd5e095b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.SourceRuntimeTemplateAuthoring
+  StableIdOverride: 1001
+  Shape: 0
+  Radius: 8
+  Size: {x: 12, y: 8}
+  SustainClipSlots:
+  - State: 0
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
+    Weights:
+    - 1
+  - State: 0
+    Lane: 1
+    Clips:
+    - {fileID: 11400000, guid: 7cc14ff5ce5f4a488af830fda539f93d, type: 2}
+    Weights:
+    - 1
+  - State: 1
+    Lane: 0
+    Clips:
+    - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
+    Weights:
+    - 1
+  - State: 1
+    Lane: 1
+    Clips:
+    - {fileID: 11400000, guid: 13955e787a1b4edfa70b980acec4da95, type: 2}
+    Weights:
+    - 1
+  EventClipSlots:
+  - TriggerState: 1
+    EventClips:
+    - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
+  ThresholdWeakened: 2000
+  ThresholdDepleted: 4000
+  InitialCollectedCount: 0
+  InitialState: 0
+  PollutionCellSize: 2
+  PollutionMin: 0
+  PollutionMax: 1
+  PollutionRegenPerSec: 0.08
+  PollutionDropPerCollect: 0.12
+  PollutionTopKSampleCount: 6
+  PollutionActiveRatioThreshold: 0.35
+  PollutionRecoveryCooldownFrames: 45
+  PollutionRecoveryWaveSeedCount: 2
+  PollutionRecoveryWaveClusterSize: 4
+  PollutionRecoveryRestoreValue: 0.4
+  PollutionRecoveryRecentCleanBiasFrames: 90
+  DrawGizmo: 1
+  DrawGizmoWhenNotSelected: 0
 --- !u!1 &1042919357
 GameObject:
   m_ObjectHideFlags: 0

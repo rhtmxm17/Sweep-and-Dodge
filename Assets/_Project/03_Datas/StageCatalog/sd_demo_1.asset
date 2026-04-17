@@ -57,15 +57,13 @@ MonoBehaviour:
       LocalYawDeg: 0
     HazardActorOrchestrationRules:
     - RuleId: 101
-      TargetPlacementInstanceIds:
-      - 1
+      TargetPlacementInstanceIds: 01000000
       ActionType: 1
       TriggerType: 1
       TriggerThresholdNormalized: 0
       TargetPhaseId: 0
     - RuleId: 102
-      TargetPlacementInstanceIds:
-      - 1
+      TargetPlacementInstanceIds: 01000000
       ActionType: 2
       TriggerType: 2
       TriggerThresholdNormalized: 0.6
