@@ -15,8 +15,8 @@ MonoBehaviour:
   Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
   EventRepeatCount: 2
   EventShotSchedule: 1
-  EventShotIntervalSec: 0.18
-  CooldownSec: 0.5
+  EventShotIntervalSec: 0.5
+  CooldownSec: 1.25
   PositionPattern:
     rid: 6141543494856999008
   Aim:
@@ -32,7 +32,7 @@ MonoBehaviour:
     - rid: 6141543494856999009
       type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        BaseAngleDeg: 180
+        BaseAngleDeg: 0
     - rid: 6141543494856999010
       type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:

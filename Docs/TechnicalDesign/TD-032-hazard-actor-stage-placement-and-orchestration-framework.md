@@ -143,7 +143,7 @@
   - `ActorArchetypeRef`
   - `SourceStableId`
   - `LocalOffset`
-- `PlacementInstanceId`는 stage 전체에서 유일한 식별자로 본다.
+- `PlacementInstanceId`는 동일 source binding 내에서 유일한 식별자로 본다(source-local scope). → ADR-20260415-01
 - placement transform authority는 `LocalOffset` 하나로 제한한다.
 - placement는 초기 등장 제어를 소유하지 않는다.
   - actor attach와 실제 등장 시작은 분리된 문제로 본다.

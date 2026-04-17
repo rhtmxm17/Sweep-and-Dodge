@@ -166,6 +166,7 @@ namespace SweepNDodge.DotsBullets
     {
         public int PlacementInstanceId;
         public float3 LocalOffset;
+        public float LocalYawDeg;
     }
 
     public struct HazardActorOrchestrationRequestSignalComponent : IComponentData

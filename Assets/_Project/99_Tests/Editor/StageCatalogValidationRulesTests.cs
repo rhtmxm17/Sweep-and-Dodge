@@ -453,25 +453,13 @@ namespace SweepNDodge.DotsBullets.Tests
                                 PlacementInstanceId = 5,
                                 ActorArchetypePrefab = archetypeA.Root,
                                 LocalOffset = new Vector3(1f, 0f, 0f),
-                            }
-                        },
-                    },
-                    new StageSourceBinding
-                    {
-                        SourceStableId = 1202u,
-                        InitialSourceState = SourceStateId.Normal,
-                        ThresholdWeakened = 0,
-                        ThresholdDepleted = 0,
-                        SustainSlots = Array.Empty<SustainSlotBinding>(),
-                        EventSlots = Array.Empty<EventSlotBinding>(),
-                        HazardActorPlacements = new[]
-                        {
+                            },
                             new HazardActorPlacementBinding
                             {
                                 PlacementInstanceId = 5,
                                 ActorArchetypePrefab = archetypeB.Root,
                                 LocalOffset = new Vector3(-1f, 0f, 0f),
-                            }
+                            },
                         },
                     },
                 };
@@ -603,44 +591,44 @@ namespace SweepNDodge.DotsBullets.Tests
                                 LocalOffset = Vector3.zero,
                             }
                         },
+                        HazardActorOrchestrationRules = new[]
+                        {
+                            new HazardActorOrchestrationRuleBinding
+                            {
+                                RuleId = 1,
+                                TargetPlacementInstanceId = 999,
+                                ActionType = HazardActorOrchestrationActionId.Spawn,
+                                TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                            },
+                            new HazardActorOrchestrationRuleBinding
+                            {
+                                RuleId = 2,
+                                TargetPlacementInstanceId = 41,
+                                ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                                TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                                TriggerThresholdNormalized = 1.25f,
+                                TargetPhaseId = 3,
+                            },
+                            new HazardActorOrchestrationRuleBinding
+                            {
+                                RuleId = 3,
+                                TargetPlacementInstanceId = 41,
+                                ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                                TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                                TriggerThresholdNormalized = 0.5f,
+                                TargetPhaseId = 2,
+                            },
+                            new HazardActorOrchestrationRuleBinding
+                            {
+                                RuleId = 4,
+                                TargetPlacementInstanceId = 41,
+                                ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                                TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                                TriggerThresholdNormalized = 0.75f,
+                                TargetPhaseId = 2,
+                            },
+                        },
                     }
-                };
-                definition.HazardActorOrchestrationRules = new[]
-                {
-                    new HazardActorOrchestrationRuleBinding
-                    {
-                        RuleId = 1,
-                        TargetPlacementInstanceId = 999,
-                        ActionType = HazardActorOrchestrationActionId.Spawn,
-                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
-                    },
-                    new HazardActorOrchestrationRuleBinding
-                    {
-                        RuleId = 2,
-                        TargetPlacementInstanceId = 41,
-                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
-                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
-                        TriggerThresholdNormalized = 1.25f,
-                        TargetPhaseId = 3,
-                    },
-                    new HazardActorOrchestrationRuleBinding
-                    {
-                        RuleId = 3,
-                        TargetPlacementInstanceId = 41,
-                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
-                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
-                        TriggerThresholdNormalized = 0.5f,
-                        TargetPhaseId = 2,
-                    },
-                    new HazardActorOrchestrationRuleBinding
-                    {
-                        RuleId = 4,
-                        TargetPlacementInstanceId = 41,
-                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
-                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
-                        TriggerThresholdNormalized = 0.75f,
-                        TargetPhaseId = 2,
-                    },
                 };
 
                 var layout = CreateLayout(created, stageId: 13);
@@ -693,24 +681,24 @@ namespace SweepNDodge.DotsBullets.Tests
                                 LocalOffset = Vector3.zero,
                             }
                         },
+                        HazardActorOrchestrationRules = new[]
+                        {
+                            new HazardActorOrchestrationRuleBinding
+                            {
+                                RuleId = 1,
+                                TargetPlacementInstanceId = 51,
+                                ActionType = HazardActorOrchestrationActionId.Spawn,
+                                TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                            },
+                            new HazardActorOrchestrationRuleBinding
+                            {
+                                RuleId = 2,
+                                TargetPlacementInstanceId = 51,
+                                ActionType = HazardActorOrchestrationActionId.Retire,
+                                TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                            },
+                        },
                     }
-                };
-                definition.HazardActorOrchestrationRules = new[]
-                {
-                    new HazardActorOrchestrationRuleBinding
-                    {
-                        RuleId = 1,
-                        TargetPlacementInstanceId = 51,
-                        ActionType = HazardActorOrchestrationActionId.Spawn,
-                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
-                    },
-                    new HazardActorOrchestrationRuleBinding
-                    {
-                        RuleId = 2,
-                        TargetPlacementInstanceId = 51,
-                        ActionType = HazardActorOrchestrationActionId.Retire,
-                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
-                    },
                 };
 
                 var layout = CreateLayout(created, stageId: 14);

@@ -374,20 +374,13 @@ namespace SweepNDodge.DotsBullets.Tests
                         LocalOffset = UnityEngine.Vector3.zero,
                     }
                 };
-                stageCatalog.Entries[0].Definition.HazardActorOrchestrationRules = new[]
+                stageCatalog.Entries[0].Definition.SourceBindings[0].HazardActorOrchestrationRules = new[]
                 {
                     new HazardActorOrchestrationRuleBinding
                     {
                         RuleId = 1,
                         TargetPlacementInstanceId = 301,
                         ActionType = HazardActorOrchestrationActionId.Spawn,
-                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
-                    },
-                    new HazardActorOrchestrationRuleBinding
-                    {
-                        RuleId = 2,
-                        TargetPlacementInstanceId = 999,
-                        ActionType = HazardActorOrchestrationActionId.Retire,
                         TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
                     },
                 };

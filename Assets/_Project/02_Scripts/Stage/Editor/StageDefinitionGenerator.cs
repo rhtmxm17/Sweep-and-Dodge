@@ -146,7 +146,6 @@ namespace SweepNDodge.DotsBullets.Editor
             if (stageNode.TargetDefinition.StageTimeLimitSec <= 0f)
                 stageNode.TargetDefinition.StageTimeLimitSec = 150f;
             stageNode.TargetDefinition.SourceBindings = sourceBindings.ToArray();
-            stageNode.TargetDefinition.HazardActorOrchestrationRules ??= Array.Empty<HazardActorOrchestrationRuleBinding>();
             EditorUtility.SetDirty(stageNode.TargetDefinition);
             if (saveAssets)
                 AssetDatabase.SaveAssets();
@@ -220,6 +219,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 SustainSlots = Array.Empty<SustainSlotBinding>(),
                 EventSlots = Array.Empty<EventSlotBinding>(),
                 HazardActorPlacements = Array.Empty<HazardActorPlacementBinding>(),
+                HazardActorOrchestrationRules = Array.Empty<HazardActorOrchestrationRuleBinding>(),
             };
         }
 
@@ -233,8 +233,41 @@ namespace SweepNDodge.DotsBullets.Editor
                 ThresholdDepleted = Mathf.Max(Mathf.Max(0, authoring.ThresholdWeakened), authoring.ThresholdDepleted),
                 SustainSlots = BuildSustainSlots(authoring.SustainClipSlots),
                 EventSlots = BuildEventSlots(authoring.EventClipSlots),
-                HazardActorPlacements = Array.Empty<HazardActorPlacementBinding>(),
+                HazardActorPlacements = BuildHazardActorPlacements(authoring),
+                HazardActorOrchestrationRules = BuildHazardActorOrchestrationRules(authoring),
             };
+        }
+
+        private static HazardActorPlacementBinding[] BuildHazardActorPlacements(SourceRuntimeTemplateAuthoringBase authoring)
+        {
+            var markers = authoring.GetComponentsInChildren<StageHazardActorMarker>(includeInactive: true);
+            if (markers == null || markers.Length == 0)
+                return Array.Empty<HazardActorPlacementBinding>();
+
+            var result = new HazardActorPlacementBinding[markers.Length];
+            for (int i = 0; i < markers.Length; i++)
+            {
+                var marker = markers[i];
+                Vector3 localOffset = marker.transform.position - authoring.transform.position;
+                result[i] = new HazardActorPlacementBinding
+                {
+                    PlacementInstanceId = Mathf.Max(1, marker.PlacementInstanceId),
+                    ActorArchetypePrefab = marker.ActorArchetypePrefab,
+                    LocalOffset = localOffset,
+                    LocalYawDeg = marker.LocalYawDeg,
+                };
+            }
+
+            return result;
+        }
+
+        private static HazardActorOrchestrationRuleBinding[] BuildHazardActorOrchestrationRules(SourceRuntimeTemplateAuthoringBase authoring)
+        {
+            var marker = authoring.GetComponent<HazardActorSourceAuthoringMarker>();
+            if (marker == null || marker.Rules == null || marker.Rules.Length == 0)
+                return Array.Empty<HazardActorOrchestrationRuleBinding>();
+
+            return marker.Rules;
         }
 
         private static SustainSlotBinding[] BuildSustainSlots(SourceRuntimeTemplateAuthoringBase.SustainClipSlotAuthoring[] slots)

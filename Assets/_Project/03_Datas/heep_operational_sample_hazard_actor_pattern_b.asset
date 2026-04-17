@@ -15,8 +15,8 @@ MonoBehaviour:
   Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
   EventRepeatCount: 3
   EventShotSchedule: 1
-  EventShotIntervalSec: 0.1
-  CooldownSec: 0.5
+  EventShotIntervalSec: 0.25
+  CooldownSec: 1.25
   PositionPattern:
     rid: 6141543494856999014
   Aim:

@@ -126,6 +126,7 @@ namespace SweepNDodge.DotsBullets
             int placementInstanceId,
             GameObject actorArchetypePrefab,
             float3 localOffset,
+            float localYawDeg,
             out string error)
         {
             error = string.Empty;
@@ -170,6 +171,7 @@ namespace SweepNDodge.DotsBullets
                 sourceEntity,
                 placementInstanceId,
                 localOffset,
+                localYawDeg,
                 actorAuthoring,
                 compatibilitySeed,
                 phaseTransitions,
@@ -212,6 +214,7 @@ namespace SweepNDodge.DotsBullets
             Entity sourceEntity,
             int placementInstanceId,
             float3 localOffset,
+            float localYawDeg,
             HazardActorAuthoring actorAuthoring,
             HazardActorPhaseSelectorCompatibilitySeed compatibilitySeed,
             HazardActorPhaseProgressTransitionBuffer[] phaseTransitions,
@@ -255,6 +258,7 @@ namespace SweepNDodge.DotsBullets
             {
                 PlacementInstanceId = placementInstanceId,
                 LocalOffset = localOffset,
+                LocalYawDeg = localYawDeg,
             });
             em.SetComponentData(actorEntity, new HazardActorAppliedConfigBaselineComponent
             {
@@ -365,6 +369,7 @@ namespace SweepNDodge.DotsBullets
             });
             em.GetBuffer<LinkedEntityGroup>(sourceEntity).Add(actorEntity);
 
+            var yawRotation = quaternion.RotateY(math.radians(localYawDeg));
             var emitters = actorAuthoring.GetComponentsInChildren<HazardEmitterAuthoring>(true);
             for (int emitterIndex = 0; emitterIndex < emitters.Length; emitterIndex++)
             {
@@ -385,6 +390,7 @@ namespace SweepNDodge.DotsBullets
                 var firstSlot = resolvedSlots[0];
                 var baselineTelegraph = HazardEmitterPatternSlotAuthoringUtility.CreateBaselineTelegraph(resolvedSlots);
                 var baselineEmission = HazardEmitterPatternSlotAuthoringUtility.CreateBaselineEmission(resolvedSlots);
+                baselineEmission.BaseAngleDeg += localYawDeg;
 
                 var emitterEntity = em.CreateEntity(
                     typeof(HazardEmitterComponent),
@@ -404,7 +410,7 @@ namespace SweepNDodge.DotsBullets
                 {
                     IsEnabled = emitterEnabled,
                     IsSuppressed = emitterSuppressed,
-                    LocalOffset = emitterAuthoring.LocalOffset,
+                    LocalOffset = math.rotate(yawRotation, (float3)emitterAuthoring.LocalOffset),
                     TelegraphProfileRefId = firstSlot.Metadata.TelegraphProfileRefId,
                     EmissionProfileRefId = firstSlot.Metadata.EmissionProfileRefId,
                 };

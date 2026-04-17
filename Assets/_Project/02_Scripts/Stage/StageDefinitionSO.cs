@@ -25,6 +25,7 @@ namespace SweepNDodge.DotsBullets
         [Min(1)] public int PlacementInstanceId;
         public GameObject ActorArchetypePrefab;
         public Vector3 LocalOffset;
+        public float LocalYawDeg;
     }
 
     public enum HazardActorOrchestrationActionId : byte
@@ -46,11 +47,21 @@ namespace SweepNDodge.DotsBullets
     public struct HazardActorOrchestrationRuleBinding
     {
         [Min(1)] public int RuleId;
-        [Min(1)] public int TargetPlacementInstanceId;
+        public int[] TargetPlacementInstanceIds;
         public HazardActorOrchestrationActionId ActionType;
         public HazardActorOrchestrationTriggerId TriggerType;
         [Range(0f, 1f)] public float TriggerThresholdNormalized;
         [Min(1)] public int TargetPhaseId;
+
+        public int TargetPlacementInstanceId
+        {
+            get => TargetPlacementInstanceIds != null && TargetPlacementInstanceIds.Length > 0
+                ? TargetPlacementInstanceIds[0]
+                : 0;
+            set => TargetPlacementInstanceIds = value > 0
+                ? new[] { value }
+                : Array.Empty<int>();
+        }
     }
 
     [Serializable]
@@ -63,6 +74,7 @@ namespace SweepNDodge.DotsBullets
         public SustainSlotBinding[] SustainSlots;
         public EventSlotBinding[] EventSlots;
         public HazardActorPlacementBinding[] HazardActorPlacements;
+        public HazardActorOrchestrationRuleBinding[] HazardActorOrchestrationRules;
     }
 
     [CreateAssetMenu(menuName = "SweepNDodge/Stage/Stage Definition", fileName = "sd_")]
@@ -73,6 +85,5 @@ namespace SweepNDodge.DotsBullets
         public bool IsFinalStage;
         [Min(0.01f)] public float StageTimeLimitSec = 150f;
         public StageSourceBinding[] SourceBindings;
-        public HazardActorOrchestrationRuleBinding[] HazardActorOrchestrationRules;
     }
 }

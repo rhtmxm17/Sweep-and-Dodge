@@ -875,7 +875,7 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
-            SeedSourceHazardActorOrchestration(em, entity, null, null);
+            SeedSourceHazardActorOrchestration(em, entity, null);
             if (HasPlacementDeliveredHazardActors(em, entity))
                 RemoveAllHazardActorsFromSource(em, entity);
         }
@@ -939,14 +939,14 @@ namespace SweepNDodge.DotsBullets
             if (hasPlacements)
             {
                 ApplySourceHazardPlacements(em, entity, binding.SourceStableId, binding.HazardActorPlacements);
-                SeedSourceHazardActorOrchestration(em, entity, binding.HazardActorPlacements, definition != null ? definition.HazardActorOrchestrationRules : null);
+                SeedSourceHazardActorOrchestration(em, entity, binding.HazardActorOrchestrationRules);
                 return;
             }
 
             if (HasPlacementDeliveredHazardActors(em, entity))
                 RemoveAllHazardActorsFromSource(em, entity);
 
-            SeedSourceHazardActorOrchestration(em, entity, null, null);
+            SeedSourceHazardActorOrchestration(em, entity, null);
         }
 
         private static bool HasHazardPlacements(HazardActorPlacementBinding[] placements)
@@ -964,7 +964,6 @@ namespace SweepNDodge.DotsBullets
         private static void SeedSourceHazardActorOrchestration(
             EntityManager em,
             Entity sourceEntity,
-            HazardActorPlacementBinding[] placements,
             HazardActorOrchestrationRuleBinding[] rules)
         {
             if (!em.Exists(sourceEntity))
@@ -980,39 +979,35 @@ namespace SweepNDodge.DotsBullets
             ruleBuffer.Clear();
             ruleStates.Clear();
 
-            if (placements == null || placements.Length <= 0 || rules == null || rules.Length <= 0)
+            if (rules == null || rules.Length <= 0)
                 return;
 
-            var ownedPlacementIds = new HashSet<int>();
-            for (int i = 0; i < placements.Length; i++)
-            {
-                if (placements[i].PlacementInstanceId > 0)
-                    ownedPlacementIds.Add(placements[i].PlacementInstanceId);
-            }
-
-            if (ownedPlacementIds.Count <= 0)
-                return;
-
+            int autoRuleId = 1;
             for (int i = 0; i < rules.Length; i++)
             {
                 var rule = rules[i];
-                if (!ownedPlacementIds.Contains(rule.TargetPlacementInstanceId))
+                var targetPlacementInstanceIds = rule.TargetPlacementInstanceIds;
+                if (targetPlacementInstanceIds == null || targetPlacementInstanceIds.Length <= 0)
                     continue;
 
-                ruleBuffer.Add(new SourceHazardActorOrchestrationRuleBuffer
+                for (int targetIndex = 0; targetIndex < targetPlacementInstanceIds.Length; targetIndex++)
                 {
-                    RuleId = rule.RuleId,
-                    TargetPlacementInstanceId = rule.TargetPlacementInstanceId,
-                    ActionType = rule.ActionType,
-                    TriggerType = rule.TriggerType,
-                    TriggerThresholdNormalized = rule.TriggerThresholdNormalized,
-                    TargetPhaseId = rule.TargetPhaseId,
-                });
-                ruleStates.Add(new SourceHazardActorOrchestrationRuleStateBuffer
-                {
-                    RuleId = rule.RuleId,
-                    HasFired = 0,
-                });
+                    ruleBuffer.Add(new SourceHazardActorOrchestrationRuleBuffer
+                    {
+                        RuleId = autoRuleId,
+                        TargetPlacementInstanceId = targetPlacementInstanceIds[targetIndex],
+                        ActionType = rule.ActionType,
+                        TriggerType = rule.TriggerType,
+                        TriggerThresholdNormalized = rule.TriggerThresholdNormalized,
+                        TargetPhaseId = rule.TargetPhaseId,
+                    });
+                    ruleStates.Add(new SourceHazardActorOrchestrationRuleStateBuffer
+                    {
+                        RuleId = autoRuleId,
+                        HasFired = 0,
+                    });
+                    autoRuleId++;
+                }
             }
         }
 
@@ -1038,6 +1033,7 @@ namespace SweepNDodge.DotsBullets
                         placement.PlacementInstanceId,
                         placement.ActorArchetypePrefab,
                         (float3)placement.LocalOffset,
+                        placement.LocalYawDeg,
                         out var error))
                 {
                     Debug.LogError(
@@ -1458,7 +1454,7 @@ namespace SweepNDodge.DotsBullets
             em.SetComponentData(entity, sustainRuntime);
             em.SetComponentData(entity, eventRuntime);
             em.SetComponentData(entity, directorState);
-            SeedSourceHazardActorOrchestration(em, entity, null, null);
+            SeedSourceHazardActorOrchestration(em, entity, null);
             if (HasPlacementDeliveredHazardActors(em, entity))
                 RemoveAllHazardActorsFromSource(em, entity);
         }

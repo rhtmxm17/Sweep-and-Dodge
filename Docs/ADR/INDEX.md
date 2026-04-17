@@ -6,6 +6,10 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260415-01-orchestration-rule-under-source-binding.md](ADR-20260415-01-orchestration-rule-under-source-binding.md): `HazardActorOrchestrationRules`를 stage 최상위에서 `StageSourceBinding` 하위로 이동하고 `PlacementInstanceId` / `RuleId` 유일성 범위를 source-local로 좁힘
+- [ADR-20260413-01-hazard-actor-stage-placement-and-orchestration.md](ADR-20260413-01-hazard-actor-stage-placement-and-orchestration.md): stage를 actor placement/orchestration owner로 고정하고 actor를 재사용 가능한 archetype content unit으로 재해석. `HazardActorBinding` path 제거
+- [ADR-20260409-01-hazard-actor-behavior-runtime-phase-and-presence.md](ADR-20260409-01-hazard-actor-behavior-runtime-phase-and-presence.md): Presence를 실제 runtime progression state로 승격하고 escalation을 slot mutation이 아닌 actor-owned phase 전환으로 모델링
+- [ADR-20260408-01-hazard-actor-intermediate-hierarchy.md](ADR-20260408-01-hazard-actor-intermediate-hierarchy.md): `Source -> HazardEmitter` 직접 구조에서 `Source -> HazardActor -> HazardEmitter` 계층으로 전환하고 `HazardEmitter`를 actor의 발사 ability slice로 재해석
 - [ADR-20260407-01-discrete-emit-bridge-and-spawn-ownership-split.md](ADR-20260407-01-discrete-emit-bridge-and-spawn-ownership-split.md): `HazardEmitter`와 `WaveClip` discrete branch를 공통 `DiscreteEmit` 브리지로 내리고 producer/execution ownership, update order, budget 경계를 분리
 - [ADR-20260402-01-broomsweep-default-cleanup-action.md](ADR-20260402-01-broomsweep-default-cleanup-action.md): 기본 청소 동작을 `BroomSweep` 1종으로 고정하고 `Trash`/`Hazard` 판정을 같은 액션 안의 분리된 서브 프로파일로 운영
 - [ADR-20260330-02-active-area-density-scaling-for-field-sampling.md](ADR-20260330-02-active-area-density-scaling-for-field-sampling.md): field sampling directive의 총 스폰량과 density cap을 active-area 비율에 연동

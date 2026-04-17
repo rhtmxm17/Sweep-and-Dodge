@@ -127,13 +127,12 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void HazardActorAssets_KeepBlueprintParityAndActorFreeSources()
+        public void HazardActorAssets_SatisfyStandaloneContractAndActorFreeSources()
         {
             ValidateActorFreeSourceTemplatePrefab(TestHazardSourceTemplatePrefabPath);
             ValidateActorFreeSourceTemplatePrefab(OperationalHazardSourceTemplatePrefabPath);
-            ValidateHazardActorArchetypePrefabParity(
-                TestHazardArchetypePrefabPath,
-                OperationalHazardArchetypePrefabPath);
+            ValidateHazardActorArchetypePrefabContract(TestHazardArchetypePrefabPath);
+            ValidateHazardActorArchetypePrefabContract(OperationalHazardArchetypePrefabPath);
         }
 
         [Test]
@@ -340,113 +339,56 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
-        private static void ValidateHazardActorArchetypePrefabParity(string lhsPrefabPath, string rhsPrefabPath)
+        private static void ValidateHazardActorArchetypePrefabContract(string prefabPath)
         {
-            var lhsRoot = PrefabUtility.LoadPrefabContents(lhsPrefabPath);
-            var rhsRoot = PrefabUtility.LoadPrefabContents(rhsPrefabPath);
+            var root = PrefabUtility.LoadPrefabContents(prefabPath);
 
             try
             {
-                var lhsActor = lhsRoot.GetComponentInChildren<HazardActorAuthoring>(true);
-                var rhsActor = rhsRoot.GetComponentInChildren<HazardActorAuthoring>(true);
-                var lhsEmitter = lhsRoot.GetComponentInChildren<HazardEmitterAuthoring>(true);
-                var rhsEmitter = rhsRoot.GetComponentInChildren<HazardEmitterAuthoring>(true);
+                var actors = root.GetComponentsInChildren<HazardActorAuthoring>(true);
+                Assert.That(actors, Is.Not.Null.And.Length.EqualTo(1), $"{prefabPath} must contain exactly one HazardActorAuthoring.");
 
-                Assert.That(lhsActor, Is.Not.Null, lhsPrefabPath);
-                Assert.That(rhsActor, Is.Not.Null, rhsPrefabPath);
-                Assert.That(lhsEmitter, Is.Not.Null, lhsPrefabPath);
-                Assert.That(rhsEmitter, Is.Not.Null, rhsPrefabPath);
+                var actor = actors[0];
+                Assert.That(actor, Is.Not.Null, prefabPath);
 
-                Assert.That(lhsActor.ActorId, Is.EqualTo(rhsActor.ActorId));
-                Assert.That(lhsActor.InitialPhaseId, Is.EqualTo(rhsActor.InitialPhaseId));
-                Assert.That(lhsActor.PhaseSelectorPolicies, Is.Not.Null);
-                Assert.That(rhsActor.PhaseSelectorPolicies, Is.Not.Null);
-                Assert.That(lhsActor.PhaseProgressTransitions, Is.Not.Null);
-                Assert.That(rhsActor.PhaseProgressTransitions, Is.Not.Null);
-                Assert.That(lhsActor.PhaseSelectorPolicies.Length, Is.EqualTo(rhsActor.PhaseSelectorPolicies.Length));
-                Assert.That(lhsActor.PhaseProgressTransitions.Length, Is.EqualTo(rhsActor.PhaseProgressTransitions.Length));
+                bool valid = HazardActorAuthoringValidationUtility.TryValidateStandalone(
+                    actor,
+                    out var selectorSeed,
+                    out var phaseTransitions,
+                    out var errorKind,
+                    out var error);
+                Assert.That(valid, Is.True, $"{prefabPath} standalone actor contract failed. kind={errorKind}, error={error}");
+                Assert.That(selectorSeed.Policies, Is.Not.Null.And.Length.GreaterThan(0), $"{prefabPath} must resolve at least one selector policy.");
 
-                for (int i = 0; i < lhsActor.PhaseSelectorPolicies.Length; i++)
+                var ownedEmitters = actor.GetComponentsInChildren<HazardEmitterAuthoring>(true)
+                    .Where(x => x != null && x.GetComponentInParent<HazardActorAuthoring>(true) == actor)
+                    .ToArray();
+                Assert.That(ownedEmitters, Is.Not.Empty, $"{prefabPath} must contain at least one owned HazardEmitterAuthoring.");
+
+                for (int i = 0; i < ownedEmitters.Length; i++)
                 {
-                    var lhsPolicy = lhsActor.PhaseSelectorPolicies[i];
-                    var rhsPolicy = rhsActor.PhaseSelectorPolicies[i];
-                    Assert.That(lhsPolicy.PhaseId, Is.EqualTo(rhsPolicy.PhaseId), $"PhaseSelectorPolicies[{i}].PhaseId mismatch.");
-                    Assert.That(lhsPolicy.SelectionMode, Is.EqualTo(rhsPolicy.SelectionMode), $"PhaseSelectorPolicies[{i}].SelectionMode mismatch.");
-                    Assert.That(lhsPolicy.Candidates, Is.Not.Null);
-                    Assert.That(rhsPolicy.Candidates, Is.Not.Null);
-                    Assert.That(lhsPolicy.Candidates.Length, Is.EqualTo(rhsPolicy.Candidates.Length), $"PhaseSelectorPolicies[{i}].Candidates length mismatch.");
-                    for (int c = 0; c < lhsPolicy.Candidates.Length; c++)
-                    {
-                        Assert.That(lhsPolicy.Candidates[c].EmitterId, Is.EqualTo(rhsPolicy.Candidates[c].EmitterId), $"PhaseSelectorPolicies[{i}].Candidates[{c}].EmitterId mismatch.");
-                        Assert.That(lhsPolicy.Candidates[c].PatternSlotId, Is.EqualTo(rhsPolicy.Candidates[c].PatternSlotId), $"PhaseSelectorPolicies[{i}].Candidates[{c}].PatternSlotId mismatch.");
-                    }
+                    var emitter = ownedEmitters[i];
+                    Assert.That(emitter.EmitterId, Is.GreaterThan(0), $"{prefabPath} emitter[{i}] requires EmitterId >= 1.");
+
+                    bool slotsResolved = HazardEmitterPatternSlotAuthoringUtility.TryResolveSlots(
+                        emitter.Slots,
+                        out var resolvedSlots,
+                        out var slotError);
+                    Assert.That(slotsResolved, Is.True, $"{prefabPath} emitter[{i}] slot contract failed. error={slotError}");
+                    Assert.That(resolvedSlots, Is.Not.Null.And.Length.GreaterThan(0), $"{prefabPath} emitter[{i}] must resolve at least one slot.");
                 }
 
-                for (int i = 0; i < lhsActor.PhaseProgressTransitions.Length; i++)
+                if (phaseTransitions.Length > 0)
                 {
-                    var lhsTransition = lhsActor.PhaseProgressTransitions[i];
-                    var rhsTransition = rhsActor.PhaseProgressTransitions[i];
-                    Assert.That(lhsTransition.FromPhaseId, Is.EqualTo(rhsTransition.FromPhaseId), $"PhaseProgressTransitions[{i}].FromPhaseId mismatch.");
-                    Assert.That(lhsTransition.ToPhaseId, Is.EqualTo(rhsTransition.ToPhaseId), $"PhaseProgressTransitions[{i}].ToPhaseId mismatch.");
-                    Assert.That(lhsTransition.ProgressThresholdNormalized, Is.EqualTo(rhsTransition.ProgressThresholdNormalized).Within(0.0001f), $"PhaseProgressTransitions[{i}].ProgressThresholdNormalized mismatch.");
-                    Assert.That(lhsTransition.TransitionLeadInSec, Is.EqualTo(rhsTransition.TransitionLeadInSec).Within(0.0001f), $"PhaseProgressTransitions[{i}].TransitionLeadInSec mismatch.");
-                }
-
-                Assert.That(lhsEmitter.EmitterId, Is.EqualTo(rhsEmitter.EmitterId));
-                Assert.That(lhsEmitter.Slots, Is.Not.Null);
-                Assert.That(rhsEmitter.Slots, Is.Not.Null);
-                Assert.That(lhsEmitter.Slots.Length, Is.EqualTo(rhsEmitter.Slots.Length));
-                for (int i = 0; i < lhsEmitter.Slots.Length; i++)
-                {
-                    var lhsSlot = lhsEmitter.Slots[i];
-                    var rhsSlot = rhsEmitter.Slots[i];
-                    Assert.That(lhsSlot.PatternSlotId, Is.EqualTo(rhsSlot.PatternSlotId), $"Slots[{i}].PatternSlotId mismatch.");
-                    Assert.That(lhsSlot.BaseWeight, Is.EqualTo(rhsSlot.BaseWeight).Within(0.0001f), $"Slots[{i}].BaseWeight mismatch.");
-                    Assert.That(lhsSlot.AvailabilityFlags, Is.EqualTo(rhsSlot.AvailabilityFlags), $"Slots[{i}].AvailabilityFlags mismatch.");
-                    Assert.That(lhsSlot.TelegraphProfile, Is.Not.Null, $"{lhsPrefabPath} Slots[{i}] telegraph missing.");
-                    Assert.That(rhsSlot.TelegraphProfile, Is.Not.Null, $"{rhsPrefabPath} Slots[{i}] telegraph missing.");
-                    Assert.That(lhsSlot.EmissionProfile, Is.Not.Null, $"{lhsPrefabPath} Slots[{i}] emission missing.");
-                    Assert.That(rhsSlot.EmissionProfile, Is.Not.Null, $"{rhsPrefabPath} Slots[{i}] emission missing.");
-                    AssertHazardTelegraphProfilesEquivalent(lhsSlot.TelegraphProfile, rhsSlot.TelegraphProfile, i);
-                    AssertHazardEmissionProfilesEquivalent(lhsSlot.EmissionProfile, rhsSlot.EmissionProfile, i);
+                    Assert.That(
+                        phaseTransitions.Any(x => x.FromPhaseId != x.ToPhaseId),
+                        Is.True,
+                        $"{prefabPath} phase transitions must contain at least one non-self transition when transitions are authored.");
                 }
             }
             finally
             {
-                PrefabUtility.UnloadPrefabContents(lhsRoot);
-                PrefabUtility.UnloadPrefabContents(rhsRoot);
-            }
-        }
-
-        private static void AssertHazardTelegraphProfilesEquivalent(HazardEmitterTelegraphProfileSO lhs, HazardEmitterTelegraphProfileSO rhs, int slotIndex)
-        {
-            Assert.That(lhs.TelegraphDurationSec, Is.EqualTo(rhs.TelegraphDurationSec).Within(0.0001f), $"Slots[{slotIndex}] TelegraphDurationSec mismatch.");
-        }
-
-        private static void AssertHazardEmissionProfilesEquivalent(HazardEmitterEmissionProfileSO lhs, HazardEmitterEmissionProfileSO rhs, int slotIndex)
-        {
-            Assert.That(lhs.Bullet, Is.EqualTo(rhs.Bullet), $"Slots[{slotIndex}] Bullet mismatch.");
-            Assert.That(lhs.EventRepeatCount, Is.EqualTo(rhs.EventRepeatCount), $"Slots[{slotIndex}] EventRepeatCount mismatch.");
-            Assert.That(lhs.EventShotSchedule, Is.EqualTo(rhs.EventShotSchedule), $"Slots[{slotIndex}] EventShotSchedule mismatch.");
-            Assert.That(lhs.EventShotIntervalSec, Is.EqualTo(rhs.EventShotIntervalSec).Within(0.0001f), $"Slots[{slotIndex}] EventShotIntervalSec mismatch.");
-            Assert.That(lhs.CooldownSec, Is.EqualTo(rhs.CooldownSec).Within(0.0001f), $"Slots[{slotIndex}] CooldownSec mismatch.");
-            Assert.That(lhs.PositionPattern?.GetType(), Is.EqualTo(rhs.PositionPattern?.GetType()), $"Slots[{slotIndex}] PositionPattern type mismatch.");
-            Assert.That(lhs.Aim?.GetType(), Is.EqualTo(rhs.Aim?.GetType()), $"Slots[{slotIndex}] Aim type mismatch.");
-            Assert.That(lhs.ShotPattern?.GetType(), Is.EqualTo(rhs.ShotPattern?.GetType()), $"Slots[{slotIndex}] ShotPattern type mismatch.");
-
-            if (lhs.Aim is FixedAimAuthoring lhsFixed && rhs.Aim is FixedAimAuthoring rhsFixed)
-                Assert.That(lhsFixed.BaseAngleDeg, Is.EqualTo(rhsFixed.BaseAngleDeg).Within(0.0001f), $"Slots[{slotIndex}] FixedAim.BaseAngleDeg mismatch.");
-
-            if (lhs.Aim is PlayerPositionAimAuthoring lhsPlayerAim && rhs.Aim is PlayerPositionAimAuthoring rhsPlayerAim)
-            {
-                Assert.That(lhsPlayerAim.AngleOffsetDeg, Is.EqualTo(rhsPlayerAim.AngleOffsetDeg).Within(0.0001f), $"Slots[{slotIndex}] PlayerPositionAim.AngleOffsetDeg mismatch.");
-                Assert.That(lhsPlayerAim.SnapshotTiming, Is.EqualTo(rhsPlayerAim.SnapshotTiming), $"Slots[{slotIndex}] PlayerPositionAim.SnapshotTiming mismatch.");
-            }
-
-            if (lhs.ShotPattern is NWayShotPatternAuthoring lhsNWay && rhs.ShotPattern is NWayShotPatternAuthoring rhsNWay)
-            {
-                Assert.That(lhsNWay.ShotCount, Is.EqualTo(rhsNWay.ShotCount), $"Slots[{slotIndex}] NWay.ShotCount mismatch.");
-                Assert.That(lhsNWay.AngleSpacingDeg, Is.EqualTo(rhsNWay.AngleSpacingDeg).Within(0.0001f), $"Slots[{slotIndex}] NWay.AngleSpacingDeg mismatch.");
+                PrefabUtility.UnloadPrefabContents(root);
             }
         }
 

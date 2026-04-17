@@ -821,7 +821,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
             definition.StageId = 1;
-            definition.HazardActorOrchestrationRules = orchestrationRules ?? System.Array.Empty<HazardActorOrchestrationRuleBinding>();
             definition.SourceBindings = new[]
             {
                 new StageSourceBinding
@@ -841,6 +840,7 @@ namespace SweepNDodge.DotsBullets.Tests
                             LocalOffset = new Vector3(2f, 0f, 0f),
                         }
                     },
+                    HazardActorOrchestrationRules = orchestrationRules ?? System.Array.Empty<HazardActorOrchestrationRuleBinding>(),
                 }
             };
 

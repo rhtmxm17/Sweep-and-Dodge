@@ -215,8 +215,6 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var bindings = definition.SourceBindings ?? Array.Empty<StageSourceBinding>();
             var sourceOwners = new Dictionary<uint, List<int>>();
-            var placementOwners = new Dictionary<int, List<string>>();
-            var placementDataById = new Dictionary<int, HazardActorPlacementValidationData>();
 
             for (int i = 0; i < bindings.Length; i++)
             {
@@ -249,7 +247,32 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
                 ValidateEventSlots(binding.EventSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
+
+                var placementOwners = new Dictionary<int, List<string>>();
+                var placementDataById = new Dictionary<int, HazardActorPlacementValidationData>();
                 ValidateHazardPlacements(binding, bindingLocation, issues, enforceOperationalReferenceRestrictions, placementOwners, placementDataById);
+
+                foreach (var pair in placementOwners)
+                {
+                    if (pair.Key < 1 || pair.Value.Count <= 1)
+                        continue;
+
+                    string joined = string.Join(", ", pair.Value);
+                    for (int j = 0; j < pair.Value.Count; j++)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "STC036",
+                            pair.Value[j],
+                            $"Duplicate HazardActorPlacementBinding.PlacementInstanceId detected: {pair.Key}. Owners: {joined}"));
+                    }
+                }
+
+                ValidateHazardActorOrchestrationRules(
+                    binding.HazardActorOrchestrationRules,
+                    bindingLocation,
+                    issues,
+                    placementDataById);
             }
 
             foreach (var pair in sourceOwners)
@@ -263,28 +286,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     location,
                     $"Duplicate SourceStableId in StageDefinition. stableId={pair.Key}"));
             }
-
-            foreach (var pair in placementOwners)
-            {
-                if (pair.Key < 1 || pair.Value.Count <= 1)
-                    continue;
-
-                string joined = string.Join(", ", pair.Value);
-                for (int i = 0; i < pair.Value.Count; i++)
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC036",
-                        pair.Value[i],
-                        $"Duplicate HazardActorPlacementBinding.PlacementInstanceId detected: {pair.Key}. Owners: {joined}"));
-                }
-            }
-
-            ValidateHazardActorOrchestrationRules(
-                definition.HazardActorOrchestrationRules,
-                location,
-                issues,
-                placementDataById);
         }
 
         private static void ValidateSustainSlots(
@@ -577,13 +578,14 @@ namespace SweepNDodge.DotsBullets.Editor
                         "HazardActorOrchestrationRuleBinding.TriggerType must be a concrete trigger."));
                 }
 
-                if (!placementDataById.TryGetValue(rule.TargetPlacementInstanceId, out var placementData))
+                var targetPlacementInstanceIds = rule.TargetPlacementInstanceIds;
+                if (targetPlacementInstanceIds == null || targetPlacementInstanceIds.Length <= 0)
                 {
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Error,
                         "STC040",
                         ruleLocation,
-                        $"HazardActorOrchestrationRuleBinding targets missing PlacementInstanceId {rule.TargetPlacementInstanceId}."));
+                        "HazardActorOrchestrationRuleBinding.TargetPlacementInstanceIds is null or empty."));
                     continue;
                 }
 
@@ -597,42 +599,56 @@ namespace SweepNDodge.DotsBullets.Editor
                         $"HazardActorOrchestrationRuleBinding.TriggerThresholdNormalized must be within [0,1]. current={rule.TriggerThresholdNormalized}"));
                 }
 
-                string conflictKey = BuildOrchestrationConflictKey(rule);
-                if (!conflictOwners.TryGetValue(conflictKey, out var conflicts))
+                for (int targetIndex = 0; targetIndex < targetPlacementInstanceIds.Length; targetIndex++)
                 {
-                    conflicts = new List<string>(2);
-                    conflictOwners.Add(conflictKey, conflicts);
+                    int targetPlacementInstanceId = targetPlacementInstanceIds[targetIndex];
+                    if (!placementDataById.TryGetValue(targetPlacementInstanceId, out var placementData))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "STC040",
+                            ruleLocation,
+                            $"HazardActorOrchestrationRuleBinding targets missing PlacementInstanceId {targetPlacementInstanceId}."));
+                        continue;
+                    }
+
+                    string conflictKey = BuildOrchestrationConflictKey(rule, targetPlacementInstanceId);
+                    if (!conflictOwners.TryGetValue(conflictKey, out var conflicts))
+                    {
+                        conflicts = new List<string>(2);
+                        conflictOwners.Add(conflictKey, conflicts);
+                    }
+
+                    conflicts.Add(ruleLocation);
+
+                    if (rule.ActionType != HazardActorOrchestrationActionId.PhaseSet)
+                        continue;
+
+                    if (!placementData.ValidPhaseIds.Contains(rule.TargetPhaseId))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "STC042",
+                            ruleLocation,
+                            $"HazardActorOrchestrationRuleBinding.PhaseSet targets invalid phase {rule.TargetPhaseId} for PlacementInstanceId {targetPlacementInstanceId}."));
+                        continue;
+                    }
+
+                    int currentExpectedPhase = expectedPhaseByPlacement.TryGetValue(targetPlacementInstanceId, out var expected)
+                        ? expected
+                        : placementData.InitialPhaseId;
+                    if (!HasTransitionBaseline(placementData.PhaseTransitions, currentExpectedPhase, rule.TargetPhaseId))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "STC045",
+                            ruleLocation,
+                            $"HazardActorOrchestrationRuleBinding.PhaseSet requires a matching archetype transition baseline. fromPhaseId={currentExpectedPhase}, targetPhaseId={rule.TargetPhaseId}, placementInstanceId={targetPlacementInstanceId}"));
+                        continue;
+                    }
+
+                    expectedPhaseByPlacement[targetPlacementInstanceId] = rule.TargetPhaseId;
                 }
-
-                conflicts.Add(ruleLocation);
-
-                if (rule.ActionType != HazardActorOrchestrationActionId.PhaseSet)
-                    continue;
-
-                if (!placementData.ValidPhaseIds.Contains(rule.TargetPhaseId))
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC042",
-                        ruleLocation,
-                        $"HazardActorOrchestrationRuleBinding.PhaseSet targets invalid phase {rule.TargetPhaseId} for PlacementInstanceId {rule.TargetPlacementInstanceId}."));
-                    continue;
-                }
-
-                int currentExpectedPhase = expectedPhaseByPlacement.TryGetValue(rule.TargetPlacementInstanceId, out var expected)
-                    ? expected
-                    : placementData.InitialPhaseId;
-                if (!HasTransitionBaseline(placementData.PhaseTransitions, currentExpectedPhase, rule.TargetPhaseId))
-                {
-                    issues.Add(new ContentValidationIssue(
-                        ContentValidationSeverity.Error,
-                        "STC045",
-                        ruleLocation,
-                        $"HazardActorOrchestrationRuleBinding.PhaseSet requires a matching archetype transition baseline. fromPhaseId={currentExpectedPhase}, targetPhaseId={rule.TargetPhaseId}, placementInstanceId={rule.TargetPlacementInstanceId}"));
-                    continue;
-                }
-
-                expectedPhaseByPlacement[rule.TargetPlacementInstanceId] = rule.TargetPhaseId;
             }
 
             foreach (var pair in ruleOwners)
@@ -694,12 +710,12 @@ namespace SweepNDodge.DotsBullets.Editor
             return false;
         }
 
-        private static string BuildOrchestrationConflictKey(HazardActorOrchestrationRuleBinding rule)
+        private static string BuildOrchestrationConflictKey(HazardActorOrchestrationRuleBinding rule, int targetPlacementInstanceId)
         {
             int triggerBits = rule.TriggerType == HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove
                 ? BitConverter.SingleToInt32Bits(rule.TriggerThresholdNormalized)
                 : 0;
-            return $"{rule.TargetPlacementInstanceId}:{(int)rule.TriggerType}:{triggerBits}";
+            return $"{targetPlacementInstanceId}:{(int)rule.TriggerType}:{triggerBits}";
         }
 
         private static void ValidateSourceCrossMapping(
