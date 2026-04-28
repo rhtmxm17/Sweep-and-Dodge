@@ -483,6 +483,15 @@ MonoBehaviour:
   ImpulseVisualLossScale: 0.03
   ImpulseVisualPerFrameMax: 0.2
   ImpulseMaxOffset: 0.35
+  EnableBroomSweepGizmos: 1
+  DrawOnlyWhenSelected: 1
+  DrawSearchRadius: 1
+  DrawStateLabel: 1
+  DrawCandidateBullets: 0
+  CandidateBulletMarkerLimit: 64
+  GizmoHeightOffset: 0.05
+  FullPathStepCount: 24
+  BandStepCount: 12
 --- !u!114 &352435933
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2145,6 +2154,7 @@ GameObject:
   - component: {fileID: 2015128788}
   - component: {fileID: 2015128789}
   - component: {fileID: 2015128790}
+  - component: {fileID: 2015128791}
   m_Layer: 0
   m_Name: RunDirectorStageBridge
   m_TagString: Untagged
@@ -2208,17 +2218,9 @@ MonoBehaviour:
   EnableKeyboardFallback: 1
   StageProfiles:
   - StageId: 1
-    DisplayName: Stage 1 - Baseline
+    DisplayName: Stage 1 - Sample Verification
     IsFinalStage: 0
-    StageTimeLimitSec: 150
-  - StageId: 2
-    DisplayName: Stage 2 - Shifted Pressure
-    IsFinalStage: 0
-    StageTimeLimitSec: 180
-  - StageId: 3
-    DisplayName: Stage 3 - Final Sweep
-    IsFinalStage: 1
-    StageTimeLimitSec: 210
+    StageTimeLimitSec: 15
   LogTransitions: 0
 --- !u!82 &2015128778
 AudioSource:
@@ -2698,6 +2700,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageTopologyPrefabCatalogAuthoring
   Catalog: {fileID: 11400000, guid: a4c5d6e7f8094a9bab1cd2ee3ff40504, type: 2}
+--- !u!114 &2015128791
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 793487583da41e942a71b88e7a737194, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageGridVisualController
+  StageCatalog: {fileID: 11400000, guid: f02948394d6e4b74bc983ecbeec8554c, type: 2}
+  TopologyBridge: {fileID: 2015128782}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

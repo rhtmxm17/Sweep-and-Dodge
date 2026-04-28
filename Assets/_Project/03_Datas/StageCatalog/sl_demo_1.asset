@@ -3720,3 +3720,4 @@ MonoBehaviour:
     Position: {x: -1.5, y: 2.55, z: -0.22}
     Euler: {x: 338.75085, y: 10.463113, z: 30.917606}
     Scale: {x: 1, y: 1, z: 1}
+  GridVisualPrefab: {fileID: 4202935094082319832, guid: 628c506a3d7fd244ebba85077e8c7c27, type: 3}

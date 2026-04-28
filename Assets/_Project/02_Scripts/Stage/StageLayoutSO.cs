@@ -13,5 +13,6 @@ namespace SweepNDodge.DotsBullets
         public StageDepositRegionLayoutData[] DepositRegions;
         public StagePlayerStartLayoutData PlayerStart;
         public StagePresentationLayoutData[] Presentations;
+        public GameObject GridVisualPrefab;
     }
 }

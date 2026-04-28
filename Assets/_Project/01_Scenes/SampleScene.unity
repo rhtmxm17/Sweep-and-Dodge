@@ -2154,6 +2154,7 @@ GameObject:
   - component: {fileID: 2015128788}
   - component: {fileID: 2015128789}
   - component: {fileID: 2015128790}
+  - component: {fileID: 2015128791}
   m_Layer: 0
   m_Name: RunDirectorStageBridge
   m_TagString: Untagged
@@ -2707,6 +2708,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageTopologyPrefabCatalogAuthoring
   Catalog: {fileID: 11400000, guid: 3023896e72d43dd4fbbdf17556c9259c, type: 2}
+--- !u!114 &2015128791
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015128773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 793487583da41e942a71b88e7a737194, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageGridVisualController
+  StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
+  TopologyBridge: {fileID: 2015128782}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -105,11 +105,85 @@ namespace SweepNDodge.DotsBullets.Editor
             stageNode.TargetLayout.DepositRegions = layout.DepositRegions;
             stageNode.TargetLayout.PlayerStart = layout.PlayerStart;
             stageNode.TargetLayout.Presentations = layout.Presentations;
+            GenerateGridVisualPrefab(authoring, stageNode.TargetLayout, layout.StageId, saveAssets);
             EditorUtility.SetDirty(stageNode.TargetLayout);
             UnityEngine.Object.DestroyImmediate(layout);
             if (saveAssets)
                 AssetDatabase.SaveAssets();
             return true;
+        }
+
+        private static void GenerateGridVisualPrefab(StageGridAuthoring authoring, StageLayoutSO targetLayout, int stageId, bool saveAssets)
+        {
+            if (targetLayout == null)
+                return;
+
+            if (authoring == null
+                || authoring.Grid == null
+                || (authoring.GroundVisualTilemap == null && authoring.WallVisualTilemap == null)
+                || !saveAssets)
+            {
+                targetLayout.GridVisualPrefab = null;
+                return;
+            }
+
+            var root = new GameObject($"GridVisual_Stage{stageId}");
+
+            try
+            {
+                root.transform.position = Vector3.zero;
+                root.transform.rotation = authoring.Grid.transform.rotation;
+                root.transform.localScale = Vector3.one;
+
+                var grid = root.AddComponent<Grid>();
+                grid.cellSize = authoring.Grid.cellSize;
+                grid.cellGap = authoring.Grid.cellGap;
+                grid.cellLayout = authoring.Grid.cellLayout;
+                grid.cellSwizzle = authoring.Grid.cellSwizzle;
+
+                CopyVisualTilemap(authoring.GroundVisualTilemap, root.transform);
+                CopyVisualTilemap(authoring.WallVisualTilemap, root.transform);
+
+                const string folderPath = "Assets/_Project/04_Prefabs/StageVisual";
+                EnsureAssetFolder(folderPath);
+
+                string prefabPath = $"{folderPath}/GridVisual_Stage{stageId}.prefab";
+                var prefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                targetLayout.GridVisualPrefab = prefab;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static void CopyVisualTilemap(Tilemap tilemap, Transform parent)
+        {
+            if (tilemap == null)
+                return;
+
+            var copy = UnityEngine.Object.Instantiate(tilemap.gameObject, parent, false);
+            copy.name = tilemap.gameObject.name;
+            copy.hideFlags = HideFlags.None;
+            var transforms = copy.GetComponentsInChildren<Transform>(includeInactive: true);
+            for (int i = 0; i < transforms.Length; i++)
+                transforms[i].gameObject.hideFlags = HideFlags.None;
+        }
+
+        private static void EnsureAssetFolder(string folderPath)
+        {
+            if (AssetDatabase.IsValidFolder(folderPath))
+                return;
+
+            string[] parts = folderPath.Split('/');
+            string current = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string next = $"{current}/{parts[i]}";
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(current, parts[i]);
+                current = next;
+            }
         }
 
         private static StageLayoutSO BuildStageLayout(StageLayoutStageMarker stageNode, StageGridAuthoring authoring)

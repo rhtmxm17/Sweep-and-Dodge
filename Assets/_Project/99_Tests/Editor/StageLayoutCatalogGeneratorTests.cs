@@ -1,6 +1,7 @@
 using System.Linq;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using Unity.Mathematics;
@@ -9,6 +10,9 @@ namespace SweepNDodge.DotsBullets.Tests
 {
     public class StageLayoutCatalogGeneratorTests
     {
+        private const string GeneratedVisualPrefabPath = "Assets/_Project/04_Prefabs/StageVisual/GridVisual_Stage901.prefab";
+        private const string GeneratedNoSaveVisualPrefabPath = "Assets/_Project/04_Prefabs/StageVisual/GridVisual_Stage902.prefab";
+
         [Test]
         public void GenerateLayoutsForRoot_BuildsDenseGrid()
         {
@@ -40,6 +44,60 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 DestroyTile(sourceTile);
                 DestroyTile(depositTile);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void GenerateLayoutsForRoot_SaveAssetsTrue_CreatesGridVisualPrefab()
+        {
+            AssetDatabase.DeleteAsset(GeneratedVisualPrefabPath);
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.Stage.StageId = 901;
+                setup.Authoring.Grid.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                var ground = AddTilemapChild(setup.Authoring.Grid.transform, "ground_visual");
+                var wall = AddTilemapChild(setup.Authoring.Grid.transform, "wall_visual");
+                setup.Authoring.GroundVisualTilemap = ground;
+                setup.Authoring.WallVisualTilemap = wall;
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: true);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.GridVisualPrefab, Is.Not.Null);
+                Assert.That(AssetDatabase.LoadAssetAtPath<GameObject>(GeneratedVisualPrefabPath), Is.EqualTo(setup.Layout.GridVisualPrefab));
+                Assert.That(setup.Layout.GridVisualPrefab.GetComponent<Grid>(), Is.Not.Null);
+                Assert.That(setup.Layout.GridVisualPrefab.transform.rotation.eulerAngles.x, Is.EqualTo(90f).Within(0.5f));
+                Assert.That(setup.Layout.GridVisualPrefab.transform.Find("ground_visual"), Is.Not.Null);
+                Assert.That(setup.Layout.GridVisualPrefab.transform.Find("wall_visual"), Is.Not.Null);
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(GeneratedVisualPrefabPath);
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void GenerateLayoutsForRoot_SaveAssetsFalse_DoesNotCreateGridVisualPrefab()
+        {
+            AssetDatabase.DeleteAsset(GeneratedNoSaveVisualPrefabPath);
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.Stage.StageId = 902;
+                setup.Authoring.GroundVisualTilemap = AddTilemapChild(setup.Authoring.Grid.transform, "ground_visual");
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.GridVisualPrefab, Is.Null);
+                Assert.That(AssetDatabase.LoadAssetAtPath<GameObject>(GeneratedNoSaveVisualPrefabPath), Is.Null);
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(GeneratedNoSaveVisualPrefabPath);
                 setup.Dispose();
             }
         }
@@ -395,6 +453,13 @@ namespace SweepNDodge.DotsBullets.Tests
             return new StageTestSetup(rootGo, stageGo, root, layout, movementTilemap, regionTilemap, authoring, playerStart);
         }
 
+        private static Tilemap AddTilemapChild(Transform parent, string name)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            return AddTilemap(go);
+        }
+
         private static Tilemap AddTilemap(GameObject go)
         {
             var tilemap = go.AddComponent<Tilemap>();
@@ -422,6 +487,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
             public GameObject StageGo { get; }
             public StageLayoutRootMarker Root { get; }
+            public StageLayoutStageMarker Stage => StageGo.GetComponent<StageLayoutStageMarker>();
             public StageLayoutSO Layout { get; }
             public Tilemap MovementTilemap { get; }
             public Tilemap RegionTilemap { get; }
