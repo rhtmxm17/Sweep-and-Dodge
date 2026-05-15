@@ -1,12 +1,12 @@
-# DOTS Bullet Pipeline Case Study
+# DOTS Large-Entity Pipeline Case Study
 
-> 대량 탄환 처리를 위해 소유권, 업데이트 순서, 구조 변경 최소화 규칙을 명시적으로 분리한 기술 사례
+> 대량 엔티티 처리를 위해 소유권, 업데이트 순서, 구조 변경 최소화 규칙을 명시적으로 분리한 기술 사례
 
 ## Metadata
 - doc_id: `PORT-001`
 - type: `Portfolio`
 - status: `draft`
-- last_updated: `2026-05-08`
+- last_updated: `2026-05-15`
 - related_docs:
   - [../ADR/ADR-20260206-01-bullet-pipeline-ownership.md](../ADR/ADR-20260206-01-bullet-pipeline-ownership.md)
   - [../ADR/ADR-20260210-01-bullet-active-filtering-and-despawn-request.md](../ADR/ADR-20260210-01-bullet-active-filtering-and-despawn-request.md)
@@ -18,20 +18,20 @@
 
 이 프로젝트의 출발점은 ECS/DOTS 워크플로우를 실제 게임플레이 문제에 적용해 보는 것이었다. ECS는 대량 오브젝트 처리 문제를 학습하고 검증할 대상으로 선택한 기술이다.
 
-그 학습 목표에 맞는 문제로 대량 탄환 시나리오를 선택했다. GameObject 중심 구조에서도 작은 규모의 탄환 처리는 충분히 구현할 수 있지만, 탄환 수가 늘어나고 생성/삭제, Transform 업데이트, 충돌/조회, 상태 전환이 프레임마다 반복되면 비용과 책임 경계가 빠르게 커진다.
+그 학습 목표에 맞는 문제로 대량 개체 시나리오를 선택했다. GameObject 중심 구조에서도 작은 규모의 회피 대상이나 수집 대상은 충분히 구현할 수 있지만, 개체 수가 늘어나고 생성/삭제, Transform 업데이트, 충돌/조회, 상태 전환이 프레임마다 반복되면 비용과 책임 경계가 빠르게 커진다.
 
-따라서 이 프로젝트는 "ECS를 한번 써보기"가 아니라, GameObject 방식에서 부담이 커지는 문제를 설정하고 그 문제를 통해 ECS/DOTS의 장단점을 확인하는 방향으로 설계했다.
+따라서 이 프로젝트는 "ECS를 한번 써보기"가 아니라, GameObject 방식에서 부담이 커지는 문제를 설정하고 그 문제를 통해 ECS/DOTS의 장단점을 확인하는 방향으로 설계했다. 탄환은 플레이어가 피해야 하는 위험 요소 중 하나이며, 데모에서 더 큰 규모로 관측되는 흐름은 수집/청소 대상까지 포함한 대량 엔티티 처리다.
 
 ## 2. 문제 정의
 
-`Sweep and Dodge`의 핵심 기술 과제는 대량 탄환을 처리하면서도 프레임 안정성, 변경 가능성, 디버깅 가능성을 유지하는 것이다.
+`Sweep and Dodge`의 핵심 기술 과제는 대량 엔티티를 처리하면서도 프레임 안정성, 변경 가능성, 디버깅 가능성을 유지하는 것이다.
 
-단순한 탄환 생성/삭제 구조는 초기 구현은 쉽지만, 탄환 수가 많아질수록 다음 문제가 커진다.
+단순한 개체 생성/삭제 구조는 초기 구현은 쉽지만, 개체 수가 많아질수록 다음 문제가 커진다.
 
 - 대량 Entity 생성/삭제에 따른 structural change 비용
 - 이동, 제거 판단, 풀 반납, 렌더 토글이 섞일 때 생기는 writer 책임 충돌
 - FreeList, CellMap 같은 ECS 의존성 추적 밖 Native container 접근 순서 문제
-- 새로운 제거 행동이나 청소 액션을 추가할 때 기존 파이프라인을 다시 흔들 위험
+- 새로운 제거 행동이나 청소/수집 액션을 추가할 때 기존 파이프라인을 다시 흔들 위험
 
 이 프로젝트는 이 문제를 프레임 내 책임을 고정된 단계로 나누는 것으로 해결했다.
 
@@ -39,7 +39,7 @@ ECS/DOTS는 이 문제에 적합한 데이터 지향 처리 모델을 제공하�
 
 ## 3. 핵심 설계
 
-탄환 처리 파이프라인은 다음 순서로 고정한다.
+대량 엔티티 파이프라인은 다음 순서로 고정한다.
 
 ```text
 ExecutionBegin -> Simulation -> Request -> ExecutionEnd
@@ -72,7 +72,7 @@ CellMap은 Simulation 단계가 writer다. Request 단계는 CellMap을 read-onl
 
 ### Enableable 기반 상태 전환
 
-대량 탄환 처리에서 Add/RemoveComponent 기반 상태 전환은 비용이 크다. 이 프로젝트는 활성 여부와 요청 상태를 enableable component로 표현해 구조 변경을 줄인다.
+대량 엔티티 처리에서 Add/RemoveComponent 기반 상태 전환은 비용이 크다. 이 프로젝트는 활성 여부와 요청 상태를 enableable component로 표현해 구조 변경을 줄인다.
 
 요청/소비 규칙은 다음처럼 운영한다.
 
@@ -89,7 +89,7 @@ Simulation/Request 단계는 렌더 상태를 직접 변경하지 않는다. 렌
 
 ## 5. 품질 관리 관점
 
-이 구조의 품질 관리는 단순히 "탄환이 보인다"가 아니라 다음 계약이 유지되는지 보는 방식으로 이루어진다.
+이 구조의 품질 관리는 단순히 "화면에 개체가 보인다"가 아니라 다음 계약이 유지되는지 보는 방식으로 이루어진다.
 
 - Pool/FreeList 접근 owner가 분산되지 않았는가
 - CellMap writer가 Simulation으로 유지되는가

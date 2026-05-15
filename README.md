@@ -1,14 +1,14 @@
 # Sweep and Dodge
 
-> Unity DOTS/Entities technical portfolio demo for large-scale bullet simulation.
+> Unity DOTS/Entities technical portfolio demo for large-scale entity handling.
 
-`Sweep and Dodge`는 Unity DOTS/Entities 기반으로 대량 탄환 처리, 청소/수집 루프, 명시적 업데이트 파이프라인을 실험하는 포트폴리오용 기술 데모입니다.
+`Sweep and Dodge`는 Unity DOTS/Entities 기반으로 대량 엔티티 처리, 회피/청소/수집 루프, 명시적 업데이트 파이프라인을 실험하는 포트폴리오용 기술 데모입니다.
 
 ## Highlights
 
 - ECS/DOTS 워크플로우 학습과 검증을 목표로 시작한 기술 데모
-- GameObject 중심 구조에서 비용이 커지는 대량 탄환/대량 상태 전환 문제를 의도적으로 선택
-- Unity DOTS/Entities 기반 대량 탄환 처리
+- GameObject 중심 구조에서 비용이 커지는 대량 개체/대량 상태 전환 문제를 의도적으로 선택
+- Unity DOTS/Entities 기반 대량 엔티티 처리
 - `ExecutionBegin -> Simulation -> Request -> ExecutionEnd` 프레임 파이프라인
 - Pool/FreeList 기반 spawn/despawn 실행 경계
 - SpatialHash/CellMap writer 단일화와 request 단계 read-only 조회
@@ -20,7 +20,7 @@
 
 이 저장소는 완성 게임 공개본이 아니라, **Unity 클라이언트 개발자 포트폴리오용 playable technical demo**를 목표로 정리 중인 프로젝트입니다.
 
-프로젝트의 출발점은 ECS/DOTS 워크플로우를 실제 게임플레이 문제에 적용해 보는 것이었습니다. 이를 위해 일반적인 GameObject 구조에서 생성/삭제, Transform 업데이트, 충돌/조회, 상태 전환 비용이 커지는 대량 탄환 시나리오를 기술 과제로 선택했습니다.
+프로젝트의 출발점은 ECS/DOTS 워크플로우를 실제 게임플레이 문제에 적용해 보는 것이었습니다. 이를 위해 일반적인 GameObject 구조에서 생성/삭제, Transform 업데이트, 충돌/조회, 상태 전환 비용이 커지는 대량 개체 시나리오를 기술 과제로 선택했습니다. 실제 데모에서는 회피 대상과 수집/청소 대상이 함께 등장하며, 수만 단위로 관측되는 개체는 주로 수집/청소 루프와 연결된 엔티티 흐름입니다.
 
 채용자에게 보여주려는 핵심은 다음입니다.
 
@@ -33,7 +33,7 @@
 
 | Area | Status | Notes |
 |---|---|---|
-| Core DOTS bullet pipeline | Implemented | 기존 ADR/OPS 문서 기준으로 파이프라인과 ownership 규칙이 정리되어 있습니다. |
+| Core DOTS entity pipeline | Implemented | 기존 ADR/OPS 문서 기준으로 파이프라인과 ownership 규칙이 정리되어 있습니다. |
 | Playable technical demo | In progress | 외부 공개용 빌드 스냅샷은 별도 범위로 정리 중입니다. |
 | Validation evidence | Partial snapshot | 기존 자동 테스트와 PlayMode smoke 기록이 있으며, 최신 공개 빌드 수치는 별도 캡처 대상입니다. |
 | Performance evidence | Partial snapshot | 개발 중 스모크/스트레스 관측값은 문서화되어 있으나, 공개용 벤치마크 표는 아직 별도 정리 전입니다. |
@@ -41,14 +41,14 @@
 
 ## Existing Validation Evidence
 
-기존 운영 문서에는 자동 테스트 기반의 스모크/스트레스 관측값이 기록되어 있습니다. 예를 들어 `OPS-001`에는 Editor 자동 테스트에서 `maxBudgetUsed=5000`, `dropCount=0`, `expiredByAge=0`가 기록되어 있고, PlayMode 자동 테스트에서 약 2.5만 active bullet 수준의 관측값이 기록되어 있습니다.
+기존 운영 문서에는 자동 테스트 기반의 스모크/스트레스 관측값이 기록되어 있습니다. 예를 들어 `OPS-001`에는 Editor 자동 테스트에서 `maxBudgetUsed=5000`, `dropCount=0`, `expiredByAge=0`가 기록되어 있고, PlayMode 자동 테스트에서 약 2.5만 active entity 수준의 관측값이 기록되어 있습니다. 기존 테스트/코드 명칭에 `Bullet`이 남아 있는 경우에도, 포트폴리오 관점의 핵심은 위험 요소와 수집/청소 대상을 포함한 대량 엔티티 처리입니다.
 
 이 값들은 개발 중 확보한 검증 스냅샷이며, 공개용 빌드 벤치마크와는 구분됩니다. 데모 빌드와 참고자료를 함께 읽는 방법은 `Docs/Portfolio/PORT-003-validation-report.md`에 정리되어 있습니다.
 
 ## Documents
 
 - [Portfolio Index](Docs/Portfolio/INDEX.md)
-- [DOTS Bullet Pipeline Case Study](Docs/Portfolio/PORT-001-dots-bullet-pipeline-case-study.md)
+- [DOTS Large-Entity Pipeline Case Study](Docs/Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)
 - [AI-assisted Engineering Workflow](Docs/Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
 - [Portfolio Demo Build and Reference Materials](Docs/Portfolio/PORT-003-validation-report.md)
 
