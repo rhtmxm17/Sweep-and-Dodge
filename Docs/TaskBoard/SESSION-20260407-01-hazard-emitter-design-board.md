@@ -31,7 +31,7 @@
 - [ ] Plan E. integration, metrics, 문서 마감
   - 완료 기준: source discrete branch와 emitter branch가 공통 `DiscreteEmit` 경로에서 통합되고 최소 backlog/metrics 및 문서 차이가 정리된다.
   - 검증: compile, console error 0, EditMode 통합 회귀, PlayMode smoke
-- [ ] actor 상위 개념 논의는 [SESSION-20260408-01-hazard-actor-design-board.md](d:\Workspace\DOTS-minigame\Docs\TaskBoard\SESSION-20260408-01-hazard-actor-design-board.md)에서 이어간다.
+- [ ] actor 상위 개념 논의는 [SESSION-20260408-01-hazard-actor-design-board.md](SESSION-20260408-01-hazard-actor-design-board.md)에서 이어간다.
   - 이유: 현재 보드는 emitter/discrete emit 구현 이력이 누적돼 있어, `HazardActor` 상위 개념 논의를 분리해 두는 편이 안전하다.
 - [ ] E3. `HazardEmitterBinding`을 반영하는 TD/ADR/TaskBoard 차이 정리를 먼저 수행한다.
   - 이유: 현재 `TD-028/029`는 emitter 공통 계약과 discrete emit bridge까지만 닫혀 있고, stage-applied emitter override seam은 아직 문서 SSOT가 아니다.
