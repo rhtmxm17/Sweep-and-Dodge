@@ -5,49 +5,35 @@
 - 완료 기준: 공개 데모 빌드 산출물, 검증 수치, 영상/GIF, README/PORT-003 갱신 항목이 완료되거나 명확한 다음 시작점으로 남는다.
 - 이번 세션에서 하지 않을 것: 프로젝트 네이밍 결정, 스토어 배포 준비, 최종 아트/사운드 품질 확정.
 
+## 현재 상태
+- 공개 빌드 대상 플랫폼은 Windows standalone으로 둔다.
+- 공개 데모 기준 씬은 `Assets/_Project/01_Scenes/SampleScene.unity`다. 이후 이름 정리가 필요하면 `DemoEntry` 같은 명확한 이름으로 별도 작업에서 처리한다.
+- 공개 진입 흐름은 `Launch -> Title -> Lobby -> Stage Play -> Stage Result -> Demo Complete`를 기준으로 한다.
+- `Lobby`에서 Stage 1~3 직접 선택은 공개 기능으로 유지한다.
+- `Give Up`은 테스트 버튼이 아니라 공개 UX로 유지한다.
+- 공개 빌드 설정은 `SampleScene` 단일 활성 씬 기준이다. `SampleScene`의 `Assets/_Project/01_Scenes/SampleScene/Entities.unity` SubScene 의존은 유지한다.
+- `Assets/Scenes/Entity Prefab Build Registry.unity`는 현재 워크트리에 없고 코드/설정 참조도 남아 있지 않아 별도 빌드 씬 의존으로 보지 않는다.
+- 개발 전용 overlay, 강제 진행 버튼, stress/replay/fixed tick/debug HUD 조작 UI는 공개 빌드에서 노출하지 않는다.
+- 스테이지별 공개 데모 역할:
+  - Stage 1: 기본 조작, 청소/수집, Deposit, 단순 위험 회피를 학습시키는 첫 루프.
+  - Stage 2: 대량 개체 처리와 actor 기반 동선 선택을 보여주는 대표 스테이지. 대표 성능 캡처 후보로 둔다.
+  - Stage 3: 다양한 탄환 반응과 최종 시각 쇼케이스 후보. 영상/GIF 하이라이트 후보로 둔다.
+- Stage 1~3의 구체 레벨 디자인과 실제 StageCatalog/Layout 편집은 T1b/T1c에서 다룬다.
+
 ## Now
-- [ ] T1. 공개 데모 빌드 기준 씬과 진입 경로 확정
-  - 목적: 외부 독자가 실행할 빌드의 시작점과 확인할 핵심 루프를 고정한다.
-  - 완료 기준: 데모 빌드에서 보여줄 씬, 진입 흐름, 제외할 개발 전용 기능이 문서화된다.
-  - 검증: 공개 빌드 후보에서 해당 경로로 진입 가능한지 확인한다.
-  - 근거: `Docs/Portfolio/PORT-003-validation-report.md`
-  - 결정:
-    - 공개 빌드 대상 플랫폼은 Windows standalone으로 둔다.
-    - 공개 데모 기준 씬은 현재 `Assets/_Project/01_Scenes/SampleScene.unity`를 기준으로 하되, 이후 `DemoEntry` 같은 명확한 이름으로 변경한다.
-    - 공개 진입 흐름은 `Launch -> Title -> Lobby -> Stage Play -> Stage Result -> Demo Complete`를 기준으로 한다.
-    - `Lobby`에서 Stage 1~3 직접 선택은 공개 기능으로 유지한다.
-    - `Give Up`은 테스트 버튼이 아니라 공개 UX로 유지한다.
-    - 공개 빌드 설정에서는 PlayMode 테스트 씬을 제거한다. 단, DOTS/Entities 빌드 의존 씬은 제거 전 의존성 점검을 수행한다.
-    - 개발 전용 overlay, 강제 진행 버튼, stress/replay/fixed tick/debug HUD 조작 UI는 공개 빌드에서 노출하지 않는다.
-  - 스테이지별 공개 데모 역할:
-    - Stage 1: 기본 조작, 청소/수집, Deposit, 단순 위험 회피를 학습시키는 첫 루프. 현재 행동 패턴 샘플용 actor는 온보딩용으로 다소 크므로, 고정 방향으로 주기 발사하는 단순 actor 중심으로 축소하는 방향을 검토한다.
-    - Stage 2: 대량 개체 처리와 actor 기반 동선 선택을 보여주는 대표 스테이지. 현재 다양한 탄환 발사 샘플은 공개 데모용 직접 샘플 노출보다 actor 구성으로 흡수하거나 제거하는 방향을 검토한다. Stage 1의 단순 actor를 포함해 간단한 패턴을 가진 actor 2종을 Source 영역별 2~3개체 배치하는 안을 우선 후보로 둔다.
-    - Stage 3: 다양한 탄환 반응(예: 가벼운 homing, 만료 시 산탄 등)을 활용한 최종 시각 쇼케이스 후보. 현재는 구체 레벨 디자인이 모호하므로 별도 설계가 필요하다.
-  - 성능/시각 증거 후보:
-    - Stage 2는 공개 데모의 대표 성능 캡처 후보로 둔다.
-    - Stage 3는 영상/GIF용 시각 하이라이트 후보로 둔다.
-    - 정확한 측정 수치, 캡처 시점, 영상 저장/링크 정책은 데모 빌드 작업 이후 T4/T5 단계에서 확정한다.
-  - 남은 점검:
-    - `SampleScene` rename 방식과 참조/GUID 유지 절차 확인.
-    - Build Settings에서 제거할 테스트 씬과 유지해야 하는 DOTS/Entities 의존 씬 구분.
-    - Stage 2를 기존 단일 Source 구조로 유지할지, 다중 Source 구조로 확장할지 결정.
-    - Stage 3의 최종 쇼케이스 구성을 actor 기반, 탄환 reaction 기반, 또는 혼합형 중 무엇으로 둘지 결정.
-  - 2026-05-18 읽기 전용 점검 결과:
-    - `ProjectSettings/EditorBuildSettings.asset`와 Unity MCP `manage_build(action=scenes)` 모두 현재 활성 빌드 씬 4개를 보고한다.
-    - 현재 활성 빌드 씬은 `SampleScene`, `PlayModeSmoke_Dedicated`, `PlayModeSmoke_SampleVerification`, `Assets/Scenes/Entity Prefab Build Registry.unity`다.
-    - `PlayModeSmoke_Dedicated`와 `PlayModeSmoke_SampleVerification`는 공개 빌드에서 제거할 테스트 씬 후보로 확인했다.
-    - `Assets/Scenes/Entity Prefab Build Registry.unity`는 현재 워크트리에 파일과 폴더가 존재하지 않는다. 제거 후보로 보되, Entities 빌드 과정에서 자동 생성/요구되는 경로인지 Unity 빌드 전 확인이 필요하다.
-    - `SampleScene`은 `Assets/_Project/01_Scenes/SampleScene/Entities.unity` SubScene을 `AutoLoadScene=1`로 참조한다. 공개 빌드 씬 정리 시 이 SubScene 의존은 유지해야 한다.
-    - `SampleScene`에는 `RuntimeUiRoot` 프리팹 인스턴스가 있고, runtime UI 활성 시 `DemoShellFlowController`의 OnGUI overlay와 `PlayerRuntimeHudBridge` OnGUI HUD가 비활성화되는 구조다.
-    - `DemoShellFlowController.ShowOverlay`는 현재 씬에서 `1`이며, runtime UI가 활성화되지 못하면 `Force ClearReady (Test)`가 포함된 fallback overlay가 노출될 수 있다. 공개 빌드 기준에서는 `ShowOverlay=0` 또는 `UNITY_EDITOR/DEVELOPMENT_BUILD` 게이트가 필요하다.
-    - `BulletDebugHudBridge`는 non-development 빌드에서 OnGUI가 return되며, `SampleScene`의 `ShowHud=0` 상태를 확인했다.
-    - Unity MCP `manage_scene`은 Editor instance를 찾지 못해 실제 씬 로드/Play 진입은 확인하지 못했다. `read_console`은 현재 error 항목 2개를 반환했으나, 하나는 Input Manager deprecation 메시지이고 하나는 MCP client handler 종료 로그다. T2 검증 전 noise/실제 에러 구분이 필요하다.
-  - 다음 액션 후보:
-    - 공개 빌드용 Build Settings 목표 목록을 `SampleScene` + 필요한 Entities/SubScene 의존으로 축소하는 패치 초안 작성.
-    - `DemoShellFlowController` fallback overlay 공개 빌드 비노출 방식 결정.
-    - Unity Editor 연결 후 `SampleScene` 로드, Title 진입, Runtime UI 활성, overlay 비노출을 실제로 확인.
+- 없음. 다음 시작점은 T1b/T1c 또는 T2 검증 갱신이다.
 
 ## Next
+- [ ] T1b. 레벨 디자인 구체화
+  - 목적: T2 검증 전에 Stage 1~3이 공개 데모에서 맡을 역할, 난이도 곡선, Source/Deposit/HazardActor 배치 의도를 문서 기준으로 고정한다.
+  - 완료 기준: Stage 1~3별 학습/성능/쇼케이스 역할, 주요 actor 패턴, Source 구조, 실패 유도/완화 포인트가 TaskBoard 또는 GD/OPS 문서에 정리된다.
+  - 검증: 설계 제안값을 serialized asset exact assert로 승격하지 않고, 실제 편집 단계에서 확인할 체크리스트로 남긴다.
+  - 근거: `Docs/TaskBoard/SESSION-20260514-01-portfolio-demo-build-board.md`, `Docs/GameDesign/GD-008-demo-flow-design.md`
+- [ ] T1c. 실제 스테이지 편집
+  - 목적: 구체화된 레벨 디자인을 `StageLayoutEditingSampleV1` / StageCatalog 자산에 반영해 공개 빌드 후보의 플레이 경험을 실제로 맞춘다.
+  - 완료 기준: Stage 1~3 layout/catalog/presentation 후보가 공개 데모 역할에 맞게 편집되고, generator/composer 결과가 운영 씬에서 참조된다.
+  - 검증: StageCatalog validation, 운영 씬 stage entry smoke, 필요한 경우 PlayMode 대표 루프 확인.
+  - 근거: `Docs/TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md`, `Docs/TechnicalDesign/TD-032-hazard-actor-stage-placement-and-orchestration-framework.md`
 - [ ] T2. Unity Console error 0 및 EditMode/PlayMode smoke 결과 확보
   - 완료 기준: 최신 검증 결과가 날짜, Unity 버전, 테스트 범위와 함께 기록된다.
   - 검증: Console error 0, EditMode, PlayMode smoke 결과 기록.
@@ -87,6 +73,12 @@
   - 근거: 현재 범위는 포트폴리오 기술 데모이며 출시 후보 빌드가 아니다.
 
 ## Done
+- [x] T1. 공개 데모 빌드 기준 씬과 진입 경로 확정
+  - 결과: Windows standalone 공개 데모 기준 씬을 `Assets/_Project/01_Scenes/SampleScene.unity`로 두고, 공개 진입 흐름을 `Launch -> Title -> Lobby -> Stage Play -> Stage Result -> Demo Complete`로 확정했다.
+  - 결과: Build Settings는 `SampleScene` 단일 활성 씬 상태로 정리되어 있으며, `SampleScene`의 SubScene 의존(`Assets/_Project/01_Scenes/SampleScene/Entities.unity`)은 유지한다.
+  - 결과: PlayMode 테스트 씬과 존재하지 않는 `Assets/Scenes/Entity Prefab Build Registry.unity`는 공개 빌드 씬 의존으로 보지 않는다.
+  - 수정: `DemoShellFlowController` fallback `OnGUI`, keyboard shortcut, `Force ClearReady` test API를 `UNITY_EDITOR || DEVELOPMENT_BUILD` 전용으로 제한했다.
+  - 문서: 세션 공통 결정은 `현재 상태` 단락으로 분리했고, `TD-016`에 공개 빌드 fallback 비노출 정책을 반영했다.
 - [x] B1. `PlayMode_OperationalScene_PresentationController_RebuildsAcrossNextAndRetry` 실패 분석 및 수정
   - 결과: 실패 원인은 presentation runtime stale child가 아니라 테스트가 같은 GameObject transform에 생성된 grid visual child를 presentation root로 오인한 전제 오류였다.
   - 수정: presentation settle/identity 검증을 `StagePresentationRuntimeController.SpawnedRootCount`와 stableId 등록 root 기준으로 변경했다.

@@ -3536,7 +3536,14 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             LogAssert.ignoreFailingMessages = true;
 
+#if UNITY_EDITOR
+            var loadedScene = UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
+                scenePath,
+                new LoadSceneParameters(LoadSceneMode.Single));
+            Assert.That(loadedScene.IsValid(), Is.True, $"Could not load PlayMode test scene: {scenePath}");
+#else
             SceneManager.LoadScene(scenePath, LoadSceneMode.Single);
+#endif
 
             int waitForActiveSceneFrames = 16;
             while (waitForActiveSceneFrames-- > 0)
@@ -3547,6 +3554,12 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 yield return null;
             }
+
+            var settledScene = SceneManager.GetActiveScene();
+            Assert.That(
+                settledScene.IsValid() && settledScene.path == scenePath,
+                Is.True,
+                $"Expected active PlayMode test scene '{scenePath}', but active scene was '{settledScene.path}'.");
 
             for (int i = 0; i < settleFrames; i++)
                 yield return null;
@@ -4572,8 +4585,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
-
-
 
 
 
