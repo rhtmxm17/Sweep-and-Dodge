@@ -404,7 +404,6 @@ namespace SweepNDodge.DotsBullets
                 PlacementInstanceId = placementInstanceId,
                 ActorEntity = actorEntity,
             });
-            em.GetBuffer<LinkedEntityGroup>(sourceEntity).Add(actorEntity);
 
             return true;
 

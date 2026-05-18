@@ -171,6 +171,8 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 
 ## 작업별 세부 지침
 
+아래 참조 파일은 단순 링크가 아니라 상황별 선행 로딩 의무다. 해당 상황에 해당하는 작업을 시작하기 전에 반드시 참조 파일을 먼저 읽고 적용한다.
+
 | 상황 | 참조 파일 |
 | ------ | ----------- |
 | 코드 생성/수정 및 MCP 검증 시 | [mcp-workflow.md](Docs/AGENTS/mcp-workflow.md) |

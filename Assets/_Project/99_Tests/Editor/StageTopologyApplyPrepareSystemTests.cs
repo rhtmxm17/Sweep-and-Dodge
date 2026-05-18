@@ -300,6 +300,10 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(actorRefs.Length, Is.EqualTo(1));
                 Assert.That(actorRefs[0].ActorEntity, Is.EqualTo(actor));
                 Assert.That(actorRefs[0].ActorId, Is.EqualTo(101));
+
+                var linkedGroup = em.GetBuffer<LinkedEntityGroup>(source);
+                Assert.That(linkedGroup.Length, Is.EqualTo(1), "Runtime hazard actors must not be added to the SubScene source LinkedEntityGroup.");
+                Assert.That(linkedGroup[0].Value, Is.EqualTo(source));
             }
             finally
             {

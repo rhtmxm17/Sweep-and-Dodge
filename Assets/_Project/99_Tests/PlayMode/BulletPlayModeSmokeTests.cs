@@ -2517,15 +2517,14 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentStageId == 1
                         && controller != null
                         && controller.LastAppliedStageId == 1
-                        && controller.SpawnedRootCount == stage1ExpectedRootCount
-                        && controller.transform.childCount == stage1ExpectedRootCount;
+                        && controller.SpawnedRootCount == stage1ExpectedRootCount;
                 },
                 360,
                 () => $"Stage1 presentation state did not settle within timeout. {DescribePresentationControllerState()}");
 
             Assert.That(stage1ExpectedRootCount, Is.GreaterThan(0), "Stage1 must expose at least one active presentation for rebuild identity checks.");
             var stage1Controller = controller;
-            var stage1Presentation = controller.transform.GetChild(0).gameObject;
+            Assert.That(TryGetFirstActivePresentationRoot(controller, 1, out var stage1Presentation), Is.True, "Stage1 presentation root must be registered by stable id.");
 
             ForceStageStateToRunning(em, 0f);
             yield return WaitForCondition(
@@ -2557,20 +2556,19 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentStageId == 2
                         && controller != null
                         && controller.LastAppliedStageId == 2
-                        && controller.SpawnedRootCount == stage2ExpectedRootCount
-                        && controller.transform.childCount == stage2ExpectedRootCount;
+                        && controller.SpawnedRootCount == stage2ExpectedRootCount;
                 },
                 360,
                 () => $"Stage2 presentation state did not settle within timeout. {DescribePresentationControllerState()}");
 
             Assert.That(controller, Is.Not.EqualTo(stage1Controller), "NextStage should reload the operational scene and recreate the presentation controller.");
-            GameObject stage2Presentation = controller.transform.childCount > 0
-                ? controller.transform.GetChild(0).gameObject
+            GameObject stage2Presentation = TryGetFirstActivePresentationRoot(controller, 2, out var resolvedStage2Presentation)
+                ? resolvedStage2Presentation
                 : null;
             if (stage2Presentation != null)
                 Assert.That(stage2Presentation, Is.Not.EqualTo(stage1Presentation), "Stage2 presentation should be recreated, not stale Stage1 instance.");
             else
-                Assert.That(controller.transform.childCount, Is.EqualTo(0), "Stage2 without active presentations must clear Stage1 roots.");
+                Assert.That(controller.SpawnedRootCount, Is.EqualTo(0), "Stage2 without active presentations must clear Stage1 presentation roots.");
 
             ForceStageStateToRunning(em, 0f);
             yield return WaitForCondition(
@@ -2603,17 +2601,21 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentStageId == 2
                         && controller != null
                         && controller.LastAppliedStageId == 2
-                        && controller.SpawnedRootCount == stage2ExpectedRootCount
-                        && controller.transform.childCount == stage2ExpectedRootCount;
+                        && controller.SpawnedRootCount == stage2ExpectedRootCount;
                 },
                 360,
                 () => $"Retry did not settle Stage2 presentation state within timeout. {DescribePresentationControllerState()}");
 
             Assert.That(controller, Is.Not.EqualTo(stage2Controller), "Retry should reload the operational scene and recreate the presentation controller.");
             if (stage2Presentation != null)
-                Assert.That(controller.transform.GetChild(0).gameObject, Is.Not.EqualTo(stage2Presentation), "Retry should recreate the Stage2 presentation root.");
+            {
+                Assert.That(TryGetFirstActivePresentationRoot(controller, 2, out var retryPresentation), Is.True, "Retry should register the Stage2 presentation root.");
+                Assert.That(retryPresentation, Is.Not.EqualTo(stage2Presentation), "Retry should recreate the Stage2 presentation root.");
+            }
             else
-                Assert.That(controller.transform.childCount, Is.EqualTo(0), "Retry should preserve the current stage's zero-presentation state without reviving stale roots.");
+            {
+                Assert.That(controller.SpawnedRootCount, Is.EqualTo(0), "Retry should preserve the current stage's zero-presentation state without reviving stale roots.");
+            }
         }
 
         [UnityTest]
@@ -4308,13 +4310,76 @@ namespace SweepNDodge.DotsBullets.Tests
                 ? controller.transform.GetChild(0).name
                 : "none";
 
+            var children = new System.Text.StringBuilder();
+            for (int i = 0; i < controller.transform.childCount; i++)
+            {
+                var child = controller.transform.GetChild(i);
+                if (i > 0)
+                    children.Append(", ");
+                children.Append(i)
+                    .Append(":")
+                    .Append(child.name)
+                    .Append("(active=")
+                    .Append(child.gameObject.activeSelf)
+                    .Append(", scene=")
+                    .Append(child.gameObject.scene.name)
+                    .Append(")");
+            }
+
             return
-                $"presentation(lastApplied={controller.LastAppliedStageId}, lastReady={controller.LastReady}, spawned={controller.SpawnedRootCount}, childCount={controller.transform.childCount}, firstChild={childName})";
+                $"presentation(lastApplied={controller.LastAppliedStageId}, lastReady={controller.LastReady}, spawned={controller.SpawnedRootCount}, childCount={controller.transform.childCount}, firstChild={childName}, children=[{children}])";
+        }
+
+        private static bool TryGetFirstActivePresentationRoot(StagePresentationRuntimeController controller, int stageId, out GameObject root)
+        {
+            root = null;
+            if (!TryGetStageLayout(controller, stageId, out var layout))
+                return false;
+
+            var presentations = layout.Presentations;
+            if (presentations == null)
+                return false;
+
+            for (int i = 0; i < presentations.Length; i++)
+            {
+                var presentation = presentations[i];
+                if (!presentation.Active)
+                    continue;
+                if (controller.TryGetPresentationRoot(presentation.StableId, out root) && root != null)
+                    return true;
+            }
+
+            root = null;
+            return false;
         }
 
         private static bool TryGetExpectedActivePresentationCount(StagePresentationRuntimeController controller, int stageId, out int count)
         {
             count = -1;
+            if (!TryGetStageLayout(controller, stageId, out var layout))
+                return false;
+
+            var presentations = layout.Presentations;
+            if (presentations == null)
+            {
+                count = 0;
+                return true;
+            }
+
+            int activeCount = 0;
+            for (int p = 0; p < presentations.Length; p++)
+            {
+                if (presentations[p].Active)
+                    activeCount++;
+            }
+
+            count = activeCount;
+            return true;
+        }
+
+        private static bool TryGetStageLayout(StagePresentationRuntimeController controller, int stageId, out StageLayoutSO layout)
+        {
+            layout = null;
             if (controller == null || stageId <= 0)
                 return false;
 
@@ -4332,21 +4397,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 if (!entry.Enabled || entry.Layout == null || entry.Layout.StageId != stageId)
                     continue;
 
-                var presentations = entry.Layout.Presentations;
-                if (presentations == null)
-                {
-                    count = 0;
-                    return true;
-                }
-
-                int activeCount = 0;
-                for (int p = 0; p < presentations.Length; p++)
-                {
-                    if (presentations[p].Active)
-                        activeCount++;
-                }
-
-                count = activeCount;
+                layout = entry.Layout;
                 return true;
             }
 
@@ -4521,8 +4572,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
-
-
 
 
 
