@@ -8,7 +8,7 @@
 - status: `active`
 - last_updated: `2026-04-28`
 - related_docs:
-  - [../GameDesign/GD-013-visual-tone-keyword-board.md](../GameDesign/GD-013-visual-tone-keyword-board.md)
+  - [GD-013-visual-tone-keyword-board.md](../GameDesign/GD-013-visual-tone-keyword-board.md)
   - [OPS-003-public-release-readiness-plan.md](./OPS-003-public-release-readiness-plan.md)
 
 ## 1. 목적

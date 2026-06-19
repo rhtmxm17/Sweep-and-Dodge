@@ -18,22 +18,20 @@
   - Stage 1: 기본 조작, 청소/수집, Deposit, 단순 위험 회피를 학습시키는 첫 루프.
   - Stage 2: 대량 개체 처리와 actor 기반 동선 선택을 보여주는 대표 스테이지. 대표 성능 캡처 후보로 둔다.
   - Stage 3: 다양한 탄환 반응과 최종 시각 쇼케이스 후보. 영상/GIF 하이라이트 후보로 둔다.
-- Stage 1~3의 구체 레벨 디자인과 실제 StageCatalog/Layout 편집은 T1b/T1c에서 다룬다.
+- Stage 1~3의 구체 레벨 디자인 기준은 `Docs/GameDesign/GD-017-demo-stage-level-design-brief.md` 초안을 따른다. 실제 StageCatalog/Layout 편집은 T1c에서 다룬다.
+- T1c 기준 결정:
+  - Stage 2는 현재 두 덩어리로 나뉜 Source 영역을 별도 Source로 분리하고, 각 Source에 다른 타입의 HazardActor를 배치한다.
+  - Stage 3은 기존 작은 샘플 layout을 유지하지 않고 공개 쇼케이스용으로 사실상 신규 작성한다.
 
 ## Now
-- 없음. 다음 시작점은 T1b/T1c 또는 T2 검증 갱신이다.
+- 없음. 다음 시작점은 T1c 또는 T2 검증 갱신이다.
 
 ## Next
-- [ ] T1b. 레벨 디자인 구체화
-  - 목적: T2 검증 전에 Stage 1~3이 공개 데모에서 맡을 역할, 난이도 곡선, Source/Deposit/HazardActor 배치 의도를 문서 기준으로 고정한다.
-  - 완료 기준: Stage 1~3별 학습/성능/쇼케이스 역할, 주요 actor 패턴, Source 구조, 실패 유도/완화 포인트가 TaskBoard 또는 GD/OPS 문서에 정리된다.
-  - 검증: 설계 제안값을 serialized asset exact assert로 승격하지 않고, 실제 편집 단계에서 확인할 체크리스트로 남긴다.
-  - 근거: `Docs/TaskBoard/SESSION-20260514-01-portfolio-demo-build-board.md`, `Docs/GameDesign/GD-008-demo-flow-design.md`
 - [ ] T1c. 실제 스테이지 편집
   - 목적: 구체화된 레벨 디자인을 `StageLayoutEditingSampleV1` / StageCatalog 자산에 반영해 공개 빌드 후보의 플레이 경험을 실제로 맞춘다.
   - 완료 기준: Stage 1~3 layout/catalog/presentation 후보가 공개 데모 역할에 맞게 편집되고, generator/composer 결과가 운영 씬에서 참조된다.
   - 검증: StageCatalog validation, 운영 씬 stage entry smoke, 필요한 경우 PlayMode 대표 루프 확인.
-  - 근거: `Docs/TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md`, `Docs/TechnicalDesign/TD-032-hazard-actor-stage-placement-and-orchestration-framework.md`
+  - 근거: `Docs/GameDesign/GD-017-demo-stage-level-design-brief.md`, `Docs/TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md`, `Docs/TechnicalDesign/TD-032-hazard-actor-stage-placement-and-orchestration-framework.md`
 - [ ] T2. Unity Console error 0 및 EditMode/PlayMode smoke 결과 확보
   - 완료 기준: 최신 검증 결과가 날짜, Unity 버전, 테스트 범위와 함께 기록된다.
   - 검증: Console error 0, EditMode, PlayMode smoke 결과 기록.
@@ -73,6 +71,11 @@
   - 근거: 현재 범위는 포트폴리오 기술 데모이며 출시 후보 빌드가 아니다.
 
 ## Done
+- [x] T1b. 레벨 디자인 구체화
+  - 결과: `Docs/GameDesign/GD-017-demo-stage-level-design-brief.md` 초안을 작성해 Stage 1~3의 공개 데모 역할, Source/Deposit/HazardActor 배치 의도, 실패 유도/완화 포인트, T1c 편집 체크리스트를 정리했다.
+  - 결정: Stage 2는 현재 두 덩어리로 나뉜 Source 영역을 별도 Source로 분리하고, 각각 다른 타입의 HazardActor를 배치한다.
+  - 결정: Stage 3은 기존 작은 샘플 layout을 유지하지 않고, 공개 쇼케이스용으로 사실상 신규 작성한다.
+  - 검증: 설계 예시 셀 수, 좌표, threshold를 serialized asset exact assert로 승격하지 않는다는 기준을 문서에 명시했다.
 - [x] T1. 공개 데모 빌드 기준 씬과 진입 경로 확정
   - 결과: Windows standalone 공개 데모 기준 씬을 `Assets/_Project/01_Scenes/SampleScene.unity`로 두고, 공개 진입 흐름을 `Launch -> Title -> Lobby -> Stage Play -> Stage Result -> Demo Complete`로 확정했다.
   - 결과: Build Settings는 `SampleScene` 단일 활성 씬 상태로 정리되어 있으며, `SampleScene`의 SubScene 의존(`Assets/_Project/01_Scenes/SampleScene/Entities.unity`)은 유지한다.

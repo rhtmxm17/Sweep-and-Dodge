@@ -6,10 +6,10 @@
 - status: `draft`
 - last_updated: `2026-04-09`
 - related_docs:
-  - [./GD-015-hazard-emitter-design.md](./GD-015-hazard-emitter-design.md)
-  - [../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md](../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md)
-  - [../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md](../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md)
-  - [../TaskBoard/SESSION-20260409-01-hazard-actor-behavior-board.md](../TaskBoard/SESSION-20260409-01-hazard-actor-behavior-board.md)
+  - [GD-015-hazard-emitter-design.md](./GD-015-hazard-emitter-design.md)
+  - [TD-030-hazard-actor-hierarchy-and-stage-application.md](../TechnicalDesign/TD-030-hazard-actor-hierarchy-and-stage-application.md)
+  - [TD-031-hazard-actor-behavior-runtime.md](../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md)
+  - [SESSION-20260409-01-hazard-actor-behavior-board.md](../TaskBoard/SESSION-20260409-01-hazard-actor-behavior-board.md)
 
 > `HazardActor`를 플레이어가 "비공격 대상 몬스터처럼 읽는 위험 개체"로 확장하기 위한 청사진 시나리오와 일반화 범위를 정리하는 문서.
 
