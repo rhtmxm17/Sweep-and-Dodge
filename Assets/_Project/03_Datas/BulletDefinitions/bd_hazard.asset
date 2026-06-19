@@ -16,7 +16,31 @@ MonoBehaviour:
   Prefab: {fileID: 8586366626638814962, guid: 0e7fe2c4e4562fc4f9973ad83b6e00c0, type: 3}
   PoolSize: 2000
   CaptureRule: 1
-  Speed: 1.8
+  Speed: 3.6
   Lifetime: 4
   Radius: 0.05
   ScoreValue: 5
+  MovementFamily: 0
+  DampedLinear:
+    DampingPerSec: 1
+    StopSpeedThreshold: 0.1
+  HomingLite:
+    TurnRateDegPerSec: 90
+    MaxAcquireDistance: 10
+    MinRetargetDistance: 0.25
+  OnMotionCompletedExplode:
+    Enabled: 0
+    SecondaryBullet: {fileID: 0}
+    SpawnCount: 0
+    Shape: 2
+    SpreadAngleDeg: 90
+    SpawnRadius: 0
+    SpawnDelaySec: 0
+  OnCleanupRemovedSpawnSecondary:
+    Enabled: 0
+    SecondaryBullet: {fileID: 0}
+    SpawnCount: 0
+    Shape: 2
+    SpreadAngleDeg: 90
+    SpawnRadius: 0
+    SpawnDelaySec: 0

@@ -28,22 +28,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
       Weights:
       - 1
-    - State: 0
-      Lane: 1
-      Clips:
-      - {fileID: 11400000, guid: 7cc14ff5ce5f4a488af830fda539f93d, type: 2}
-      Weights:
-      - 1
     - State: 1
       Lane: 0
       Clips:
       - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
-      Weights:
-      - 1
-    - State: 1
-      Lane: 1
-      Clips:
-      - {fileID: 11400000, guid: 13955e787a1b4edfa70b980acec4da95, type: 2}
       Weights:
       - 1
     EventSlots:
@@ -52,18 +40,22 @@ MonoBehaviour:
       - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
     HazardActorPlacements:
     - PlacementInstanceId: 1
-      ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
-      LocalOffset: {x: 0, y: 0, z: 0}
+      ActorArchetypePrefab: {fileID: 4069771742991948589, guid: be2250d34f47b4d4389d07084b4b5da8, type: 3}
+      LocalOffset: {x: 2, y: 0, z: 10}
       LocalYawDeg: 0
+    - PlacementInstanceId: 2
+      ActorArchetypePrefab: {fileID: 4069771742991948589, guid: be2250d34f47b4d4389d07084b4b5da8, type: 3}
+      LocalOffset: {x: 17, y: 0, z: 7}
+      LocalYawDeg: 180
     HazardActorOrchestrationRules:
     - RuleId: 101
-      TargetPlacementInstanceIds: 01000000
+      TargetPlacementInstanceIds: 0100000002000000
       ActionType: 1
       TriggerType: 1
       TriggerThresholdNormalized: 0
       TargetPhaseId: 0
     - RuleId: 102
-      TargetPlacementInstanceIds: 01000000
+      TargetPlacementInstanceIds: 0100000002000000
       ActionType: 2
       TriggerType: 2
       TriggerThresholdNormalized: 0.6

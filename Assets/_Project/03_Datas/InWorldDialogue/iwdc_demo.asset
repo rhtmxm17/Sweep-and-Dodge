@@ -92,7 +92,7 @@ MonoBehaviour:
     RetryPolicy: 0
     FullVariant:
       Lines:
-      - SpeakerKey: hero
+      - SpeakerKey: MC
         Text: Clear line
         Anchor:
           Kind: 2
@@ -159,7 +159,7 @@ MonoBehaviour:
     RetryPolicy: 3
     FullVariant:
       Lines:
-      - SpeakerKey: hero
+      - SpeakerKey: MC
         Text: Forest theme
         Anchor:
           Kind: 0

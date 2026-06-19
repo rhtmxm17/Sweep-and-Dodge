@@ -247,11 +247,13 @@ namespace SweepNDodge.DotsBullets
                 typeof(HazardActorPhaseTransitionSignalComponent),
                 typeof(HazardActorPresencePresentationSignalComponent),
                 typeof(HazardActorOrchestrationRequestSignalComponent),
-                typeof(HazardActorOrchestrationRequestConsumptionComponent));
+                typeof(HazardActorOrchestrationRequestConsumptionComponent),
+                typeof(LocalTransform));
             createdEntities.Add(actorEntity);
 
             byte actorEnabled = actorAuthoring.Enabled ? (byte)1 : (byte)0;
             byte actorSuppressed = actorAuthoring.StartSuppressed ? (byte)1 : (byte)0;
+            quaternion actorRotation = quaternion.RotateY(math.radians(localYawDeg));
 
             em.SetComponentData(actorEntity, new HazardActorComponent
             {
@@ -264,6 +266,7 @@ namespace SweepNDodge.DotsBullets
                 LocalOffset = localOffset,
                 LocalYawDeg = localYawDeg,
             });
+            em.SetComponentData(actorEntity, LocalTransform.FromPositionRotationScale(localOffset, actorRotation, 1f));
             em.SetComponentData(actorEntity, new HazardActorAppliedConfigBaselineComponent
             {
                 IsEnabled = actorEnabled,
@@ -382,6 +385,7 @@ namespace SweepNDodge.DotsBullets
                 resolvedSlots,
                 ref patternSlots,
                 ref executionSlots);
+            ApplyPlacementYawToExecutionSlots(executionSlots, localYawDeg);
 
             var baselineTelegraph = HazardActorPatternSlotAuthoringUtility.CreateBaselineTelegraph(resolvedSlots);
             var baselineEmission = HazardActorPatternSlotAuthoringUtility.CreateBaselineEmission(resolvedSlots);
@@ -451,6 +455,21 @@ namespace SweepNDodge.DotsBullets
             }
 
             return false;
+        }
+
+        private static void ApplyPlacementYawToExecutionSlots(
+            DynamicBuffer<HazardActorPatternExecutionSlotBuffer> executionSlots,
+            float localYawDeg)
+        {
+            if (math.abs(localYawDeg) <= 0.0001f)
+                return;
+
+            for (int i = 0; i < executionSlots.Length; i++)
+            {
+                var slot = executionSlots[i];
+                slot.BaseAngleDeg += localYawDeg;
+                executionSlots[i] = slot;
+            }
         }
 
     }
