@@ -274,6 +274,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         PlacementInstanceId = 101,
                         ActorArchetypePrefab = archetype.Root,
                         LocalOffset = new UnityEngine.Vector3(3f, 0f, -2f),
+                        LocalYawDeg = 180f,
                     }
                 };
 
@@ -294,6 +295,17 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(placement.PlacementInstanceId, Is.EqualTo(101));
                 Assert.That(placement.LocalOffset.x, Is.EqualTo(3f).Within(0.001f));
                 Assert.That(placement.LocalOffset.z, Is.EqualTo(-2f).Within(0.001f));
+                Assert.That(placement.LocalYawDeg, Is.EqualTo(180f).Within(0.001f));
+                Assert.That(em.HasComponent<LocalTransform>(actor), Is.True);
+                var actorTransform = em.GetComponentData<LocalTransform>(actor);
+                Assert.That(actorTransform.Position.x, Is.EqualTo(3f).Within(0.001f));
+                Assert.That(actorTransform.Position.z, Is.EqualTo(-2f).Within(0.001f));
+                var actorRight = math.rotate(actorTransform.Rotation, new float3(1f, 0f, 0f));
+                Assert.That(actorRight.x, Is.EqualTo(-1f).Within(0.001f));
+                Assert.That(actorRight.z, Is.EqualTo(0f).Within(0.001f));
+                var executionSlots = em.GetBuffer<HazardActorPatternExecutionSlotBuffer>(actor);
+                Assert.That(executionSlots.Length, Is.EqualTo(1));
+                Assert.That(executionSlots[0].BaseAngleDeg, Is.EqualTo(180f).Within(0.001f));
                 Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
 
                 var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(source);

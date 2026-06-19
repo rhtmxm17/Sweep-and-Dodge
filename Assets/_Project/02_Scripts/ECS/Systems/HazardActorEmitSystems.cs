@@ -259,7 +259,10 @@ namespace SweepNDodge.DotsBullets
                 return math.transform(localToWorldLookup[actorEntity].Value, localOffset);
 
             if (localTransformLookup.HasComponent(actorEntity))
-                return localTransformLookup[actorEntity].Position + localOffset;
+            {
+                var tx = localTransformLookup[actorEntity];
+                return tx.Position + math.rotate(tx.Rotation, localOffset * tx.Scale);
+            }
 
             return localOffset;
         }
