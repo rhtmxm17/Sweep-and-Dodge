@@ -99,13 +99,13 @@ namespace SweepNDodge.DotsBullets
                 {
                     PatternSlotId = slot.PatternSlotId,
                     TelegraphProfileRefId = resolvedTelegraph.ProfileId,
-                    EmissionProfileRefId = slot.EmissionProfile.GetInstanceID(),
+                    EmissionProfileRefId = resolvedEmission.EmissionCore.ProfileRefId,
                     BaseWeight = math.max(0f, slot.BaseWeight),
                     AvailabilityFlags = slot.AvailabilityFlags,
                 };
                 var execution = CreateExecutionSlot(
                     slot.PatternSlotId,
-                    slot.EmissionProfile.GetInstanceID(),
+                    resolvedEmission.EmissionCore.ProfileRefId,
                     (float3)slot.LocalOffset,
                     resolvedTelegraph,
                     resolvedEmission);

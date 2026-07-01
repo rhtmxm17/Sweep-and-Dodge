@@ -5,6 +5,9 @@ namespace SweepNDodge.DotsBullets
     [CreateAssetMenu(menuName = "SweepNDodge/Hazard/Hazard Emitter Emission Profile", fileName = "heep_")]
     public class HazardEmitterEmissionProfileSO : ScriptableObject
     {
+        [Header("Common Profile Reference")]
+        public EmissionProfileSO Profile;
+
         [Header("Payload")]
         public BulletDefinitionSO Bullet;
 

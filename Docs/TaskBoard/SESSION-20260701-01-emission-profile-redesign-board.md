@@ -145,15 +145,13 @@ LifecycleTrigger
   - 금지: transition inline support를 장기 authoring SSOT로 고정하는 것.
 
 ## Now
-- [ ] T7. 전면 참조형 authoring schema/resolver 구현
-  - 완료 기준: `EmissionProfileSO`와 공통 `EmissionProfileResolver`가 도입되고, Source/Hazard/Triggered wrapper가 공통 `ResolvedEmissionCore`를 참조 또는 포함해 resolve된다.
-  - 완료 기준: transition 기간의 inline common grammar는 compatibility source로만 남고 신규 작성 기준은 profile 참조형으로 고정된다.
-
-## Next
 - [ ] T8. asset migration 및 legacy 격하
   - 완료 기준: 기존 WaveClip/Hazard/secondary spawn sample/operational asset이 `EmissionProfileSO` 참조형으로 변환된다.
   - 완료 기준: `BulletDefinitionSO` movement/reaction 필드는 operational authoring SSOT에서 제외되고 compatibility fallback 또는 migration warning 대상으로만 남는다.
   - 완료 기준: migration 후 validation/test가 operational asset의 profile reference integrity를 검증한다.
+
+## Next
+- 없음
 
 ## Blocked
 - 없음
@@ -169,6 +167,20 @@ LifecycleTrigger
   - 근거: 신규 구조가 안정화될 때까지 legacy compatibility path로 유지한다.
 
 ## Done
+- [x] T7. 전면 참조형 authoring schema/resolver 구현
+  - 결과: `Assets/_Project/02_Scripts/ECS/Authoring/EmissionProfileSO.cs`를 추가했다.
+  - 결과: `Assets/_Project/02_Scripts/ECS/Authoring/EmissionProfileResolver.cs`에 `ResolvedEmissionCore`와 공통 resolver를 추가했다.
+  - 결과: `WaveSpawnEntryAuthoring.Profile` optional 참조를 추가하고, profile 참조가 있으면 common grammar를 profile에서 우선 resolve하도록 연결했다.
+  - 결과: `HazardEmitterEmissionProfileSO.Profile` optional 참조를 추가하고, profile 참조가 있으면 기존 Hazard profile inline grammar보다 우선 resolve하도록 연결했다.
+  - 결과: 기존 inline common grammar는 compatibility source로 유지했다.
+  - 결과: Source/Hazard resolved snapshot이 `ResolvedEmissionCore`를 포함한다.
+  - 결과: `EmissionProfileResolverTests`를 추가해 profile 우선 resolve와 inline compatibility resolve를 검증했다.
+  - 검증: compile 후 `Assets/_Project` 경로 기준 Unity Console error 0건.
+  - 검증: 신규 `EmissionProfileResolverTests` 3개 통과.
+  - 검증: 전체 EditMode 482개 통과.
+  - 검증: `BulletPlayModeSmokeTests.PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors` 통과.
+  - 참고: 전체 EditMode 1차 실행에서 `WaveClip_WithNonPositiveDefinitionId_IsError` 회귀를 발견했으나 Source inline path의 DefinitionId 검사를 validation layer에 남기도록 수정했고, 이후 전체 EditMode가 통과했다.
+  - 제외: 실제 asset migration, runtime `DiscreteEmitRequestBuffer` 확장, spawned bullet apply override 구현.
 - [x] T6. runtime pipeline 계층 설계 점검
   - 결과: `Docs/TechnicalDesign/TD-033-emission-profile-common-schema.md`의 `### 9.8 T6 runtime pipeline decision`에 A안을 채택해 반영했다.
   - 결과: `DiscreteEmitRequestBuffer`를 신규 `EmissionProfile` discrete execution의 주 채널로 확장하는 방향을 채택했다.

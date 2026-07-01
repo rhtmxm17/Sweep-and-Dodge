@@ -271,6 +271,7 @@ namespace SweepNDodge.DotsBullets
     [Serializable]
     public sealed class WaveSpawnEntryAuthoring
     {
+        public EmissionProfileSO Profile;
         public WaveClipSO.SpawnPayloadProfile Payload;
 
         [SerializeReference] public WaveEmissionAuthoringBase Emission = new RateFieldEmissionAuthoring();
