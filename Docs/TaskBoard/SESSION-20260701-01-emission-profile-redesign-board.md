@@ -22,8 +22,10 @@
   - `MotionCompleted -> TriggerEmissionProfile` 1차 스키마가 확정된다.
   - `BulletDefinitionSO`의 movement/reaction 필드를 deprecated로 다루는 마이그레이션 기준이 정리된다.
   - `WaveSpawnEntryAuthoring`, `HazardEmitterEmissionProfileSO`, 기존 secondary spawn reaction 데이터의 통합/호환 전략이 구현 착수 가능한 단위로 분해된다.
+  - 최종 완료 시점에는 Source/Hazard/Triggered의 공통 탄막 문법이 모두 `EmissionProfileSO` 참조형으로 전환된다.
+  - 기존 WaveClip/Hazard/secondary spawn asset migration이 완료되고, operational asset에 남은 inline common emission grammar는 제거되거나 compatibility-only 상태로 격하된다.
   - 데이터 스키마 확정 전에는 `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer`, `BulletSecondarySpawnRequestBuffer` 같은 파이프라인 계층 변경을 착수하지 않는다.
-- 이번 세션에서 하지 않을 것:
+- 이번 T2b 문서 반영 직후에 하지 않을 것:
   - runtime spawn request/channel 재설계 구현
   - 기존 asset migration 실행
   - 전체 WaveClip/HazardActor inspector UX polish
@@ -35,6 +37,8 @@
 - 1차 lifecycle trigger 이벤트 범위는 `MotionCompleted`만 연다.
 - `BulletDefinitionSO`의 `Speed`, `Lifetime`, `MovementFamily`, `DampedLinear`, `HomingLite`, `OnMotionCompletedExplode`, `OnCleanupRemovedSpawnSecondary`는 신규 데이터 작성 기준에서 deprecated로 취급한다.
 - 기존 `BulletSecondarySpawnRequestBuffer` 기반 secondary spawn 경로는 호환 경로로 유지하되, 신규 설계의 SSOT로 확장하지 않는다.
+- 최종 목표는 전면 참조형 전환이다. Source/Hazard/Triggered의 active authoring SSOT는 `EmissionProfileSO` 참조가 되어야 하며, inline common emission grammar는 migration 기간 동안만 허용한다.
+- 전환형 하이브리드는 최종 아키텍처가 아니라 staged migration 전략이다. 기존 asset과 runtime path를 유지한 채 `ResolvedEmissionCore`와 공통 resolver를 먼저 도입하고, 이후 asset migration과 legacy 제거로 전면 참조형에 도달한다.
 
 ## Working Schema Draft
 
@@ -128,25 +132,28 @@ LifecycleTrigger
   - 전제: 공통 authoring/resolver 출력은 `ResolvedEmissionCore`로 고정한다.
   - 전제: runtime T6에서 `ResolvedEmissionCore -> SourceSpawnRequestBuffer/DiscreteEmitRequestBuffer/TriggeredEmissionRequest` 매핑을 결정한다.
 
+## Transition Strategy Decision
+- 판단: 최종 목표가 마이그레이션 포함 전면 참조형 전환이어도, 전환형 하이브리드를 중간 단계로 거치는 것을 권장한다.
+- 이유:
+  - `HazardEmitterEmissionProfileSO`는 이미 별도 profile asset 구조라 `EmissionProfileSO`로 옮기기 쉽지만, `WaveSpawnEntryAuthoring`은 Source 전용 `Emission/Sampling`과 공통 `Payload/Position/Aim/Shot`이 같은 inline directive 안에 섞여 있다.
+  - Source는 sustain/event timeline, rate-field, sampling, lane/phase 문맥이 강하므로 즉시 전면 참조형으로 바꾸면 migration과 runtime 변경 범위가 동시에 커진다.
+  - `ResolvedEmissionCore`를 먼저 만들면 Source/Hazard/Triggered가 같은 공통 grammar를 resolve한다는 계약을 선행 검증할 수 있다.
+  - 이후 `WaveSpawnEntryAuthoring`의 inline common grammar를 `EmissionProfileSO` 참조로 치환하고, `HazardEmitterEmissionProfileSO`를 compatibility alias 또는 migration source로 격하하면 전면 참조형 목표와 충돌하지 않는다.
+- 결론:
+  - 최종안: 전면 참조형 `EmissionProfileSO`.
+  - 이행안: 전환형 하이브리드.
+  - 금지: transition inline support를 장기 authoring SSOT로 고정하는 것.
+
 ## Now
-- [ ] T2b. `WaveSpawnEntryAuthoring`와 `HazardEmitterEmissionProfileSO` 통합 전략 결정
-  - 완료 기준: WaveClip directive가 profile 참조형으로 전환될지, transition 기간 동안 inline directive를 유지할지 결정한다.
-  - 점검: 기존 `WaveClipAuthoringResolver`, `HazardEmitterProfileResolver`의 중복 축과 공통 resolver 추출 가능성.
-  - 전제: 공통 resolver 출력 단위는 `ResolvedEmissionCore`로 둔다.
-  - 제외: request buffer/channel 수정, spawned bullet apply 단계 변경, asset migration.
+- [ ] T7. 전면 참조형 authoring schema/resolver 구현
+  - 완료 기준: `EmissionProfileSO`와 공통 `EmissionProfileResolver`가 도입되고, Source/Hazard/Triggered wrapper가 공통 `ResolvedEmissionCore`를 참조 또는 포함해 resolve된다.
+  - 완료 기준: transition 기간의 inline common grammar는 compatibility source로만 남고 신규 작성 기준은 profile 참조형으로 고정된다.
 
 ## Next
-- [ ] T3. `MotionCompleted -> TriggerEmissionProfile` validation rule 설계
-  - 완료 기준: null reference, self/direct cycle, max depth, usage flag, operational/test asset 교차 참조, deprecated data coexistence 규칙이 정리된다.
-- [ ] T4. `BulletDefinitionSO` deprecated 필드 마이그레이션 기준 작성
-  - 완료 기준: 신규 작성 금지 필드, 기존 asset compatibility read path, warning/error 전환 시점이 정리된다.
-  - 대상: `Speed`, `Lifetime`, `MovementFamily`, `DampedLinear`, `HomingLite`, `OnMotionCompletedExplode`, `OnCleanupRemovedSpawnSecondary`.
-- [ ] T5. 기존 샘플 데이터 변환 후보 작성
-  - 완료 기준: `bd_sample_bubble -> ep_sample_bubble_parent + ep_sample_bubble_fragments` 변환 예시가 문서화된다.
-  - 제외: 실제 asset migration.
-- [ ] T6. runtime pipeline 계층 설계 점검
-  - 시작 조건: T1~T5에서 데이터 구조와 validation 기준이 확정된 뒤, T2a preflight 결론을 구현 수준으로 구체화할 필요가 있을 때 착수한다.
-  - 검토 대상: `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer`, `BulletSecondarySpawnRequestBuffer`, 공통 `ResolvedEmission`/`TriggeredEmissionRequest` 필요 여부.
+- [ ] T8. asset migration 및 legacy 격하
+  - 완료 기준: 기존 WaveClip/Hazard/secondary spawn sample/operational asset이 `EmissionProfileSO` 참조형으로 변환된다.
+  - 완료 기준: `BulletDefinitionSO` movement/reaction 필드는 operational authoring SSOT에서 제외되고 compatibility fallback 또는 migration warning 대상으로만 남는다.
+  - 완료 기준: migration 후 validation/test가 operational asset의 profile reference integrity를 검증한다.
 
 ## Blocked
 - 없음
@@ -157,11 +164,50 @@ LifecycleTrigger
 - [ ] P2. `EmissionProfile` graph/preview editor UX
   - 근거: trigger profile 참조 구조가 확정된 뒤 graph view나 preview context를 설계하는 편이 안전하다.
 - [ ] P3. frame당 triggered emission budget과 backlog 정책
-  - 근거: 데이터 스키마 확정 전 runtime policy를 먼저 고정하면 구조가 불필요하게 좁아질 수 있다.
+  - 근거: T6에서는 `DiscreteEmitPolicyComponent` 재사용을 기본으로 두고, trigger storm 확인 시 별도 budget slot을 추가하기로 했다.
 - [ ] P4. 기존 `BulletSecondarySpawnRequestBuffer` 제거 여부
   - 근거: 신규 구조가 안정화될 때까지 legacy compatibility path로 유지한다.
 
 ## Done
+- [x] T6. runtime pipeline 계층 설계 점검
+  - 결과: `Docs/TechnicalDesign/TD-033-emission-profile-common-schema.md`의 `### 9.8 T6 runtime pipeline decision`에 A안을 채택해 반영했다.
+  - 결과: `DiscreteEmitRequestBuffer`를 신규 `EmissionProfile` discrete execution의 주 채널로 확장하는 방향을 채택했다.
+  - 결과: `MotionCompleted -> TriggerEmissionProfile`은 별도 `TriggeredEmissionRequestBuffer`가 아니라 profile-resolved `DiscreteEmitRequestBuffer` append로 실행한다.
+  - 결과: `BulletSecondarySpawnRequestBuffer`는 legacy compatibility path로 유지하고 신규 SSOT로 확장하지 않는다고 정리했다.
+  - 결과: `SpawnRequestCommonUtility.ApplySpawnedBulletState`는 profile-resolved speed/lifetime/movement/lifecycle tuning을 받을 수 있는 apply contract로 확장해야 한다고 정리했다.
+  - 결과: Source sustain branch는 즉시 discrete channel로 완전 흡수하지 않고, 같은 profile-resolved apply contract를 공유하는 후속 구현 기준으로 둔다.
+  - 결과: legacy `SpawnRadius` 보존은 triggered request context가 아니라 `PositionPattern` 확장 후보로 정리했다.
+  - 제외: 실제 request buffer/component/schema 코드 수정, `EmissionProfileSO` 구현, spawned bullet apply 구현, asset migration.
+- [x] T5. 기존 샘플 데이터 변환 후보 작성
+  - 결과: `Docs/TechnicalDesign/TD-033-emission-profile-common-schema.md`의 `### 9.7 bd_sample_bubble conversion candidate`에 변환 후보를 추가했다.
+  - 결과: `bd_sample_bubble`은 `ep_sample_bubble_parent`로, `bd_sample_bubble_fragment`는 `ep_sample_bubble_fragments`로 분리하는 예시를 문서화했다.
+  - 결과: `Speed`, `Lifetime`, `DampedLinear`, `MotionCompleted`, `SpawnCount`, `SpreadAngleDeg`의 대응 위치를 정리했다.
+  - 결과: `DefinitionId`, prefab/visual identity, pool size, capture rule, baseline radius, score value는 `BulletDefinitionSO` 책임으로 유지한다고 정리했다.
+  - 결과: 기존 `OnMotionCompletedExplode.SpawnRadius = 0.08`은 1차 변환에서 완전 보존하지 않고 T6/T7 판단 대상으로 남겼다.
+  - 제외: 실제 `EmissionProfileSO` asset 생성, 기존 asset migration, exact tuning snapshot test 작성.
+- [x] T4. `BulletDefinitionSO` deprecated 필드 마이그레이션 기준 작성
+  - 결과: `Docs/TechnicalDesign/TD-033-emission-profile-common-schema.md`의 `## 7. BulletDefinitionSO deprecated 정책`에 Phase 0/1/2 마이그레이션 기준을 추가했다.
+  - 결과: Phase 0에서는 기존 `BulletDefinitionSO` schema validation과 pool/bootstrap fallback source를 유지한다.
+  - 결과: Phase 1에서는 `EmissionProfileSO` 값이 있으면 profile 값을 우선하고, 없으면 `BulletDefinitionSO` 값을 fallback으로 읽는다.
+  - 결과: Phase 2 migration 완료 후에는 operational asset에서 deprecated field가 gameplay SSOT로 사용되는 상태를 error 후보로 전환한다.
+  - 결과: `Speed`, `Lifetime`, `MovementFamily`, `DampedLinear`, `HomingLite`, `OnMotionCompletedExplode`, `OnCleanupRemovedSpawnSecondary`의 신규 위치와 migration 기준을 필드별로 정리했다.
+  - 결과: test-only asset과 compatibility fixture는 deprecated field 사용을 허용한다.
+  - 제외: code validation 변경, `BulletPoolDefinitionBuffer` 변경, actual asset migration.
+- [x] T3. `MotionCompleted -> TriggerEmissionProfile` validation rule 설계
+  - 결과: `Docs/TechnicalDesign/TD-033-emission-profile-common-schema.md`의 `## 8. Validation Rules`에 1차 validation 기준을 구체화했다.
+  - 결과: null target, self/direct/transitive cycle, `MaxTriggerDepth = 4` 초과는 error로 둔다.
+  - 결과: `MotionCompleted` trigger가 있으나 movement family가 motion completion request를 만들 수 없는 경우는 warning으로 둔다.
+  - 결과: operational asset이 test-only trigger profile 또는 test-only bullet definition을 참조하면 error로 둔다.
+  - 결과: test-only asset이 operational profile/bullet definition을 참조하는 것은 허용한다.
+  - 결과: 신규 `MotionCompleted -> TriggerEmissionProfile`과 기존 `BulletDefinitionSO.OnMotionCompletedExplode`가 migration 기간에 같은 logical emission path에서 공존하면 warning으로 두고, migration 완료 후 error 후보로 전환한다.
+  - 결과: `OnCleanupRemovedSpawnSecondary`는 T3 범위 밖 후속 event migration 후보로 분류했다.
+  - 제외: 실제 `ContentValidationRules` 구현, runtime frame budget/backlog policy, asset migration.
+- [x] T2b. `WaveSpawnEntryAuthoring`와 `HazardEmitterEmissionProfileSO` 통합 전략 결정
+  - 결과: 최종 목표는 마이그레이션 포함 전면 참조형 `EmissionProfileSO` 전환으로 확정했다.
+  - 결과: 전환형 하이브리드는 최종안이 아니라 staged migration 전략으로 채택했다.
+  - 결과: `ResolvedEmissionCore`와 공통 resolver를 먼저 도입하고, Source/Hazard/Triggered wrapper는 이를 감싸는 방향으로 정리한다.
+  - 결과: transition 기간 동안 `WaveSpawnEntryAuthoring` inline common grammar와 `HazardEmitterEmissionProfileSO`는 compatibility source로 유지할 수 있으나, 신규 작성 기준은 `EmissionProfileSO` 참조형으로 이동한다.
+  - 제외: request buffer/channel 수정, spawned bullet apply 단계 변경, 실제 asset migration.
 - [x] T2a. Pipeline Preflight
   - 결과: T2b는 진행 가능하되, 공통 authoring/resolver 출력 단위로 `ResolvedEmissionCore`가 필요하다고 판단했다.
   - 결과: `DiscreteEmitRequestBuffer`는 공통 emission 실행 문법에 가장 가까운 기존 경로지만 `SpeedOverride`, `LifetimeOverride`, `MovementTuning`, `LifecycleTriggers`를 담지 못하므로 T6에서 확장/분리 설계가 필요하다.
