@@ -14,26 +14,36 @@ namespace SweepNDodge.DotsBullets.Tests
         public void CloneDirective_DeepClonesAllManagedNodes()
         {
             var source = CreateRichDirective();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            source.Profile = profile;
 
-            var clone = WaveClipManagedReferenceGraphUtility.CloneDirective(source);
+            try
+            {
+                var clone = WaveClipManagedReferenceGraphUtility.CloneDirective(source);
 
-            Assert.That(clone, Is.Not.Null);
-            Assert.That(clone, Is.Not.SameAs(source));
-            Assert.That(clone.Emission, Is.Not.SameAs(source.Emission));
-            Assert.That(clone.Sampling, Is.Not.SameAs(source.Sampling));
-            Assert.That(clone.Sampling.Anchor, Is.Not.SameAs(source.Sampling.Anchor));
-            Assert.That(clone.Sampling.AreaSampler, Is.Not.SameAs(source.Sampling.AreaSampler));
-            Assert.That(clone.PositionPattern, Is.Not.SameAs(source.PositionPattern));
-            Assert.That(clone.Aim, Is.Not.SameAs(source.Aim));
-            Assert.That(clone.ShotPattern, Is.Not.SameAs(source.ShotPattern));
+                Assert.That(clone, Is.Not.Null);
+                Assert.That(clone, Is.Not.SameAs(source));
+                Assert.That(clone.Profile, Is.SameAs(profile));
+                Assert.That(clone.Emission, Is.Not.SameAs(source.Emission));
+                Assert.That(clone.Sampling, Is.Not.SameAs(source.Sampling));
+                Assert.That(clone.Sampling.Anchor, Is.Not.SameAs(source.Sampling.Anchor));
+                Assert.That(clone.Sampling.AreaSampler, Is.Not.SameAs(source.Sampling.AreaSampler));
+                Assert.That(clone.PositionPattern, Is.Not.SameAs(source.PositionPattern));
+                Assert.That(clone.Aim, Is.Not.SameAs(source.Aim));
+                Assert.That(clone.ShotPattern, Is.Not.SameAs(source.ShotPattern));
 
-            var sourcePointSet = (PointSetPositionPatternAuthoring)source.PositionPattern;
-            var clonePointSet = (PointSetPositionPatternAuthoring)clone.PositionPattern;
-            Assert.That(clonePointSet.Points, Is.Not.SameAs(sourcePointSet.Points));
-            Assert.That(clonePointSet.Points, Is.EqualTo(sourcePointSet.Points));
+                var sourcePointSet = (PointSetPositionPatternAuthoring)source.PositionPattern;
+                var clonePointSet = (PointSetPositionPatternAuthoring)clone.PositionPattern;
+                Assert.That(clonePointSet.Points, Is.Not.SameAs(sourcePointSet.Points));
+                Assert.That(clonePointSet.Points, Is.EqualTo(sourcePointSet.Points));
 
-            var cloneAim = (PlayerPositionAimAuthoring)clone.Aim;
-            Assert.That(cloneAim.SnapshotTiming, Is.EqualTo(WaveAimSnapshotTimingId.PerShot));
+                var cloneAim = (PlayerPositionAimAuthoring)clone.Aim;
+                Assert.That(cloneAim.SnapshotTiming, Is.EqualTo(WaveAimSnapshotTimingId.PerShot));
+            }
+            finally
+            {
+                Object.DestroyImmediate(profile);
+            }
         }
 
         [Test]

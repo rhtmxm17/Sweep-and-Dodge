@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 96b729550b95e4048b5973a3e3324a5e, type: 3}
   m_Name: heep_operational_sample_hazard_actor_pattern_b_prime
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.HazardEmitterEmissionProfileSO
+  Profile: {fileID: 11400000, guid: 550165f47b1618b4d98658b246dc9cb8, type: 2}
   Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
   EventRepeatCount: 7
   EventShotSchedule: 1

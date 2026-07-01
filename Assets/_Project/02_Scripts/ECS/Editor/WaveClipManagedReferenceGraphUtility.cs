@@ -270,6 +270,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             return new WaveSpawnEntryAuthoring
             {
+                Profile = source.Profile,
                 Payload = source.Payload,
                 Emission = CloneEmission(source.Emission),
                 Sampling = CloneSampling(source.Sampling),

@@ -28,6 +28,8 @@ namespace SweepNDodge.DotsBullets.Editor
             var stagePresentationCatalogs = CollectScriptableObjects<StagePresentationCatalogSO>();
             var topologyPrefabCatalogs = CollectScriptableObjects<StageTopologyPrefabCatalogSO>();
             var cleanupActionSets = CollectScriptableObjects<PlayerCleanupActionSetSO>();
+            var emissionProfiles = CollectScriptableObjects<EmissionProfileSO>();
+            var hazardEmitterEmissionProfiles = CollectScriptableObjects<HazardEmitterEmissionProfileSO>();
             var inWorldDialogueCatalogs = CollectScriptableObjects<InWorldDialogueCatalogSO>();
             var inWorldDialogueSpeakerCatalogs = CollectScriptableObjects<InWorldDialogueSpeakerCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
@@ -45,6 +47,8 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(stagePresentationCatalogs);
             SortRecordsByLocation(topologyPrefabCatalogs);
             SortRecordsByLocation(cleanupActionSets);
+            SortRecordsByLocation(emissionProfiles);
+            SortRecordsByLocation(hazardEmitterEmissionProfiles);
             SortRecordsByLocation(inWorldDialogueCatalogs);
             SortRecordsByLocation(inWorldDialogueSpeakerCatalogs);
             SortRecordsByLocation(visuals);
@@ -52,7 +56,17 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(bullets);
             SortRecordsByLocation(playerProxies);
 
-            var input = new ContentValidationInput(definitions, waveClips, topologyPrefabCatalogs, cleanupActionSets, visuals, sources, bullets, playerProxies);
+            var input = new ContentValidationInput(
+                definitions,
+                waveClips,
+                topologyPrefabCatalogs,
+                cleanupActionSets,
+                emissionProfiles,
+                hazardEmitterEmissionProfiles,
+                visuals,
+                sources,
+                bullets,
+                playerProxies);
             var issues = ContentValidationRules.Validate(input);
             StageGridLayoutValidationRules.ValidateLayoutRecords(stageLayouts, issues);
             StageCatalogValidationRules.ValidateCatalogRecords(stageCatalogs, issues);

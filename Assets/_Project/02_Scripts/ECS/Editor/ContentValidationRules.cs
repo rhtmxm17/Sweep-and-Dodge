@@ -46,6 +46,8 @@ namespace SweepNDodge.DotsBullets.Editor
         public readonly IReadOnlyList<ContentValidationRecord<WaveClipSO>> WaveClips;
         public readonly IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> TopologyPrefabCatalogs;
         public readonly IReadOnlyList<ContentValidationRecord<PlayerCleanupActionSetSO>> CleanupActionSets;
+        public readonly IReadOnlyList<ContentValidationRecord<EmissionProfileSO>> EmissionProfiles;
+        public readonly IReadOnlyList<ContentValidationRecord<HazardEmitterEmissionProfileSO>> HazardEmitterEmissionProfiles;
         public readonly IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> VisualAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> SourceAuthorings;
         public readonly IReadOnlyList<ContentValidationRecord<BulletAuthoring>> BulletAuthorings;
@@ -56,6 +58,8 @@ namespace SweepNDodge.DotsBullets.Editor
             IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
             IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> topologyPrefabCatalogs,
             IReadOnlyList<ContentValidationRecord<PlayerCleanupActionSetSO>> cleanupActionSets,
+            IReadOnlyList<ContentValidationRecord<EmissionProfileSO>> emissionProfiles,
+            IReadOnlyList<ContentValidationRecord<HazardEmitterEmissionProfileSO>> hazardEmitterEmissionProfiles,
             IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
             IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
             IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings,
@@ -65,10 +69,25 @@ namespace SweepNDodge.DotsBullets.Editor
             WaveClips = waveClips ?? Array.Empty<ContentValidationRecord<WaveClipSO>>();
             TopologyPrefabCatalogs = topologyPrefabCatalogs ?? Array.Empty<ContentValidationRecord<StageTopologyPrefabCatalogSO>>();
             CleanupActionSets = cleanupActionSets ?? Array.Empty<ContentValidationRecord<PlayerCleanupActionSetSO>>();
+            EmissionProfiles = emissionProfiles ?? Array.Empty<ContentValidationRecord<EmissionProfileSO>>();
+            HazardEmitterEmissionProfiles = hazardEmitterEmissionProfiles ?? Array.Empty<ContentValidationRecord<HazardEmitterEmissionProfileSO>>();
             VisualAuthorings = visualAuthorings ?? Array.Empty<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
             SourceAuthorings = sourceAuthorings ?? Array.Empty<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>>();
             BulletAuthorings = bulletAuthorings ?? Array.Empty<ContentValidationRecord<BulletAuthoring>>();
             PlayerProxyAuthorings = playerProxyAuthorings ?? Array.Empty<ContentValidationRecord<PlayerProxyAuthoring>>();
+        }
+
+        public ContentValidationInput(
+            IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
+            IReadOnlyList<ContentValidationRecord<WaveClipSO>> waveClips,
+            IReadOnlyList<ContentValidationRecord<StageTopologyPrefabCatalogSO>> topologyPrefabCatalogs,
+            IReadOnlyList<ContentValidationRecord<PlayerCleanupActionSetSO>> cleanupActionSets,
+            IReadOnlyList<ContentValidationRecord<BulletVisualPrefabAuthoring>> visualAuthorings,
+            IReadOnlyList<ContentValidationRecord<SourceRuntimeTemplateAuthoringBase>> sourceAuthorings,
+            IReadOnlyList<ContentValidationRecord<BulletAuthoring>> bulletAuthorings,
+            IReadOnlyList<ContentValidationRecord<PlayerProxyAuthoring>> playerProxyAuthorings)
+            : this(definitions, waveClips, topologyPrefabCatalogs, cleanupActionSets, null, null, visualAuthorings, sourceAuthorings, bulletAuthorings, playerProxyAuthorings)
+        {
         }
 
         public ContentValidationInput(
@@ -96,6 +115,7 @@ namespace SweepNDodge.DotsBullets.Editor
     public static class ContentValidationRules
     {
         private const string TestDataRootPath = "Assets/_Project/99_Tests/";
+        private const int EmissionProfileMaxTriggerDepth = 4;
 
         public static List<ContentValidationIssue> Validate(in ContentValidationInput input)
         {
@@ -109,6 +129,8 @@ namespace SweepNDodge.DotsBullets.Editor
             ValidatePlayerProxyAuthoringContracts(input.PlayerProxyAuthorings, issues);
             ValidateVisualAuthoringContracts(input.VisualAuthorings, issues);
             ValidateWaveClipContracts(input.Definitions, input.WaveClips, issues);
+            ValidateEmissionProfileContracts(input.Definitions, input.EmissionProfiles, issues);
+            ValidateHazardEmitterEmissionProfileContracts(input.HazardEmitterEmissionProfiles, issues);
             ValidateBulletAuthoringRenderContracts(input.BulletAuthorings, issues);
             ValidateAutoCorrectionWarnings(input.Definitions, input.VisualAuthorings, input.SourceAuthorings, issues);
 
@@ -306,6 +328,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (clip == null)
                     continue;
 
+                bool requireProfileReference = IsOperationalProjectAssetPath(clips[i].Location);
                 var sharedManagedReferenceIssues = WaveClipManagedReferenceGraphUtility.DetectSharedManagedReferences(clip);
                 for (int issueIndex = 0; issueIndex < sharedManagedReferenceIssues.Count; issueIndex++)
                 {
@@ -371,6 +394,31 @@ namespace SweepNDodge.DotsBullets.Editor
                                     $"{segmentLocation}/Directives[{e}]",
                                     authoringError));
                                 continue;
+                            }
+
+                            var directive = seg.Directives[e];
+                            if (requireProfileReference)
+                            {
+                                if (directive == null || directive.Profile == null)
+                                {
+                                    issues.Add(new ContentValidationIssue(
+                                        ContentValidationSeverity.Error,
+                                        "CV046",
+                                        validationEntry.EntryLocation,
+                                        "Operational WaveClip directive must reference EmissionProfileSO for common emission grammar."));
+                                }
+                                else
+                                {
+                                    string profilePath = AssetDatabase.GetAssetPath(directive.Profile);
+                                    if (IsTestOnlyPath(profilePath))
+                                    {
+                                        issues.Add(new ContentValidationIssue(
+                                            ContentValidationSeverity.Error,
+                                            "CV046",
+                                            validationEntry.EntryLocation,
+                                            $"Operational WaveClip directive cannot reference test-only EmissionProfileSO. asset={profilePath}"));
+                                    }
+                                }
                             }
 
                             var bullet = validationEntry.Snapshot.Bullet;
@@ -696,7 +744,8 @@ namespace SweepNDodge.DotsBullets.Editor
             float rawLineLength = 0f;
             float rawLineSampleSpacing = 0f;
             int rawPointCount = 0;
-            switch (typedEntry.PositionPattern)
+            var rawPositionPattern = typedEntry.Profile != null ? typedEntry.Profile.PositionPattern : typedEntry.PositionPattern;
+            switch (rawPositionPattern)
             {
                 case LineEvenPositionPatternAuthoring lineEven:
                     rawLineLength = (lineEven.LineEnd - lineEven.LineStart).magnitude;
@@ -711,7 +760,8 @@ namespace SweepNDodge.DotsBullets.Editor
             float rawNWayAngleSpacingDeg = 0f;
             float rawSpiralStepDeg = 0f;
             WaveAimSnapshotTimingId rawAimSnapshotTiming = WaveAimSnapshotTimingId.EventStart;
-            switch (typedEntry.Aim)
+            var rawAim = typedEntry.Profile != null ? typedEntry.Profile.Aim : typedEntry.Aim;
+            switch (rawAim)
             {
                 case SpiralAimAuthoring spiral:
                     rawSpiralStepDeg = spiral.SpiralStepDeg;
@@ -721,7 +771,8 @@ namespace SweepNDodge.DotsBullets.Editor
                     break;
             }
 
-            switch (typedEntry.ShotPattern)
+            var rawShotPattern = typedEntry.Profile != null ? typedEntry.Profile.ShotPattern : typedEntry.ShotPattern;
+            switch (rawShotPattern)
             {
                 case NWayShotPatternAuthoring nWay:
                     rawShotCount = nWay.ShotCount;
@@ -753,6 +804,311 @@ namespace SweepNDodge.DotsBullets.Editor
                 rawPointCount);
             error = string.Empty;
             return true;
+        }
+
+        private static void ValidateEmissionProfileContracts(
+            IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
+            IReadOnlyList<ContentValidationRecord<EmissionProfileSO>> profiles,
+            List<ContentValidationIssue> issues)
+        {
+            var knownKeys = new HashSet<int>();
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                var def = definitions[i].Value;
+                if (def != null && def.DefinitionId != 0)
+                    knownKeys.Add(def.DefinitionId);
+            }
+
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                var profile = profiles[i].Value;
+                if (profile == null)
+                    continue;
+
+                string location = profiles[i].Location;
+                if (!EmissionProfileResolver.TryResolve(profile, out var core, out string error))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV047",
+                        location,
+                        error));
+                    continue;
+                }
+
+                var bullet = core.Bullet;
+                if (bullet == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV047",
+                        location,
+                        "EmissionProfileSO.Bullet is null."));
+                    continue;
+                }
+
+                if (bullet.DefinitionId <= 0)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV047",
+                        location,
+                        $"EmissionProfileSO references invalid Bullet DefinitionId {bullet.DefinitionId}."));
+                }
+                else if (!knownKeys.Contains(bullet.DefinitionId))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV047",
+                        location,
+                        $"EmissionProfileSO references unknown Bullet DefinitionId {bullet.DefinitionId}."));
+                }
+
+                if (IsOperationalProjectAssetPath(location))
+                {
+                    string bulletPath = AssetDatabase.GetAssetPath(bullet);
+                    if (IsTestOnlyPath(bulletPath))
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV047",
+                            location,
+                            $"Operational EmissionProfileSO cannot reference test-only BulletDefinitionSO. asset={bulletPath}"));
+                    }
+                }
+
+                ValidateEmissionProfileGrammar(profile, core, location, issues);
+                ValidateEmissionProfileMotionCompletedTrigger(profile, location, issues);
+            }
+
+            ValidateEmissionProfileTriggerGraph(profiles, issues);
+        }
+
+        private static void ValidateHazardEmitterEmissionProfileContracts(
+            IReadOnlyList<ContentValidationRecord<HazardEmitterEmissionProfileSO>> profiles,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                var profile = profiles[i].Value;
+                if (profile == null || !IsOperationalProjectAssetPath(profiles[i].Location))
+                    continue;
+
+                if (profile.Profile == null)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV050",
+                        profiles[i].Location,
+                        "Operational HazardEmitterEmissionProfileSO must reference EmissionProfileSO for common emission grammar."));
+                    continue;
+                }
+
+                string profilePath = AssetDatabase.GetAssetPath(profile.Profile);
+                if (IsTestOnlyPath(profilePath))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV050",
+                        profiles[i].Location,
+                        $"Operational HazardEmitterEmissionProfileSO cannot reference test-only EmissionProfileSO. asset={profilePath}"));
+                }
+            }
+        }
+
+        private static void ValidateEmissionProfileGrammar(
+            EmissionProfileSO profile,
+            in ResolvedEmissionCore core,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            if (profile == null)
+                return;
+
+            switch (profile.PositionPattern)
+            {
+                case null:
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV047",
+                        location,
+                        "EmissionProfileSO.PositionPattern is null."));
+                    break;
+                case LineEvenPositionPatternAuthoring lineEven:
+                    if ((lineEven.LineEnd - lineEven.LineStart).magnitude <= 0f || lineEven.SampleSpacing <= 0f)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV026",
+                            location,
+                            "EmissionProfileSO LineEven PositionPattern requires positive length and SampleSpacing."));
+                    }
+                    break;
+                case PointSetPositionPatternAuthoring pointSet:
+                    int pointCount = pointSet.Points?.Length ?? 0;
+                    if (pointCount <= 0)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Error,
+                            "CV028",
+                            location,
+                            "EmissionProfileSO PointSet PositionPattern requires at least one point."));
+                    }
+                    else if (pointCount > PointSetPositionPatternAuthoring.MaxPointCount)
+                    {
+                        issues.Add(new ContentValidationIssue(
+                            ContentValidationSeverity.Warning,
+                            "CVW033",
+                            location,
+                            $"EmissionProfileSO PointSet PointCount exceeds max({PointSetPositionPatternAuthoring.MaxPointCount}) and will be clamped."));
+                    }
+                    break;
+            }
+
+            if (profile.Aim == null)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV047",
+                    location,
+                    "EmissionProfileSO.Aim is null."));
+            }
+            else if (core.AimMode == WaveAimModeId.LineNormal && core.PositionPatternMode != WavePositionPatternModeId.LineEven)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV042",
+                    location,
+                    "EmissionProfileSO uses LineNormalAim without LineEven PositionPattern."));
+            }
+            else if (profile.Aim is SpiralAimAuthoring spiral && Mathf.Abs(spiral.SpiralStepDeg) < 0.0001f)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Warning,
+                    "CVW032",
+                    location,
+                    "EmissionProfileSO uses Spiral with near-zero SpiralStepDeg."));
+            }
+
+            switch (profile.ShotPattern)
+            {
+                case null:
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV047",
+                        location,
+                        "EmissionProfileSO.ShotPattern is null."));
+                    break;
+                case NWayShotPatternAuthoring nWay when nWay.ShotCount < 2 || nWay.AngleSpacingDeg <= 0f:
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV023",
+                        location,
+                        "EmissionProfileSO NWay ShotPattern requires ShotCount >= 2 and AngleSpacingDeg > 0."));
+                    break;
+                case RadialShotPatternAuthoring radial when radial.ShotCount < 2:
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV024",
+                        location,
+                        "EmissionProfileSO Radial ShotPattern requires ShotCount >= 2."));
+                    break;
+            }
+        }
+
+        private static void ValidateEmissionProfileMotionCompletedTrigger(
+            EmissionProfileSO profile,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            var trigger = profile?.LifecycleTriggers?.MotionCompleted;
+            if (trigger == null || !trigger.Enabled)
+                return;
+
+            if (trigger.TargetProfile == null)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV048",
+                    location,
+                    "EmissionProfileSO MotionCompleted trigger requires TargetProfile."));
+                return;
+            }
+
+            if (IsOperationalProjectAssetPath(location))
+            {
+                string targetPath = AssetDatabase.GetAssetPath(trigger.TargetProfile);
+                if (IsTestOnlyPath(targetPath))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV048",
+                        location,
+                        $"Operational EmissionProfileSO cannot trigger test-only EmissionProfileSO. asset={targetPath}"));
+                }
+            }
+
+            if (trigger.DelaySec < 0f)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV048",
+                    location,
+                    "EmissionProfileSO MotionCompleted trigger requires DelaySec >= 0."));
+            }
+        }
+
+        private static void ValidateEmissionProfileTriggerGraph(
+            IReadOnlyList<ContentValidationRecord<EmissionProfileSO>> profiles,
+            List<ContentValidationIssue> issues)
+        {
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                var profile = profiles[i].Value;
+                if (profile == null)
+                    continue;
+
+                var visited = new HashSet<EmissionProfileSO>();
+                if (TryFindTriggerGraphViolation(profile, profile, 0, visited, out string reason))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV049",
+                        profiles[i].Location,
+                        reason));
+                }
+            }
+        }
+
+        private static bool TryFindTriggerGraphViolation(
+            EmissionProfileSO root,
+            EmissionProfileSO current,
+            int depth,
+            HashSet<EmissionProfileSO> visited,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (current == null)
+                return false;
+
+            if (depth > EmissionProfileMaxTriggerDepth)
+            {
+                reason = $"EmissionProfile trigger graph exceeds max depth {EmissionProfileMaxTriggerDepth}. root={root.name}.";
+                return true;
+            }
+
+            var trigger = current.LifecycleTriggers?.MotionCompleted;
+            if (trigger == null || !trigger.Enabled || trigger.TargetProfile == null)
+                return false;
+
+            var target = trigger.TargetProfile;
+            if (ReferenceEquals(target, root) || !visited.Add(target))
+            {
+                reason = $"EmissionProfile trigger graph contains a cycle. root={root.name}, target={target.name}.";
+                return true;
+            }
+
+            return TryFindTriggerGraphViolation(root, target, depth + 1, visited, out reason);
         }
 
         private static float ResolveEffectiveSegmentDurationSec(float startSec, float durationSec, float clipDurationSec)
@@ -1052,6 +1408,16 @@ namespace SweepNDodge.DotsBullets.Editor
                 return false;
 
             return assetPath.Replace('\\', '/').StartsWith(TestDataRootPath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsOperationalProjectAssetPath(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+                return false;
+
+            string normalized = assetPath.Replace('\\', '/');
+            return normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                && !IsTestOnlyPath(normalized);
         }
 
         private static void ValidateMovementDefinition(

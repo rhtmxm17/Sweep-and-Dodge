@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -21,7 +21,8 @@ MonoBehaviour:
     StartSec: 0
     DurationSec: 1
     Directives:
-    - Payload:
+    - Profile: {fileID: 11400000, guid: 36e7c7b180cfe7a4cb1e9352dca7af8c, type: 2}
+      Payload:
         Bullet: {fileID: 11400000, guid: d770120fbd6b4061836ce6a8b58441f3, type: 2}
       Emission:
         rid: 6141543268140187755
@@ -43,7 +44,8 @@ MonoBehaviour:
     StartSec: 2
     DurationSec: 1
     Directives:
-    - Payload:
+    - Profile: {fileID: 11400000, guid: 6b58fa5ba2d08e34699b656fd8827054, type: 2}
+      Payload:
         Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
       Emission:
         rid: 6141543268140187758
@@ -65,7 +67,8 @@ MonoBehaviour:
     StartSec: 4
     DurationSec: 1
     Directives:
-    - Payload:
+    - Profile: {fileID: 11400000, guid: 29cde96a8a6aa0f4b899f49b5c8312b0, type: 2}
+      Payload:
         Bullet: {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
       Emission:
         rid: 6141543401000000001
@@ -87,7 +90,8 @@ MonoBehaviour:
     StartSec: 6
     DurationSec: 2
     Directives:
-    - Payload:
+    - Profile: {fileID: 11400000, guid: e12b3d98c05b184488fd13dc89039fec, type: 2}
+      Payload:
         Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
       Emission:
         rid: 6141543268140187761
@@ -109,7 +113,8 @@ MonoBehaviour:
     StartSec: 8
     DurationSec: 2
     Directives:
-    - Payload:
+    - Profile: {fileID: 11400000, guid: ef4b4ffb9bf3c6e4db09225479821a29, type: 2}
+      Payload:
         Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
       Emission:
         rid: 6141543401000000011
@@ -276,4 +281,3 @@ MonoBehaviour:
     - rid: 9141543401000000013
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
-

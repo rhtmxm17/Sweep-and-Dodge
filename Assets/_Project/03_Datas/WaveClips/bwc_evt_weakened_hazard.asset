@@ -22,7 +22,8 @@ MonoBehaviour:
     StartSec: 0
     DurationSec: 5
     Directives:
-    - Payload:
+    - Profile: {fileID: 11400000, guid: e1dca8c17c3f1194190106a47fa17b3c, type: 2}
+      Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
         rid: 6141543268140187716
@@ -44,7 +45,8 @@ MonoBehaviour:
     StartSec: 1.8
     DurationSec: 1
     Directives:
-    - Payload:
+    - Profile: {fileID: 11400000, guid: 167db1c8d66532a47951355f47b1817c, type: 2}
+      Payload:
         Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
       Emission:
         rid: 6141543268140187719

@@ -145,10 +145,7 @@ LifecycleTrigger
   - 금지: transition inline support를 장기 authoring SSOT로 고정하는 것.
 
 ## Now
-- [ ] T8. asset migration 및 legacy 격하
-  - 완료 기준: 기존 WaveClip/Hazard/secondary spawn sample/operational asset이 `EmissionProfileSO` 참조형으로 변환된다.
-  - 완료 기준: `BulletDefinitionSO` movement/reaction 필드는 operational authoring SSOT에서 제외되고 compatibility fallback 또는 migration warning 대상으로만 남는다.
-  - 완료 기준: migration 후 validation/test가 operational asset의 profile reference integrity를 검증한다.
+- 없음
 
 ## Next
 - 없음
@@ -167,6 +164,24 @@ LifecycleTrigger
   - 근거: 신규 구조가 안정화될 때까지 legacy compatibility path로 유지한다.
 
 ## Done
+- [x] T8. asset migration 및 legacy 격하
+  - 결과: `Assets/_Project/02_Scripts/ECS/Editor/EmissionProfileAssetMigrationUtility.cs`를 추가해 operational WaveClip/Hazard/secondary spawn sample을 `EmissionProfileSO` 참조형으로 migration할 수 있게 했다.
+  - 결과: `Assets/_Project/03_Datas/EmissionProfiles/` 아래에 WaveClip 12개, Hazard 5개, BulletReaction 2개 profile asset을 생성했다.
+  - 결과: 기존 operational WaveClip directive의 `Profile` 참조를 모두 채웠고, Source 전용 `Emission/Sampling`은 wrapper 책임으로 유지했다.
+  - 결과: 기존 operational `HazardEmitterEmissionProfileSO` 5개는 wrapper asset으로 유지하되 내부 common grammar source를 `EmissionProfileSO` 참조로 이동했다.
+  - 결과: `bd_sample_bubble` 계열 secondary spawn sample을 `ep_sample_bubble_parent` / `ep_sample_bubble_fragments` profile 쌍으로 변환했고, parent의 `MotionCompleted` trigger가 fragments profile을 참조한다.
+  - 결과: profile asset에는 `BulletDefinitionSO`의 speed/lifetime/movement 값을 profile override로 복사해 operational authoring SSOT가 profile 쪽으로 이동했다.
+  - 결과: `BulletDefinitionSO`의 deprecated movement/reaction 필드는 runtime compatibility fallback으로 유지했다. 실제 `DiscreteEmitRequestBuffer` 확장과 spawned bullet apply override는 T6 후속 runtime 구현 범위로 남겼다.
+  - 결과: `ContentValidationRunner`가 `EmissionProfileSO`와 `HazardEmitterEmissionProfileSO`를 수집하도록 확장했다.
+  - 결과: `ContentValidationRules`에 operational WaveClip/Hazard wrapper의 profile 참조 필수 규칙, profile bullet/trigger reference integrity, trigger graph cycle/depth 검증을 추가했다.
+  - 결과: `WaveClipManagedReferenceGraphUtility.CloneDirective`가 `Profile` 참조를 보존하도록 수정했다.
+  - 검증: compile 후 `Assets/_Project` 경로 기준 Unity Console error 0건.
+  - 검증: 관련 EditMode 테스트 64개 통과.
+  - 검증: 전체 EditMode 486개 통과.
+  - 검증: `ContentValidationRunner.ValidateProjectAssets()` 결과 error 0건.
+  - 검증: operational WaveClip/Hazard wrapper의 missing `Profile` 참조 0건.
+  - 검증: `BulletPlayModeSmokeTests.PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors` 통과.
+  - 참고: `ContentValidationRunner.ValidateProjectAssets()` warning 2건은 기존 콘텐츠 범위의 `CVW040` unreachable tail burst, `STG018` Stage 3 PlayerStart/DepositRegion overlap이며 T8 migration error는 아니다.
 - [x] T7. 전면 참조형 authoring schema/resolver 구현
   - 결과: `Assets/_Project/02_Scripts/ECS/Authoring/EmissionProfileSO.cs`를 추가했다.
   - 결과: `Assets/_Project/02_Scripts/ECS/Authoring/EmissionProfileResolver.cs`에 `ResolvedEmissionCore`와 공통 resolver를 추가했다.
@@ -240,6 +255,6 @@ LifecycleTrigger
   - 결과: `CleanupRemoved` 등 다른 lifecycle event는 후속 확장 후보로 분리했다.
 
 ## End of Session
-- 결과:
-- 남은 리스크:
-- 다음 세션 시작점:
+- 결과: T1~T8 완료. `EmissionProfileSO` authoring schema, resolver, operational asset migration, reference integrity validation, 관련 tests가 반영됐다.
+- 남은 리스크: runtime request/apply 계층은 아직 profile-resolved speed/lifetime/movement/lifecycle tuning을 소비하지 않는다. 현재는 기존 `BulletDefinitionSO` 값이 compatibility fallback으로 남아 있다.
+- 다음 세션 시작점: T6에서 정리한 `DiscreteEmitRequestBuffer` 확장과 spawned bullet apply override 구현, 또는 Parking Lot의 lifecycle trigger event 확장 검토.

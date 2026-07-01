@@ -1896,6 +1896,194 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void OperationalWaveClipDirective_WithoutEmissionProfileReference_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9401);
+                def.Prefab = prefab;
+                clip.ClipId = 9401;
+                clip.DurationSec = 1f;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { CreateDefaultTypedEntry(def) },
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "Assets/_Project/03_Datas/WaveClips/generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV046"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void OperationalWaveClipDirective_WithEmissionProfileReference_IsAllowed()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9402);
+                def.Prefab = prefab;
+                profile.Bullet = def;
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Profile = profile;
+
+                clip.ClipId = 9402;
+                clip.DurationSec = 1f;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry },
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "Assets/_Project/03_Datas/WaveClips/generated.asset"),
+                    },
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV046"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void EmissionProfile_MotionCompletedWithoutTarget_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9403);
+                def.Prefab = prefab;
+                profile.Bullet = def;
+                profile.LifecycleTriggers.MotionCompleted.Enabled = true;
+                profile.LifecycleTriggers.MotionCompleted.TargetProfile = null;
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV048"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void OperationalHazardEmitterEmissionProfile_WithoutEmissionProfileReference_IsError()
+        {
+            var hazardProfile = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+
+            try
+            {
+                var input = new ContentValidationInput(
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<HazardEmitterEmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<HazardEmitterEmissionProfileSO>(hazardProfile, "Assets/_Project/03_Datas/heep_generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV050"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(hazardProfile);
+            }
+        }
+
+        [Test]
         public void WaveClip_TypedEntryMissingEmission_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
