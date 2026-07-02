@@ -46,11 +46,13 @@ namespace SweepNDodge.DotsBullets.Tests
             var sourceEntity = new Entity { Index = 101, Version = 1 };
             var producerEntity = new Entity { Index = 202, Version = 1 };
             var anchorEntity = new Entity { Index = 303, Version = 1 };
+            var causerEntity = new Entity { Index = 404, Version = 1 };
             var seed = new DiscreteEmitRequestSeed
             {
                 ProducerKind = DiscreteEmitProducerKind.HazardActor,
                 SourceEntity = sourceEntity,
                 ProducerEntity = producerEntity,
+                CauserEntity = causerEntity,
                 EmissionId = 77,
                 ProfileRefId = 88,
                 BulletTypeKey = 9,
@@ -93,6 +95,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 EventShotIntervalSec = 0.25f,
                 RepeatCount = 3,
                 Priority = 12,
+                ReadyFrame = 60u,
             };
 
             var request = DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(seed, 55u);
@@ -100,6 +103,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.ProducerKind, Is.EqualTo(DiscreteEmitProducerKind.HazardActor));
             Assert.That(request.SourceEntity, Is.EqualTo(sourceEntity));
             Assert.That(request.ProducerEntity, Is.EqualTo(producerEntity));
+            Assert.That(request.CauserEntity, Is.EqualTo(causerEntity));
             Assert.That(request.EmissionId, Is.EqualTo(77));
             Assert.That(request.ProfileRefId, Is.EqualTo(88));
             Assert.That(request.BulletTypeKey, Is.EqualTo(9));
@@ -125,6 +129,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.EventShotElapsedSec, Is.EqualTo(0f));
             Assert.That(request.Priority, Is.EqualTo(12));
             Assert.That(request.OldestFrame, Is.EqualTo(55u));
+            Assert.That(request.ReadyFrame, Is.EqualTo(60u));
         }
 
         [Test]
@@ -163,6 +168,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.ShotCount, Is.EqualTo(1));
             Assert.That(request.PointSetCount, Is.EqualTo(4));
             Assert.That(request.EventShotIntervalSec, Is.EqualTo(0f));
+            Assert.That(request.ReadyFrame, Is.EqualTo(99u));
         }
     }
 }

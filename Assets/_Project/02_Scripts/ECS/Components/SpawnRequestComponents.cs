@@ -166,10 +166,59 @@ namespace SweepNDodge.DotsBullets
 
     public struct DiscreteEmitChannelSingletonTag : IComponentData { }
 
+    public struct EmissionProfileRuntimeRegistryTag : IComponentData { }
+
+    [InternalBufferCapacity(32)]
+    public struct EmissionProfileRuntimeRegistryBuffer : IBufferElementData
+    {
+        public int ProfileRefId;
+        public int BulletTypeKey;
+        public byte HasSpeedOverride;
+        public float SpeedOverride;
+        public byte HasLifetimeOverride;
+        public float LifetimeOverride;
+        public byte HasMovementOverride;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
+
+        public WavePositionPatternModeId PositionPatternMode;
+        public float2 SpawnOffset;
+        public float2 LineStart;
+        public float2 LineEnd;
+        public float SampleSpacing;
+        public int PointSetCount;
+        public float2 Point0;
+        public float2 Point1;
+        public float2 Point2;
+        public float2 Point3;
+
+        public WaveAimModeId AimMode;
+        public WaveAimSnapshotTimingId AimSnapshotTiming;
+        public float BaseAngleDeg;
+        public float AimAngleOffsetDeg;
+        public WaveLineNormalSideId LineNormalSide;
+        public float LineNormalAngleOffsetDeg;
+        public float SpiralStepDeg;
+
+        public WaveShotPatternModeId ShotPatternMode;
+        public int ShotCount;
+        public float NWayAngleSpacingDeg;
+
+        public byte HasMotionCompletedTrigger;
+        public int MotionCompletedTargetProfileRefId;
+        public EmissionTriggerOriginBindingId MotionCompletedOriginPosition;
+        public EmissionTriggerDirectionBindingId MotionCompletedForwardDirection;
+        public EmissionTriggerSourceBindingId MotionCompletedSourceEntity;
+        public EmissionTriggerCauserBindingId MotionCompletedCauserEntity;
+        public float MotionCompletedDelaySec;
+    }
+
     public enum DiscreteEmitProducerKind : byte
     {
         WaveClipEvent = 0,
         HazardActor = 1,
+        TriggeredEmission = 2,
     }
 
     public enum DiscreteEmitAnchorMode : byte
@@ -184,6 +233,7 @@ namespace SweepNDodge.DotsBullets
         public DiscreteEmitProducerKind ProducerKind;
         public Entity SourceEntity;
         public Entity ProducerEntity;
+        public Entity CauserEntity;
         public int EmissionId;
         public int ProfileRefId;
         public int BulletTypeKey;
@@ -235,6 +285,7 @@ namespace SweepNDodge.DotsBullets
 
         public byte Priority;
         public uint OldestFrame;
+        public uint ReadyFrame;
     }
 
     public struct DiscreteEmitPolicyComponent : IComponentData

@@ -263,6 +263,97 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ReactionOwner_MotionCompletedWithProfileTrigger_AppendsDiscreteRequest_AndSuppressesLegacyExplode()
+        {
+            using var world = new World("BulletLifecycleReaction_ProfileTrigger");
+            var em = world.EntityManager;
+
+            SetExecutionEndPrerequisites(em, frame: 14u);
+            SetFixedTickRuntime(em, 1f / 60f);
+            var secondaryChannel = CreateSecondaryChannel(em);
+            var discreteChannel = CreateDiscreteChannel(em);
+            CreateRegistry(em, CreateSourceRegistryEntry(100, targetProfileRefId: 200, delaySec: 0.10f), CreateTargetRegistryEntry(200, bulletTypeKey: 44));
+            var source = em.CreateEntity();
+            var bullet = CreatePendingBullet(
+                em,
+                BulletLifecycleReasonId.MotionCompleted,
+                new BulletLifecycleContactComponent
+                {
+                    PositionXZ = new float2(4f, 6f),
+                    DirectionXZ = new float2(0f, 2f),
+                },
+                active: true,
+                despawnRequested: true,
+                typeKey: 9,
+                sourceRef: source,
+                addTransform: true,
+                explodeReaction: new BulletOnMotionCompletedExplodeReactionComponent
+                {
+                    SecondaryBulletTypeKey = 21,
+                    SpawnCount = 3,
+                    Shape = BulletSecondarySpawnShapeId.ForwardSpread,
+                    SpreadAngleDeg = 90f,
+                    SpawnRadius = 1.5f,
+                    SpawnDelaySec = 0f,
+                },
+                collectReaction: null,
+                profileRefId: 100);
+
+            world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetBuffer<BulletSecondarySpawnRequestBuffer>(secondaryChannel).Length, Is.EqualTo(0));
+
+            var requests = em.GetBuffer<DiscreteEmitRequestBuffer>(discreteChannel);
+            Assert.That(requests.Length, Is.EqualTo(1));
+            var request = requests[0];
+            Assert.That(request.ProducerKind, Is.EqualTo(DiscreteEmitProducerKind.TriggeredEmission));
+            Assert.That(request.SourceEntity, Is.EqualTo(source));
+            Assert.That(request.ProducerEntity, Is.EqualTo(bullet));
+            Assert.That(request.CauserEntity, Is.EqualTo(bullet));
+            Assert.That(request.EmissionId, Is.EqualTo(100));
+            Assert.That(request.ProfileRefId, Is.EqualTo(200));
+            Assert.That(request.BulletTypeKey, Is.EqualTo(44));
+            Assert.That(request.AnchorPosition, Is.EqualTo(new float3(4f, 0f, 6f)).Using(Float3Comparer.Within(1e-5f)));
+            Assert.That(request.BaseAngleDeg, Is.EqualTo(100f).Within(1e-5f));
+            Assert.That(request.ReadyFrame, Is.EqualTo(20u));
+        }
+
+        [Test]
+        public void ReactionOwner_MotionCompletedWithMissingTriggerTarget_DoesNotAppendProfileOrLegacyWithoutLegacyReaction()
+        {
+            using var world = new World("BulletLifecycleReaction_ProfileTriggerMissingTarget");
+            var em = world.EntityManager;
+
+            SetExecutionEndPrerequisites(em, frame: 14u);
+            var secondaryChannel = CreateSecondaryChannel(em);
+            var discreteChannel = CreateDiscreteChannel(em);
+            CreateRegistry(em, CreateSourceRegistryEntry(100, targetProfileRefId: 200, delaySec: 0f));
+            CreatePendingBullet(
+                em,
+                BulletLifecycleReasonId.MotionCompleted,
+                new BulletLifecycleContactComponent
+                {
+                    PositionXZ = new float2(4f, 6f),
+                    DirectionXZ = new float2(0f, 2f),
+                },
+                active: true,
+                despawnRequested: true,
+                typeKey: 9,
+                sourceRef: Entity.Null,
+                addTransform: true,
+                explodeReaction: null,
+                collectReaction: null,
+                profileRefId: 100);
+
+            world.GetOrCreateSystem<BulletLifecycleReactionExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(discreteChannel).Length, Is.EqualTo(0));
+            Assert.That(em.GetBuffer<BulletSecondarySpawnRequestBuffer>(secondaryChannel).Length, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ReactionOwner_VacuumCollectedWithCleanupRemovedReaction_AppendsSecondarySpawnRequest_AndKeepsSourcePending()
         {
             using var world = new World("BulletLifecycleReaction_VacuumCollectedAppend");
@@ -588,6 +679,70 @@ namespace SweepNDodge.DotsBullets.Tests
             return entity;
         }
 
+        private static Entity CreateDiscreteChannel(EntityManager em)
+        {
+            var entity = em.CreateEntity(
+                typeof(DiscreteEmitChannelSingletonTag),
+                typeof(DiscreteEmitPolicyComponent),
+                typeof(DiscreteEmitBacklogMetricsComponent));
+            em.SetComponentData(entity, new DiscreteEmitPolicyComponent
+            {
+                BudgetPerFrame = 8,
+                MaxPendingCount = 32,
+                MaxPendingAgeFrames = 120,
+            });
+            em.SetComponentData(entity, default(DiscreteEmitBacklogMetricsComponent));
+            em.AddBuffer<DiscreteEmitRequestBuffer>(entity);
+            return entity;
+        }
+
+        private static Entity CreateRegistry(EntityManager em, params EmissionProfileRuntimeRegistryBuffer[] entries)
+        {
+            var entity = em.CreateEntity(typeof(EmissionProfileRuntimeRegistryTag));
+            var registry = em.AddBuffer<EmissionProfileRuntimeRegistryBuffer>(entity);
+            for (int i = 0; i < entries.Length; i++)
+                registry.Add(entries[i]);
+            return entity;
+        }
+
+        private static EmissionProfileRuntimeRegistryBuffer CreateSourceRegistryEntry(int profileRefId, int targetProfileRefId, float delaySec)
+        {
+            return new EmissionProfileRuntimeRegistryBuffer
+            {
+                ProfileRefId = profileRefId,
+                BulletTypeKey = 9,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                HasMotionCompletedTrigger = 1,
+                MotionCompletedTargetProfileRefId = targetProfileRefId,
+                MotionCompletedOriginPosition = EmissionTriggerOriginBindingId.LifecycleContactPosition,
+                MotionCompletedForwardDirection = EmissionTriggerDirectionBindingId.LifecycleContactDirection,
+                MotionCompletedSourceEntity = EmissionTriggerSourceBindingId.CauserSourceEntity,
+                MotionCompletedCauserEntity = EmissionTriggerCauserBindingId.CompletedBullet,
+                MotionCompletedDelaySec = delaySec,
+            };
+        }
+
+        private static EmissionProfileRuntimeRegistryBuffer CreateTargetRegistryEntry(int profileRefId, int bulletTypeKey)
+        {
+            return new EmissionProfileRuntimeRegistryBuffer
+            {
+                ProfileRefId = profileRefId,
+                BulletTypeKey = bulletTypeKey,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                BaseAngleDeg = 10f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+            };
+        }
+
         private static void AdvanceFrame(EntityManager em)
         {
             var query = em.CreateEntityQuery(ComponentType.ReadOnly<BulletFrameCounterComponent>());
@@ -607,12 +762,14 @@ namespace SweepNDodge.DotsBullets.Tests
             Entity sourceRef,
             bool addTransform,
             BulletOnMotionCompletedExplodeReactionComponent? explodeReaction,
-            BulletOnCleanupRemovedSpawnSecondaryReactionComponent? collectReaction)
+            BulletOnCleanupRemovedSpawnSecondaryReactionComponent? collectReaction,
+            int profileRefId = 0)
         {
             var entity = em.CreateEntity(
                 typeof(BulletLifetimeComponent),
                 typeof(BulletTypeKeyComponent),
                 typeof(BulletSourceRefComponent),
+                typeof(BulletEmissionProfileRefComponent),
                 typeof(BulletLifecycleRequestComponent),
                 typeof(BulletLifecycleContactComponent),
                 typeof(BulletActiveTag),
@@ -628,6 +785,7 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, new BulletLifetimeComponent { Value = 4f });
             em.SetComponentData(entity, new BulletTypeKeyComponent { Value = typeKey });
             em.SetComponentData(entity, new BulletSourceRefComponent { Value = sourceRef });
+            em.SetComponentData(entity, new BulletEmissionProfileRefComponent { ProfileRefId = profileRefId });
             em.SetComponentData(entity, new BulletLifecycleRequestComponent
             {
                 Reason = reason,

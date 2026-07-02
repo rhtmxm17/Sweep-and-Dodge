@@ -123,6 +123,60 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(movement.Family, Is.EqualTo(BulletMovementFamilyId.DampedLinear));
             Assert.That(movement.DampedLinear.DampingPerSec, Is.EqualTo(12f).Within(1e-5f));
             Assert.That(movement.DampedLinear.StopSpeedThreshold, Is.EqualTo(0.3f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletEmissionProfileRefComponent>(pooledBullet).ProfileRefId, Is.EqualTo(20));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_ReadyFrameDefersRequestWithoutSpendingBudget()
+        {
+            using var world = new World("DiscreteEmit_ReadyFrameDelay");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 10u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 4, 16, 60u);
+            var source = CreateSourceWithActiveCountBuffer(em, 18);
+            var pooledBullet = CreatePooledBullet(em, 18, 2f, 4f);
+            BulletFieldShared.FreeByKey.Add(18, pooledBullet);
+
+            em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Add(DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(new DiscreteEmitRequestSeed
+            {
+                ProducerKind = DiscreteEmitProducerKind.TriggeredEmission,
+                SourceEntity = source,
+                ProducerEntity = Entity.Null,
+                CauserEntity = Entity.Null,
+                EmissionId = 100,
+                ProfileRefId = 200,
+                BulletTypeKey = 18,
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorPosition = float3.zero,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                RepeatCount = 1,
+                ReadyFrame = 12u,
+            }, 10u));
+
+            var system = world.GetOrCreateSystem<DiscreteEmitExecutionSystem>();
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.IsComponentEnabled<BulletActiveTag>(pooledBullet), Is.False);
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(1));
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(0));
+
+            CreateFrameCounter(em, 12u);
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.IsComponentEnabled<BulletActiveTag>(pooledBullet), Is.True);
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
         }
 
         [Test]
@@ -424,6 +478,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(BulletSpeedComponent),
                 typeof(BulletLifetimeMaxComponent),
                 typeof(BulletMovementRuntimeComponent),
+                typeof(BulletEmissionProfileRefComponent),
                 typeof(BulletLifecycleRequestComponent),
                 typeof(BulletLifecycleContactComponent),
                 typeof(BulletTypeKeyComponent),
@@ -444,6 +499,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 DampedLinear = default,
                 HomingLite = default,
             });
+            em.SetComponentData(entity, new BulletEmissionProfileRefComponent { ProfileRefId = 0 });
             em.SetComponentData(entity, default(BulletLifecycleRequestComponent));
             em.SetComponentData(entity, default(BulletLifecycleContactComponent));
             em.SetComponentData(entity, new BulletTypeKeyComponent { Value = bulletTypeKey });

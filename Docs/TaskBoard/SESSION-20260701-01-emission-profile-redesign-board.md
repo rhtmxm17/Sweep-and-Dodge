@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260701-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-07-01`
+- last_updated: `2026-07-02`
 - related_docs:
   - [SESSION-20260406-01-waveclip-authoring-board.md](SESSION-20260406-01-waveclip-authoring-board.md)
   - [SESSION-20260407-01-hazard-emitter-design-board.md](SESSION-20260407-01-hazard-emitter-design-board.md)
@@ -164,6 +164,29 @@ LifecycleTrigger
   - 근거: 신규 구조가 안정화될 때까지 legacy compatibility path로 유지한다.
 
 ## Done
+- [x] T11. `MotionCompleted` LifecycleTrigger runtime registry 구현
+  - 결과: `BulletEmissionProfileRefComponent`를 추가해 spawned bullet이 자신이 spawn된 `ProfileRefId`를 보유하도록 했다.
+  - 결과: `EmissionProfileRuntimeRegistryTag` singleton과 `EmissionProfileRuntimeRegistryBuffer`를 추가했다.
+  - 결과: Stage apply 시 active `StageDefinitionSO`에서 Source WaveClip directive profile, HazardActor pattern slot emission profile, recursive `MotionCompleted.TargetProfile`을 수집해 registry를 재구성한다.
+  - 결과: `ProfileRefId = EmissionProfileSO.GetInstanceID()` 기준으로 registry entry를 de-duplicate한다.
+  - 결과: `DiscreteEmitProducerKind.TriggeredEmission`, `DiscreteEmitRequestBuffer.CauserEntity`, `DiscreteEmitRequestBuffer.ReadyFrame`을 추가했다.
+  - 결과: 기존 Source/Hazard discrete emit request는 `ReadyFrame = frame`으로 생성하고, MotionCompleted trigger request는 fixed tick 기준 delay를 적용해 최소 다음 frame부터 실행한다.
+  - 결과: `DiscreteEmitExecutionSystem`은 `ReadyFrame > currentFrame` request를 실행 후보에서 제외하고 backlog에 유지한다.
+  - 결과: `BulletLifecycleReactionExecutionSystem`은 MotionCompleted 처리 시 registry profile trigger를 먼저 조회하고, append 성공 시 legacy `BulletOnMotionCompletedExplodeReactionComponent`를 실행하지 않는다.
+  - 결과: registry miss/target miss는 exception 없이 no-op/fallback 처리한다.
+  - 결과: `ContentValidationRules`에 profile MotionCompleted trigger와 legacy OnMotionCompletedExplode 공존 warning을 추가했다.
+  - 검증: compile 후 프로젝트 코드 error 0건. 단, MCP bridge 연결 로그가 Unity Console의 error 타입으로 남는 현상은 별도 도구 로그로 확인했다.
+  - 검증: 관련 EditMode 테스트 75개 통과.
+  - 검증: 전체 EditMode 483개 통과.
+  - 검증: `BulletPlayModeSmokeTests` 39개 통과.
+- [x] T10. profile runtime SpawnTuning/MovementTuning 적용
+  - 결과: `SpawnTuning.SpeedOverride` / `LifetimeOverride`가 Source/Hazard request와 spawned bullet apply 단계까지 전달된다.
+  - 결과: spawn 시점에 profile speed/lifetime override가 있으면 `BulletSpeedComponent`, `BulletVelocityComponent`, `BulletLifetimeComponent`, `BulletLifetimeMaxComponent`를 갱신한다.
+  - 결과: `BulletMovementRuntimeComponent`를 추가해 spawned bullet에 profile movement override를 기록한다.
+  - 결과: `BulletSimulationSystem`은 runtime movement component가 있는 bullet을 profile-resolved movement 값 기준으로 처리한다.
+  - 결과: 기존 `BulletDefinitionSO` movement 값은 pool/bootstrap fallback으로 유지하고, profile override가 있으면 runtime component가 우선한다.
+  - 검증: compile 후 프로젝트 코드 error 0건.
+  - 검증: 관련 EditMode/PlayMode smoke 통과.
 - [x] T9. unused emission compatibility cleanup
   - 결과: `HazardEmitterEmissionProfileSO` 타입, `heep_*` operational/test asset, T8 migration utility를 제거했다.
   - 결과: `HazardActorPatternSlotAuthoring`은 `Emission.Profile`과 repeat/cooldown schedule을 직접 소유하도록 전환했다.
@@ -264,6 +287,6 @@ LifecycleTrigger
   - 결과: `CleanupRemoved` 등 다른 lifecycle event는 후속 확장 후보로 분리했다.
 
 ## End of Session
-- 결과: T1~T8 완료. `EmissionProfileSO` authoring schema, resolver, operational asset migration, reference integrity validation, 관련 tests가 반영됐다.
-- 남은 리스크: runtime request/apply 계층은 아직 profile-resolved speed/lifetime/movement/lifecycle tuning을 소비하지 않는다. 현재는 기존 `BulletDefinitionSO` 값이 compatibility fallback으로 남아 있다.
-- 다음 세션 시작점: T6에서 정리한 `DiscreteEmitRequestBuffer` 확장과 spawned bullet apply override 구현, 또는 Parking Lot의 lifecycle trigger event 확장 검토.
+- 결과: T1~T11 완료. `EmissionProfileSO` authoring schema, resolver, operational asset migration, reference integrity validation, profile SpawnTuning/MovementTuning runtime 적용, `MotionCompleted -> TriggerEmissionProfile` registry runtime path가 반영됐다.
+- 남은 리스크: `CleanupRemoved`, `PlayerHit`, `LifetimeExpired`, `StageBlocked` trigger event는 아직 열지 않았다. 기존 `BulletSecondarySpawnRequestBuffer`는 compatibility path로 남아 있다.
+- 다음 세션 시작점: lifecycle trigger event 확장 여부, triggered emission budget/backlog 별도 정책, legacy secondary spawn 제거 가능성 검토.

@@ -112,6 +112,7 @@ namespace SweepNDodge.DotsBullets
             }
 
             ApplySourceTopology(ref state, requestedStageId, prefabs.SourceTemplate, entry.Layout, entry.Definition, currentApplyVersion);
+            ApplyEmissionProfileRuntimeRegistry(em, entry.Definition);
             CleanupUnmappedOwnedEntities(em, currentApplyVersion);
 
             lifecycleState.CurrentAppliedVersion = currentApplyVersion;
@@ -1009,6 +1010,23 @@ namespace SweepNDodge.DotsBullets
                     autoRuleId++;
                 }
             }
+        }
+
+        private static void ApplyEmissionProfileRuntimeRegistry(EntityManager em, StageDefinitionSO definition)
+        {
+            Entity registryEntity;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<EmissionProfileRuntimeRegistryTag>()))
+            {
+                registryEntity = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(EmissionProfileRuntimeRegistryTag))
+                    : query.GetSingletonEntity();
+            }
+
+            if (!em.HasBuffer<EmissionProfileRuntimeRegistryBuffer>(registryEntity))
+                em.AddBuffer<EmissionProfileRuntimeRegistryBuffer>(registryEntity);
+
+            var registry = em.GetBuffer<EmissionProfileRuntimeRegistryBuffer>(registryEntity);
+            EmissionProfileRuntimeRegistryUtility.RebuildFromStageDefinition(em, definition, registry);
         }
 
         private static void ApplySourceHazardPlacements(

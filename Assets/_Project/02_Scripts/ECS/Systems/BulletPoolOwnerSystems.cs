@@ -213,6 +213,7 @@ namespace SweepNDodge.DotsBullets
 
             EnsureSecondarySpawnRuntimeSingleton(em);
             EnsureDiscreteEmitRuntimeSingleton(em);
+            EnsureEmissionProfileRuntimeRegistrySingleton(em);
 
             if (!HasSingleton<RunProgressDirectorConfigComponent>(em))
             {
@@ -437,6 +438,23 @@ namespace SweepNDodge.DotsBullets
 
             if (!em.HasComponent<DiscreteEmitBacklogMetricsComponent>(singletonEntity))
                 em.AddComponentData(singletonEntity, default(DiscreteEmitBacklogMetricsComponent));
+        }
+
+        private static void EnsureEmissionProfileRuntimeRegistrySingleton(EntityManager em)
+        {
+            Entity singletonEntity;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<EmissionProfileRuntimeRegistryTag>()))
+            {
+                singletonEntity = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(EmissionProfileRuntimeRegistryTag))
+                    : query.GetSingletonEntity();
+            }
+
+            if (!em.HasBuffer<EmissionProfileRuntimeRegistryBuffer>(singletonEntity))
+            {
+                var buffer = em.AddBuffer<EmissionProfileRuntimeRegistryBuffer>(singletonEntity);
+                buffer.EnsureCapacity(32);
+            }
         }
 
         private static void ApplyDefinitionBehaviorComponents(EntityManager em, Entity bullet, in BulletPoolDefinitionBuffer def)

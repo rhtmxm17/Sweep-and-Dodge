@@ -509,6 +509,7 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
             ref ComponentLookup<BulletMovementRuntimeComponent> movementRuntimeLookup,
+            ref ComponentLookup<BulletEmissionProfileRefComponent> emissionProfileRefLookup,
             ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
             ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
@@ -557,6 +558,8 @@ namespace SweepNDodge.DotsBullets
                     HomingLite = runtimeTuning.HomingLite,
                 };
             }
+            if (emissionProfileRefLookup.HasComponent(bulletEntity))
+                emissionProfileRefLookup[bulletEntity] = new BulletEmissionProfileRefComponent { ProfileRefId = runtimeTuning.ProfileRefId };
             if (typeKeyLookup.HasComponent(bulletEntity))
                 typeKeyLookup[bulletEntity] = new BulletTypeKeyComponent { Value = requestedTypeKey };
             if (sourceRefLookup.HasComponent(bulletEntity))

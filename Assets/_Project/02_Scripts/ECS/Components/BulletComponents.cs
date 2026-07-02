@@ -152,6 +152,11 @@ namespace SweepNDodge.DotsBullets
         public Entity Value;
     }
 
+    public struct BulletEmissionProfileRefComponent : IComponentData
+    {
+        public int ProfileRefId;
+    }
+
     // Enableable Tag (활성/비활성 토글용)
     public struct BulletActiveTag : IComponentData, IEnableableComponent { }
 

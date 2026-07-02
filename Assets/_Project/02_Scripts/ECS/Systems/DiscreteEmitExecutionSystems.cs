@@ -63,6 +63,7 @@ namespace SweepNDodge.DotsBullets
             var speedLookup = SystemAPI.GetComponentLookup<BulletSpeedComponent>(false);
             var lifeMaxLookup = SystemAPI.GetComponentLookup<BulletLifetimeMaxComponent>(false);
             var movementRuntimeLookup = SystemAPI.GetComponentLookup<BulletMovementRuntimeComponent>(false);
+            var emissionProfileRefLookup = SystemAPI.GetComponentLookup<BulletEmissionProfileRefComponent>(false);
             var lifecycleRequestLookup = SystemAPI.GetComponentLookup<BulletLifecycleRequestComponent>(false);
             var lifecycleContactLookup = SystemAPI.GetComponentLookup<BulletLifecycleContactComponent>(false);
             var typeKeyLookup = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
@@ -82,6 +83,7 @@ namespace SweepNDodge.DotsBullets
             speedLookup.Update(ref state);
             lifeMaxLookup.Update(ref state);
             movementRuntimeLookup.Update(ref state);
+            emissionProfileRefLookup.Update(ref state);
             lifecycleRequestLookup.Update(ref state);
             lifecycleContactLookup.Update(ref state);
             typeKeyLookup.Update(ref state);
@@ -120,7 +122,7 @@ namespace SweepNDodge.DotsBullets
             int budgetUsed = 0;
             while (remainingBudget > 0 && pending > 0)
             {
-                int requestIndex = FindBestReadyRequestIndex(requests, ref BulletFieldShared.FreeByKey, remainingBudget);
+                int requestIndex = FindBestReadyRequestIndex(requests, ref BulletFieldShared.FreeByKey, remainingBudget, frame);
                 if (requestIndex < 0)
                     break;
 
@@ -138,6 +140,7 @@ namespace SweepNDodge.DotsBullets
                         ref speedLookup,
                         ref lifeMaxLookup,
                         ref movementRuntimeLookup,
+                        ref emissionProfileRefLookup,
                         ref lifecycleRequestLookup,
                         ref lifecycleContactLookup,
                         ref typeKeyLookup,
@@ -177,7 +180,7 @@ namespace SweepNDodge.DotsBullets
             metrics.LastFrameBudgetUsed = budgetUsed;
             if (pending > 0)
             {
-                if (HasBudgetBlockedPendingRequest(requests, ref BulletFieldShared.FreeByKey, remainingBudget))
+                if (HasBudgetBlockedPendingRequest(requests, ref BulletFieldShared.FreeByKey, remainingBudget, frame))
                     metrics.DeferredByBudget = pending;
                 else
                     metrics.DeferredByPool = pending;
@@ -250,7 +253,8 @@ namespace SweepNDodge.DotsBullets
         private static int FindBestReadyRequestIndex(
             DynamicBuffer<DiscreteEmitRequestBuffer> requests,
             ref NativeParallelMultiHashMap<int, Entity> freeByKey,
-            int remainingBudget)
+            int remainingBudget,
+            uint frame)
         {
             int bestIndex = -1;
             int bestPriority = int.MinValue;
@@ -260,7 +264,7 @@ namespace SweepNDodge.DotsBullets
                 var item = requests[i];
                 if (item.AnchorMode != DiscreteEmitAnchorMode.FixedWorld || item.RemainingRepeats <= 0)
                     continue;
-                if (!IsReadyForConsume(in item))
+                if (!IsReadyForConsume(in item, frame))
                     continue;
 
                 int shotsPerRepeat = ResolveShotsPerRepeat(in item);
@@ -285,7 +289,8 @@ namespace SweepNDodge.DotsBullets
         private static bool HasBudgetBlockedPendingRequest(
             DynamicBuffer<DiscreteEmitRequestBuffer> requests,
             ref NativeParallelMultiHashMap<int, Entity> freeByKey,
-            int remainingBudget)
+            int remainingBudget,
+            uint frame)
         {
             if (remainingBudget <= 0)
                 return true;
@@ -295,7 +300,7 @@ namespace SweepNDodge.DotsBullets
                 var item = requests[i];
                 if (item.AnchorMode != DiscreteEmitAnchorMode.FixedWorld || item.RemainingRepeats <= 0)
                     continue;
-                if (!IsReadyForConsume(in item))
+                if (!IsReadyForConsume(in item, frame))
                     continue;
 
                 int shotsPerRepeat = ResolveShotsPerRepeat(in item);
@@ -308,8 +313,10 @@ namespace SweepNDodge.DotsBullets
             return false;
         }
 
-        private static bool IsReadyForConsume(in DiscreteEmitRequestBuffer request)
+        private static bool IsReadyForConsume(in DiscreteEmitRequestBuffer request, uint frame)
         {
+            if (request.ReadyFrame > frame)
+                return false;
             if (request.EventShotSchedule != SourceSpawnEventShotScheduleId.Timed)
                 return true;
             if (request.RepeatSequence == 0u)
@@ -346,6 +353,7 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
             ref ComponentLookup<BulletMovementRuntimeComponent> movementRuntimeLookup,
+            ref ComponentLookup<BulletEmissionProfileRefComponent> emissionProfileRefLookup,
             ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
             ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
@@ -382,6 +390,7 @@ namespace SweepNDodge.DotsBullets
                     ref speedLookup,
                     ref lifeMaxLookup,
                     ref movementRuntimeLookup,
+                    ref emissionProfileRefLookup,
                     ref lifecycleRequestLookup,
                     ref lifecycleContactLookup,
                     ref typeKeyLookup,

@@ -8,6 +8,7 @@ namespace SweepNDodge.DotsBullets
         public DiscreteEmitProducerKind ProducerKind;
         public Entity SourceEntity;
         public Entity ProducerEntity;
+        public Entity CauserEntity;
         public int EmissionId;
         public int ProfileRefId;
         public int BulletTypeKey;
@@ -53,6 +54,7 @@ namespace SweepNDodge.DotsBullets
         public int RepeatCount;
 
         public byte Priority;
+        public uint ReadyFrame;
     }
 
     public static class DiscreteEmitRequestUtility
@@ -69,6 +71,7 @@ namespace SweepNDodge.DotsBullets
                 ProducerKind = DiscreteEmitProducerKind.WaveClipEvent,
                 SourceEntity = sourceEntity,
                 ProducerEntity = sourceEntity,
+                CauserEntity = Entity.Null,
                 EmissionId = directiveId,
                 ProfileRefId = pattern.ProfileRefId,
                 BulletTypeKey = pattern.BulletTypeKey,
@@ -124,6 +127,7 @@ namespace SweepNDodge.DotsBullets
                 ProducerKind = DiscreteEmitProducerKind.HazardActor,
                 SourceEntity = sourceEntity,
                 ProducerEntity = actorEntity,
+                CauserEntity = Entity.Null,
                 EmissionId = emissionId,
                 ProfileRefId = emissionProfile.ProfileId,
                 BulletTypeKey = emissionProfile.BulletTypeKey,
@@ -166,6 +170,70 @@ namespace SweepNDodge.DotsBullets
             };
         }
 
+        public static DiscreteEmitRequestSeed BuildDiscreteEmitSeedFromTriggeredRegistry(
+            Entity sourceEntity,
+            Entity causerEntity,
+            int sourceProfileRefId,
+            in EmissionProfileRuntimeRegistryBuffer targetProfile,
+            float3 anchorPosition,
+            float2 contextDirection,
+            uint readyFrame,
+            byte priority)
+        {
+            float contextAngleDeg = math.degrees(math.atan2(contextDirection.y, contextDirection.x));
+            float baseAngleDeg = targetProfile.BaseAngleDeg;
+            if (targetProfile.AimMode == WaveAimModeId.Fixed || targetProfile.AimMode == WaveAimModeId.Spiral)
+                baseAngleDeg += contextAngleDeg;
+
+            return new DiscreteEmitRequestSeed
+            {
+                ProducerKind = DiscreteEmitProducerKind.TriggeredEmission,
+                SourceEntity = sourceEntity,
+                ProducerEntity = causerEntity,
+                CauserEntity = causerEntity,
+                EmissionId = sourceProfileRefId,
+                ProfileRefId = targetProfile.ProfileRefId,
+                BulletTypeKey = targetProfile.BulletTypeKey,
+                HasSpeedOverride = targetProfile.HasSpeedOverride,
+                SpeedOverride = targetProfile.SpeedOverride,
+                HasLifetimeOverride = targetProfile.HasLifetimeOverride,
+                LifetimeOverride = targetProfile.LifetimeOverride,
+                HasMovementOverride = targetProfile.HasMovementOverride,
+                MovementFamily = targetProfile.MovementFamily,
+                DampedLinear = targetProfile.DampedLinear,
+                HomingLite = targetProfile.HomingLite,
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorEntity = causerEntity,
+                AnchorPosition = anchorPosition,
+                AnchorLocalOffset = float3.zero,
+                PositionPatternMode = targetProfile.PositionPatternMode,
+                SpawnOffset = targetProfile.SpawnOffset,
+                LineStart = targetProfile.LineStart,
+                LineEnd = targetProfile.LineEnd,
+                SampleSpacing = targetProfile.SampleSpacing,
+                PointSetCount = targetProfile.PointSetCount,
+                Point0 = targetProfile.Point0,
+                Point1 = targetProfile.Point1,
+                Point2 = targetProfile.Point2,
+                Point3 = targetProfile.Point3,
+                AimMode = targetProfile.AimMode,
+                AimSnapshotTiming = targetProfile.AimSnapshotTiming,
+                BaseAngleDeg = baseAngleDeg,
+                AimAngleOffsetDeg = targetProfile.AimAngleOffsetDeg,
+                LineNormalSide = targetProfile.LineNormalSide,
+                LineNormalAngleOffsetDeg = targetProfile.LineNormalAngleOffsetDeg,
+                SpiralStepDeg = targetProfile.SpiralStepDeg,
+                ShotPatternMode = targetProfile.ShotPatternMode,
+                ShotCount = targetProfile.ShotCount,
+                NWayAngleSpacingDeg = targetProfile.NWayAngleSpacingDeg,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                EventShotIntervalSec = 0f,
+                RepeatCount = 1,
+                Priority = priority,
+                ReadyFrame = readyFrame,
+            };
+        }
+
         public static DiscreteEmitRequestBuffer CreateDiscreteEmitRequest(in DiscreteEmitRequestSeed seed, uint frame)
         {
             return new DiscreteEmitRequestBuffer
@@ -173,6 +241,7 @@ namespace SweepNDodge.DotsBullets
                 ProducerKind = seed.ProducerKind,
                 SourceEntity = seed.SourceEntity,
                 ProducerEntity = seed.ProducerEntity,
+                CauserEntity = seed.CauserEntity,
                 EmissionId = seed.EmissionId,
                 ProfileRefId = seed.ProfileRefId,
                 BulletTypeKey = seed.BulletTypeKey,
@@ -217,6 +286,7 @@ namespace SweepNDodge.DotsBullets
                 EventShotElapsedSec = 0f,
                 Priority = seed.Priority,
                 OldestFrame = frame,
+                ReadyFrame = seed.ReadyFrame > 0u ? seed.ReadyFrame : frame,
             };
         }
 

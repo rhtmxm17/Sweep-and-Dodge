@@ -2052,6 +2052,67 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void EmissionProfile_MotionCompletedTriggerWithLegacyExplodeReaction_IsMigrationWarning()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var targetDef = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var targetProfile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var prefab = new GameObject("bullet_prefab");
+            var targetPrefab = new GameObject("target_bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9404);
+                def.Prefab = prefab;
+                targetDef.Editor_SetDefinitionId(9405);
+                targetDef.Prefab = targetPrefab;
+                def.OnMotionCompletedExplode = new BulletSecondarySpawnReactionDefinition
+                {
+                    Enabled = true,
+                    SecondaryBullet = targetDef,
+                    SpawnCount = 1,
+                    Shape = BulletSecondarySpawnShapeId.PointBurst,
+                };
+                profile.Bullet = def;
+                profile.LifecycleTriggers.MotionCompleted.Enabled = true;
+                profile.LifecycleTriggers.MotionCompleted.TargetProfile = targetProfile;
+                targetProfile.Bullet = targetDef;
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                        new ContentValidationRecord<BulletDefinitionSO>(targetDef, "targetDef"),
+                    },
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                        new ContentValidationRecord<EmissionProfileSO>(targetProfile, "Assets/_Project/03_Datas/EmissionProfiles/target.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CVW041" && i.Severity == ContentValidationSeverity.Warning), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(targetDef);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(targetProfile);
+                Object.DestroyImmediate(prefab);
+                Object.DestroyImmediate(targetPrefab);
+            }
+        }
+
+        [Test]
         public void WaveClip_TypedEntryMissingEmission_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();

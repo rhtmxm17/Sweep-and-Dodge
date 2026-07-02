@@ -42,6 +42,7 @@ namespace SweepNDodge.DotsBullets
                     DirectionXZ = Unity.Mathematics.float2.zero,
                 });
                 AddComponent(root, new BulletSourceRefComponent { Value = Entity.Null });
+                AddComponent(root, new BulletEmissionProfileRefComponent { ProfileRefId = 0 });
                 AddComponent(root, new BulletLifecycleTraceComponent
                 {
                     LastSpawnFrame = 0,

@@ -895,7 +895,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 }
 
                 ValidateEmissionProfileGrammar(profile, core, location, issues);
-                ValidateEmissionProfileMotionCompletedTrigger(profile, location, issues);
+                ValidateEmissionProfileMotionCompletedTrigger(profile, in core, location, issues);
             }
 
             ValidateEmissionProfileTriggerGraph(profiles, issues);
@@ -1003,6 +1003,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static void ValidateEmissionProfileMotionCompletedTrigger(
             EmissionProfileSO profile,
+            in ResolvedEmissionCore core,
             string location,
             List<ContentValidationIssue> issues)
         {
@@ -1040,6 +1041,15 @@ namespace SweepNDodge.DotsBullets.Editor
                     "CV048",
                     location,
                     "EmissionProfileSO MotionCompleted trigger requires DelaySec >= 0."));
+            }
+
+            if (core.Bullet != null && core.Bullet.OnMotionCompletedExplode.Enabled)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Warning,
+                    "CVW041",
+                    location,
+                    "EmissionProfileSO MotionCompleted trigger and BulletDefinitionSO.OnMotionCompletedExplode coexist. Runtime uses profile trigger first; legacy reaction is compatibility fallback only."));
             }
         }
 
