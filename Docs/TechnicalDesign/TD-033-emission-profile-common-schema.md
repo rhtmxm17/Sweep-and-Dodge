@@ -4,7 +4,7 @@
 - doc_id: `TD-033`
 - type: `TechnicalDesign`
 - status: `draft`
-- last_updated: `2026-07-01`
+- last_updated: `2026-07-02`
 - related_docs:
   - [../TaskBoard/SESSION-20260701-01-emission-profile-redesign-board.md](../TaskBoard/SESSION-20260701-01-emission-profile-redesign-board.md)
   - [TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
@@ -552,6 +552,17 @@ SpawnedBulletRuntimeTuning
 - profile lifecycle trigger runtime ref가 있으면 spawned bullet에 신규 trigger component를 적용한다.
 - profile 값이 없으면 `BulletDefinitionSO -> BulletPoolDefinitionBuffer`로 bootstrap된 fallback 값을 사용한다.
 
+2026-07-02 1차 구현 상태:
+- `SpawnTuning.SpeedOverride` / `LifetimeOverride`는 `SourceClipPatternBuffer`, `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer`, `HazardActor` execution/active emission runtime을 통해 spawned bullet apply 단계까지 전달된다.
+- `SpawnRequestCommonUtility.ApplySpawnedBulletState`는 profile speed/lifetime override가 있으면 `BulletSpeedComponent`, `BulletVelocityComponent`, `BulletLifetimeComponent`, `BulletLifetimeMaxComponent`를 spawn 시점에 갱신한다.
+
+2026-07-02 MovementTuning C안 구현 상태:
+- `MovementTuning`은 `SourceClipPatternBuffer`, `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer`, `HazardActor` execution/active emission runtime을 통해 spawned bullet apply 단계까지 전달된다.
+- spawned bullet에는 `BulletMovementRuntimeComponent`를 둔다. profile movement override가 있으면 spawn 시점에 이 component의 `Family`, `DampedLinear`, `HomingLite` 값을 갱신한다.
+- `BulletSimulationSystem`은 `BulletMovementRuntimeComponent`가 있는 bullet을 runtime movement job에서 처리한다. 기존 `BulletDampedMotionComponent` / `BulletHomingLiteMotionComponent` 기반 job은 runtime component가 없는 compatibility/fallback entity만 처리한다.
+- `BulletDefinitionSO` movement 값은 pool/bootstrap fallback으로 유지한다. profile override가 있으면 runtime movement 값이 우선한다.
+- `LifecycleTriggers(MotionCompleted -> TriggerEmissionProfile)`의 실제 runtime 적용은 아직 후속 단계다.
+
 `MotionCompleted -> TriggerEmissionProfile` runtime path:
 1. spawned bullet은 profile-resolved lifecycle trigger runtime ref를 가진다.
 2. `BulletLifecycleReactionExecutionSystem`은 `MotionCompleted` request를 읽고 trigger ref가 있으면 `DiscreteEmitRequestBuffer`에 request를 append한다.
@@ -602,3 +613,5 @@ SpawnedBulletRuntimeTuning
 - 2026-07-01: T6 runtime pipeline 결정으로 `DiscreteEmitRequestBuffer` 확장안을 채택하고, triggered emission을 profile-resolved discrete emission으로 실행하는 기준을 추가했다.
 - 2026-07-01: 최종 목표를 마이그레이션 포함 전면 참조형 `EmissionProfileSO` 전환으로 명시하고, 전환형 하이브리드는 implementation staging으로만 채택하도록 정리했다.
 - 2026-07-01: 초안 작성. Source/Hazard/Triggered 공통 `EmissionProfile` 스키마, B안 context binding, `MotionCompleted -> TriggerEmissionProfile`, `BulletDefinitionSO` deprecated 정책을 정리했다.
+- 2026-07-02: runtime pipeline 1차 구현 상태를 반영했다. `SpawnTuning.SpeedOverride` / `LifetimeOverride`는 Source/Hazard request와 공통 spawn apply 경로에서 적용되며, movement/lifecycle trigger 적용은 후속 단계로 유지한다.
+- 2026-07-02: MovementTuning C안을 반영했다. `BulletMovementRuntimeComponent`를 통해 profile movement override를 spawn 시점에 적용하고, simulation은 runtime movement component를 우선 처리한다.

@@ -144,10 +144,19 @@ namespace SweepNDodge.DotsBullets
 
         public static SourceSpawnRequestBuffer CreateRequestTemplate(
             int directiveId,
+            int profileRefId,
             SourceWavePhaseId phase,
             SourceSpawnLaneId lane,
             int lanePriority,
             int bulletTypeKey,
+            byte hasSpeedOverride,
+            float speedOverride,
+            byte hasLifetimeOverride,
+            float lifetimeOverride,
+            byte hasMovementOverride,
+            BulletMovementFamilyId movementFamily,
+            BulletDampedLinearDefinition dampedLinear,
+            BulletHomingLiteDefinition homingLite,
             SourceSpawnEmissionModeId emissionMode,
             SourceSpawnModeId spawnMode,
             WaveSamplingAnchorModeId samplingAnchorMode,
@@ -182,10 +191,19 @@ namespace SweepNDodge.DotsBullets
             return new SourceSpawnRequestBuffer
             {
                 DirectiveId = directiveId,
+                ProfileRefId = profileRefId,
                 Phase = phase,
                 Lane = lane,
                 LanePriority = lanePriority,
                 BulletTypeKey = bulletTypeKey,
+                HasSpeedOverride = hasSpeedOverride,
+                SpeedOverride = math.max(0.001f, speedOverride),
+                HasLifetimeOverride = hasLifetimeOverride,
+                LifetimeOverride = math.max(0.001f, lifetimeOverride),
+                HasMovementOverride = hasMovementOverride,
+                MovementFamily = movementFamily,
+                DampedLinear = dampedLinear,
+                HomingLite = homingLite,
                 EmissionMode = emissionMode,
                 SpawnMode = spawnMode,
                 SamplingAnchorMode = samplingAnchorMode,
@@ -444,10 +462,43 @@ namespace SweepNDodge.DotsBullets
             });
         }
 
+        public static SpawnedBulletRuntimeTuning CreateRuntimeTuning(in SourceSpawnRequestBuffer request)
+        {
+            return new SpawnedBulletRuntimeTuning
+            {
+                ProfileRefId = request.ProfileRefId,
+                HasSpeedOverride = request.HasSpeedOverride,
+                SpeedOverride = math.max(0.001f, request.SpeedOverride),
+                HasLifetimeOverride = request.HasLifetimeOverride,
+                LifetimeOverride = math.max(0.001f, request.LifetimeOverride),
+                HasMovementOverride = request.HasMovementOverride,
+                MovementFamily = request.MovementFamily,
+                DampedLinear = request.DampedLinear,
+                HomingLite = request.HomingLite,
+            };
+        }
+
+        public static SpawnedBulletRuntimeTuning CreateRuntimeTuning(in DiscreteEmitRequestBuffer request)
+        {
+            return new SpawnedBulletRuntimeTuning
+            {
+                ProfileRefId = request.ProfileRefId,
+                HasSpeedOverride = request.HasSpeedOverride,
+                SpeedOverride = math.max(0.001f, request.SpeedOverride),
+                HasLifetimeOverride = request.HasLifetimeOverride,
+                LifetimeOverride = math.max(0.001f, request.LifetimeOverride),
+                HasMovementOverride = request.HasMovementOverride,
+                MovementFamily = request.MovementFamily,
+                DampedLinear = request.DampedLinear,
+                HomingLite = request.HomingLite,
+            };
+        }
+
         public static void ApplySpawnedBulletState(
             Entity bulletEntity,
             Entity sourceEntity,
             int requestedTypeKey,
+            in SpawnedBulletRuntimeTuning runtimeTuning,
             float3 pos,
             float2 dir,
             uint frame,
@@ -457,6 +508,7 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletMovementRuntimeComponent> movementRuntimeLookup,
             ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
             ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
@@ -476,6 +528,10 @@ namespace SweepNDodge.DotsBullets
             float bulletLifetime = lifeMaxLookup.HasComponent(bulletEntity)
                 ? math.max(0f, lifeMaxLookup[bulletEntity].Value)
                 : 0f;
+            if (runtimeTuning.HasSpeedOverride != 0)
+                bulletSpeed = math.max(0.001f, runtimeTuning.SpeedOverride);
+            if (runtimeTuning.HasLifetimeOverride != 0)
+                bulletLifetime = math.max(0.001f, runtimeTuning.LifetimeOverride);
 
             if (txLookup.HasComponent(bulletEntity))
                 txLookup[bulletEntity] = LocalTransform.FromPositionRotationScale(pos, rot, 1f);
@@ -486,8 +542,21 @@ namespace SweepNDodge.DotsBullets
 
             if (velLookup.HasComponent(bulletEntity))
                 velLookup[bulletEntity] = new BulletVelocityComponent { Value = safeDir * bulletSpeed };
+            if (runtimeTuning.HasSpeedOverride != 0 && speedLookup.HasComponent(bulletEntity))
+                speedLookup[bulletEntity] = new BulletSpeedComponent { Value = bulletSpeed };
             if (lifeLookup.HasComponent(bulletEntity))
                 lifeLookup[bulletEntity] = new BulletLifetimeComponent { Value = bulletLifetime };
+            if (runtimeTuning.HasLifetimeOverride != 0 && lifeMaxLookup.HasComponent(bulletEntity))
+                lifeMaxLookup[bulletEntity] = new BulletLifetimeMaxComponent { Value = bulletLifetime };
+            if (runtimeTuning.HasMovementOverride != 0 && movementRuntimeLookup.HasComponent(bulletEntity))
+            {
+                movementRuntimeLookup[bulletEntity] = new BulletMovementRuntimeComponent
+                {
+                    Family = runtimeTuning.MovementFamily,
+                    DampedLinear = runtimeTuning.DampedLinear,
+                    HomingLite = runtimeTuning.HomingLite,
+                };
+            }
             if (typeKeyLookup.HasComponent(bulletEntity))
                 typeKeyLookup[bulletEntity] = new BulletTypeKeyComponent { Value = requestedTypeKey };
             if (sourceRefLookup.HasComponent(bulletEntity))

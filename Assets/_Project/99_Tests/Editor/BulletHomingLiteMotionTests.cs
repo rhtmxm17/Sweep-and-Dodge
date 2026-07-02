@@ -276,6 +276,44 @@ namespace SweepNDodge.DotsBullets.Tests
             });
         }
 
+        [Test]
+        public void BulletSimulation_RuntimeMovement_DampedLinear_EmitsMotionCompletedWithoutOptionalMotionComponent()
+        {
+            using var world = new World("BulletSimulation_RuntimeMovementDamped");
+            var em = world.EntityManager;
+
+            SetSimulationPrerequisites(em);
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[] { StageCellMovementFlags.None });
+
+            var bullet = CreateBullet(
+                em,
+                new float3(0f, 0f, 0f),
+                new float2(1f, 0f),
+                speed: 1f,
+                radius: 0.05f,
+                lifetime: 5f,
+                movementRuntime: new BulletMovementRuntimeComponent
+                {
+                    Family = BulletMovementFamilyId.DampedLinear,
+                    DampedLinear = new BulletDampedLinearDefinition
+                    {
+                        DampingPerSec = 10f,
+                        StopSpeedThreshold = 0.5f,
+                    },
+                    HomingLite = default,
+                });
+
+            Assert.That(em.HasComponent<BulletDampedMotionComponent>(bullet), Is.False);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            var request = em.GetComponentData<BulletLifecycleRequestComponent>(bullet);
+            Assert.That(request.Reason, Is.EqualTo(BulletLifecycleReasonId.MotionCompleted));
+        }
+
         private static Entity SetSimulationPrerequisites(EntityManager em)
         {
             SetSingleton(em, new BulletFieldConfigComponent
@@ -343,7 +381,8 @@ namespace SweepNDodge.DotsBullets.Tests
             bool despawnRequested = false,
             BulletLifecycleReasonId existingReason = BulletLifecycleReasonId.None,
             BulletDampedMotionComponent? dampedMotion = null,
-            BulletHomingLiteMotionComponent? homingMotion = null)
+            BulletHomingLiteMotionComponent? homingMotion = null,
+            BulletMovementRuntimeComponent? movementRuntime = null)
         {
             var entity = em.CreateEntity(
                 typeof(LocalTransform),
@@ -359,6 +398,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 em.AddComponentData(entity, dampedMotion.Value);
             if (homingMotion.HasValue)
                 em.AddComponentData(entity, homingMotion.Value);
+            if (movementRuntime.HasValue)
+                em.AddComponentData(entity, movementRuntime.Value);
 
             em.SetComponentData(entity, LocalTransform.FromPositionRotationScale(position, quaternion.identity, 1f));
             em.SetComponentData(entity, new BulletVelocityComponent { Value = velocity });

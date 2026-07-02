@@ -52,7 +52,19 @@ namespace SweepNDodge.DotsBullets.Tests
                 SourceEntity = sourceEntity,
                 ProducerEntity = producerEntity,
                 EmissionId = 77,
+                ProfileRefId = 88,
                 BulletTypeKey = 9,
+                HasSpeedOverride = 1,
+                SpeedOverride = 6.5f,
+                HasLifetimeOverride = 1,
+                LifetimeOverride = 9.25f,
+                HasMovementOverride = 1,
+                MovementFamily = BulletMovementFamilyId.DampedLinear,
+                DampedLinear = new BulletDampedLinearDefinition
+                {
+                    DampingPerSec = 4f,
+                    StopSpeedThreshold = 0.2f,
+                },
                 AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
                 AnchorEntity = anchorEntity,
                 AnchorPosition = new float3(1f, 2f, 3f),
@@ -89,7 +101,16 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.SourceEntity, Is.EqualTo(sourceEntity));
             Assert.That(request.ProducerEntity, Is.EqualTo(producerEntity));
             Assert.That(request.EmissionId, Is.EqualTo(77));
+            Assert.That(request.ProfileRefId, Is.EqualTo(88));
             Assert.That(request.BulletTypeKey, Is.EqualTo(9));
+            Assert.That(request.HasSpeedOverride, Is.EqualTo(1));
+            Assert.That(request.SpeedOverride, Is.EqualTo(6.5f));
+            Assert.That(request.HasLifetimeOverride, Is.EqualTo(1));
+            Assert.That(request.LifetimeOverride, Is.EqualTo(9.25f));
+            Assert.That(request.HasMovementOverride, Is.EqualTo(1));
+            Assert.That(request.MovementFamily, Is.EqualTo(BulletMovementFamilyId.DampedLinear));
+            Assert.That(request.DampedLinear.DampingPerSec, Is.EqualTo(4f));
+            Assert.That(request.DampedLinear.StopSpeedThreshold, Is.EqualTo(0.2f));
             Assert.That(request.AnchorMode, Is.EqualTo(DiscreteEmitAnchorMode.FixedWorld));
             Assert.That(request.AnchorEntity, Is.EqualTo(anchorEntity));
             Assert.That(request.AnchorPosition, Is.EqualTo(new float3(1f, 2f, 3f)));

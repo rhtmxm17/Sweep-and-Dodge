@@ -15,7 +15,7 @@ namespace SweepNDodge.DotsBullets.Tests
     {
         private const string DedicatedScenePath = "Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity";
         private const string OperationalScenePath = "Assets/_Project/01_Scenes/SampleScene.unity";
-        private const int LinearHazardTypeKey = 1435459723;
+        private const int Stage1HazardTypeKey = 1827470348;
 
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
@@ -88,26 +88,25 @@ namespace SweepNDodge.DotsBullets.Tests
             var transitions = em.GetBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
             var slots = em.GetBuffer<HazardActorPatternSlotBuffer>(actorEntity);
             Assert.That(selectorPolicies.Length, Is.EqualTo(2), "Operational blueprint actor must expose two phase selector policies.");
-            Assert.That(selectorCandidates.Length, Is.EqualTo(4), "Operational blueprint actor must expose four ordered selector candidates.");
+            Assert.That(selectorCandidates.Length, Is.EqualTo(2), "Stage 1 Simple Crossing Sentry must expose one ordered selector candidate per phase.");
             Assert.That(transitions.Length, Is.EqualTo(1), "Operational blueprint actor must expose one progress transition.");
-            Assert.That(slots.Length, Is.EqualTo(3), "Operational blueprint actor must expose A/B/B' slots.");
+            Assert.That(slots.Length, Is.EqualTo(2), "Stage 1 Simple Crossing Sentry must expose single-shot and double-shot slots.");
             Assert.That(slots[0].PatternSlotId, Is.EqualTo(1));
             Assert.That(slots[1].PatternSlotId, Is.EqualTo(2));
-            Assert.That(slots[2].PatternSlotId, Is.EqualTo(3));
 
             bool sawLinearBullet = false;
             bool sawEmitterAdvance = false;
             for (int i = 0; i < 600; i++)
             {
                 yield return null;
-                sawLinearBullet |= CountActiveBulletsByType(em, LinearHazardTypeKey) > 0;
+                sawLinearBullet |= CountActiveBulletsByType(em, Stage1HazardTypeKey) > 0;
                 sawEmitterAdvance |= AnyEmitterAdvancedFromDormant(em);
                 if (sawLinearBullet && sawEmitterAdvance)
                     break;
             }
 
             Assert.That(sawEmitterAdvance, Is.True, "Operational sample actor-owned emitter did not advance its runtime state.");
-            Assert.That(sawLinearBullet, Is.True, "Operational sample actor-owned emitter did not produce the sample linear hazard bullet.");
+            Assert.That(sawLinearBullet, Is.True, "Operational sample actor-owned emitter did not produce the Stage 1 hazard bullet.");
         }
 
         [UnityTest]
@@ -4585,9 +4584,6 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
-
-
-
 
 
 

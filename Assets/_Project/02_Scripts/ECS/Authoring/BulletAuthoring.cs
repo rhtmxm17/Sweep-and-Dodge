@@ -23,6 +23,12 @@ namespace SweepNDodge.DotsBullets
                 AddComponent(root, new BulletTypeKeyComponent { Value = 0 });
                 AddComponent(root, new BulletCaptureRuleComponent { Value = BulletCaptureRuleId.StandardCollectible });
                 AddComponent(root, new BulletLifetimeComponent { Value = 0f });
+                AddComponent(root, new BulletMovementRuntimeComponent
+                {
+                    Family = BulletMovementFamilyId.Linear,
+                    DampedLinear = default,
+                    HomingLite = default,
+                });
                 AddComponent(root, new BulletLifecycleRequestComponent
                 {
                     Reason = BulletLifecycleReasonId.None,

@@ -64,6 +64,68 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void DiscreteEmitExecution_ProfileRuntimeTuning_OverridesSpawnedBulletSpeedAndLifetime()
+        {
+            using var world = new World("DiscreteEmit_RuntimeTuning");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 10u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 4, 16, 60u);
+            var source = CreateSourceWithActiveCountBuffer(em, 17);
+            var pooledBullet = CreatePooledBullet(em, 17, 1f, 2f);
+            BulletFieldShared.FreeByKey.Add(17, pooledBullet);
+
+            var requests = em.GetBuffer<DiscreteEmitRequestBuffer>(channel);
+            requests.Add(DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(new DiscreteEmitRequestSeed
+            {
+                ProducerKind = DiscreteEmitProducerKind.HazardActor,
+                SourceEntity = source,
+                ProducerEntity = source,
+                EmissionId = 10,
+                ProfileRefId = 20,
+                BulletTypeKey = 17,
+                HasSpeedOverride = 1,
+                SpeedOverride = 6f,
+                HasLifetimeOverride = 1,
+                LifetimeOverride = 9f,
+                HasMovementOverride = 1,
+                MovementFamily = BulletMovementFamilyId.DampedLinear,
+                DampedLinear = new BulletDampedLinearDefinition
+                {
+                    DampingPerSec = 12f,
+                    StopSpeedThreshold = 0.3f,
+                },
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorEntity = source,
+                AnchorPosition = float3.zero,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                BaseAngleDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                RepeatCount = 1,
+            }, 10u));
+
+            world.GetOrCreateSystem<DiscreteEmitExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetComponentData<BulletSpeedComponent>(pooledBullet).Value, Is.EqualTo(6f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletVelocityComponent>(pooledBullet).Value.x, Is.EqualTo(6f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletVelocityComponent>(pooledBullet).Value.y, Is.EqualTo(0f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletLifetimeComponent>(pooledBullet).Value, Is.EqualTo(9f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletLifetimeMaxComponent>(pooledBullet).Value, Is.EqualTo(9f).Within(1e-5f));
+            var movement = em.GetComponentData<BulletMovementRuntimeComponent>(pooledBullet);
+            Assert.That(movement.Family, Is.EqualTo(BulletMovementFamilyId.DampedLinear));
+            Assert.That(movement.DampedLinear.DampingPerSec, Is.EqualTo(12f).Within(1e-5f));
+            Assert.That(movement.DampedLinear.StopSpeedThreshold, Is.EqualTo(0.3f).Within(1e-5f));
+        }
+
+        [Test]
         public void DiscreteEmitExecution_TimedSchedule_FirstRepeatImmediate_ThenWaitsForInterval()
         {
             using var world = new World("DiscreteEmit_Timed");
@@ -361,6 +423,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(BulletLifetimeComponent),
                 typeof(BulletSpeedComponent),
                 typeof(BulletLifetimeMaxComponent),
+                typeof(BulletMovementRuntimeComponent),
                 typeof(BulletLifecycleRequestComponent),
                 typeof(BulletLifecycleContactComponent),
                 typeof(BulletTypeKeyComponent),
@@ -375,6 +438,12 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, new BulletLifetimeComponent { Value = 0f });
             em.SetComponentData(entity, new BulletSpeedComponent { Value = speed });
             em.SetComponentData(entity, new BulletLifetimeMaxComponent { Value = lifetime });
+            em.SetComponentData(entity, new BulletMovementRuntimeComponent
+            {
+                Family = BulletMovementFamilyId.Linear,
+                DampedLinear = default,
+                HomingLite = default,
+            });
             em.SetComponentData(entity, default(BulletLifecycleRequestComponent));
             em.SetComponentData(entity, default(BulletLifecycleContactComponent));
             em.SetComponentData(entity, new BulletTypeKeyComponent { Value = bulletTypeKey });

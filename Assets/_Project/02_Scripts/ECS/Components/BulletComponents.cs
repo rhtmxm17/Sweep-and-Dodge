@@ -105,6 +105,13 @@ namespace SweepNDodge.DotsBullets
         public float MinRetargetDistance;
     }
 
+    public struct BulletMovementRuntimeComponent : IComponentData
+    {
+        public BulletMovementFamilyId Family;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
+    }
+
     public struct BulletOnMotionCompletedExplodeReactionComponent : IComponentData
     {
         public int SecondaryBulletTypeKey;

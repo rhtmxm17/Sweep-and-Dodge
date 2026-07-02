@@ -15,9 +15,9 @@ MonoBehaviour:
   Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
   SpawnTuning:
     OverrideSpeed: 1
-    SpeedOverride: 6
+    SpeedOverride: 5.6
     OverrideLifetime: 1
-    LifetimeOverride: 10
+    LifetimeOverride: 4
   MovementTuning:
     OverrideMovement: 1
     Family: 0

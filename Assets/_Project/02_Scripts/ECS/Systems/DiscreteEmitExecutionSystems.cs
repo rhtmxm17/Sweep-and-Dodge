@@ -60,8 +60,9 @@ namespace SweepNDodge.DotsBullets
             var localToWorldLookup = SystemAPI.GetComponentLookup<LocalToWorld>(false);
             var velLookup = SystemAPI.GetComponentLookup<BulletVelocityComponent>(false);
             var lifeLookup = SystemAPI.GetComponentLookup<BulletLifetimeComponent>(false);
-            var speedLookup = SystemAPI.GetComponentLookup<BulletSpeedComponent>(true);
-            var lifeMaxLookup = SystemAPI.GetComponentLookup<BulletLifetimeMaxComponent>(true);
+            var speedLookup = SystemAPI.GetComponentLookup<BulletSpeedComponent>(false);
+            var lifeMaxLookup = SystemAPI.GetComponentLookup<BulletLifetimeMaxComponent>(false);
+            var movementRuntimeLookup = SystemAPI.GetComponentLookup<BulletMovementRuntimeComponent>(false);
             var lifecycleRequestLookup = SystemAPI.GetComponentLookup<BulletLifecycleRequestComponent>(false);
             var lifecycleContactLookup = SystemAPI.GetComponentLookup<BulletLifecycleContactComponent>(false);
             var typeKeyLookup = SystemAPI.GetComponentLookup<BulletTypeKeyComponent>(false);
@@ -80,6 +81,7 @@ namespace SweepNDodge.DotsBullets
             lifeLookup.Update(ref state);
             speedLookup.Update(ref state);
             lifeMaxLookup.Update(ref state);
+            movementRuntimeLookup.Update(ref state);
             lifecycleRequestLookup.Update(ref state);
             lifecycleContactLookup.Update(ref state);
             typeKeyLookup.Update(ref state);
@@ -135,6 +137,7 @@ namespace SweepNDodge.DotsBullets
                         ref lifeLookup,
                         ref speedLookup,
                         ref lifeMaxLookup,
+                        ref movementRuntimeLookup,
                         ref lifecycleRequestLookup,
                         ref lifecycleContactLookup,
                         ref typeKeyLookup,
@@ -342,6 +345,7 @@ namespace SweepNDodge.DotsBullets
             ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
             ref ComponentLookup<BulletSpeedComponent> speedLookup,
             ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
+            ref ComponentLookup<BulletMovementRuntimeComponent> movementRuntimeLookup,
             ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
             ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
             ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
@@ -356,6 +360,7 @@ namespace SweepNDodge.DotsBullets
         {
             int shotsPerRepeat = ResolveShotsPerRepeat(in request);
             float3 repeatOrigin = ResolveRepeatOriginPosition(request.AnchorPosition, in request, request.RepeatSequence);
+            var runtimeTuning = SpawnRequestCommonUtility.CreateRuntimeTuning(in request);
             for (int slotIndex = 0; slotIndex < shotsPerRepeat; slotIndex++)
             {
                 if (!SpawnRequestCommonUtility.TryDequeueByKey(ref BulletFieldShared.FreeByKey, request.BulletTypeKey, out var bulletEntity))
@@ -366,6 +371,7 @@ namespace SweepNDodge.DotsBullets
                     bulletEntity,
                     request.SourceEntity,
                     request.BulletTypeKey,
+                    in runtimeTuning,
                     repeatOrigin,
                     direction,
                     frame,
@@ -375,6 +381,7 @@ namespace SweepNDodge.DotsBullets
                     ref lifeLookup,
                     ref speedLookup,
                     ref lifeMaxLookup,
+                    ref movementRuntimeLookup,
                     ref lifecycleRequestLookup,
                     ref lifecycleContactLookup,
                     ref typeKeyLookup,

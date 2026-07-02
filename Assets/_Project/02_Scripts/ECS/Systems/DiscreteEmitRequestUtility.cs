@@ -9,7 +9,16 @@ namespace SweepNDodge.DotsBullets
         public Entity SourceEntity;
         public Entity ProducerEntity;
         public int EmissionId;
+        public int ProfileRefId;
         public int BulletTypeKey;
+        public byte HasSpeedOverride;
+        public float SpeedOverride;
+        public byte HasLifetimeOverride;
+        public float LifetimeOverride;
+        public byte HasMovementOverride;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
 
         public DiscreteEmitAnchorMode AnchorMode;
         public Entity AnchorEntity;
@@ -61,7 +70,16 @@ namespace SweepNDodge.DotsBullets
                 SourceEntity = sourceEntity,
                 ProducerEntity = sourceEntity,
                 EmissionId = directiveId,
+                ProfileRefId = pattern.ProfileRefId,
                 BulletTypeKey = pattern.BulletTypeKey,
+                HasSpeedOverride = pattern.HasSpeedOverride,
+                SpeedOverride = pattern.SpeedOverride,
+                HasLifetimeOverride = pattern.HasLifetimeOverride,
+                LifetimeOverride = pattern.LifetimeOverride,
+                HasMovementOverride = pattern.HasMovementOverride,
+                MovementFamily = pattern.MovementFamily,
+                DampedLinear = pattern.DampedLinear,
+                HomingLite = pattern.HomingLite,
                 AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
                 AnchorEntity = sourceEntity,
                 AnchorPosition = resolvedAnchorPosition,
@@ -107,7 +125,16 @@ namespace SweepNDodge.DotsBullets
                 SourceEntity = sourceEntity,
                 ProducerEntity = actorEntity,
                 EmissionId = emissionId,
+                ProfileRefId = emissionProfile.ProfileId,
                 BulletTypeKey = emissionProfile.BulletTypeKey,
+                HasSpeedOverride = emissionProfile.HasSpeedOverride,
+                SpeedOverride = emissionProfile.SpeedOverride,
+                HasLifetimeOverride = emissionProfile.HasLifetimeOverride,
+                LifetimeOverride = emissionProfile.LifetimeOverride,
+                HasMovementOverride = emissionProfile.HasMovementOverride,
+                MovementFamily = emissionProfile.MovementFamily,
+                DampedLinear = emissionProfile.DampedLinear,
+                HomingLite = emissionProfile.HomingLite,
                 AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
                 AnchorEntity = actorEntity,
                 AnchorPosition = resolvedAnchorPosition,
@@ -147,7 +174,16 @@ namespace SweepNDodge.DotsBullets
                 SourceEntity = seed.SourceEntity,
                 ProducerEntity = seed.ProducerEntity,
                 EmissionId = seed.EmissionId,
+                ProfileRefId = seed.ProfileRefId,
                 BulletTypeKey = seed.BulletTypeKey,
+                HasSpeedOverride = seed.HasSpeedOverride,
+                SpeedOverride = seed.SpeedOverride,
+                HasLifetimeOverride = seed.HasLifetimeOverride,
+                LifetimeOverride = seed.LifetimeOverride,
+                HasMovementOverride = seed.HasMovementOverride,
+                MovementFamily = seed.MovementFamily,
+                DampedLinear = seed.DampedLinear,
+                HomingLite = seed.HomingLite,
                 AnchorMode = seed.AnchorMode,
                 AnchorEntity = seed.AnchorEntity,
                 AnchorPosition = seed.AnchorPosition,

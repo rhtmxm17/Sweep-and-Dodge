@@ -441,6 +441,13 @@ namespace SweepNDodge.DotsBullets
 
         private static void ApplyDefinitionBehaviorComponents(EntityManager em, Entity bullet, in BulletPoolDefinitionBuffer def)
         {
+            SetOrAddComponent(em, bullet, new BulletMovementRuntimeComponent
+            {
+                Family = def.MovementFamily,
+                DampedLinear = def.DampedLinear,
+                HomingLite = def.HomingLite,
+            });
+
             switch (def.MovementFamily)
             {
                 case BulletMovementFamilyId.DampedLinear:

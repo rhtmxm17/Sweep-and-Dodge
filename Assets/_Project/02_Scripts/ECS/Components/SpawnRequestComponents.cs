@@ -3,15 +3,37 @@ using Unity.Mathematics;
 
 namespace SweepNDodge.DotsBullets
 {
+    public struct SpawnedBulletRuntimeTuning
+    {
+        public int ProfileRefId;
+        public byte HasSpeedOverride;
+        public float SpeedOverride;
+        public byte HasLifetimeOverride;
+        public float LifetimeOverride;
+        public byte HasMovementOverride;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
+    }
+
     // Aggregated spawn request payload per source entity.
     [InternalBufferCapacity(8)]
     public struct SourceSpawnRequestBuffer : IBufferElementData
     {
         public int DirectiveId;
+        public int ProfileRefId;
         public SourceWavePhaseId Phase;
         public SourceSpawnLaneId Lane;
         public int LanePriority;
         public int BulletTypeKey;
+        public byte HasSpeedOverride;
+        public float SpeedOverride;
+        public byte HasLifetimeOverride;
+        public float LifetimeOverride;
+        public byte HasMovementOverride;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
         public SourceSpawnEmissionModeId EmissionMode;
         public SourceSpawnModeId SpawnMode;
         public WaveSamplingAnchorModeId SamplingAnchorMode;
@@ -163,7 +185,16 @@ namespace SweepNDodge.DotsBullets
         public Entity SourceEntity;
         public Entity ProducerEntity;
         public int EmissionId;
+        public int ProfileRefId;
         public int BulletTypeKey;
+        public byte HasSpeedOverride;
+        public float SpeedOverride;
+        public byte HasLifetimeOverride;
+        public float LifetimeOverride;
+        public byte HasMovementOverride;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
 
         public DiscreteEmitAnchorMode AnchorMode;
         public Entity AnchorEntity;
