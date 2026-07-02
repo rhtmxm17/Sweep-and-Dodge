@@ -23,8 +23,6 @@ MonoBehaviour:
     DurationSec: 1
     Directives:
     - Profile: {fileID: 11400000, guid: 2590af821e60cb848a17f47147fe5f75, type: 2}
-      Payload:
-        Bullet: {fileID: 11400000, guid: c58d7b6c03244e246b5e6f9c5be56450, type: 2}
       Emission:
         rid: 6141543268140187728
       Sampling:
@@ -34,12 +32,6 @@ MonoBehaviour:
           rid: 7141543268140187729
         AreaSampler:
           rid: 6141543268140187729
-      PositionPattern:
-        rid: 8141543268140187729
-      Aim:
-        rid: 6141543268140187730
-      ShotPattern:
-        rid: 9141543268140187730
   references:
     version: 2
     RefIds:
@@ -52,15 +44,6 @@ MonoBehaviour:
     - rid: 6141543268140187729
       type: {class: PollutionTopKAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
-    - rid: 6141543268140187730
-      type: {class: RandomAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: 
     - rid: 7141543268140187729
       type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: 
-    - rid: 8141543268140187729
-      type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: 
-    - rid: 9141543268140187730
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 

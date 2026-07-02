@@ -108,18 +108,7 @@ namespace SweepNDodge.DotsBullets
             out ResolvedEmissionCore core,
             out string error)
         {
-            if (entry.Profile != null)
-                return EmissionProfileResolver.TryResolve(entry.Profile, out core, out error);
-
-            return EmissionProfileResolver.TryResolveInline(
-                entry.Payload.Bullet,
-                entry.PositionPattern,
-                entry.Aim,
-                entry.ShotPattern,
-                profileRefId: 0,
-                out core,
-                out error,
-                requirePositiveDefinitionId: false);
+            return EmissionProfileResolver.TryResolve(entry.Profile, out core, out error);
         }
 
         private static ResolvedWaveSpawnDirectiveSnapshot CreateDefaultSnapshot()

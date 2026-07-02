@@ -86,7 +86,7 @@ namespace SweepNDodge.DotsBullets
             return true;
         }
 
-        public static bool TryResolveInline(
+        private static bool TryResolveInline(
             BulletDefinitionSO bullet,
             WavePositionPatternAuthoringBase positionPattern,
             WaveAimAuthoringBase aim,

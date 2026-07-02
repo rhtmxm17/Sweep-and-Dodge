@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0354f73ac2220374faa8fce7c055686a, type: 3}
-  m_Name: ep_stage1_simple_crossing_single
+  m_Name: ep_test_sample_hazard_actor
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.EmissionProfileSO
-  Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+  Bullet: {fileID: 11400000, guid: abb8319f5d47435fb29b4e541563635f, type: 2}
   SpawnTuning:
     OverrideSpeed: 1
-    SpeedOverride: 6
+    SpeedOverride: 1.8
     OverrideLifetime: 1
-    LifetimeOverride: 2
+    LifetimeOverride: 4
   MovementTuning:
     OverrideMovement: 1
     Family: 0
@@ -29,11 +29,11 @@ MonoBehaviour:
       MaxAcquireDistance: 10
       MinRetargetDistance: 0.25
   PositionPattern:
-    rid: 3059539566354235612
+    rid: 3059539566354235723
   Aim:
-    rid: 3059539566354235613
+    rid: 3059539566354235724
   ShotPattern:
-    rid: 3059539566354235614
+    rid: 3059539566354235725
   LifecycleTriggers:
     MotionCompleted:
       Enabled: 0
@@ -46,13 +46,15 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 3059539566354235612
+    - rid: 3059539566354235723
       type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 
-    - rid: 3059539566354235613
+    - rid: 3059539566354235724
       type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        BaseAngleDeg: 0
-    - rid: 3059539566354235614
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: 
+        BaseAngleDeg: 180
+    - rid: 3059539566354235725
+      type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        ShotCount: 4
+        AngleSpacingDeg: 30

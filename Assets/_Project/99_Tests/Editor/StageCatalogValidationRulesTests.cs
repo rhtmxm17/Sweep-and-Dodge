@@ -17,7 +17,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             public GameObject Root;
             public HazardEmitterTelegraphProfileSO Telegraph;
-            public HazardEmitterEmissionProfileSO Emission;
+            public EmissionProfileSO Emission;
             public BulletDefinitionSO Bullet;
 
             public void Dispose()
@@ -893,12 +893,12 @@ namespace SweepNDodge.DotsBullets.Tests
             return AssetDatabase.LoadAssetAtPath<HazardEmitterTelegraphProfileSO>(assetPath);
         }
 
-        private static HazardEmitterEmissionProfileSO CreateEmissionProfileAsset(string assetPath)
+        private static EmissionProfileSO CreateEmissionProfileAsset(string assetPath)
         {
-            var profile = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
             AssetDatabase.CreateAsset(profile, assetPath);
             AssetDatabase.SaveAssets();
-            return AssetDatabase.LoadAssetAtPath<HazardEmitterEmissionProfileSO>(assetPath);
+            return AssetDatabase.LoadAssetAtPath<EmissionProfileSO>(assetPath);
         }
 
         private static string EnsureFolder(string assetPath)
@@ -951,15 +951,11 @@ namespace SweepNDodge.DotsBullets.Tests
             fixture.Telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
             fixture.Bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             fixture.Bullet.Editor_SetDefinitionId(5000 + emitterId);
-            fixture.Emission = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            fixture.Emission = ScriptableObject.CreateInstance<EmissionProfileSO>();
             fixture.Emission.Bullet = fixture.Bullet;
             fixture.Emission.PositionPattern = new SinglePointPositionPatternAuthoring();
             fixture.Emission.Aim = new FixedAimAuthoring();
             fixture.Emission.ShotPattern = new SingleShotPatternAuthoring();
-            fixture.Emission.EventRepeatCount = 1;
-            fixture.Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
-            fixture.Emission.EventShotIntervalSec = 0f;
-            fixture.Emission.CooldownSec = 1f;
 
             actor.PatternSlots = new[]
             {
@@ -967,7 +963,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     PatternSlotId = 1,
                     TelegraphProfile = fixture.Telegraph,
-                    EmissionProfile = fixture.Emission,
+                    Emission = new HazardActorEmissionAuthoring
+                    {
+                        Profile = fixture.Emission,
+                        EventRepeatCount = 1,
+                        EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                        EventShotIntervalSec = 0f,
+                        CooldownSec = 1f,
+                    },
                     BaseWeight = 1f,
                     AvailabilityFlags = 0u,
                 }

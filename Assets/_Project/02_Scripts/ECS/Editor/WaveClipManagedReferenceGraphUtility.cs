@@ -63,9 +63,6 @@ namespace SweepNDodge.DotsBullets.Editor
                         RegisterNode(ownerByNode, issues, sampling.AreaSampler, BuildSlotLocation(s, d, "Sampling.AreaSampler"));
                     }
 
-                    RegisterNode(ownerByNode, issues, directive.PositionPattern, BuildSlotLocation(s, d, nameof(WaveSpawnEntryAuthoring.PositionPattern)));
-                    RegisterNode(ownerByNode, issues, directive.Aim, BuildSlotLocation(s, d, nameof(WaveSpawnEntryAuthoring.Aim)));
-                    RegisterNode(ownerByNode, issues, directive.ShotPattern, BuildSlotLocation(s, d, nameof(WaveSpawnEntryAuthoring.ShotPattern)));
                 }
             }
 
@@ -99,9 +96,6 @@ namespace SweepNDodge.DotsBullets.Editor
                         directive.Sampling.AreaSampler = EnsureUniqueClone(directive.Sampling.AreaSampler, seenNodes, CloneAreaSampler, ref changed);
                     }
 
-                    directive.PositionPattern = EnsureUniqueClone(directive.PositionPattern, seenNodes, ClonePositionPattern, ref changed);
-                    directive.Aim = EnsureUniqueClone(directive.Aim, seenNodes, CloneAim, ref changed);
-                    directive.ShotPattern = EnsureUniqueClone(directive.ShotPattern, seenNodes, CloneShotPattern, ref changed);
                 }
 
                 segments[s] = segment;
@@ -130,16 +124,12 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             return new WaveSpawnEntryAuthoring
             {
-                Payload = new WaveClipSO.SpawnPayloadProfile(),
                 Emission = new RateFieldEmissionAuthoring(),
                 Sampling = new WaveSamplingAuthoring
                 {
                     Anchor = new SourceCenterSamplingAnchorAuthoring(),
                     AreaSampler = new UniformFieldAreaSamplerAuthoring(),
                 },
-                PositionPattern = new SinglePointPositionPatternAuthoring(),
-                Aim = new RandomAimAuthoring(),
-                ShotPattern = new SingleShotPatternAuthoring(),
             };
         }
 
@@ -150,61 +140,29 @@ namespace SweepNDodge.DotsBullets.Editor
                 WaveClipDirectivePresetId.SingleHazard => CreateDefaultDirective(),
                 WaveClipDirectivePresetId.FanBurst => new WaveSpawnEntryAuthoring
                 {
-                    Payload = new WaveClipSO.SpawnPayloadProfile(),
                     Emission = new EventBurstEmissionAuthoring(),
                     Sampling = new WaveSamplingAuthoring
                     {
                         Anchor = new SourceCenterSamplingAnchorAuthoring(),
                         AreaSampler = new CenterPointAreaSamplerAuthoring(),
-                    },
-                    PositionPattern = new SinglePointPositionPatternAuthoring(),
-                    Aim = new FixedAimAuthoring(),
-                    ShotPattern = new NWayShotPatternAuthoring
-                    {
-                        ShotCount = 4,
-                        AngleSpacingDeg = 30f,
                     },
                 },
                 WaveClipDirectivePresetId.RadialBurst => new WaveSpawnEntryAuthoring
                 {
-                    Payload = new WaveClipSO.SpawnPayloadProfile(),
                     Emission = new EventBurstEmissionAuthoring(),
                     Sampling = new WaveSamplingAuthoring
                     {
                         Anchor = new SourceCenterSamplingAnchorAuthoring(),
                         AreaSampler = new CenterPointAreaSamplerAuthoring(),
                     },
-                    PositionPattern = new SinglePointPositionPatternAuthoring(),
-                    Aim = new FixedAimAuthoring(),
-                    ShotPattern = new RadialShotPatternAuthoring
-                    {
-                        ShotCount = 8,
-                    },
                 },
                 WaveClipDirectivePresetId.LineNormalFan => new WaveSpawnEntryAuthoring
                 {
-                    Payload = new WaveClipSO.SpawnPayloadProfile(),
                     Emission = new EventBurstEmissionAuthoring(),
                     Sampling = new WaveSamplingAuthoring
                     {
                         Anchor = new FixedPointSamplingAnchorAuthoring(),
                         AreaSampler = new CenterPointAreaSamplerAuthoring(),
-                    },
-                    PositionPattern = new LineEvenPositionPatternAuthoring
-                    {
-                        LineStart = new Vector2(-2f, 0f),
-                        LineEnd = new Vector2(2f, 0f),
-                        SampleSpacing = 1f,
-                    },
-                    Aim = new LineNormalAimAuthoring
-                    {
-                        NormalSide = WaveLineNormalSideId.Left,
-                        AngleOffsetDeg = 0f,
-                    },
-                    ShotPattern = new NWayShotPatternAuthoring
-                    {
-                        ShotCount = 3,
-                        AngleSpacingDeg = 30f,
                     },
                 },
                 _ => CreateDefaultDirective(),
@@ -271,12 +229,8 @@ namespace SweepNDodge.DotsBullets.Editor
             return new WaveSpawnEntryAuthoring
             {
                 Profile = source.Profile,
-                Payload = source.Payload,
                 Emission = CloneEmission(source.Emission),
                 Sampling = CloneSampling(source.Sampling),
-                PositionPattern = ClonePositionPattern(source.PositionPattern),
-                Aim = CloneAim(source.Aim),
-                ShotPattern = CloneShotPattern(source.ShotPattern),
             };
         }
 
@@ -451,74 +405,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 UniformFieldAreaSamplerAuthoring => new UniformFieldAreaSamplerAuthoring(),
                 PollutionTopKAreaSamplerAuthoring => new PollutionTopKAreaSamplerAuthoring(),
                 _ => throw new InvalidOperationException($"Unsupported area sampler type '{source.GetType().Name}'."),
-            };
-        }
-
-        private static WavePositionPatternAuthoringBase ClonePositionPattern(WavePositionPatternAuthoringBase source)
-        {
-            return source switch
-            {
-                null => null,
-                SinglePointPositionPatternAuthoring => new SinglePointPositionPatternAuthoring(),
-                LineEvenPositionPatternAuthoring lineEven => new LineEvenPositionPatternAuthoring
-                {
-                    LineStart = lineEven.LineStart,
-                    LineEnd = lineEven.LineEnd,
-                    SampleSpacing = lineEven.SampleSpacing,
-                },
-                PointSetPositionPatternAuthoring pointSet => new PointSetPositionPatternAuthoring
-                {
-                    Points = pointSet.Points != null ? (Vector2[])pointSet.Points.Clone() : null,
-                },
-                _ => throw new InvalidOperationException($"Unsupported position pattern type '{source.GetType().Name}'."),
-            };
-        }
-
-        private static WaveAimAuthoringBase CloneAim(WaveAimAuthoringBase source)
-        {
-            return source switch
-            {
-                null => null,
-                RandomAimAuthoring => new RandomAimAuthoring(),
-                FixedAimAuthoring fixedAim => new FixedAimAuthoring
-                {
-                    BaseAngleDeg = fixedAim.BaseAngleDeg,
-                },
-                LineNormalAimAuthoring lineNormalAim => new LineNormalAimAuthoring
-                {
-                    NormalSide = lineNormalAim.NormalSide,
-                    AngleOffsetDeg = lineNormalAim.AngleOffsetDeg,
-                },
-                SpiralAimAuthoring spiralAim => new SpiralAimAuthoring
-                {
-                    BaseAngleDeg = spiralAim.BaseAngleDeg,
-                    SpiralStepDeg = spiralAim.SpiralStepDeg,
-                },
-                PlayerPositionAimAuthoring playerPositionAim => new PlayerPositionAimAuthoring
-                {
-                    AngleOffsetDeg = playerPositionAim.AngleOffsetDeg,
-                    SnapshotTiming = playerPositionAim.SnapshotTiming,
-                },
-                _ => throw new InvalidOperationException($"Unsupported aim type '{source.GetType().Name}'."),
-            };
-        }
-
-        private static WaveShotPatternAuthoringBase CloneShotPattern(WaveShotPatternAuthoringBase source)
-        {
-            return source switch
-            {
-                null => null,
-                SingleShotPatternAuthoring => new SingleShotPatternAuthoring(),
-                NWayShotPatternAuthoring nWay => new NWayShotPatternAuthoring
-                {
-                    ShotCount = nWay.ShotCount,
-                    AngleSpacingDeg = nWay.AngleSpacingDeg,
-                },
-                RadialShotPatternAuthoring radial => new RadialShotPatternAuthoring
-                {
-                    ShotCount = radial.ShotCount,
-                },
-                _ => throw new InvalidOperationException($"Unsupported shot pattern type '{source.GetType().Name}'."),
             };
         }
 

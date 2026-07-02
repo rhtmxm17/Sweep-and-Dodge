@@ -157,14 +157,15 @@ namespace SweepNDodge.DotsBullets.Tests
                     for (int d = 0; d < typedCount; d++)
                     {
                         var directive = segment.Directives[d];
-                        Assert.That(directive.Payload.Bullet, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Payload.Bullet.");
+                        Assert.That(directive.Profile, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Profile.");
+                        Assert.That(directive.Profile.Bullet, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Profile.Bullet.");
                         Assert.That(directive.Emission, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Emission.");
                         Assert.That(directive.Sampling, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Sampling.");
                         Assert.That(directive.Sampling.Anchor, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Sampling.Anchor.");
                         Assert.That(directive.Sampling.AreaSampler, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Sampling.AreaSampler.");
-                        Assert.That(directive.PositionPattern, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep PositionPattern.");
-                        Assert.That(directive.Aim, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Aim.");
-                        Assert.That(directive.ShotPattern, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep ShotPattern.");
+                        Assert.That(directive.Profile.PositionPattern, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Profile.PositionPattern.");
+                        Assert.That(directive.Profile.Aim, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Profile.Aim.");
+                        Assert.That(directive.Profile.ShotPattern, Is.Not.Null, $"{path} segment[{s}] directive[{d}] must keep Profile.ShotPattern.");
                     }
                 }
 

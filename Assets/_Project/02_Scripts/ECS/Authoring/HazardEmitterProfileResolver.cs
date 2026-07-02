@@ -57,7 +57,33 @@ namespace SweepNDodge.DotsBullets
         }
 
         public static bool TryResolve(
-            HazardEmitterEmissionProfileSO profile,
+            in HazardActorEmissionAuthoring emission,
+            out ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
+            out string error)
+        {
+            if (emission.Profile != null)
+            {
+                return TryResolve(
+                    emission.Profile,
+                    emission.EventRepeatCount,
+                    emission.EventShotSchedule,
+                    emission.EventShotIntervalSec,
+                    emission.CooldownSec,
+                    out snapshot,
+                    out error);
+            }
+
+            snapshot = default;
+            error = "Hazard actor emission profile is null.";
+            return false;
+        }
+
+        public static bool TryResolve(
+            EmissionProfileSO profile,
+            int eventRepeatCount,
+            SourceSpawnEventShotScheduleId eventShotSchedule,
+            float eventShotIntervalSec,
+            float cooldownSec,
             out ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
             out string error)
         {
@@ -66,16 +92,38 @@ namespace SweepNDodge.DotsBullets
 
             if (profile == null)
             {
-                error = "Hazard emitter emission profile is null.";
+                error = "Hazard actor emission profile is null.";
                 return false;
             }
 
-            if (!TryResolveEmissionCore(profile, out var core, out error))
+            if (!EmissionProfileResolver.TryResolve(profile, out var core, out error))
                 return false;
+
+            return TryCreateEmissionSnapshot(
+                in core,
+                eventRepeatCount,
+                eventShotSchedule,
+                eventShotIntervalSec,
+                cooldownSec,
+                out snapshot,
+                out error);
+        }
+
+        private static bool TryCreateEmissionSnapshot(
+            in ResolvedEmissionCore core,
+            int eventRepeatCount,
+            SourceSpawnEventShotScheduleId eventShotSchedule,
+            float eventShotIntervalSec,
+            float cooldownSec,
+            out ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
+            out string error)
+        {
+            snapshot = default;
+            error = string.Empty;
 
             if (core.AimMode == WaveAimModeId.Random)
             {
-                error = "Hazard emitter emission profile does not support Random aim in Plan D.";
+                error = "Hazard actor emission profile does not support Random aim.";
                 return false;
             }
 
@@ -103,32 +151,14 @@ namespace SweepNDodge.DotsBullets
                 ShotPatternMode = core.ShotPatternMode,
                 ShotCount = core.ShotCount,
                 NWayAngleSpacingDeg = core.NWayAngleSpacingDeg,
-                EventShotSchedule = profile.EventShotSchedule,
-                EventShotIntervalSec = profile.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
-                    ? Mathf.Max(0.001f, profile.EventShotIntervalSec)
+                EventShotSchedule = eventShotSchedule,
+                EventShotIntervalSec = eventShotSchedule == SourceSpawnEventShotScheduleId.Timed
+                    ? Mathf.Max(0.001f, eventShotIntervalSec)
                     : 0f,
-                EventRepeatCount = Mathf.Max(1, profile.EventRepeatCount),
-                CooldownSec = Mathf.Max(0f, profile.CooldownSec),
+                EventRepeatCount = Mathf.Max(1, eventRepeatCount),
+                CooldownSec = Mathf.Max(0f, cooldownSec),
             };
             return true;
-        }
-
-        private static bool TryResolveEmissionCore(
-            HazardEmitterEmissionProfileSO profile,
-            out ResolvedEmissionCore core,
-            out string error)
-        {
-            if (profile.Profile != null)
-                return EmissionProfileResolver.TryResolve(profile.Profile, out core, out error);
-
-            return EmissionProfileResolver.TryResolveInline(
-                profile.Bullet,
-                profile.PositionPattern,
-                profile.Aim,
-                profile.ShotPattern,
-                profile.GetInstanceID(),
-                out core,
-                out error);
         }
     }
 }

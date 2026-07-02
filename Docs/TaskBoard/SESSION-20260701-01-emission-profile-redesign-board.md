@@ -37,8 +37,8 @@
 - 1차 lifecycle trigger 이벤트 범위는 `MotionCompleted`만 연다.
 - `BulletDefinitionSO`의 `Speed`, `Lifetime`, `MovementFamily`, `DampedLinear`, `HomingLite`, `OnMotionCompletedExplode`, `OnCleanupRemovedSpawnSecondary`는 신규 데이터 작성 기준에서 deprecated로 취급한다.
 - 기존 `BulletSecondarySpawnRequestBuffer` 기반 secondary spawn 경로는 호환 경로로 유지하되, 신규 설계의 SSOT로 확장하지 않는다.
-- 최종 목표는 전면 참조형 전환이다. Source/Hazard/Triggered의 active authoring SSOT는 `EmissionProfileSO` 참조가 되어야 하며, inline common emission grammar는 migration 기간 동안만 허용한다.
-- 전환형 하이브리드는 최종 아키텍처가 아니라 staged migration 전략이다. 기존 asset과 runtime path를 유지한 채 `ResolvedEmissionCore`와 공통 resolver를 먼저 도입하고, 이후 asset migration과 legacy 제거로 전면 참조형에 도달한다.
+- 최종 목표는 전면 참조형 전환이다. Source/Hazard/Triggered의 active authoring SSOT는 `EmissionProfileSO` 참조다.
+- 전환형 하이브리드는 최종 아키텍처가 아니라 staged migration 전략으로만 사용했다. cleanup 완료 후 `WaveSpawnEntryAuthoring` inline common grammar와 `HazardEmitterEmissionProfileSO` compatibility source는 제거됐다.
 
 ## Working Schema Draft
 
@@ -164,6 +164,15 @@ LifecycleTrigger
   - 근거: 신규 구조가 안정화될 때까지 legacy compatibility path로 유지한다.
 
 ## Done
+- [x] T9. unused emission compatibility cleanup
+  - 결과: `HazardEmitterEmissionProfileSO` 타입, `heep_*` operational/test asset, T8 migration utility를 제거했다.
+  - 결과: `HazardActorPatternSlotAuthoring`은 `Emission.Profile`과 repeat/cooldown schedule을 직접 소유하도록 전환했다.
+  - 결과: `WaveSpawnEntryAuthoring`은 `Profile + Emission + Sampling`만 소유하고, inline `Payload / PositionPattern / Aim / ShotPattern` fallback을 제거했다.
+  - 결과: 운영/테스트 WaveClip 및 Hazard prefab을 `EmissionProfileSO` 참조형으로 재직렬화했다.
+  - 결과: 테스트 전용 `Assets/_Project/99_Tests/TestData/EmissionProfiles/` fixture를 생성했다.
+  - 결과: `ContentValidationRules`에서 `CV050`과 Hazard wrapper 수집을 제거하고, WaveClip directive `Profile` 필수 계약을 `CV046`으로 고정했다.
+  - 결과: 관련 resolver/editor/validation/sample asset 테스트를 참조형 기준으로 갱신했다.
+  - 검증: compile 후 Unity Console code error 0건.
 - [x] T8. asset migration 및 legacy 격하
   - 결과: `Assets/_Project/02_Scripts/ECS/Editor/EmissionProfileAssetMigrationUtility.cs`를 추가해 operational WaveClip/Hazard/secondary spawn sample을 `EmissionProfileSO` 참조형으로 migration할 수 있게 했다.
   - 결과: `Assets/_Project/03_Datas/EmissionProfiles/` 아래에 WaveClip 12개, Hazard 5개, BulletReaction 2개 profile asset을 생성했다.

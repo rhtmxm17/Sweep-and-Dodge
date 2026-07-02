@@ -1000,8 +1000,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 15f };
-                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 1, AngleSpacingDeg = 30f };
+                entry.Profile.Aim = new FixedAimAuthoring { BaseAngleDeg = 15f };
+                entry.Profile.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 1, AngleSpacingDeg = 30f };
 
                 clip.ClipId = 14;
                 clip.Segments = new[]
@@ -1030,7 +1030,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
 
-                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 4, AngleSpacingDeg = 0f };
+                entry.Profile.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 4, AngleSpacingDeg = 0f };
                 issues = ContentValidationRules.Validate(input);
                 Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
             }
@@ -1055,7 +1055,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new PlayerPositionAimAuthoring
+                entry.Profile.Aim = new PlayerPositionAimAuthoring
                 {
                     AngleOffsetDeg = 10f,
                     SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
@@ -1109,8 +1109,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.PositionPattern = new SinglePointPositionPatternAuthoring();
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Left,
                     AngleOffsetDeg = 0f,
@@ -1143,7 +1143,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 Assert.That(issues.Any(i => i.Code == "CV042"), Is.True);
 
-                entry.PositionPattern = new PointSetPositionPatternAuthoring
+                entry.Profile.PositionPattern = new PointSetPositionPatternAuthoring
                 {
                     Points = new[] { Vector2.zero }
                 };
@@ -1171,13 +1171,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                entry.Profile.PositionPattern = new LineEvenPositionPatternAuthoring
                 {
                     LineStart = Vector2.zero,
                     LineEnd = Vector2.zero,
                     SampleSpacing = 1f,
                 };
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Right,
                     AngleOffsetDeg = 15f,
@@ -1245,16 +1245,16 @@ namespace SweepNDodge.DotsBullets.Tests
                     Anchor = new SourceCenterSamplingAnchorAuthoring(),
                     AreaSampler = new CenterPointAreaSamplerAuthoring(),
                 };
-                entry.PositionPattern = new PointSetPositionPatternAuthoring
+                entry.Profile.PositionPattern = new PointSetPositionPatternAuthoring
                 {
                     Points = new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one, new Vector2(-1f, 0f) }
                 };
-                entry.Aim = new PlayerPositionAimAuthoring
+                entry.Profile.Aim = new PlayerPositionAimAuthoring
                 {
                     AngleOffsetDeg = 22f,
                     SnapshotTiming = WaveAimSnapshotTimingId.EventStart,
                 };
-                entry.ShotPattern = new RadialShotPatternAuthoring
+                entry.Profile.ShotPattern = new RadialShotPatternAuthoring
                 {
                     ShotCount = 6,
                 };
@@ -1284,13 +1284,13 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(3008);
                 var entry = CreateDefaultTypedEntry(def);
-                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                entry.Profile.PositionPattern = new LineEvenPositionPatternAuthoring
                 {
                     LineStart = new Vector2(-2f, 0f),
                     LineEnd = new Vector2(2f, 0f),
                     SampleSpacing = 1f,
                 };
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Left,
                     AngleOffsetDeg = 0f,
@@ -1301,7 +1301,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(snapshot.LineNormalSide, Is.EqualTo(WaveLineNormalSideId.Left));
                 Assert.That(snapshot.LineNormalAngleOffsetDeg, Is.EqualTo(0f));
 
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Right,
                     AngleOffsetDeg = 15f,
@@ -1327,7 +1327,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(3007);
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new PlayerPositionAimAuthoring
+                entry.Profile.Aim = new PlayerPositionAimAuthoring
                 {
                     AngleOffsetDeg = 15f,
                     SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
@@ -1353,8 +1353,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(3009);
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 0f };
-                entry.ShotPattern = new NWayShotPatternAuthoring
+                entry.Profile.Aim = new FixedAimAuthoring { BaseAngleDeg = 0f };
+                entry.Profile.ShotPattern = new NWayShotPatternAuthoring
                 {
                     ShotCount = 4,
                     AngleSpacingDeg = 30f,
@@ -1908,13 +1908,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
                 clip.ClipId = 9401;
                 clip.DurationSec = 1f;
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Profile = null;
                 clip.Segments = new[]
                 {
                     new WaveClipSO.ClipSegment
                     {
                         StartSec = 0f,
                         DurationSec = 1f,
-                        Directives = new[] { CreateDefaultTypedEntry(def) },
+                        Directives = new[] { entry },
                     }
                 };
 
@@ -1927,7 +1929,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     {
                         new ContentValidationRecord<WaveClipSO>(clip, "Assets/_Project/03_Datas/WaveClips/generated.asset"),
                     },
-                    null,
                     null,
                     null,
                     null,
@@ -1993,7 +1994,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     null,
                     null,
                     null,
-                    null,
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
@@ -2038,7 +2038,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     null,
                     null,
                     null,
-                    null,
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
@@ -2049,37 +2048,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 Object.DestroyImmediate(def);
                 Object.DestroyImmediate(profile);
                 Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
-        public void OperationalHazardEmitterEmissionProfile_WithoutEmissionProfileReference_IsError()
-        {
-            var hazardProfile = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
-
-            try
-            {
-                var input = new ContentValidationInput(
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    new List<ContentValidationRecord<HazardEmitterEmissionProfileSO>>
-                    {
-                        new ContentValidationRecord<HazardEmitterEmissionProfileSO>(hazardProfile, "Assets/_Project/03_Datas/heep_generated.asset"),
-                    },
-                    null,
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV050"), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(hazardProfile);
             }
         }
 
@@ -2136,10 +2104,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             return new WaveSpawnEntryAuthoring
             {
-                Payload = new WaveClipSO.SpawnPayloadProfile
-                {
-                    Bullet = def,
-                },
+                Profile = CreateDefaultEmissionProfile(def),
                 Emission = new RateFieldEmissionAuthoring
                 {
                     SpawnMode = SourceSpawnModeId.FixedDensity,
@@ -2153,17 +2118,24 @@ namespace SweepNDodge.DotsBullets.Tests
                     Anchor = new SourceCenterSamplingAnchorAuthoring(),
                     AreaSampler = new UniformFieldAreaSamplerAuthoring(),
                 },
-                PositionPattern = new SinglePointPositionPatternAuthoring(),
-                Aim = new RandomAimAuthoring(),
-                ShotPattern = new SingleShotPatternAuthoring(),
             };
+        }
+
+        private static EmissionProfileSO CreateDefaultEmissionProfile(BulletDefinitionSO def)
+        {
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            profile.Bullet = def;
+            profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+            profile.Aim = new RandomAimAuthoring();
+            profile.ShotPattern = new SingleShotPatternAuthoring();
+            return profile;
         }
 
         private static WaveSpawnEntryAuthoring CreatePointSetTypedEntry(BulletDefinitionSO def, Vector2[] points)
         {
             var entry = CreateDefaultTypedEntry(def);
             entry.Sampling.AreaSampler = new CenterPointAreaSamplerAuthoring();
-            entry.PositionPattern = new PointSetPositionPatternAuthoring { Points = points };
+            entry.Profile.PositionPattern = new PointSetPositionPatternAuthoring { Points = points };
             return entry;
         }
 

@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -21,8 +21,7 @@ MonoBehaviour:
     StartSec: 2.25
     DurationSec: 1
     Directives:
-    - Payload:
-        Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
+    - Profile: {fileID: 11400000, guid: 34187ec5521247743bed3c81cb49b71e, type: 2}
       Emission:
         rid: 6141543268140187731
       Sampling:
@@ -32,18 +31,11 @@ MonoBehaviour:
           rid: 7141543268140187732
         AreaSampler:
           rid: 8141543268140187732
-      PositionPattern:
-        rid: 6141543268140187732
-      Aim:
-        rid: 6141543268140187733
-      ShotPattern:
-        rid: 9141543268140187733
   - editorOnlyDescription: Cleanup Reward - CarryFullRemoved
     StartSec: 8.5
     DurationSec: 1
     Directives:
-    - Payload:
-        Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
+    - Profile: {fileID: 11400000, guid: 8bec7f5d02368dc408f913fa28620564, type: 2}
       Emission:
         rid: 6141543268140187734
       Sampling:
@@ -53,12 +45,6 @@ MonoBehaviour:
           rid: 7141543268140187735
         AreaSampler:
           rid: 8141543268140187735
-      PositionPattern:
-        rid: 6141543268140187735
-      Aim:
-        rid: 6141543268140187736
-      ShotPattern:
-        rid: 9141543268140187736
   references:
     version: 2
     RefIds:
@@ -72,25 +58,6 @@ MonoBehaviour:
         EventRepeatCount: 1
         EventShotSchedule: 0
         EventShotIntervalSec: 0
-    - rid: 6141543268140187732
-      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        Points:
-        - {x: 2.88, y: 0}
-    - rid: 7141543268140187732
-      type: {class: PlayerRelativeSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        SpawnOffset: {x: 0, y: 0}
-    - rid: 8141543268140187732
-      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 6141543268140187733
-      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        BaseAngleDeg: 180
-    - rid: 9141543268140187733
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
     - rid: 6141543268140187734
       type: {class: EventBurstEmissionAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
@@ -101,23 +68,17 @@ MonoBehaviour:
         EventRepeatCount: 1
         EventShotSchedule: 0
         EventShotIntervalSec: 0
-    - rid: 6141543268140187735
-      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+    - rid: 7141543268140187732
+      type: {class: PlayerRelativeSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        Points:
-        - {x: 2.88, y: 0}
+        SpawnOffset: {x: 0, y: 0}
     - rid: 7141543268140187735
       type: {class: PlayerRelativeSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
         SpawnOffset: {x: 0, y: 0}
+    - rid: 8141543268140187732
+      type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
     - rid: 8141543268140187735
       type: {class: CenterPointAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 6141543268140187736
-      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data:
-        BaseAngleDeg: 180
-    - rid: 9141543268140187736
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-
+      data: 

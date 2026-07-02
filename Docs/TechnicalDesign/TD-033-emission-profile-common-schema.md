@@ -54,10 +54,10 @@
 - 첫 lifecycle trigger는 `MotionCompleted`만 지원한다.
 - 기존 secondary spawn path는 호환 경로로 유지하되 신규 SSOT로 확장하지 않는다.
 - 최종 authoring SSOT는 참조형 `EmissionProfileSO`다.
-- 전환형 하이브리드는 최종 구조가 아니라 implementation staging이다.
-  - `WaveSpawnEntryAuthoring` inline common grammar는 transition 기간 동안 compatibility source로만 유지한다.
-  - `HazardEmitterEmissionProfileSO`는 `EmissionProfileSO`로 migration하거나 compatibility alias로 격하한다.
-  - 신규 작성 기준은 `EmissionProfileSO` 참조형을 우선한다.
+- 전환형 하이브리드는 implementation staging으로만 사용했고, cleanup 완료 후 active authoring schema에서 제거했다.
+  - `WaveSpawnEntryAuthoring`은 `EmissionProfileSO + Source Emission + Sampling`만 소유한다.
+  - `HazardActorPatternSlotAuthoring`은 `TelegraphProfile + EmissionProfileSO + repeat/cooldown schedule`을 소유한다.
+  - `HazardEmitterEmissionProfileSO`는 제거됐다.
 
 ## 4. 공통 데이터 모델
 
@@ -126,11 +126,7 @@ ResolvedEmissionCore
 - Source wrapper는 여기에 `RateField`, `Sampling`, lane/phase/segment timing을 더한다.
 - Hazard wrapper는 여기에 telegraph, cooldown, slot metadata, local offset을 더한다.
 - Triggered wrapper는 여기에 lifecycle event와 context binding을 더한다.
-- transition 기간에는 아래 authoring source가 모두 `ResolvedEmissionCore`로 내려갈 수 있다.
-  - 신규 `EmissionProfileSO`
-  - 기존 `WaveSpawnEntryAuthoring`의 inline common grammar
-  - 기존 `HazardEmitterEmissionProfileSO`
-- migration 완료 후 operational asset의 common grammar source는 `EmissionProfileSO` 참조형으로 단일화한다.
+- cleanup 완료 후 active authoring source는 `EmissionProfileSO` 참조형으로 단일화한다.
 
 ### 4.3 `EmissionExecutionContext`
 `EmissionProfile`은 직접 source grid, actor transform, lifecycle contact를 알지 않는다. 대신 wrapper가 아래 canonical context를 제공한다.
@@ -186,8 +182,7 @@ SourceWaveDirective
 - `RateField`, `Poisson`, `EventBurst`는 Source event 생성 방식이다.
 - `Sampling`은 source field에서 event anchor를 고르는 방식이다.
 - `EmissionProfile`은 sampling 결과로 만들어진 context를 받아 탄막 문법만 실행한다.
-- 최종 상태에서 `WaveSpawnEntryAuthoring`은 inline `Payload / PositionPattern / Aim / ShotPattern`을 직접 소유하지 않고 `EmissionProfileSO`를 참조한다.
-- transition 기간에는 기존 inline directive를 `ResolvedEmissionCore`로 resolve할 수 있지만, 이는 migration source이며 장기 authoring SSOT가 아니다.
+- `WaveSpawnEntryAuthoring`은 inline `Payload / PositionPattern / Aim / ShotPattern`을 직접 소유하지 않고 `EmissionProfileSO`를 참조한다.
 
 ### 5.2 HazardActor wrapper
 HazardActor wrapper는 actor state, telegraph, slot selection, cooldown을 책임진다.
@@ -205,8 +200,8 @@ HazardActorPatternSlot
 - actor는 selected slot과 actor transform을 기준으로 `EmissionExecutionContext`를 만든다.
 - `CooldownSec`은 actor slot 실행 tempo이며 `EmissionProfile` 내부에 넣지 않는다.
 - `TelegraphProfile`은 발사 전 예고 연출/타이밍이며 `EmissionProfile`의 탄막 문법과 분리한다.
-- 최종 상태에서 pattern slot은 `EmissionProfileSO`를 참조한다.
-- 기존 `HazardEmitterEmissionProfileSO`는 migration 완료 전까지 compatibility source로만 허용한다.
+- pattern slot은 `EmissionProfileSO`를 직접 참조한다.
+- repeat/cooldown schedule은 `EmissionProfile` 내부가 아니라 HazardActor slot wrapper 책임이다.
 
 ### 5.3 Triggered wrapper
 Triggered wrapper는 lifecycle event와 context binding을 책임진다.
@@ -402,9 +397,9 @@ EmissionProfile: ep_sample_bubble_fragments
 
 ### 9.2 Plan B. authoring schema 도입
 - 공통 `EmissionProfileSO`를 추가한다.
-- 기존 `HazardEmitterEmissionProfileSO`는 새 profile로 migration하고, migration 기간에만 compatibility alias/source로 둔다.
-- `WaveSpawnEntryAuthoring`은 최종적으로 profile 참조형으로 전환한다.
-- transition 기간에는 inline common grammar를 유지할 수 있지만, 신규 작성 기준은 `EmissionProfileSO` 참조형으로 둔다.
+- 기존 `HazardEmitterEmissionProfileSO`는 새 profile로 migration한 뒤 제거한다.
+- `WaveSpawnEntryAuthoring`은 profile 참조형으로 전환한다.
+- cleanup 완료 후 inline common grammar fallback은 유지하지 않는다.
 
 ### 9.3 Plan C. resolver 통합
 - `WaveClipAuthoringResolver`와 `HazardEmitterProfileResolver`의 공통 grammar resolve를 `EmissionProfileResolver`로 추출한다.
@@ -430,10 +425,10 @@ EmissionProfile: ep_sample_bubble_fragments
   - common resolved emission snapshot 필요 여부
 
 ### 9.6 Plan F. full reference migration
-- 기존 `WaveSpawnEntryAuthoring` inline common grammar를 `EmissionProfileSO` asset으로 추출한다.
-- 기존 `HazardEmitterEmissionProfileSO` asset을 `EmissionProfileSO` asset으로 변환하고 pattern slot 참조를 교체한다.
+- 기존 `WaveSpawnEntryAuthoring` inline common grammar를 `EmissionProfileSO` asset으로 추출했다.
+- 기존 `HazardEmitterEmissionProfileSO` asset을 `EmissionProfileSO` asset으로 변환하고 pattern slot 참조를 교체했다.
 - `bd_sample_bubble`의 `OnMotionCompletedExplode`는 parent/fragment `EmissionProfileSO` 쌍으로 변환한다.
-- migration 후 compatibility source가 operational asset에서 사용되지 않는지 validation한다.
+- cleanup 완료 후 compatibility source가 operational/test asset에서 사용되지 않는지 validation한다.
 
 ### 9.7 `bd_sample_bubble` conversion candidate
 `bd_sample_bubble` 계열은 기존 `MotionCompleted -> secondary spawn` 데이터를 `MotionCompleted -> TriggerEmissionProfile`로 옮기는 migration fixture 후보로 둔다. 아래 값은 migration 예시이며, 테스트 oracle로 exact tuning snapshot을 고정하지 않는다.
@@ -595,8 +590,6 @@ SpawnedBulletRuntimeTuning
 
 ## 11. 오픈 이슈
 - `EmissionProfile`이 `RateField` 없이 direct discrete emission만 표현할지, source sustain emission의 payload profile까지 완전히 대체할지
-- 전면 참조형 전환 후 `WaveSpawnEntryAuthoring`에서 inline common grammar 필드를 언제 제거할지
-- `HazardEmitterEmissionProfileSO`를 완전히 제거할지, obsolete compatibility alias로 남길지
 - `ContextForward`를 기존 `FixedAimAuthoring`의 확장으로 둘지, 별도 `ContextForwardAimAuthoring` subtype으로 둘지
 - `Radius`를 `BulletDefinitionSO` baseline으로 둘지, `RadiusMultiplier`를 1차 범위에 포함할지
 - `BulletDefinitionSO.CaptureRule`은 profile override를 허용할지, bullet identity에 고정할지
@@ -605,6 +598,7 @@ SpawnedBulletRuntimeTuning
 - `OnCleanupRemovedSpawnSecondary` migration을 언제 열지
 
 ## 12. 변경 이력
+- 2026-07-01: cleanup 완료 기준을 반영했다. `WaveSpawnEntryAuthoring` inline common grammar와 `HazardEmitterEmissionProfileSO` compatibility source를 제거하고, active authoring SSOT를 `EmissionProfileSO` 참조형으로 단일화했다.
 - 2026-07-01: T6 runtime pipeline 결정으로 `DiscreteEmitRequestBuffer` 확장안을 채택하고, triggered emission을 profile-resolved discrete emission으로 실행하는 기준을 추가했다.
 - 2026-07-01: 최종 목표를 마이그레이션 포함 전면 참조형 `EmissionProfileSO` 전환으로 명시하고, 전환형 하이브리드는 implementation staging으로만 채택하도록 정리했다.
 - 2026-07-01: 초안 작성. Source/Hazard/Triggered 공통 `EmissionProfile` 스키마, B안 context binding, `MotionCompleted -> TriggerEmissionProfile`, `BulletDefinitionSO` deprecated 정책을 정리했다.

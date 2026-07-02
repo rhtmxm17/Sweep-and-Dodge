@@ -7,11 +7,21 @@ using UnityEngine;
 namespace SweepNDodge.DotsBullets
 {
     [Serializable]
+    public struct HazardActorEmissionAuthoring
+    {
+        public EmissionProfileSO Profile;
+        [Min(1)] public int EventRepeatCount;
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        [Min(0f)] public float EventShotIntervalSec;
+        [Min(0f)] public float CooldownSec;
+    }
+
+    [Serializable]
     public struct HazardActorPatternSlotAuthoring
     {
         [Min(1)] public int PatternSlotId;
         public HazardEmitterTelegraphProfileSO TelegraphProfile;
-        public HazardEmitterEmissionProfileSO EmissionProfile;
+        public HazardActorEmissionAuthoring Emission;
         [Min(0f)] public float BaseWeight;
         public uint AvailabilityFlags;
         public Vector3 LocalOffset;
@@ -71,7 +81,7 @@ namespace SweepNDodge.DotsBullets
                     return false;
                 }
 
-                if (slot.EmissionProfile == null)
+                if (slot.Emission.Profile == null)
                 {
                     error = $"HazardActor pattern slot is missing EmissionProfile. slotId={slot.PatternSlotId}.";
                     return false;
@@ -89,7 +99,7 @@ namespace SweepNDodge.DotsBullets
                     return false;
                 }
 
-                if (!HazardEmitterProfileResolver.TryResolve(slot.EmissionProfile, out var resolvedEmission, out error))
+                if (!HazardEmitterProfileResolver.TryResolve(slot.Emission, out var resolvedEmission, out error))
                 {
                     error = $"HazardActor pattern slot failed to resolve EmissionProfile. slotId={slot.PatternSlotId}. {error}";
                     return false;

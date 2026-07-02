@@ -10,30 +10,30 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0354f73ac2220374faa8fce7c055686a, type: 3}
-  m_Name: ep_stage1_simple_crossing_single
+  m_Name: ep_bwc_test_sample_hazard_s2_d0
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.EmissionProfileSO
-  Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+  Bullet: {fileID: 11400000, guid: 018218fced61498b833a095c9a5e02ba, type: 2}
   SpawnTuning:
     OverrideSpeed: 1
-    SpeedOverride: 6
+    SpeedOverride: 2.5
     OverrideLifetime: 1
-    LifetimeOverride: 2
+    LifetimeOverride: 4.5
   MovementTuning:
     OverrideMovement: 1
-    Family: 0
+    Family: 2
     DampedLinear:
       DampingPerSec: 1
       StopSpeedThreshold: 0.1
     HomingLite:
-      TurnRateDegPerSec: 90
+      TurnRateDegPerSec: 25
       MaxAcquireDistance: 10
-      MinRetargetDistance: 0.25
+      MinRetargetDistance: 0.75
   PositionPattern:
-    rid: 3059539566354235612
+    rid: 3059539566354235720
   Aim:
-    rid: 3059539566354235613
+    rid: 3059539566354235721
   ShotPattern:
-    rid: 3059539566354235614
+    rid: 3059539566354235722
   LifecycleTriggers:
     MotionCompleted:
       Enabled: 0
@@ -46,13 +46,15 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 3059539566354235612
-      type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: 
-    - rid: 3059539566354235613
+    - rid: 3059539566354235720
+      type: {class: PointSetPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        Points:
+        - {x: 0, y: 0}
+    - rid: 3059539566354235721
       type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        BaseAngleDeg: 0
-    - rid: 3059539566354235614
+        BaseAngleDeg: 180
+    - rid: 3059539566354235722
       type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data: 

@@ -391,9 +391,9 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void DrawDenseDirectiveBody(SerializedProperty directiveProperty, int segmentIndex, int directiveIndex)
         {
-            var payloadProperty = directiveProperty.FindPropertyRelative(nameof(WaveSpawnEntryAuthoring.Payload));
-            if (payloadProperty != null)
-                EditorGUILayout.PropertyField(payloadProperty, true);
+            var profileProperty = directiveProperty.FindPropertyRelative(nameof(WaveSpawnEntryAuthoring.Profile));
+            if (profileProperty != null)
+                EditorGUILayout.PropertyField(profileProperty, true);
 
             DrawDenseDirectiveSection(
                 segmentIndex,
@@ -405,21 +405,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 directiveIndex,
                 nameof(WaveSpawnEntryAuthoring.Sampling),
                 directiveProperty.FindPropertyRelative(nameof(WaveSpawnEntryAuthoring.Sampling)));
-            DrawDenseDirectiveSection(
-                segmentIndex,
-                directiveIndex,
-                nameof(WaveSpawnEntryAuthoring.PositionPattern),
-                directiveProperty.FindPropertyRelative(nameof(WaveSpawnEntryAuthoring.PositionPattern)));
-            DrawDenseDirectiveSection(
-                segmentIndex,
-                directiveIndex,
-                nameof(WaveSpawnEntryAuthoring.Aim),
-                directiveProperty.FindPropertyRelative(nameof(WaveSpawnEntryAuthoring.Aim)));
-            DrawDenseDirectiveSection(
-                segmentIndex,
-                directiveIndex,
-                nameof(WaveSpawnEntryAuthoring.ShotPattern),
-                directiveProperty.FindPropertyRelative(nameof(WaveSpawnEntryAuthoring.ShotPattern)));
         }
 
         private void DrawDenseDirectiveSection(int segmentIndex, int directiveIndex, string sectionName, SerializedProperty property)
@@ -664,12 +649,13 @@ namespace SweepNDodge.DotsBullets.Editor
             if (entry == null)
                 return "Null Directive";
 
-            return $"Bullet={FormatBullet(entry.Payload.Bullet)}"
+            return $"Profile={FormatProfile(entry.Profile)}"
+                + $" | Bullet={FormatBullet(entry.Profile != null ? entry.Profile.Bullet : null)}"
                 + $" | {FormatEmission(entry.Emission)}"
                 + $" | {FormatSampling(entry.Sampling)}"
-                + $" | {FormatPositionPattern(entry.PositionPattern)}"
-                + $" | {FormatAim(entry.Aim)}"
-                + $" | {FormatShotPattern(entry.ShotPattern)}";
+                + $" | {FormatPositionPattern(entry.Profile != null ? entry.Profile.PositionPattern : null)}"
+                + $" | {FormatAim(entry.Profile != null ? entry.Profile.Aim : null)}"
+                + $" | {FormatShotPattern(entry.Profile != null ? entry.Profile.ShotPattern : null)}";
         }
 
         public static List<string> CollectInlineWarnings(WaveSpawnEntryAuthoring entry)
@@ -678,13 +664,20 @@ namespace SweepNDodge.DotsBullets.Editor
             if (entry == null)
                 return warnings;
 
-            if (entry.Aim is LineNormalAimAuthoring && entry.PositionPattern is not LineEvenPositionPatternAuthoring)
+            var profile = entry.Profile;
+            if (profile == null)
+            {
+                warnings.Add("CV046: WaveClip directive requires EmissionProfileSO.");
+                return warnings;
+            }
+
+            if (profile.Aim is LineNormalAimAuthoring && profile.PositionPattern is not LineEvenPositionPatternAuthoring)
                 warnings.Add("CV042: LineNormalAim requires LineEven PositionPattern.");
 
-            if (entry.ShotPattern is NWayShotPatternAuthoring nWay && (nWay.ShotCount < 2 || nWay.AngleSpacingDeg <= 0f))
+            if (profile.ShotPattern is NWayShotPatternAuthoring nWay && (nWay.ShotCount < 2 || nWay.AngleSpacingDeg <= 0f))
                 warnings.Add("CV023: NWay ShotPattern requires ShotCount >= 2 and AngleSpacingDeg > 0.");
 
-            if (entry.ShotPattern is RadialShotPatternAuthoring radial && radial.ShotCount < 2)
+            if (profile.ShotPattern is RadialShotPatternAuthoring radial && radial.ShotCount < 2)
                 warnings.Add("CV024: Radial ShotPattern requires ShotCount >= 2.");
 
             if (entry.Emission is PoissonEmissionAuthoring poisson
@@ -701,7 +694,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 warnings.Add("CV025: Timed EventShotSchedule requires EventShotIntervalSec > 0.");
             }
 
-            if (entry.PositionPattern is PointSetPositionPatternAuthoring pointSet
+            if (profile.PositionPattern is PointSetPositionPatternAuthoring pointSet
                 && (pointSet.Points == null || pointSet.Points.Length <= 0))
             {
                 warnings.Add("CV028: PointSet PositionPattern requires at least one point.");
@@ -713,7 +706,9 @@ namespace SweepNDodge.DotsBullets.Editor
         public static List<ContentValidationIssue> ValidateCurrentClip(WaveClipSO clip)
         {
             var definitions = new List<ContentValidationRecord<BulletDefinitionSO>>();
+            var profiles = new List<ContentValidationRecord<EmissionProfileSO>>();
             var seenDefinitionIds = new HashSet<int>();
+            var seenProfileIds = new HashSet<int>();
 
             if (clip?.Segments != null)
             {
@@ -725,7 +720,15 @@ namespace SweepNDodge.DotsBullets.Editor
 
                     for (int d = 0; d < directives.Length; d++)
                     {
-                        var bullet = directives[d]?.Payload.Bullet;
+                        var profile = directives[d]?.Profile;
+                        if (profile != null)
+                        {
+                            int profileId = profile.GetInstanceID();
+                            if (seenProfileIds.Add(profileId))
+                                profiles.Add(new ContentValidationRecord<EmissionProfileSO>(profile, $"clip/EmissionProfiles[{profiles.Count}]"));
+                        }
+
+                        var bullet = profile != null ? profile.Bullet : null;
                         if (bullet == null)
                             continue;
 
@@ -741,6 +744,10 @@ namespace SweepNDodge.DotsBullets.Editor
             var input = new ContentValidationInput(
                 definitions,
                 new[] { new ContentValidationRecord<WaveClipSO>(clip, "clip") },
+                null,
+                null,
+                profiles,
+                null,
                 null,
                 null,
                 null);
@@ -764,6 +771,14 @@ namespace SweepNDodge.DotsBullets.Editor
         public static string FormatIssueLabel(in ContentValidationIssue issue)
         {
             return $"{issue.Code} | {issue.Location} | {issue.Message}";
+        }
+
+        private static string FormatProfile(EmissionProfileSO profile)
+        {
+            if (profile == null)
+                return "None";
+
+            return !string.IsNullOrWhiteSpace(profile.name) ? profile.name : "EmissionProfile";
         }
 
         private static string FormatBullet(BulletDefinitionSO bullet)

@@ -29,7 +29,6 @@ namespace SweepNDodge.DotsBullets.Editor
             var topologyPrefabCatalogs = CollectScriptableObjects<StageTopologyPrefabCatalogSO>();
             var cleanupActionSets = CollectScriptableObjects<PlayerCleanupActionSetSO>();
             var emissionProfiles = CollectScriptableObjects<EmissionProfileSO>();
-            var hazardEmitterEmissionProfiles = CollectScriptableObjects<HazardEmitterEmissionProfileSO>();
             var inWorldDialogueCatalogs = CollectScriptableObjects<InWorldDialogueCatalogSO>();
             var inWorldDialogueSpeakerCatalogs = CollectScriptableObjects<InWorldDialogueSpeakerCatalogSO>();
             var visuals = new List<ContentValidationRecord<BulletVisualPrefabAuthoring>>();
@@ -48,7 +47,6 @@ namespace SweepNDodge.DotsBullets.Editor
             SortRecordsByLocation(topologyPrefabCatalogs);
             SortRecordsByLocation(cleanupActionSets);
             SortRecordsByLocation(emissionProfiles);
-            SortRecordsByLocation(hazardEmitterEmissionProfiles);
             SortRecordsByLocation(inWorldDialogueCatalogs);
             SortRecordsByLocation(inWorldDialogueSpeakerCatalogs);
             SortRecordsByLocation(visuals);
@@ -62,7 +60,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 topologyPrefabCatalogs,
                 cleanupActionSets,
                 emissionProfiles,
-                hazardEmitterEmissionProfiles,
                 visuals,
                 sources,
                 bullets,
