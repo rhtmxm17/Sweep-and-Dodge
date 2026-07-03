@@ -21,10 +21,6 @@ namespace SweepNDodge.DotsBullets
             state.CompleteDependency();
             state.Dependency = default;
 
-            bool hasSecondaryChannel = SystemAPI.TryGetSingletonEntity<BulletSecondarySpawnChannelSingletonTag>(out var channelEntity);
-            DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests = default;
-            if (hasSecondaryChannel)
-                secondaryRequests = state.EntityManager.GetBuffer<BulletSecondarySpawnRequestBuffer>(channelEntity);
             bool hasDiscreteChannel = SystemAPI.TryGetSingletonEntity<DiscreteEmitChannelSingletonTag>(out var discreteChannelEntity);
             DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests = default;
             if (hasDiscreteChannel)
@@ -44,13 +40,9 @@ namespace SweepNDodge.DotsBullets
             var txLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
             var sourceRefLookup = SystemAPI.GetComponentLookup<BulletSourceRefComponent>(true);
             var emissionProfileRefLookup = SystemAPI.GetComponentLookup<BulletEmissionProfileRefComponent>(true);
-            var explodeReactionLookup = SystemAPI.GetComponentLookup<BulletOnMotionCompletedExplodeReactionComponent>(true);
-            var cleanupRemovedReactionLookup = SystemAPI.GetComponentLookup<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(true);
             txLookup.Update(ref state);
             sourceRefLookup.Update(ref state);
             emissionProfileRefLookup.Update(ref state);
-            explodeReactionLookup.Update(ref state);
-            cleanupRemovedReactionLookup.Update(ref state);
 
             foreach (var (despawnRequest, lifecycleRequest, lifecycleContact, entity) in SystemAPI
                          .Query<EnabledRefRO<BulletDespawnRequestTag>, RefRO<BulletLifecycleRequestComponent>, RefRO<BulletLifecycleContactComponent>>()
@@ -66,17 +58,13 @@ namespace SweepNDodge.DotsBullets
                     currentFrame,
                     hasFixedTickRuntime,
                     in fixedTickRuntime,
-                    hasSecondaryChannel,
-                    secondaryRequests,
                     hasDiscreteChannel,
                     discreteRequests,
                     hasRegistry,
                     registry,
                     ref txLookup,
                     ref sourceRefLookup,
-                    ref emissionProfileRefLookup,
-                    ref explodeReactionLookup,
-                    ref cleanupRemovedReactionLookup);
+                    ref emissionProfileRefLookup);
             }
         }
 
@@ -87,17 +75,13 @@ namespace SweepNDodge.DotsBullets
             uint currentFrame,
             bool hasFixedTickRuntime,
             in FixedTickStepRuntimeComponent fixedTickRuntime,
-            bool hasSecondaryChannel,
-            DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
             bool hasDiscreteChannel,
             DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
             bool hasRegistry,
             DynamicBuffer<EmissionProfileRuntimeRegistryBuffer> registry,
             ref ComponentLookup<LocalTransform> txLookup,
             ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
-            ref ComponentLookup<BulletEmissionProfileRefComponent> emissionProfileRefLookup,
-            ref ComponentLookup<BulletOnMotionCompletedExplodeReactionComponent> explodeReactionLookup,
-            ref ComponentLookup<BulletOnCleanupRemovedSpawnSecondaryReactionComponent> cleanupRemovedReactionLookup)
+            ref ComponentLookup<BulletEmissionProfileRefComponent> emissionProfileRefLookup)
         {
             switch (lifecycleRequest.Reason)
             {
@@ -107,17 +91,19 @@ namespace SweepNDodge.DotsBullets
                     break;
                 case BulletLifecycleReasonId.VacuumCollected:
                 case BulletLifecycleReasonId.CarryFullRemoved:
-                    TryAppendCleanupRemovedSecondarySpawnRequest(
+                    TryAppendCleanupRemovedTriggeredEmissionRequest(
                         bullet,
                         in lifecycleContact,
                         currentFrame,
                         hasFixedTickRuntime,
                         in fixedTickRuntime,
-                        hasSecondaryChannel,
-                        secondaryRequests,
+                        hasDiscreteChannel,
+                        discreteRequests,
+                        hasRegistry,
+                        registry,
                         ref txLookup,
                         ref sourceRefLookup,
-                        ref cleanupRemovedReactionLookup);
+                        ref emissionProfileRefLookup);
                     break;
                 case BulletLifecycleReasonId.MotionCompleted:
                     if (TryAppendMotionCompletedTriggeredEmissionRequest(
@@ -136,23 +122,81 @@ namespace SweepNDodge.DotsBullets
                     {
                         break;
                     }
-
-                    TryAppendMotionCompletedExplodeRequest(
-                        bullet,
-                        in lifecycleContact,
-                        currentFrame,
-                        hasFixedTickRuntime,
-                        in fixedTickRuntime,
-                        hasSecondaryChannel,
-                        secondaryRequests,
-                        ref txLookup,
-                        ref sourceRefLookup,
-                        ref explodeReactionLookup);
                     break;
                 case BulletLifecycleReasonId.None:
                 default:
                     break;
             }
+        }
+
+        private static bool TryAppendCleanupRemovedTriggeredEmissionRequest(
+            Entity bullet,
+            in BulletLifecycleContactComponent lifecycleContact,
+            uint currentFrame,
+            bool hasFixedTickRuntime,
+            in FixedTickStepRuntimeComponent fixedTickRuntime,
+            bool hasDiscreteChannel,
+            DynamicBuffer<DiscreteEmitRequestBuffer> discreteRequests,
+            bool hasRegistry,
+            DynamicBuffer<EmissionProfileRuntimeRegistryBuffer> registry,
+            ref ComponentLookup<LocalTransform> txLookup,
+            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
+            ref ComponentLookup<BulletEmissionProfileRefComponent> emissionProfileRefLookup)
+        {
+            if (!hasDiscreteChannel || !hasRegistry || !emissionProfileRefLookup.HasComponent(bullet))
+                return false;
+
+            int sourceProfileRefId = emissionProfileRefLookup[bullet].ProfileRefId;
+            if (sourceProfileRefId == 0)
+                return false;
+
+            if (!EmissionProfileRuntimeRegistryUtility.TryFind(registry, sourceProfileRefId, out var sourceProfile)
+                || sourceProfile.HasCleanupRemovedTrigger == 0
+                || sourceProfile.CleanupRemovedTargetProfileRefId == 0)
+            {
+                return false;
+            }
+
+            if (!EmissionProfileRuntimeRegistryUtility.TryFind(
+                    registry,
+                    sourceProfile.CleanupRemovedTargetProfileRefId,
+                    out var targetProfile))
+            {
+                return false;
+            }
+
+            Entity sourceEntity = ResolveTriggerSourceEntity(
+                bullet,
+                sourceProfile.CleanupRemovedSourceEntity,
+                ref sourceRefLookup);
+            Entity causerEntity = ResolveTriggerCauserEntity(
+                bullet,
+                sourceProfile.CleanupRemovedCauserEntity);
+            float originY = txLookup.HasComponent(bullet)
+                ? txLookup[bullet].Position.y
+                : 0f;
+            float3 anchorPosition = new(
+                lifecycleContact.PositionXZ.x,
+                originY,
+                lifecycleContact.PositionXZ.y);
+            float2 contextDirection = math.normalizesafe(lifecycleContact.DirectionXZ, new float2(1f, 0f));
+            uint readyFrame = ResolveReadyFrame(
+                currentFrame,
+                sourceProfile.CleanupRemovedDelaySec,
+                hasFixedTickRuntime,
+                in fixedTickRuntime);
+
+            var seed = DiscreteEmitRequestUtility.BuildDiscreteEmitSeedFromTriggeredRegistry(
+                sourceEntity,
+                causerEntity,
+                sourceProfile.ProfileRefId,
+                in targetProfile,
+                anchorPosition,
+                contextDirection,
+                readyFrame,
+                priority: 0);
+            discreteRequests.Add(DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(seed, currentFrame));
+            return true;
         }
 
         private static bool TryAppendMotionCompletedTriggeredEmissionRequest(
@@ -248,121 +292,6 @@ namespace SweepNDodge.DotsBullets
                 EmissionTriggerCauserBindingId.CompletedBullet => bullet,
                 _ => Entity.Null,
             };
-        }
-
-        private static void TryAppendMotionCompletedExplodeRequest(
-            Entity bullet,
-            in BulletLifecycleContactComponent lifecycleContact,
-            uint currentFrame,
-            bool hasFixedTickRuntime,
-            in FixedTickStepRuntimeComponent fixedTickRuntime,
-            bool hasSecondaryChannel,
-            DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
-            ref ComponentLookup<LocalTransform> txLookup,
-            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
-            ref ComponentLookup<BulletOnMotionCompletedExplodeReactionComponent> explodeReactionLookup)
-        {
-            if (!hasSecondaryChannel || !explodeReactionLookup.HasComponent(bullet))
-                return;
-
-            var reaction = explodeReactionLookup[bullet];
-            TryAppendSecondarySpawnRequest(
-                bullet,
-                reaction.SecondaryBulletTypeKey,
-                reaction.SpawnCount,
-                reaction.Shape,
-                reaction.SpreadAngleDeg,
-                reaction.SpawnRadius,
-                reaction.SpawnDelaySec,
-                in lifecycleContact,
-                currentFrame,
-                hasFixedTickRuntime,
-                in fixedTickRuntime,
-                secondaryRequests,
-                ref txLookup,
-                ref sourceRefLookup);
-        }
-
-        private static void TryAppendCleanupRemovedSecondarySpawnRequest(
-            Entity bullet,
-            in BulletLifecycleContactComponent lifecycleContact,
-            uint currentFrame,
-            bool hasFixedTickRuntime,
-            in FixedTickStepRuntimeComponent fixedTickRuntime,
-            bool hasSecondaryChannel,
-            DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
-            ref ComponentLookup<LocalTransform> txLookup,
-            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
-            ref ComponentLookup<BulletOnCleanupRemovedSpawnSecondaryReactionComponent> cleanupRemovedReactionLookup)
-        {
-            if (!hasSecondaryChannel || !cleanupRemovedReactionLookup.HasComponent(bullet))
-                return;
-
-            var reaction = cleanupRemovedReactionLookup[bullet];
-            TryAppendSecondarySpawnRequest(
-                bullet,
-                reaction.SecondaryBulletTypeKey,
-                reaction.SpawnCount,
-                reaction.Shape,
-                reaction.SpreadAngleDeg,
-                reaction.SpawnRadius,
-                reaction.SpawnDelaySec,
-                in lifecycleContact,
-                currentFrame,
-                hasFixedTickRuntime,
-                in fixedTickRuntime,
-                secondaryRequests,
-                ref txLookup,
-                ref sourceRefLookup);
-        }
-
-        private static void TryAppendSecondarySpawnRequest(
-            Entity bullet,
-            int secondaryBulletTypeKey,
-            int spawnCount,
-            BulletSecondarySpawnShapeId shape,
-            float spreadAngleDeg,
-            float spawnRadius,
-            float spawnDelaySec,
-            in BulletLifecycleContactComponent lifecycleContact,
-            uint currentFrame,
-            bool hasFixedTickRuntime,
-            in FixedTickStepRuntimeComponent fixedTickRuntime,
-            DynamicBuffer<BulletSecondarySpawnRequestBuffer> secondaryRequests,
-            ref ComponentLookup<LocalTransform> txLookup,
-            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup)
-        {
-            if (secondaryBulletTypeKey < 0 || spawnCount <= 0)
-                return;
-
-            Entity sourceEntity = sourceRefLookup.HasComponent(bullet)
-                ? sourceRefLookup[bullet].Value
-                : Entity.Null;
-            float originY = txLookup.HasComponent(bullet)
-                ? txLookup[bullet].Position.y
-                : 0f;
-            uint readyFrame = ResolveReadyFrame(
-                currentFrame,
-                spawnDelaySec,
-                hasFixedTickRuntime,
-                in fixedTickRuntime);
-
-            secondaryRequests.Add(new BulletSecondarySpawnRequestBuffer
-            {
-                BulletTypeKey = secondaryBulletTypeKey,
-                Count = spawnCount,
-                Priority = 0,
-                SourceEntity = sourceEntity,
-                CauserEntity = bullet,
-                OriginPosition = new float3(lifecycleContact.PositionXZ.x, originY, lifecycleContact.PositionXZ.y),
-                BaseDirection = math.normalizesafe(lifecycleContact.DirectionXZ, new float2(1f, 0f)),
-                SpreadAngleDeg = spreadAngleDeg,
-                SpawnRadius = spawnRadius,
-                Shape = shape,
-                OldestFrame = currentFrame,
-                ReadyFrame = readyFrame,
-                Sequence = 0u,
-            });
         }
 
         private static uint ResolveReadyFrame(

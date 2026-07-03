@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -28,17 +28,3 @@ MonoBehaviour:
     TurnRateDegPerSec: 90
     MaxAcquireDistance: 10
     MinRetargetDistance: 0.25
-  OnMotionCompletedExplode:
-    Enabled: 0
-    SecondaryBullet: {fileID: 0}
-    SpawnCount: 0
-    Shape: 2
-    SpreadAngleDeg: 90
-    SpawnRadius: 0
-  OnCleanupRemovedSpawnSecondary:
-    Enabled: 0
-    SecondaryBullet: {fileID: 0}
-    SpawnCount: 0
-    Shape: 2
-    SpreadAngleDeg: 90
-    SpawnRadius: 0

@@ -24,7 +24,7 @@
   - `WaveSpawnEntryAuthoring`, `HazardEmitterEmissionProfileSO`, 기존 secondary spawn reaction 데이터의 통합/호환 전략이 구현 착수 가능한 단위로 분해된다.
   - 최종 완료 시점에는 Source/Hazard/Triggered의 공통 탄막 문법이 모두 `EmissionProfileSO` 참조형으로 전환된다.
   - 기존 WaveClip/Hazard/secondary spawn asset migration이 완료되고, operational asset에 남은 inline common emission grammar는 제거되거나 compatibility-only 상태로 격하된다.
-  - 데이터 스키마 확정 전에는 `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer`, `BulletSecondarySpawnRequestBuffer` 같은 파이프라인 계층 변경을 착수하지 않는다.
+  - 데이터 스키마 확정 전에는 `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer` 같은 파이프라인 계층 변경을 착수하지 않는다.
 - 이번 T2b 문서 반영 직후에 하지 않을 것:
   - runtime spawn request/channel 재설계 구현
   - 기존 asset migration 실행
@@ -34,9 +34,11 @@
 - `EmissionProfile`은 Source/Hazard/Triggered 모두가 쓰는 공통 탄막 데이터 단위로 둔다.
 - `Sampling`, `RateField`, Source area sampling은 Source 전용 개념이므로 `EmissionProfile` 안에 넣지 않고 실행 context/wrapper가 제공한다.
 - Triggered emission의 anchor/direction은 `EmissionProfile` 내부 데이터가 아니라 trigger link/context binding이 제공한다.
-- 1차 lifecycle trigger 이벤트 범위는 `MotionCompleted`만 연다.
-- `BulletDefinitionSO`의 `Speed`, `Lifetime`, `MovementFamily`, `DampedLinear`, `HomingLite`, `OnMotionCompletedExplode`, `OnCleanupRemovedSpawnSecondary`는 신규 데이터 작성 기준에서 deprecated로 취급한다.
-- 기존 `BulletSecondarySpawnRequestBuffer` 기반 secondary spawn 경로는 호환 경로로 유지하되, 신규 설계의 SSOT로 확장하지 않는다.
+- lifecycle trigger 이벤트 범위는 현재 `MotionCompleted`, `CleanupRemoved`까지 연다.
+- `BulletDefinitionSO`의 `Speed`, `Lifetime`, `MovementFamily`, `DampedLinear`, `HomingLite`, `OnCleanupRemovedSpawnSecondary`는 신규 데이터 작성 기준에서 deprecated로 취급한다.
+- `OnMotionCompletedExplode`는 `EmissionProfileSO.LifecycleTriggers.MotionCompleted`로 migration 완료 후 제거됐다.
+- `OnCleanupRemovedSpawnSecondary`는 `EmissionProfileSO.LifecycleTriggers.CleanupRemoved`로 migration 완료 후 제거됐다.
+- 기존 `BulletSecondarySpawnRequestBuffer` 기반 secondary spawn 경로는 제거됐다. 신규/현재 후속 발사의 SSOT는 `EmissionProfileSO` lifecycle trigger와 `DiscreteEmitRequestBuffer` registry path다.
 - 최종 목표는 전면 참조형 전환이다. Source/Hazard/Triggered의 active authoring SSOT는 `EmissionProfileSO` 참조다.
 - 전환형 하이브리드는 최종 아키텍처가 아니라 staged migration 전략으로만 사용했다. cleanup 완료 후 `WaveSpawnEntryAuthoring` inline common grammar와 `HazardEmitterEmissionProfileSO` compatibility source는 제거됐다.
 
@@ -54,7 +56,8 @@ EmissionProfile
 - Aim
 - ShotPattern
 - LifecycleTriggers
-  - MotionCompleted only in first implementation slice
+  - MotionCompleted
+  - CleanupRemoved
 ```
 
 ### Source Wrapper
@@ -85,7 +88,7 @@ HazardActorPatternSlot
 ### Triggered Wrapper
 ```text
 LifecycleTrigger
-- Event: MotionCompleted
+- Event: MotionCompleted / CleanupRemoved
 - TriggerEmissionProfile
 - ContextBinding
   - OriginPosition: LifecycleContactPosition
@@ -109,7 +112,7 @@ LifecycleTrigger
   - `OnMotionCompletedExplode.Enabled = true`
   - secondary bullet은 `bd_sample_bubble_fragment.asset`
   - `PointBurst`, `SpawnCount = 8`, `SpreadAngleDeg = 360`, `SpawnRadius = 0.08`
-- `bd_sample_candy.asset`는 `OnCleanupRemovedSpawnSecondary` 대표 데이터다. 1차 범위에는 포함하지 않고 후속 trigger event 후보로 둔다.
+- 기존 `OnCleanupRemovedSpawnSecondary` serialized block은 bullet definition asset에서 제거됐다. 확인 시점에 enabled operational cleanup secondary 데이터는 남아 있지 않아 별도 target profile 생성 migration은 필요하지 않았다.
 - `WaveSpawnEntryAuthoring`과 `HazardEmitterEmissionProfileSO`는 이미 유사한 emission grammar를 중복 소유한다.
 - `HazardEmitterEmissionProfileSO`는 Source 전용 sampling/rate 개념 없이 discrete emission에 가까운 형태다.
 
@@ -154,16 +157,46 @@ LifecycleTrigger
 - 없음
 
 ## Parking Lot
-- [ ] P1. `CleanupRemoved`, `PlayerHit`, `LifetimeExpired`, `StageBlocked` trigger event 확장
-  - 근거: 1차 범위는 `MotionCompleted`만 열고, 이벤트 확장은 데이터 구조 안정화 후 판단한다.
+- [ ] P1. `PlayerHit`, `LifetimeExpired`, `StageBlocked` trigger event 확장
+  - 근거: 현재 범위는 `MotionCompleted`, `CleanupRemoved`까지 열었고, 나머지 이벤트는 데이터 구조 안정화 후 판단한다.
 - [ ] P2. `EmissionProfile` graph/preview editor UX
   - 근거: trigger profile 참조 구조가 확정된 뒤 graph view나 preview context를 설계하는 편이 안전하다.
-- [ ] P3. frame당 triggered emission budget과 backlog 정책
-  - 근거: T6에서는 `DiscreteEmitPolicyComponent` 재사용을 기본으로 두고, trigger storm 확인 시 별도 budget slot을 추가하기로 했다.
-- [ ] P4. 기존 `BulletSecondarySpawnRequestBuffer` 제거 여부
-  - 근거: 신규 구조가 안정화될 때까지 legacy compatibility path로 유지한다.
-
 ## Done
+- [x] T15. ProducerKind별 DiscreteEmit budget/backlog 정책 구현
+  - 결과: C안 기준으로 단일 `DiscreteEmitRequestBuffer` / `DiscreteEmitExecutionSystem`을 유지했다.
+  - 결과: `DiscreteEmitPolicyComponent`에 `WaveClipEvent`, `HazardActor`, `TriggeredEmission`별 budget/cap field를 추가했다.
+  - 결과: `DiscreteEmitBacklogMetricsComponent`에 ProducerKind별 pending/deferred/budget used/dropped/expired metrics를 추가했다.
+  - 결과: `DiscreteEmitExecutionSystem`이 global budget/cap과 ProducerKind별 budget/cap을 함께 만족하는 request만 실행 후보로 선택하도록 갱신했다.
+  - 결과: ProducerKind별 값이 0이면 기존 global 정책을 fallback으로 사용해 기존 fixture 호환성을 유지한다.
+  - 검증: 관련 EditMode 테스트 29개 통과.
+  - 검증: DiscreteEmit 관련 EditMode 테스트 12개 통과.
+  - 검증: 전체 EditMode 464개 통과.
+  - 검증: `BulletPlayModeSmokeTests` 39개 통과.
+  - 검증: 최종 compile 후 프로젝트 코드 error 0건. 단, MCP bridge 연결 로그는 Unity Console의 error 타입으로 남는 도구 로그로 확인했다.
+- [x] T14. CleanupRemoved legacy runtime/data 제거 및 profile trigger 전환
+  - 결과: `EmissionProfileSO.LifecycleTriggers.CleanupRemoved` authoring schema와 resolver/runtime registry field를 추가했다.
+  - 결과: `VacuumCollected`, `CarryFullRemoved` lifecycle request는 profile registry에서 `CleanupRemoved.TargetProfile`을 조회해 `DiscreteEmitRequestBuffer`에 triggered emission request를 append한다.
+  - 결과: `BulletDefinitionSO.OnCleanupRemovedSpawnSecondary`, cleanup secondary component/authoring, `BulletSecondarySpawnRequestBuffer`, `SecondarySpawnExecutionSystem`을 제거했다.
+  - 결과: bullet definition asset의 `OnCleanupRemovedSpawnSecondary` serialized block을 제거했다.
+  - 결과: legacy secondary spawn 전용 EditMode/PlayMode 테스트를 제거하고, CleanupRemoved profile trigger behavior/validation/registry 테스트로 갱신했다.
+  - 검증: 관련 EditMode 테스트 75개 통과.
+  - 검증: 전체 EditMode 462개 통과.
+  - 검증: `BulletPlayModeSmokeTests` 39개 통과.
+  - 검증: 최종 compile 후 프로젝트 코드 error 0건. 단, MCP bridge 연결 로그는 Unity Console의 error 타입으로 남는 도구 로그로 확인했다.
+- [x] T13. MotionCompleted legacy runtime/authoring/test 제거
+  - 결과: `BulletDefinitionSO.OnMotionCompletedExplode` 필드, `BulletOnMotionCompletedExplodeReactionComponent`, optional authoring 파일을 제거했다.
+  - 결과: `BulletVisualPrefabAuthoring` / `BulletPoolOwnerBootstrapSystem`의 MotionCompleted legacy bake/bootstrap 경로를 제거했다.
+  - 결과: `BulletLifecycleReactionExecutionSystem`에서 registry miss 시 legacy secondary spawn fallback을 제거했다. 이제 MotionCompleted 후속 발사는 profile registry 경로만 사용한다.
+  - 결과: `ContentValidationRules`의 legacy coexistence warning `CVW041`과 forbidden optional authoring 검사 항목을 제거했다.
+  - 결과: legacy MotionCompleted explode 전용 EditMode/PlayMode 테스트를 삭제하고, profile trigger 테스트로 갱신했다.
+  - 검증: 관련 EditMode 테스트 64개 통과.
+  - 검증: 전체 EditMode 478개 통과.
+  - 검증: `BulletPlayModeSmokeTests` 39개 통과.
+  - 검증: 최종 compile 후 프로젝트 코드 error 0건. 단, MCP bridge 연결 로그는 Unity Console의 error 타입으로 남는 도구 로그로 확인했다.
+- [x] T12. MotionCompleted legacy data migration
+  - 결과: operational/test bullet definition asset의 `OnMotionCompletedExplode` serialized block을 제거했다.
+  - 결과: enabled legacy 데이터는 `bd_sample_bubble` 1건이었고, 이미 존재하는 `ep_sample_bubble_parent -> ep_sample_bubble_fragments` profile trigger 경로로 대체됐다.
+  - 결과: `OnMotionCompletedExplode.SpawnRadius = 0.08`은 기존 TD 기준대로 1차 단순 변환에서는 보존하지 않았다. exact radius 보존은 후속 `PositionPattern` 확장 후보로 유지한다.
 - [x] T11. `MotionCompleted` LifecycleTrigger runtime registry 구현
   - 결과: `BulletEmissionProfileRefComponent`를 추가해 spawned bullet이 자신이 spawn된 `ProfileRefId`를 보유하도록 했다.
   - 결과: `EmissionProfileRuntimeRegistryTag` singleton과 `EmissionProfileRuntimeRegistryBuffer`를 추가했다.
@@ -287,6 +320,6 @@ LifecycleTrigger
   - 결과: `CleanupRemoved` 등 다른 lifecycle event는 후속 확장 후보로 분리했다.
 
 ## End of Session
-- 결과: T1~T11 완료. `EmissionProfileSO` authoring schema, resolver, operational asset migration, reference integrity validation, profile SpawnTuning/MovementTuning runtime 적용, `MotionCompleted -> TriggerEmissionProfile` registry runtime path가 반영됐다.
-- 남은 리스크: `CleanupRemoved`, `PlayerHit`, `LifetimeExpired`, `StageBlocked` trigger event는 아직 열지 않았다. 기존 `BulletSecondarySpawnRequestBuffer`는 compatibility path로 남아 있다.
-- 다음 세션 시작점: lifecycle trigger event 확장 여부, triggered emission budget/backlog 별도 정책, legacy secondary spawn 제거 가능성 검토.
+- 결과: T1~T15 완료. `EmissionProfileSO` authoring schema, resolver, operational asset migration, reference integrity validation, profile SpawnTuning/MovementTuning runtime 적용, `MotionCompleted`/`CleanupRemoved -> TriggerEmissionProfile` registry runtime path, legacy secondary spawn 제거, ProducerKind별 DiscreteEmit budget/backlog 정책이 반영됐다.
+- 남은 리스크: `PlayerHit`, `LifetimeExpired`, `StageBlocked` trigger event는 아직 열지 않았다. ProducerKind별 budget/cap field는 추가됐지만 실제 operational tuning 값은 아직 기본값 0(global fallback)이다.
+- 다음 세션 시작점: 남은 lifecycle event 확장 여부, operational ProducerKind별 budget/cap tuning 적용 여부, legacy `SpawnRadius` 보존을 위한 `PositionPattern` 확장 여부 검토.

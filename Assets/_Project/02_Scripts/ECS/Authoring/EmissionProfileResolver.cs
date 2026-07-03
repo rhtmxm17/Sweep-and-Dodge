@@ -49,6 +49,15 @@ namespace SweepNDodge.DotsBullets
         public EmissionTriggerSourceBindingId MotionCompletedSourceEntity;
         public EmissionTriggerCauserBindingId MotionCompletedCauserEntity;
         public float MotionCompletedDelaySec;
+
+        public bool HasCleanupRemovedTrigger;
+        public EmissionProfileSO CleanupRemovedTargetProfile;
+        public int CleanupRemovedTargetProfileRefId;
+        public EmissionTriggerOriginBindingId CleanupRemovedOriginPosition;
+        public EmissionTriggerDirectionBindingId CleanupRemovedForwardDirection;
+        public EmissionTriggerSourceBindingId CleanupRemovedSourceEntity;
+        public EmissionTriggerCauserBindingId CleanupRemovedCauserEntity;
+        public float CleanupRemovedDelaySec;
     }
 
     public static class EmissionProfileResolver
@@ -180,6 +189,14 @@ namespace SweepNDodge.DotsBullets
                 MotionCompletedSourceEntity = EmissionTriggerSourceBindingId.CauserSourceEntity,
                 MotionCompletedCauserEntity = EmissionTriggerCauserBindingId.CompletedBullet,
                 MotionCompletedDelaySec = 0f,
+                HasCleanupRemovedTrigger = false,
+                CleanupRemovedTargetProfile = null,
+                CleanupRemovedTargetProfileRefId = 0,
+                CleanupRemovedOriginPosition = EmissionTriggerOriginBindingId.LifecycleContactPosition,
+                CleanupRemovedForwardDirection = EmissionTriggerDirectionBindingId.LifecycleContactDirection,
+                CleanupRemovedSourceEntity = EmissionTriggerSourceBindingId.CauserSourceEntity,
+                CleanupRemovedCauserEntity = EmissionTriggerCauserBindingId.CompletedBullet,
+                CleanupRemovedDelaySec = 0f,
             };
         }
 
@@ -208,19 +225,34 @@ namespace SweepNDodge.DotsBullets
         private static void ApplyLifecycleTriggers(ref ResolvedEmissionCore core, EmissionLifecycleTriggersAuthoring lifecycleTriggers)
         {
             var motionCompleted = lifecycleTriggers?.MotionCompleted;
-            if (motionCompleted == null || !motionCompleted.Enabled)
+            if (motionCompleted != null && motionCompleted.Enabled)
+            {
+                core.HasMotionCompletedTrigger = true;
+                core.MotionCompletedTargetProfile = motionCompleted.TargetProfile;
+                core.MotionCompletedTargetProfileRefId = motionCompleted.TargetProfile != null
+                    ? motionCompleted.TargetProfile.GetInstanceID()
+                    : 0;
+                core.MotionCompletedOriginPosition = motionCompleted.OriginPosition;
+                core.MotionCompletedForwardDirection = motionCompleted.ForwardDirection;
+                core.MotionCompletedSourceEntity = motionCompleted.SourceEntity;
+                core.MotionCompletedCauserEntity = motionCompleted.CauserEntity;
+                core.MotionCompletedDelaySec = Mathf.Max(0f, motionCompleted.DelaySec);
+            }
+
+            var cleanupRemoved = lifecycleTriggers?.CleanupRemoved;
+            if (cleanupRemoved == null || !cleanupRemoved.Enabled)
                 return;
 
-            core.HasMotionCompletedTrigger = true;
-            core.MotionCompletedTargetProfile = motionCompleted.TargetProfile;
-            core.MotionCompletedTargetProfileRefId = motionCompleted.TargetProfile != null
-                ? motionCompleted.TargetProfile.GetInstanceID()
+            core.HasCleanupRemovedTrigger = true;
+            core.CleanupRemovedTargetProfile = cleanupRemoved.TargetProfile;
+            core.CleanupRemovedTargetProfileRefId = cleanupRemoved.TargetProfile != null
+                ? cleanupRemoved.TargetProfile.GetInstanceID()
                 : 0;
-            core.MotionCompletedOriginPosition = motionCompleted.OriginPosition;
-            core.MotionCompletedForwardDirection = motionCompleted.ForwardDirection;
-            core.MotionCompletedSourceEntity = motionCompleted.SourceEntity;
-            core.MotionCompletedCauserEntity = motionCompleted.CauserEntity;
-            core.MotionCompletedDelaySec = Mathf.Max(0f, motionCompleted.DelaySec);
+            core.CleanupRemovedOriginPosition = cleanupRemoved.OriginPosition;
+            core.CleanupRemovedForwardDirection = cleanupRemoved.ForwardDirection;
+            core.CleanupRemovedSourceEntity = cleanupRemoved.SourceEntity;
+            core.CleanupRemovedCauserEntity = cleanupRemoved.CauserEntity;
+            core.CleanupRemovedDelaySec = Mathf.Max(0f, cleanupRemoved.DelaySec);
         }
 
         private static void ApplyPositionPattern(

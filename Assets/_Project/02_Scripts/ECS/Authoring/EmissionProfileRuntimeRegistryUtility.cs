@@ -144,6 +144,8 @@ namespace SweepNDodge.DotsBullets
             registry.Add(CreateEntry(in core));
             if (core.HasMotionCompletedTrigger)
                 CollectProfileRecursive(core.MotionCompletedTargetProfile, registry, visited);
+            if (core.HasCleanupRemovedTrigger)
+                CollectProfileRecursive(core.CleanupRemovedTargetProfile, registry, visited);
         }
 
         private static EmissionProfileRuntimeRegistryBuffer CreateEntry(in ResolvedEmissionCore core)
@@ -189,6 +191,13 @@ namespace SweepNDodge.DotsBullets
                 MotionCompletedSourceEntity = core.MotionCompletedSourceEntity,
                 MotionCompletedCauserEntity = core.MotionCompletedCauserEntity,
                 MotionCompletedDelaySec = math.max(0f, core.MotionCompletedDelaySec),
+                HasCleanupRemovedTrigger = core.HasCleanupRemovedTrigger ? (byte)1 : (byte)0,
+                CleanupRemovedTargetProfileRefId = core.CleanupRemovedTargetProfileRefId,
+                CleanupRemovedOriginPosition = core.CleanupRemovedOriginPosition,
+                CleanupRemovedForwardDirection = core.CleanupRemovedForwardDirection,
+                CleanupRemovedSourceEntity = core.CleanupRemovedSourceEntity,
+                CleanupRemovedCauserEntity = core.CleanupRemovedCauserEntity,
+                CleanupRemovedDelaySec = math.max(0f, core.CleanupRemovedDelaySec),
             };
         }
     }

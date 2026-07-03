@@ -12,7 +12,6 @@ namespace SweepNDodge.DotsBullets
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
     [UpdateAfter(typeof(BulletFieldAreaUpdateSystem))]
-    [UpdateAfter(typeof(SecondarySpawnExecutionSystem))]
     [UpdateAfter(typeof(DiscreteEmitExecutionSystem))]
     public partial struct SpawnRequestRoundRobinExecutionSystem : ISystem
     {

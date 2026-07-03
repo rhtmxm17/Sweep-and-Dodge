@@ -21,7 +21,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void PoolBootstrap_AppliesMovementAndReactionMetadata_FromDefinitionBuffer()
+        public void PoolBootstrap_AppliesMovementMetadata_FromDefinitionBuffer()
         {
             using var world = new World("BulletDefinitionSchema_Apply");
             var em = world.EntityManager;
@@ -47,24 +47,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     StopSpeedThreshold = 0.25f,
                 },
                 HomingLite = default,
-                OnMotionCompletedExplode = new BulletSecondarySpawnReactionRuntimeDefinition
-                {
-                    SecondaryBulletTypeKey = 777,
-                    SpawnCount = 4,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 90f,
-                    SpawnRadius = 1.5f,
-                    SpawnDelaySec = 0.2f,
-                },
-                OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionRuntimeDefinition
-                {
-                    SecondaryBulletTypeKey = 778,
-                    SpawnCount = 2,
-                    Shape = BulletSecondarySpawnShapeId.ForwardSpread,
-                    SpreadAngleDeg = 30f,
-                    SpawnRadius = 0.5f,
-                    SpawnDelaySec = 0.1f,
-                },
             });
 
             world.GetOrCreateSystem<BulletPoolOwnerBootstrapSystem>().Update(world.Unmanaged);
@@ -73,22 +55,10 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(BulletFieldShared.FreeByKey.TryGetFirstValue(501, out var bullet, out var iterator), Is.True);
             Assert.That(em.HasComponent<BulletDampedMotionComponent>(bullet), Is.True);
             Assert.That(em.HasComponent<BulletHomingLiteMotionComponent>(bullet), Is.False);
-            Assert.That(em.HasComponent<BulletOnMotionCompletedExplodeReactionComponent>(bullet), Is.True);
-            Assert.That(em.HasComponent<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(bullet), Is.True);
 
             var damped = em.GetComponentData<BulletDampedMotionComponent>(bullet);
             Assert.That(damped.DampingPerSec, Is.EqualTo(4f));
             Assert.That(damped.StopSpeedThreshold, Is.EqualTo(0.25f));
-
-            var explode = em.GetComponentData<BulletOnMotionCompletedExplodeReactionComponent>(bullet);
-            Assert.That(explode.SecondaryBulletTypeKey, Is.EqualTo(777));
-            Assert.That(explode.SpawnCount, Is.EqualTo(4));
-            Assert.That(explode.SpawnDelaySec, Is.EqualTo(0.2f));
-
-            var collect = em.GetComponentData<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(bullet);
-            Assert.That(collect.SecondaryBulletTypeKey, Is.EqualTo(778));
-            Assert.That(collect.SpawnCount, Is.EqualTo(2));
-            Assert.That(collect.SpawnDelaySec, Is.EqualTo(0.1f));
         }
 
         [Test]
@@ -114,8 +84,6 @@ namespace SweepNDodge.DotsBullets.Tests
                 MovementFamily = BulletMovementFamilyId.Linear,
                 DampedLinear = default,
                 HomingLite = default,
-                OnMotionCompletedExplode = default,
-                OnCleanupRemovedSpawnSecondary = default,
             });
 
             world.GetOrCreateSystem<BulletPoolOwnerBootstrapSystem>().Update(world.Unmanaged);
@@ -124,37 +92,6 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(BulletFieldShared.FreeByKey.TryGetFirstValue(502, out var bullet, out var iterator), Is.True);
             Assert.That(em.HasComponent<BulletDampedMotionComponent>(bullet), Is.False);
             Assert.That(em.HasComponent<BulletHomingLiteMotionComponent>(bullet), Is.False);
-            Assert.That(em.HasComponent<BulletOnMotionCompletedExplodeReactionComponent>(bullet), Is.False);
-            Assert.That(em.HasComponent<BulletOnCleanupRemovedSpawnSecondaryReactionComponent>(bullet), Is.False);
-        }
-
-        [Test]
-        public void BakeUtility_ResolvesSecondaryBulletReference_ToRuntimeKey()
-        {
-            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-
-            try
-            {
-                secondary.Editor_SetDefinitionId(881);
-                var runtime = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = secondary,
-                    SpawnCount = 3,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 90f,
-                    SpawnRadius = 1f,
-                    SpawnDelaySec = 0.25f,
-                });
-
-                Assert.That(runtime.SecondaryBulletTypeKey, Is.EqualTo(881));
-                Assert.That(runtime.SpawnCount, Is.EqualTo(3));
-                Assert.That(runtime.SpawnDelaySec, Is.EqualTo(0.25f));
-            }
-            finally
-            {
-                ScriptableObject.DestroyImmediate(secondary);
-            }
         }
 
         private static void CreateConfigAndPlayer(EntityManager em)
@@ -223,24 +160,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     TurnRateDegPerSec = 90f,
                     MaxAcquireDistance = 10f,
                     MinRetargetDistance = 0.25f,
-                });
-                em.AddComponentData(prefab, new BulletOnMotionCompletedExplodeReactionComponent
-                {
-                    SecondaryBulletTypeKey = 1,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 90f,
-                    SpawnRadius = 0f,
-                    SpawnDelaySec = 0f,
-                });
-                em.AddComponentData(prefab, new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
-                {
-                    SecondaryBulletTypeKey = 2,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 90f,
-                    SpawnRadius = 0f,
-                    SpawnDelaySec = 0f,
                 });
             }
 

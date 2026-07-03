@@ -14,9 +14,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
             var rootBullet = CreateBulletDefinition(5101);
             var targetBullet = CreateBulletDefinition(5102);
-            var hazardBullet = CreateBulletDefinition(5103);
+            var cleanupTargetBullet = CreateBulletDefinition(5103);
+            var hazardBullet = CreateBulletDefinition(5104);
             var rootProfile = CreateProfile("ep_registry_root", rootBullet);
             var targetProfile = CreateProfile("ep_registry_target", targetBullet);
+            var cleanupTargetProfile = CreateProfile("ep_registry_cleanup_target", cleanupTargetBullet);
             var hazardProfile = CreateProfile("ep_registry_hazard", hazardBullet);
             var clip = ScriptableObject.CreateInstance<WaveClipSO>();
             var stageDefinition = ScriptableObject.CreateInstance<StageDefinitionSO>();
@@ -26,6 +28,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 rootProfile.LifecycleTriggers.MotionCompleted.Enabled = true;
                 rootProfile.LifecycleTriggers.MotionCompleted.TargetProfile = targetProfile;
+                targetProfile.LifecycleTriggers.CleanupRemoved.Enabled = true;
+                targetProfile.LifecycleTriggers.CleanupRemoved.TargetProfile = cleanupTargetProfile;
                 clip.Segments = new[]
                 {
                     new WaveClipSO.ClipSegment
@@ -84,9 +88,10 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 EmissionProfileRuntimeRegistryUtility.RebuildFromStageDefinition(em, stageDefinition, registry);
 
-                Assert.That(registry.Length, Is.EqualTo(3));
+                Assert.That(registry.Length, Is.EqualTo(4));
                 Assert.That(ContainsProfile(registry, rootProfile.GetInstanceID()), Is.True);
                 Assert.That(ContainsProfile(registry, targetProfile.GetInstanceID()), Is.True);
+                Assert.That(ContainsProfile(registry, cleanupTargetProfile.GetInstanceID()), Is.True);
                 Assert.That(ContainsProfile(registry, hazardProfile.GetInstanceID()), Is.True);
                 Assert.That(CountProfile(registry, rootProfile.GetInstanceID()), Is.EqualTo(1));
             }
@@ -97,12 +102,15 @@ namespace SweepNDodge.DotsBullets.Tests
                 Object.DestroyImmediate(clip);
                 Object.DestroyImmediate(rootProfile);
                 Object.DestroyImmediate(targetProfile);
+                Object.DestroyImmediate(cleanupTargetProfile);
                 Object.DestroyImmediate(hazardProfile);
                 Object.DestroyImmediate(rootBullet.Prefab);
                 Object.DestroyImmediate(targetBullet.Prefab);
+                Object.DestroyImmediate(cleanupTargetBullet.Prefab);
                 Object.DestroyImmediate(hazardBullet.Prefab);
                 Object.DestroyImmediate(rootBullet);
                 Object.DestroyImmediate(targetBullet);
+                Object.DestroyImmediate(cleanupTargetBullet);
                 Object.DestroyImmediate(hazardBullet);
             }
         }

@@ -195,14 +195,6 @@ namespace SweepNDodge.DotsBullets.Editor
             IReadOnlyList<ContentValidationRecord<BulletDefinitionSO>> definitions,
             List<ContentValidationIssue> issues)
         {
-            var knownKeys = new HashSet<int>();
-            for (int i = 0; i < definitions.Count; i++)
-            {
-                var def = definitions[i].Value;
-                if (def != null && def.DefinitionId > 0)
-                    knownKeys.Add(def.DefinitionId);
-            }
-
             for (int i = 0; i < definitions.Count; i++)
             {
                 var def = definitions[i].Value;
@@ -211,8 +203,6 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 string location = definitions[i].Location;
                 ValidateMovementDefinition(def, location, issues);
-                ValidateReactionDefinition(def.OnMotionCompletedExplode, knownKeys, location, "OnMotionCompletedExplode", issues);
-                ValidateReactionDefinition(def.OnCleanupRemovedSpawnSecondary, knownKeys, location, "OnCleanupRemovedSpawnSecondary", issues);
                 ValidateForbiddenOptionalAuthorings(def, location, issues);
             }
         }
@@ -895,7 +885,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 }
 
                 ValidateEmissionProfileGrammar(profile, core, location, issues);
-                ValidateEmissionProfileMotionCompletedTrigger(profile, in core, location, issues);
+                ValidateEmissionProfileLifecycleTriggers(profile, location, issues);
             }
 
             ValidateEmissionProfileTriggerGraph(profiles, issues);
@@ -1001,13 +991,29 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateEmissionProfileMotionCompletedTrigger(
+        private static void ValidateEmissionProfileLifecycleTriggers(
             EmissionProfileSO profile,
-            in ResolvedEmissionCore core,
             string location,
             List<ContentValidationIssue> issues)
         {
-            var trigger = profile?.LifecycleTriggers?.MotionCompleted;
+            ValidateEmissionProfileTrigger(
+                profile?.LifecycleTriggers?.MotionCompleted,
+                "MotionCompleted",
+                location,
+                issues);
+            ValidateEmissionProfileTrigger(
+                profile?.LifecycleTriggers?.CleanupRemoved,
+                "CleanupRemoved",
+                location,
+                issues);
+        }
+
+        private static void ValidateEmissionProfileTrigger(
+            EmissionMotionCompletedTriggerAuthoring trigger,
+            string triggerName,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
             if (trigger == null || !trigger.Enabled)
                 return;
 
@@ -1017,7 +1023,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     ContentValidationSeverity.Error,
                     "CV048",
                     location,
-                    "EmissionProfileSO MotionCompleted trigger requires TargetProfile."));
+                    $"EmissionProfileSO {triggerName} trigger requires TargetProfile."));
                 return;
             }
 
@@ -1030,7 +1036,7 @@ namespace SweepNDodge.DotsBullets.Editor
                         ContentValidationSeverity.Error,
                         "CV048",
                         location,
-                        $"Operational EmissionProfileSO cannot trigger test-only EmissionProfileSO. asset={targetPath}"));
+                        $"Operational EmissionProfileSO cannot trigger test-only EmissionProfileSO. trigger={triggerName}, asset={targetPath}"));
                 }
             }
 
@@ -1040,16 +1046,49 @@ namespace SweepNDodge.DotsBullets.Editor
                     ContentValidationSeverity.Error,
                     "CV048",
                     location,
-                    "EmissionProfileSO MotionCompleted trigger requires DelaySec >= 0."));
+                    $"EmissionProfileSO {triggerName} trigger requires DelaySec >= 0."));
             }
+        }
 
-            if (core.Bullet != null && core.Bullet.OnMotionCompletedExplode.Enabled)
+        private static void ValidateEmissionProfileTrigger(
+            EmissionCleanupRemovedTriggerAuthoring trigger,
+            string triggerName,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            if (trigger == null || !trigger.Enabled)
+                return;
+
+            if (trigger.TargetProfile == null)
             {
                 issues.Add(new ContentValidationIssue(
-                    ContentValidationSeverity.Warning,
-                    "CVW041",
+                    ContentValidationSeverity.Error,
+                    "CV048",
                     location,
-                    "EmissionProfileSO MotionCompleted trigger and BulletDefinitionSO.OnMotionCompletedExplode coexist. Runtime uses profile trigger first; legacy reaction is compatibility fallback only."));
+                    $"EmissionProfileSO {triggerName} trigger requires TargetProfile."));
+                return;
+            }
+
+            if (IsOperationalProjectAssetPath(location))
+            {
+                string targetPath = AssetDatabase.GetAssetPath(trigger.TargetProfile);
+                if (IsTestOnlyPath(targetPath))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "CV048",
+                        location,
+                        $"Operational EmissionProfileSO cannot trigger test-only EmissionProfileSO. trigger={triggerName}, asset={targetPath}"));
+                }
+            }
+
+            if (trigger.DelaySec < 0f)
+            {
+                issues.Add(new ContentValidationIssue(
+                    ContentValidationSeverity.Error,
+                    "CV048",
+                    location,
+                    $"EmissionProfileSO {triggerName} trigger requires DelaySec >= 0."));
             }
         }
 
@@ -1092,11 +1131,34 @@ namespace SweepNDodge.DotsBullets.Editor
                 return true;
             }
 
-            var trigger = current.LifecycleTriggers?.MotionCompleted;
-            if (trigger == null || !trigger.Enabled || trigger.TargetProfile == null)
-                return false;
+            var motionCompleted = current.LifecycleTriggers?.MotionCompleted;
+            if (motionCompleted != null
+                && motionCompleted.Enabled
+                && motionCompleted.TargetProfile != null
+                && TryFindTriggerGraphViolationFromTarget(root, motionCompleted.TargetProfile, depth, visited, out reason))
+            {
+                return true;
+            }
 
-            var target = trigger.TargetProfile;
+            var cleanupRemoved = current.LifecycleTriggers?.CleanupRemoved;
+            if (cleanupRemoved != null
+                && cleanupRemoved.Enabled
+                && cleanupRemoved.TargetProfile != null
+                && TryFindTriggerGraphViolationFromTarget(root, cleanupRemoved.TargetProfile, depth, visited, out reason))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryFindTriggerGraphViolationFromTarget(
+            EmissionProfileSO root,
+            EmissionProfileSO target,
+            int depth,
+            HashSet<EmissionProfileSO> visited,
+            out string reason)
+        {
             if (ReferenceEquals(target, root) || !visited.Add(target))
             {
                 reason = $"EmissionProfile trigger graph contains a cycle. root={root.name}, target={target.name}.";
@@ -1449,50 +1511,6 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateReactionDefinition(
-            in BulletSecondarySpawnReactionDefinition reaction,
-            HashSet<int> knownKeys,
-            string location,
-            string reactionName,
-            List<ContentValidationIssue> issues)
-        {
-            if (!reaction.Enabled)
-                return;
-
-            if (reaction.SpawnCount <= 0
-                || reaction.SpreadAngleDeg < 0f
-                || reaction.SpawnRadius < 0f
-                || reaction.SpawnDelaySec < 0f
-                || reaction.SecondaryBullet == null)
-            {
-                issues.Add(new ContentValidationIssue(
-                    ContentValidationSeverity.Error,
-                    "CV033",
-                    location,
-                    $"{reactionName} has invalid enabled reaction parameters."));
-                return;
-            }
-
-            if (reaction.SecondaryBullet.DefinitionId <= 0)
-            {
-                issues.Add(new ContentValidationIssue(
-                    ContentValidationSeverity.Error,
-                    "CV035",
-                    location,
-                    $"{reactionName} references invalid SecondaryBullet definition id {reaction.SecondaryBullet.DefinitionId}."));
-                return;
-            }
-
-            if (!knownKeys.Contains(reaction.SecondaryBullet.DefinitionId))
-            {
-                issues.Add(new ContentValidationIssue(
-                    ContentValidationSeverity.Error,
-                    "CV035",
-                    location,
-                    $"{reactionName} references unknown SecondaryBullet definition id {reaction.SecondaryBullet.DefinitionId}."));
-            }
-        }
-
         private static void ValidateForbiddenOptionalAuthorings(
             BulletDefinitionSO definition,
             string location,
@@ -1503,10 +1521,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var prefab = definition.Prefab;
             if (prefab.GetComponent<BulletDampedMotionAuthoring>() != null
-                || prefab.GetComponent<BulletHomingLiteMotionAuthoring>() != null
-                || prefab.GetComponent<BulletOnMotionCompletedExplodeReactionAuthoring>() != null
-                || prefab.GetComponent<BulletOnCleanupRemovedSpawnSecondaryReactionAuthoring>() != null
-                || prefab.GetComponent<BulletOnCollectedSpawnSecondaryReactionAuthoring>() != null)
+                || prefab.GetComponent<BulletHomingLiteMotionAuthoring>() != null)
             {
                 issues.Add(new ContentValidationIssue(
                     ContentValidationSeverity.Error,

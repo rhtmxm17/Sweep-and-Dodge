@@ -82,16 +82,6 @@ namespace SweepNDodge.DotsBullets
         public float MinRetargetDistance;
     }
 
-    public struct BulletSecondarySpawnReactionRuntimeDefinition
-    {
-        public int SecondaryBulletTypeKey;
-        public int SpawnCount;
-        public BulletSecondarySpawnShapeId Shape;
-        public float SpreadAngleDeg;
-        public float SpawnRadius;
-        public float SpawnDelaySec;
-    }
-
     public struct BulletDampedMotionComponent : IComponentData
     {
         public float DampingPerSec;
@@ -110,26 +100,6 @@ namespace SweepNDodge.DotsBullets
         public BulletMovementFamilyId Family;
         public BulletDampedLinearDefinition DampedLinear;
         public BulletHomingLiteDefinition HomingLite;
-    }
-
-    public struct BulletOnMotionCompletedExplodeReactionComponent : IComponentData
-    {
-        public int SecondaryBulletTypeKey;
-        public int SpawnCount;
-        public BulletSecondarySpawnShapeId Shape;
-        public float SpreadAngleDeg;
-        public float SpawnRadius;
-        public float SpawnDelaySec;
-    }
-
-    public struct BulletOnCleanupRemovedSpawnSecondaryReactionComponent : IComponentData
-    {
-        public int SecondaryBulletTypeKey;
-        public int SpawnCount;
-        public BulletSecondarySpawnShapeId Shape;
-        public float SpreadAngleDeg;
-        public float SpawnRadius;
-        public float SpawnDelaySec;
     }
 
     public struct BulletLifecycleRequestComponent : IComponentData
@@ -190,8 +160,6 @@ namespace SweepNDodge.DotsBullets
         public BulletMovementFamilyId MovementFamily;
         public BulletDampedLinearDefinition DampedLinear;
         public BulletHomingLiteDefinition HomingLite;
-        public BulletSecondarySpawnReactionRuntimeDefinition OnMotionCompletedExplode;
-        public BulletSecondarySpawnReactionRuntimeDefinition OnCleanupRemovedSpawnSecondary;
     }
 
     // 프레임 파이프라인 기준 단조 증가 프레임 ID.

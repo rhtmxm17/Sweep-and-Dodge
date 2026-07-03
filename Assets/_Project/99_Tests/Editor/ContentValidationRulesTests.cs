@@ -291,94 +291,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Definition_ReactionWithUnknownSecondaryBulletReference_IsError()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(2203);
-                def.Prefab = prefab;
-                secondary.Editor_SetDefinitionId(9999);
-                secondary.Prefab = secondaryPrefab;
-                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = secondary,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 45f,
-                    SpawnRadius = 1f,
-                    SpawnDelaySec = 0f,
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    null,
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV035"), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(secondary);
-                Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(secondaryPrefab);
-            }
-        }
-
-        [Test]
-        public void Definition_ReactionWithNullSecondaryBullet_IsError()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(2205);
-                def.Prefab = prefab;
-                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = null,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 45f,
-                    SpawnRadius = 1f,
-                    SpawnDelaySec = 0f,
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    null,
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV033"), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
         public void Definition_PrefabWithForbiddenOptionalBehaviorAuthoring_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -407,54 +319,6 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 Object.DestroyImmediate(def);
                 Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
-        public void Definition_ReactionWithKnownSecondaryBulletReference_IsAllowed()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(2206);
-                def.Prefab = prefab;
-                secondary.Editor_SetDefinitionId(2207);
-                secondary.Prefab = secondaryPrefab;
-                def.OnMotionCompletedExplode = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = secondary,
-                    SpawnCount = 2,
-                    Shape = BulletSecondarySpawnShapeId.ForwardSpread,
-                    SpreadAngleDeg = 60f,
-                    SpawnRadius = 0.5f,
-                    SpawnDelaySec = 0.1f,
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                        new ContentValidationRecord<BulletDefinitionSO>(secondary, "secondary"),
-                    },
-                    null,
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV033" || i.Code == "CV035"), Is.False);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(secondary);
-                Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(secondaryPrefab);
             }
         }
 
@@ -569,35 +433,40 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Definition_ReactionWithNegativeSpawnDelay_IsError()
+        public void EmissionProfile_CleanupRemovedWithNegativeDelay_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var targetProfile = ScriptableObject.CreateInstance<EmissionProfileSO>();
             var prefab = new GameObject("bullet_prefab");
-            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
+            var targetPrefab = new GameObject("target_bullet_prefab");
+            var targetDef = ScriptableObject.CreateInstance<BulletDefinitionSO>();
 
             try
             {
                 def.Editor_SetDefinitionId(2208);
                 def.Prefab = prefab;
-                secondary.Editor_SetDefinitionId(2209);
-                secondary.Prefab = secondaryPrefab;
-                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = secondary,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 45f,
-                    SpawnRadius = 1f,
-                    SpawnDelaySec = -0.01f,
-                };
+                targetDef.Editor_SetDefinitionId(2209);
+                targetDef.Prefab = targetPrefab;
+                profile.Bullet = def;
+                targetProfile.Bullet = targetDef;
+                profile.LifecycleTriggers.CleanupRemoved.Enabled = true;
+                profile.LifecycleTriggers.CleanupRemoved.TargetProfile = targetProfile;
+                profile.LifecycleTriggers.CleanupRemoved.DelaySec = -0.01f;
 
                 var input = new ContentValidationInput(
                     new List<ContentValidationRecord<BulletDefinitionSO>>
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                        new ContentValidationRecord<BulletDefinitionSO>(secondary, "secondary"),
+                        new ContentValidationRecord<BulletDefinitionSO>(targetDef, "target"),
+                    },
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                        new ContentValidationRecord<EmissionProfileSO>(targetProfile, "Assets/_Project/03_Datas/EmissionProfiles/target.asset"),
                     },
                     null,
                     null,
@@ -605,14 +474,16 @@ namespace SweepNDodge.DotsBullets.Tests
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV033"), Is.True);
+                Assert.That(issues.Any(i => i.Code == "CV048"), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(secondary);
+                Object.DestroyImmediate(targetDef);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(targetProfile);
                 Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(secondaryPrefab);
+                Object.DestroyImmediate(targetPrefab);
             }
         }
 
@@ -2052,38 +1923,24 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void EmissionProfile_MotionCompletedTriggerWithLegacyExplodeReaction_IsMigrationWarning()
+        public void EmissionProfile_CleanupRemovedWithoutTarget_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var targetDef = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
-            var targetProfile = ScriptableObject.CreateInstance<EmissionProfileSO>();
             var prefab = new GameObject("bullet_prefab");
-            var targetPrefab = new GameObject("target_bullet_prefab");
 
             try
             {
                 def.Editor_SetDefinitionId(9404);
                 def.Prefab = prefab;
-                targetDef.Editor_SetDefinitionId(9405);
-                targetDef.Prefab = targetPrefab;
-                def.OnMotionCompletedExplode = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = targetDef,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                };
                 profile.Bullet = def;
-                profile.LifecycleTriggers.MotionCompleted.Enabled = true;
-                profile.LifecycleTriggers.MotionCompleted.TargetProfile = targetProfile;
-                targetProfile.Bullet = targetDef;
+                profile.LifecycleTriggers.CleanupRemoved.Enabled = true;
+                profile.LifecycleTriggers.CleanupRemoved.TargetProfile = null;
 
                 var input = new ContentValidationInput(
                     new List<ContentValidationRecord<BulletDefinitionSO>>
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                        new ContentValidationRecord<BulletDefinitionSO>(targetDef, "targetDef"),
                     },
                     null,
                     null,
@@ -2091,7 +1948,6 @@ namespace SweepNDodge.DotsBullets.Tests
                     new List<ContentValidationRecord<EmissionProfileSO>>
                     {
                         new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
-                        new ContentValidationRecord<EmissionProfileSO>(targetProfile, "Assets/_Project/03_Datas/EmissionProfiles/target.asset"),
                     },
                     null,
                     null,
@@ -2099,16 +1955,13 @@ namespace SweepNDodge.DotsBullets.Tests
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CVW041" && i.Severity == ContentValidationSeverity.Warning), Is.True);
+                Assert.That(issues.Any(i => i.Code == "CV048"), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(targetDef);
                 Object.DestroyImmediate(profile);
-                Object.DestroyImmediate(targetProfile);
                 Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(targetPrefab);
             }
         }
 

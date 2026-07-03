@@ -63,9 +63,22 @@ namespace SweepNDodge.DotsBullets
     }
 
     [Serializable]
+    public sealed class EmissionCleanupRemovedTriggerAuthoring
+    {
+        public bool Enabled;
+        public EmissionProfileSO TargetProfile;
+        public EmissionTriggerOriginBindingId OriginPosition = EmissionTriggerOriginBindingId.LifecycleContactPosition;
+        public EmissionTriggerDirectionBindingId ForwardDirection = EmissionTriggerDirectionBindingId.LifecycleContactDirection;
+        public EmissionTriggerSourceBindingId SourceEntity = EmissionTriggerSourceBindingId.CauserSourceEntity;
+        public EmissionTriggerCauserBindingId CauserEntity = EmissionTriggerCauserBindingId.CompletedBullet;
+        [Min(0f)] public float DelaySec;
+    }
+
+    [Serializable]
     public sealed class EmissionLifecycleTriggersAuthoring
     {
         public EmissionMotionCompletedTriggerAuthoring MotionCompleted = new EmissionMotionCompletedTriggerAuthoring();
+        public EmissionCleanupRemovedTriggerAuthoring CleanupRemoved = new EmissionCleanupRemovedTriggerAuthoring();
     }
 
     [CreateAssetMenu(menuName = "SweepNDodge/Bullet/Emission Profile", fileName = "ep_")]

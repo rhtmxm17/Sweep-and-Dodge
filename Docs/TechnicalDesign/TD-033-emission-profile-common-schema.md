@@ -21,7 +21,7 @@
   - `HazardEmitterEmissionProfileSO`는 유사한 `Bullet / EventRepeat / PositionPattern / Aim / ShotPattern` 구조를 별도로 가진다.
   - `BulletDefinitionSO`는 visual/pool 정체성뿐 아니라 `Speed`, `Lifetime`, `MovementFamily`, `DampedLinear`, `HomingLite`, lifecycle reaction까지 함께 가진다.
 - 그 결과, 탄막 제작자는 "이 패턴에서 속도/수명/이동/후속 발사를 어떻게 줄 것인가"를 패턴 단위가 아니라 bullet definition 단위에서 우회 작성해야 한다.
-- `MotionCompleted -> secondary spawn` 같은 패턴은 본질적으로 "이 이벤트에서 다른 탄막을 실행한다"에 가깝지만, 현재는 `BulletDefinitionSO.OnMotionCompletedExplode` 안에 별도 축으로 중복 표현된다.
+- `MotionCompleted -> secondary spawn` 같은 패턴은 본질적으로 "이 이벤트에서 다른 탄막을 실행한다"에 가깝지만, 기존에는 `BulletDefinitionSO.OnMotionCompletedExplode` 안에 별도 축으로 중복 표현됐다.
 
 ## 2. 목표 / 비목표
 
@@ -36,7 +36,7 @@
 - Source 전용 개념과 공통 탄막 문법을 분리한다.
   - `Sampling`, `RateField`, source density/cap은 Source wrapper 책임이다.
   - `EmissionProfile`은 주어진 execution context에서 탄막을 어떻게 펼칠지만 책임진다.
-- `MotionCompleted` 발생 시 다른 `EmissionProfile`을 trigger하는 1차 스키마를 정의한다.
+- `MotionCompleted`, `CleanupRemoved` 발생 시 다른 `EmissionProfile`을 trigger하는 lifecycle trigger 스키마를 정의한다.
 - `BulletDefinitionSO`의 movement/reaction 필드를 신규 데이터 작성 기준에서 deprecated로 둔다.
 - 기존 WaveClip/Hazard/secondary spawn asset을 `EmissionProfileSO` 참조형으로 migration하는 최종 상태를 목표로 둔다.
 - migration 완료 후 operational authoring에서 inline common emission grammar를 제거하거나 compatibility-only 상태로 격하한다.
@@ -45,14 +45,14 @@
 - 이번 문서에서 runtime request/channel wire shape를 확정하지 않는다.
 - 이번 문서에서 기존 asset migration을 실행하지는 않는다. 단, redesign 작업의 최종 완료 기준에는 migration 완료가 포함된다.
 - 이번 문서에서 inspector graph/preview UX를 최종 확정하지 않는다.
-- 이번 1차 범위에서 `CleanupRemoved`, `PlayerHit`, `LifetimeExpired`, `StageBlocked` trigger를 열지 않는다.
+- 이번 범위에서 `PlayerHit`, `LifetimeExpired`, `StageBlocked` trigger는 열지 않는다.
 
 ## 3. 채택 기준
 - `EmissionProfile`은 canonical execution context를 소비한다.
 - Source/Hazard/Triggered의 차이는 wrapper/context binding에서 해결한다.
 - Triggered emission의 anchor/direction은 profile 내부가 아니라 trigger link가 제공한다.
-- 첫 lifecycle trigger는 `MotionCompleted`만 지원한다.
-- 기존 secondary spawn path는 호환 경로로 유지하되 신규 SSOT로 확장하지 않는다.
+- lifecycle trigger는 `MotionCompleted`, `CleanupRemoved`를 지원한다.
+- 기존 secondary spawn path는 제거하고, triggered emission SSOT는 `EmissionProfileSO` lifecycle trigger와 `DiscreteEmitRequestBuffer` registry path로 고정한다.
 - 최종 authoring SSOT는 참조형 `EmissionProfileSO`다.
 - 전환형 하이브리드는 implementation staging으로만 사용했고, cleanup 완료 후 active authoring schema에서 제거했다.
   - `WaveSpawnEntryAuthoring`은 `EmissionProfileSO + Source Emission + Sampling`만 소유한다.
@@ -103,7 +103,7 @@ EmissionProfile
   - 기존 `Single`, `NWay`, `Radial` 의미를 재사용한다.
 - `LifecycleTriggers`
   - 이 profile로 spawn된 bullet가 특정 lifecycle event에 도달했을 때 실행할 후속 emission link를 가진다.
-  - 1차는 `MotionCompleted`만 허용한다.
+  - 현재 지원 이벤트는 `MotionCompleted`, `CleanupRemoved`다.
 
 ### 4.2 `ResolvedEmissionCore`
 Authoring source는 migration 단계에서 여러 형태가 공존할 수 있지만, resolver 출력의 공통 단위는 `ResolvedEmissionCore`로 고정한다.
@@ -208,7 +208,7 @@ Triggered wrapper는 lifecycle event와 context binding을 책임진다.
 
 ```text
 LifecycleTrigger
-- Event: MotionCompleted
+- Event: MotionCompleted / CleanupRemoved
 - TriggerEmissionProfile
 - ContextBinding
   - OriginPosition: LifecycleContactPosition
@@ -219,7 +219,7 @@ LifecycleTrigger
 - DelaySec
 ```
 
-- `MotionCompleted`는 1차 trigger event다.
+- `MotionCompleted`와 `CleanupRemoved`는 현재 지원하는 trigger event다.
 - trigger link는 대상 `EmissionProfile`과 context binding을 가진다.
 - 대상 `EmissionProfile`은 자신이 lifecycle trigger로 실행되는지, source/actor에서 직접 실행되는지 몰라도 된다.
 
@@ -295,8 +295,8 @@ EmissionProfile: ep_sample_bubble_fragments
 | `MovementFamily` | `EmissionProfile.MovementTuning.Family` | deprecated |
 | `DampedLinear` | `EmissionProfile.MovementTuning.DampedLinear` | deprecated |
 | `HomingLite` | `EmissionProfile.MovementTuning.HomingLite` | deprecated |
-| `OnMotionCompletedExplode` | `EmissionProfile.LifecycleTriggers.MotionCompleted` | deprecated |
-| `OnCleanupRemovedSpawnSecondary` | 후속 lifecycle trigger 확장 후보 | deprecated, 1차 migration 제외 |
+| `OnMotionCompletedExplode` | `EmissionProfile.LifecycleTriggers.MotionCompleted` | 제거 완료 |
+| `OnCleanupRemovedSpawnSecondary` | `EmissionProfile.LifecycleTriggers.CleanupRemoved` | 제거 완료 |
 
 ### 7.2 남길 책임
 `BulletDefinitionSO`는 아래 역할을 계속 가진다.
@@ -307,22 +307,23 @@ EmissionProfile: ep_sample_bubble_fragments
 - baseline collision radius
 - capture rule / interaction family
 - compatibility fallback 값
+  - movement fallback
 
-### 7.3 호환 경로
-- 기존 asset은 즉시 깨지지 않아야 한다.
-- compatibility read path는 기존 `BulletDefinitionSO` movement/reaction 값을 읽을 수 있다.
-- 신규 authoring UI/validation은 `EmissionProfile` 값을 우선 사용한다.
-- migration 완료 후 operational asset에서는 deprecated movement/reaction 값을 authoring SSOT로 사용하지 않는다.
-- deprecated 필드가 남아 있더라도 `EmissionProfileSO` 값과 충돌하지 않는 fallback/legacy read path로만 취급한다.
+### 7.3 현재 runtime path
+- `MotionCompleted` 후속 발사는 `EmissionProfileSO.LifecycleTriggers.MotionCompleted`와 runtime registry 경로로 전환됐다.
+- `BulletDefinitionSO.OnMotionCompletedExplode`, `BulletOnMotionCompletedExplodeReactionComponent`, optional authoring, legacy runtime fallback은 제거됐다.
+- `CleanupRemoved` 후속 발사는 `EmissionProfileSO.LifecycleTriggers.CleanupRemoved`와 runtime registry 경로로 전환됐다.
+- `BulletDefinitionSO.OnCleanupRemovedSpawnSecondary`, `BulletOnCleanupRemovedSpawnSecondaryReactionComponent`, optional authoring, `BulletSecondarySpawnRequestBuffer`, `SecondarySpawnExecutionSystem`은 제거됐다.
+- movement 값은 아직 `BulletDefinitionSO` pool/bootstrap fallback 값을 유지한다. profile movement override가 있으면 spawned bullet runtime 값이 우선한다.
 
 ### 7.4 마이그레이션 단계
-현재 runtime은 `BulletDefinitionSO -> BulletPoolDefinitionBuffer -> BulletPoolOwnerBootstrapSystem` 경로로 speed/lifetime/movement/reaction 컴포넌트를 초기화한다. 따라서 `EmissionProfileSO` 기반 runtime apply가 들어오기 전까지 deprecated 필드를 즉시 제거하거나 error로 막지 않는다.
+현재 runtime은 `EmissionProfileSO` 값을 spawned bullet apply 단계와 lifecycle trigger registry에 반영한다. movement fallback은 `BulletDefinitionSO -> BulletPoolDefinitionBuffer -> BulletPoolOwnerBootstrapSystem` 경로를 보존한다.
 
 | 단계 | 기준 | validation 정책 | runtime 정책 |
 | --- | --- | --- | --- |
-| Phase 0. 현재 | `EmissionProfileSO` runtime 적용 전 | 기존 `BulletDefinitionSO` schema validation 유지 | `BulletDefinitionSO` 값을 pool/bootstrap fallback source로 사용 |
-| Phase 1. profile authoring 도입 후 | `EmissionProfileSO`와 resolver가 존재하지만 migration 전 | operational 신규 작성에서 deprecated gameplay field 사용은 warning | profile 값이 있으면 profile 우선, 없으면 `BulletDefinitionSO` fallback |
-| Phase 2. migration 완료 후 | operational asset이 profile 참조형으로 전환됨 | operational asset에서 deprecated field가 gameplay SSOT로 사용되면 error 후보 | compatibility/test fixture 외에는 profile-resolved value를 사용 |
+| Phase 1. 완료 | `MotionCompleted` 후속 발사를 profile trigger로 전환 | `MotionCompleted` trigger graph를 검증하고 legacy coexistence warning은 제거 | registry 기반 `DiscreteEmitRequestBuffer` append만 사용 |
+| Phase 2. 완료 | movement fallback 유지, `CleanupRemoved` legacy 제거 | operational 신규 작성은 profile 값을 우선하고, legacy reaction coexistence는 허용하지 않음 | profile 값이 있으면 profile 우선, 없으면 movement만 `BulletDefinitionSO` fallback |
+| Phase 3. 완료 | `CleanupRemoved` lifecycle trigger event migration | `OnCleanupRemovedSpawnSecondary`와 secondary spawn path를 제거 | `DiscreteEmitRequestBuffer` registry path만 사용 |
 
 ### 7.5 필드별 migration 기준
 | `BulletDefinitionSO` 필드 | `EmissionProfileSO` 위치 | migration 기준 |
@@ -332,14 +333,14 @@ EmissionProfile: ep_sample_bubble_fragments
 | `MovementFamily` | `MovementTuning.Family` | profile movement가 있으면 bullet definition movement family는 무시한다. |
 | `DampedLinear` | `MovementTuning.DampedLinear` | `MovementTuning.Family = DampedLinear`일 때 profile 파라미터를 우선한다. |
 | `HomingLite` | `MovementTuning.HomingLite` | `MovementTuning.Family = HomingLite`일 때 profile 파라미터를 우선한다. |
-| `OnMotionCompletedExplode` | `LifecycleTriggers.MotionCompleted` | `MotionCompleted -> TriggerEmissionProfile`로 변환한다. migration 기간에는 legacy reaction과 공존하면 warning이다. |
-| `OnCleanupRemovedSpawnSecondary` | 후속 lifecycle trigger event | 1차 범위 밖이다. 후속 event migration 후보로 분류하고, migration 완료 전까지 legacy compatibility로 유지한다. |
+| `OnMotionCompletedExplode` | `LifecycleTriggers.MotionCompleted` | 변환 완료. legacy field/component/runtime fallback은 제거됐다. |
+| `OnCleanupRemovedSpawnSecondary` | `LifecycleTriggers.CleanupRemoved` | 변환 완료. legacy field/component/channel/system은 제거됐다. |
 
 ### 7.6 신규 작성 금지 기준
 - 신규 operational 탄막 데이터는 gameplay tuning을 `EmissionProfileSO`에 작성한다.
 - `BulletDefinitionSO`에 새 movement/reaction 값을 추가해 신규 패턴을 만드는 것은 금지 방향이다.
-- 단, `BulletDefinitionSO`는 pool/visual identity와 fallback 값을 보존하므로 필드 자체를 즉시 제거하지 않는다.
-- test-only asset과 compatibility fixture는 deprecated field를 명시적으로 사용할 수 있다.
+- 단, `BulletDefinitionSO`는 pool/visual identity와 movement fallback 값을 보존하므로 해당 필드는 후속 migration 전까지 유지한다.
+- test-only asset과 compatibility fixture는 남아 있는 movement deprecated field를 명시적으로 사용할 수 있다.
 
 ## 8. Validation Rules
 
@@ -352,16 +353,16 @@ EmissionProfile: ep_sample_bubble_fragments
 - `HomingLite`는 non-negative parameter와 `MinRetargetDistance <= MaxAcquireDistance`를 만족해야 한다.
 - Source wrapper의 `Sampling`, `RateField`, source density/cap 필드는 `EmissionProfile` 내부에 있으면 error다.
 
-### 8.2 `MotionCompleted` trigger graph
-- 1차 lifecycle trigger event는 `MotionCompleted`만 허용한다.
-- `LifecycleTrigger.Event = MotionCompleted`의 target profile은 null이면 error다.
+### 8.2 Lifecycle trigger graph
+- 현재 lifecycle trigger event는 `MotionCompleted`, `CleanupRemoved`를 허용한다.
+- enabled lifecycle trigger의 target profile은 null이면 error다.
 - self trigger는 error다.
 - direct cycle과 transitive cycle은 error다.
 - authoring validation의 1차 graph depth 한도는 `MaxTriggerDepth = 4`다.
   - root profile depth는 0이다.
   - trigger target으로 한 단계 이동할 때마다 depth를 1 증가시킨다.
   - traversal 중 depth 4를 초과하면 error다.
-- 하나의 profile에 여러 `MotionCompleted` trigger link를 허용할지는 이번 slice에서 열지 않는다. 1차 schema는 단일 target link로 검증한다.
+- 하나의 event에 여러 trigger link를 허용할지는 이번 slice에서 열지 않는다. 현재 schema는 event별 단일 target link로 검증한다.
 - `MotionCompleted` trigger가 있는데 profile의 movement family가 motion completion request를 만들 수 없으면 warning이다.
   - 예: `Linear` movement가 lifetime/stage/player hit로만 종료되는 경우.
   - 이유: authoring reuse나 future movement 확장 가능성 때문에 1차부터 error로 잠그지 않는다.
@@ -373,12 +374,9 @@ EmissionProfile: ep_sample_bubble_fragments
 - operational/test 판정은 현재 validation의 `Assets/_Project/99_Tests/` 경로 기준을 재사용한다.
 
 ### 8.4 Deprecated data coexistence
-- 신규 `EmissionProfileSO` 값이 존재하면 `BulletDefinitionSO`의 deprecated movement/reaction 값보다 우선한다.
-- migration 기간에는 같은 logical emission path에서 신규 `MotionCompleted -> TriggerEmissionProfile`과 기존 `BulletDefinitionSO.OnMotionCompletedExplode`가 동시에 유효하면 warning이다.
-- migration 완료 후에는 operational asset에서 위 중복 상태를 error 후보로 전환한다.
-- `OnCleanupRemovedSpawnSecondary`는 T3 범위의 trigger event가 아니다.
-  - 1차 validation에서는 deprecated 후속 event migration 후보로만 분류한다.
-  - 해당 필드가 enabled인 기존 asset은 Phase 0/1에서는 legacy compatibility로 유지하고, 후속 event migration이 끝난 뒤 operational error 후보로 전환한다.
+- 신규 `EmissionProfileSO` 값이 존재하면 `BulletDefinitionSO`의 deprecated movement 값보다 우선한다.
+- `MotionCompleted -> TriggerEmissionProfile`과 `BulletDefinitionSO.OnMotionCompletedExplode` 공존 상태는 더 이상 허용하지 않는다. legacy field와 runtime fallback은 제거됐다.
+- `CleanupRemoved -> TriggerEmissionProfile`과 `BulletDefinitionSO.OnCleanupRemovedSpawnSecondary` 공존 상태는 더 이상 허용하지 않는다. legacy field와 runtime fallback은 제거됐다.
 
 ### 8.5 Validation implementation target
 - T3의 문서 기준은 이후 `ContentValidationRules` 또는 별도 `EmissionProfileValidationRules`에서 구현한다.
@@ -387,7 +385,7 @@ EmissionProfile: ep_sample_bubble_fragments
   - self/direct/transitive cycle
   - `MaxTriggerDepth = 4`
   - operational/test asset boundary
-  - deprecated coexistence warning/error policy
+  - deprecated movement compatibility policy
 
 ## 9. 구현 분해 초안
 
@@ -413,14 +411,13 @@ EmissionProfile: ep_sample_bubble_fragments
 - migration 완료 기준을 정의한다.
   - operational WaveClip/Hazard asset이 inline common grammar 대신 `EmissionProfileSO`를 참조한다.
   - 기존 `OnMotionCompletedExplode`는 `MotionCompleted -> TriggerEmissionProfile`로 변환된다.
-  - `OnCleanupRemovedSpawnSecondary`는 1차 migration 제외 또는 후속 event migration 대상으로 명시 분류된다.
+- `OnCleanupRemovedSpawnSecondary`는 `CleanupRemoved -> TriggerEmissionProfile`로 변환된다.
 
 ### 9.5 Plan E. runtime pipeline 설계 점검
 - 시작 조건: Plan A~D에서 데이터 구조와 validation 기준이 확정된 뒤 착수한다.
 - 검토 대상:
   - `SourceSpawnRequestBuffer`
   - `DiscreteEmitRequestBuffer`
-  - `BulletSecondarySpawnRequestBuffer`
   - triggered emission 전용 request 필요 여부
   - common resolved emission snapshot 필요 여부
 
@@ -505,7 +502,7 @@ ResolvedEmissionCore
 - `SourceClip` event branch와 `HazardActor` direct emit branch는 이미 `DiscreteEmitRequestBuffer`를 공유한다.
 - `DiscreteEmitRequestBuffer`는 현재 runtime에서 `PositionPattern`, `Aim`, `ShotPattern`, repeat, backlog, budget 실행 문법을 가장 많이 포함한다.
 - `MotionCompleted -> TriggerEmissionProfile`은 별도 secondary spawn 문법이 아니라 profile-resolved discrete emission request로 변환한다.
-- `BulletSecondarySpawnRequestBuffer`는 legacy compatibility path로 유지하고, 신규 SSOT로 확장하지 않는다.
+- `BulletSecondarySpawnRequestBuffer`는 legacy cleanup migration 완료 후 제거됐으며, 신규 SSOT로 사용하지 않는다.
 - Source sustain branch는 즉시 `DiscreteEmitRequestBuffer`로 완전 흡수하지 않는다. 다만 profile-resolved gameplay tuning은 `SourceSpawnRequestBuffer`와 `DiscreteEmitRequestBuffer` 양쪽이 같은 apply 계약을 통해 사용할 수 있어야 한다.
 
 `DiscreteEmitRequestBuffer` 확장 후보:
@@ -570,7 +567,7 @@ SpawnedBulletRuntimeTuning
   - HazardActor pattern slot emission profile
   - 각 profile의 `MotionCompleted.TargetProfile` recursive target
 - registry key는 `EmissionProfileSO.GetInstanceID()` 기반 `ProfileRefId`이며 중복 profile은 de-duplicate한다.
-- registry entry는 target emission 실행에 필요한 resolved payload, spawn/movement tuning, position/aim/shot pattern, `MotionCompleted` target/context binding/delay를 저장한다.
+- registry entry는 target emission 실행에 필요한 resolved payload, spawn/movement tuning, position/aim/shot pattern, `MotionCompleted`/`CleanupRemoved` target/context binding/delay를 저장한다.
 - registry miss 또는 target miss는 runtime exception이 아니라 no-op/fallback으로 처리한다. authoring 오류는 validation이 담당한다.
 
 `MotionCompleted -> TriggerEmissionProfile` runtime path:
@@ -585,24 +582,54 @@ SpawnedBulletRuntimeTuning
 5. target profile의 resolved core를 `DiscreteEmitRequestBuffer`로 변환해 append한다.
 6. `DelaySec`는 fixed tick 기준 frame delay로 변환하며, 최소 다음 frame부터 실행되도록 `ReadyFrame >= currentFrame + 1`로 둔다.
 7. `DiscreteEmitExecutionSystem`은 `ReadyFrame > currentFrame`인 request를 실행 후보에서 제외하고 backlog에는 남긴다.
-8. source profile trigger append에 성공하면 legacy `BulletOnMotionCompletedExplodeReactionComponent`는 실행하지 않는다.
-9. source profile trigger가 없거나 registry lookup이 실패하면 기존 legacy `BulletSecondarySpawnRequestBuffer` path를 compatibility fallback으로 유지한다.
+8. source profile trigger append에 성공하면 triggered emission request는 `DiscreteEmitExecutionSystem`의 일반 discrete emission 실행 계약을 따른다.
+9. source profile trigger가 없거나 registry lookup이 실패하면 `MotionCompleted` 후속 emission은 no-op이다. legacy `BulletSecondarySpawnRequestBuffer` fallback은 제거됐다.
+
+`CleanupRemoved -> TriggerEmissionProfile` runtime path:
+1. `VacuumCollected` 또는 `CarryFullRemoved` lifecycle request가 발생하면 cleanup removal trigger 후보로 본다.
+2. spawned bullet의 `BulletEmissionProfileRefComponent.ProfileRefId`로 source profile registry entry를 조회한다.
+3. source profile에 `CleanupRemoved` trigger가 있으면 target profile entry를 조회한다.
+4. trigger context는 `MotionCompleted`와 같은 binding 기본값을 사용한다.
+   - origin: `BulletLifecycleContactComponent.PositionXZ` + bullet 현재 Y
+   - direction: `BulletLifecycleContactComponent.DirectionXZ`, fallback `(1, 0)`
+   - source: `BulletSourceRefComponent.Value`
+   - producer/causer: cleanup removed bullet entity
+5. target profile resolved core를 `DiscreteEmitRequestBuffer`로 append한다.
+6. source profile trigger가 없거나 registry lookup이 실패하면 cleanup removed 후속 emission은 no-op이다.
 
 동시 존재 정책:
-- profile lifecycle trigger가 legacy `BulletDefinitionSO.OnMotionCompletedExplode`보다 우선한다.
-- 같은 profile의 bullet definition에 legacy `OnMotionCompletedExplode.Enabled`가 함께 있으면 migration warning을 낸다.
-- legacy `BulletSecondarySpawnRequestBuffer`는 compatibility path이며 신규 profile trigger의 SSOT로 사용하지 않는다.
+- `MotionCompleted` 후속 발사의 SSOT는 profile lifecycle trigger다.
+- legacy `BulletDefinitionSO.OnMotionCompletedExplode`, `BulletOnMotionCompletedExplodeReactionComponent`, optional authoring, runtime fallback은 제거됐다.
+- `CleanupRemoved` 후속 발사의 SSOT도 profile lifecycle trigger다.
+- legacy `BulletDefinitionSO.OnCleanupRemovedSpawnSecondary`, `BulletOnCleanupRemovedSpawnSecondaryReactionComponent`, optional authoring, `BulletSecondarySpawnRequestBuffer`, `SecondarySpawnExecutionSystem`은 제거됐다.
 
 `SpawnRadius` 보존 기준:
-- legacy `OnMotionCompletedExplode.SpawnRadius`는 triggered request context가 아니라 `PositionPattern` 확장으로 보존하는 방향을 채택한다.
+- legacy `OnMotionCompletedExplode.SpawnRadius`는 현재 변환에서 보존하지 않았다. exact radius 보존이 필요하면 `PositionPattern` 확장으로 다룬다.
 - 1차 구현에서는 `SinglePoint` + `Radial ShotPattern` 단순 변환을 허용한다.
 - exact legacy radius 보존이 필요한 fixture는 `PositionPattern`에 radial spawn offset/radius 표현을 추가한 뒤 migration한다.
 
 보류/제외:
 - `TriggeredEmissionRequestBuffer`를 별도 채널로 만들지 않는다.
-- `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer`, `BulletSecondarySpawnRequestBuffer`의 전면 통합은 이번 단계에서 하지 않는다.
-- frame당 triggered emission budget/backlog는 우선 `DiscreteEmitPolicyComponent`를 재사용하되, trigger storm이 확인되면 별도 budget slot을 추가한다.
-- `BulletSecondarySpawnRequestBuffer` 제거는 migration 완료 후 판단한다.
+- `SourceSpawnRequestBuffer`, `DiscreteEmitRequestBuffer`의 전면 통합은 이번 단계에서 하지 않는다.
+
+2026-07-02 T15 ProducerKind별 budget/backlog 정책:
+- 채택안은 C안이다. 단일 `DiscreteEmitRequestBuffer`와 `DiscreteEmitExecutionSystem`은 유지하고, `DiscreteEmitProducerKind`별 budget/cap/metrics를 추가한다.
+- 기존 `DiscreteEmitPolicyComponent.BudgetPerFrame`, `MaxPendingCount`, `MaxPendingAgeFrames`는 total/global guard로 유지한다.
+- ProducerKind별 `BudgetPerFrame` / `MaxPendingCount` 값은 0이면 legacy-compatible fallback으로 해석한다.
+  - per-kind budget 0: 해당 producer는 global remaining budget 안에서 소비된다.
+  - per-kind max pending 0: 해당 producer는 global `MaxPendingCount` 안에서만 제한된다.
+- `TriggeredEmission`에 별도 budget/cap을 줄 수 있어 Source/Hazard discrete emit이 lifecycle trigger storm에 완전히 밀리지 않게 한다.
+- 별도 `TriggeredEmissionRequestBuffer` 또는 별도 execution system은 만들지 않는다.
+- metrics는 total 값과 ProducerKind별 pending/deferred/budget used/dropped/expired count를 함께 기록한다.
+- request 선택은 기존 priority/oldest 기준을 유지하되, global budget과 producer-specific budget을 모두 만족하는 request만 실행 후보로 본다.
+
+2026-07-02 T15 구현 상태:
+- `DiscreteEmitPolicyComponent`에 ProducerKind별 budget/cap field를 추가했다.
+  - `WaveClipEventBudgetPerFrame`, `HazardActorBudgetPerFrame`, `TriggeredEmissionBudgetPerFrame`
+  - `WaveClipEventMaxPendingCount`, `HazardActorMaxPendingCount`, `TriggeredEmissionMaxPendingCount`
+- `DiscreteEmitBacklogMetricsComponent`에 ProducerKind별 pending/deferred/budget used/dropped/expired metrics를 추가했다.
+- `DiscreteEmitExecutionSystem`은 global budget/cap과 ProducerKind별 budget/cap을 동시에 만족하는 request만 실행 후보로 선택한다.
+- ProducerKind별 값이 0인 기존 fixture/asset은 기존 global policy만 적용받는다.
 
 ## 10. 검증 계획
 - 문서 단계:
@@ -613,7 +640,7 @@ SpawnedBulletRuntimeTuning
   - Unity Console error 0
   - EditMode validation tests
   - `MotionCompleted -> TriggerEmissionProfile` behavior smoke
-  - 기존 `BulletMotionCompletedExplodePlayModeTests` compatibility path 유지 여부 확인
+  - legacy MotionCompleted/CleanupRemoved compatibility path 제거 확인
   - migration 후 operational asset reference integrity 검사
   - migrated WaveClip/Hazard asset이 `EmissionProfileSO` 참조형으로 resolve되는지 검사
   - Source event, HazardActor direct emit, Triggered emission이 같은 `DiscreteEmitRequestBuffer` apply contract를 사용하는지 검사
@@ -627,12 +654,14 @@ SpawnedBulletRuntimeTuning
 - `ContextForward`를 기존 `FixedAimAuthoring`의 확장으로 둘지, 별도 `ContextForwardAimAuthoring` subtype으로 둘지
 - `Radius`를 `BulletDefinitionSO` baseline으로 둘지, `RadiusMultiplier`를 1차 범위에 포함할지
 - `BulletDefinitionSO.CaptureRule`은 profile override를 허용할지, bullet identity에 고정할지
-- trigger storm 방지를 위해 `DiscreteEmitPolicyComponent`와 별도로 triggered emission 전용 budget slot을 둘지
 - legacy secondary spawn `SpawnRadius`를 보존하기 위한 `PositionPattern` 확장 shape를 어떻게 정의할지
-- `OnCleanupRemovedSpawnSecondary` migration을 언제 열지
+- `PlayerHit`, `LifetimeExpired`, `StageBlocked` lifecycle trigger를 언제 열지
 
 ## 12. 변경 이력
-- 2026-07-02: MotionCompleted LifecycleTrigger runtime registry 구현 상태를 반영했다. spawned bullet은 `ProfileRefId`만 보유하고, lifecycle reaction owner가 stage registry에서 source/target profile을 조회해 `DiscreteEmitRequestBuffer`에 triggered emission request를 append한다. profile trigger와 legacy reaction이 공존하면 profile trigger를 우선한다.
+- 2026-07-02: T15 ProducerKind별 budget/backlog 정책으로 C안을 채택했다. 단일 `DiscreteEmitRequestBuffer`는 유지하고, `DiscreteEmitProducerKind`별 budget/cap/metrics를 `DiscreteEmitPolicyComponent` / `DiscreteEmitBacklogMetricsComponent`에 추가하는 기준을 반영했다.
+- 2026-07-02: MotionCompleted legacy data/runtime 제거 상태를 반영했다. `BulletDefinitionSO.OnMotionCompletedExplode`, legacy component/authoring/fallback, 관련 tests를 제거하고 profile registry 기반 triggered emission을 유일한 MotionCompleted 후속 발사 경로로 고정했다.
+- 2026-07-02: CleanupRemoved legacy data/runtime 제거 상태를 반영했다. `BulletDefinitionSO.OnCleanupRemovedSpawnSecondary`, cleanup secondary component/authoring/channel/system, 관련 tests를 제거하고 profile registry 기반 triggered emission을 유일한 CleanupRemoved 후속 발사 경로로 고정했다.
+- 2026-07-02: MotionCompleted LifecycleTrigger runtime registry 구현 상태를 반영했다. spawned bullet은 `ProfileRefId`만 보유하고, lifecycle reaction owner가 stage registry에서 source/target profile을 조회해 `DiscreteEmitRequestBuffer`에 triggered emission request를 append한다.
 - 2026-07-01: cleanup 완료 기준을 반영했다. `WaveSpawnEntryAuthoring` inline common grammar와 `HazardEmitterEmissionProfileSO` compatibility source를 제거하고, active authoring SSOT를 `EmissionProfileSO` 참조형으로 단일화했다.
 - 2026-07-01: T6 runtime pipeline 결정으로 `DiscreteEmitRequestBuffer` 확장안을 채택하고, triggered emission을 profile-resolved discrete emission으로 실행하는 기준을 추가했다.
 - 2026-07-01: 최종 목표를 마이그레이션 포함 전면 참조형 `EmissionProfileSO` 전환으로 명시하고, 전환형 하이브리드는 implementation staging으로만 채택하도록 정리했다.

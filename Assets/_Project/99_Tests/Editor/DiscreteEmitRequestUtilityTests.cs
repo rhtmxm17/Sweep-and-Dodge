@@ -38,6 +38,12 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(policy.BudgetPerFrame, Is.EqualTo(256));
             Assert.That(policy.MaxPendingCount, Is.EqualTo(8192));
             Assert.That(policy.MaxPendingAgeFrames, Is.EqualTo(120u));
+            Assert.That(policy.WaveClipEventBudgetPerFrame, Is.EqualTo(0));
+            Assert.That(policy.HazardActorBudgetPerFrame, Is.EqualTo(0));
+            Assert.That(policy.TriggeredEmissionBudgetPerFrame, Is.EqualTo(0));
+            Assert.That(policy.WaveClipEventMaxPendingCount, Is.EqualTo(0));
+            Assert.That(policy.HazardActorMaxPendingCount, Is.EqualTo(0));
+            Assert.That(policy.TriggeredEmissionMaxPendingCount, Is.EqualTo(0));
         }
 
         [Test]
