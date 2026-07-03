@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260701-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-07-02`
+- last_updated: `2026-07-03`
 - related_docs:
   - [SESSION-20260406-01-waveclip-authoring-board.md](SESSION-20260406-01-waveclip-authoring-board.md)
   - [SESSION-20260407-01-hazard-emitter-design-board.md](SESSION-20260407-01-hazard-emitter-design-board.md)
@@ -14,6 +14,15 @@
   - [../TechnicalDesign/TD-029-discrete-emit-spawn-bridge-contract.md](../TechnicalDesign/TD-029-discrete-emit-spawn-bridge-contract.md)
   - [../TechnicalDesign/TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](../TechnicalDesign/TD-032-hazard-actor-stage-placement-and-orchestration-framework.md)
   - [../TechnicalDesign/TD-033-emission-profile-common-schema.md](../TechnicalDesign/TD-033-emission-profile-common-schema.md)
+
+## Reading Guide
+- 현재 기준은 `Adopted Baseline`, `Done`의 최신 항목, `End of Session`, 그리고 `TD-033`이다.
+- `Current Data Findings`, `Pipeline Preflight Findings`, `Transition Strategy Decision`은 redesign 초기에 작성된 조사/결정 기록이다. 해당 섹션 안의 legacy 명칭은 당시 상태를 설명하기 위한 역사적 표현이며, 현재 runtime/asset 경로를 의미하지 않는다.
+- legacy lifecycle reaction 경로의 현재 상태:
+  - `OnMotionCompletedExplode`: migration 완료 후 field/component/authoring/runtime fallback 제거.
+  - `OnCleanupRemovedSpawnSecondary`: migration 완료 후 field/component/authoring/channel/system 제거.
+  - `BulletSecondarySpawnRequestBuffer` / `SecondarySpawnExecutionSystem`: 제거.
+  - `HazardEmitterEmissionProfileSO` / `heep_*`: 제거.
 
 ## Session Goal
 - 한 줄 목표: `EmissionProfile`을 Source/Hazard/Triggered가 공통으로 사용하는 탄막 데이터 단위로 재설계해, 탄막 작성자가 속도/수명/이동/후속 발사 같은 플레이 감각 데이터를 패턴 단위에서 직관적으로 다룰 수 있게 한다.
@@ -106,31 +115,33 @@ LifecycleTrigger
 - Trigger depth와 frame당 triggered emission budget은 별도 설계가 필요하지만, 구체 runtime policy는 데이터 구조 확정 후 다룬다.
 - 기존 exact tuning 값은 테스트 oracle로 승격하지 않는다. 검증은 schema, reference integrity, authoring-to-runtime symbolic contract 중심으로 잡는다.
 
-## Current Data Findings
-- `bd_sample_bubble.asset`은 기존 `MotionCompleted -> secondary spawn` 대표 데이터다.
+## Initial Data Findings (Historical)
+- redesign 시작 시점의 `bd_sample_bubble.asset`은 기존 `MotionCompleted -> secondary spawn` 대표 데이터였다.
   - `MovementFamily = DampedLinear`
   - `OnMotionCompletedExplode.Enabled = true`
   - secondary bullet은 `bd_sample_bubble_fragment.asset`
   - `PointBurst`, `SpawnCount = 8`, `SpreadAngleDeg = 360`, `SpawnRadius = 0.08`
 - 기존 `OnCleanupRemovedSpawnSecondary` serialized block은 bullet definition asset에서 제거됐다. 확인 시점에 enabled operational cleanup secondary 데이터는 남아 있지 않아 별도 target profile 생성 migration은 필요하지 않았다.
-- `WaveSpawnEntryAuthoring`과 `HazardEmitterEmissionProfileSO`는 이미 유사한 emission grammar를 중복 소유한다.
-- `HazardEmitterEmissionProfileSO`는 Source 전용 sampling/rate 개념 없이 discrete emission에 가까운 형태다.
+- redesign 시작 시점에는 `WaveSpawnEntryAuthoring`과 `HazardEmitterEmissionProfileSO`가 유사한 emission grammar를 중복 소유했다.
+- `HazardEmitterEmissionProfileSO`는 이후 `EmissionProfileSO` 참조형으로 migration된 뒤 제거됐다.
 
-## Pipeline Preflight Findings
-- 현재 Source/Hazard 양쪽에 이미 공통 emission grammar가 존재하지만, wrapper 필드와 한 구조체에 섞여 있다.
+## Pipeline Preflight Findings (Historical)
+- preflight 시점에는 Source/Hazard 양쪽에 이미 공통 emission grammar가 존재했지만, wrapper 필드와 한 구조체에 섞여 있었다.
   - Source: `SourceClipPatternBuffer`는 segment/lane/phase, rate/sampling 필드와 bullet/position/aim/shot 필드를 함께 가진다.
   - HazardActor: `HazardActorPatternExecutionSlotBuffer`와 `HazardActorEmitActiveEmissionComponent`는 telegraph/cooldown/slot 필드와 bullet/position/aim/shot 필드를 함께 가진다.
   - 결론: authoring 단계에서 공통 `ResolvedEmissionCore`를 먼저 만들고 Source/Hazard/Triggered wrapper가 이를 감싸는 방향이 가장 덜 흔들린다.
 - `DiscreteEmitRequestBuffer`는 현재 런타임에서 공통 emission 실행 문법에 가장 가깝다.
   - Source discrete path와 HazardActor direct emit path가 모두 `DiscreteEmitRequestUtility`를 거쳐 같은 실행 시스템으로 들어간다.
   - 단, Source rate-field/sampling path 전체를 대체하지는 못하므로 Source wrapper의 실행 context는 유지해야 한다.
-- profile-level `SpeedOverride`, `LifetimeOverride`, `MovementTuning`, `LifecycleTriggers`는 현재 request/apply 경계에 실려 있지 않다.
+- preflight 시점에는 profile-level `SpeedOverride`, `LifetimeOverride`, `MovementTuning`, `LifecycleTriggers`가 request/apply 경계에 실려 있지 않았다.
   - `SpawnRequestCommonUtility.ApplySpawnedBulletState`는 풀에서 꺼낸 bullet의 `BulletSpeedComponent`와 `BulletLifetimeMaxComponent`를 읽어 속도와 수명을 적용한다.
   - `BulletPoolOwnerBootstrapSystem`은 `BulletDefinitionSO` 기반 pool definition에서 speed/lifetime/movement/reaction 컴포넌트를 초기화한다.
   - 결론: 신규 profile tuning을 구현하려면 request payload 또는 spawned bullet apply 단계가 resolved tuning을 받을 수 있어야 한다.
+  - 현재 상태: SpawnTuning/MovementTuning/LifecycleTriggers는 profile-resolved runtime path에 반영됐다.
 - 기존 `BulletSecondarySpawnRequestBuffer`는 `MotionCompleted -> TriggerEmissionProfile`의 SSOT로 쓰기에는 좁다.
   - count/spread/radius/shape 중심의 secondary spawn만 표현하며 position/aim/shot/movement/lifecycle trigger 문법을 담지 못한다.
-  - 결론: legacy compatibility path로 유지하고, 신규 triggered emission은 `DiscreteEmitRequestBuffer` 확장 또는 별도 `TriggeredEmissionRequest`로 설계한다.
+  - 당시 결론: legacy compatibility path로 유지하고, 신규 triggered emission은 `DiscreteEmitRequestBuffer` 확장 또는 별도 `TriggeredEmissionRequest`로 설계한다.
+  - 현재 상태: `BulletSecondarySpawnRequestBuffer`는 제거됐고, 신규/현재 triggered emission은 `DiscreteEmitRequestBuffer` registry path를 사용한다.
 - T2b 통합 전략은 runtime concrete schema를 확정하지 않고도 진행 가능하다.
   - 전제: 공통 authoring/resolver 출력은 `ResolvedEmissionCore`로 고정한다.
   - 전제: runtime T6에서 `ResolvedEmissionCore -> SourceSpawnRequestBuffer/DiscreteEmitRequestBuffer/TriggeredEmissionRequest` 매핑을 결정한다.

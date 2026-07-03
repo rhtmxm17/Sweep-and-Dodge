@@ -1,6 +1,8 @@
 # ADR-20260407-01-discrete-emit-bridge-and-spawn-ownership-split
 > `HazardEmitter`와 `WaveClip` discrete branch를 공통 `DiscreteEmit` 브리지로 내리고 spawn ownership을 분리한 결정
 
+> Superseded note (2026-07-03): 본 ADR의 `SecondarySpawnExecutionSystem` 순서와 `SecondarySpawn` budget 분리 내용은 당시 구조 기록이다. 현재 lifecycle-trigger 후속 발사는 `TD-033` 기준으로 `EmissionProfileSO.LifecycleTriggers`와 `DiscreteEmitRequestBuffer` registry path를 사용하며, secondary spawn channel/system은 제거됐다.
+
 ## 상태
 - 합의됨 (문서 반영, 구현 예정)
 

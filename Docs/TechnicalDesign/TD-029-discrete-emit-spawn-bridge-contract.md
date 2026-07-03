@@ -4,13 +4,14 @@
 - doc_id: `TD-029`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-17`
+- last_updated: `2026-07-03`
 - related_docs:
   - [../ADR/ADR-20260407-01-discrete-emit-bridge-and-spawn-ownership-split.md](../ADR/ADR-20260407-01-discrete-emit-bridge-and-spawn-ownership-split.md)
   - [../ADR/ADR-20260417-01-hazard-actor-direct-emit-ownership.md](../ADR/ADR-20260417-01-hazard-actor-direct-emit-ownership.md)
   - [./TD-002-pattern-wave-progress-runtime-contract.md](./TD-002-pattern-wave-progress-runtime-contract.md)
   - [./TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
   - [./TD-031-hazard-actor-behavior-runtime.md](./TD-031-hazard-actor-behavior-runtime.md)
+  - [./TD-033-emission-profile-common-schema.md](./TD-033-emission-profile-common-schema.md)
 
 > `WaveClip` discrete branch와 `HazardActor` 직접 발사를 공통 `DiscreteEmitRequest` 경계로 내리는 현재 SSOT. source-wave와 actor emit은 같은 request wire shape를 공유하지만, producer owner와 상위 상태기계는 분리한다.
 
@@ -96,7 +97,7 @@
 ## 5. 제약
 - `HazardEmitter` 독립 runtime entity는 더 이상 producer가 아니다.
 - actor direct emit path는 selected slot이 없거나 actor가 suppress된 경우 request를 append하지 않는다.
-- `HazardEmitterTelegraphProfileSO`, `HazardEmitterEmissionProfileSO`는 asset 이름만 유지되며 request provenance owner는 actor다.
+- Telegraph authoring과 `EmissionProfileSO` 참조는 actor slot authoring의 일부이며 request provenance owner는 actor다.
 
 ## 6. 검증 기준
 - `WaveClip` discrete event와 `HazardActor` emit 1회가 같은 `DiscreteEmitRequest` wire shape를 공유한다.
