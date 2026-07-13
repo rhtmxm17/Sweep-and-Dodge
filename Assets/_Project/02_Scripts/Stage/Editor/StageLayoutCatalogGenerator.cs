@@ -233,7 +233,7 @@ namespace SweepNDodge.DotsBullets.Editor
             layout.Presentations = stageNode.GetComponentsInChildren<StagePresentationMarker>(includeInactive: true)
                 .OrderBy(x => x.StableId)
                 .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                .Select(ToPresentationData)
+                .Select(x => ToPresentationData(stageNode, x))
                 .ToArray();
             return layout;
         }
@@ -322,11 +322,19 @@ namespace SweepNDodge.DotsBullets.Editor
             return authoring != null ? authoring.GetLocalCell(tileCell) : tileCell;
         }
 
-        private static StagePresentationLayoutData ToPresentationData(StagePresentationMarker marker)
+        private static StagePresentationLayoutData ToPresentationData(
+            StageLayoutStageMarker stageNode,
+            StagePresentationMarker marker)
         {
             var transform = marker.transform;
             ResolvePresentationLink(marker, out var linkKind, out var linkedStableId);
             bool linked = marker.PlacementMode == StagePresentationPlacementMode.LinkedToParent;
+            Vector3 position = linked
+                ? transform.localPosition
+                : stageNode.transform.InverseTransformPoint(transform.position);
+            Quaternion rotation = linked
+                ? transform.localRotation
+                : Quaternion.Inverse(stageNode.transform.rotation) * transform.rotation;
             return new StagePresentationLayoutData
             {
                 StableId = marker.StableId,
@@ -335,8 +343,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 LinkKind = linked ? linkKind : StagePresentationLinkKind.None,
                 LinkedStableId = linked ? linkedStableId : 0u,
                 PresentationKey = marker.PresentationKey != null ? marker.PresentationKey.Trim() : string.Empty,
-                Position = linked ? transform.localPosition : transform.position,
-                Euler = linked ? transform.localEulerAngles : transform.eulerAngles,
+                Position = position,
+                Euler = rotation.eulerAngles,
                 Scale = transform.localScale,
             };
         }

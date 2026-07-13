@@ -87,6 +87,9 @@ namespace SweepNDodge.DotsBullets.Tests
             AssertLayoutMatchesSceneAuthoring(layout1, 1);
             AssertLayoutMatchesSceneAuthoring(layout2, 2);
             AssertLayoutMatchesSceneAuthoring(layout3, 3);
+            AssertHazardActorDataMatchesScene(definition1, 1);
+            AssertHazardActorDataMatchesScene(definition2, 2);
+            AssertHazardActorDataMatchesScene(definition3, 3);
 
             for (int i = 0; i < DeprecatedPaintAssetPaths.Length; i++)
                 Assert.That(AssetDatabase.LoadMainAssetAtPath(DeprecatedPaintAssetPaths[i]), Is.Null, $"Deprecated paint asset must be removed: {DeprecatedPaintAssetPaths[i]}");
@@ -222,6 +225,64 @@ namespace SweepNDodge.DotsBullets.Tests
             return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
         }
 
+        private static void AssertHazardActorDataMatchesScene(StageDefinitionSO definition, int stageId)
+        {
+            Assert.That(EditorSceneManager.OpenScene(SampleScenePath, OpenSceneMode.Single).IsValid(), Is.True);
+
+            var stage = UnityEngine.Object.FindObjectsByType<StageLayoutStageMarker>(
+                    FindObjectsInactive.Include,
+                    FindObjectsSortMode.None)
+                .Single(x => x.StageId == stageId);
+            var bindings = definition.SourceBindings ?? Array.Empty<StageSourceBinding>();
+            var sources = stage.GetComponentsInChildren<SourceRuntimeTemplateAuthoringBase>(true);
+            for (int sourceIndex = 0; sourceIndex < sources.Length; sourceIndex++)
+            {
+                var source = sources[sourceIndex];
+                var matchingBindings = bindings
+                    .Where(x => x.SourceStableId == source.StableIdOverride)
+                    .ToArray();
+                Assert.That(
+                    matchingBindings,
+                    Has.Length.EqualTo(1),
+                    $"Stage {stageId} source {source.StableIdOverride} must have exactly one Definition binding.");
+
+                var binding = matchingBindings[0];
+                var expectedPlacements = StageDefinitionGenerator.BuildHazardActorPlacements(source)
+                    .OrderBy(x => x.PlacementInstanceId)
+                    .ToArray();
+                var actualPlacements = (binding.HazardActorPlacements ?? Array.Empty<HazardActorPlacementBinding>())
+                    .OrderBy(x => x.PlacementInstanceId)
+                    .ToArray();
+                Assert.That(actualPlacements, Has.Length.EqualTo(expectedPlacements.Length));
+                for (int i = 0; i < expectedPlacements.Length; i++)
+                {
+                    Assert.That(actualPlacements[i].PlacementInstanceId, Is.EqualTo(expectedPlacements[i].PlacementInstanceId));
+                    Assert.That(actualPlacements[i].ActorArchetypePrefab, Is.EqualTo(expectedPlacements[i].ActorArchetypePrefab));
+                    Assert.That(Vector3.Distance(actualPlacements[i].LocalOffset, expectedPlacements[i].LocalOffset), Is.LessThan(0.001f));
+                    Assert.That(
+                        Mathf.Abs(Mathf.DeltaAngle(actualPlacements[i].LocalYawDeg, expectedPlacements[i].LocalYawDeg)),
+                        Is.LessThan(0.001f));
+                }
+
+                var rulesMarker = source.GetComponent<HazardActorSourceAuthoringMarker>();
+                var expectedRules = rulesMarker != null
+                    ? rulesMarker.Rules ?? Array.Empty<HazardActorOrchestrationRuleBinding>()
+                    : Array.Empty<HazardActorOrchestrationRuleBinding>();
+                var actualRules = binding.HazardActorOrchestrationRules
+                    ?? Array.Empty<HazardActorOrchestrationRuleBinding>();
+                Assert.That(actualRules, Has.Length.EqualTo(expectedRules.Length));
+                for (int i = 0; i < expectedRules.Length; i++)
+                {
+                    Assert.That(actualRules[i].RuleId, Is.EqualTo(expectedRules[i].RuleId));
+                    Assert.That(actualRules[i].TargetPlacementInstanceIds, Is.EqualTo(expectedRules[i].TargetPlacementInstanceIds));
+                    Assert.That(actualRules[i].ActionType, Is.EqualTo(expectedRules[i].ActionType));
+                    Assert.That(actualRules[i].TriggerType, Is.EqualTo(expectedRules[i].TriggerType));
+                    Assert.That(actualRules[i].TriggerThresholdNormalized, Is.EqualTo(expectedRules[i].TriggerThresholdNormalized));
+                    Assert.That(actualRules[i].TargetPhaseId, Is.EqualTo(expectedRules[i].TargetPhaseId));
+                }
+            }
+        }
+
         private static void AssertSourceAndDepositAnchorsMatchScene(StageGridAuthoring authoring, StageLayoutStageMarker stage, StageLayoutSO layout)
         {
             var expectedSources = stage.GetComponentsInChildren<StageRegionAnchorMarker>(true)
@@ -251,6 +312,23 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(expectedDeposits.TryGetValue(region.StableId, out var anchorCell), Is.True, $"Missing deposit anchor for stableId={region.StableId}.");
                 Assert.That(region.AnchorCell, Is.EqualTo(anchorCell), $"Deposit anchor mismatch for stableId={region.StableId}.");
             }
+
+            var markers = stage.GetComponentsInChildren<StageRegionAnchorMarker>(true);
+            for (int i = 0; i < markers.Length; i++)
+            {
+                var marker = markers[i];
+                Assert.That(
+                    StageAnchorTransformEditorUtility.TryGetWorldPosition(
+                        authoring,
+                        marker.AnchorCell,
+                        marker.AnchorOffset,
+                        out var expectedWorldPosition),
+                    Is.True);
+                AssertVector3(
+                    marker.transform.position,
+                    expectedWorldPosition,
+                    $"Stage {stage.StageId} region anchor Transform mismatch for {marker.name}.");
+            }
         }
 
         private static void AssertPlayerStartMatchesScene(StageGridAuthoring authoring, StageLayoutStageMarker stage, StageLayoutSO layout)
@@ -260,6 +338,21 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(layout.PlayerStart.AnchorCell, Is.EqualTo(authoring.GetLocalCell(marker.AnchorCell)));
             Assert.That(layout.PlayerStart.AnchorOffset, Is.EqualTo(marker.AnchorOffset));
             Assert.That(layout.PlayerStart.YawDeg, Is.EqualTo(marker.YawDeg).Within(0.001f));
+            Assert.That(
+                StageAnchorTransformEditorUtility.TryGetWorldPosition(
+                    authoring,
+                    marker.AnchorCell,
+                    marker.AnchorOffset,
+                    out var expectedWorldPosition),
+                Is.True);
+            AssertVector3(
+                marker.transform.position,
+                expectedWorldPosition,
+                $"Stage {stage.StageId} player start Transform position mismatch.");
+            Assert.That(
+                Quaternion.Angle(marker.transform.rotation, Quaternion.Euler(0f, marker.YawDeg, 0f)),
+                Is.LessThan(0.001f),
+                $"Stage {stage.StageId} player start Transform yaw mismatch.");
         }
 
         private static void AssertPresentationsMatchScene(StageLayoutStageMarker stage, StageLayoutSO layout)
@@ -267,7 +360,7 @@ namespace SweepNDodge.DotsBullets.Tests
             var expected = StagePresentationEditorUtility.GetPresentationMarkers(stage)
                 .OrderBy(x => x.StableId)
                 .ThenBy(x => BuildHierarchyPath(x.transform), StringComparer.Ordinal)
-                .Select(ToPresentationData)
+                .Select(x => ToPresentationData(stage, x))
                 .ToArray();
             var actual = layout.Presentations ?? Array.Empty<StagePresentationLayoutData>();
 
@@ -278,7 +371,9 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
-        private static StagePresentationLayoutData ToPresentationData(StagePresentationMarker marker)
+        private static StagePresentationLayoutData ToPresentationData(
+            StageLayoutStageMarker stage,
+            StagePresentationMarker marker)
         {
             var transform = marker.transform;
             bool linked = marker.PlacementMode == StagePresentationPlacementMode.LinkedToParent;
@@ -287,6 +382,12 @@ namespace SweepNDodge.DotsBullets.Tests
             if (linked)
                 StagePresentationEditorUtility.TryFindLinkedParent(transform, out linkKind, out linkedStableId, out _);
 
+            Vector3 position = linked
+                ? transform.localPosition
+                : stage.transform.InverseTransformPoint(transform.position);
+            Quaternion rotation = linked
+                ? transform.localRotation
+                : Quaternion.Inverse(stage.transform.rotation) * transform.rotation;
             return new StagePresentationLayoutData
             {
                 StableId = marker.StableId,
@@ -295,8 +396,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 LinkKind = linked ? linkKind : StagePresentationLinkKind.None,
                 LinkedStableId = linked ? linkedStableId : 0u,
                 PresentationKey = marker.PresentationKey != null ? marker.PresentationKey.Trim() : string.Empty,
-                Position = linked ? transform.localPosition : transform.position,
-                Euler = linked ? transform.localEulerAngles : transform.eulerAngles,
+                Position = position,
+                Euler = rotation.eulerAngles,
                 Scale = transform.localScale,
             };
         }

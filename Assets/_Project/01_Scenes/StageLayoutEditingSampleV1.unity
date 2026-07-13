@@ -2793,7 +2793,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePlayerStartMarker
   Active: 1
-  AnchorCell: {x: 4, y: 20}
+  AnchorCell: {x: 5, y: 3}
   AnchorOffset: {x: 0, y: 0}
   YawDeg: 90
   DrawGizmo: 1
@@ -2823,7 +2823,7 @@ Transform:
   m_GameObject: {fileID: 598002137}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 2, y: 0, z: 10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2842,7 +2842,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageHazardActorMarker
   PlacementInstanceId: 1
-  ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
+  ActorArchetypePrefab: {fileID: 4069771742991948589, guid: be2250d34f47b4d4389d07084b4b5da8, type: 3}
   LocalYawDeg: 0
 --- !u!1 &610918852
 GameObject:
@@ -2889,7 +2889,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StagePlayerStartMarker
   Active: 1
-  AnchorCell: {x: 2, y: -10}
+  AnchorCell: {x: 2, y: 1}
   AnchorOffset: {x: 0, y: 0}
   YawDeg: 0
   DrawGizmo: 1
@@ -3635,6 +3635,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 598002138}
+  - {fileID: 1427628645}
   m_Father: {fileID: 691910719}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1042918360
@@ -3670,13 +3671,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.HazardActorSourceAuthoringMarker
   Rules:
   - RuleId: 101
-    TargetPlacementInstanceIds: 01000000
+    TargetPlacementInstanceIds: 0100000002000000
     ActionType: 1
     TriggerType: 1
     TriggerThresholdNormalized: 0
     TargetPhaseId: 0
   - RuleId: 102
-    TargetPlacementInstanceIds: 01000000
+    TargetPlacementInstanceIds: 0100000002000000
     ActionType: 2
     TriggerType: 2
     TriggerThresholdNormalized: 0.6
@@ -5562,6 +5563,53 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!1 &1427628644
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1427628645}
+  - component: {fileID: 1427628646}
+  m_Layer: 0
+  m_Name: HazardActor_Placement_2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1427628645
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1427628644}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: -0.00000004371139}
+  m_LocalPosition: {x: 17, y: 0, z: 7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1042918358}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1427628646
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1427628644}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 315e08e467e04ffa917c7560b4dfa0ce, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageHazardActorMarker
+  PlacementInstanceId: 2
+  ActorArchetypePrefab: {fileID: 4069771742991948589, guid: be2250d34f47b4d4389d07084b4b5da8, type: 3}
+  LocalYawDeg: 180
 --- !u!1 &1510331692
 GameObject:
   m_ObjectHideFlags: 0

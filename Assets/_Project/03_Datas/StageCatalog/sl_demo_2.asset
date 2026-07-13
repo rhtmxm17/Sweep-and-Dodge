@@ -4832,7 +4832,7 @@ MonoBehaviour:
     AnchorOffset: {x: 0, y: 0}
   PlayerStart:
     Active: 1
-    AnchorCell: {x: 12, y: 15}
+    AnchorCell: {x: 12, y: 26}
     AnchorOffset: {x: 0, y: 0}
     YawDeg: 0
   Presentations: []

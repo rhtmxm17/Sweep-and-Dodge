@@ -134,70 +134,10 @@ namespace SweepNDodge.DotsBullets.Editor
             if (authoring == null || authoring.Grid == null)
                 return;
 
-            var bounds = authoring.GetAuthoringBounds();
-            if (bounds.size.x <= 0 || bounds.size.y <= 0)
-                return;
-
-            using var drawingScope = new Handles.DrawingScope(Matrix4x4.TRS(authoring.Grid.transform.position, authoring.Grid.transform.rotation, Vector3.one));
-            float cellWidth = authoring.Grid.cellSize.x;
-            float cellHeight = authoring.Grid.cellSize.y;
-            float z = 0f;
-
-            if (authoring.ShowGridGizmo)
-            {
-                Handles.color = new Color(0.6f, 0.6f, 0.6f, 0.5f);
-                DrawBoundsOutline(bounds, cellWidth, cellHeight, z);
-                for (int x = 0; x <= bounds.size.x; x++)
-                {
-                    float lineX = (bounds.xMin + x) * cellWidth;
-                    Handles.DrawLine(new Vector3(lineX, bounds.yMin * cellHeight, z), new Vector3(lineX, (bounds.yMin + bounds.size.y) * cellHeight, z));
-                }
-
-                for (int y = 0; y <= bounds.size.y; y++)
-                {
-                    float lineY = (bounds.yMin + y) * cellHeight;
-                    Handles.DrawLine(new Vector3(bounds.xMin * cellWidth, lineY, z), new Vector3((bounds.xMin + bounds.size.x) * cellWidth, lineY, z));
-                }
-            }
-
-            for (int localY = 0; localY < bounds.size.y; localY++)
-            {
-                for (int localX = 0; localX < bounds.size.x; localX++)
-                {
-                    int tileX = bounds.xMin + localX;
-                    int tileY = bounds.yMin + localY;
-                    DrawCellOverlays(authoring, tileX, tileY, localX, localY, cellWidth, cellHeight, z);
-                }
-            }
+            StageGridSceneVisualizationRenderer.Draw(authoring);
 
             if (authoring.ShowAnchorGizmo)
-                DrawAnchors(authoring, cellWidth, cellHeight, z);
-        }
-
-        private static void DrawCellOverlays(StageGridAuthoring authoring, int tileX, int tileY, int localX, int localY, float cellWidth, float cellHeight, float z)
-        {
-            Rect rect = new Rect(tileX * cellWidth, tileY * cellHeight, cellWidth, cellHeight);
-
-            if (authoring.ShowMovementGizmo && authoring.MovementTilemap != null)
-            {
-                var tile = authoring.MovementTilemap.GetTile(new Vector3Int(tileX, tileY, 0)) as StageMovementTile;
-                if (tile != null && tile.MovementFlags != StageCellMovementFlags.None)
-                {
-                    DrawCellHatch(rect, z - 0.003f, ResolveMovementColor(tile.MovementFlags), StageGridHatchDirection.ForwardSlash);
-                }
-            }
-
-            uint sourceCell = ResolveRegionCell(authoring, StageRegionKind.Source, localX, localY);
-            if (authoring.ShowSourceGizmo && sourceCell != 0u)
-            {
-                DrawCellHatch(rect, z - 0.002f, new Color(0.1f, 0.75f, 1f, 0.55f), StageGridHatchDirection.BackSlash);
-            }
-
-            uint depositCell = ResolveRegionCell(authoring, StageRegionKind.Deposit, localX, localY);
-            if (authoring.ShowDepositGizmo && depositCell != 0u)
-            {
-                DrawCellHatch(rect, z - 0.001f, new Color(1f, 0.7f, 0.1f, 0.55f), StageGridHatchDirection.BackSlash);
-            }
+                DrawAnchors(authoring, authoring.Grid.cellSize.x, authoring.Grid.cellSize.y, 0f);
         }
 
         private static void DrawAnchors(StageGridAuthoring authoring, float cellWidth, float cellHeight, float z)
@@ -227,80 +167,6 @@ namespace SweepNDodge.DotsBullets.Editor
                     : $"{anchor.RegionKind}:slot{anchor.RegionSlotIndex}";
                 Handles.Label(pos, label);
             }
-        }
-
-        private static uint ResolveRegionCell(StageGridAuthoring authoring, StageRegionKind kind, int localX, int localY)
-        {
-            if (authoring == null)
-                return 0u;
-
-            var tile = authoring.RegionTilemap != null
-                ? authoring.RegionTilemap.GetTile(authoring.GetTilemapCell(localX, localY)) as StageRegionTile
-                : null;
-            if (tile == null || tile.RegionKind != kind || tile.RegionSlotIndex <= 0)
-                return 0u;
-
-            return authoring.TryResolveStableId(kind, tile.RegionSlotIndex, out uint stableId) ? stableId : 0u;
-        }
-
-        private static Vector3[] BuildRectVerts(Rect rect, float z)
-        {
-            return new[]
-            {
-                new Vector3(rect.xMin, rect.yMin, z),
-                new Vector3(rect.xMax, rect.yMin, z),
-                new Vector3(rect.xMax, rect.yMax, z),
-                new Vector3(rect.xMin, rect.yMax, z),
-            };
-        }
-
-        private static void DrawBoundsOutline(BoundsInt bounds, float cellWidth, float cellHeight, float z)
-        {
-            var rect = new Rect(bounds.xMin * cellWidth, bounds.yMin * cellHeight, bounds.size.x * cellWidth, bounds.size.y * cellHeight);
-            Handles.DrawPolyLine(BuildRectVerts(rect, z));
-            Handles.DrawLine(new Vector3(rect.xMin, rect.yMax, z), new Vector3(rect.xMin, rect.yMin, z));
-        }
-
-        private static void DrawCellHatch(Rect rect, float z, Color color, StageGridHatchDirection direction)
-        {
-            Handles.color = color;
-            float insetX = rect.width * 0.08f;
-            float insetY = rect.height * 0.08f;
-            float minX = rect.xMin + insetX;
-            float maxX = rect.xMax - insetX;
-            float minY = rect.yMin + insetY;
-            float maxY = rect.yMax - insetY;
-            const int lineCount = 2;
-
-            for (int i = 0; i < lineCount; i++)
-            {
-                float t = (i + 0.5f) / lineCount;
-                if (direction == StageGridHatchDirection.ForwardSlash)
-                {
-                    Handles.DrawLine(
-                        new Vector3(maxX, Mathf.Lerp(minY, maxY, t), z),
-                        new Vector3(Mathf.Lerp(minX, maxX, t), maxY, z));
-                }
-                else
-                {
-                    Handles.DrawLine(
-                        new Vector3(minX, Mathf.Lerp(maxY, minY, t), z),
-                        new Vector3(Mathf.Lerp(minX, maxX, t), maxY, z));
-                }
-            }
-        }
-
-        private static Color ResolveMovementColor(StageCellMovementFlags flags)
-        {
-            bool blockPlayer = (flags & StageCellMovementFlags.BlockPlayer) != 0;
-            bool blockBullet = (flags & StageCellMovementFlags.BlockBullet) != 0;
-            if (blockPlayer && blockBullet)
-                return new Color(0.55f, 0.05f, 0.05f, 0.26f);
-            if (blockPlayer)
-                return new Color(0.95f, 0.55f, 0.15f, 0.22f);
-            if (blockBullet)
-                return new Color(0.9f, 0.1f, 0.85f, 0.22f);
-            return Color.clear;
         }
 
         private static void IncludeTilemapBounds(Tilemap tilemap, ref bool hasAny, ref int minX, ref int minY, ref int maxX, ref int maxY)
@@ -360,10 +226,5 @@ namespace SweepNDodge.DotsBullets.Editor
             maxY = Mathf.Max(maxY, y);
         }
 
-        private enum StageGridHatchDirection : byte
-        {
-            ForwardSlash = 0,
-            BackSlash = 1,
-        }
     }
 }

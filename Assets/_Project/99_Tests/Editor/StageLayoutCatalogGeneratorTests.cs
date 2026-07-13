@@ -180,6 +180,40 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GenerateLayoutsForRoot_StandalonePresentation_IgnoresWorkspaceTranslation()
+        {
+            var setup = CreateStageSetup();
+            try
+            {
+                setup.StageGo.transform.position = new Vector3(100f, 3f, -20f);
+
+                var presentationGo = new GameObject("standalone_presentation");
+                presentationGo.transform.SetParent(setup.StageGo.transform, false);
+                presentationGo.transform.localPosition = new Vector3(15f, 2f, 6f);
+                presentationGo.transform.localRotation = Quaternion.Euler(10f, 20f, 30f);
+                var presentation = presentationGo.AddComponent<StagePresentationMarker>();
+                presentation.StableId = 4002u;
+                presentation.PlacementMode = StagePresentationPlacementMode.Standalone;
+                presentation.PresentationKey = "standalone_basic";
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.True, string.Join("\n", issues.Select(x => x.Code + ":" + x.Message)));
+                Assert.That(setup.Layout.Presentations, Has.Length.EqualTo(1));
+                Assert.That(setup.Layout.Presentations[0].Position, Is.EqualTo(presentationGo.transform.localPosition));
+                Assert.That(
+                    Quaternion.Angle(
+                        Quaternion.Euler(setup.Layout.Presentations[0].Euler),
+                        presentationGo.transform.localRotation),
+                    Is.LessThan(0.001f));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void GenerateLayoutsForRoot_RotatedGrid_IgnoresWorkspaceTransformForRuntimeOrigin()
         {
             var setup = CreateStageSetup();

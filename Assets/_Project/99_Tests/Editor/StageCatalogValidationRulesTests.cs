@@ -483,6 +483,64 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ValidateCatalog_HazardActorPlacements_DuplicateIdsAcrossSourceBindings_AreReportedAsErrors()
+        {
+            var created = new List<ScriptableObject>();
+            using var archetype = CreateHazardActorArchetype("shared_archetype", actorId: 3, emitterId: 33);
+
+            try
+            {
+                var definition = CreateDefinition(created, stageId: 14);
+                definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1401u,
+                        HazardActorPlacements = new[]
+                        {
+                            new HazardActorPlacementBinding
+                            {
+                                PlacementInstanceId = 9,
+                                ActorArchetypePrefab = archetype.Root,
+                            },
+                        },
+                    },
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 1402u,
+                        HazardActorPlacements = new[]
+                        {
+                            new HazardActorPlacementBinding
+                            {
+                                PlacementInstanceId = 9,
+                                ActorArchetypePrefab = archetype.Root,
+                            },
+                        },
+                    },
+                };
+
+                var layout = CreateLayout(created, stageId: 14);
+                var catalog = CreateCatalog(created, new StageCatalogEntry
+                {
+                    Enabled = true,
+                    EntryKey = "stage_14",
+                    Definition = definition,
+                    Layout = layout,
+                });
+
+                var issues = ValidateCatalog(catalog);
+                Assert.That(
+                    issues.Any(x => x.Code == "STC036"
+                        && x.Message.Contains("across SourceBindings")),
+                    Is.True);
+            }
+            finally
+            {
+                DestroyAll(created);
+            }
+        }
+
+        [Test]
         public void ValidateCatalog_HazardActorPlacements_NullPrefab_IsReportedAsError()
         {
             var created = new List<ScriptableObject>();

@@ -75,6 +75,7 @@ namespace SweepNDodge.DotsBullets.Editor
             DrawSourceFieldSection();
             DrawSourceDefinitionSeedSection();
             DrawCleaningTrailSection();
+            DrawHazardActorPlacementSection();
             DrawDebugSection();
 
             serializedObject.ApplyModifiedProperties();
@@ -166,6 +167,90 @@ namespace SweepNDodge.DotsBullets.Editor
             EditorGUILayout.LabelField("Debug", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_drawGizmoProperty);
             EditorGUILayout.PropertyField(_drawGizmoWhenNotSelectedProperty);
+        }
+
+        private void DrawHazardActorPlacementSection()
+        {
+            serializedObject.ApplyModifiedProperties();
+
+            var source = (SourceRuntimeTemplateAuthoringBase)target;
+            EditorGUILayout.LabelField("Hazard Actor Placements", EditorStyles.boldLabel);
+            if (GUILayout.Button("Add Hazard Actor Placement"))
+            {
+                if (!StageHazardActorPlacementEditorUtility.TryCreatePlacement(source, out _, out string error))
+                    Debug.LogError($"[HazardActorPlacement] {error}", source);
+            }
+
+            var markers = source.GetComponentsInChildren<StageHazardActorMarker>(includeInactive: true);
+            int ownedPlacementCount = 0;
+            for (int i = 0; i < markers.Length; i++)
+            {
+                var marker = markers[i];
+                if (marker == null || marker.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>() != source)
+                    continue;
+
+                ownedPlacementCount++;
+                if (StageHazardActorPlacementEditorUtility.TryGetLocalPose(
+                        marker,
+                        out _,
+                        out Vector3 localOffset,
+                        out float localYawDeg))
+                {
+                    EditorGUILayout.LabelField(
+                        $"#{marker.PlacementInstanceId} {marker.name}: offset={localOffset}, yaw={localYawDeg:0.###}",
+                        EditorStyles.wordWrappedMiniLabel);
+                }
+
+                var errors = StageHazardActorPlacementEditorUtility.CollectValidationErrors(marker);
+                for (int errorIndex = 0; errorIndex < errors.Count; errorIndex++)
+                    EditorGUILayout.HelpBox($"{marker.name}: {errors[errorIndex]}", MessageType.Error);
+            }
+
+            EditorGUILayout.LabelField($"Placements: {ownedPlacementCount}", EditorStyles.miniLabel);
+            DrawHazardActorDefinitionSync(source);
+            EditorGUILayout.Space(4f);
+            serializedObject.Update();
+        }
+
+        private static void DrawHazardActorDefinitionSync(SourceRuntimeTemplateAuthoringBase source)
+        {
+            if (!StageHazardActorPlacementEditorUtility.TryBuildDefinitionSyncPlan(
+                    source,
+                    out var plan,
+                    out var errors))
+            {
+                for (int i = 0; i < errors.Count; i++)
+                    EditorGUILayout.HelpBox(errors[i], MessageType.Error);
+                return;
+            }
+
+            if (!plan.HasChanges)
+            {
+                EditorGUILayout.HelpBox("Definition status: Up to date.", MessageType.Info);
+                return;
+            }
+
+            EditorGUILayout.HelpBox($"Definition status: Modified\n{plan.Summary}", MessageType.Warning);
+            if (!GUILayout.Button("Apply Hazard Actor Data To Definition"))
+                return;
+
+            if (plan.RequiresConfirmation
+                && !EditorUtility.DisplayDialog(
+                    "Apply Hazard Actor Data",
+                    $"{plan.Summary}\n\nRemoved placements and prefab replacements will overwrite the Definition.",
+                    "Apply",
+                    "Cancel"))
+            {
+                return;
+            }
+
+            if (!StageHazardActorPlacementEditorUtility.TryApplyDefinitionSyncPlan(
+                    plan,
+                    saveAssets: true,
+                    out string error))
+            {
+                Debug.LogError($"[HazardActorPlacement] {error}", source);
+            }
         }
     }
 

@@ -238,9 +238,18 @@ namespace SweepNDodge.DotsBullets.Editor
             };
         }
 
-        private static HazardActorPlacementBinding[] BuildHazardActorPlacements(SourceRuntimeTemplateAuthoringBase authoring)
+        /// <summary>
+        /// Builds Hazard Actor placement data owned directly by the given source in source-local transform space.
+        /// </summary>
+        public static HazardActorPlacementBinding[] BuildHazardActorPlacements(SourceRuntimeTemplateAuthoringBase authoring)
         {
-            var markers = authoring.GetComponentsInChildren<StageHazardActorMarker>(includeInactive: true);
+            if (authoring == null)
+                return Array.Empty<HazardActorPlacementBinding>();
+
+            var markers = authoring.GetComponentsInChildren<StageHazardActorMarker>(includeInactive: true)
+                .Where(marker => marker != null
+                    && marker.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>() == authoring)
+                .ToArray();
             if (markers == null || markers.Length == 0)
                 return Array.Empty<HazardActorPlacementBinding>();
 
@@ -248,13 +257,15 @@ namespace SweepNDodge.DotsBullets.Editor
             for (int i = 0; i < markers.Length; i++)
             {
                 var marker = markers[i];
-                Vector3 localOffset = marker.transform.position - authoring.transform.position;
+                Vector3 localOffset = authoring.transform.InverseTransformPoint(marker.transform.position);
+                Quaternion localRotation = Quaternion.Inverse(authoring.transform.rotation) * marker.transform.rotation;
+                float localYawDeg = Mathf.Repeat(localRotation.eulerAngles.y, 360f);
                 result[i] = new HazardActorPlacementBinding
                 {
                     PlacementInstanceId = Mathf.Max(1, marker.PlacementInstanceId),
                     ActorArchetypePrefab = marker.ActorArchetypePrefab,
                     LocalOffset = localOffset,
-                    LocalYawDeg = marker.LocalYawDeg,
+                    LocalYawDeg = Mathf.Approximately(localYawDeg, 360f) ? 0f : localYawDeg,
                 };
             }
 
