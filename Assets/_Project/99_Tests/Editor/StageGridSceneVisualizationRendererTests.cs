@@ -60,6 +60,50 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GetOrBuildCacheStats_NonPositiveBounds_BuildsEmptyCacheWithoutTileLookups()
+        {
+            var root = new GameObject("stage");
+            StageMovementTile movementTile = null;
+            StageRegionTile regionTile = null;
+            try
+            {
+                var grid = root.AddComponent<Grid>();
+                var movement = CreateTilemap(root.transform, "movement");
+                var region = CreateTilemap(root.transform, "region");
+                var authoring = root.AddComponent<StageGridAuthoring>();
+                authoring.Grid = grid;
+                authoring.MovementTilemap = movement;
+                authoring.RegionTilemap = region;
+                authoring.BoundsSize = new Vector2Int(0, -2);
+                authoring.SourceRegionMappings = new[]
+                {
+                    new StageRegionSlotMapping { RegionSlotIndex = 1, StableId = 1001u },
+                };
+
+                movementTile = ScriptableObject.CreateInstance<StageMovementTile>();
+                movementTile.MovementFlags = StageCellMovementFlags.BlockPlayer;
+                movement.SetTile(Vector3Int.zero, movementTile);
+                regionTile = ScriptableObject.CreateInstance<StageRegionTile>();
+                regionTile.RegionKind = StageRegionKind.Source;
+                regionTile.RegionSlotIndex = 1;
+                region.SetTile(Vector3Int.zero, regionTile);
+
+                var stats = StageGridSceneVisualizationRenderer.GetOrBuildCacheStats(authoring);
+
+                Assert.That(stats.CellCount, Is.EqualTo(0));
+                Assert.That(stats.TileLookupCount, Is.EqualTo(0));
+                Assert.That(stats.VertexCount, Is.EqualTo(0));
+                Assert.That(stats.RebuildCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(movementTile);
+                Object.DestroyImmediate(regionTile);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void GetOrBuildCacheStats_AuthoringSignatureChange_RebuildsCache()
         {
             var root = new GameObject("stage");
@@ -117,6 +161,33 @@ namespace SweepNDodge.DotsBullets.Tests
             finally
             {
                 Object.DestroyImmediate(movementTile);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void ClearCaches_RemovesCacheSoNextStatsRequestRebuilds()
+        {
+            var root = new GameObject("stage");
+            try
+            {
+                var grid = root.AddComponent<Grid>();
+                var authoring = root.AddComponent<StageGridAuthoring>();
+                authoring.Grid = grid;
+                authoring.MovementTilemap = CreateTilemap(root.transform, "movement");
+                authoring.RegionTilemap = CreateTilemap(root.transform, "region");
+                authoring.BoundsSize = new Vector2Int(2, 2);
+
+                var first = StageGridSceneVisualizationRenderer.GetOrBuildCacheStats(authoring);
+                StageGridSceneVisualizationRenderer.ClearCaches();
+                var afterClear = StageGridSceneVisualizationRenderer.GetOrBuildCacheStats(authoring);
+
+                Assert.That(first.RebuildCount, Is.EqualTo(1));
+                Assert.That(afterClear.RebuildCount, Is.EqualTo(1));
+                Assert.That(afterClear.VertexCount, Is.EqualTo(first.VertexCount));
+            }
+            finally
+            {
                 Object.DestroyImmediate(root);
             }
         }

@@ -214,6 +214,34 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void GenerateLayoutsForRoot_StandalonePresentationUnderScaledIntermediateParent_FailsValidation()
+        {
+            var setup = CreateStageSetup();
+            try
+            {
+                var organizerGo = new GameObject("scaled_organizer");
+                organizerGo.transform.SetParent(setup.StageGo.transform, false);
+                organizerGo.transform.localScale = new Vector3(2f, 1f, 1f);
+
+                var presentationGo = new GameObject("standalone_presentation");
+                presentationGo.transform.SetParent(organizerGo.transform, false);
+                var presentation = presentationGo.AddComponent<StagePresentationMarker>();
+                presentation.StableId = 4003u;
+                presentation.PlacementMode = StagePresentationPlacementMode.Standalone;
+                presentation.PresentationKey = "standalone_basic";
+
+                bool ok = StageLayoutCatalogGenerator.TryGenerateLayoutsForRoot(setup.Root, out var issues, saveAssets: false);
+
+                Assert.That(ok, Is.False);
+                Assert.That(issues.Any(x => x.Code == "STL015"), Is.True);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void GenerateLayoutsForRoot_RotatedGrid_IgnoresWorkspaceTransformForRuntimeOrigin()
         {
             var setup = CreateStageSetup();

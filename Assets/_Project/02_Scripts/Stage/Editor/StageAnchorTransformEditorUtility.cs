@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace SweepNDodge.DotsBullets.Editor
 {
@@ -10,6 +11,20 @@ namespace SweepNDodge.DotsBullets.Editor
     {
         private const float PositionToleranceSqr = 0.000001f;
         private const float RotationToleranceDeg = 0.001f;
+
+        private readonly struct TransformPose
+        {
+            public TransformPose(Vector3 position, Quaternion rotation)
+            {
+                Position = position;
+                Rotation = rotation;
+            }
+
+            public Vector3 Position { get; }
+            public Quaternion Rotation { get; }
+        }
+
+        private static readonly Dictionary<int, TransformPose> LastObservedTransformPoses = new();
 
         /// <summary>
         /// Applies region anchor cell and offset data to its Transform.
@@ -31,6 +46,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             marker.transform.position = worldPosition;
             EditorUtility.SetDirty(marker.transform);
+            RememberTransformPose(marker.transform);
             return true;
         }
 
@@ -59,7 +75,21 @@ namespace SweepNDodge.DotsBullets.Editor
             marker.transform.position = worldPosition;
             EditorUtility.SetDirty(marker);
             EditorUtility.SetDirty(marker.transform);
+            RememberTransformPose(marker.transform);
             return true;
+        }
+
+        /// <summary>
+        /// Syncs region data only when the Scene View actually changed the Transform since the last observed pose.
+        /// </summary>
+        public static bool SyncRegionDataFromTransformIfChanged(StageRegionAnchorMarker marker, bool recordUndo)
+        {
+            if (marker == null || !HasTransformPoseChanged(marker.transform))
+                return false;
+
+            bool changed = SyncRegionDataFromTransform(marker, recordUndo);
+            RememberTransformPose(marker.transform);
+            return changed;
         }
 
         /// <summary>
@@ -85,6 +115,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             marker.transform.SetPositionAndRotation(worldPosition, worldRotation);
             EditorUtility.SetDirty(marker.transform);
+            RememberTransformPose(marker.transform);
             return true;
         }
 
@@ -119,7 +150,32 @@ namespace SweepNDodge.DotsBullets.Editor
             marker.transform.SetPositionAndRotation(worldPosition, worldRotation);
             EditorUtility.SetDirty(marker);
             EditorUtility.SetDirty(marker.transform);
+            RememberTransformPose(marker.transform);
             return true;
+        }
+
+        /// <summary>
+        /// Syncs player start data only when the Scene View actually changed the Transform since the last observed pose.
+        /// </summary>
+        public static bool SyncPlayerDataFromTransformIfChanged(StagePlayerStartMarker marker, bool recordUndo)
+        {
+            if (marker == null || !HasTransformPoseChanged(marker.transform))
+                return false;
+
+            bool changed = SyncPlayerDataFromTransform(marker, recordUndo);
+            RememberTransformPose(marker.transform);
+            return changed;
+        }
+
+        /// <summary>
+        /// Records the current Transform as the idle Scene View pose so a repaint does not count as user movement.
+        /// </summary>
+        public static void RememberTransformPose(Transform transform)
+        {
+            if (transform == null)
+                return;
+
+            LastObservedTransformPoses[transform.GetInstanceID()] = new TransformPose(transform.position, transform.rotation);
         }
 
         /// <summary>
@@ -141,6 +197,28 @@ namespace SweepNDodge.DotsBullets.Editor
                 new Unity.Mathematics.int2(anchorCell.x, anchorCell.y),
                 new Unity.Mathematics.float2(anchorOffset.x, anchorOffset.y),
                 authoring.GetEditorPreviewPlaneY());
+            return true;
+        }
+
+        private static bool HasTransformPoseChanged(Transform transform)
+        {
+            if (transform == null)
+                return false;
+
+            int id = transform.GetInstanceID();
+            var current = new TransformPose(transform.position, transform.rotation);
+            if (!LastObservedTransformPoses.TryGetValue(id, out var previous))
+            {
+                LastObservedTransformPoses.Add(id, current);
+                return false;
+            }
+
+            if ((previous.Position - current.Position).sqrMagnitude <= PositionToleranceSqr
+                && Quaternion.Angle(previous.Rotation, current.Rotation) <= RotationToleranceDeg)
+            {
+                return false;
+            }
+
             return true;
         }
 

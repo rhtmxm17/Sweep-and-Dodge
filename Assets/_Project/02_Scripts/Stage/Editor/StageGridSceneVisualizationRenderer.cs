@@ -44,6 +44,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static readonly Dictionary<int, CacheEntry> Entries = new();
         private static Material _lineMaterial;
+        private static bool _warnedMissingLineShader;
+        private static bool _warnedFallbackLineShader;
 
         static StageGridSceneVisualizationRenderer()
         {
@@ -130,6 +132,17 @@ namespace SweepNDodge.DotsBullets.Editor
         private static void Rebuild(CacheEntry entry, int signature)
         {
             var authoring = entry.Authoring;
+            if (authoring.BoundsSize.x <= 0 || authoring.BoundsSize.y <= 0)
+            {
+                ApplyEmptyMesh(entry.Mesh);
+                entry.Signature = signature;
+                entry.Dirty = false;
+                entry.CellCount = 0;
+                entry.TileLookupCount = 0;
+                entry.RebuildCount++;
+                return;
+            }
+
             var bounds = authoring.GetAuthoringBounds();
             var vertices = new List<Vector3>(EstimateVertexCapacity(authoring, bounds));
             var colors = new List<Color>(vertices.Capacity);
@@ -298,6 +311,11 @@ namespace SweepNDodge.DotsBullets.Editor
             mesh.SetIndices(indices, MeshTopology.Lines, 0, calculateBounds: true);
         }
 
+        private static void ApplyEmptyMesh(Mesh mesh)
+        {
+            mesh.Clear();
+        }
+
         private static Mesh CreateMesh(StageGridAuthoring authoring)
         {
             return new Mesh
@@ -314,13 +332,39 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var shader = Shader.Find("Hidden/Internal-Colored");
             if (shader == null)
-                return null;
+            {
+                shader = Shader.Find("Sprites/Default");
+                if (shader == null)
+                {
+                    if (!_warnedMissingLineShader)
+                    {
+                        Debug.LogWarning("StageGridSceneVisualizationRenderer could not find a line rendering shader. Stage grid Scene View visualization will be skipped.");
+                        _warnedMissingLineShader = true;
+                    }
+
+                    return null;
+                }
+
+                if (!_warnedFallbackLineShader)
+                {
+                    Debug.LogWarning("StageGridSceneVisualizationRenderer could not find Hidden/Internal-Colored and will use Sprites/Default as a fallback line shader.");
+                    _warnedFallbackLineShader = true;
+                }
+            }
+
+            bool usesInternalColored = shader.name == "Hidden/Internal-Colored";
+            if (usesInternalColored)
+                _warnedMissingLineShader = false;
 
             _lineMaterial = new Material(shader)
             {
                 name = "StageGridSceneVisualizationMaterial",
                 hideFlags = HideFlags.HideAndDontSave,
             };
+
+            if (!usesInternalColored)
+                return _lineMaterial;
+
             _lineMaterial.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
             _lineMaterial.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
             _lineMaterial.SetInt("_Cull", (int)CullMode.Off);

@@ -6,6 +6,13 @@ namespace SweepNDodge.DotsBullets.Editor
     [CustomEditor(typeof(StagePlayerStartMarker))]
     public sealed class StagePlayerStartMarkerEditor : UnityEditor.Editor
     {
+        private void OnEnable()
+        {
+            var marker = (StagePlayerStartMarker)target;
+            if (marker != null)
+                StageAnchorTransformEditorUtility.RememberTransformPose(marker.transform);
+        }
+
         public override void OnInspectorGUI()
         {
             bool dataChanged = DrawDefaultInspector();
@@ -39,7 +46,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private void OnSceneGUI()
         {
             var marker = (StagePlayerStartMarker)target;
-            if (StageAnchorTransformEditorUtility.SyncPlayerDataFromTransform(marker, recordUndo: true))
+            if (StageAnchorTransformEditorUtility.SyncPlayerDataFromTransformIfChanged(marker, recordUndo: true))
                 SceneView.RepaintAll();
         }
 

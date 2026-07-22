@@ -249,6 +249,8 @@ namespace SweepNDodge.DotsBullets.Editor
             var markers = authoring.GetComponentsInChildren<StageHazardActorMarker>(includeInactive: true)
                 .Where(marker => marker != null
                     && marker.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>() == authoring)
+                .OrderBy(marker => Mathf.Max(1, marker.PlacementInstanceId))
+                .ThenBy(marker => BuildHierarchyPath(marker.transform), StringComparer.Ordinal)
                 .ToArray();
             if (markers == null || markers.Length == 0)
                 return Array.Empty<HazardActorPlacementBinding>();
@@ -278,7 +280,24 @@ namespace SweepNDodge.DotsBullets.Editor
             if (marker == null || marker.Rules == null || marker.Rules.Length == 0)
                 return Array.Empty<HazardActorOrchestrationRuleBinding>();
 
-            return marker.Rules;
+            return CloneRules(marker.Rules);
+        }
+
+        private static HazardActorOrchestrationRuleBinding[] CloneRules(HazardActorOrchestrationRuleBinding[] rules)
+        {
+            if (rules == null || rules.Length == 0)
+                return Array.Empty<HazardActorOrchestrationRuleBinding>();
+
+            var clones = new HazardActorOrchestrationRuleBinding[rules.Length];
+            for (int i = 0; i < rules.Length; i++)
+            {
+                clones[i] = rules[i];
+                clones[i].TargetPlacementInstanceIds = rules[i].TargetPlacementInstanceIds != null
+                    ? (int[])rules[i].TargetPlacementInstanceIds.Clone()
+                    : Array.Empty<int>();
+            }
+
+            return clones;
         }
 
         private static SustainSlotBinding[] BuildSustainSlots(SourceRuntimeTemplateAuthoringBase.SustainClipSlotAuthoring[] slots)

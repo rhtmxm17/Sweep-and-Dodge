@@ -119,6 +119,13 @@ namespace SweepNDodge.DotsBullets.Editor
             return Mathf.Max(1, maxId + 1);
         }
 
+        public static SourceRuntimeTemplateAuthoringBase ResolveSourceForPlacement(GameObject selected)
+        {
+            return selected != null
+                ? selected.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>()
+                : null;
+        }
+
         public static bool TryGetLocalPose(
             StageHazardActorMarker marker,
             out SourceRuntimeTemplateAuthoringBase source,
@@ -290,12 +297,12 @@ namespace SweepNDodge.DotsBullets.Editor
                 errors.Add($"StageDefinition has duplicate SourceBindings for StableId {source.StableIdOverride}.");
             }
 
-            var stageMarkers = stage.GetComponentsInChildren<StageHazardActorMarker>(includeInactive: true);
+            var sourceMarkers = source.GetComponentsInChildren<StageHazardActorMarker>(includeInactive: true);
             var uniqueErrors = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 0; i < stageMarkers.Length; i++)
+            for (int i = 0; i < sourceMarkers.Length; i++)
             {
-                var marker = stageMarkers[i];
-                if (marker == null || marker.GetComponentInParent<StageLayoutStageMarker>() != stage)
+                var marker = sourceMarkers[i];
+                if (marker == null || marker.GetComponentInParent<SourceRuntimeTemplateAuthoringBase>() != source)
                     continue;
 
                 var markerErrors = CollectValidationErrors(marker);
@@ -430,9 +437,7 @@ namespace SweepNDodge.DotsBullets.Editor
         [MenuItem("GameObject/Stage/Add Hazard Actor Placement", false, 20)]
         private static void AddPlacementMenu()
         {
-            var source = Selection.activeGameObject != null
-                ? Selection.activeGameObject.GetComponent<SourceRuntimeTemplateAuthoringBase>()
-                : null;
+            var source = ResolveSourceForPlacement(Selection.activeGameObject);
             if (!TryCreatePlacement(source, out _, out string error))
                 Debug.LogError($"[HazardActorPlacement] {error}");
         }
@@ -440,8 +445,7 @@ namespace SweepNDodge.DotsBullets.Editor
         [MenuItem("GameObject/Stage/Add Hazard Actor Placement", true)]
         private static bool ValidateAddPlacementMenu()
         {
-            return Selection.activeGameObject != null
-                && Selection.activeGameObject.GetComponent<SourceRuntimeTemplateAuthoringBase>() != null;
+            return ResolveSourceForPlacement(Selection.activeGameObject) != null;
         }
 
         private static void ComputePlacementDiff(

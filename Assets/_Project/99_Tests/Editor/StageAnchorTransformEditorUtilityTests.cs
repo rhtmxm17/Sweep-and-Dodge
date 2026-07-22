@@ -55,6 +55,35 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SyncRegionDataFromTransformIfChanged_IgnoresIdleSceneGuiAndPreservesExplicitOffset()
+        {
+            var setup = CreateSetup(new Vector3(10f, 2f, -4f), 2f);
+            try
+            {
+                var marker = CreateRegionMarker(setup.Stage.transform);
+                marker.AnchorCell = new Vector2Int(-2, 3);
+                marker.AnchorOffset = new Vector2(0.25f, -0.1f);
+                StageAnchorTransformEditorUtility.SyncRegionTransformFromData(marker, recordUndo: false);
+
+                bool idleChanged = StageAnchorTransformEditorUtility.SyncRegionDataFromTransformIfChanged(marker, recordUndo: false);
+
+                Assert.That(idleChanged, Is.False);
+                Assert.That(marker.AnchorCell, Is.EqualTo(new Vector2Int(-2, 3)));
+                Assert.That(marker.AnchorOffset, Is.EqualTo(new Vector2(0.25f, -0.1f)));
+
+                marker.transform.position += new Vector3(1.2f, 5f, 0.8f);
+                bool movedChanged = StageAnchorTransformEditorUtility.SyncRegionDataFromTransformIfChanged(marker, recordUndo: false);
+
+                Assert.That(movedChanged, Is.True);
+                Assert.That(marker.AnchorOffset, Is.EqualTo(Vector2.zero));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void PlayerStart_RoundTrip_SnapsTransformAndAppliesExplicitData()
         {
             var setup = CreateSetup(new Vector3(50f, 1f, 0f), 1f);
@@ -84,6 +113,42 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(applied, Is.True);
                 AssertVector3(marker.transform.position, new Vector3(49.75f, 1f, 2.25f));
                 Assert.That(Quaternion.Angle(marker.transform.rotation, Quaternion.Euler(0f, 270f, 0f)), Is.LessThan(0.001f));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void SyncPlayerDataFromTransformIfChanged_IgnoresIdleSceneGuiAndPreservesExplicitOffset()
+        {
+            var setup = CreateSetup(new Vector3(50f, 1f, 0f), 1f);
+            try
+            {
+                var markerGo = new GameObject("player_start");
+                markerGo.transform.SetParent(setup.Stage.transform, false);
+                var marker = markerGo.AddComponent<StagePlayerStartMarker>();
+                marker.AnchorCell = new Vector2Int(-1, 2);
+                marker.AnchorOffset = new Vector2(0.25f, -0.25f);
+                marker.YawDeg = 270f;
+                StageAnchorTransformEditorUtility.SyncPlayerTransformFromData(marker, recordUndo: false);
+
+                bool idleChanged = StageAnchorTransformEditorUtility.SyncPlayerDataFromTransformIfChanged(marker, recordUndo: false);
+
+                Assert.That(idleChanged, Is.False);
+                Assert.That(marker.AnchorCell, Is.EqualTo(new Vector2Int(-1, 2)));
+                Assert.That(marker.AnchorOffset, Is.EqualTo(new Vector2(0.25f, -0.25f)));
+                Assert.That(marker.YawDeg, Is.EqualTo(270f).Within(0.001f));
+
+                marker.transform.SetPositionAndRotation(
+                    marker.transform.position + new Vector3(1.2f, 5f, -0.8f),
+                    Quaternion.Euler(0f, 135f, 0f));
+                bool movedChanged = StageAnchorTransformEditorUtility.SyncPlayerDataFromTransformIfChanged(marker, recordUndo: false);
+
+                Assert.That(movedChanged, Is.True);
+                Assert.That(marker.AnchorOffset, Is.EqualTo(Vector2.zero));
+                Assert.That(marker.YawDeg, Is.EqualTo(135f).Within(0.001f));
             }
             finally
             {

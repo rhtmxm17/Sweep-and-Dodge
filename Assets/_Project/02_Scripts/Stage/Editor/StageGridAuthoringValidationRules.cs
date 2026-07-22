@@ -499,7 +499,45 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 if (marker.PlacementMode == StagePresentationPlacementMode.Standalone && hasParentTopology)
                     issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL012", location, "Standalone presentation must not be authored under a topology marker parent."));
+
+                if (marker.PlacementMode == StagePresentationPlacementMode.Standalone
+                    && TryFindScaledIntermediateParent(marker.transform, stageNode.transform, out var scaledParent))
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STL015",
+                        location,
+                        $"Standalone presentation must not be authored under a scaled intermediate parent. parent={BuildHierarchyPath(scaledParent)}"));
+                }
             }
+        }
+
+        private static bool TryFindScaledIntermediateParent(Transform marker, Transform stage, out Transform scaledParent)
+        {
+            scaledParent = null;
+            if (marker == null || stage == null)
+                return false;
+
+            var current = marker.parent;
+            while (current != null && current != stage)
+            {
+                if (!Approximately(current.localScale, Vector3.one))
+                {
+                    scaledParent = current;
+                    return true;
+                }
+
+                current = current.parent;
+            }
+
+            return false;
+        }
+
+        private static bool Approximately(Vector3 a, Vector3 b)
+        {
+            return Mathf.Approximately(a.x, b.x)
+                && Mathf.Approximately(a.y, b.y)
+                && Mathf.Approximately(a.z, b.z);
         }
 
         public static string BuildHierarchyPath(Transform transform)

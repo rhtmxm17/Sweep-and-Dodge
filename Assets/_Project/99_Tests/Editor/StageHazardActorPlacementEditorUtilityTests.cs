@@ -65,6 +65,25 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void ResolveSourceForPlacement_UsesNearestParentSource()
+        {
+            var setup = CreateStageWithSources();
+            try
+            {
+                var child = new GameObject("selected_child");
+                child.transform.SetParent(setup.SourceA.transform, false);
+
+                var resolved = StageHazardActorPlacementEditorUtility.ResolveSourceForPlacement(child);
+
+                Assert.That(resolved, Is.EqualTo(setup.SourceA));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void LocalPoseAndGenerator_UseSourceTransformSpaceAndTransformYaw()
         {
             var setup = CreateStageWithSources();
@@ -101,6 +120,90 @@ namespace SweepNDodge.DotsBullets.Tests
             finally
             {
                 setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void BuildHazardActorPlacements_ReturnsStablePlacementIdOrder()
+        {
+            var setup = CreateStageWithSources();
+            try
+            {
+                var lateGo = new GameObject("late_in_hierarchy");
+                lateGo.transform.SetParent(setup.SourceA.transform, false);
+                var late = lateGo.AddComponent<StageHazardActorMarker>();
+                late.PlacementInstanceId = 9;
+
+                var earlyGo = new GameObject("early_in_id_order");
+                earlyGo.transform.SetParent(setup.SourceA.transform, false);
+                var early = earlyGo.AddComponent<StageHazardActorMarker>();
+                early.PlacementInstanceId = 2;
+
+                var generated = StageDefinitionGenerator.BuildHazardActorPlacements(setup.SourceA);
+
+                Assert.That(generated.Select(x => x.PlacementInstanceId).ToArray(), Is.EqualTo(new[] { 2, 9 }));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void SyncDefinitionsFromAuthoring_ClonesHazardActorRules()
+        {
+            var rootGo = new GameObject("root");
+            var layout = ScriptableObject.CreateInstance<StageLayoutSO>();
+            var definition = ScriptableObject.CreateInstance<StageDefinitionSO>();
+            try
+            {
+                rootGo.AddComponent<StageLayoutRootMarker>();
+                var stageGo = new GameObject("stage");
+                stageGo.transform.SetParent(rootGo.transform, false);
+                var stage = stageGo.AddComponent<StageLayoutStageMarker>();
+                stage.StageId = 12;
+                stage.TargetLayout = layout;
+                stage.TargetDefinition = definition;
+                layout.SchemaVersion = 2;
+                const uint stableId = 990001u;
+                layout.SourceRegions = new[]
+                {
+                    new StageSourceRegionLayoutData { StableId = stableId, Active = true },
+                };
+
+                var sourceGo = new GameObject("source");
+                sourceGo.transform.SetParent(stageGo.transform, false);
+                var source = sourceGo.AddComponent<SourceRuntimeTemplateAuthoring>();
+                source.StableIdOverride = stableId;
+                var rulesMarker = sourceGo.AddComponent<HazardActorSourceAuthoringMarker>();
+                rulesMarker.Rules = new[]
+                {
+                    new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = 1,
+                        TargetPlacementInstanceIds = new[] { 5 },
+                        ActionType = HazardActorOrchestrationActionId.Spawn,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    },
+                };
+
+                bool synced = StageDefinitionGenerator.TrySyncDefinitionsForRoot(
+                    rootGo.GetComponent<StageLayoutRootMarker>(),
+                    out var issues,
+                    saveAssets: false);
+
+                Assert.That(synced, Is.True, string.Join("\n", issues.Select(x => x.Message)));
+                var generatedRules = definition.SourceBindings[0].HazardActorOrchestrationRules;
+                Assert.That(generatedRules, Has.Length.EqualTo(1));
+                Assert.That(generatedRules[0].TargetPlacementInstanceIds, Is.Not.SameAs(rulesMarker.Rules[0].TargetPlacementInstanceIds));
+                rulesMarker.Rules[0].TargetPlacementInstanceIds[0] = 99;
+                Assert.That(generatedRules[0].TargetPlacementInstanceIds, Is.EqualTo(new[] { 5 }));
+            }
+            finally
+            {
+                Object.DestroyImmediate(rootGo);
+                Object.DestroyImmediate(layout);
+                Object.DestroyImmediate(definition);
             }
         }
 
@@ -341,6 +444,50 @@ namespace SweepNDodge.DotsBullets.Tests
                         out var errors),
                     Is.False);
                 Assert.That(errors.Any(x => x.Contains("conflicts with Definition SourceBinding 1002")), Is.True);
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void DefinitionSyncPlan_DoesNotBlockOnUnownedIncompleteMarker()
+        {
+            var setup = CreateStageWithSources();
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(HazardPrefabPath);
+            Assert.That(prefab, Is.Not.Null);
+
+            try
+            {
+                var currentGo = new GameObject("current_placement");
+                currentGo.transform.SetParent(setup.SourceA.transform, false);
+                var current = currentGo.AddComponent<StageHazardActorMarker>();
+                current.PlacementInstanceId = 5;
+                current.ActorArchetypePrefab = prefab;
+
+                var incompleteOtherGo = new GameObject("other_incomplete_placement");
+                incompleteOtherGo.transform.SetParent(setup.SourceB.transform, false);
+                var incompleteOther = incompleteOtherGo.AddComponent<StageHazardActorMarker>();
+                incompleteOther.PlacementInstanceId = 6;
+
+                setup.Definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = setup.SourceA.StableIdOverride,
+                        HazardActorPlacements = System.Array.Empty<HazardActorPlacementBinding>(),
+                        HazardActorOrchestrationRules = System.Array.Empty<HazardActorOrchestrationRuleBinding>(),
+                    },
+                };
+
+                bool built = StageHazardActorPlacementEditorUtility.TryBuildDefinitionSyncPlan(
+                    setup.SourceA,
+                    out var plan,
+                    out var errors);
+
+                Assert.That(built, Is.True, string.Join("\n", errors));
+                Assert.That(plan.AddCount, Is.EqualTo(1));
             }
             finally
             {

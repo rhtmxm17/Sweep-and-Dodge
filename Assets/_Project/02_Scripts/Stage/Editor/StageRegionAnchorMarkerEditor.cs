@@ -6,6 +6,13 @@ namespace SweepNDodge.DotsBullets.Editor
     [CustomEditor(typeof(StageRegionAnchorMarker))]
     public sealed class StageRegionAnchorMarkerEditor : UnityEditor.Editor
     {
+        private void OnEnable()
+        {
+            var marker = (StageRegionAnchorMarker)target;
+            if (marker != null)
+                StageAnchorTransformEditorUtility.RememberTransformPose(marker.transform);
+        }
+
         public override void OnInspectorGUI()
         {
             bool dataChanged = DrawDefaultInspector();
@@ -43,7 +50,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private void OnSceneGUI()
         {
             var marker = (StageRegionAnchorMarker)target;
-            if (StageAnchorTransformEditorUtility.SyncRegionDataFromTransform(marker, recordUndo: true))
+            if (StageAnchorTransformEditorUtility.SyncRegionDataFromTransformIfChanged(marker, recordUndo: true))
                 SceneView.RepaintAll();
         }
 
