@@ -66,21 +66,31 @@ MonoBehaviour:
     ThemeKey: 
     Priority: 10
     BlockingMode: 1
-    RetryPolicy: 0
+    RetryPolicy: 1
     FullVariant:
       Lines:
       - SpeakerKey: MC
-        Text: "\uC774\uBC88\uC5D4 \uB450 \uAC1C\uC758 \uBC29\uC744 \uCCAD\uC18C\uD574\uC57C\uD574.\r\n\uBC29\uB9C8\uB2E4
+        Text: "\uC774\uBC88\uC5D4 \uB450 \uAC1C\uC758 \uBC29\uC744 \uCCAD\uC18C\uD574\uC57C\uD574.\n\uBC29\uB9C8\uB2E4
           \uC704\uD5D8 \uC7A5\uCE58\uC758 \uD589\uB3D9\uC774 \uB2E4\uB974\uB2C8\uAE4C
           \uC870\uC2EC\uD558\uC790."
         Anchor:
-          Kind: 1
-          StagePresentationStableId: 9002
-          ScreenAnchor: 0
-        MinHoldSec: 0.2
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
         AutoAdvanceSec: 0
     RetryVariant:
-      Lines: []
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uD55C\uCABD\uB9CC \uBD99\uC7A1\uACE0 \uC788\uC73C\uBA74 \uB3D9\uC120\uC774
+          \uAF2C\uC77C \uC218 \uC788\uC5B4.\n\uB450 \uBC29\uC758 \uC704\uD5D8 \uC7A5\uCE58\uAC00
+          \uC5B4\uB5BB\uAC8C \uB2E4\uB978\uC9C0 \uBCF4\uACE0 \uC6C0\uC9C1\uC774\uC790."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
   - EntryKey: stage_01_clear
     Enabled: 1
     Trigger: 2
@@ -93,12 +103,13 @@ MonoBehaviour:
     FullVariant:
       Lines:
       - SpeakerKey: MC
-        Text: Clear line
+        Text: "\uC2AC\uC2AC \uC0AC\uC6A9\uBC95\uC5D0 \uC775\uC219\uD574\uC9C4 \uAC83
+          \uAC19\uC544.\n\uC774\uB300\uB85C \uB2E4\uC74C \uAD6C\uC5ED\uB3C4 \uD574\uACB0\uD574\uBCF4\uC790!"
         Anchor:
           Kind: 2
           StagePresentationStableId: 0
           ScreenAnchor: 1
-        MinHoldSec: 0
+        MinHoldSec: 0.1
         AutoAdvanceSec: 0
     RetryVariant:
       Lines: []
@@ -166,6 +177,85 @@ MonoBehaviour:
           StagePresentationStableId: 0
           ScreenAnchor: 0
         MinHoldSec: 0
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
+  - EntryKey: stage_02_clear
+    Enabled: 1
+    Trigger: 2
+    TargetKind: 0
+    StageId: 2
+    ThemeKey: 
+    Priority: 20
+    BlockingMode: 2
+    RetryPolicy: 0
+    FullVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uC88B\uC544, \uB450 \uBC29 \uBAA8\uB450 \uAE54\uB054\uD558\uAC8C
+          \uC815\uB9AC\uB410\uC5B4.\n\uB9C8\uC9C0\uB9C9 \uAD6C\uC5ED\uC740 \uB354
+          \uC9D1\uC911\uD574\uC11C \uD53C\uD574\uC57C \uD560\uAC70\uC57C."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 1
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
+  - EntryKey: stage_03_start
+    Enabled: 1
+    Trigger: 1
+    TargetKind: 0
+    StageId: 3
+    ThemeKey: 
+    Priority: 10
+    BlockingMode: 1
+    RetryPolicy: 1
+    FullVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uB9C8\uC9C0\uB9C9 \uAD6C\uC5ED\uC740 \uBC18\uC751\uC774 \uD6E8\uC52C
+          \uD06C\uAC8C \uC62C \uAC70\uC57C.\nSource\uAC00 \uC57D\uD574\uC9C0\uB294
+          \uC21C\uAC04 \uD06C\uAC8C \uB0A0\uB6F0\uB2C8\uAE4C \uC8FC\uC758\uD574\uC57C\uD574."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uD328\uD134\uC774 \uBC14\uB00C\uB294 \uC21C\uAC04\uB9CC \uB193\uCE58\uC9C0
+          \uB9D0\uC790.\n\uBAB0\uB9AC\uAE30 \uC804\uC5D0 Deposit \uCABD \uAE38\uC744
+          \uB0A8\uACA8 \uB450\uBA74 \uB2E4\uC2DC \uB4E4\uC5B4\uAC08 \uC218 \uC788\uC5B4."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
+  - EntryKey: stage_03_clear
+    Enabled: 1
+    Trigger: 2
+    TargetKind: 0
+    StageId: 3
+    ThemeKey: 
+    Priority: 20
+    BlockingMode: 2
+    RetryPolicy: 0
+    FullVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uB410\uC5B4, \uB9C8\uC9C0\uB9C9 Source\uAE4C\uC9C0 \uC815\uB9AC\uB410\uC5B4.\n\uC774
+          \uC815\uB3C4\uBA74 \uACF5\uAC1C \uB370\uBAA8 \uB8E8\uD504\uB294 \uB05D\uAE4C\uC9C0
+          \uBCF4\uC5EC\uC904 \uC218 \uC788\uACA0\uB2E4."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 1
+        MinHoldSec: 0.1
         AutoAdvanceSec: 0
     RetryVariant:
       Lines: []

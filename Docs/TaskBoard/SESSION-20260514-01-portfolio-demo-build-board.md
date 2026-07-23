@@ -22,20 +22,24 @@
 - T1c 기준 결정:
   - Stage 2는 현재 두 덩어리로 나뉜 Source 영역을 별도 Source로 분리하고, 각 Source에 다른 타입의 HazardActor를 배치한다.
   - Stage 3은 기존 작은 샘플 layout을 유지하지 않고 공개 쇼케이스용으로 사실상 신규 작성한다.
+- T1c 반영 결과:
+  - Stage 1은 단일 Source / 단일 Simple Crossing Sentry 학습 루프로 정리했다.
+  - Stage 2는 Source `1002`, `1004` 두 개로 분리하고 각각 다른 HazardActor 후보를 배치했다.
+  - Stage 3은 30x30 공개 쇼케이스 후보 layout으로 재작성하고 Source `1003`에 두 개의 HazardActor 후보를 배치했다.
 
 ## Now
-- 없음. 다음 시작점은 T1c 또는 T2 검증 갱신이다.
+- 없음. 다음 시작점은 T2 검증 갱신 또는 T3 비개발 빌드 기동 smoke다.
 
 ## Next
-- [ ] T1c. 실제 스테이지 편집
-  - 목적: 구체화된 레벨 디자인을 `StageLayoutEditingSampleV1` / StageCatalog 자산에 반영해 공개 빌드 후보의 플레이 경험을 실제로 맞춘다.
-  - 완료 기준: Stage 1~3 layout/catalog/presentation 후보가 공개 데모 역할에 맞게 편집되고, generator/composer 결과가 운영 씬에서 참조된다.
-  - 검증: StageCatalog validation, 운영 씬 stage entry smoke, 필요한 경우 PlayMode 대표 루프 확인.
-  - 근거: `Docs/GameDesign/GD-017-demo-stage-level-design-brief.md`, `Docs/TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md`, `Docs/TechnicalDesign/TD-032-hazard-actor-stage-placement-and-orchestration-framework.md`
 - [ ] T2. Unity Console error 0 및 EditMode/PlayMode smoke 결과 확보
   - 완료 기준: 최신 검증 결과가 날짜, Unity 버전, 테스트 범위와 함께 기록된다.
   - 검증: Console error 0, EditMode, PlayMode smoke 결과 기록.
   - 근거: `Docs/ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md`
+  - 2026-07-23 재검증 메모:
+    - Unity `6000.3.6f1`, `Sweep-and-Dodge@ee769676` MCP 기준 T1c 산출물 검증을 수행했다.
+    - EditMode: `StageCatalogSampleAssetsTests`, `InWorldDialogueSampleAssetsTests`, `ContentValidationGateTests` 범위 `11/11 passed`.
+    - PlayMode 대표 smoke: dedicated scene core loop, Stage 1 actor runtime, Stage 2 layout/pattern apply, Stage 3 complete flow 범위 `4/4 passed`.
+    - 테스트 직후 Test Runner/MCP transport 로그를 제외하고 콘솔을 재확인했으며 Unity Console error `0건`을 확인했다.
   - 2026-05-18 재검증 메모:
     - Unity `6000.3.6f1`, `Sweep-and-Dodge@ee769676` MCP 연결 기준으로 EditMode 전체 테스트는 `479/479 passed`를 확인했다.
     - PlayMode 전체 테스트는 `50 total` 중 실패가 남아 T2 완료 조건을 충족하지 못했다.
@@ -71,6 +75,12 @@
   - 근거: 현재 범위는 포트폴리오 기술 데모이며 출시 후보 빌드가 아니다.
 
 ## Done
+- [x] T1c. 실제 스테이지 편집
+  - 결과: `StageLayoutEditingSampleV1` / StageCatalog 자산에 Stage 1~3 공개 데모 후보 레이아웃과 HazardActor 배치를 반영했다.
+  - 결과: Stage 2는 Source `1002`, `1004` 두 개와 서로 다른 HazardActor 후보 2개로 분리했다.
+  - 결과: Stage 3은 기존 7x5 샘플을 30x30 쇼케이스 후보로 재작성하고, Source `1003` / Deposit `2001` / HazardActor 2개 / final stage 흐름을 유지했다.
+  - 생성: `srt_source_02.asset`, `pf_stage2_fan_sentry.prefab`, `pf_stage2_tracker_sentry.prefab`.
+  - 검증: 2026-07-23 Unity `6000.3.6f1`, `Sweep-and-Dodge@ee769676` MCP 기준 EditMode 관련 검증 `11/11 passed`, PlayMode 대표 smoke `4/4 passed`, 최종 콘솔 error `0건`.
 - [x] T1b. 레벨 디자인 구체화
   - 결과: `Docs/GameDesign/GD-017-demo-stage-level-design-brief.md` 초안을 작성해 Stage 1~3의 공개 데모 역할, Source/Deposit/HazardActor 배치 의도, 실패 유도/완화 포인트, T1c 편집 체크리스트를 정리했다.
   - 결정: Stage 2는 현재 두 덩어리로 나뉜 Source 영역을 별도 Source로 분리하고, 각각 다른 타입의 HazardActor를 배치한다.
