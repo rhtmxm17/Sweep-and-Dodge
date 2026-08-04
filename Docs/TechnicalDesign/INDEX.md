@@ -35,3 +35,4 @@
 - [TD-031-hazard-actor-behavior-runtime.md](TD-031-hazard-actor-behavior-runtime.md): `Presence + PhaseTransition + PatternSelector + actor-owned emit runtime` 기준의 현재 behavior SSOT
 - [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](TD-032-hazard-actor-stage-placement-and-orchestration-framework.md): stage가 actor archetype을 actor-only placement/orchestration seam으로 attach/reset/cleanup 하는 current content-delivery 계약
 - [TD-033-emission-profile-common-schema.md](TD-033-emission-profile-common-schema.md): Source/Hazard/Triggered 공통 `EmissionProfileSO` authoring/runtime schema
+- [TD-034-stage-map-editor-replacement.md](TD-034-stage-map-editor-replacement.md): 기존 Inspector/Tilemap/Marker 기반 stage authoring 툴을 `StageMapDocument` 중심 실무형 맵 에디터로 대체하는 설계

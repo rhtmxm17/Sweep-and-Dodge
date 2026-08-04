@@ -13,6 +13,7 @@
   - [../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
   - [../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
   - [../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md)
+  - [TD-034-stage-map-editor-replacement.md](./TD-034-stage-map-editor-replacement.md)
   - [../TaskBoard/SESSION-20260324-01-stage-grid-layout-board.md](../TaskBoard/SESSION-20260324-01-stage-grid-layout-board.md)
 > 현재 채택안은 `StageCatalogSO`의 dual catalog 구조는 유지하되, layout 쪽 SSOT를 `shape entry array`에서 `grid cell authoritative`로 전환하는 것이다. `StageTopologyPrepareGroup`은 계속 `StageSessionResetPrepareSystem -> StageTopologyApplyPrepareSystem` 순서로 동작하고, prepare owner는 `StageLayoutSO`의 grid 데이터를 읽어 runtime grid cache를 구축한다. P4 기준으로 runtime topology reconcile은 `Source`만 유지하고, movement / deposit gameplay는 grid cache를 직접 읽는다. obstacle gameplay는 더 이상 독립 shape topology kind가 아니라 cell movement authority로 흡수하며, obstacle visual은 gameplay authority와 분리된 tilemap/presentation 계층으로 유지한다.
 
@@ -223,6 +224,8 @@
   - stage entry 시 `LocalTransform`, `PlayerGoSyncComponent`, `PlayerPreviousPositionComponent`를 함께 맞춘다.
 
 ## 7. 에디터 파이프라인
+> 신규 사용자-facing 맵 편집 기준은 [TD-034 Stage Map Editor Replacement](./TD-034-stage-map-editor-replacement.md)를 따른다. 이 문서의 Tilemap/Marker 기반 authoring 경로는 runtime layout/catalog 계약과 legacy import/debug/backend 경로를 설명하는 기준으로 유지한다.
+
 ### 7.1 채택 authoring 경로
 - 1순위: Unity Tilemap 기반 authoring + generator
   - `StageGridAuthoring`
