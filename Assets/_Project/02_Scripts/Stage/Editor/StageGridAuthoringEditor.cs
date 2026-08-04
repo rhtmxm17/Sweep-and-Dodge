@@ -137,35 +137,43 @@ namespace SweepNDodge.DotsBullets.Editor
             StageGridSceneVisualizationRenderer.Draw(authoring);
 
             if (authoring.ShowAnchorGizmo)
-                DrawAnchors(authoring, authoring.Grid.cellSize.x, authoring.Grid.cellSize.y, 0f);
+                DrawAnchors(authoring);
         }
 
-        private static void DrawAnchors(StageGridAuthoring authoring, float cellWidth, float cellHeight, float z)
+        public static bool TryGetAnchorGizmoWorldPosition(StageGridAuthoring authoring, StageRegionAnchorMarker anchor, out Vector3 worldPosition)
+        {
+            worldPosition = default;
+            if (authoring == null || anchor == null)
+                return false;
+
+            return StageAnchorTransformEditorUtility.TryGetWorldPosition(
+                authoring,
+                anchor.AnchorCell,
+                anchor.AnchorOffset,
+                out worldPosition);
+        }
+
+        private static void DrawAnchors(StageGridAuthoring authoring)
         {
             var stageNode = authoring.GetComponent<StageLayoutStageMarker>();
             var anchors = stageNode != null
                 ? stageNode.GetComponentsInChildren<StageRegionAnchorMarker>(includeInactive: true)
                 : authoring.GetComponentsInChildren<StageRegionAnchorMarker>(includeInactive: true);
+            float cellSize = Mathf.Max(0.0001f, authoring.Grid.cellSize.x);
             for (int i = 0; i < anchors.Length; i++)
             {
                 var anchor = anchors[i];
-                if (anchor == null)
+                if (!TryGetAnchorGizmoWorldPosition(authoring, anchor, out var pos))
                     continue;
 
-                int tileX = anchor.AnchorCell.x;
-                int tileY = anchor.AnchorCell.y;
-                var pos = new Vector3(
-                    (tileX + anchor.AnchorOffset.x + 0.5f) * cellWidth,
-                    (tileY + anchor.AnchorOffset.y + 0.5f) * cellHeight,
-                    z - 0.004f);
                 Handles.color = anchor.RegionKind == StageRegionKind.Source
                     ? new Color(0.1f, 0.85f, 1f, 1f)
                     : new Color(1f, 0.75f, 0.1f, 1f);
-                Handles.DrawSolidDisc(pos, Vector3.forward, 0.12f * Mathf.Min(cellWidth, cellHeight));
+                Handles.DrawSolidDisc(pos, Vector3.up, 0.12f * cellSize);
                 string label = authoring.TryResolveStableId(anchor.RegionKind, anchor.RegionSlotIndex, out uint stableId)
                     ? $"{anchor.RegionKind}:slot{anchor.RegionSlotIndex}->{stableId}"
                     : $"{anchor.RegionKind}:slot{anchor.RegionSlotIndex}";
-                Handles.Label(pos, label);
+                Handles.Label(pos + Vector3.up * (0.12f * cellSize), label);
             }
         }
 

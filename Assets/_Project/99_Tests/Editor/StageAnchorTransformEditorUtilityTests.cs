@@ -55,6 +55,27 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void AnchorGizmoWorldPosition_UsesPreviewWorldPositionInsteadOfRawCellXY()
+        {
+            var setup = CreateSetup(new Vector3(10f, 2f, -4f), 2f);
+            try
+            {
+                var marker = CreateRegionMarker(setup.Stage.transform);
+                marker.AnchorCell = new Vector2Int(-2, 3);
+                marker.AnchorOffset = new Vector2(0.25f, -0.1f);
+
+                bool resolved = StageGridAuthoringEditor.TryGetAnchorGizmoWorldPosition(setup.Authoring, marker, out var worldPosition);
+
+                Assert.That(resolved, Is.True);
+                AssertVector3(worldPosition, new Vector3(7.5f, 2f, 2.8f));
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
         public void SyncRegionDataFromTransformIfChanged_IgnoresIdleSceneGuiAndPreservesExplicitOffset()
         {
             var setup = CreateSetup(new Vector3(10f, 2f, -4f), 2f);
