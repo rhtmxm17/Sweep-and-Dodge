@@ -143,6 +143,12 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
+            if (!em.HasComponent<SourceAnchorComponent>(sourceEntity))
+            {
+                error = "Source entity does not contain SourceAnchorComponent.";
+                return false;
+            }
+
             if (!TryResolveStandaloneActorAuthoring(actorArchetypePrefab, out var actorAuthoring, out error))
                 return false;
 
@@ -166,11 +172,15 @@ namespace SweepNDodge.DotsBullets
                 linked.Add(sourceEntity);
             }
 
+            float3 actorWorldPosition = em.GetComponentData<SourceAnchorComponent>(sourceEntity).Position
+                + localOffset;
+
             return TryCreateStandaloneActorHierarchy(
                 em,
                 sourceEntity,
                 placementInstanceId,
                 localOffset,
+                actorWorldPosition,
                 localYawDeg,
                 actorAuthoring,
                 compatibilitySeed,
@@ -214,6 +224,7 @@ namespace SweepNDodge.DotsBullets
             Entity sourceEntity,
             int placementInstanceId,
             float3 localOffset,
+            float3 worldPosition,
             float localYawDeg,
             HazardActorAuthoring actorAuthoring,
             HazardActorPhaseSelectorCompatibilitySeed compatibilitySeed,
@@ -266,7 +277,7 @@ namespace SweepNDodge.DotsBullets
                 LocalOffset = localOffset,
                 LocalYawDeg = localYawDeg,
             });
-            em.SetComponentData(actorEntity, LocalTransform.FromPositionRotationScale(localOffset, actorRotation, 1f));
+            em.SetComponentData(actorEntity, LocalTransform.FromPositionRotationScale(worldPosition, actorRotation, 1f));
             em.SetComponentData(actorEntity, new HazardActorAppliedConfigBaselineComponent
             {
                 IsEnabled = actorEnabled,

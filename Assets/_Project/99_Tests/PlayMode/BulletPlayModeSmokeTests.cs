@@ -68,13 +68,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
                     bool ready = shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && shell.CurrentStageId == 1
-                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
-                        && CountByComponentType<HazardActorComponent>(em) > 0;
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
                     if (!ready)
                         return false;
 
-                    actorEntity = FindFirstEntity<HazardActorComponent>(em);
-                    return actorEntity != Entity.Null
+                    return TryFindFirstPlacementDeliveredHazardActor(em, out actorEntity)
                         && em.HasBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity)
                         && em.HasBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity)
                         && em.HasBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity)
@@ -94,6 +92,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(slots.Length, Is.EqualTo(2), "Stage 1 Simple Crossing Sentry must expose single-shot and double-shot slots.");
             Assert.That(slots[0].PatternSlotId, Is.EqualTo(1));
             Assert.That(slots[1].PatternSlotId, Is.EqualTo(2));
+            AssertHazardActorPlacementMatchesSource(em, actorEntity);
 
             bool sawLinearBullet = false;
             bool sawEmitterAdvance = false;
@@ -3795,6 +3794,55 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(applyState.LastAppliedVersion, Is.EqualTo(runtime.AppliedVersion));
         }
 
+        private static void AssertHazardActorPlacementMatchesSource(EntityManager em, Entity actorEntity)
+        {
+            CompleteTrackedJobs(em);
+            Assert.That(em.Exists(actorEntity), Is.True, "Placement-delivered HazardActor must exist.");
+            Assert.That(em.HasComponent<HazardActorComponent>(actorEntity), Is.True, "Placement actor must keep HazardActorComponent.");
+            Assert.That(em.HasComponent<HazardActorPlacementComponent>(actorEntity), Is.True, "Placement actor must keep source-local placement data.");
+            Assert.That(em.HasComponent<LocalTransform>(actorEntity), Is.True, "Placement actor must expose its runtime world transform.");
+
+            var actor = em.GetComponentData<HazardActorComponent>(actorEntity);
+            Assert.That(actor.SourceEntity, Is.Not.EqualTo(Entity.Null), "Placement actor must reference its owning source.");
+            Assert.That(em.Exists(actor.SourceEntity), Is.True, "Placement actor source must exist.");
+            Assert.That(em.HasComponent<SourceAnchorComponent>(actor.SourceEntity), Is.True, "Placement actor source must expose its runtime anchor.");
+
+            var placement = em.GetComponentData<HazardActorPlacementComponent>(actorEntity);
+            var sourceAnchor = em.GetComponentData<SourceAnchorComponent>(actor.SourceEntity);
+            var actorTransform = em.GetComponentData<LocalTransform>(actorEntity);
+            var expectedWorldPosition = sourceAnchor.Position + placement.LocalOffset;
+            Assert.That(actorTransform.Position.x, Is.EqualTo(expectedWorldPosition.x).Within(0.001f));
+            Assert.That(actorTransform.Position.y, Is.EqualTo(expectedWorldPosition.y).Within(0.001f));
+            Assert.That(actorTransform.Position.z, Is.EqualTo(expectedWorldPosition.z).Within(0.001f));
+        }
+
+        private static bool TryFindFirstPlacementDeliveredHazardActor(EntityManager em, out Entity actorEntity)
+        {
+            CompleteTrackedJobs(em);
+            actorEntity = Entity.Null;
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<SourceHazardActorPlacementRefBuffer>());
+            using var sources = query.ToEntityArray(Allocator.Temp);
+            for (int sourceIndex = 0; sourceIndex < sources.Length; sourceIndex++)
+            {
+                var placements = em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sources[sourceIndex], isReadOnly: true);
+                for (int placementIndex = 0; placementIndex < placements.Length; placementIndex++)
+                {
+                    Entity candidate = placements[placementIndex].ActorEntity;
+                    if (!em.Exists(candidate)
+                        || !em.HasComponent<HazardActorComponent>(candidate)
+                        || !em.HasComponent<HazardActorPlacementComponent>(candidate))
+                    {
+                        continue;
+                    }
+
+                    actorEntity = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool IsStageMapAppliedForStage2(EntityManager em)
         {
             CompleteTrackedJobs(em);
@@ -4607,4 +4655,3 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
-

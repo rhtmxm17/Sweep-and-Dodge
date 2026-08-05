@@ -298,8 +298,11 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(placement.LocalYawDeg, Is.EqualTo(180f).Within(0.001f));
                 Assert.That(em.HasComponent<LocalTransform>(actor), Is.True);
                 var actorTransform = em.GetComponentData<LocalTransform>(actor);
-                Assert.That(actorTransform.Position.x, Is.EqualTo(3f).Within(0.001f));
-                Assert.That(actorTransform.Position.z, Is.EqualTo(-2f).Within(0.001f));
+                var sourceAnchor = em.GetComponentData<SourceAnchorComponent>(source);
+                float3 expectedWorldPosition = sourceAnchor.Position + placement.LocalOffset;
+                Assert.That(actorTransform.Position.x, Is.EqualTo(expectedWorldPosition.x).Within(0.001f));
+                Assert.That(actorTransform.Position.y, Is.EqualTo(expectedWorldPosition.y).Within(0.001f));
+                Assert.That(actorTransform.Position.z, Is.EqualTo(expectedWorldPosition.z).Within(0.001f));
                 var actorRight = math.rotate(actorTransform.Rotation, new float3(1f, 0f, 0f));
                 Assert.That(actorRight.x, Is.EqualTo(-1f).Within(0.001f));
                 Assert.That(actorRight.z, Is.EqualTo(0f).Within(0.001f));
