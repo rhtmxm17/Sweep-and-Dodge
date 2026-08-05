@@ -10,6 +10,8 @@
   - [../ADR/ADR-20260417-01-hazard-actor-direct-emit-ownership.md](../ADR/ADR-20260417-01-hazard-actor-direct-emit-ownership.md)
   - [./TD-030-hazard-actor-hierarchy-and-stage-application.md](./TD-030-hazard-actor-hierarchy-and-stage-application.md)
   - [./TD-031-hazard-actor-behavior-runtime.md](./TD-031-hazard-actor-behavior-runtime.md)
+  - [./TD-034-stage-map-editor-replacement.md](./TD-034-stage-map-editor-replacement.md)
+  - [./TD-035-hazard-actor-authoring-workbench-and-preview.md](./TD-035-hazard-actor-authoring-workbench-and-preview.md)
 
 > stage는 actor archetype의 placement/orchestration owner이고, runtime lifecycle owner는 여전히 source다. 현재 delivery/reset/cleanup seam은 actor-only 기준으로 닫혀 있다.
 
@@ -29,6 +31,8 @@
   - `PhaseSet`
   - `Retire`
   - trigger evaluation / one-shot fired state
+- authoring 시점에는 `StageMapDocument`가 placement와 source-local orchestration rule의 SSOT다.
+- runtime에서는 document export 결과인 `StageDefinitionSO`와 source runtime buffer가 기존 실행 소유권을 유지한다.
 
 ## 2. Delivery / Resolve Seam
 - source apply 시 placement instance마다 actor archetype runtime을 attach한다.
@@ -64,3 +68,4 @@
 ## 6. 검증 기준
 - active 기술문서 기준으로 placement/orchestration 문맥에서 emitter entity attach/cleanup 설명이 남아 있지 않아야 한다.
 - `PlacementInstanceId -> ActorEntity` resolve seam이 현재 stage actor targeting seam으로 유지돼야 한다.
+- editor authoring/migration/preview는 [TD-035](./TD-035-hazard-actor-authoring-workbench-and-preview.md)를 따르며 runtime resolve/lifecycle 계약을 변경하지 않아야 한다.

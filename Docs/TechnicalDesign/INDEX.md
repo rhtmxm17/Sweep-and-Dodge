@@ -36,3 +36,4 @@
 - [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](TD-032-hazard-actor-stage-placement-and-orchestration-framework.md): stage가 actor archetype을 actor-only placement/orchestration seam으로 attach/reset/cleanup 하는 current content-delivery 계약
 - [TD-033-emission-profile-common-schema.md](TD-033-emission-profile-common-schema.md): Source/Hazard/Triggered 공통 `EmissionProfileSO` authoring/runtime schema
 - [TD-034-stage-map-editor-replacement.md](TD-034-stage-map-editor-replacement.md): 기존 Inspector/Tilemap/Marker 기반 stage authoring 툴을 `StageMapDocument` 중심 실무형 맵 에디터로 대체하는 설계
+- [TD-035-hazard-actor-authoring-workbench-and-preview.md](TD-035-hazard-actor-authoring-workbench-and-preview.md): prefab SSOT 기반 HazardActor Workbench, Stage Encounter 편집, 공통 분석형 Preview Core 설계

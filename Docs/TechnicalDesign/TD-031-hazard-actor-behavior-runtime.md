@@ -12,6 +12,7 @@
   - [../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md](../GameDesign/GD-016-hazard-actor-blueprint-scenarios.md)
   - [./TD-029-discrete-emit-spawn-bridge-contract.md](./TD-029-discrete-emit-spawn-bridge-contract.md)
   - [./TD-030-hazard-actor-hierarchy-and-stage-application.md](./TD-030-hazard-actor-hierarchy-and-stage-application.md)
+  - [./TD-035-hazard-actor-authoring-workbench-and-preview.md](./TD-035-hazard-actor-authoring-workbench-and-preview.md)
 
 > `HazardActor`는 현재 `Presence + PhaseTransition + PatternSelector + actor-owned emit runtime`을 직접 소유하는 위험 개체다. 이 문서는 actor behavior/runtime의 현재 SSOT다.
 
@@ -104,6 +105,8 @@
 - hierarchy/apply/reset/cleanup owner: [TD-030](./TD-030-hazard-actor-hierarchy-and-stage-application.md)
 - placement/orchestration content frame: [TD-032](./TD-032-hazard-actor-stage-placement-and-orchestration-framework.md)
 - discrete emit request contract: [TD-029](./TD-029-discrete-emit-spawn-bridge-contract.md)
+- actor authoring Workbench와 editor-only preview: [TD-035](./TD-035-hazard-actor-authoring-workbench-and-preview.md)
+- preview simulator는 이 문서의 runtime owner/update order를 모사하는 비권위 도구이며 새로운 runtime SSOT가 아니다.
 
 ## 7. 검증 기준
 - active 기술문서는 actor-only hierarchy, actor-owned slot/runtime, `HazardActorEmitSystem` producer 경계를 현재 계약으로 설명해야 한다.

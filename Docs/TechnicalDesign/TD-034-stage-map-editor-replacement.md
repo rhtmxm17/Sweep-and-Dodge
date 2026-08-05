@@ -4,11 +4,12 @@
 ## Metadata
 - doc_id: `TD-034`
 - type: `TechnicalDesign`
-- status: `implemented`
+- status: `active`
 - last_updated: `2026-08-05`
 - related_docs:
   - [TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](./TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
   - [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](./TD-032-hazard-actor-stage-placement-and-orchestration-framework.md)
+  - [TD-035-hazard-actor-authoring-workbench-and-preview.md](./TD-035-hazard-actor-authoring-workbench-and-preview.md)
   - [../ADR/ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md](../ADR/ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md)
   - [../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md)
 
@@ -23,13 +24,14 @@
   - PlayerStart
   - HazardActor placements
   - Presentation links
+- 후속 HazardActor editor replacement 범위에서 source-local orchestration rule과 Encounter Track을 `StageMapDocument`/`StageMapEditorWindow`에 통합한다.
 - runtime 입력은 계속 `StageLayoutSO`, `StageDefinitionSO`, `StageCatalogSO`로 유지한다.
 - 모든 asset-writing 작업은 `Validate/Dry Run -> Diff Summary -> Apply` 흐름을 통과한다.
 
 ### 1.2 비목표
-- v1에서 HazardActor orchestration rule 상세 편집기를 완성하지 않는다.
 - v1에서 외부 importer(`LDtk`, `Tiled` 등)를 도입하지 않는다.
 - runtime stage topology, DOTS update order, `StageLayoutSO` grid schema를 재설계하지 않는다.
+- HazardActor behavior prefab/profile 편집 UI와 분석형 preview 내부 구현을 이 문서에서 중복 정의하지 않는다. 해당 기준은 `TD-035`를 따른다.
 - 기존 Tilemap/Marker scene authoring을 즉시 삭제하지 않는다.
 
 ## 2. 채택 구조 요약
@@ -66,6 +68,9 @@
   - active, anchor cell, anchor offset, yaw
 - hazard actor placements
   - placement instance id, owning source stable id, actor archetype prefab, source-local offset, local yaw
+- hazard actor orchestration rules
+  - owning source stable id, source-local rule id, target placement instance ids
+  - action type, trigger type, normalized threshold, target phase id
 - presentation links
   - stable id, active, presentation key, placement mode, linked kind, linked stable id, local/standalone pose
 
@@ -121,6 +126,9 @@
 - Apply panel
   - Validate, Dry Run, Diff Summary, Apply buttons를 제공한다.
   - destructive 변경은 confirmation을 요구한다.
+- Hazard Encounter panel
+  - 선택 source의 placement 행과 normalized progress 축에 Spawn/PhaseSet/Retire rule을 표시한다.
+  - rule/target 편집, 다중 target fan-out, progress scrub과 Encounter Preview를 제공하며 세부 기준은 `TD-035`를 따른다.
 
 ### 4.2 Scene View tool modes
 - Select
@@ -170,6 +178,8 @@
 ### 5.2 Export / Apply
 - document에서 `StageLayoutSO` grid schema를 생성한다.
 - document의 stage meta와 source binding 관련 값은 `StageDefinitionSO`에 반영한다.
+- document의 source-local HazardActor orchestration rule을 `StageDefinitionSO` source binding에 반영한다.
+- orchestration schema migration 이후에는 target definition의 기존 rule을 암묵적으로 보존하거나 merge하지 않는다.
 - catalog entry pair는 기존 `StageCatalogSO` dual catalog 구조를 유지한다.
 - generator/validation 기존 구현은 backend로 재사용할 수 있으나 사용자 진입점은 `StageMapEditorWindow`로 제한한다.
 - apply 성공 전까지 generated asset은 수정하지 않는다.
@@ -194,6 +204,8 @@
 - Import owner: `StageMapLegacyImportUtility`.
 - Apply plan owner: `StageMapApplyPlanner`.
 - Export owner: `StageMapDocumentExporter`.
+- HazardActor behavior authoring/preview owner는 `TD-035`의 Workbench와 Preview Core다.
+- HazardActor orchestration document writer는 Stage Map Editor의 Encounter command layer다.
 - Runtime apply owner는 `TD-015`의 `StageTopologyApplyPrepareSystem` 계약을 유지한다.
 - runtime `ExecutionBegin -> Simulation -> Request -> ExecutionEnd` 순서는 변경하지 않는다.
 - 신규 editor data는 runtime ECS Native container, Fence, Enableable ownership을 변경하지 않는다.
@@ -222,8 +234,9 @@
   - T5: 완료. structured issue target/navigation과 preview-first quick-fix를 구현했다.
   - T6: 완료. sample Stage 1 document migration과 Layout/Definition/Catalog 동등성, operational runtime을 검증했다.
   - Scene View overlay 성능 교체: 완료. layer별 cached mesh와 fixed submission 경계를 검증했다.
+- T7. HazardActor Encounter extension: 계획됨
+  - orchestration schema/migration/export, Encounter Track과 Preview 연결은 `TD-035`와 `SESSION-20260805-03`에서 추적한다.
 - Parking Lot
-  - HazardActor orchestration rule editor
   - external importer
   - advanced playtest tooling
 
@@ -242,6 +255,10 @@
   - issue 클릭 시 대상 위치 또는 document element로 이동해야 한다.
 - Runtime smoke
   - document에서 생성된 `StageLayoutSO`, `StageDefinitionSO`, `StageCatalogSO`로 기존 PlayMode stage entry smoke가 통과해야 한다.
+- HazardActor Encounter extension
+  - 기존 target definition rule을 명시적 migration으로 손실 없이 document에 편입할 수 있어야 한다.
+  - document rule export와 stale-plan 거부, source/rule/placement structured navigation을 검증해야 한다.
+  - 실제 placement pose를 사용하는 Encounter Preview 기준은 `TD-035`를 따른다.
 
 ### 8.1 2026-08-05 실제 검증 결과
 - 실제 migration
