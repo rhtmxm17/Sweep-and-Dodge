@@ -9,11 +9,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ded24860c6a0ae844a3e661c60e40647, type: 3}
-  m_Name: sl_demo_1
-  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageLayoutSO
+  m_Script: {fileID: 11500000, guid: cf1ad2896d61fdc4c94ea87464c8be63, type: 3}
+  m_Name: smd_demo_1
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.Editor.StageMapDocument
   SchemaVersion: 2
   StageId: 1
+  DisplayName: Stage 1 - Baseline
+  IsFinalStage: 0
+  StageTimeLimitSec: 150
   Grid:
     Width: 35
     Height: 35
@@ -3695,6 +3698,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
+  VisualTileKeys: []
   SourceRegions:
   - StableId: 1001
     Active: 1
@@ -3710,7 +3714,13 @@ MonoBehaviour:
     AnchorCell: {x: 13, y: 27}
     AnchorOffset: {x: 0.0040163994, y: -0.07186127}
     YawDeg: 90
-  Presentations:
+  HazardActorPlacements:
+  - OwningSourceStableId: 1001
+    PlacementInstanceId: 1
+    ActorArchetypePrefab: {fileID: 4069771742991948589, guid: be2250d34f47b4d4389d07084b4b5da8, type: 3}
+    SourceLocalOffset: {x: -6.0067773, y: 0, z: 2.044446}
+    LocalYawDeg: 0
+  PresentationLinks:
   - StableId: 9001
     Active: 1
     PlacementMode: 0
@@ -3720,4 +3730,11 @@ MonoBehaviour:
     Position: {x: -1.5, y: 2.55, z: -0.22}
     Euler: {x: 338.75085, y: 10.463113, z: 30.917606}
     Scale: {x: 1, y: 1, z: 1}
-  GridVisualPrefab: {fileID: 4202935094082319832, guid: 628c506a3d7fd244ebba85077e8c7c27, type: 3}
+  TargetLayout: {fileID: 11400000, guid: 2f4ee260d250cc947849ca730c9333c5, type: 2}
+  TargetDefinition: {fileID: 11400000, guid: 3160656c95e13a84b821425457327c39, type: 2}
+  TargetCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
+  PresentationCatalog: {fileID: 11400000, guid: 58ead03715b01e94cbb0b74a81c0c331, type: 2}
+  IncludeInCatalog: 1
+  EnabledInCatalog: 1
+  CatalogEntryKey: stage_01
+  _lastAppliedCatalogEntryKey: stage_01

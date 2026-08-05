@@ -209,11 +209,30 @@ namespace SweepNDodge.DotsBullets.Editor
             if (issues == null)
                 return;
 
-            ValidateHazardActorData(
+            ValidateHazardActorDataInternal(
                 binding,
                 string.IsNullOrWhiteSpace(location) ? "HazardActorData" : location,
                 issues,
                 enforceOperationalReferenceRestrictions: false);
+        }
+
+        /// <summary>
+        /// Validates Hazard Actor placement and orchestration data for editor-only import/apply previews.
+        /// </summary>
+        public static void ValidateHazardActorData(
+            StageSourceBinding binding,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
+        {
+            if (issues == null)
+                return;
+
+            ValidateHazardActorDataInternal(
+                binding,
+                string.IsNullOrWhiteSpace(location) ? "HazardActorData" : location,
+                issues,
+                enforceOperationalReferenceRestrictions);
         }
 
         private static void ValidateDefinition(
@@ -268,7 +287,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
                 ValidateEventSlots(binding.EventSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
 
-                ValidateHazardActorData(
+                ValidateHazardActorDataInternal(
                     binding,
                     bindingLocation,
                     issues,
@@ -322,7 +341,7 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private static void ValidateHazardActorData(
+        private static void ValidateHazardActorDataInternal(
             StageSourceBinding binding,
             string location,
             List<ContentValidationIssue> issues,

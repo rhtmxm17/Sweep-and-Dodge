@@ -4,8 +4,8 @@
 ## Metadata
 - doc_id: `TD-034`
 - type: `TechnicalDesign`
-- status: `draft`
-- last_updated: `2026-08-04`
+- status: `implemented`
+- last_updated: `2026-08-05`
 - related_docs:
   - [TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](./TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
   - [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](./TD-032-hazard-actor-stage-placement-and-orchestration-framework.md)
@@ -80,6 +80,25 @@
 - apply 직전 signature가 달라지면 stale plan으로 보고 거부한다.
 - editor document 변경은 Unity Undo와 `EditorUtility.SetDirty`를 사용한다.
 
+### 3.4 Schema migration
+- current schema는 명시적 `StagePresentationCatalogSO` validation target과 마지막 성공 apply의 catalog entry identity를 가진다.
+- migration owner는 `StageMapDocumentMigrationUtility` 하나로 고정한다.
+- migration은 `Validate/Preview -> Diff -> Apply`에서만 실행하며 asset load 시 자동·무음 변경하지 않는다.
+- v1 migration은 project presentation catalog가 정확히 하나일 때만 후보를 만들고, target catalog의 Definition/Layout pair가 정확히 하나의 entry와 일치할 때만 last-applied identity를 유도한다.
+- current version은 no-op이며 지원하지 않는 과거/미래 version은 error로 거부한다.
+
+### 3.5 Dense grid resize / repair
+- movement/region paint는 `Cells.Length != Grid.Width * Grid.Height` 상태를 수정하지 않고 명시적 issue와 함께 거부한다.
+- Grid 변경은 전용 resize preview/apply command가 소유한다.
+- resize는 이전/신규 grid가 공유하는 `(x, y)` 좌표의 cell과 visual key를 보존한다.
+- shrink로 잘리는 non-default cell 또는 visual key는 destructive diff와 confirmation 대상이다.
+- 손상된 배열 길이 repair는 현재 grid의 보존 가능한 flattened index/coordinate 데이터를 유지하며 document만 수정한다.
+
+### 3.6 Structured issue target
+- Navigator용 issue는 원본 `ContentValidationIssue`와 별도로 target kind, stable id/array index, optional cell, optional fix id를 가진다.
+- document validation owner가 runtime/content issue를 structured target으로 변환한다.
+- UI는 location 문자열 재해석을 fallback으로만 사용한다.
+
 ## 4. Editor UX
 ### 4.1 StageMapEditorWindow
 - Stage list
@@ -91,6 +110,12 @@
 - Inspector
   - 현재 선택된 cell/region/anchor/player/hazard/presentation 속성을 편집한다.
   - 기존 Unity Inspector에 의존하지 않는다.
+- Selection Navigator
+  - cell 좌표와 region/anchor/player/hazard/presentation inventory를 category별로 표시한다.
+  - hidden 또는 locked element도 선택과 조회는 허용하며 Scene View hit-test/handle/mutation만 제한한다.
+- Contextual Inspector
+  - canonical selection kind에 대응하는 section 하나만 표시한다.
+  - inventory 선택과 속성 편집 책임을 분리하고 array index 기반 병렬 선택 상태를 두지 않는다.
 - Issue Navigator
   - validation 결과를 severity/code/location 기준으로 표시하고 선택 시 해당 위치로 이동한다.
 - Apply panel
@@ -114,6 +139,23 @@
 - Place PresentationLink
   - source/deposit/standalone target에 presentation key를 연결한다.
 
+### 4.3 Selection / lock / invalidation
+- selection kind는 Cell, Source/Deposit Region, Source/Deposit Anchor, PlayerStart, HazardActor, Presentation을 명시적으로 구분한다.
+- selection identity는 Cell=`(x,y)`, Region/Anchor=`kind+stableId`, HazardActor=`sourceStableId+placementInstanceId`, Presentation=`stableId`를 사용한다.
+- resize/reorder/delete/Undo/Redo/external mutation은 단일 reconcile 경로에서 identity를 다시 해석하고 missing/ambiguous/out-of-bounds selection을 해제한다.
+- lock은 Scene View tool, structured inspector, delete, resize를 포함한 해당 layer의 모든 mutation을 거부하되 선택과 조회는 허용한다.
+- Source/Deposit Anchor mutation은 owner region layer와 Anchors layer가 모두 unlocked일 때만 허용한다.
+- hidden layer element는 Scene View hit-test에서 제외한다.
+- `CenterRegionAnchors`와 `CenterPlayerStart`는 서로 독립적인 Undo 가능 editor-session preference이며 기본값은 false다. enable 시 compatible selection offset을 0으로 만들고 이후 place/move에도 0을 강제한다.
+- document switch, structured/raw edit, import, migration, quick-fix, resize, Undo/Redo, 외부 serialized 변경은 selection clamp와 apply/import plan 폐기 및 overlay invalidation을 수행한다.
+
+### 4.4 Scene View overlay geometry
+- movement/source/deposit은 layer별 cached `Mesh` geometry로 생성한다.
+- geometry는 document 또는 visibility 관련 cache input이 바뀔 때만 재생성한다.
+- steady repaint는 전체 cell scan, cell별 corner 배열 생성, cell별 `Handles.Draw*`를 수행하지 않고 layer별 고정 draw submission만 수행한다.
+- transient mesh/material은 Window lifecycle에서 명시적으로 정리한다.
+- dense synthetic grid에서 vertex/index/layer 계약, build count, managed allocation, draw submission 수를 검증한다.
+
 ## 5. Import / Export / Apply 흐름
 ### 5.1 Legacy import
 - `StageLayoutEditingSampleV1` 같은 기존 authoring scene에서 document를 생성할 수 있어야 한다.
@@ -123,6 +165,7 @@
   - hazard actor markers
   - presentation markers
 - import는 document를 수정하는 작업이므로 preview summary와 Undo/dirty 정책을 따른다.
+- saved legacy scene이 dirty이면 automated migration/import를 거부하며, scene dirty state를 import stale signature에 포함한다.
 
 ### 5.2 Export / Apply
 - document에서 `StageLayoutSO` grid schema를 생성한다.
@@ -132,8 +175,18 @@
 - apply 성공 전까지 generated asset은 수정하지 않는다.
 
 ### 5.3 동등성 기준
-- 기존 sample scene import 후 export한 layout/definition/catalog는 기존 asset과 동등해야 한다.
+- legacy sample scene import/export 동등성은 temporary document/Layout/Definition/Catalog에서 검증하며 실제 document와 generated asset을 수정하지 않는다.
+- 실제 document는 자체 validation, target reference integrity, document-to-runtime dry-run 0을 기준으로 검증하고 legacy scene을 콘텐츠 oracle로 사용하지 않는다.
 - 동등하지 않은 값은 diff summary에서 설명 가능해야 하며, 문서화된 migration rule 없이는 silent rewrite하지 않는다.
+
+### 5.4 Catalog identity / apply group
+- catalog entry identity는 last-applied key, Definition/Layout pair의 단일 일치, 아직 apply되지 않은 document의 현재 key 순서로 해석한다.
+- ambiguous identity는 validation error이며 임의 수정하지 않는다.
+- key rename은 기존 entry update로 처리하고 destructive diff/confirmation에 표시한다.
+- `IncludeInCatalog=false`는 식별된 entry를 제거하며 `TargetCatalog`는 include 여부와 무관하게 필수다.
+- candidate catalog에 기존 `StageCatalogValidationRules`를 적용해 duplicate/invalid pair를 asset mutation 전에 거부한다.
+- apply는 모든 target과 candidate catalog를 mutation 전에 검증한다.
+- successful apply는 Layout/Definition/Catalog mutation과 document last-applied identity 갱신을 하나의 Undo group으로 기록한다. 이는 rollback 가능한 atomic transaction을 의미하지 않는다.
 
 ## 6. 소유권 / 업데이트 순서 / 제약
 - Editor document writer: `StageMapEditorWindow`와 Scene View tool command layer.
@@ -160,6 +213,15 @@
   - issue list, scene focus, quick-fix preview/apply를 구현한다.
 - T6. Migration / compatibility
   - `StageLayoutEditingSampleV1`을 document로 import하고 export 동등성을 검증한다.
+- 2026-08-05 implementation 상태
+  - T0: 완료. legacy Inspector UI는 import/debug/backend 안내를 유지한다.
+  - T1: 완료. schema v2 explicit migration과 dense grid resize/repair 안전성을 구현했다.
+  - T2: 완료. Window 제작 표면, lock/visibility, Undo/dirty/cache/stale-plan 정책을 구현했다.
+  - T3: 완료. 명시적 selection과 v1 Scene View 배치/이동/삭제, overlap 표시를 구현했다.
+  - T4: 완료. complete legacy import diff/validation/stale 검사와 prevalidated single-Undo-group apply/catalog identity를 구현했다.
+  - T5: 완료. structured issue target/navigation과 preview-first quick-fix를 구현했다.
+  - T6: 완료. sample Stage 1 document migration과 Layout/Definition/Catalog 동등성, operational runtime을 검증했다.
+  - Scene View overlay 성능 교체: 완료. layer별 cached mesh와 fixed submission 경계를 검증했다.
 - Parking Lot
   - HazardActor orchestration rule editor
   - external importer
@@ -180,3 +242,28 @@
   - issue 클릭 시 대상 위치 또는 document element로 이동해야 한다.
 - Runtime smoke
   - document에서 생성된 `StageLayoutSO`, `StageDefinitionSO`, `StageCatalogSO`로 기존 PlayMode stage entry smoke가 통과해야 한다.
+
+### 8.1 2026-08-05 실제 검증 결과
+- 실제 migration
+  - source: `Assets/_Project/01_Scenes/StageLayoutEditingSampleV1.unity` Stage 1.
+  - document: `Assets/_Project/03_Datas/StageMapDocuments/smd_demo_1.asset`.
+  - saved legacy scene은 temporary document/Layout/Definition/Catalog round-trip에서 검증했고 실제 document/generated asset signature는 유지했다.
+  - 실제 document는 validation, target integrity, document dry-run generated runtime diff 0건을 통과했다.
+  - dirty active saved legacy scene의 automated migration/import 거부와 stale signature 반영을 검증했다.
+  - TD-015에서 ground/wall visual tilemap은 runtime layout generator 입력이 아니므로 legacy import의 optional `VisualTileKeys`는 empty로 유지한다.
+- overlay 측정
+  - `32 x 32` synthetic dense grid, 1,024 cells, movement/source/deposit/overlap 모두 populated.
+  - layer당 4 vertices와 6 indices: `4,096 vertices / 6,144 indices`.
+  - 모든 layer visible 시 draw submission은 cell 수와 무관하게 최대 4회.
+  - unchanged `EnsureBuilt` 256회에서 rebuild 0회, current-thread managed allocation `0 B`.
+  - 실제 migrated document 1,225 cells의 최초 build 결과는 movement/source/deposit/overlap vertices `312/800/48/0`.
+- EditMode / Editor smoke
+  - Stage Map 관련 6개 test fixture `71/71` 통과.
+  - 실제 메뉴에서 `StageMapEditorWindow` open, `smd_demo_1` load/list/target 연결, category selection, contextual Inspector 단일 section, Scene hit/Issue navigation, hidden handle, dry-run 0을 확인했다.
+  - migrated document clone으로 movement/region paint+erase, anchor/PlayerStart/HazardActor/Presentation place+move+delete, center lock, composite lock, resize/reorder/delete selection reconcile, stale plan/Undo를 Window command/Scene tool route에서 확인했다.
+- PlayMode
+  - operational/dedicated core loop, operational HazardActor actor-owned emitter, Presentation Stage 1->2->retry rebuild smoke `4/4` 통과.
+  - operational Stage 1에서 PlayerStart runtime ready, 위치 적용, apply version 소비를 확인했다.
+- 정적 / console
+  - Unity `6000.3.6f1` compile 성공, 최종 console error 0.
+  - `git diff --check` 통과, `Assets/_Project` 파일 `.meta` 누락 0, `InitTestScene*`/`__Generated*` 잔여물 0.

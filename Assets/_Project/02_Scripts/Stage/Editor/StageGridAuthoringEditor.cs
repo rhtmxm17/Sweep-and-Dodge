@@ -20,7 +20,8 @@ namespace SweepNDodge.DotsBullets.Editor
             if (authoring.Grid == null || authoring.MovementTilemap == null || authoring.RegionTilemap == null)
                 EditorGUILayout.HelpBox("Grid, MovementTilemap, and RegionTilemap must be assigned.", MessageType.Warning);
 
-            EditorGUILayout.HelpBox("RegionTilemap is the only region metadata workflow. Source/Deposit are distinguished by StageRegionTile.RegionKind and resolved through slot mappings.", MessageType.Info);
+            EditorGUILayout.HelpBox("Legacy import/debug/backend path. New user-facing stage editing should use Tools/Project/Stage Map Editor/Open and StageMapDocument.", MessageType.Info);
+            EditorGUILayout.HelpBox("RegionTilemap remains the legacy import metadata source. Source/Deposit are distinguished by StageRegionTile.RegionKind and resolved through slot mappings.", MessageType.Info);
 
             using (new EditorGUILayout.HorizontalScope())
             {

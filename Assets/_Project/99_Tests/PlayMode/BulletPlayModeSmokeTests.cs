@@ -8,6 +8,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -3473,6 +3474,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     240,
                     "Operational scene smoke did not apply Stage1 layout before core loop observation.");
 
+                AssertPlayerStartApplied(em, expectedStageId: 1);
                 ForceStageStateToRunning(em, 0f);
             }
 
@@ -3770,6 +3772,27 @@ namespace SweepNDodge.DotsBullets.Tests
                 && area1.Kind == Shape2DKind.Rectangle
                 && sourceCells1.Length > 0
                 && HasAnyDepositCell(cells);
+        }
+
+        private static void AssertPlayerStartApplied(EntityManager em, int expectedStageId)
+        {
+            CompleteTrackedJobs(em);
+            var runtime = GetSingleton<StagePlayerStartRuntimeComponent>(em);
+            Assert.That(runtime.StageId, Is.EqualTo(expectedStageId));
+            Assert.That(runtime.Ready, Is.EqualTo(1));
+            Assert.That(runtime.AppliedVersion, Is.GreaterThan(0u));
+
+            var player = GetSingletonEntity<PlayerTag>(em);
+            Assert.That(em.HasComponent<LocalTransform>(player), Is.True);
+            Assert.That(em.HasComponent<PlayerStageEntryApplyStateComponent>(player), Is.True);
+
+            var transform = em.GetComponentData<LocalTransform>(player);
+            Assert.That(transform.Position.x, Is.EqualTo(runtime.PositionX).Within(0.001f));
+            Assert.That(transform.Position.y, Is.EqualTo(runtime.PositionY).Within(0.001f));
+            Assert.That(transform.Position.z, Is.EqualTo(runtime.PositionZ).Within(0.001f));
+
+            var applyState = em.GetComponentData<PlayerStageEntryApplyStateComponent>(player);
+            Assert.That(applyState.LastAppliedVersion, Is.EqualTo(runtime.AppliedVersion));
         }
 
         private static bool IsStageMapAppliedForStage2(EntityManager em)
@@ -4584,6 +4607,4 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
-
-
 

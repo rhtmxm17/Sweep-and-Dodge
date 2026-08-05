@@ -41,7 +41,7 @@ MonoBehaviour:
     HazardActorPlacements:
     - PlacementInstanceId: 1
       ActorArchetypePrefab: {fileID: 4069771742991948589, guid: be2250d34f47b4d4389d07084b4b5da8, type: 3}
-      LocalOffset: {x: 2, y: 0, z: 10}
+      LocalOffset: {x: -6.0067773, y: 0, z: 2.044446}
       LocalYawDeg: 0
     HazardActorOrchestrationRules:
     - RuleId: 101

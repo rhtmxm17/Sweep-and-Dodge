@@ -67,6 +67,42 @@ namespace SweepNDodge.DotsBullets.Editor
             return !HasError(issues);
         }
 
+        public static bool TryBuildStageLayoutSnapshot(
+            StageLayoutStageMarker stageNode,
+            out StageLayoutSO layout,
+            out List<ContentValidationIssue> issues)
+        {
+            layout = null;
+            issues = new List<ContentValidationIssue>(16);
+            if (stageNode == null)
+            {
+                issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STL900", "(null)", "StageLayoutStageMarker is null."));
+                return false;
+            }
+
+            string location = BuildHierarchyPath(stageNode.transform);
+            StageGridAuthoringValidationRules.Validate(stageNode, issues);
+            if (HasError(issues))
+                return false;
+
+            if (!stageNode.TryGetComponent(out StageGridAuthoring authoring) || authoring == null)
+            {
+                issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "STA001", location, "StageGridAuthoring is required on the StageLayoutStageMarker GameObject."));
+                return false;
+            }
+
+            layout = BuildStageLayout(stageNode, authoring);
+            var validation = new List<ContentValidationIssue>(8);
+            StageGridLayoutValidationRules.ValidateLayout(layout, location, validation);
+            issues.AddRange(validation);
+            if (!HasError(validation))
+                return true;
+
+            UnityEngine.Object.DestroyImmediate(layout);
+            layout = null;
+            return false;
+        }
+
         private static bool TryGenerateLayoutForStage(StageLayoutStageMarker stageNode, List<ContentValidationIssue> issues, bool saveAssets)
         {
             if (stageNode == null)

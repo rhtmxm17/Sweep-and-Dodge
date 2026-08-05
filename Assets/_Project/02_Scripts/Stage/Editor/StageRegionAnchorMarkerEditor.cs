@@ -15,6 +15,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
         public override void OnInspectorGUI()
         {
+            EditorGUILayout.HelpBox("Legacy import/debug/backend path. New user-facing stage editing should use StageMapDocument in the Stage Map Editor.", MessageType.Info);
+
             bool dataChanged = DrawDefaultInspector();
 
             var marker = (StageRegionAnchorMarker)target;

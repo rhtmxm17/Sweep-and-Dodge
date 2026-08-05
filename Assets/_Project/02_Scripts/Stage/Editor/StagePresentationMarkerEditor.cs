@@ -32,6 +32,8 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             serializedObject.Update();
 
+            EditorGUILayout.HelpBox("Legacy import/debug/backend path. New user-facing stage editing should use StageMapDocument in the Stage Map Editor.", MessageType.Info);
+
             EditorGUILayout.PropertyField(_stableId);
             EditorGUILayout.PropertyField(_active);
             EditorGUILayout.PropertyField(_placementMode);
