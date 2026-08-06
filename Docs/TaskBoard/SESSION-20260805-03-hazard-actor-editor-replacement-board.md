@@ -61,6 +61,12 @@
   - Workbench 본문을 `Behavior / Preview`와 `Contextual Inspector` 중심의 2열 구조로 정리했다.
   - Phase/Pattern 목록을 긴 버튼 텍스트 대신 열 기반 행 요약과 분리된 command 영역으로 바꿨다.
   - 가시성 구조와 summary helper를 EditMode 회귀 테스트로 고정했고, targeted `HazardActorWorkbenchPreviewTests` 21/21 pass와 `HazardEmitterPlayModeTests` 2/2 pass를 확인했다.
+- [x] R10. Workbench selection-driven preview UX 문서 정합성 보강
+  - `Phase` preview scope와 selection-derived preview binding을 TD-035 본문 계약으로 추가했다.
+  - Actor 선택에서만 Source Progress를 표시하고 Phase/Transition/Pattern/Profile 선택에서는 숨기는 정책을 문서화했다.
+  - embedded preview의 target click, middle-drag pan, wheel zoom, fit/reset/restart-with-target 조작과 session-only 상태 정책을 문서화했다.
+  - Phase/Pattern 반복 command는 icon button + tooltip으로 축약하는 정책을 문서화했다.
+  - ADR 갱신은 하지 않았다. 이번 항목은 SSOT/소유권 결정이 아니라 Workbench UX 계약 보강이다.
 
 ## Next
 - 없음. 후속 R1~R7 감사 기준 구현과 검증을 완료했다.

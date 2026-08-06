@@ -5,6 +5,7 @@ using System.Text;
 using System.Diagnostics;
 using NUnit.Framework;
 using SweepNDodge.DotsBullets.Editor;
+using UnityEditor;
 using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Tests
@@ -119,7 +120,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void PreviewSession_TargetChangePreservesPlaybackTimeAndActiveGhosts()
+        public void PreviewSession_LiveTargetMove_PreservesPlaybackTimeAndGhosts()
         {
             using (var setup = CreateActorSetup())
             {
@@ -149,6 +150,34 @@ namespace SweepNDodge.DotsBullets.Tests
                 session.Step();
                 Assert.That(session.Playing, Is.True);
                 Assert.That(session.TimeSec, Is.GreaterThan(timeBefore));
+            }
+        }
+
+        [Test]
+        public void PreviewSession_RestartWithTarget_RebuildsFromCurrentTarget()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+                session.EvaluateAt(0.2f);
+                Assert.That(session.Frame.ActiveGhostCount, Is.GreaterThan(0));
+
+                var nextTarget = new Vector3(3f, 0f, -2f);
+                session.SetTargetWorldPosition(nextTarget);
+                session.Restart();
+
+                Assert.That(session.TimeSec, Is.EqualTo(0f));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(0));
+                Assert.That(session.Input.TargetWorldPosition, Is.EqualTo(nextTarget));
+                Assert.That(session.Frame.Presence, Is.EqualTo(HazardActorPresenceStateId.Active));
             }
         }
 
@@ -227,6 +256,33 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 Assert.That(session.Frame.PhaseId, Is.EqualTo(2));
                 Assert.That(session.Frame.PatternSlotId, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_PhaseScope_IsolatesForcedPhaseWithoutActivationOrProgressTransition()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Actor.ActivationDurationSec = 5f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Phase,
+                    ForcedPhaseId = 1,
+                    SourceProgress01 = 1f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                session.Step();
+                session.Step();
+
+                Assert.That(session.Frame.Presence, Is.EqualTo(HazardActorPresenceStateId.Active));
+                Assert.That(session.Frame.PhaseId, Is.EqualTo(1));
+                Assert.That(session.Frame.PatternSlotId, Is.EqualTo(1));
+                Assert.That(session.Frame.ActiveGhostCount, Is.GreaterThan(0));
             }
         }
 
@@ -473,6 +529,47 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void WorkbenchPreviewInteractionState_DoesNotDirtyAuthoringAssets()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                EditorUtility.ClearDirty(setup.Actor);
+                EditorUtility.ClearDirty(setup.ProfileA);
+                EditorUtility.ClearDirty(setup.Telegraph);
+
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+                session.EvaluateAt(0.2f);
+
+                session.SetTargetWorldPosition(new Vector3(2f, 0f, -1f));
+                HazardActorWorkbenchPreviewElement.CalculatePannedCenter(
+                    Vector2.zero,
+                    8f,
+                    new Rect(0f, 0f, 320f, 160f),
+                    new Vector2(40f, -20f));
+                HazardActorWorkbenchPreviewElement.CalculateZoomAroundPoint(
+                    new Vector2(160f, 80f),
+                    Vector2.zero,
+                    8f,
+                    new Rect(0f, 0f, 320f, 160f),
+                    0.9f,
+                    out _,
+                    out _);
+                session.Restart();
+
+                Assert.That(EditorUtility.GetDirtyCount(setup.Actor), Is.EqualTo(0));
+                Assert.That(EditorUtility.GetDirtyCount(setup.ProfileA), Is.EqualTo(0));
+                Assert.That(EditorUtility.GetDirtyCount(setup.Telegraph), Is.EqualTo(0));
+            }
+        }
+
+        [Test]
         public void WorkbenchPreview_DefaultsToExactAndUsesDensityOnlyWhenExplicitlySelected()
         {
             var session = new HazardActorPreviewSession();
@@ -595,7 +692,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var phase = HazardActorWorkbenchWindow.BuildPreviewBinding(
                     HazardActorWorkbenchSelection.ForPhase(setup.Root, 2));
-                Assert.That(phase.Scope, Is.EqualTo(HazardActorPreviewScope.Actor));
+                Assert.That(phase.Scope, Is.EqualTo(HazardActorPreviewScope.Phase));
                 Assert.That(phase.ForcedPhaseId, Is.EqualTo(2));
                 Assert.That(phase.ForcedPatternSlotId, Is.EqualTo(0));
                 Assert.That(phase.ShowSourceProgress, Is.False);
@@ -603,7 +700,7 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 var transition = HazardActorWorkbenchWindow.BuildPreviewBinding(
                     HazardActorWorkbenchSelection.ForTransition(setup.Root, 1));
-                Assert.That(transition.Scope, Is.EqualTo(HazardActorPreviewScope.Actor));
+                Assert.That(transition.Scope, Is.EqualTo(HazardActorPreviewScope.Phase));
                 Assert.That(transition.ForcedPhaseId, Is.EqualTo(1));
                 Assert.That(transition.ShowSourceProgress, Is.False);
 
@@ -633,6 +730,9 @@ namespace SweepNDodge.DotsBullets.Tests
             string window = File.ReadAllText(
                 Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorWorkbenchWindow.cs"),
                 Encoding.UTF8);
+            string renderer = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorPreviewRendererUtility.cs"),
+                Encoding.UTF8);
 
             Assert.That(window, Does.Not.Contain("EnumField(\"Scope\""));
             Assert.That(window, Does.Not.Contain("_scopeField"));
@@ -650,6 +750,46 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.Remove"));
             Assert.That(window, Does.Contain("EditorGUIUtility.IconContent"));
             Assert.That(window, Does.Contain("Advanced Preview Controls"));
+            Assert.That(window, Does.Contain("Restart With Target"));
+            Assert.That(window, Does.Contain("Target: Live"));
+            Assert.That(renderer, Does.Contain("Shift+R restart with target"));
+            Assert.That(renderer, Does.Contain("RestartWithTargetRequested"));
+            Assert.That(window, Does.Not.Contain("(scope={binding.Scope})"));
+        }
+
+        [Test]
+        public void WorkbenchIssueNavigator_BuildsUnsavedChangeItemsWithoutValidationSeverity()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                EditorUtility.ClearDirty(setup.Actor);
+                EditorUtility.ClearDirty(setup.ProfileA);
+                EditorUtility.ClearDirty(setup.ProfileB);
+                EditorUtility.ClearDirty(setup.Telegraph);
+                EditorUtility.SetDirty(setup.Actor);
+                EditorUtility.SetDirty(setup.ProfileA);
+                EditorUtility.SetDirty(setup.Telegraph);
+
+                var issues = HazardActorWorkbenchWindow.BuildUnsavedChangeIssues(setup.Root, setup.Actor);
+
+                Assert.That(issues.Select(x => x.Code), Does.Contain("UNSAVED_ACTOR"));
+                Assert.That(issues.Select(x => x.Code), Does.Contain("UNSAVED_EMISSION_PROFILE"));
+                Assert.That(issues.Select(x => x.Code), Does.Contain("UNSAVED_TELEGRAPH_PROFILE"));
+
+                var actor = issues.Single(x => x.Code == "UNSAVED_ACTOR");
+                Assert.That(actor.Target.Kind, Is.EqualTo(HazardActorWorkbenchSelectionKind.Actor));
+                Assert.That(actor.PingTarget, Is.EqualTo(setup.Root));
+
+                var emission = issues.Single(x => x.Code == "UNSAVED_EMISSION_PROFILE");
+                Assert.That(emission.Target.Kind, Is.EqualTo(HazardActorWorkbenchSelectionKind.EmissionProfile));
+                Assert.That(emission.Target.PatternSlotId, Is.EqualTo(1));
+                Assert.That(emission.PingTarget, Is.EqualTo(setup.ProfileA));
+
+                var telegraph = issues.Single(x => x.Code == "UNSAVED_TELEGRAPH_PROFILE");
+                Assert.That(telegraph.Target.Kind, Is.EqualTo(HazardActorWorkbenchSelectionKind.TelegraphProfile));
+                Assert.That(telegraph.Target.PatternSlotId, Is.EqualTo(1));
+                Assert.That(telegraph.PingTarget, Is.EqualTo(setup.Telegraph));
+            }
         }
 
         [Test]

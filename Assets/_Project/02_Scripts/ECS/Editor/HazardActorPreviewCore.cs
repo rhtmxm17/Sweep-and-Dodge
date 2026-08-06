@@ -11,6 +11,7 @@ namespace SweepNDodge.DotsBullets.Editor
         Pattern = 0,
         Actor = 1,
         Encounter = 2,
+        Phase = 3,
     }
 
     public enum HazardActorWorkbenchSelectionKind : byte
@@ -523,6 +524,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private HazardActorPresenceStateId ResolveInitialPresence()
         {
+            if (_input.Scope == HazardActorPreviewScope.Phase)
+                return HazardActorPresenceStateId.Active;
             if (_snapshot == null || !_snapshot.Enabled || _snapshot.StartSuppressed)
                 return HazardActorPresenceStateId.Hidden;
             if (_input.Scope == HazardActorPreviewScope.Pattern)
@@ -534,7 +537,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void StepPresence()
         {
-            if (_input.Scope == HazardActorPreviewScope.Pattern)
+            if (_input.Scope == HazardActorPreviewScope.Pattern || _input.Scope == HazardActorPreviewScope.Phase)
             {
                 _presence = HazardActorPresenceStateId.Active;
                 return;
@@ -572,8 +575,12 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void StepPhase()
         {
-            if (_presence != HazardActorPresenceStateId.Active || _input.Scope == HazardActorPreviewScope.Pattern)
+            if (_presence != HazardActorPresenceStateId.Active
+                || _input.Scope == HazardActorPreviewScope.Pattern
+                || _input.Scope == HazardActorPreviewScope.Phase)
+            {
                 return;
+            }
 
             if (_input.ForcedPhaseId > 0 && _phaseId != _input.ForcedPhaseId)
             {

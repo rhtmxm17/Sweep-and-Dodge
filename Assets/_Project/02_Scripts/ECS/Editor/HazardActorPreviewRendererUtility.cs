@@ -37,6 +37,7 @@ namespace SweepNDodge.DotsBullets.Editor
             style.minHeight = 120f;
             style.backgroundColor = new Color(0.055f, 0.065f, 0.075f, 1f);
             style.overflow = Overflow.Hidden;
+            tooltip = "Click target, middle-drag pan, wheel zoom, F fit, R reset, Shift+R restart with target";
             generateVisualContent += GenerateVisualContent;
             RegisterCallback<MouseDownEvent>(OnMouseDown);
             RegisterCallback<MouseMoveEvent>(OnMouseMove);
@@ -49,6 +50,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public event System.Action<Vector2, float> ViewChanged;
         public event System.Action FitRequested;
         public event System.Action ResetViewRequested;
+        public event System.Action RestartWithTargetRequested;
 
         public HazardActorPreviewDisplayMode DisplayMode
         {
@@ -376,7 +378,10 @@ namespace SweepNDodge.DotsBullets.Editor
             }
             else if (evt.keyCode == KeyCode.R)
             {
-                ResetViewRequested?.Invoke();
+                if (evt.shiftKey)
+                    RestartWithTargetRequested?.Invoke();
+                else
+                    ResetViewRequested?.Invoke();
                 evt.StopPropagation();
             }
         }

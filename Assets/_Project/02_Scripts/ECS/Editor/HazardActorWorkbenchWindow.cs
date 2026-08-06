@@ -527,6 +527,7 @@ namespace SweepNDodge.DotsBullets.Editor
             viewButtons.Add(new Button(FitPreviewView) { text = "Fit", tooltip = "Fit active ghosts" });
             viewButtons.Add(new Button(ResetPreviewView) { text = "Reset View", tooltip = "Reset preview pan and zoom" });
             viewButtons.Add(new Button(ResetPreviewTarget) { text = "Reset Target", tooltip = "Reset preview target position" });
+            viewButtons.Add(new Button(RestartPreviewWithTarget) { text = "Restart With Target", tooltip = "Restart preview from the current live target position" });
             advanced.Add(viewButtons);
             _canvas.Add(advanced);
 
@@ -544,6 +545,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _previewSurface.ViewChanged += SetPreviewView;
             _previewSurface.FitRequested += FitPreviewView;
             _previewSurface.ResetViewRequested += ResetPreviewView;
+            _previewSurface.RestartWithTargetRequested += RestartPreviewWithTarget;
             _canvas.Add(_previewSurface);
             RefreshPreviewPresentation();
         }
@@ -720,6 +722,10 @@ namespace SweepNDodge.DotsBullets.Editor
             if (_actorPrefab == null)
                 return;
             var issues = HazardActorPreviewSnapshotBuilder.Validate(_actorPrefab);
+            int errorCount = CountIssues(issues, ContentValidationSeverity.Error);
+            int warningCount = CountIssues(issues, ContentValidationSeverity.Warning);
+            var unsaved = BuildUnsavedChangeIssues(_actorPrefab, _actor);
+            header.text = $"Issue Navigator - {errorCount} errors, {warningCount} warnings, {unsaved.Length} unsaved";
             for (int i = 0; i < issues.Length; i++)
             {
                 var issue = issues[i];
@@ -729,6 +735,20 @@ namespace SweepNDodge.DotsBullets.Editor
                     if (issue.Target.ProfileAsset != null)
                         EditorGUIUtility.PingObject(issue.Target.ProfileAsset);
                 }) { text = $"{issue.Severity} {issue.Code}: {issue.Message}" });
+            }
+            if (unsaved.Length == 0)
+                return;
+
+            _issues.Add(new Label("Unsaved Changes") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 4 } });
+            for (int i = 0; i < unsaved.Length; i++)
+            {
+                var issue = unsaved[i];
+                _issues.Add(new Button(() =>
+                {
+                    SelectWorkbenchTarget(issue.Target);
+                    if (issue.PingTarget != null)
+                        EditorGUIUtility.PingObject(issue.PingTarget);
+                }) { text = $"{issue.Code}: {issue.Message}" });
             }
         }
 
@@ -767,11 +787,12 @@ namespace SweepNDodge.DotsBullets.Editor
             if (_previewScopeLabel != null)
                 _previewScopeLabel.text = BuildPreviewScopeLabel(binding);
             if (_previewTargetLabel != null)
-                _previewTargetLabel.text = $"Target ({_previewTargetWorldPosition.x:0.##}, {_previewTargetWorldPosition.z:0.##})";
+                _previewTargetLabel.text = $"Target: Live ({_previewTargetWorldPosition.x:0.##}, {_previewTargetWorldPosition.z:0.##})";
             if (_previewStatusLabel != null)
             {
                 _previewStatusLabel.text =
-                    $"Preview: {binding.PresentationLabel} | t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} " +
+                    $"Preview: {binding.PresentationLabel} | Target: Live ({_previewTargetWorldPosition.x:0.##}, {_previewTargetWorldPosition.z:0.##}) | " +
+                    $"t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} " +
                     $"pattern={frame.PatternSlotId} {frame.Lifecycle} | ghosts={frame.ActiveGhostCount}/{_previewSession.GhostCap} " +
                     $"suppressed={frame.SuppressedGhostCount} | display={_previewDisplayMode}";
             }
@@ -841,6 +862,11 @@ namespace SweepNDodge.DotsBullets.Editor
         private void ResetPreviewTarget()
         {
             SetPreviewTarget(new Vector3(0f, 0f, 3f));
+        }
+
+        private void RestartPreviewWithTarget()
+        {
+            RestartPreview();
         }
 
         private void RefreshAfterMutation()
@@ -1098,14 +1124,14 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 case HazardActorWorkbenchSelectionKind.Phase:
                     return new HazardActorWorkbenchPreviewBinding(
-                        HazardActorPreviewScope.Actor,
+                        HazardActorPreviewScope.Phase,
                         Math.Max(0, selection.PhaseId),
                         0,
                         false,
                         $"Phase {selection.PhaseId}");
                 case HazardActorWorkbenchSelectionKind.Transition:
                     return new HazardActorWorkbenchPreviewBinding(
-                        HazardActorPreviewScope.Actor,
+                        HazardActorPreviewScope.Phase,
                         Math.Max(0, selection.TransitionFromPhaseId),
                         0,
                         false,
@@ -1153,7 +1179,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private static string BuildPreviewScopeLabel(HazardActorWorkbenchPreviewBinding binding)
         {
-            return $"Preview: {binding.PresentationLabel} (scope={binding.Scope})";
+            return $"Preview: {binding.PresentationLabel}";
         }
 
         private static int CountIssues(HazardActorWorkbenchIssue[] issues, ContentValidationSeverity severity)
@@ -1197,6 +1223,55 @@ namespace SweepNDodge.DotsBullets.Editor
             if (warnings > 0)
                 return $"{warnings} warn";
             return "OK";
+        }
+
+        public static UnsavedWorkbenchIssue[] BuildUnsavedChangeIssues(GameObject actorPrefab, HazardActorAuthoring actor)
+        {
+            if (actorPrefab == null || actor == null)
+                return Array.Empty<UnsavedWorkbenchIssue>();
+
+            var issues = new List<UnsavedWorkbenchIssue>(4);
+            if (EditorUtility.GetDirtyCount(actor) > 0)
+            {
+                issues.Add(new UnsavedWorkbenchIssue(
+                    "UNSAVED_ACTOR",
+                    "Unsaved changes in HazardActor prefab.",
+                    HazardActorWorkbenchSelection.ForActor(actorPrefab),
+                    actorPrefab));
+            }
+
+            var slots = actor.PatternSlots ?? Array.Empty<HazardActorPatternSlotAuthoring>();
+            var emissionProfileIds = new HashSet<int>();
+            var telegraphProfileIds = new HashSet<int>();
+            for (int i = 0; i < slots.Length; i++)
+            {
+                var slot = slots[i];
+                var emission = slot.Emission.Profile;
+                if (emission != null
+                    && emissionProfileIds.Add(emission.GetInstanceID())
+                    && EditorUtility.GetDirtyCount(emission) > 0)
+                {
+                    issues.Add(new UnsavedWorkbenchIssue(
+                        "UNSAVED_EMISSION_PROFILE",
+                        $"Unsaved changes in Emission Profile: {emission.name}",
+                        HazardActorWorkbenchSelection.ForEmissionProfile(actorPrefab, slot.PatternSlotId, emission),
+                        emission));
+                }
+
+                var telegraph = slot.TelegraphProfile;
+                if (telegraph != null
+                    && telegraphProfileIds.Add(telegraph.GetInstanceID())
+                    && EditorUtility.GetDirtyCount(telegraph) > 0)
+                {
+                    issues.Add(new UnsavedWorkbenchIssue(
+                        "UNSAVED_TELEGRAPH_PROFILE",
+                        $"Unsaved changes in Telegraph Profile: {telegraph.name}",
+                        HazardActorWorkbenchSelection.ForTelegraphProfile(actorPrefab, slot.PatternSlotId, telegraph),
+                        telegraph));
+                }
+            }
+
+            return issues.ToArray();
         }
 
         public readonly struct ArchetypeLibraryRowSummary
@@ -1271,6 +1346,26 @@ namespace SweepNDodge.DotsBullets.Editor
             public string ScheduleLabel { get; }
             public string MovementLabel { get; }
             public string IssueLabel { get; }
+        }
+
+        public readonly struct UnsavedWorkbenchIssue
+        {
+            public UnsavedWorkbenchIssue(
+                string code,
+                string message,
+                HazardActorWorkbenchSelection target,
+                UnityEngine.Object pingTarget)
+            {
+                Code = code ?? string.Empty;
+                Message = message ?? string.Empty;
+                Target = target;
+                PingTarget = pingTarget;
+            }
+
+            public string Code { get; }
+            public string Message { get; }
+            public HazardActorWorkbenchSelection Target { get; }
+            public UnityEngine.Object PingTarget { get; }
         }
 
         public readonly struct HazardActorWorkbenchPreviewBinding

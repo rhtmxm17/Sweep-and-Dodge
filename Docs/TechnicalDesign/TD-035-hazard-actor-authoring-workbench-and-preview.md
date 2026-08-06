@@ -45,8 +45,9 @@
   - document export 결과이며 Workbench/Preview의 편집 SSOT가 아니다.
 
 ### 2.2 Transient data
-- `HazardActorEditingSession`은 선택 archetype, 선택 Phase/Transition/Pattern/Profile, foldout, filter, preview scope를 소유한다.
-- `HazardActorPreviewSession`은 play state, elapsed time, source progress, target pose, forced phase/pattern, manual cleanup event와 표시 옵션을 소유한다.
+- `HazardActorEditingSession`은 선택 archetype, 선택 Phase/Transition/Pattern/Profile, foldout, filter, user-local view option을 소유한다.
+- Workbench의 기본 preview scope는 수동 field가 아니라 canonical selection에서 파생한다.
+- `HazardActorPreviewSession`은 play state, elapsed time, resolved preview scope, source progress, target pose, forced phase/pattern, manual cleanup event와 표시 옵션을 소유한다.
 - session 변경은 Undo/dirty/save 대상이 아니다.
 - `Auto Play on Selection`은 user-local editor preference이며 기본값은 false다.
 
@@ -82,6 +83,7 @@
   - Profile: asset reference
 - array index는 selection identity가 아니며 reorder/Undo/Redo 후 id로 재해석한다.
 - missing, duplicate, ambiguous identity는 selection을 해제하고 issue를 생성한다.
+- selection breadcrumb는 현재 actor에서 선택 항목까지의 경로를 표시하며, Preview 상태 표시는 같은 selection에서 파생된 scope와 target을 함께 보여준다.
 
 ### 3.3 Behavior Canvas
 - Phase는 좌우 진행 순서로 표시하고 progress transition edge에 threshold와 lead-in을 표시한다.
@@ -102,6 +104,7 @@
 ### 3.4 편집 명령
 - Actor/Phase/Transition/Pattern의 단일 필드 편집은 `SerializedObject`로 즉시 반영한다.
 - 구조 명령은 `Add`, `Duplicate`, `Move`, `Remove`를 제공하며 하나의 Undo group으로 기록한다.
+- 반복되는 구조 명령은 text button 대신 icon/기호 button과 tooltip을 사용해 행 폭을 제한한다.
 - id 자동 할당은 같은 actor의 사용 중인 양의 id를 제외한 최소 양수를 사용한다.
 - 삭제가 selector candidate, transition, stage PhaseSet rule에서 참조 중이면 영향 요약과 확인 없이 실행하지 않는다.
 - 참조를 자동 재지정하지 않는다. 사용자가 참조 제거 또는 삭제 취소를 선택한다.
@@ -124,13 +127,22 @@
 - `HazardActorPreviewSimulator`
   - snapshot과 preview input을 받아 fixed-step으로 presence, phase, selector, emit lifecycle과 ghost motion을 진행한다.
 - `HazardActorPreviewSession`
-  - Pattern/Actor/Encounter scope, transport, source progress, target, forced selection과 warning state를 소유한다.
+  - Phase/Pattern/Actor/Encounter scope, transport, source progress, target, forced selection과 warning state를 소유한다.
 - `HazardActorPreviewRenderer`
   - simulator output을 embedded preview와 Scene View에 표시하며 simulation state를 수정하지 않는다.
 
 ### 4.2 Preview scope
+- Workbench는 기본적으로 `Follow Selection` 정책을 사용한다. 별도 수동 scope field를 기본 노출하지 않고, canonical selection에서 preview binding을 만든다.
+- selection별 기본 binding:
+  - Actor: `Actor` scope, source progress slider 표시
+  - Phase: `Phase` scope, 해당 `PhaseId`를 forced phase로 사용, source progress slider 숨김
+  - Transition: `Phase` scope, transition source `PhaseId`를 forced phase로 사용, source progress slider 숨김
+  - Pattern/EmissionProfile/TelegraphProfile: `Pattern` scope, 해당 `PatternSlotId`를 forced pattern으로 사용, source progress slider 숨김
+  - Stage Map source/Encounter rule: `Encounter` scope, source progress slider 표시
 - `Pattern`
   - 선택한 Pattern 하나를 반복하며 Phase/selector/orchestration을 건너뛴다.
+- `Phase`
+  - 선택한 Phase 하나를 forced phase로 재생하며 actor presence와 selector는 유지하되 progress transition/orchestration은 격리한다.
 - `Actor`
   - 선택 actor의 presence, phase transition, selector, telegraph, emit, cooldown을 재생한다.
 - `Encounter`
@@ -143,7 +155,9 @@
 - source progress는 기본적으로 time과 독립된 수동 slider다.
 - optional `Sweep Progress`는 session-only duration 동안 0에서 1까지 선형 진행하며 기본 duration은 10초다.
 - progress 또는 time을 뒤로 scrub하면 초기 상태에서 해당 지점까지 고정 step으로 재평가한다.
-- player target은 draggable preview handle이며 Stage Map에서는 PlayerStart를 최초 기본값으로 사용한다.
+- player target은 preview 영역 좌클릭 또는 draggable preview handle로 이동할 수 있으며 Stage Map에서는 PlayerStart를 최초 기본값으로 사용한다.
+- Workbench embedded preview는 휠 클릭 drag로 pan, mouse wheel로 zoom, `F`로 active ghost fit, `R`로 view reset, `Shift+R`로 현재 live target 기준 restart를 제공한다.
+- Workbench target, pan, zoom, display mode, transport는 session-only 상태이며 asset dirty나 Undo 대상이 아니다.
 - forced Phase/Pattern은 preview 격리용이며 asset이나 runtime rule을 변경하지 않는다.
 
 ### 4.4 지원 행동과 제한
@@ -288,7 +302,9 @@
 ### 9.2 Editor UX smoke
 - 기본 Inspector 없이 Actor, Phase, Pattern, Transition, Profile을 생성·수정할 수 있다.
 - GD-016 대표 actor를 Pattern/Actor Preview로 판독할 수 있다.
-- 선택 시 preview는 준비되지만 자동 재생되지 않고, transport와 Undo/Redo 후 selection/preview가 일관된다.
+- 선택 시 preview는 canonical selection에 맞는 Actor/Phase/Pattern scope로 준비되지만 자동 재생되지 않고, transport와 Undo/Redo 후 selection/preview가 일관된다.
+- Actor 선택에서만 Workbench Source Progress slider가 표시되고 Phase/Transition/Pattern/Profile 선택에서는 숨겨진다.
+- Workbench embedded preview에서 target click, pan, zoom, fit/reset 조작이 asset dirty나 Undo 기록을 만들지 않는다.
 - Stage Map에서 실제 placement 위치/yaw로 telegraph와 탄막이 표시된다.
 - Source Progress scrub과 역방향 재평가에서 Spawn/PhaseSet/Retire 결과가 결정적이다.
 - issue 클릭 시 해당 Workbench 항목, Encounter marker 또는 Scene 위치로 이동한다.
@@ -343,6 +359,9 @@
 - world XZ를 preview pixel로 직접 투영하며 서로 다른 위치를 개별 quad로 유지하고, view 밖 좌표는 edge cell로 왜곡하지 않는다.
 - Workbench 가시성 개선으로 상시 `Archetype Library` side panel을 제거하고 toolbar `Change Archetype` popup picker로 대체했다. popup은 `Name / Phases / Patterns / Profiles / Issues` 열을 제공하며 선택 후 닫힌다.
 - Phase/Pattern 기본 목록은 긴 버튼 텍스트 대신 열 기반 행 요약으로 표시하고, 상세 편집은 기존 Contextual Inspector의 canonical selection 하나에만 표시한다.
+- Workbench preview는 manual scope field 대신 selection-derived binding을 사용한다. Actor는 Actor scope와 Source Progress를 표시하고, Phase/Transition은 Phase scope, Pattern/Profile은 Pattern scope로 격리한다.
+- embedded preview는 target click, middle-drag pan, wheel zoom, fit/reset/restart-with-target 조작을 제공하며 해당 조작은 session-only 상태다.
+- 반복 구조 명령은 icon command button과 tooltip으로 축약해 Phase/Pattern 행의 정보 열을 보존한다.
 - `pf_stage2_fan_sentry` live Workbench smoke에서 active ghost 12개, visible exact ghost 12개, UI mesh submission 1회를 확인했다.
 - `HazardActorWorkbenchPreviewTests`: 가시성 회귀 테스트 2개를 포함해 21/21 pass.
 - `HazardEmitterPlayModeTests`: 기존 HazardActor PlayMode smoke 2/2 pass.
