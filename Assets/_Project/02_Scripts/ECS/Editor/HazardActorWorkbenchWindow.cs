@@ -19,10 +19,20 @@ namespace SweepNDodge.DotsBullets.Editor
         private ScrollView _canvas;
         private ScrollView _inspector;
         private ScrollView _issues;
-        private IMGUIContainer _previewSurface;
+        private HazardActorWorkbenchPreviewElement _previewSurface;
         private EnumField _scopeField;
         private Slider _progressSlider;
         private Vector3Field _targetField;
+        private EnumField _previewDisplayModeField;
+        private Vector2Field _previewViewCenterField;
+        private Slider _previewViewHalfHeightField;
+        private Label _previewStatusLabel;
+        private Label _previewWarningLabel;
+        private HazardActorPreviewDisplayMode _previewDisplayMode = HazardActorPreviewDisplayMode.Exact;
+        private Vector2 _previewViewCenter = Vector2.zero;
+        private float _previewViewHalfHeight = 8f;
+        private string _observedPreviewSignature = string.Empty;
+        private double _nextPreviewSignatureCheck;
 
         [MenuItem("Tools/Project/Hazard Actor Workbench/Open")]
         public static void Open()
@@ -39,6 +49,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public GameObject ActiveActorPrefab => _actorPrefab;
         public HazardActorWorkbenchSelection Selection => _selection;
         public HazardActorPreviewSession PreviewSession => _previewSession;
+        public HazardActorPreviewDisplayMode PreviewDisplayMode => _previewDisplayMode;
 
         public void CreateGUI()
         {
@@ -65,6 +76,7 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             Undo.undoRedoPerformed += OnUndoRedo;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
+            HazardActorPreviewCoordinator.PreviewRepaintRequested += OnPreviewRepaintRequested;
             HazardActorPreviewCoordinator.SetActiveSession(_previewSession);
         }
 
@@ -72,7 +84,24 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             Undo.undoRedoPerformed -= OnUndoRedo;
             AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+            HazardActorPreviewCoordinator.PreviewRepaintRequested -= OnPreviewRepaintRequested;
             HazardActorPreviewCoordinator.ClearActiveSession(_previewSession);
+        }
+
+        private void Update()
+        {
+            if (_actorPrefab == null || EditorApplication.timeSinceStartup < _nextPreviewSignatureCheck)
+                return;
+            _nextPreviewSignatureCheck = EditorApplication.timeSinceStartup + 0.1d;
+            string signature = ComputePreviewSignature();
+            if (signature == _observedPreviewSignature)
+                return;
+
+            _observedPreviewSignature = signature;
+            _actor = ResolveActor(_actorPrefab);
+            RefreshCanvas();
+            RefreshIssues();
+            RestartPreview();
         }
 
         private void BuildToolbar()
@@ -87,8 +116,8 @@ namespace SweepNDodge.DotsBullets.Editor
             toolbar.Add(new ToolbarButton(() => RestartPreview()) { text = "Restart" });
             toolbar.Add(new ToolbarButton(() => _previewSession.Play()) { text = "Play" });
             toolbar.Add(new ToolbarButton(() => _previewSession.Pause()) { text = "Pause" });
-            toolbar.Add(new ToolbarButton(() => { _previewSession.Step(); Repaint(); }) { text = "Step" });
-            toolbar.Add(new ToolbarButton(() => { _previewSession.CleanupOldestGhost(); Repaint(); }) { text = "CleanupRemoved" });
+            toolbar.Add(new ToolbarButton(() => { _previewSession.Step(); RefreshPreviewPresentation(); }) { text = "Step" });
+            toolbar.Add(new ToolbarButton(() => { _previewSession.CleanupOldestGhost(); RefreshPreviewPresentation(); }) { text = "CleanupRemoved" });
             rootVisualElement.Add(toolbar);
         }
 
@@ -232,6 +261,12 @@ namespace SweepNDodge.DotsBullets.Editor
                     RefreshAfterMutation();
                 }) { text = "Remove" });
                 _canvas.Add(row);
+
+                var detail = new Label(BuildPhaseSummary(policy));
+                detail.style.marginLeft = 8;
+                detail.style.marginBottom = 4;
+                detail.style.whiteSpace = WhiteSpace.Normal;
+                _canvas.Add(detail);
             }
         }
 
@@ -275,7 +310,46 @@ namespace SweepNDodge.DotsBullets.Editor
                     RefreshAfterMutation();
                 }) { text = "Remove" });
                 _canvas.Add(row);
+
+                var detail = new Label(BuildPatternSummary(slot));
+                detail.style.marginLeft = 8;
+                detail.style.marginBottom = 4;
+                detail.style.whiteSpace = WhiteSpace.Normal;
+                _canvas.Add(detail);
             }
+        }
+
+        private string BuildPhaseSummary(HazardActorPhaseSelectorPolicyAuthoring policy)
+        {
+            var candidates = policy.Candidates ?? Array.Empty<HazardActorPhaseSelectorCandidateAuthoring>();
+            string candidateSummary = candidates.Length == 0
+                ? "no candidates"
+                : string.Join(" -> ", candidates.Select((x, index) => $"P{x.PatternSlotId}(candidate {index})"));
+            var transitions = _actor.PhaseProgressTransitions ?? Array.Empty<HazardActorPhaseProgressTransitionAuthoring>();
+            string transitionSummary = "no progress transition";
+            for (int i = 0; i < transitions.Length; i++)
+            {
+                if (transitions[i].FromPhaseId != policy.PhaseId)
+                    continue;
+                transitionSummary = $"progress >= {transitions[i].ProgressThresholdNormalized:0.##} -> Phase {transitions[i].ToPhaseId}, lead-in {transitions[i].TransitionLeadInSec:0.##}s";
+                break;
+            }
+            return $"Selector: {policy.SelectionMode}. Candidates: {candidateSummary}. Transition: {transitionSummary}.";
+        }
+
+        private static string BuildPatternSummary(HazardActorPatternSlotAuthoring slot)
+        {
+            string telegraph = slot.TelegraphProfile != null ? $"{slot.TelegraphProfile.TelegraphDurationSec:0.##}s" : "missing";
+            string repeat = $"repeat x{Mathf.Max(1, slot.Emission.EventRepeatCount)}";
+            string schedule = slot.Emission.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
+                ? $"timed {Mathf.Max(0f, slot.Emission.EventShotIntervalSec):0.###}s"
+                : "instant";
+            string cooldown = $"{Mathf.Max(0f, slot.Emission.CooldownSec):0.##}s";
+            string profile = slot.Emission.Profile != null ? slot.Emission.Profile.name : "missing profile";
+            string movement = slot.Emission.Profile != null && EmissionProfileResolver.TryResolve(slot.Emission.Profile, out var core, out _)
+                ? core.MovementFamily.ToString()
+                : "unknown movement";
+            return $"Timeline: Telegraph {telegraph} -> Emit {repeat} / {schedule} -> Cooldown {cooldown}. Profile: {profile}. Movement: {movement}.";
         }
 
         private void DrawPreviewControls()
@@ -290,8 +364,47 @@ namespace SweepNDodge.DotsBullets.Editor
             _targetField = new Vector3Field("Target") { value = new Vector3(0f, 0f, 3f) };
             _targetField.RegisterValueChangedCallback(_ => RestartPreview());
             _canvas.Add(_targetField);
-            _previewSurface = new IMGUIContainer(DrawEmbeddedPreview) { style = { height = 260, marginTop = 4 } };
+
+            _previewDisplayModeField = new EnumField("Display", _previewDisplayMode);
+            _previewDisplayModeField.RegisterValueChangedCallback(evt =>
+            {
+                _previewDisplayMode = (HazardActorPreviewDisplayMode)evt.newValue;
+                RefreshPreviewPresentation();
+            });
+            _canvas.Add(_previewDisplayModeField);
+            _canvas.Add(new Label("Exact preserves every visible bullet position. Density is a diagnostic aggregation view.")
+            {
+                style = { whiteSpace = WhiteSpace.Normal, fontSize = 10, marginBottom = 2 }
+            });
+
+            _previewViewCenterField = new Vector2Field("View Center") { value = _previewViewCenter };
+            _previewViewCenterField.RegisterValueChangedCallback(evt =>
+            {
+                _previewViewCenter = evt.newValue;
+                RefreshPreviewPresentation();
+            });
+            _canvas.Add(_previewViewCenterField);
+            _previewViewHalfHeightField = new Slider("View Half Height", 1f, 32f) { value = _previewViewHalfHeight };
+            _previewViewHalfHeightField.RegisterValueChangedCallback(evt =>
+            {
+                _previewViewHalfHeight = evt.newValue;
+                RefreshPreviewPresentation();
+            });
+            _canvas.Add(_previewViewHalfHeightField);
+            _canvas.Add(new Button(FitPreviewView) { text = "Fit Active Ghosts" });
+
+            _previewStatusLabel = new Label();
+            _previewStatusLabel.style.whiteSpace = WhiteSpace.Normal;
+            _canvas.Add(_previewStatusLabel);
+            _previewWarningLabel = new Label();
+            _previewWarningLabel.style.whiteSpace = WhiteSpace.Normal;
+            _canvas.Add(_previewWarningLabel);
+            _previewSurface = new HazardActorWorkbenchPreviewElement(_previewSession)
+            {
+                style = { height = 240, marginTop = 4 }
+            };
             _canvas.Add(_previewSurface);
+            RefreshPreviewPresentation();
         }
 
         private void RefreshInspector()
@@ -496,36 +609,60 @@ namespace SweepNDodge.DotsBullets.Editor
                 ForcedPatternSlotId = _selection.Kind == HazardActorWorkbenchSelectionKind.PatternSlot ? _selection.PatternSlotId : 0,
             };
             _previewSession.Load(snapshot, input);
+            _observedPreviewSignature = ComputePreviewSignature();
             HazardActorPreviewCoordinator.SetActiveSession(_previewSession);
+            RefreshPreviewPresentation();
+        }
+
+        private void RefreshPreviewPresentation()
+        {
+            var frame = _previewSession.Frame;
+            if (_previewStatusLabel != null)
+            {
+                _previewStatusLabel.text =
+                    $"t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} " +
+                    $"pattern={frame.PatternSlotId} {frame.Lifecycle} | ghosts={frame.ActiveGhostCount}/{_previewSession.GhostCap} " +
+                    $"suppressed={frame.SuppressedGhostCount} | display={_previewDisplayMode}";
+            }
+            if (_previewWarningLabel != null)
+                _previewWarningLabel.text = string.IsNullOrEmpty(frame.Warning) ? string.Empty : frame.Warning;
+            if (_previewSurface != null)
+            {
+                _previewSurface.DisplayMode = _previewDisplayMode;
+                _previewSurface.SetView(_previewViewCenter, _previewViewHalfHeight);
+                _previewSurface.MarkDirtyRepaint();
+            }
             Repaint();
         }
 
-        private void DrawEmbeddedPreview()
+        private void FitPreviewView()
         {
-            Rect rect = GUILayoutUtility.GetRect(10f, 240f, GUILayout.ExpandWidth(true));
-            GUI.Box(rect, GUIContent.none);
-            var frame = _previewSession.Frame;
-            GUI.Label(new Rect(rect.x + 8f, rect.y + 8f, rect.width - 16f, 20f), $"t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} pattern={frame.PatternSlotId} {frame.Lifecycle}");
-            GUI.Label(new Rect(rect.x + 8f, rect.y + 28f, rect.width - 16f, 20f), $"ghosts={frame.ActiveGhostCount}/{_previewSession.GhostCap} suppressed={frame.SuppressedGhostCount}");
-            if (!string.IsNullOrEmpty(frame.Warning))
-                GUI.Label(new Rect(rect.x + 8f, rect.y + 48f, rect.width - 16f, 20f), frame.Warning);
-
-            Vector2 center = rect.center;
-            DrawDot(center, Color.magenta, 5f);
+            Vector3 actor = _previewSession.Input.ActorWorldPosition;
+            Vector3 target = _previewSession.Input.TargetWorldPosition;
+            float minX = Mathf.Min(actor.x, target.x);
+            float maxX = Mathf.Max(actor.x, target.x);
+            float minZ = Mathf.Min(actor.z, target.z);
+            float maxZ = Mathf.Max(actor.z, target.z);
             var ghosts = _previewSession.Ghosts;
             for (int i = 0; i < ghosts.Count; i++)
             {
-                Vector2 p = center + new Vector2(ghosts[i].Position.x, -ghosts[i].Position.z) * 24f;
-                DrawDot(p, Color.cyan, 3f);
+                Vector3 position = ghosts[i].Position;
+                minX = Mathf.Min(minX, position.x);
+                maxX = Mathf.Max(maxX, position.x);
+                minZ = Mathf.Min(minZ, position.z);
+                maxZ = Mathf.Max(maxZ, position.z);
             }
-        }
 
-        private static void DrawDot(Vector2 center, Color color, float size)
-        {
-            Color prev = GUI.color;
-            GUI.color = color;
-            GUI.DrawTexture(new Rect(center.x - size * 0.5f, center.y - size * 0.5f, size, size), Texture2D.whiteTexture);
-            GUI.color = prev;
+            _previewViewCenter = new Vector2((minX + maxX) * 0.5f, (minZ + maxZ) * 0.5f);
+            float aspect = _previewSurface != null && _previewSurface.contentRect.height > 0f
+                ? _previewSurface.contentRect.width / _previewSurface.contentRect.height
+                : 2f;
+            float halfWidth = Mathf.Max(0.5f, (maxX - minX) * 0.5f);
+            float halfHeight = Mathf.Max(0.5f, (maxZ - minZ) * 0.5f);
+            _previewViewHalfHeight = Mathf.Clamp(Mathf.Max(halfHeight, halfWidth / Mathf.Max(0.1f, aspect)) * 1.15f, 1f, 32f);
+            _previewViewCenterField?.SetValueWithoutNotify(_previewViewCenter);
+            _previewViewHalfHeightField?.SetValueWithoutNotify(_previewViewHalfHeight);
+            RefreshPreviewPresentation();
         }
 
         private void RefreshAfterMutation()
@@ -559,6 +696,33 @@ namespace SweepNDodge.DotsBullets.Editor
         private void OnBeforeAssemblyReload()
         {
             HazardActorPreviewCoordinator.ClearActiveSession(_previewSession);
+        }
+
+        private void OnPreviewRepaintRequested()
+        {
+            RefreshPreviewPresentation();
+        }
+
+        private string ComputePreviewSignature()
+        {
+            if (_actor == null)
+                return string.Empty;
+
+            unchecked
+            {
+                int hash = 17;
+                hash = (hash * 397) ^ EditorUtility.GetDirtyCount(_actor);
+                var slots = _actor.PatternSlots ?? Array.Empty<HazardActorPatternSlotAuthoring>();
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    hash = (hash * 397) ^ slots[i].PatternSlotId;
+                    if (slots[i].TelegraphProfile != null)
+                        hash = (hash * 397) ^ EditorUtility.GetDirtyCount(slots[i].TelegraphProfile);
+                    if (slots[i].Emission.Profile != null)
+                        hash = (hash * 397) ^ EditorUtility.GetDirtyCount(slots[i].Emission.Profile);
+                }
+                return hash.ToString();
+            }
         }
 
         private static HazardActorAuthoring ResolveActor(GameObject prefab)

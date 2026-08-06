@@ -1018,7 +1018,13 @@ namespace SweepNDodge.DotsBullets.Editor
                 uint sourceId = ResolveEncounterSourceId();
                 sourceId = DrawUIntField("Source Id", sourceId);
                 _session.HazardActorSourceStableId = sourceId;
+                EditorGUI.BeginChangeCheck();
                 _encounterPreviewProgress = EditorGUILayout.Slider("Progress", _encounterPreviewProgress, 0f, 1f);
+                if (EditorGUI.EndChangeCheck() && HazardActorPreviewCoordinator.ActiveEncounterSession != null)
+                {
+                    HazardActorPreviewCoordinator.ActiveEncounterSession.SetSourceProgress(_encounterPreviewProgress);
+                    SceneView.RepaintAll();
+                }
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -1173,8 +1179,14 @@ namespace SweepNDodge.DotsBullets.Editor
                     continue;
                 if (!HazardActorPreviewSnapshotBuilder.TryBuild(placements[i].ActorArchetypePrefab, out var snapshot))
                     continue;
-                encounter.AddActor(snapshot, input);
+                encounter.AddActorPlan(
+                    placements[i].PlacementInstanceId,
+                    snapshot,
+                    input,
+                    BuildEncounterRulePreviews(sourceId, placements[i].PlacementInstanceId));
             }
+
+            encounter.SetSourceProgress(_encounterPreviewProgress);
 
             if (encounter.ActiveActorCount <= 0)
             {
@@ -1203,59 +1215,43 @@ namespace SweepNDodge.DotsBullets.Editor
                 return false;
             }
 
-            bool hasRuleForPlacement = false;
-            bool spawned = false;
-            bool retired = false;
-            int forcedPhaseId = 0;
-            var rules = (_document.HazardActorOrchestrationRules ?? Array.Empty<StageMapHazardActorOrchestrationRuleData>())
-                .Where(x => x.OwningSourceStableId == placement.OwningSourceStableId)
-                .OrderBy(x => x.TriggerThresholdNormalized)
-                .ThenBy(x => x.RuleId);
-            foreach (var rule in rules)
-            {
-                if (!ContainsTarget(rule.TargetPlacementInstanceIds, placement.PlacementInstanceId))
-                    continue;
-                hasRuleForPlacement = true;
-                if (!IsEncounterRuleTriggered(rule, _encounterPreviewProgress))
-                    continue;
-
-                switch (rule.ActionType)
-                {
-                    case HazardActorOrchestrationActionId.Spawn:
-                        spawned = true;
-                        retired = false;
-                        break;
-                    case HazardActorOrchestrationActionId.PhaseSet:
-                        forcedPhaseId = Math.Max(0, rule.TargetPhaseId);
-                        break;
-                    case HazardActorOrchestrationActionId.Retire:
-                        retired = true;
-                        break;
-                }
-            }
-
-            if (hasRuleForPlacement && (!spawned || retired))
-                return false;
-
             Vector3 world = StageMapSelectionUtility.GetHazardActorWorld(_document, hazardIndex);
             input = new HazardActorPreviewInput
             {
                 Scope = HazardActorPreviewScope.Encounter,
-                ForcedPhaseId = forcedPhaseId,
                 GhostCapOverride = capPerActor,
                 SourceProgress01 = _encounterPreviewProgress,
                 ActorWorldPosition = world,
                 ActorYawDeg = placement.LocalYawDeg,
                 TargetWorldPosition = StageMapSelectionUtility.GetPlayerStartWorld(_document),
-                SpawnAtStart = !hasRuleForPlacement || spawned,
+                SpawnAtStart = true,
             };
             return true;
         }
 
-        private static bool IsEncounterRuleTriggered(StageMapHazardActorOrchestrationRuleData rule, float progress01)
+        private HazardActorEncounterRulePreview[] BuildEncounterRulePreviews(uint sourceId, int placementId)
         {
-            return rule.TriggerType == HazardActorOrchestrationTriggerId.OnStageStart
-                || progress01 >= Mathf.Clamp01(rule.TriggerThresholdNormalized);
+            var rules = _document.HazardActorOrchestrationRules ?? Array.Empty<StageMapHazardActorOrchestrationRuleData>();
+            var previews = new List<HazardActorEncounterRulePreview>(4);
+            for (int i = 0; i < rules.Length; i++)
+            {
+                var rule = rules[i];
+                if (rule.OwningSourceStableId != sourceId || !ContainsTarget(rule.TargetPlacementInstanceIds, placementId))
+                    continue;
+                previews.Add(new HazardActorEncounterRulePreview(
+                    rule.RuleId,
+                    placementId,
+                    rule.ActionType,
+                    rule.TriggerType,
+                    rule.TriggerThresholdNormalized,
+                    rule.TargetPhaseId));
+            }
+            previews.Sort((a, b) =>
+            {
+                int threshold = a.TriggerThresholdNormalized.CompareTo(b.TriggerThresholdNormalized);
+                return threshold != 0 ? threshold : a.RuleId.CompareTo(b.RuleId);
+            });
+            return previews.ToArray();
         }
 
         private static bool ContainsTarget(int[] targets, int placementId)

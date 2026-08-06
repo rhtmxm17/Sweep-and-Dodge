@@ -5,7 +5,7 @@
 - doc_id: `TD-035`
 - type: `TechnicalDesign`
 - status: `implemented`
-- last_updated: `2026-08-05`
+- last_updated: `2026-08-06`
 - related_docs:
   - [../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md](../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md)
   - [TD-031-hazard-actor-behavior-runtime.md](TD-031-hazard-actor-behavior-runtime.md)
@@ -313,3 +313,27 @@
 - PlayMode full: 46/46 pass. 첫 전체 실행에서 pause intervention smoke 1건이 실패했으나 단독 재실행 1/1 pass, 이후 전체 재실행 46/46 pass.
 - Preview steady step managed allocation: `HazardActorWorkbenchPreviewTests.PreviewSimulator_SteadyStepDoesNotAllocateManagedMemory`에서 0 byte assertion pass.
 - MCP Editor smoke: `Tools/Project/Hazard Actor Workbench/Open`와 `Tools/Project/Stage Map Editor/Open` menu item 실행 성공, Scene View screenshot capture 성공.
+
+## 11. 2026-08-06 후속 구현 / 검증 결과
+- Preview coordinator는 editor callback count가 아니라 wall-clock anchor에서 target preview time을 계산하고 `EvaluateAt` fixed-step catch-up으로 재생한다. Workbench는 `PreviewRepaintRequested`에서 embedded preview repaint를 요청한다.
+- Preview simulator는 `EventRepeatCount`, `EventShotSchedule`, `EventShotIntervalSec`를 반영하고, `LineEven` spawn count를 branch trajectory sample cap과 분리한다.
+- Scene View ghost renderer는 `Graphics.DrawMeshInstanced` 기반 batch renderer를 사용한다. Workbench embedded preview는 UI Toolkit `MeshGenerationContext`의 단일 mesh에 각 visible ghost의 정확한 투영 위치를 기록한다. `Exact`가 기본이며 `Density`는 사용자가 명시적으로 선택하는 진단용 집약 모드다. 화면 밖 ghost는 가장자리로 clamp하지 않고 clip한다.
+- Encounter preview session은 source placement plan과 document-owned Spawn/PhaseSet/Retire rule preview를 보유하고, progress scrub forward/backward에서 active actor set과 forced phase를 재평가한다.
+- Workbench는 actor/profile/telegraph dirty signature를 주기적으로 감지해 snapshot/preview를 자동 재생성하고, canvas에 selector/state summary와 pattern timeline summary를 표시한다.
+
+검증 결과:
+- `HazardActorWorkbenchPreviewTests`: 17/17 pass.
+- StageMap targeted suite (`StageMapSampleMigrationAndWindowSmokeTests`, `StageMapDocumentTests`, `StageMapEditorInteractionTests`): 50/50 pass.
+- EditMode full: 574/574 pass.
+- PlayMode full: 46/46 pass.
+- Preview performance 단독 측정: Actor p95 `0.815 ms`, Encounter p95 `4.002 ms`, managed GC `0 B`, submissions Actor `2` / Encounter `5`.
+- MCP Editor smoke: operational actor Workbench live tree에서 `Timeline:`/`Selector:`/`Preview` 확인, explicit Step 45회 후 ghost 8개 생성, `CleanupRemoved` 후 7개, Restart 후 time `0.033s`.
+- Stage Map smoke: `smd_demo_1` source `1001` Encounter Preview에서 active actor 1, ghost 1, preview time `0.200s`, warning 없음.
+- Scene View smoke: active preview 상태에서 Scene View screenshot capture 성공. 완료 전 임시 screenshot/generated validation asset은 삭제했다.
+- Runtime ECS component, baker output, update order, owner/Fence 규칙은 변경하지 않았다.
+
+정확 위치 표시 후속 검증:
+- Workbench fixed density 기본 표시를 제거하고, `Exact` 기본/`Density` 명시 선택, view center/zoom, `Fit Active Ghosts` 조작을 추가했다.
+- world XZ를 preview pixel로 직접 투영하며 서로 다른 위치를 개별 quad로 유지하고, view 밖 좌표는 edge cell로 왜곡하지 않는다.
+- `pf_stage2_fan_sentry` live Workbench smoke에서 active ghost 12개, visible exact ghost 12개, UI mesh submission 1회를 확인했다.
+- `HazardActorWorkbenchPreviewTests`: 19/19 pass, 전체 EditMode 576/576 pass, 전체 PlayMode 46/46 pass.

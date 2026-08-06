@@ -175,6 +175,32 @@ namespace SweepNDodge.DotsBullets.Editor
         public BulletHomingLiteDefinition HomingLite;
     }
 
+    public readonly struct HazardActorEncounterRulePreview
+    {
+        public HazardActorEncounterRulePreview(
+            int ruleId,
+            int placementInstanceId,
+            HazardActorOrchestrationActionId actionType,
+            HazardActorOrchestrationTriggerId triggerType,
+            float triggerThresholdNormalized,
+            int targetPhaseId)
+        {
+            RuleId = ruleId;
+            PlacementInstanceId = placementInstanceId;
+            ActionType = actionType;
+            TriggerType = triggerType;
+            TriggerThresholdNormalized = Mathf.Clamp01(triggerThresholdNormalized);
+            TargetPhaseId = targetPhaseId;
+        }
+
+        public int RuleId { get; }
+        public int PlacementInstanceId { get; }
+        public HazardActorOrchestrationActionId ActionType { get; }
+        public HazardActorOrchestrationTriggerId TriggerType { get; }
+        public float TriggerThresholdNormalized { get; }
+        public int TargetPhaseId { get; }
+    }
+
     public sealed class HazardActorPreviewFrame
     {
         public HazardActorPresenceStateId Presence;
@@ -338,6 +364,8 @@ namespace SweepNDodge.DotsBullets.Editor
         private HazardActorEmitLifecycleStateId _lifecycle;
         private float _lifecycleElapsed;
         private int _appliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId;
+        private int _remainingRepeats;
+        private float _repeatElapsed;
         private int _suppressedGhostCount;
         private string _warning = string.Empty;
 
@@ -392,16 +420,32 @@ namespace SweepNDodge.DotsBullets.Editor
             _lifecycle = HazardActorEmitLifecycleStateId.Dormant;
             _lifecycleElapsed = 0f;
             _appliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId;
+            _remainingRepeats = 0;
+            _repeatElapsed = 0f;
             PublishFrame();
+        }
+
+        public void EvaluateAt(float timeSec)
+        {
+            float target = Mathf.Max(0f, timeSec);
+            int targetStep = Mathf.FloorToInt(target / FixedDeltaTime);
+            int currentStep = Mathf.RoundToInt(TimeSec / FixedDeltaTime);
+            if (targetStep < currentStep)
+            {
+                Restart();
+                currentStep = 0;
+            }
+
+            while (currentStep < targetStep)
+            {
+                Step();
+                currentStep++;
+            }
         }
 
         public void ScrubTo(float timeSec)
         {
-            float target = Mathf.Max(0f, timeSec);
-            Restart();
-            int steps = Mathf.FloorToInt(target / FixedDeltaTime);
-            for (int i = 0; i < steps; i++)
-                Step();
+            EvaluateAt(timeSec);
         }
 
         public void Step()
@@ -620,6 +664,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
             if (_lifecycle != HazardActorEmitLifecycleStateId.Dormant)
                 _lifecycleElapsed += FixedDeltaTime;
+            if (_lifecycle == HazardActorEmitLifecycleStateId.Emit)
+                _repeatElapsed += FixedDeltaTime;
 
             bool emittedThisStep = false;
             for (int guard = 0; guard < 4; guard++)
@@ -635,13 +681,15 @@ namespace SweepNDodge.DotsBullets.Editor
                     case HazardActorEmitLifecycleStateId.Telegraph:
                         if (_lifecycleElapsed < Mathf.Max(0f, slot.Execution.TelegraphDurationSec))
                             return;
-                        EmitSlot(slot, 0);
+                        BeginEmit(slot);
                         emittedThisStep = true;
-                        _lifecycle = HazardActorEmitLifecycleStateId.Cooldown;
-                        _lifecycleElapsed = 0f;
-                        if (slot.Execution.CooldownSec <= 0f)
-                            CompleteCycle();
-                        return;
+                        if (_lifecycle == HazardActorEmitLifecycleStateId.Cooldown)
+                            return;
+                        break;
+                    case HazardActorEmitLifecycleStateId.Emit:
+                        if (!TryEmitTimedRepeat(slot, ref emittedThisStep))
+                            return;
+                        break;
                     case HazardActorEmitLifecycleStateId.Cooldown:
                         if (_lifecycleElapsed < Mathf.Max(0f, slot.Execution.CooldownSec))
                             return;
@@ -654,6 +702,63 @@ namespace SweepNDodge.DotsBullets.Editor
                         return;
                 }
             }
+        }
+
+        private void BeginEmit(HazardActorPreviewPatternSlot slot)
+        {
+            _remainingRepeats = Mathf.Max(1, slot.Execution.EventRepeatCount);
+            _repeatElapsed = 0f;
+            if (slot.Execution.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
+            {
+                EmitSlot(slot, 0);
+                _remainingRepeats--;
+                if (_remainingRepeats > 0)
+                {
+                    _lifecycle = HazardActorEmitLifecycleStateId.Emit;
+                    _lifecycleElapsed = 0f;
+                    return;
+                }
+            }
+            else
+            {
+                while (_remainingRepeats > 0)
+                {
+                    EmitSlot(slot, 0);
+                    _remainingRepeats--;
+                }
+            }
+
+            BeginCooldown(slot);
+        }
+
+        private bool TryEmitTimedRepeat(HazardActorPreviewPatternSlot slot, ref bool emittedThisStep)
+        {
+            float interval = Mathf.Max(0.001f, slot.Execution.EventShotIntervalSec);
+            while (_remainingRepeats > 0 && _repeatElapsed >= interval)
+            {
+                _repeatElapsed = Mathf.Max(0f, _repeatElapsed - interval);
+                EmitSlot(slot, 0);
+                _remainingRepeats--;
+                emittedThisStep = true;
+                if (_remainingRepeats > 0)
+                    return true;
+            }
+
+            if (_remainingRepeats > 0)
+                return false;
+
+            BeginCooldown(slot);
+            return true;
+        }
+
+        private void BeginCooldown(HazardActorPreviewPatternSlot slot)
+        {
+            _lifecycle = HazardActorEmitLifecycleStateId.Cooldown;
+            _lifecycleElapsed = 0f;
+            _remainingRepeats = 0;
+            _repeatElapsed = 0f;
+            if (slot.Execution.CooldownSec <= 0f)
+                CompleteCycle();
         }
 
         private void StepGhosts()
@@ -819,7 +924,7 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 case WavePositionPatternModeId.LineEven:
                     float distance = math.distance(execution.LineStart, execution.LineEnd);
-                    return Mathf.Clamp(Mathf.FloorToInt(distance / Mathf.Max(0.001f, execution.SampleSpacing)) + 1, 1, TrajectorySamplesPerBranch);
+                    return Mathf.Max(1, Mathf.FloorToInt(distance / Mathf.Max(0.001f, execution.SampleSpacing)) + 1);
                 case WavePositionPatternModeId.PointSet:
                     return Mathf.Clamp(execution.PointSetCount, 1, PointSetPositionPatternAuthoring.MaxPointCount);
                 default:
@@ -1067,26 +1172,59 @@ namespace SweepNDodge.DotsBullets.Editor
 
     public sealed class HazardActorEncounterPreviewSession : IDisposable
     {
+        private sealed class ActorPlan
+        {
+            public int PlacementInstanceId;
+            public HazardActorPreviewSnapshot Snapshot;
+            public HazardActorPreviewInput Input;
+            public HazardActorEncounterRulePreview[] Rules = Array.Empty<HazardActorEncounterRulePreview>();
+        }
+
+        private readonly List<ActorPlan> _plans = new List<ActorPlan>(16);
         private readonly List<HazardActorPreviewSession> _actors = new List<HazardActorPreviewSession>(16);
         private readonly HazardActorPreviewFrame _frame = new HazardActorPreviewFrame();
+        private float _sourceProgress01;
 
         public HazardActorPreviewFrame Frame => _frame;
         public IReadOnlyList<HazardActorPreviewSession> Actors => _actors;
         public bool Playing { get; private set; }
         public bool IsDisposed { get; private set; }
         public int ActiveActorCount => _actors.Count;
+        public float TimeSec
+        {
+            get
+            {
+                float time = 0f;
+                for (int i = 0; i < _actors.Count; i++)
+                    time = Mathf.Max(time, _actors[i].TimeSec);
+                return time;
+            }
+        }
 
         public void AddActor(HazardActorPreviewSnapshot snapshot, HazardActorPreviewInput input)
+        {
+            AddActorPlan(0, snapshot, input, Array.Empty<HazardActorEncounterRulePreview>());
+        }
+
+        public void AddActorPlan(
+            int placementInstanceId,
+            HazardActorPreviewSnapshot snapshot,
+            HazardActorPreviewInput input,
+            HazardActorEncounterRulePreview[] rules)
         {
             if (snapshot == null || snapshot.HasErrors)
                 return;
 
             input.Scope = HazardActorPreviewScope.Encounter;
             input.GhostCapOverride = Mathf.Max(1, input.GhostCapOverride);
-            var actor = new HazardActorPreviewSession();
-            actor.Load(snapshot, input);
-            _actors.Add(actor);
-            PublishFrame();
+            _plans.Add(new ActorPlan
+            {
+                PlacementInstanceId = placementInstanceId,
+                Snapshot = snapshot,
+                Input = input,
+                Rules = rules ?? Array.Empty<HazardActorEncounterRulePreview>(),
+            });
+            RebuildActorsForProgress();
         }
 
         public void Play()
@@ -1111,10 +1249,31 @@ namespace SweepNDodge.DotsBullets.Editor
             PublishFrame();
         }
 
+        public void SetSourceProgress(float sourceProgress01)
+        {
+            float next = Mathf.Clamp01(sourceProgress01);
+            if (Mathf.Approximately(_sourceProgress01, next))
+                return;
+            _sourceProgress01 = next;
+            float time = TimeSec;
+            bool wasPlaying = Playing;
+            RebuildActorsForProgress();
+            EvaluateAt(time);
+            if (wasPlaying)
+                Play();
+        }
+
         public void Step()
         {
             for (int i = 0; i < _actors.Count; i++)
                 _actors[i].Step();
+            PublishFrame();
+        }
+
+        public void EvaluateAt(float timeSec)
+        {
+            for (int i = 0; i < _actors.Count; i++)
+                _actors[i].EvaluateAt(timeSec);
             PublishFrame();
         }
 
@@ -1138,7 +1297,75 @@ namespace SweepNDodge.DotsBullets.Editor
             for (int i = 0; i < _actors.Count; i++)
                 _actors[i].Dispose();
             _actors.Clear();
+            _plans.Clear();
             PublishFrame();
+        }
+
+        private void RebuildActorsForProgress()
+        {
+            for (int i = 0; i < _actors.Count; i++)
+                _actors[i].Dispose();
+            _actors.Clear();
+
+            for (int i = 0; i < _plans.Count; i++)
+            {
+                if (!TryResolveInputAtProgress(_plans[i], out var input))
+                    continue;
+
+                var actor = new HazardActorPreviewSession();
+                actor.Load(_plans[i].Snapshot, input);
+                if (Playing)
+                    actor.Play();
+                _actors.Add(actor);
+            }
+
+            PublishFrame();
+        }
+
+        private bool TryResolveInputAtProgress(ActorPlan plan, out HazardActorPreviewInput input)
+        {
+            input = plan.Input;
+            input.SourceProgress01 = _sourceProgress01;
+            bool hasRule = false;
+            bool spawned = false;
+            bool retired = false;
+            int forcedPhaseId = 0;
+            var rules = plan.Rules ?? Array.Empty<HazardActorEncounterRulePreview>();
+            for (int i = 0; i < rules.Length; i++)
+            {
+                var rule = rules[i];
+                if (plan.PlacementInstanceId > 0 && rule.PlacementInstanceId != plan.PlacementInstanceId)
+                    continue;
+                hasRule = true;
+                if (!IsRuleTriggered(rule, _sourceProgress01))
+                    continue;
+
+                switch (rule.ActionType)
+                {
+                    case HazardActorOrchestrationActionId.Spawn:
+                        spawned = true;
+                        retired = false;
+                        break;
+                    case HazardActorOrchestrationActionId.PhaseSet:
+                        forcedPhaseId = Math.Max(0, rule.TargetPhaseId);
+                        break;
+                    case HazardActorOrchestrationActionId.Retire:
+                        retired = true;
+                        break;
+                }
+            }
+
+            if (hasRule && (!spawned || retired))
+                return false;
+            input.SpawnAtStart = !hasRule || spawned;
+            input.ForcedPhaseId = forcedPhaseId;
+            return true;
+        }
+
+        private static bool IsRuleTriggered(HazardActorEncounterRulePreview rule, float progress01)
+        {
+            return rule.TriggerType == HazardActorOrchestrationTriggerId.OnStageStart
+                || progress01 >= rule.TriggerThresholdNormalized;
         }
 
         private void PublishFrame()
@@ -1169,7 +1396,12 @@ namespace SweepNDodge.DotsBullets.Editor
         private static HazardActorPreviewSession _activeSession;
         private static HazardActorEncounterPreviewSession _activeEncounterSession;
         private static double _lastUpdateTime;
+        private static double _playWallAnchorTime;
+        private static float _playPreviewAnchorTime;
+        private static bool _wasPlaying;
         private static bool _hooksRegistered;
+
+        public static event Action PreviewRepaintRequested;
 
         public static HazardActorPreviewSession ActiveSession => _activeSession;
         public static HazardActorEncounterPreviewSession ActiveEncounterSession => _activeEncounterSession;
@@ -1183,6 +1415,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _activeEncounterSession?.Dispose();
             _activeSession = session;
             _activeEncounterSession = null;
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
             if (_activeSession != null)
                 EnsureHooks();
         }
@@ -1195,6 +1428,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _activeEncounterSession?.Dispose();
             _activeSession = null;
             _activeEncounterSession = session;
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
             if (_activeEncounterSession != null)
                 EnsureHooks();
         }
@@ -1205,6 +1439,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
             _activeSession?.Dispose();
             _activeSession = null;
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
             RemoveHooksIfIdle();
         }
 
@@ -1214,6 +1449,8 @@ namespace SweepNDodge.DotsBullets.Editor
             _activeEncounterSession?.Dispose();
             _activeSession = null;
             _activeEncounterSession = null;
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
+            HazardActorPreviewRendererUtility.Dispose();
             RemoveHooks();
         }
 
@@ -1223,6 +1460,13 @@ namespace SweepNDodge.DotsBullets.Editor
                 _activeSession.Step();
             else
                 _activeEncounterSession?.Step();
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
+            RequestPreviewRepaint();
+        }
+
+        public static void EvaluatePlaybackForTests(double editorTimeSinceStartup)
+        {
+            UpdateAt(editorTimeSinceStartup);
         }
 
         public static void DrawScenePreview()
@@ -1244,12 +1488,10 @@ namespace SweepNDodge.DotsBullets.Editor
             Handles.DrawLine(input.ActorWorldPosition, input.ActorWorldPosition + forward * 0.7f);
 
             var ghosts = _activeSession.Ghosts;
-            Handles.color = Color.cyan;
-            for (int i = 0; i < ghosts.Count; i++)
-            {
-                Handles.DrawSolidDisc(ghosts[i].Position, Vector3.up, 0.04f);
-                Handles.DrawLine(ghosts[i].Position, ghosts[i].Position + ghosts[i].Velocity.normalized * 0.25f);
-            }
+            HazardActorPreviewRendererUtility.DrawGhostInstances(
+                ghosts,
+                0.08f,
+                _activeSession.Frame.SuppressedGhostCount > 0);
             if (!string.IsNullOrEmpty(_activeSession.Frame.Warning))
                 Handles.Label(input.ActorWorldPosition + Vector3.up * 0.5f, _activeSession.Frame.Warning);
         }
@@ -1266,13 +1508,10 @@ namespace SweepNDodge.DotsBullets.Editor
                 Vector3 forward = Quaternion.Euler(0f, input.ActorYawDeg, 0f) * Vector3.forward;
                 Handles.DrawLine(input.ActorWorldPosition, input.ActorWorldPosition + forward * 0.55f);
 
-                var ghosts = actor.Ghosts;
-                Handles.color = Color.cyan;
-                for (int i = 0; i < ghosts.Count; i++)
-                {
-                    Handles.DrawSolidDisc(ghosts[i].Position, Vector3.up, 0.035f);
-                    Handles.DrawLine(ghosts[i].Position, ghosts[i].Position + ghosts[i].Velocity.normalized * 0.2f);
-                }
+                HazardActorPreviewRendererUtility.DrawGhostInstances(
+                    actor.Ghosts,
+                    0.07f,
+                    actor.Frame.SuppressedGhostCount > 0);
             }
 
             if (!string.IsNullOrEmpty(encounter.Frame.Warning) && actors.Count > 0)
@@ -1305,7 +1544,48 @@ namespace SweepNDodge.DotsBullets.Editor
             _hooksRegistered = false;
         }
 
+        private static void ResetPlaybackClock(double now)
+        {
+            _lastUpdateTime = now;
+            _playWallAnchorTime = now;
+            _playPreviewAnchorTime = GetActivePreviewTime();
+            _wasPlaying = IsActivePlaying();
+        }
+
+        private static float GetActivePreviewTime()
+        {
+            if (_activeSession != null)
+                return _activeSession.TimeSec;
+            return _activeEncounterSession != null ? _activeEncounterSession.TimeSec : 0f;
+        }
+
+        private static bool IsActivePlaying()
+        {
+            if (_activeSession != null)
+                return _activeSession.Playing;
+            return _activeEncounterSession != null && _activeEncounterSession.Playing;
+        }
+
+        private static void EvaluateActiveAt(float timeSec)
+        {
+            if (_activeSession != null)
+                _activeSession.EvaluateAt(timeSec);
+            else
+                _activeEncounterSession?.EvaluateAt(timeSec);
+        }
+
+        private static void RequestPreviewRepaint()
+        {
+            PreviewRepaintRequested?.Invoke();
+            SceneView.RepaintAll();
+        }
+
         private static void OnEditorUpdate()
+        {
+            UpdateAt(EditorApplication.timeSinceStartup);
+        }
+
+        private static void UpdateAt(double now)
         {
             if (_activeSession == null && _activeEncounterSession == null)
             {
@@ -1313,14 +1593,27 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
             }
 
-            double now = EditorApplication.timeSinceStartup;
-            bool playing = _activeSession != null ? _activeSession.Playing : _activeEncounterSession.Playing;
-            if (!playing || now - _lastUpdateTime < HazardActorPreviewSession.FixedDeltaTime)
+            bool playing = IsActivePlaying();
+            if (!playing)
+            {
+                _wasPlaying = false;
+                return;
+            }
+
+            if (!_wasPlaying)
+            {
+                ResetPlaybackClock(now);
+                _wasPlaying = true;
+                return;
+            }
+
+            if (now - _lastUpdateTime < HazardActorPreviewSession.FixedDeltaTime)
                 return;
 
             _lastUpdateTime = now;
-            StepActiveSession();
-            SceneView.RepaintAll();
+            float targetTime = _playPreviewAnchorTime + (float)(now - _playWallAnchorTime);
+            EvaluateActiveAt(targetTime);
+            RequestPreviewRepaint();
         }
 
         private static void OnSceneGUI(SceneView view)
