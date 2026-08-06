@@ -43,6 +43,14 @@ MonoBehaviour:
       SourceEntity: 0
       CauserEntity: 0
       DelaySec: 0
+    CleanupRemoved:
+      Enabled: 0
+      TargetProfile: {fileID: 0}
+      OriginPosition: 0
+      ForwardDirection: 0
+      SourceEntity: 0
+      CauserEntity: 0
+      DelaySec: 0
   references:
     version: 2
     RefIds:
@@ -52,7 +60,7 @@ MonoBehaviour:
     - rid: 3059539566354235724
       type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:
-        BaseAngleDeg: 180
+        BaseAngleDeg: 0
     - rid: 3059539566354235725
       type: {class: NWayShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
       data:

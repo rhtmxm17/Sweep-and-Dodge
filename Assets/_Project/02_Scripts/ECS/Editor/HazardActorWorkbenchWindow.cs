@@ -22,17 +22,21 @@ namespace SweepNDodge.DotsBullets.Editor
         private Label _currentArchetypeStatusLabel;
         private ToolbarButton _changeArchetypeButton;
         private HazardActorWorkbenchPreviewElement _previewSurface;
-        private EnumField _scopeField;
         private Slider _progressSlider;
         private Vector3Field _targetField;
         private EnumField _previewDisplayModeField;
         private Vector2Field _previewViewCenterField;
         private Slider _previewViewHalfHeightField;
+        private Label _selectionBreadcrumbLabel;
+        private Label _previewScopeLabel;
+        private Label _previewTargetLabel;
         private Label _previewStatusLabel;
         private Label _previewWarningLabel;
         private HazardActorPreviewDisplayMode _previewDisplayMode = HazardActorPreviewDisplayMode.Exact;
         private Vector2 _previewViewCenter = Vector2.zero;
         private float _previewViewHalfHeight = 8f;
+        private Vector3 _previewTargetWorldPosition = new Vector3(0f, 0f, 3f);
+        private float _sourceProgress01;
         private string _observedPreviewSignature = string.Empty;
         private double _nextPreviewSignatureCheck;
 
@@ -156,7 +160,9 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             _actorPrefab = prefab;
             _actor = ResolveActor(prefab);
-            _selection = _actorPrefab != null ? HazardActorWorkbenchSelection.ForActor(_actorPrefab) : HazardActorWorkbenchSelection.None;
+            _selection = _actorPrefab != null
+                ? HazardActorWorkbenchSelection.ForActor(_actorPrefab)
+                : HazardActorWorkbenchSelection.None;
             RefreshAll();
             RestartPreview();
         }
@@ -165,8 +171,22 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             if (_actorPrefab == null)
                 return;
-            _selection = HazardActorWorkbenchSelection.ForActor(_actorPrefab);
+            SetWorkbenchSelection(HazardActorWorkbenchSelection.ForActor(_actorPrefab));
+        }
+
+        private void SetWorkbenchSelection(HazardActorWorkbenchSelection selection)
+        {
+            if (selection.ActorPrefab != null && selection.ActorPrefab != _actorPrefab)
+            {
+                _actorPrefab = selection.ActorPrefab;
+                _actor = ResolveActor(_actorPrefab);
+            }
+
+            _selection = selection.Kind != HazardActorWorkbenchSelectionKind.None
+                ? selection
+                : (_actorPrefab != null ? HazardActorWorkbenchSelection.ForActor(_actorPrefab) : HazardActorWorkbenchSelection.None);
             RefreshAll();
+            RestartPreview();
         }
 
         private void RefreshProjectPrefabs()
@@ -250,13 +270,13 @@ namespace SweepNDodge.DotsBullets.Editor
                 HazardActorWorkbenchCommandUtility.AddPhase(_actor, out int phaseId);
                 _selection = HazardActorWorkbenchSelection.ForPhase(_actorPrefab, phaseId);
                 RefreshAfterMutation();
-            }) { text = "Add Phase" });
+            }) { text = "+ Phase", tooltip = "Add phase" });
             row.Add(new Button(() =>
             {
                 HazardActorWorkbenchCommandUtility.AddPattern(_actor, out int patternId);
                 _selection = HazardActorWorkbenchSelection.ForPattern(_actorPrefab, patternId);
                 RefreshAfterMutation();
-            }) { text = "Add Pattern" });
+            }) { text = "+ Pattern", tooltip = "Add pattern" });
             _canvas.Add(row);
         }
 
@@ -265,7 +285,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _canvas.Add(new Label("Phases") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 6 } });
             var policies = _actor.PhaseSelectorPolicies ?? Array.Empty<HazardActorPhaseSelectorPolicyAuthoring>();
             var issues = HazardActorPreviewSnapshotBuilder.Validate(_actorPrefab);
-            DrawTableHeader(_canvas, "Phase", "Selector", "Candidates", "Transition", "Issues", "Commands");
+            DrawTableHeader(_canvas, "Phase", "Selector", "Candidates", "Transition", "Issues", "Edit", "Commands");
             for (int i = 0; i < policies.Length; i++)
             {
                 var policy = policies[i];
@@ -273,34 +293,34 @@ namespace SweepNDodge.DotsBullets.Editor
                 var row = BuildSelectableRow(_selection.Kind == HazardActorWorkbenchSelectionKind.Phase && _selection.PhaseId == policy.PhaseId);
                 row.RegisterCallback<MouseUpEvent>(_ =>
                 {
-                    _selection = HazardActorWorkbenchSelection.ForPhase(_actorPrefab, policy.PhaseId);
-                    RefreshInspector();
+                    SetWorkbenchSelection(HazardActorWorkbenchSelection.ForPhase(_actorPrefab, policy.PhaseId));
                 });
                 row.Add(Cell(summary.PhaseLabel, 70));
                 row.Add(Cell(summary.SelectorLabel, 130));
                 row.Add(Cell(summary.CandidatesLabel, 160));
                 row.Add(Cell(summary.TransitionLabel, 210));
                 row.Add(Cell(summary.IssueLabel, 80));
-                var commands = CommandCell();
-                commands.Add(new Button(() =>
+                var edit = EditCell();
+                edit.Add(EditButton("Transition", "Edit transition", () =>
                 {
-                    _selection = HazardActorWorkbenchSelection.ForTransition(_actorPrefab, policy.PhaseId);
-                    RefreshInspector();
-                }) { text = "Transition" });
-                commands.Add(new Button(() =>
+                    SetWorkbenchSelection(HazardActorWorkbenchSelection.ForTransition(_actorPrefab, policy.PhaseId));
+                }));
+                row.Add(edit);
+                var commands = CommandCell();
+                commands.Add(IconCommandButton(EditorIconKind.Duplicate, "Duplicate phase", () =>
                 {
                     HazardActorWorkbenchCommandUtility.DuplicatePhase(_actor, policy.PhaseId, out int newId);
                     _selection = HazardActorWorkbenchSelection.ForPhase(_actorPrefab, newId);
                     RefreshAfterMutation();
-                }) { text = "Duplicate" });
-                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, -1); RefreshAfterMutation(); }) { text = "Up" });
-                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, 1); RefreshAfterMutation(); }) { text = "Down" });
-                commands.Add(new Button(() =>
+                }));
+                commands.Add(IconCommandButton(EditorIconKind.MoveUp, "Move phase up", () => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, -1); RefreshAfterMutation(); }));
+                commands.Add(IconCommandButton(EditorIconKind.MoveDown, "Move phase down", () => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, 1); RefreshAfterMutation(); }));
+                commands.Add(IconCommandButton(EditorIconKind.Remove, "Remove phase", () =>
                 {
                     if (!HazardActorWorkbenchCommandUtility.RemovePhase(_actor, policy.PhaseId, out string error))
                         EditorUtility.DisplayDialog("Remove Phase", error, "OK");
                     RefreshAfterMutation();
-                }) { text = "Remove" });
+                }));
                 row.Add(commands);
                 _canvas.Add(row);
             }
@@ -311,7 +331,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _canvas.Add(new Label("Patterns") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 6 } });
             var slots = _actor.PatternSlots ?? Array.Empty<HazardActorPatternSlotAuthoring>();
             var issues = HazardActorPreviewSnapshotBuilder.Validate(_actorPrefab);
-            DrawTableHeader(_canvas, "Pattern", "Telegraph", "Emission", "Schedule", "Movement", "Issues", "Commands");
+            DrawTableHeader(_canvas, "Pattern", "Telegraph", "Emission", "Schedule", "Movement", "Issues", "Edit", "Commands");
             for (int i = 0; i < slots.Length; i++)
             {
                 var slot = slots[i];
@@ -319,8 +339,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 var row = BuildSelectableRow(_selection.Kind == HazardActorWorkbenchSelectionKind.PatternSlot && _selection.PatternSlotId == slot.PatternSlotId);
                 row.RegisterCallback<MouseUpEvent>(_ =>
                 {
-                    _selection = HazardActorWorkbenchSelection.ForPattern(_actorPrefab, slot.PatternSlotId);
-                    RefreshInspector();
+                    SetWorkbenchSelection(HazardActorWorkbenchSelection.ForPattern(_actorPrefab, slot.PatternSlotId));
                 });
                 row.Add(Cell(summary.PatternLabel, 70));
                 row.Add(Cell(summary.TelegraphLabel, 140));
@@ -328,31 +347,31 @@ namespace SweepNDodge.DotsBullets.Editor
                 row.Add(Cell(summary.ScheduleLabel, 180));
                 row.Add(Cell(summary.MovementLabel, 110));
                 row.Add(Cell(summary.IssueLabel, 80));
+                var edit = EditCell();
+                edit.Add(EditButton("Emission", "Edit emission profile", () =>
+                {
+                    SetWorkbenchSelection(HazardActorWorkbenchSelection.ForEmissionProfile(_actorPrefab, slot.PatternSlotId, slot.Emission.Profile));
+                }));
+                edit.Add(EditButton("Telegraph", "Edit telegraph profile", () =>
+                {
+                    SetWorkbenchSelection(HazardActorWorkbenchSelection.ForTelegraphProfile(_actorPrefab, slot.PatternSlotId, slot.TelegraphProfile));
+                }));
+                row.Add(edit);
                 var commands = CommandCell();
-                commands.Add(new Button(() =>
-                {
-                    _selection = HazardActorWorkbenchSelection.ForEmissionProfile(_actorPrefab, slot.PatternSlotId, slot.Emission.Profile);
-                    RefreshInspector();
-                }) { text = "Emission Profile" });
-                commands.Add(new Button(() =>
-                {
-                    _selection = HazardActorWorkbenchSelection.ForTelegraphProfile(_actorPrefab, slot.PatternSlotId, slot.TelegraphProfile);
-                    RefreshInspector();
-                }) { text = "Telegraph" });
-                commands.Add(new Button(() =>
+                commands.Add(IconCommandButton(EditorIconKind.Duplicate, "Duplicate pattern", () =>
                 {
                     HazardActorWorkbenchCommandUtility.DuplicatePattern(_actor, slot.PatternSlotId, out int newId);
                     _selection = HazardActorWorkbenchSelection.ForPattern(_actorPrefab, newId);
                     RefreshAfterMutation();
-                }) { text = "Duplicate" });
-                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, -1); RefreshAfterMutation(); }) { text = "Up" });
-                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, 1); RefreshAfterMutation(); }) { text = "Down" });
-                commands.Add(new Button(() =>
+                }));
+                commands.Add(IconCommandButton(EditorIconKind.MoveUp, "Move pattern up", () => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, -1); RefreshAfterMutation(); }));
+                commands.Add(IconCommandButton(EditorIconKind.MoveDown, "Move pattern down", () => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, 1); RefreshAfterMutation(); }));
+                commands.Add(IconCommandButton(EditorIconKind.Remove, "Remove pattern", () =>
                 {
                     if (!HazardActorWorkbenchCommandUtility.RemovePattern(_actor, slot.PatternSlotId, out string error))
                         EditorUtility.DisplayDialog("Remove Pattern", error, "OK");
                     RefreshAfterMutation();
-                }) { text = "Remove" });
+                }));
                 row.Add(commands);
                 _canvas.Add(row);
             }
@@ -452,15 +471,32 @@ namespace SweepNDodge.DotsBullets.Editor
         private void DrawPreviewControls()
         {
             _canvas.Add(new Label("Preview") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 8 } });
-            _scopeField = new EnumField("Scope", HazardActorPreviewScope.Actor);
-            _scopeField.RegisterValueChangedCallback(_ => RestartPreview());
-            _canvas.Add(_scopeField);
-            _progressSlider = new Slider("Source Progress", 0f, 1f) { value = 0f };
-            _progressSlider.RegisterValueChangedCallback(_ => RestartPreview());
-            _canvas.Add(_progressSlider);
-            _targetField = new Vector3Field("Target") { value = new Vector3(0f, 0f, 3f) };
-            _targetField.RegisterValueChangedCallback(_ => RestartPreview());
-            _canvas.Add(_targetField);
+            var binding = BuildPreviewBinding(_selection);
+            _selectionBreadcrumbLabel = new Label(BuildSelectionBreadcrumb(_selection));
+            _selectionBreadcrumbLabel.style.whiteSpace = WhiteSpace.Normal;
+            _canvas.Add(_selectionBreadcrumbLabel);
+
+            _previewScopeLabel = new Label(BuildPreviewScopeLabel(binding));
+            _previewScopeLabel.style.whiteSpace = WhiteSpace.Normal;
+            _canvas.Add(_previewScopeLabel);
+
+            _previewTargetLabel = new Label();
+            _canvas.Add(_previewTargetLabel);
+
+            if (binding.ShowSourceProgress)
+            {
+                _progressSlider = new Slider("Source Progress", 0f, 1f) { value = _sourceProgress01 };
+                _progressSlider.RegisterValueChangedCallback(evt =>
+                {
+                    _sourceProgress01 = evt.newValue;
+                    RestartPreview();
+                });
+                _canvas.Add(_progressSlider);
+            }
+            else
+            {
+                _progressSlider = null;
+            }
 
             _previewDisplayModeField = new EnumField("Display", _previewDisplayMode);
             _previewDisplayModeField.RegisterValueChangedCallback(evt =>
@@ -469,26 +505,30 @@ namespace SweepNDodge.DotsBullets.Editor
                 RefreshPreviewPresentation();
             });
             _canvas.Add(_previewDisplayModeField);
-            _canvas.Add(new Label("Exact preserves every visible bullet position. Density is a diagnostic aggregation view.")
-            {
-                style = { whiteSpace = WhiteSpace.Normal, fontSize = 10, marginBottom = 2 }
-            });
-
+            var advanced = new Foldout { text = "Advanced Preview Controls", value = false };
+            _targetField = new Vector3Field("Target") { value = _previewTargetWorldPosition };
+            _targetField.RegisterValueChangedCallback(evt => SetPreviewTarget(evt.newValue));
+            advanced.Add(_targetField);
             _previewViewCenterField = new Vector2Field("View Center") { value = _previewViewCenter };
             _previewViewCenterField.RegisterValueChangedCallback(evt =>
             {
                 _previewViewCenter = evt.newValue;
                 RefreshPreviewPresentation();
             });
-            _canvas.Add(_previewViewCenterField);
+            advanced.Add(_previewViewCenterField);
             _previewViewHalfHeightField = new Slider("View Half Height", 1f, 32f) { value = _previewViewHalfHeight };
             _previewViewHalfHeightField.RegisterValueChangedCallback(evt =>
             {
                 _previewViewHalfHeight = evt.newValue;
                 RefreshPreviewPresentation();
             });
-            _canvas.Add(_previewViewHalfHeightField);
-            _canvas.Add(new Button(FitPreviewView) { text = "Fit Active Ghosts" });
+            advanced.Add(_previewViewHalfHeightField);
+            var viewButtons = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            viewButtons.Add(new Button(FitPreviewView) { text = "Fit", tooltip = "Fit active ghosts" });
+            viewButtons.Add(new Button(ResetPreviewView) { text = "Reset View", tooltip = "Reset preview pan and zoom" });
+            viewButtons.Add(new Button(ResetPreviewTarget) { text = "Reset Target", tooltip = "Reset preview target position" });
+            advanced.Add(viewButtons);
+            _canvas.Add(advanced);
 
             _previewStatusLabel = new Label();
             _previewStatusLabel.style.whiteSpace = WhiteSpace.Normal;
@@ -500,6 +540,10 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 style = { height = 240, marginTop = 4 }
             };
+            _previewSurface.TargetWorldPositionChanged += SetPreviewTarget;
+            _previewSurface.ViewChanged += SetPreviewView;
+            _previewSurface.FitRequested += FitPreviewView;
+            _previewSurface.ResetViewRequested += ResetPreviewView;
             _canvas.Add(_previewSurface);
             RefreshPreviewPresentation();
         }
@@ -690,17 +734,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void SelectWorkbenchTarget(HazardActorWorkbenchSelection target)
         {
-            if (target.ActorPrefab != null && target.ActorPrefab != _actorPrefab)
-            {
-                _actorPrefab = target.ActorPrefab;
-                _actor = ResolveActor(_actorPrefab);
-            }
-
-            _selection = target.Kind != HazardActorWorkbenchSelectionKind.None
-                ? target
-                : (_actorPrefab != null ? HazardActorWorkbenchSelection.ForActor(_actorPrefab) : HazardActorWorkbenchSelection.None);
-            RefreshAll();
-            RestartPreview();
+            SetWorkbenchSelection(target);
         }
 
         private void RestartPreview()
@@ -708,16 +742,17 @@ namespace SweepNDodge.DotsBullets.Editor
             if (_actorPrefab == null)
                 return;
             HazardActorPreviewSnapshotBuilder.TryBuild(_actorPrefab, out var snapshot);
+            var binding = BuildPreviewBinding(_selection);
             var input = new HazardActorPreviewInput
             {
-                Scope = _scopeField != null ? (HazardActorPreviewScope)_scopeField.value : HazardActorPreviewScope.Actor,
-                SourceProgress01 = _progressSlider != null ? _progressSlider.value : 0f,
-                TargetWorldPosition = _targetField != null ? _targetField.value : new Vector3(0f, 0f, 3f),
+                Scope = binding.Scope,
+                SourceProgress01 = binding.ShowSourceProgress ? _sourceProgress01 : 0f,
+                TargetWorldPosition = _previewTargetWorldPosition,
                 ActorWorldPosition = Vector3.zero,
                 ActorYawDeg = 0f,
                 SpawnAtStart = true,
-                ForcedPhaseId = _selection.Kind == HazardActorWorkbenchSelectionKind.Phase ? _selection.PhaseId : 0,
-                ForcedPatternSlotId = _selection.Kind == HazardActorWorkbenchSelectionKind.PatternSlot ? _selection.PatternSlotId : 0,
+                ForcedPhaseId = binding.ForcedPhaseId,
+                ForcedPatternSlotId = binding.ForcedPatternSlotId,
             };
             _previewSession.Load(snapshot, input);
             _observedPreviewSignature = ComputePreviewSignature();
@@ -728,10 +763,15 @@ namespace SweepNDodge.DotsBullets.Editor
         private void RefreshPreviewPresentation()
         {
             var frame = _previewSession.Frame;
+            var binding = BuildPreviewBinding(_selection);
+            if (_previewScopeLabel != null)
+                _previewScopeLabel.text = BuildPreviewScopeLabel(binding);
+            if (_previewTargetLabel != null)
+                _previewTargetLabel.text = $"Target ({_previewTargetWorldPosition.x:0.##}, {_previewTargetWorldPosition.z:0.##})";
             if (_previewStatusLabel != null)
             {
                 _previewStatusLabel.text =
-                    $"t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} " +
+                    $"Preview: {binding.PresentationLabel} | t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} " +
                     $"pattern={frame.PatternSlotId} {frame.Lifecycle} | ghosts={frame.ActiveGhostCount}/{_previewSession.GhostCap} " +
                     $"suppressed={frame.SuppressedGhostCount} | display={_previewDisplayMode}";
             }
@@ -744,6 +784,23 @@ namespace SweepNDodge.DotsBullets.Editor
                 _previewSurface.MarkDirtyRepaint();
             }
             Repaint();
+        }
+
+        private void SetPreviewTarget(Vector3 target)
+        {
+            _previewTargetWorldPosition = target;
+            _targetField?.SetValueWithoutNotify(_previewTargetWorldPosition);
+            _previewSession.SetTargetWorldPosition(_previewTargetWorldPosition);
+            RefreshPreviewPresentation();
+        }
+
+        private void SetPreviewView(Vector2 center, float halfHeight)
+        {
+            _previewViewCenter = center;
+            _previewViewHalfHeight = Mathf.Clamp(halfHeight, 0.25f, 32f);
+            _previewViewCenterField?.SetValueWithoutNotify(_previewViewCenter);
+            _previewViewHalfHeightField?.SetValueWithoutNotify(_previewViewHalfHeight);
+            RefreshPreviewPresentation();
         }
 
         private void FitPreviewView()
@@ -774,6 +831,16 @@ namespace SweepNDodge.DotsBullets.Editor
             _previewViewCenterField?.SetValueWithoutNotify(_previewViewCenter);
             _previewViewHalfHeightField?.SetValueWithoutNotify(_previewViewHalfHeight);
             RefreshPreviewPresentation();
+        }
+
+        private void ResetPreviewView()
+        {
+            SetPreviewView(Vector2.zero, 8f);
+        }
+
+        private void ResetPreviewTarget()
+        {
+            SetPreviewTarget(new Vector3(0f, 0f, 3f));
         }
 
         private void RefreshAfterMutation()
@@ -873,7 +940,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 case 3: return 210f;
                 case 4: return 110f;
                 case 5: return 80f;
-                default: return 300f;
+                case 6: return 160f;
+                default: return 112f;
             }
         }
 
@@ -916,11 +984,176 @@ namespace SweepNDodge.DotsBullets.Editor
                 style =
                 {
                     flexDirection = FlexDirection.Row,
-                    flexWrap = Wrap.Wrap,
-                    width = 300,
-                    minWidth = 300,
+                    flexWrap = Wrap.NoWrap,
+                    width = 112,
+                    minWidth = 112,
                 }
             };
+        }
+
+        private static VisualElement EditCell()
+        {
+            return new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexWrap = Wrap.NoWrap,
+                    width = 160,
+                    minWidth = 160,
+                }
+            };
+        }
+
+        private static Button EditButton(string text, string tooltip, Action action)
+        {
+            return new Button(action)
+            {
+                text = text,
+                tooltip = tooltip,
+                style =
+                {
+                    minWidth = 72,
+                    marginLeft = 1,
+                    marginRight = 1,
+                    unityTextAlign = TextAnchor.MiddleCenter,
+                }
+            };
+        }
+
+        private static Button IconCommandButton(EditorIconKind kind, string tooltip, Action action)
+        {
+            var button = new Button(action)
+            {
+                text = string.Empty,
+                tooltip = tooltip,
+                style =
+                {
+                    width = 24,
+                    minWidth = 24,
+                    marginLeft = 1,
+                    marginRight = 1,
+                    unityTextAlign = TextAnchor.MiddleCenter,
+                }
+            };
+            var image = new Image
+            {
+                image = LoadEditorIcon(kind),
+                scaleMode = ScaleMode.ScaleToFit,
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    width = 14,
+                    height = 14,
+                    alignSelf = Align.Center,
+                }
+            };
+            button.Add(image);
+            return button;
+        }
+
+        private static Texture2D LoadEditorIcon(EditorIconKind kind)
+        {
+            string[] names;
+            switch (kind)
+            {
+                case EditorIconKind.Duplicate:
+                    names = new[] { "TreeEditor.Duplicate", "d_TreeEditor.Duplicate", "Clipboard", "d_Clipboard" };
+                    break;
+                case EditorIconKind.MoveUp:
+                    names = new[] { "scrollup", "d_scrollup", "Animation.PrevKey", "d_Animation.PrevKey" };
+                    break;
+                case EditorIconKind.MoveDown:
+                    names = new[] { "scrolldown", "d_scrolldown", "Animation.NextKey", "d_Animation.NextKey" };
+                    break;
+                case EditorIconKind.Remove:
+                    names = new[] { "TreeEditor.Trash", "d_TreeEditor.Trash", "TreeEditor.TrashGray", "d_TreeEditor.TrashGray" };
+                    break;
+                default:
+                    names = Array.Empty<string>();
+                    break;
+            }
+
+            for (int i = 0; i < names.Length; i++)
+            {
+                var content = EditorGUIUtility.IconContent(names[i]);
+                if (content?.image is Texture2D texture)
+                    return texture;
+            }
+
+            return EditorGUIUtility.whiteTexture;
+        }
+
+        private enum EditorIconKind
+        {
+            Duplicate,
+            MoveUp,
+            MoveDown,
+            Remove,
+        }
+
+        public static HazardActorWorkbenchPreviewBinding BuildPreviewBinding(HazardActorWorkbenchSelection selection)
+        {
+            switch (selection.Kind)
+            {
+                case HazardActorWorkbenchSelectionKind.Phase:
+                    return new HazardActorWorkbenchPreviewBinding(
+                        HazardActorPreviewScope.Actor,
+                        Math.Max(0, selection.PhaseId),
+                        0,
+                        false,
+                        $"Phase {selection.PhaseId}");
+                case HazardActorWorkbenchSelectionKind.Transition:
+                    return new HazardActorWorkbenchPreviewBinding(
+                        HazardActorPreviewScope.Actor,
+                        Math.Max(0, selection.TransitionFromPhaseId),
+                        0,
+                        false,
+                        $"Phase {selection.TransitionFromPhaseId}");
+                case HazardActorWorkbenchSelectionKind.PatternSlot:
+                case HazardActorWorkbenchSelectionKind.EmissionProfile:
+                case HazardActorWorkbenchSelectionKind.TelegraphProfile:
+                    return new HazardActorWorkbenchPreviewBinding(
+                        HazardActorPreviewScope.Pattern,
+                        0,
+                        Math.Max(0, selection.PatternSlotId),
+                        false,
+                        $"Pattern {selection.PatternSlotId}");
+                default:
+                    return new HazardActorWorkbenchPreviewBinding(
+                        HazardActorPreviewScope.Actor,
+                        0,
+                        0,
+                        true,
+                        "Actor");
+            }
+        }
+
+        public static string BuildSelectionBreadcrumb(HazardActorWorkbenchSelection selection)
+        {
+            string actorName = selection.ActorPrefab != null ? selection.ActorPrefab.name : "(none)";
+            switch (selection.Kind)
+            {
+                case HazardActorWorkbenchSelectionKind.Actor:
+                    return $"{actorName} > Actor";
+                case HazardActorWorkbenchSelectionKind.Phase:
+                    return $"{actorName} > Phase {selection.PhaseId}";
+                case HazardActorWorkbenchSelectionKind.Transition:
+                    return $"{actorName} > Phase {selection.TransitionFromPhaseId} > Transition";
+                case HazardActorWorkbenchSelectionKind.PatternSlot:
+                    return $"{actorName} > Pattern {selection.PatternSlotId}";
+                case HazardActorWorkbenchSelectionKind.EmissionProfile:
+                    return $"{actorName} > Pattern {selection.PatternSlotId} > Emission Profile";
+                case HazardActorWorkbenchSelectionKind.TelegraphProfile:
+                    return $"{actorName} > Pattern {selection.PatternSlotId} > Telegraph Profile";
+                default:
+                    return $"{actorName} > No selection";
+            }
+        }
+
+        private static string BuildPreviewScopeLabel(HazardActorWorkbenchPreviewBinding binding)
+        {
+            return $"Preview: {binding.PresentationLabel} (scope={binding.Scope})";
         }
 
         private static int CountIssues(HazardActorWorkbenchIssue[] issues, ContentValidationSeverity severity)
@@ -1038,6 +1271,29 @@ namespace SweepNDodge.DotsBullets.Editor
             public string ScheduleLabel { get; }
             public string MovementLabel { get; }
             public string IssueLabel { get; }
+        }
+
+        public readonly struct HazardActorWorkbenchPreviewBinding
+        {
+            public HazardActorWorkbenchPreviewBinding(
+                HazardActorPreviewScope scope,
+                int forcedPhaseId,
+                int forcedPatternSlotId,
+                bool showSourceProgress,
+                string presentationLabel)
+            {
+                Scope = scope;
+                ForcedPhaseId = forcedPhaseId;
+                ForcedPatternSlotId = forcedPatternSlotId;
+                ShowSourceProgress = showSourceProgress;
+                PresentationLabel = presentationLabel ?? string.Empty;
+            }
+
+            public HazardActorPreviewScope Scope { get; }
+            public int ForcedPhaseId { get; }
+            public int ForcedPatternSlotId { get; }
+            public bool ShowSourceProgress { get; }
+            public string PresentationLabel { get; }
         }
 
         private sealed class ArchetypePickerPopup : PopupWindowContent

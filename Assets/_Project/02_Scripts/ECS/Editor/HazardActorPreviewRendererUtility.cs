@@ -19,21 +19,36 @@ namespace SweepNDodge.DotsBullets.Editor
     {
         private const int DensityGridSize = 16;
         private const float ExactGhostSizePx = 5f;
+        private const float MinViewHalfHeight = 0.25f;
+        private const float MaxViewHalfHeight = 32f;
         private readonly HazardActorPreviewSession _session;
         private readonly int[] _density = new int[DensityGridSize * DensityGridSize];
         private HazardActorPreviewDisplayMode _displayMode;
         private Vector2 _viewCenter;
         private float _viewHalfHeight = 8f;
+        private bool _middleDragging;
+        private Vector2 _lastPointerPosition;
 
         public HazardActorWorkbenchPreviewElement(HazardActorPreviewSession session)
         {
             _session = session;
-            pickingMode = PickingMode.Ignore;
+            focusable = true;
+            pickingMode = PickingMode.Position;
             style.minHeight = 120f;
             style.backgroundColor = new Color(0.055f, 0.065f, 0.075f, 1f);
             style.overflow = Overflow.Hidden;
             generateVisualContent += GenerateVisualContent;
+            RegisterCallback<MouseDownEvent>(OnMouseDown);
+            RegisterCallback<MouseMoveEvent>(OnMouseMove);
+            RegisterCallback<MouseUpEvent>(OnMouseUp);
+            RegisterCallback<WheelEvent>(OnWheel);
+            RegisterCallback<KeyDownEvent>(OnKeyDown);
         }
+
+        public event System.Action<Vector3> TargetWorldPositionChanged;
+        public event System.Action<Vector2, float> ViewChanged;
+        public event System.Action FitRequested;
+        public event System.Action ResetViewRequested;
 
         public HazardActorPreviewDisplayMode DisplayMode
         {
@@ -55,7 +70,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public void SetView(Vector2 center, float halfHeight)
         {
             _viewCenter = center;
-            _viewHalfHeight = Mathf.Max(0.25f, halfHeight);
+            _viewHalfHeight = Mathf.Clamp(halfHeight, MinViewHalfHeight, MaxViewHalfHeight);
             MarkDirtyRepaint();
         }
 
@@ -80,6 +95,66 @@ namespace SweepNDodge.DotsBullets.Editor
                 rect.center.x + (normalizedX * rect.width * 0.5f),
                 rect.center.y - (normalizedY * rect.height * 0.5f));
             return true;
+        }
+
+        public static bool TryProjectPreviewToWorld(
+            Vector2 previewPosition,
+            Vector2 viewCenter,
+            float viewHalfHeight,
+            Rect rect,
+            out Vector3 worldPosition)
+        {
+            worldPosition = default;
+            if (rect.width <= 0f || rect.height <= 0f || viewHalfHeight <= 0f)
+                return false;
+            if (!rect.Contains(previewPosition))
+                return false;
+
+            float halfWidth = viewHalfHeight * (rect.width / rect.height);
+            float normalizedX = (previewPosition.x - rect.center.x) / (rect.width * 0.5f);
+            float normalizedY = -(previewPosition.y - rect.center.y) / (rect.height * 0.5f);
+            worldPosition = new Vector3(
+                viewCenter.x + (normalizedX * halfWidth),
+                0f,
+                viewCenter.y + (normalizedY * viewHalfHeight));
+            return true;
+        }
+
+        public static Vector2 CalculatePannedCenter(
+            Vector2 viewCenter,
+            float viewHalfHeight,
+            Rect rect,
+            Vector2 pixelDelta)
+        {
+            if (rect.width <= 0f || rect.height <= 0f || viewHalfHeight <= 0f)
+                return viewCenter;
+
+            float halfWidth = viewHalfHeight * (rect.width / rect.height);
+            return new Vector2(
+                viewCenter.x - ((pixelDelta.x / rect.width) * halfWidth * 2f),
+                viewCenter.y + ((pixelDelta.y / rect.height) * viewHalfHeight * 2f));
+        }
+
+        public static void CalculateZoomAroundPoint(
+            Vector2 pointerPosition,
+            Vector2 viewCenter,
+            float viewHalfHeight,
+            Rect rect,
+            float zoomFactor,
+            out Vector2 nextCenter,
+            out float nextHalfHeight)
+        {
+            nextCenter = viewCenter;
+            nextHalfHeight = Mathf.Clamp(viewHalfHeight * Mathf.Max(0.01f, zoomFactor), MinViewHalfHeight, MaxViewHalfHeight);
+            if (!TryProjectPreviewToWorld(pointerPosition, viewCenter, viewHalfHeight, rect, out Vector3 world))
+                return;
+
+            float normalizedX = (pointerPosition.x - rect.center.x) / (rect.width * 0.5f);
+            float normalizedY = -(pointerPosition.y - rect.center.y) / (rect.height * 0.5f);
+            float nextHalfWidth = nextHalfHeight * (rect.width / rect.height);
+            nextCenter = new Vector2(
+                world.x - (normalizedX * nextHalfWidth),
+                world.z - (normalizedY * nextHalfHeight));
         }
 
         public static int CountVisibleGhosts(
@@ -236,6 +311,74 @@ namespace SweepNDodge.DotsBullets.Editor
             mesh.SetNextIndex(first);
             mesh.SetNextIndex((ushort)(first + 2));
             mesh.SetNextIndex((ushort)(first + 3));
+        }
+
+        private void OnMouseDown(MouseDownEvent evt)
+        {
+            Focus();
+            if (evt.button == 0)
+            {
+                if (TryProjectPreviewToWorld(evt.localMousePosition, _viewCenter, _viewHalfHeight, contentRect, out Vector3 world))
+                {
+                    if (_session != null)
+                        world.y = _session.Input.TargetWorldPosition.y;
+                    TargetWorldPositionChanged?.Invoke(world);
+                }
+                evt.StopPropagation();
+            }
+            else if (evt.button == 2)
+            {
+                _middleDragging = true;
+                _lastPointerPosition = evt.localMousePosition;
+                MouseCaptureController.CaptureMouse(this);
+                evt.StopPropagation();
+            }
+        }
+
+        private void OnMouseMove(MouseMoveEvent evt)
+        {
+            if (!_middleDragging)
+                return;
+
+            Vector2 delta = evt.localMousePosition - _lastPointerPosition;
+            _lastPointerPosition = evt.localMousePosition;
+            _viewCenter = CalculatePannedCenter(_viewCenter, _viewHalfHeight, contentRect, delta);
+            ViewChanged?.Invoke(_viewCenter, _viewHalfHeight);
+            MarkDirtyRepaint();
+            evt.StopPropagation();
+        }
+
+        private void OnMouseUp(MouseUpEvent evt)
+        {
+            if (evt.button != 2 || !_middleDragging)
+                return;
+
+            _middleDragging = false;
+            MouseCaptureController.ReleaseMouse(this);
+            evt.StopPropagation();
+        }
+
+        private void OnWheel(WheelEvent evt)
+        {
+            float factor = evt.delta.y > 0f ? 1.1f : 0.9f;
+            CalculateZoomAroundPoint(evt.localMousePosition, _viewCenter, _viewHalfHeight, contentRect, factor, out _viewCenter, out _viewHalfHeight);
+            ViewChanged?.Invoke(_viewCenter, _viewHalfHeight);
+            MarkDirtyRepaint();
+            evt.StopPropagation();
+        }
+
+        private void OnKeyDown(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.F)
+            {
+                FitRequested?.Invoke();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.R)
+            {
+                ResetViewRequested?.Invoke();
+                evt.StopPropagation();
+            }
         }
     }
 

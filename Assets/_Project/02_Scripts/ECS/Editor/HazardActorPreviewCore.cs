@@ -396,6 +396,12 @@ namespace SweepNDodge.DotsBullets.Editor
         public void Play() => Playing = true;
         public void Pause() => Playing = false;
 
+        public void SetTargetWorldPosition(Vector3 targetWorldPosition)
+        {
+            _input.TargetWorldPosition = targetWorldPosition;
+            PublishFrame();
+        }
+
         public void Restart()
         {
             Playing = false;

@@ -73,7 +73,7 @@ MonoBehaviour:
       CooldownSec: 0.5
     BaseWeight: 1
     AvailabilityFlags: 0
-    LocalOffset: {x: -3, y: 0, z: 2}
+    LocalOffset: {x: 0, y: 0, z: 0}
   - PatternSlotId: 2
     TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
     Emission:
@@ -84,7 +84,7 @@ MonoBehaviour:
       CooldownSec: 0.5
     BaseWeight: 1
     AvailabilityFlags: 0
-    LocalOffset: {x: -3, y: 0, z: 2}
+    LocalOffset: {x: 0, y: 0, z: 0}
   - PatternSlotId: 3
     TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
     Emission:
@@ -95,7 +95,7 @@ MonoBehaviour:
       CooldownSec: 0.5
     BaseWeight: 1
     AvailabilityFlags: 0
-    LocalOffset: {x: -3, y: 0, z: 2}
+    LocalOffset: {x: 0, y: 0, z: 0}
   PhaseProgressTransitions:
   - FromPhaseId: 1
     ToPhaseId: 2

@@ -119,6 +119,40 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void PreviewSession_TargetChangePreservesPlaybackTimeAndActiveGhosts()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+                session.EvaluateAt(0.2f);
+                session.Play();
+
+                float timeBefore = session.TimeSec;
+                int ghostsBefore = session.Frame.ActiveGhostCount;
+                var nextTarget = new Vector3(3f, 0f, -2f);
+
+                session.SetTargetWorldPosition(nextTarget);
+
+                Assert.That(session.Playing, Is.True);
+                Assert.That(session.TimeSec, Is.EqualTo(timeBefore));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(ghostsBefore));
+                Assert.That(session.Input.TargetWorldPosition, Is.EqualTo(nextTarget));
+
+                session.Step();
+                Assert.That(session.Playing, Is.True);
+                Assert.That(session.TimeSec, Is.GreaterThan(timeBefore));
+            }
+        }
+
+        [Test]
         public void PreviewSimulator_UsesRepeatScheduleAndInterval()
         {
             using (var setup = CreateActorSetup())
@@ -389,6 +423,56 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void WorkbenchPreviewProjection_RoundTripsAndSupportsViewInteractionMath()
+        {
+            var rect = new Rect(0f, 0f, 320f, 160f);
+            var center = new Vector2(2f, -1f);
+            const float halfHeight = 8f;
+            var world = new Vector3(4f, 0f, 3f);
+
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectWorldToPreview(
+                world,
+                center,
+                halfHeight,
+                rect,
+                out Vector2 preview), Is.True);
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectPreviewToWorld(
+                preview,
+                center,
+                halfHeight,
+                rect,
+                out Vector3 roundTrip), Is.True);
+            Assert.That(roundTrip.x, Is.EqualTo(world.x).Within(0.001f));
+            Assert.That(roundTrip.z, Is.EqualTo(world.z).Within(0.001f));
+
+            var panned = HazardActorWorkbenchPreviewElement.CalculatePannedCenter(
+                center,
+                halfHeight,
+                rect,
+                new Vector2(40f, -20f));
+            Assert.That(panned.x, Is.LessThan(center.x));
+            Assert.That(panned.y, Is.LessThan(center.y));
+
+            HazardActorWorkbenchPreviewElement.CalculateZoomAroundPoint(
+                preview,
+                center,
+                halfHeight,
+                rect,
+                0.5f,
+                out Vector2 zoomCenter,
+                out float zoomHalfHeight);
+            Assert.That(zoomHalfHeight, Is.EqualTo(4f).Within(0.001f));
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectPreviewToWorld(
+                preview,
+                zoomCenter,
+                zoomHalfHeight,
+                rect,
+                out Vector3 zoomRoundTrip), Is.True);
+            Assert.That(zoomRoundTrip.x, Is.EqualTo(world.x).Within(0.001f));
+            Assert.That(zoomRoundTrip.z, Is.EqualTo(world.z).Within(0.001f));
+        }
+
+        [Test]
         public void WorkbenchPreview_DefaultsToExactAndUsesDensityOnlyWhenExplicitlySelected()
         {
             var session = new HazardActorPreviewSession();
@@ -494,6 +578,78 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(window, Does.Not.Contain("Panel(\"Archetype Library\""));
             Assert.That(window, Does.Not.Contain("private ScrollView _library"));
             Assert.That(window, Does.Not.Contain("new UnityEditor.UIElements.ObjectField"));
+        }
+
+        [Test]
+        public void WorkbenchPreviewScope_FollowsSelectionWithoutManualScopeField()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                var actor = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForActor(setup.Root));
+                Assert.That(actor.Scope, Is.EqualTo(HazardActorPreviewScope.Actor));
+                Assert.That(actor.ForcedPhaseId, Is.EqualTo(0));
+                Assert.That(actor.ForcedPatternSlotId, Is.EqualTo(0));
+                Assert.That(actor.ShowSourceProgress, Is.True);
+                Assert.That(actor.PresentationLabel, Is.EqualTo("Actor"));
+
+                var phase = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForPhase(setup.Root, 2));
+                Assert.That(phase.Scope, Is.EqualTo(HazardActorPreviewScope.Actor));
+                Assert.That(phase.ForcedPhaseId, Is.EqualTo(2));
+                Assert.That(phase.ForcedPatternSlotId, Is.EqualTo(0));
+                Assert.That(phase.ShowSourceProgress, Is.False);
+                Assert.That(phase.PresentationLabel, Is.EqualTo("Phase 2"));
+
+                var transition = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForTransition(setup.Root, 1));
+                Assert.That(transition.Scope, Is.EqualTo(HazardActorPreviewScope.Actor));
+                Assert.That(transition.ForcedPhaseId, Is.EqualTo(1));
+                Assert.That(transition.ShowSourceProgress, Is.False);
+
+                var pattern = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForPattern(setup.Root, 2));
+                Assert.That(pattern.Scope, Is.EqualTo(HazardActorPreviewScope.Pattern));
+                Assert.That(pattern.ForcedPatternSlotId, Is.EqualTo(2));
+                Assert.That(pattern.ShowSourceProgress, Is.False);
+
+                var emission = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForEmissionProfile(setup.Root, 1, setup.ProfileA));
+                Assert.That(emission.Scope, Is.EqualTo(HazardActorPreviewScope.Pattern));
+                Assert.That(emission.ForcedPatternSlotId, Is.EqualTo(1));
+                Assert.That(emission.ShowSourceProgress, Is.False);
+
+                Assert.That(
+                    HazardActorWorkbenchWindow.BuildSelectionBreadcrumb(
+                        HazardActorWorkbenchSelection.ForEmissionProfile(setup.Root, 1, setup.ProfileA)),
+                    Does.Contain("Pattern 1 > Emission Profile"));
+            }
+        }
+
+        [Test]
+        public void WorkbenchVisibility_SeparatesEditColumnAndUsesIconCommandButtons()
+        {
+            string root = Directory.GetParent(Application.dataPath).FullName;
+            string window = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorWorkbenchWindow.cs"),
+                Encoding.UTF8);
+
+            Assert.That(window, Does.Not.Contain("EnumField(\"Scope\""));
+            Assert.That(window, Does.Not.Contain("_scopeField"));
+            Assert.That(window, Does.Not.Contain("text = \"Duplicate\""));
+            Assert.That(window, Does.Not.Contain("text = \"Up\""));
+            Assert.That(window, Does.Not.Contain("text = \"Down\""));
+            Assert.That(window, Does.Not.Contain("text = \"Remove\""));
+            Assert.That(window, Does.Contain("\"Edit\", \"Commands\""));
+            Assert.That(window, Does.Contain("EditButton(\"Transition\""));
+            Assert.That(window, Does.Contain("EditButton(\"Emission\""));
+            Assert.That(window, Does.Contain("EditButton(\"Telegraph\""));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.Duplicate"));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.MoveUp"));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.MoveDown"));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.Remove"));
+            Assert.That(window, Does.Contain("EditorGUIUtility.IconContent"));
+            Assert.That(window, Does.Contain("Advanced Preview Controls"));
         }
 
         [Test]
