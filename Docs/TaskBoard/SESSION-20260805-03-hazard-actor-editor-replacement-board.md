@@ -3,7 +3,7 @@
 ## Metadata
 - doc_id: `SESSION-20260805-03`
 - type: `SessionTaskBoard`
-- status: `planned`
+- status: `implemented`
 - last_updated: `2026-08-05`
 - related_docs:
   - [../TechnicalDesign/TD-035-hazard-actor-authoring-workbench-and-preview.md](../TechnicalDesign/TD-035-hazard-actor-authoring-workbench-and-preview.md)
@@ -25,27 +25,18 @@
 - Unity compile, Console error 0, 관련 EditMode와 기존 HazardActor PlayMode smoke를 통과한다.
 
 ## Now
-- 없음
+- [x] T0~T8 구현 감사 완료 후 editor-only 구현 착수
+  - 감사 결과: Workbench/Preview Core 타입 없음, `HazardActorAuthoring` 기본 Inspector raw array 경로 유지, `StageMapDocument`는 v2이며 source-local orchestration rule 배열 없음.
+  - 감사 결과: `StageMapEditorWindow`는 placement 편집과 Scene View overlay를 제공하지만 Encounter Track, rule selection/navigation, document-authoritative rule export는 미구현.
+  - 감사 결과: runtime HazardActor authoring/resolver/system 계약은 TD-031/TD-032 기준으로 유지 가능하며 이번 작업에서 변경하지 않는다.
+- [x] 구현/검증 완료
+  - EditMode full: 565/565 pass.
+  - PlayMode full: 46/46 pass.
+  - Preview steady step allocation: 0 byte assertion pass.
+  - MCP smoke: Workbench/Stage Map Editor menu open 성공, Scene View screenshot capture 성공.
 
 ## Next
-- [ ] T0. Legacy Inspector freeze
-  - 완료 기준: `HazardActorAuthoring` Inspector가 read-only 요약, validation, `Open Workbench`만 제공하고 공식 raw array 편집 경로가 제거된다.
-- [ ] T1. Workbench UI Toolkit shell
-  - 완료 기준: Archetype Library, Behavior/Preview surface, canonical selection, Contextual Inspector, Issue 영역과 session cleanup이 동작한다.
-- [ ] T2. Phase/Pattern canvas와 Profile 편집
-  - 완료 기준: Phase/transition/selector/pattern/timeline 편집, 구조 명령 Undo, 공유 profile 사용처와 `Duplicate & Assign`이 구현된다.
-- [ ] T3. Preview snapshot/simulator
-  - 완료 기준: 기존 resolver 기반 snapshot과 30Hz fixed-step Presence/Phase/Selector/Emit/movement simulation이 결정적으로 동작한다.
-- [ ] T4. Embedded/Scene View preview renderer
-  - 완료 기준: debug geometry와 가능한 inert ghost 외형, transport, cache, 1,024/4,096 cap, 집약 표시와 모든 Editor lifecycle cleanup이 구현된다.
-- [ ] T5. StageMapDocument orchestration schema/migration
-  - 완료 기준: schema version, source-local rule data, structured validation, TargetDefinition 명시적 migration, stale rejection과 document-authoritative export가 동작한다.
-- [ ] T6. Encounter Track
-  - 완료 기준: Stage Map Editor에서 rule marker와 다중 target fan-out을 편집하고 progress scrub으로 Spawn/PhaseSet/Retire를 재생한다.
-- [ ] T7. Validation/Issue navigation
-  - 완료 기준: actor/profile/phase/pattern/source/rule/placement issue가 Workbench, track, Scene View의 정확한 대상으로 이동한다.
-- [ ] T8. Migration·UX·성능·runtime 회귀 검증
-  - 완료 기준: 기존 content migration, GD-016 preview smoke, Undo/Redo, allocation/cap 측정, compile/Console/EditMode/PlayMode 결과가 기록된다.
+- 없음
 
 ## Blocked
 - 없음
@@ -58,3 +49,21 @@
 
 ## Done
 - [x] D0. 신규 editor의 SSOT, UI, preview, stage orchestration, migration, 성능 정책을 ADR-20260805-01과 TD-035로 고정했다.
+- [x] T0. Legacy Inspector freeze
+  - `HazardActorAuthoringEditor`가 read-only 요약/validation/Open Workbench만 제공한다.
+- [x] T1. Workbench UI Toolkit shell
+  - `HazardActorWorkbenchWindow`가 library, canvas, Contextual Inspector, Issue/Preview 영역과 canonical selection/session cleanup을 제공한다.
+- [x] T2. Phase/Pattern canvas와 Profile 편집
+  - 구조 명령, selector/transition/pattern edit, shared profile 사용처, `Open`, `Duplicate & Assign`, Undo/dirty 경로를 구현했다.
+- [x] T3. Preview snapshot/simulator
+  - resolver 기반 snapshot과 30Hz fixed-step Presence/Phase/Selector/Telegraph/Emit/Cooldown, Linear/DampedLinear/HomingLite, lifecycle trigger replay를 구현했다.
+- [x] T4. Embedded/Scene View preview renderer
+  - Workbench embedded preview와 Scene View preview가 `HazardActorPreviewCoordinator` active session을 공유하며 cap/30Hz/callback cleanup을 검증했다.
+- [x] T5. StageMapDocument orchestration schema/migration
+  - schema v3, source-local rule validation, explicit TargetDefinition import preview/apply/stale rejection, document-authoritative export를 구현했다.
+- [x] T6. Encounter Track
+  - source별 placement row, Spawn/PhaseSet/Retire marker, multi-target edit, common PhaseId picker, progress scrub composite preview를 구현했다.
+- [x] T7. Validation/Issue navigation
+  - Workbench issue selection과 StageMap source/rule/placement issue target navigation을 구현했다.
+- [x] T8. Migration·UX·성능·runtime 회귀 검증
+  - `smd_demo_1` schema v3 migration, targeted 58/58, EditMode 565/565, PlayMode 46/46, allocation 0 byte, MCP window/Scene View smoke를 기록했다.

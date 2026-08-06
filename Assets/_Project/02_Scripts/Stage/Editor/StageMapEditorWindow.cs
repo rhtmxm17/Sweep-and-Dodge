@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -21,6 +22,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private StageMapApplyPlan _applyPlan;
         private StageMapLegacyImportPlan _importPlan;
         private StageMapDocumentMigrationPlan _migrationPlan;
+        private StageMapHazardActorOrchestrationImportPlan _hazardOrchestrationImportPlan;
         private StageMapGridResizePlan _gridResizePlan;
         private StageGridSpec _pendingGrid;
         private readonly List<StageMapDocument> _projectDocuments = new List<StageMapDocument>(16);
@@ -31,6 +33,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private int _observedDocumentDirtyCount;
         private string _observedDocumentSignature = string.Empty;
         private Vector2Int _navigatorCell;
+        private float _encounterPreviewProgress;
 
         public StageMapDocument ActiveDocument => _document;
         public StageMapEditingSession Session => _session;
@@ -104,6 +107,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _applyPlan = null;
             _importPlan = null;
             _migrationPlan = null;
+            _hazardOrchestrationImportPlan = null;
             _gridResizePlan = null;
             _issues.Clear();
             _documentIssues.Clear();
@@ -388,6 +392,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 DrawSessionToolbar();
                 DrawSelectionNavigator();
                 DrawContextualInspector();
+                DrawEncounterTrack();
                 DrawIssues();
                 DrawImportPanel();
                 DrawDiff();
@@ -574,6 +579,16 @@ namespace SweepNDodge.DotsBullets.Editor
                     }
                 }
 
+                EditorGUILayout.LabelField("Hazard Rules", EditorStyles.miniBoldLabel);
+                var rules = _document.HazardActorOrchestrationRules ?? Array.Empty<StageMapHazardActorOrchestrationRuleData>();
+                for (int i = 0; i < rules.Length; i++)
+                {
+                    var rule = rules[i];
+                    string label = $"Source {rule.OwningSourceStableId} / Rule {rule.RuleId} / {rule.ActionType}";
+                    if (GUILayout.Button(label, EditorStyles.miniButton))
+                        TrySelect(StageMapSelection.ForHazardRule(rule.OwningSourceStableId, rule.RuleId), frame: false);
+                }
+
                 EditorGUILayout.LabelField("Presentation Links", EditorStyles.miniBoldLabel);
                 var links = _document.PresentationLinks ?? Array.Empty<StageMapPresentationLinkData>();
                 for (int i = 0; i < links.Length; i++)
@@ -654,6 +669,9 @@ namespace SweepNDodge.DotsBullets.Editor
                         break;
                     case StageMapInspectorSection.HazardActor:
                         DrawHazardActorInspector();
+                        break;
+                    case StageMapInspectorSection.HazardActorRule:
+                        DrawHazardActorRuleInspector();
                         break;
                     case StageMapInspectorSection.Presentation:
                         DrawPresentationLinkInspector();
@@ -870,6 +888,72 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
+        private void DrawHazardActorRuleInspector()
+        {
+            EditorGUILayout.LabelField("Hazard Actor Rule", EditorStyles.miniBoldLabel);
+            StageMapSelection identity = _session.Selection;
+            if (!StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                    _document,
+                    identity.OwningSourceStableId,
+                    identity.RuleId,
+                    out int index))
+            {
+                EditorGUILayout.HelpBox("Selected HazardActor rule identity is missing or ambiguous.", MessageType.Warning);
+                return;
+            }
+
+            var rule = _document.HazardActorOrchestrationRules[index];
+            int[] commonPhaseIds = StageMapHazardActorOrchestrationUtility.GetCommonPhaseIds(_document, rule);
+            using (new EditorGUI.DisabledScope(IsLayerLocked(StageMapEditorLayer.HazardActors)))
+            {
+                EditorGUI.BeginChangeCheck();
+                uint sourceId = DrawUIntField("Source Id", rule.OwningSourceStableId);
+                int ruleId = EditorGUILayout.IntField("Rule Id", rule.RuleId);
+                string targetCsv = EditorGUILayout.TextField("Target Placement Ids", JoinInts(rule.TargetPlacementInstanceIds));
+                var action = (HazardActorOrchestrationActionId)EditorGUILayout.EnumPopup("Action", rule.ActionType);
+                var trigger = (HazardActorOrchestrationTriggerId)EditorGUILayout.EnumPopup("Trigger", rule.TriggerType);
+                float threshold = EditorGUILayout.Slider("Progress", rule.TriggerThresholdNormalized, 0f, 1f);
+                int targetPhaseId = DrawPhaseIdField(rule.TargetPhaseId, commonPhaseIds);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    RecordAndApply(
+                        "Edit Stage Hazard Actor Rule",
+                        () => StageMapEditorMutationUtility.TryUpdateHazardRule(
+                            _session,
+                            identity,
+                            new StageMapHazardActorOrchestrationRuleData
+                            {
+                                OwningSourceStableId = sourceId,
+                                RuleId = Mathf.Max(1, ruleId),
+                                TargetPlacementInstanceIds = ParseInts(targetCsv),
+                                ActionType = action,
+                                TriggerType = trigger,
+                                TriggerThresholdNormalized = Mathf.Clamp01(threshold),
+                                TargetPhaseId = Mathf.Max(1, targetPhaseId),
+                            },
+                            out _));
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Duplicate Rule"))
+                    {
+                        RecordAndApply(
+                            "Duplicate Stage Hazard Actor Rule",
+                            () =>
+                            {
+                                bool changed = StageMapHazardActorOrchestrationUtility.DuplicateRule(_document, rule.OwningSourceStableId, rule.RuleId, out int newRuleId);
+                                if (changed)
+                                    _session.Select(StageMapSelection.ForHazardRule(rule.OwningSourceStableId, newRuleId));
+                                return changed;
+                            });
+                    }
+                    if (GUILayout.Button("Delete Rule"))
+                        RecordAndApply("Delete Stage Hazard Actor Rule", () => StageMapEditorMutationUtility.TryDeleteSelection(_session, out _));
+                }
+            }
+        }
+
         private void DrawPresentationLinkInspector()
         {
             EditorGUILayout.LabelField("Presentation Link", EditorStyles.miniBoldLabel);
@@ -923,6 +1007,267 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (GUILayout.Button("Delete Presentation Link"))
                     RecordAndApply("Delete Stage Presentation Link", () => StageMapEditorMutationUtility.TryDeleteSelection(_session, out _));
             }
+        }
+
+        private void DrawEncounterTrack()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Hazard Encounter", EditorStyles.boldLabel);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                uint sourceId = ResolveEncounterSourceId();
+                sourceId = DrawUIntField("Source Id", sourceId);
+                _session.HazardActorSourceStableId = sourceId;
+                _encounterPreviewProgress = EditorGUILayout.Slider("Progress", _encounterPreviewProgress, 0f, 1f);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Preview Import"))
+                        _hazardOrchestrationImportPlan = StageMapHazardActorOrchestrationUtility.BuildImportPreview(_document);
+                    using (new EditorGUI.DisabledScope(_hazardOrchestrationImportPlan == null || _hazardOrchestrationImportPlan.HasErrors || !_hazardOrchestrationImportPlan.HasChanges))
+                    {
+                        if (GUILayout.Button("Apply Import"))
+                        {
+                            if (!StageMapHazardActorOrchestrationUtility.TryApplyImport(_hazardOrchestrationImportPlan, false, out string error))
+                                EditorUtility.DisplayDialog("Import Hazard Orchestration", error, "OK");
+                            RefreshAfterDocumentMutation(markDirty: true);
+                        }
+                    }
+                }
+
+                if (_hazardOrchestrationImportPlan != null)
+                {
+                    EditorGUILayout.LabelField($"Import candidates: {_hazardOrchestrationImportPlan.CandidateRules.Count}, changes: {_hazardOrchestrationImportPlan.Changes.Count}", EditorStyles.miniLabel);
+                    for (int i = 0; i < _hazardOrchestrationImportPlan.Issues.Count; i++)
+                        EditorGUILayout.HelpBox(_hazardOrchestrationImportPlan.Issues[i].Message, MessageType.Error);
+                }
+
+                var placements = (_document.HazardActorPlacements ?? Array.Empty<StageMapHazardActorPlacementData>())
+                    .Where(x => x.OwningSourceStableId == sourceId)
+                    .OrderBy(x => x.PlacementInstanceId)
+                    .ToArray();
+                var rules = (_document.HazardActorOrchestrationRules ?? Array.Empty<StageMapHazardActorOrchestrationRuleData>())
+                    .Where(x => x.OwningSourceStableId == sourceId)
+                    .OrderBy(x => x.TriggerThresholdNormalized)
+                    .ThenBy(x => x.RuleId)
+                    .ToArray();
+
+                for (int i = 0; i < placements.Length; i++)
+                {
+                    var placement = placements[i];
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            if (GUILayout.Button($"Placement {placement.PlacementInstanceId}", EditorStyles.miniButtonLeft))
+                                TrySelect(StageMapSelection.ForHazard(sourceId, placement.PlacementInstanceId), frame: true);
+                            if (GUILayout.Button("Actor Preview", EditorStyles.miniButtonRight))
+                                BeginPlacementPreview(placement, HazardActorPreviewScope.Actor);
+                        }
+
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            if (GUILayout.Button("Spawn", EditorStyles.miniButton))
+                                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.Spawn);
+                            if (GUILayout.Button("PhaseSet", EditorStyles.miniButton))
+                                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.PhaseSet);
+                            if (GUILayout.Button("Retire", EditorStyles.miniButton))
+                                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.Retire);
+                        }
+
+                        for (int ruleIndex = 0; ruleIndex < rules.Length; ruleIndex++)
+                        {
+                            var rule = rules[ruleIndex];
+                            if (!ContainsTarget(rule.TargetPlacementInstanceIds, placement.PlacementInstanceId))
+                                continue;
+                            Rect row = EditorGUILayout.GetControlRect(false, 20f);
+                            float x = Mathf.Lerp(row.xMin + 80f, row.xMax - 16f, Mathf.Clamp01(rule.TriggerThresholdNormalized));
+                            EditorGUI.LabelField(new Rect(row.xMin, row.y, 76f, row.height), rule.ActionType.ToString(), EditorStyles.miniLabel);
+                            if (GUI.Button(new Rect(x - 6f, row.y + 2f, 12f, 16f), GUIContent.none))
+                                TrySelect(StageMapSelection.ForHazardRule(sourceId, rule.RuleId), frame: true);
+                            EditorGUI.LabelField(new Rect(x + 8f, row.y, row.xMax - x - 8f, row.height), $"Rule {rule.RuleId}", EditorStyles.miniLabel);
+                        }
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Encounter Preview"))
+                        BeginEncounterPreviewForSource(sourceId);
+                    if (GUILayout.Button("Step"))
+                    {
+                        HazardActorPreviewCoordinator.StepActiveSession();
+                        SceneView.RepaintAll();
+                    }
+                    if (GUILayout.Button("Restart"))
+                        BeginEncounterPreviewForSource(sourceId);
+                }
+            }
+        }
+
+        private void AddEncounterRule(uint sourceId, int placementId, HazardActorOrchestrationActionId action)
+        {
+            RecordAndApply(
+                $"Add Hazard Actor {action} Rule",
+                () =>
+                {
+                    bool changed = StageMapHazardActorOrchestrationUtility.AddRule(_document, sourceId, action, placementId, out int ruleId);
+                    if (changed)
+                        _session.Select(StageMapSelection.ForHazardRule(sourceId, ruleId));
+                    return changed;
+                });
+        }
+
+        private uint ResolveEncounterSourceId()
+        {
+            if (_session.Selection.Kind == StageMapSelectionKind.HazardActor || _session.Selection.Kind == StageMapSelectionKind.HazardActorRule)
+                return _session.Selection.OwningSourceStableId;
+            if (_session.HazardActorSourceStableId > 0u)
+                return _session.HazardActorSourceStableId;
+            var sources = _document.SourceRegions ?? Array.Empty<StageMapRegionData>();
+            for (int i = 0; i < sources.Length; i++)
+            {
+                if (sources[i].Active && sources[i].StableId > 0u)
+                    return sources[i].StableId;
+            }
+            return 1u;
+        }
+
+        private void BeginPlacementPreview(StageMapHazardActorPlacementData placement, HazardActorPreviewScope scope)
+        {
+            if (placement.ActorArchetypePrefab == null)
+                return;
+            HazardActorPreviewSnapshotBuilder.TryBuild(placement.ActorArchetypePrefab, out var snapshot);
+            if (!StageMapSelectionUtility.TryFindUniqueHazardIndex(_document.HazardActorPlacements, placement.OwningSourceStableId, placement.PlacementInstanceId, out int hazardIndex))
+                return;
+            Vector3 world = StageMapSelectionUtility.GetHazardActorWorld(_document, hazardIndex);
+            var session = new HazardActorPreviewSession();
+            session.Load(snapshot, new HazardActorPreviewInput
+            {
+                Scope = scope,
+                SourceProgress01 = _encounterPreviewProgress,
+                ActorWorldPosition = world,
+                ActorYawDeg = placement.LocalYawDeg,
+                TargetWorldPosition = StageMapSelectionUtility.GetPlayerStartWorld(_document),
+                SpawnAtStart = true,
+            });
+            session.Play();
+            HazardActorPreviewCoordinator.SetActiveSession(session);
+            SceneView.RepaintAll();
+        }
+
+        public bool BeginEncounterPreviewForSource(uint sourceId)
+        {
+            var placements = _document.HazardActorPlacements ?? Array.Empty<StageMapHazardActorPlacementData>();
+            int matchingCount = placements.Count(x => x.OwningSourceStableId == sourceId && x.ActorArchetypePrefab != null);
+            if (matchingCount <= 0)
+                return false;
+
+            int capPerActor = Mathf.Max(1, HazardActorPreviewSession.EncounterGhostCap / matchingCount);
+            var encounter = new HazardActorEncounterPreviewSession();
+            for (int i = 0; i < placements.Length; i++)
+            {
+                if (placements[i].OwningSourceStableId != sourceId || placements[i].ActorArchetypePrefab == null)
+                    continue;
+                if (!TryBuildEncounterPreviewInput(placements[i], capPerActor, out var input))
+                    continue;
+                if (!HazardActorPreviewSnapshotBuilder.TryBuild(placements[i].ActorArchetypePrefab, out var snapshot))
+                    continue;
+                encounter.AddActor(snapshot, input);
+            }
+
+            if (encounter.ActiveActorCount <= 0)
+            {
+                encounter.Dispose();
+                return false;
+            }
+
+            encounter.Play();
+            HazardActorPreviewCoordinator.SetActiveEncounterSession(encounter);
+            SceneView.RepaintAll();
+            return true;
+        }
+
+        private bool TryBuildEncounterPreviewInput(
+            StageMapHazardActorPlacementData placement,
+            int capPerActor,
+            out HazardActorPreviewInput input)
+        {
+            input = default;
+            if (!StageMapSelectionUtility.TryFindUniqueHazardIndex(
+                    _document.HazardActorPlacements,
+                    placement.OwningSourceStableId,
+                    placement.PlacementInstanceId,
+                    out int hazardIndex))
+            {
+                return false;
+            }
+
+            bool hasRuleForPlacement = false;
+            bool spawned = false;
+            bool retired = false;
+            int forcedPhaseId = 0;
+            var rules = (_document.HazardActorOrchestrationRules ?? Array.Empty<StageMapHazardActorOrchestrationRuleData>())
+                .Where(x => x.OwningSourceStableId == placement.OwningSourceStableId)
+                .OrderBy(x => x.TriggerThresholdNormalized)
+                .ThenBy(x => x.RuleId);
+            foreach (var rule in rules)
+            {
+                if (!ContainsTarget(rule.TargetPlacementInstanceIds, placement.PlacementInstanceId))
+                    continue;
+                hasRuleForPlacement = true;
+                if (!IsEncounterRuleTriggered(rule, _encounterPreviewProgress))
+                    continue;
+
+                switch (rule.ActionType)
+                {
+                    case HazardActorOrchestrationActionId.Spawn:
+                        spawned = true;
+                        retired = false;
+                        break;
+                    case HazardActorOrchestrationActionId.PhaseSet:
+                        forcedPhaseId = Math.Max(0, rule.TargetPhaseId);
+                        break;
+                    case HazardActorOrchestrationActionId.Retire:
+                        retired = true;
+                        break;
+                }
+            }
+
+            if (hasRuleForPlacement && (!spawned || retired))
+                return false;
+
+            Vector3 world = StageMapSelectionUtility.GetHazardActorWorld(_document, hazardIndex);
+            input = new HazardActorPreviewInput
+            {
+                Scope = HazardActorPreviewScope.Encounter,
+                ForcedPhaseId = forcedPhaseId,
+                GhostCapOverride = capPerActor,
+                SourceProgress01 = _encounterPreviewProgress,
+                ActorWorldPosition = world,
+                ActorYawDeg = placement.LocalYawDeg,
+                TargetWorldPosition = StageMapSelectionUtility.GetPlayerStartWorld(_document),
+                SpawnAtStart = !hasRuleForPlacement || spawned,
+            };
+            return true;
+        }
+
+        private static bool IsEncounterRuleTriggered(StageMapHazardActorOrchestrationRuleData rule, float progress01)
+        {
+            return rule.TriggerType == HazardActorOrchestrationTriggerId.OnStageStart
+                || progress01 >= Mathf.Clamp01(rule.TriggerThresholdNormalized);
+        }
+
+        private static bool ContainsTarget(int[] targets, int placementId)
+        {
+            if (targets == null)
+                return false;
+            for (int i = 0; i < targets.Length; i++)
+            {
+                if (targets[i] == placementId)
+                    return true;
+            }
+            return false;
         }
 
         private void DrawIssues()
@@ -1553,6 +1898,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _applyPlan = null;
             _importPlan = null;
             _migrationPlan = null;
+            _hazardOrchestrationImportPlan = null;
             _gridResizePlan = null;
             _pendingGrid = _document.Grid;
             ClampSelection();
@@ -1741,6 +2087,41 @@ namespace SweepNDodge.DotsBullets.Editor
             if (next >= uint.MaxValue)
                 return uint.MaxValue;
             return (uint)next;
+        }
+
+        private static int DrawPhaseIdField(int current, int[] commonPhaseIds)
+        {
+            if (commonPhaseIds == null || commonPhaseIds.Length == 0)
+                return EditorGUILayout.IntField("Target Phase Id", current);
+
+            string[] labels = commonPhaseIds.Select(x => x.ToString()).ToArray();
+            int selected = Array.IndexOf(commonPhaseIds, current);
+            if (selected < 0)
+            {
+                EditorGUILayout.HelpBox($"Current TargetPhaseId {current} is not common to all selected target archetypes.", MessageType.Error);
+                return EditorGUILayout.IntField("Target Phase Id", current);
+            }
+            int next = EditorGUILayout.Popup("Target Phase Id", selected, labels);
+            return commonPhaseIds[Mathf.Clamp(next, 0, commonPhaseIds.Length - 1)];
+        }
+
+        private static string JoinInts(int[] values)
+        {
+            return values == null || values.Length == 0 ? string.Empty : string.Join(",", values);
+        }
+
+        private static int[] ParseInts(string csv)
+        {
+            if (string.IsNullOrWhiteSpace(csv))
+                return Array.Empty<int>();
+            string[] parts = csv.Split(',');
+            var values = new List<int>(parts.Length);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (int.TryParse(parts[i].Trim(), out int value) && value > 0)
+                    values.Add(value);
+            }
+            return values.ToArray();
         }
     }
 }

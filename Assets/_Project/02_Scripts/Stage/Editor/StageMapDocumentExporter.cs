@@ -148,6 +148,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var sourceIds = CollectSourceStableIds(document.SourceRegions);
             var hazardBySource = BuildHazardsBySource(document.HazardActorPlacements);
+            var rulesBySource = BuildOrchestrationRulesBySource(document.HazardActorOrchestrationRules);
             var bindings = new List<StageSourceBinding>(sourceIds.Count);
             for (int i = 0; i < sourceIds.Count; i++)
             {
@@ -160,8 +161,9 @@ namespace SweepNDodge.DotsBullets.Editor
                 binding.HazardActorPlacements = hazardBySource.TryGetValue(stableId, out var placements)
                     ? placements
                     : Array.Empty<HazardActorPlacementBinding>();
-                if (binding.HazardActorOrchestrationRules == null)
-                    binding.HazardActorOrchestrationRules = Array.Empty<HazardActorOrchestrationRuleBinding>();
+                binding.HazardActorOrchestrationRules = rulesBySource.TryGetValue(stableId, out var rules)
+                    ? rules
+                    : Array.Empty<HazardActorOrchestrationRuleBinding>();
                 if (binding.SustainSlots == null)
                     binding.SustainSlots = Array.Empty<SustainSlotBinding>();
                 if (binding.EventSlots == null)
@@ -221,6 +223,44 @@ namespace SweepNDodge.DotsBullets.Editor
             return grouped.ToDictionary(
                 pair => pair.Key,
                 pair => pair.Value.OrderBy(x => x.PlacementInstanceId).ToArray());
+        }
+
+        private static Dictionary<uint, HazardActorOrchestrationRuleBinding[]> BuildOrchestrationRulesBySource(StageMapHazardActorOrchestrationRuleData[] rules)
+        {
+            var grouped = new Dictionary<uint, List<HazardActorOrchestrationRuleBinding>>();
+            if (rules != null)
+            {
+                for (int i = 0; i < rules.Length; i++)
+                {
+                    var rule = rules[i];
+                    if (rule.OwningSourceStableId == 0u || rule.RuleId <= 0)
+                        continue;
+
+                    if (!grouped.TryGetValue(rule.OwningSourceStableId, out var list))
+                    {
+                        list = new List<HazardActorOrchestrationRuleBinding>();
+                        grouped.Add(rule.OwningSourceStableId, list);
+                    }
+
+                    list.Add(new HazardActorOrchestrationRuleBinding
+                    {
+                        RuleId = rule.RuleId,
+                        TargetPlacementInstanceIds = rule.TargetPlacementInstanceIds != null
+                            ? (int[])rule.TargetPlacementInstanceIds.Clone()
+                            : Array.Empty<int>(),
+                        ActionType = rule.ActionType,
+                        TriggerType = rule.TriggerType,
+                        TriggerThresholdNormalized = Mathf.Clamp01(rule.TriggerThresholdNormalized),
+                        TargetPhaseId = rule.ActionType == HazardActorOrchestrationActionId.PhaseSet
+                            ? Mathf.Max(1, rule.TargetPhaseId)
+                            : rule.TargetPhaseId,
+                    });
+                }
+            }
+
+            return grouped.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value.OrderBy(x => x.RuleId).ToArray());
         }
 
         private static StageSourceBinding CreateDefaultBinding(uint stableId)

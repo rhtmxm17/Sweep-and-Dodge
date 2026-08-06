@@ -23,6 +23,18 @@ namespace SweepNDodge.DotsBullets.Editor
     }
 
     [Serializable]
+    public struct StageMapHazardActorOrchestrationRuleData
+    {
+        [Min(1)] public uint OwningSourceStableId;
+        [Min(1)] public int RuleId;
+        public int[] TargetPlacementInstanceIds;
+        public HazardActorOrchestrationActionId ActionType;
+        public HazardActorOrchestrationTriggerId TriggerType;
+        [Range(0f, 1f)] public float TriggerThresholdNormalized;
+        [Min(1)] public int TargetPhaseId;
+    }
+
+    [Serializable]
     public struct StageMapPresentationLinkData
     {
         [Min(1)] public uint StableId;
@@ -43,7 +55,7 @@ namespace SweepNDodge.DotsBullets.Editor
     [CreateAssetMenu(menuName = "SweepNDodge/Stage Map Editor/Stage Map Document", fileName = "smd_")]
     public sealed class StageMapDocument : ScriptableObject
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         [Min(1)] public int SchemaVersion = CurrentSchemaVersion;
         [Min(1)] public int StageId = 1;
@@ -58,6 +70,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public StageMapRegionData[] DepositRegions = Array.Empty<StageMapRegionData>();
         public StagePlayerStartLayoutData PlayerStart;
         public StageMapHazardActorPlacementData[] HazardActorPlacements = Array.Empty<StageMapHazardActorPlacementData>();
+        public StageMapHazardActorOrchestrationRuleData[] HazardActorOrchestrationRules = Array.Empty<StageMapHazardActorOrchestrationRuleData>();
         public StageMapPresentationLinkData[] PresentationLinks = Array.Empty<StageMapPresentationLinkData>();
 
         [Header("Generated Runtime Assets")]

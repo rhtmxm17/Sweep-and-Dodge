@@ -70,7 +70,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     changes);
             }
 
-            if (sourceVersion != 1)
+            if (sourceVersion != 1 && sourceVersion != 2)
             {
                 issues.Add(new ContentValidationIssue(
                     ContentValidationSeverity.Error,
@@ -87,8 +87,12 @@ namespace SweepNDodge.DotsBullets.Editor
                     changes);
             }
 
-            StagePresentationCatalogSO presentationCatalog = ResolvePresentationCatalogCandidate(document, location, issues);
-            string appliedEntryKey = ResolveAppliedEntryIdentity(document, location, issues);
+            StagePresentationCatalogSO presentationCatalog = sourceVersion == 1
+                ? ResolvePresentationCatalogCandidate(document, location, issues)
+                : document.PresentationCatalog;
+            string appliedEntryKey = sourceVersion == 1
+                ? ResolveAppliedEntryIdentity(document, location, issues)
+                : document.LastAppliedCatalogEntryKey;
             if (presentationCatalog != null)
             {
                 changes.Add(new StageMapApplyPlanChange(
@@ -147,7 +151,7 @@ namespace SweepNDodge.DotsBullets.Editor
             if (!plan.HasChanges)
                 return true;
 
-            if (plan.SourceVersion != 1 || plan.TargetVersion != StageMapDocument.CurrentSchemaVersion)
+            if ((plan.SourceVersion != 1 && plan.SourceVersion != 2) || plan.TargetVersion != StageMapDocument.CurrentSchemaVersion)
             {
                 error = "StageMapDocument migration version is no longer supported.";
                 return false;

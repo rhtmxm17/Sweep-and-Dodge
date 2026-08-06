@@ -19,6 +19,7 @@ namespace SweepNDodge.DotsBullets.Editor
         TargetDefinition = 10,
         TargetCatalog = 11,
         PresentationCatalog = 12,
+        HazardActorRule = 13,
     }
 
     public readonly struct StageMapIssueTarget
@@ -29,6 +30,7 @@ namespace SweepNDodge.DotsBullets.Editor
             uint stableId,
             uint owningSourceStableId,
             int placementInstanceId,
+            int ruleId,
             bool hasCell,
             Vector2Int cell,
             string fixId,
@@ -39,6 +41,7 @@ namespace SweepNDodge.DotsBullets.Editor
             StableId = stableId;
             OwningSourceStableId = owningSourceStableId;
             PlacementInstanceId = placementInstanceId;
+            RuleId = ruleId;
             HasCell = hasCell;
             Cell = cell;
             FixId = fixId ?? string.Empty;
@@ -50,6 +53,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public uint StableId { get; }
         public uint OwningSourceStableId { get; }
         public int PlacementInstanceId { get; }
+        public int RuleId { get; }
         public bool HasCell { get; }
         public Vector2Int Cell { get; }
         public string FixId { get; }
@@ -107,6 +111,26 @@ namespace SweepNDodge.DotsBullets.Editor
                     0u,
                     placement.OwningSourceStableId,
                     placement.PlacementInstanceId,
+                    false,
+                    default,
+                    fixId,
+                    null);
+            }
+
+            if (TryParseArrayIndex(issue.Location, "/HazardActorOrchestrationRules[", out int ruleIndex))
+            {
+                var rule = document.HazardActorOrchestrationRules != null
+                    && ruleIndex >= 0
+                    && ruleIndex < document.HazardActorOrchestrationRules.Length
+                    ? document.HazardActorOrchestrationRules[ruleIndex]
+                    : default;
+                return Target(
+                    StageMapIssueTargetKind.HazardActorRule,
+                    ruleIndex,
+                    0u,
+                    rule.OwningSourceStableId,
+                    0,
+                    rule.RuleId,
                     false,
                     default,
                     fixId,
@@ -188,6 +212,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 stableId,
                 owningSourceStableId,
                 placementInstanceId,
+                0,
                 hasCell,
                 cell,
                 fixId,
@@ -204,6 +229,31 @@ namespace SweepNDodge.DotsBullets.Editor
             UnityEngine.Object asset)
         {
             return Target(kind, index, stableId, 0u, 0, hasCell, cell, fixId, asset);
+        }
+
+        private static StageMapIssueTarget Target(
+            StageMapIssueTargetKind kind,
+            int index,
+            uint stableId,
+            uint owningSourceStableId,
+            int placementInstanceId,
+            int ruleId,
+            bool hasCell,
+            Vector2Int cell,
+            string fixId,
+            UnityEngine.Object asset)
+        {
+            return new StageMapIssueTarget(
+                kind,
+                index,
+                stableId,
+                owningSourceStableId,
+                placementInstanceId,
+                ruleId,
+                hasCell,
+                cell,
+                fixId,
+                asset);
         }
 
         private static StageMapRegionData GetRegion(StageMapRegionData[] regions, int index)
@@ -303,6 +353,29 @@ namespace SweepNDodge.DotsBullets.Editor
                         return false;
                     selection = StageMapSelection.ForHazard(ownerStableId, placementInstanceId);
                     worldPosition = StageMapSelectionUtility.GetHazardActorWorld(document, hazardIndex);
+                    return true;
+                case StageMapIssueTargetKind.HazardActorRule:
+                    uint ruleOwnerStableId = target.OwningSourceStableId;
+                    int ruleId = target.RuleId;
+                    if ((ruleOwnerStableId == 0u || ruleId <= 0)
+                        && document.HazardActorOrchestrationRules != null
+                        && target.ArrayIndex >= 0
+                        && target.ArrayIndex < document.HazardActorOrchestrationRules.Length)
+                    {
+                        var fallback = document.HazardActorOrchestrationRules[target.ArrayIndex];
+                        ruleOwnerStableId = fallback.OwningSourceStableId;
+                        ruleId = fallback.RuleId;
+                    }
+                    if (!StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                            document,
+                            ruleOwnerStableId,
+                            ruleId,
+                            out int ruleIndex))
+                    {
+                        return false;
+                    }
+                    selection = StageMapSelection.ForHazardRule(ruleOwnerStableId, ruleId);
+                    worldPosition = StageMapSelectionUtility.GetHazardRuleWorld(document, document.HazardActorOrchestrationRules[ruleIndex]);
                     return true;
                 case StageMapIssueTargetKind.Presentation:
                     if (!StageMapSelectionUtility.TryFindUniquePresentationIndex(

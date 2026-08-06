@@ -288,7 +288,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Assert.That(preserved.ThresholdDepleted, Is.EqualTo(22));
                     Assert.That(preserved.SustainSlots.Length, Is.EqualTo(1));
                     Assert.That(preserved.EventSlots.Length, Is.EqualTo(1));
-                    Assert.That(preserved.HazardActorOrchestrationRules.Length, Is.EqualTo(1));
+                    Assert.That(preserved.HazardActorOrchestrationRules, Is.Empty);
                 }
                 finally
                 {
@@ -300,6 +300,102 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void DefinitionSnapshot_ExportsDocumentOwnedHazardActorRules()
+        {
+            var setup = CreateValidSetup();
+            try
+            {
+                setup.Document.HazardActorOrchestrationRules = new[]
+                {
+                    new StageMapHazardActorOrchestrationRuleData
+                    {
+                        OwningSourceStableId = 100u,
+                        RuleId = 7,
+                        TargetPlacementInstanceIds = new[] { 1, 2 },
+                        ActionType = HazardActorOrchestrationActionId.PhaseSet,
+                        TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                        TriggerThresholdNormalized = 0.75f,
+                        TargetPhaseId = 2,
+                    }
+                };
+
+                var snapshot = StageMapDocumentExporter.BuildDefinitionSnapshot(setup.Document);
+                try
+                {
+                    var rule = snapshot.SourceBindings.Single(x => x.SourceStableId == 100u).HazardActorOrchestrationRules.Single();
+                    Assert.That(rule.RuleId, Is.EqualTo(7));
+                    Assert.That(rule.TargetPlacementInstanceIds, Is.EqualTo(new[] { 1, 2 }));
+                    Assert.That(rule.ActionType, Is.EqualTo(HazardActorOrchestrationActionId.PhaseSet));
+                    Assert.That(rule.TriggerType, Is.EqualTo(HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove));
+                    Assert.That(rule.TriggerThresholdNormalized, Is.EqualTo(0.75f));
+                    Assert.That(rule.TargetPhaseId, Is.EqualTo(2));
+                }
+                finally
+                {
+                    Object.DestroyImmediate(snapshot);
+                }
+            }
+            finally
+            {
+                setup.Dispose();
+            }
+        }
+
+        [Test]
+        public void TargetDefinitionOrchestrationImport_RequiresPreviewAndRejectsStaleApply()
+        {
+            var setup = CreateValidSetup();
+            var prefab = new GameObject("HazardActorPrefab");
+            try
+            {
+                setup.Document.HazardActorPlacements = new[]
+                {
+                    new StageMapHazardActorPlacementData
+                    {
+                        OwningSourceStableId = 100u,
+                        PlacementInstanceId = 1,
+                        ActorArchetypePrefab = prefab,
+                    }
+                };
+                setup.Definition.SourceBindings = new[]
+                {
+                    new StageSourceBinding
+                    {
+                        SourceStableId = 100u,
+                        HazardActorOrchestrationRules = new[]
+                        {
+                            new HazardActorOrchestrationRuleBinding
+                            {
+                                RuleId = 3,
+                                TargetPlacementInstanceIds = new[] { 1 },
+                                ActionType = HazardActorOrchestrationActionId.Spawn,
+                                TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                                TargetPhaseId = 1,
+                            }
+                        },
+                    }
+                };
+
+                var plan = StageMapHazardActorOrchestrationUtility.BuildImportPreview(setup.Document);
+                Assert.That(plan.HasErrors, Is.False);
+                Assert.That(plan.CandidateRules.ToArray().Length, Is.EqualTo(1));
+
+                setup.Document.StageTimeLimitSec += 1f;
+                Assert.That(StageMapHazardActorOrchestrationUtility.TryApplyImport(plan, false, out string staleError), Is.False);
+                Assert.That(staleError, Does.Contain("changed after orchestration import preview"));
+
+                plan = StageMapHazardActorOrchestrationUtility.BuildImportPreview(setup.Document);
+                Assert.That(StageMapHazardActorOrchestrationUtility.TryApplyImport(plan, false, out string error), Is.True, error);
+                Assert.That(setup.Document.HazardActorOrchestrationRules.Single().RuleId, Is.EqualTo(3));
+            }
+            finally
+            {
+                Object.DestroyImmediate(prefab);
                 setup.Dispose();
             }
         }

@@ -172,6 +172,9 @@ namespace SweepNDodge.DotsBullets.Editor
                 snapshot.DepositRegions = ToMapRegions(layout.DepositRegions);
                 snapshot.PlayerStart = layout.PlayerStart;
                 snapshot.HazardActorPlacements = CollectHazardPlacements(sourceStage, issues);
+                snapshot.HazardActorOrchestrationRules = existingDocument != null && existingDocument.HazardActorOrchestrationRules != null
+                    ? (StageMapHazardActorOrchestrationRuleData[])existingDocument.HazardActorOrchestrationRules.Clone()
+                    : Array.Empty<StageMapHazardActorOrchestrationRuleData>();
                 snapshot.PresentationLinks = ToMapPresentationLinks(layout.Presentations);
 
                 var root = sourceStage.GetComponentInParent<StageLayoutRootMarker>();
@@ -263,6 +266,7 @@ namespace SweepNDodge.DotsBullets.Editor
             target.DepositRegions = source.DepositRegions != null ? (StageMapRegionData[])source.DepositRegions.Clone() : Array.Empty<StageMapRegionData>();
             target.PlayerStart = source.PlayerStart;
             target.HazardActorPlacements = source.HazardActorPlacements != null ? (StageMapHazardActorPlacementData[])source.HazardActorPlacements.Clone() : Array.Empty<StageMapHazardActorPlacementData>();
+            target.HazardActorOrchestrationRules = source.HazardActorOrchestrationRules != null ? (StageMapHazardActorOrchestrationRuleData[])source.HazardActorOrchestrationRules.Clone() : Array.Empty<StageMapHazardActorOrchestrationRuleData>();
             target.PresentationLinks = source.PresentationLinks != null ? (StageMapPresentationLinkData[])source.PresentationLinks.Clone() : Array.Empty<StageMapPresentationLinkData>();
             target.TargetLayout = source.TargetLayout;
             target.TargetDefinition = source.TargetDefinition;
@@ -296,6 +300,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 changes.Add(new StageMapApplyPlanChange(StageMapApplyChangeKind.Update, "StageMapDocument", nameof(StageMapDocument.PlayerStart), "Update PlayerStart from legacy marker."));
             if (!JsonEqual(current.HazardActorPlacements, imported.HazardActorPlacements))
                 changes.Add(new StageMapApplyPlanChange(StageMapApplyChangeKind.Update, "StageMapDocument", nameof(StageMapDocument.HazardActorPlacements), "Update HazardActor placements from legacy markers."));
+            if (!JsonEqual(current.HazardActorOrchestrationRules, imported.HazardActorOrchestrationRules))
+                changes.Add(new StageMapApplyPlanChange(StageMapApplyChangeKind.Update, "StageMapDocument", nameof(StageMapDocument.HazardActorOrchestrationRules), "Preserve document-owned HazardActor orchestration rules."));
             if (!JsonEqual(current.PresentationLinks, imported.PresentationLinks))
                 changes.Add(new StageMapApplyPlanChange(StageMapApplyChangeKind.Update, "StageMapDocument", nameof(StageMapDocument.PresentationLinks), "Update presentation links from legacy markers."));
             if (current.TargetLayout != imported.TargetLayout

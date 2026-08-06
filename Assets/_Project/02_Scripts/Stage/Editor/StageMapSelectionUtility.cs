@@ -80,6 +80,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 case StageMapSelectionKind.PlayerStart:
                     return IsUnlocked(session, StageMapEditorLayer.PlayerStart, out lockedLayer);
                 case StageMapSelectionKind.HazardActor:
+                case StageMapSelectionKind.HazardActorRule:
                     return IsUnlocked(session, StageMapEditorLayer.HazardActors, out lockedLayer);
                 case StageMapSelectionKind.Presentation:
                     return IsUnlocked(session, StageMapEditorLayer.Presentations, out lockedLayer);
@@ -110,6 +111,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 case StageMapSelectionKind.PlayerStart:
                     return IsLayerVisible(session, StageMapEditorLayer.PlayerStart);
                 case StageMapSelectionKind.HazardActor:
+                case StageMapSelectionKind.HazardActorRule:
                     return IsLayerVisible(session, StageMapEditorLayer.HazardActors);
                 case StageMapSelectionKind.Presentation:
                     return IsLayerVisible(session, StageMapEditorLayer.Presentations);
@@ -129,6 +131,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 case StageMapSelectionKind.DepositAnchor: return StageMapEditorLayer.Anchors;
                 case StageMapSelectionKind.PlayerStart: return StageMapEditorLayer.PlayerStart;
                 case StageMapSelectionKind.HazardActor: return StageMapEditorLayer.HazardActors;
+                case StageMapSelectionKind.HazardActorRule: return StageMapEditorLayer.HazardActors;
                 case StageMapSelectionKind.Presentation: return StageMapEditorLayer.Presentations;
                 default: return StageMapEditorLayer.Grid;
             }
@@ -263,6 +266,17 @@ namespace SweepNDodge.DotsBullets.Editor
                     }
                     worldPosition = GetHazardActorWorld(document, hazardIndex);
                     return true;
+                case StageMapSelectionKind.HazardActorRule:
+                    if (!StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                            document,
+                            selection.OwningSourceStableId,
+                            selection.RuleId,
+                            out int ruleIndex))
+                    {
+                        return false;
+                    }
+                    worldPosition = GetHazardRuleWorld(document, document.HazardActorOrchestrationRules[ruleIndex]);
+                    return true;
                 case StageMapSelectionKind.Presentation:
                     if (!TryFindUniquePresentationIndex(document.PresentationLinks, selection.StableId, out int presentationIndex))
                         return false;
@@ -292,6 +306,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 case StageMapSelectionKind.PlayerStart: return "PlayerStart";
                 case StageMapSelectionKind.HazardActor:
                     return $"Source {selection.OwningSourceStableId} / Placement {selection.PlacementInstanceId}";
+                case StageMapSelectionKind.HazardActorRule:
+                    return $"Source {selection.OwningSourceStableId} / Rule {selection.RuleId}";
                 case StageMapSelectionKind.Presentation:
                     if (document != null
                         && TryFindUniquePresentationIndex(document.PresentationLinks, selection.StableId, out int index))
@@ -345,6 +361,22 @@ namespace SweepNDodge.DotsBullets.Editor
             var placement = document.HazardActorPlacements[index];
             return GetRegionAnchorWorld(document, StageRegionKind.Source, placement.OwningSourceStableId)
                 + placement.SourceLocalOffset;
+        }
+
+        public static Vector3 GetHazardRuleWorld(StageMapDocument document, StageMapHazardActorOrchestrationRuleData rule)
+        {
+            var targets = rule.TargetPlacementInstanceIds ?? Array.Empty<int>();
+            if (targets.Length > 0
+                && StageMapHazardActorOrchestrationUtility.TryFindPlacement(
+                    document,
+                    rule.OwningSourceStableId,
+                    targets[0],
+                    out _)
+                && TryFindUniqueHazardIndex(document.HazardActorPlacements, rule.OwningSourceStableId, targets[0], out int hazardIndex))
+            {
+                return GetHazardActorWorld(document, hazardIndex);
+            }
+            return GetRegionAnchorWorld(document, StageRegionKind.Source, rule.OwningSourceStableId);
         }
 
         public static Vector3 GetPresentationWorld(StageMapDocument document, int index)

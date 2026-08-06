@@ -4,7 +4,7 @@
 ## Metadata
 - doc_id: `TD-035`
 - type: `TechnicalDesign`
-- status: `planned`
+- status: `implemented`
 - last_updated: `2026-08-05`
 - related_docs:
   - [../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md](../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md)
@@ -296,3 +296,20 @@
 - Unity compile 성공과 Console error 0을 확인한다.
 - 관련 EditMode 테스트와 기존 HazardActor PlayMode smoke를 통과한다.
 - runtime component, baker output, update order, discrete emit producer 계약에 의도하지 않은 변경이 없어야 한다.
+
+## 10. 2026-08-05 구현 / 검증 결과
+- T0: `HazardActorAuthoringEditor`를 추가해 기본 Inspector를 read-only summary, validation, `Open HazardActor Workbench` 진입점으로 제한했다.
+- T1~T2: `HazardActorWorkbenchWindow`와 command utility를 추가해 Actor/Phase/Transition/Pattern/Profile canonical selection, Contextual Inspector, 구조 명령, shared profile 사용처, `Open`, `Duplicate & Assign`, Undo/dirty 경로를 구현했다.
+- T3: `HazardActorPreviewSnapshotBuilder`와 `HazardActorPreviewSession`이 기존 authoring resolver/profile resolver 결과를 사용하며 30Hz fixed-step Presence/Phase/Selector/Telegraph/Emit/Cooldown, Linear/DampedLinear/HomingLite, MotionCompleted depth 3, manual CleanupRemoved를 재생한다.
+- T4: Workbench embedded preview와 Scene View preview는 `HazardActorPreviewCoordinator`의 active session을 공유한다. Actor cap 1,024, Encounter cap 4,096, branch sample 16, 30Hz update owner, callback cleanup을 editor-only로 구현했다.
+- T5: `StageMapDocument` schema v3에 source-local `StageMapHazardActorOrchestrationRuleData[]`를 추가했다. TargetDefinition rule import는 preview/diff/apply 전용이며 stale/missing/ambiguous identity를 거부하고, exporter는 document rule을 authoritative하게 기록한다.
+- T6: Stage Map Editor `Hazard Encounter` track에서 source별 placement row, Spawn/PhaseSet/Retire marker, multi-target target id edit, common PhaseId picker, duplicate/move/delete, progress scrub preview를 document pose 기준으로 연결했다.
+- T7: actor/workbench issue와 StageMap source/rule/placement issue target mapping을 canonical selection과 Scene View navigation으로 확장했다.
+- T8: `smd_demo_1` actual document를 schema v3로 명시 migration하고 기존 `sd_demo_1` source rule을 document-owned rule로 반영했다. Runtime ECS component, baker, owner, update order, Fence 규칙은 변경하지 않았다.
+
+검증 결과:
+- EditMode targeted Workbench/StageMap suite: 58/58 pass.
+- EditMode full: 565/565 pass.
+- PlayMode full: 46/46 pass. 첫 전체 실행에서 pause intervention smoke 1건이 실패했으나 단독 재실행 1/1 pass, 이후 전체 재실행 46/46 pass.
+- Preview steady step managed allocation: `HazardActorWorkbenchPreviewTests.PreviewSimulator_SteadyStepDoesNotAllocateManagedMemory`에서 0 byte assertion pass.
+- MCP Editor smoke: `Tools/Project/Hazard Actor Workbench/Open`와 `Tools/Project/Stage Map Editor/Open` menu item 실행 성공, Scene View screenshot capture 성공.

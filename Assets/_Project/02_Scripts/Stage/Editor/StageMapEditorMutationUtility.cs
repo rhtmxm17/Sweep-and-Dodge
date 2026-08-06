@@ -277,6 +277,37 @@ namespace SweepNDodge.DotsBullets.Editor
             return true;
         }
 
+        public static bool TryUpdateHazardRule(
+            StageMapEditingSession session,
+            StageMapSelection identity,
+            StageMapHazardActorOrchestrationRuleData value,
+            out ContentValidationIssue issue)
+        {
+            if (!CanMutate(session, StageMapEditorLayer.HazardActors, out issue))
+                return false;
+            if (!StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                    session.Document,
+                    identity.OwningSourceStableId,
+                    identity.RuleId,
+                    out _))
+            {
+                issue = BuildIssue("Selected HazardActor rule identity is missing or ambiguous.");
+                return false;
+            }
+
+            if (!StageMapHazardActorOrchestrationUtility.UpdateRule(
+                    session.Document,
+                    identity.OwningSourceStableId,
+                    identity.RuleId,
+                    value))
+            {
+                issue = BuildIssue("Selected HazardActor rule could not be updated.");
+                return false;
+            }
+            session.Select(StageMapSelection.ForHazardRule(value.OwningSourceStableId, value.RuleId));
+            return true;
+        }
+
         public static bool TryUpdatePresentation(
             StageMapEditingSession session,
             StageMapSelection identity,
@@ -358,6 +389,13 @@ namespace SweepNDodge.DotsBullets.Editor
                 changed = RemoveAt(ref placements, hazardIndex);
                 if (changed)
                     session.Document.HazardActorPlacements = placements;
+            }
+            else if (selection.Kind == StageMapSelectionKind.HazardActorRule)
+            {
+                changed = StageMapHazardActorOrchestrationUtility.DeleteRule(
+                    session.Document,
+                    selection.OwningSourceStableId,
+                    selection.RuleId);
             }
             else if (selection.Kind == StageMapSelectionKind.Presentation
                 && StageMapSelectionUtility.TryFindUniquePresentationIndex(

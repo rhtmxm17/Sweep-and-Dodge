@@ -40,6 +40,7 @@ namespace SweepNDodge.DotsBullets.Editor
         Presentation = 8,
         Document = 9,
         TargetAsset = 10,
+        HazardActorRule = 11,
     }
 
     public enum StageMapInspectorSection : byte
@@ -52,6 +53,7 @@ namespace SweepNDodge.DotsBullets.Editor
         Presentation = 5,
         Document = 6,
         TargetAsset = 7,
+        HazardActorRule = 8,
     }
 
     /// <summary>
@@ -65,6 +67,7 @@ namespace SweepNDodge.DotsBullets.Editor
             uint stableId,
             uint owningSourceStableId,
             int placementInstanceId,
+            int ruleId,
             UnityEngine.Object targetAsset)
         {
             Kind = kind;
@@ -72,6 +75,7 @@ namespace SweepNDodge.DotsBullets.Editor
             StableId = stableId;
             OwningSourceStableId = owningSourceStableId;
             PlacementInstanceId = placementInstanceId;
+            RuleId = ruleId;
             TargetAsset = targetAsset;
         }
 
@@ -80,11 +84,12 @@ namespace SweepNDodge.DotsBullets.Editor
         public uint StableId { get; }
         public uint OwningSourceStableId { get; }
         public int PlacementInstanceId { get; }
+        public int RuleId { get; }
         public UnityEngine.Object TargetAsset { get; }
 
         public static StageMapSelection None => default;
         public static StageMapSelection ForCell(Vector2Int cell) =>
-            new StageMapSelection(StageMapSelectionKind.Cell, cell, 0u, 0u, 0, null);
+            new StageMapSelection(StageMapSelectionKind.Cell, cell, 0u, 0u, 0, 0, null);
 
         public static StageMapSelection ForRegion(StageRegionKind kind, uint stableId) =>
             new StageMapSelection(
@@ -92,6 +97,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 default,
                 stableId,
                 0u,
+                0,
                 0,
                 null);
 
@@ -102,22 +108,26 @@ namespace SweepNDodge.DotsBullets.Editor
                 stableId,
                 0u,
                 0,
+                0,
                 null);
 
         public static StageMapSelection ForPlayerStart() =>
-            new StageMapSelection(StageMapSelectionKind.PlayerStart, default, 0u, 0u, 0, null);
+            new StageMapSelection(StageMapSelectionKind.PlayerStart, default, 0u, 0u, 0, 0, null);
 
         public static StageMapSelection ForHazard(uint owningSourceStableId, int placementInstanceId) =>
-            new StageMapSelection(StageMapSelectionKind.HazardActor, default, 0u, owningSourceStableId, placementInstanceId, null);
+            new StageMapSelection(StageMapSelectionKind.HazardActor, default, 0u, owningSourceStableId, placementInstanceId, 0, null);
+
+        public static StageMapSelection ForHazardRule(uint owningSourceStableId, int ruleId) =>
+            new StageMapSelection(StageMapSelectionKind.HazardActorRule, default, 0u, owningSourceStableId, 0, ruleId, null);
 
         public static StageMapSelection ForPresentation(uint stableId) =>
-            new StageMapSelection(StageMapSelectionKind.Presentation, default, stableId, 0u, 0, null);
+            new StageMapSelection(StageMapSelectionKind.Presentation, default, stableId, 0u, 0, 0, null);
 
         public static StageMapSelection ForDocument(StageMapDocument document) =>
-            new StageMapSelection(StageMapSelectionKind.Document, default, 0u, 0u, 0, document);
+            new StageMapSelection(StageMapSelectionKind.Document, default, 0u, 0u, 0, 0, document);
 
         public static StageMapSelection ForTargetAsset(UnityEngine.Object targetAsset) =>
-            new StageMapSelection(StageMapSelectionKind.TargetAsset, default, 0u, 0u, 0, targetAsset);
+            new StageMapSelection(StageMapSelectionKind.TargetAsset, default, 0u, 0u, 0, 0, targetAsset);
 
         public bool Equals(StageMapSelection other)
         {
@@ -126,6 +136,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 && StableId == other.StableId
                 && OwningSourceStableId == other.OwningSourceStableId
                 && PlacementInstanceId == other.PlacementInstanceId
+                && RuleId == other.RuleId
                 && TargetAsset == other.TargetAsset;
         }
 
@@ -140,6 +151,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 hash = (hash * 397) ^ (int)StableId;
                 hash = (hash * 397) ^ (int)OwningSourceStableId;
                 hash = (hash * 397) ^ PlacementInstanceId;
+                hash = (hash * 397) ^ RuleId;
                 hash = (hash * 397) ^ (TargetAsset != null ? TargetAsset.GetInstanceID() : 0);
                 return hash;
             }
@@ -242,6 +254,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     return StageMapInspectorSection.RegionOrAnchor;
                 case StageMapSelectionKind.PlayerStart: return StageMapInspectorSection.PlayerStart;
                 case StageMapSelectionKind.HazardActor: return StageMapInspectorSection.HazardActor;
+                case StageMapSelectionKind.HazardActorRule: return StageMapInspectorSection.HazardActorRule;
                 case StageMapSelectionKind.Presentation: return StageMapInspectorSection.Presentation;
                 case StageMapSelectionKind.Document: return StageMapInspectorSection.Document;
                 case StageMapSelectionKind.TargetAsset: return StageMapInspectorSection.TargetAsset;
@@ -289,6 +302,16 @@ namespace SweepNDodge.DotsBullets.Editor
                             document.HazardActorPlacements,
                             selection.OwningSourceStableId,
                             selection.PlacementInstanceId,
+                            out _))
+                    {
+                        Select(StageMapSelection.None);
+                    }
+                    return;
+                case StageMapSelectionKind.HazardActorRule:
+                    if (!StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                            document,
+                            selection.OwningSourceStableId,
+                            selection.RuleId,
                             out _))
                     {
                         Select(StageMapSelection.None);

@@ -55,6 +55,7 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             ValidateHazardPlacements(document, location, issues);
+            ValidateHazardOrchestrationRules(document, location, issues);
             ValidatePresentationLinks(document, location, issues);
         }
 
@@ -308,6 +309,94 @@ namespace SweepNDodge.DotsBullets.Editor
                 ValidatePresentationKeysAgainstCatalog(document, links, location, issues);
         }
 
+        private static void ValidateHazardOrchestrationRules(StageMapDocument document, string location, List<ContentValidationIssue> issues)
+        {
+            var rules = document.HazardActorOrchestrationRules ?? Array.Empty<StageMapHazardActorOrchestrationRuleData>();
+            if (rules.Length == 0)
+                return;
+
+            var activeSourceIds = BuildActiveSourceIdSet(document.SourceRegions);
+            var placementsBySource = BuildPlacementLookup(document.HazardActorPlacements);
+            var ruleKeys = new HashSet<string>();
+            for (int i = 0; i < rules.Length; i++)
+            {
+                var rule = rules[i];
+                string ruleLocation = $"{location}/HazardActorOrchestrationRules[{i}]";
+                if (rule.OwningSourceStableId == 0u)
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD040", ruleLocation, "OwningSourceStableId must be >= 1."));
+                }
+                else if (!activeSourceIds.Contains(rule.OwningSourceStableId))
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD041", ruleLocation, $"OwningSourceStableId must reference an active source region. stableId={rule.OwningSourceStableId}"));
+                }
+
+                if (rule.RuleId <= 0)
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD042", ruleLocation, "RuleId must be >= 1."));
+                }
+                else if (!ruleKeys.Add($"{rule.OwningSourceStableId}:{rule.RuleId}"))
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD043", ruleLocation, $"Duplicate source-local HazardActor rule id. source={rule.OwningSourceStableId}, ruleId={rule.RuleId}"));
+                }
+
+                if (rule.ActionType != HazardActorOrchestrationActionId.Spawn
+                    && rule.ActionType != HazardActorOrchestrationActionId.PhaseSet
+                    && rule.ActionType != HazardActorOrchestrationActionId.Retire)
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD044", ruleLocation, $"Unsupported ActionType {rule.ActionType}."));
+                }
+
+                if (rule.TriggerType != HazardActorOrchestrationTriggerId.OnStageStart
+                    && rule.TriggerType != HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove)
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD045", ruleLocation, $"Unsupported TriggerType {rule.TriggerType}."));
+                }
+
+                if (rule.TriggerThresholdNormalized < 0f || rule.TriggerThresholdNormalized > 1f)
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD046", ruleLocation, "TriggerThresholdNormalized must be within [0, 1]."));
+                }
+
+                var targets = rule.TargetPlacementInstanceIds ?? Array.Empty<int>();
+                if (targets.Length == 0)
+                {
+                    issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD047", ruleLocation, "At least one target placement id is required."));
+                    continue;
+                }
+
+                var targetSet = new HashSet<int>();
+                for (int targetIndex = 0; targetIndex < targets.Length; targetIndex++)
+                {
+                    int placementId = targets[targetIndex];
+                    if (placementId <= 0)
+                    {
+                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD048", ruleLocation, "TargetPlacementInstanceIds must be >= 1."));
+                        continue;
+                    }
+
+                    if (!targetSet.Add(placementId))
+                    {
+                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD049", ruleLocation, $"Duplicate target placement id {placementId} in rule."));
+                        continue;
+                    }
+
+                    if (!placementsBySource.TryGetValue(rule.OwningSourceStableId, out var sourcePlacements)
+                        || !sourcePlacements.TryGetValue(placementId, out var placement))
+                    {
+                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD050", ruleLocation, $"Target placement {placementId} is missing or belongs to another source."));
+                        continue;
+                    }
+
+                    if (rule.ActionType == HazardActorOrchestrationActionId.PhaseSet
+                        && !ActorDefinesPhase(placement.ActorArchetypePrefab, rule.TargetPhaseId))
+                    {
+                        issues.Add(new ContentValidationIssue(ContentValidationSeverity.Error, "SMD051", ruleLocation, $"TargetPhaseId {rule.TargetPhaseId} is not defined by all target actor archetypes."));
+                    }
+                }
+            }
+        }
+
         private static void ValidateHazardPlacementThroughCatalogRules(
             StageMapHazardActorPlacementData placement,
             string placementLocation,
@@ -390,6 +479,45 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             return ids;
+        }
+
+        private static Dictionary<uint, Dictionary<int, StageMapHazardActorPlacementData>> BuildPlacementLookup(StageMapHazardActorPlacementData[] placements)
+        {
+            var result = new Dictionary<uint, Dictionary<int, StageMapHazardActorPlacementData>>();
+            if (placements == null)
+                return result;
+            for (int i = 0; i < placements.Length; i++)
+            {
+                var placement = placements[i];
+                if (placement.OwningSourceStableId == 0u || placement.PlacementInstanceId <= 0)
+                    continue;
+                if (!result.TryGetValue(placement.OwningSourceStableId, out var source))
+                {
+                    source = new Dictionary<int, StageMapHazardActorPlacementData>();
+                    result.Add(placement.OwningSourceStableId, source);
+                }
+                if (!source.ContainsKey(placement.PlacementInstanceId))
+                    source.Add(placement.PlacementInstanceId, placement);
+            }
+            return result;
+        }
+
+        private static bool ActorDefinesPhase(GameObject actorPrefab, int phaseId)
+        {
+            if (actorPrefab == null || phaseId <= 0)
+                return false;
+            var actor = actorPrefab.GetComponentInChildren<HazardActorAuthoring>(true);
+            if (actor == null)
+                return false;
+            if (!HazardActorAuthoringValidationUtility.TryValidateStandalone(actor, out var seed, out _, out _, out _))
+                return false;
+            var policies = seed.Policies ?? Array.Empty<HazardActorPhaseSelectorPolicyBuffer>();
+            for (int i = 0; i < policies.Length; i++)
+            {
+                if (policies[i].PhaseId == phaseId)
+                    return true;
+            }
+            return false;
         }
 
         private static string BuildDocumentLocation(string prefix, int stageId)

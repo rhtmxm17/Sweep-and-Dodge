@@ -163,6 +163,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     Issue("STG010", "document/DepositRegions[0]"),
                     Issue("PLAYER", "document/PlayerStart"),
                     Issue("HAZARD", "document/HazardActorPlacements[0]"),
+                    Issue("RULE", "document/HazardActorOrchestrationRules[0]"),
                     Issue("PRESENTATION", "document/PresentationLinks[0]"),
                     Issue("SMD900", "document"),
                     Issue("SMD901", "document"),
@@ -183,6 +184,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     StageMapIssueTargetKind.DepositAnchor,
                     StageMapIssueTargetKind.PlayerStart,
                     StageMapIssueTargetKind.HazardActor,
+                    StageMapIssueTargetKind.HazardActorRule,
                     StageMapIssueTargetKind.Presentation,
                     StageMapIssueTargetKind.TargetLayout,
                     StageMapIssueTargetKind.TargetDefinition,
@@ -364,6 +366,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     (StageMapSelection.ForAnchor(StageRegionKind.Deposit, 200u), StageMapInspectorSection.RegionOrAnchor),
                     (StageMapSelection.ForPlayerStart(), StageMapInspectorSection.PlayerStart),
                     (StageMapSelection.ForHazard(100u, 1), StageMapInspectorSection.HazardActor),
+                    (StageMapSelection.ForHazardRule(100u, 1), StageMapInspectorSection.HazardActorRule),
                     (StageMapSelection.ForPresentation(900u), StageMapInspectorSection.Presentation),
                     (StageMapSelection.ForDocument(setup.Document), StageMapInspectorSection.Document),
                     (StageMapSelection.ForTargetAsset(setup.Layout), StageMapInspectorSection.TargetAsset),
@@ -537,6 +540,18 @@ namespace SweepNDodge.DotsBullets.Tests
                     OwningSourceStableId = 100u,
                     ActorArchetypePrefab = prefab,
                     SourceLocalOffset = new Vector3(0f, 0f, 2f),
+                }
+            };
+            document.HazardActorOrchestrationRules = new[]
+            {
+                new StageMapHazardActorOrchestrationRuleData
+                {
+                    OwningSourceStableId = 100u,
+                    RuleId = 1,
+                    TargetPlacementInstanceIds = new[] { 1 },
+                    ActionType = HazardActorOrchestrationActionId.Spawn,
+                    TriggerType = HazardActorOrchestrationTriggerId.OnStageStart,
+                    TargetPhaseId = 1,
                 }
             };
             document.PresentationLinks = new[]

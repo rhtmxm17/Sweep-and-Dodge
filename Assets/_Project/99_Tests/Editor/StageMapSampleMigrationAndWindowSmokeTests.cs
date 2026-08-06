@@ -198,6 +198,10 @@ namespace SweepNDodge.DotsBullets.Tests
                     window,
                     StageMapSelection.ForHazard(hazard.OwningSourceStableId, hazard.PlacementInstanceId),
                     StageMapInspectorSection.HazardActor);
+                Assert.That(window.BeginEncounterPreviewForSource(hazard.OwningSourceStableId), Is.True);
+                Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession, Is.Not.Null);
+                Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession.ActiveActorCount, Is.GreaterThan(0));
+                HazardActorPreviewCoordinator.StepActiveSession();
                 StageMapPresentationLinkData presentation = document.PresentationLinks.First();
                 AssertSelectionSection(window, StageMapSelection.ForPresentation(presentation.StableId), StageMapInspectorSection.Presentation);
 
@@ -232,6 +236,7 @@ namespace SweepNDodge.DotsBullets.Tests
             }
             finally
             {
+                HazardActorPreviewCoordinator.Shutdown();
                 window.Close();
             }
         }
