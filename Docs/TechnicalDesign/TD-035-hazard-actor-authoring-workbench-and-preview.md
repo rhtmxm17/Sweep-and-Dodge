@@ -62,13 +62,16 @@
 ## 3. Workbench UX
 
 ### 3.1 화면 구조
-- UI Toolkit 기반 3열 layout을 사용한다.
-  - 왼쪽 `Archetype Library`: prefab 검색, 선택, validation badge, stage 사용처 수
-  - 중앙 `Behavior Canvas`: Phase/Pattern 상태 차트와 선택 항목 timing timeline
-  - 오른쪽 `Contextual Inspector`: 현재 canonical selection 하나의 상세만 표시
+- UI Toolkit 기반 편집 layout을 사용한다.
+  - toolbar `Current Archetype`: 현재 선택 prefab, Phase/Pattern/Profile 수, validation 요약을 표시한다.
+  - `Change Archetype`: popup picker를 열어 prefab 검색, 선택, validation badge를 표 형태로 제공한다.
+  - 중앙 `Behavior Canvas`: 선택된 Archetype 하나의 Phase/Pattern 상태 차트와 선택 항목 timing timeline을 표시한다.
+  - 오른쪽 `Contextual Inspector`: 현재 canonical selection 하나의 상세만 표시한다.
 - 하단에는 preview transport와 Issue Navigator를 둔다.
 - 중앙 preview tab은 `Behavior`와 `Preview`를 전환하거나 분할할 수 있으며, preview는 top-down 기준이다.
 - canvas는 `GraphView`나 임의 연결을 사용하지 않고 custom `VisualElement`로 현재 runtime 구조만 표현한다.
+- Archetype Library는 상시 side panel이 아니라 짧은 선택/전환 작업을 위한 popup picker가 기본이다.
+- Archetype popup은 `Name / Phases / Patterns / Profiles / Issues` 열을 제공하고, 선택 후 닫힌다.
 
 ### 3.2 Selection model
 - canonical selection kind는 `Actor`, `Phase`, `Transition`, `PatternSlot`, `EmissionProfile`, `TelegraphProfile`이다.
@@ -83,6 +86,8 @@
 ### 3.3 Behavior Canvas
 - Phase는 좌우 진행 순서로 표시하고 progress transition edge에 threshold와 lead-in을 표시한다.
 - 각 Phase 내부에 selector mode와 candidate Pattern card를 순서대로 표시한다.
+- Phase 목록은 `Phase / Selector / Candidates / Transition / Issues / Commands` 열을 가진 행 요약으로 표시한다.
+- Pattern 목록은 `Pattern / Telegraph / Emission / Schedule / Movement / Issues / Commands` 열을 가진 행 요약으로 표시한다.
 - Pattern card는 다음 resolved 요약을 표시한다.
   - position pattern
   - aim mode와 snapshot timing
@@ -92,6 +97,7 @@
   - movement family와 local offset
 - `OrderedPriority`와 `OrderedCycle`은 서로 다른 badge와 실행 순서 표시를 사용한다.
 - 선택 Pattern의 timeline은 실제 시간 비율로 `Telegraph`, event shot/repeat, `Cooldown` 구간을 표시한다.
+- 긴 상세 문장은 기본 목록에 압축하지 않고 선택 후 Contextual Inspector 또는 선택 상세 영역에서 표시한다.
 
 ### 3.4 편집 명령
 - Actor/Phase/Transition/Pattern의 단일 필드 편집은 `SerializedObject`로 즉시 반영한다.
@@ -247,7 +253,7 @@
 - T0. Legacy Inspector freeze
   - read-only 요약과 Workbench 진입점을 제공하고 공식 raw array 편집 경로를 닫는다.
 - T1. Workbench shell
-  - UI Toolkit Window, Archetype Library, canonical selection, Contextual Inspector, session 수명주기를 구현한다.
+  - UI Toolkit Window, toolbar current archetype selector, popup Archetype picker, canonical selection, Contextual Inspector, session 수명주기를 구현한다.
 - T2. Behavior/Profile editing
   - Phase/Pattern canvas, timeline, 구조 명령, 공유 profile 사용처와 Duplicate & Assign을 구현한다.
 - T3. Preview snapshot/simulator
@@ -335,5 +341,9 @@
 정확 위치 표시 후속 검증:
 - Workbench fixed density 기본 표시를 제거하고, `Exact` 기본/`Density` 명시 선택, view center/zoom, `Fit Active Ghosts` 조작을 추가했다.
 - world XZ를 preview pixel로 직접 투영하며 서로 다른 위치를 개별 quad로 유지하고, view 밖 좌표는 edge cell로 왜곡하지 않는다.
+- Workbench 가시성 개선으로 상시 `Archetype Library` side panel을 제거하고 toolbar `Change Archetype` popup picker로 대체했다. popup은 `Name / Phases / Patterns / Profiles / Issues` 열을 제공하며 선택 후 닫힌다.
+- Phase/Pattern 기본 목록은 긴 버튼 텍스트 대신 열 기반 행 요약으로 표시하고, 상세 편집은 기존 Contextual Inspector의 canonical selection 하나에만 표시한다.
 - `pf_stage2_fan_sentry` live Workbench smoke에서 active ghost 12개, visible exact ghost 12개, UI mesh submission 1회를 확인했다.
-- `HazardActorWorkbenchPreviewTests`: 19/19 pass, 전체 EditMode 576/576 pass, 전체 PlayMode 46/46 pass.
+- `HazardActorWorkbenchPreviewTests`: 가시성 회귀 테스트 2개를 포함해 21/21 pass.
+- `HazardEmitterPlayModeTests`: 기존 HazardActor PlayMode smoke 2/2 pass.
+- 전체 EditMode/PlayMode 최신 재실행은 별도 검증 대상이다.

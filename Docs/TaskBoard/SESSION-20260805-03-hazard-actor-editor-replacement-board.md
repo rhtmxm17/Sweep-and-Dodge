@@ -55,6 +55,12 @@
   - 위치 투영, out-of-view clipping, Exact 기본값과 Density 명시 선택을 EditMode 회귀 테스트로 고정했다.
   - live Workbench smoke: `pf_stage2_fan_sentry`, active 12 / visible exact 12 / UI submission 1.
   - 검증: `HazardActorWorkbenchPreviewTests` 19/19, full EditMode 576/576, full PlayMode 46/46 pass.
+- [x] R9. Workbench 가시성 개선
+  - 상시 `Archetype Library` side panel을 제거하고 toolbar `Change Archetype` popup picker로 대체했다.
+  - popup picker는 `Name / Phases / Patterns / Profiles / Issues` 열 기반 요약과 검색, 행 클릭/Enter 선택을 제공한다.
+  - Workbench 본문을 `Behavior / Preview`와 `Contextual Inspector` 중심의 2열 구조로 정리했다.
+  - Phase/Pattern 목록을 긴 버튼 텍스트 대신 열 기반 행 요약과 분리된 command 영역으로 바꿨다.
+  - 가시성 구조와 summary helper를 EditMode 회귀 테스트로 고정했고, targeted `HazardActorWorkbenchPreviewTests` 21/21 pass와 `HazardEmitterPlayModeTests` 2/2 pass를 확인했다.
 
 ## Next
 - 없음. 후속 R1~R7 감사 기준 구현과 검증을 완료했다.
@@ -73,7 +79,7 @@
 - [x] T0. Legacy Inspector freeze
   - `HazardActorAuthoringEditor`가 read-only 요약/validation/Open Workbench만 제공한다.
 - [x] T1. Workbench UI Toolkit shell
-  - `HazardActorWorkbenchWindow`가 library, canvas, Contextual Inspector, Issue/Preview 영역과 canonical selection/session cleanup을 제공한다.
+  - `HazardActorWorkbenchWindow`가 toolbar current archetype selector, popup picker, canvas, Contextual Inspector, Issue/Preview 영역과 canonical selection/session cleanup을 제공한다.
 - [x] T2. Phase/Pattern canvas와 Profile 편집
   - 구조 명령, selector/transition/pattern edit, shared profile 사용처, `Open`, `Duplicate & Assign`, Undo/dirty 경로를 구현했다.
 - [x] T3. Preview snapshot/simulator

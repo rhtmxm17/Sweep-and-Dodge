@@ -15,10 +15,12 @@ namespace SweepNDodge.DotsBullets.Editor
         private GameObject _actorPrefab;
         private HazardActorAuthoring _actor;
         private HazardActorWorkbenchSelection _selection;
-        private ScrollView _library;
         private ScrollView _canvas;
         private ScrollView _inspector;
         private ScrollView _issues;
+        private Label _currentArchetypeLabel;
+        private Label _currentArchetypeStatusLabel;
+        private ToolbarButton _changeArchetypeButton;
         private HazardActorWorkbenchPreviewElement _previewSurface;
         private EnumField _scopeField;
         private Slider _progressSlider;
@@ -57,10 +59,8 @@ namespace SweepNDodge.DotsBullets.Editor
             BuildToolbar();
 
             var split = new VisualElement { style = { flexDirection = FlexDirection.Row, flexGrow = 1f } };
-            _library = Panel("Archetype Library", 240);
-            _canvas = Panel("Behavior / Preview", 520);
+            _canvas = Panel("Behavior / Preview", 520, 1f);
             _inspector = Panel("Contextual Inspector", 320);
-            split.Add(_library);
             split.Add(_canvas);
             split.Add(_inspector);
             rootVisualElement.Add(split);
@@ -107,9 +107,28 @@ namespace SweepNDodge.DotsBullets.Editor
         private void BuildToolbar()
         {
             var toolbar = new Toolbar();
-            var picker = new UnityEditor.UIElements.ObjectField { objectType = typeof(GameObject), allowSceneObjects = false, value = _actorPrefab };
-            picker.RegisterValueChangedCallback(evt => SetActorPrefab((GameObject)evt.newValue));
-            toolbar.Add(picker);
+            _currentArchetypeLabel = new Label("Archetype: (none)")
+            {
+                style =
+                {
+                    minWidth = 180,
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                }
+            };
+            _currentArchetypeStatusLabel = new Label("No HazardActor prefab selected.")
+            {
+                style =
+                {
+                    minWidth = 260,
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                    fontSize = 10,
+                }
+            };
+            toolbar.Add(_currentArchetypeLabel);
+            toolbar.Add(_currentArchetypeStatusLabel);
+            _changeArchetypeButton = new ToolbarButton(ShowArchetypePicker) { text = "Change Archetype" };
+            toolbar.Add(_changeArchetypeButton);
             toolbar.Add(new ToolbarButton(() => RefreshProjectPrefabs()) { text = "Refresh" });
             toolbar.Add(new ToolbarButton(() => SelectActor()) { text = "Actor" });
             toolbar.Add(new ToolbarSpacer { flex = true });
@@ -121,9 +140,14 @@ namespace SweepNDodge.DotsBullets.Editor
             rootVisualElement.Add(toolbar);
         }
 
-        private ScrollView Panel(string title, int width)
+        private ScrollView Panel(string title, int width, float flexGrow = 0f)
         {
-            var root = new ScrollView { style = { width = width, flexGrow = 1f, paddingLeft = 6, paddingRight = 6, paddingTop = 6 } };
+            var root = new ScrollView { style = { width = width, flexGrow = flexGrow, paddingLeft = 6, paddingRight = 6, paddingTop = 6 } };
+            if (flexGrow > 0f)
+            {
+                root.style.width = StyleKeyword.Auto;
+                root.style.flexGrow = flexGrow;
+            }
             root.Add(new Label(title) { style = { unityFontStyleAndWeight = FontStyle.Bold } });
             return root;
         }
@@ -157,36 +181,44 @@ namespace SweepNDodge.DotsBullets.Editor
                     _prefabs.Add(prefab);
             }
             _prefabs.Sort((a, b) => string.CompareOrdinal(AssetDatabase.GetAssetPath(a), AssetDatabase.GetAssetPath(b)));
-            RefreshLibrary();
+            RefreshToolbarArchetypeSummary();
         }
 
         private void RefreshAll()
         {
             _actor = ResolveActor(_actorPrefab);
-            RefreshLibrary();
+            RefreshToolbarArchetypeSummary();
             RefreshCanvas();
             RefreshInspector();
             RefreshIssues();
         }
 
-        private void RefreshLibrary()
+        private void RefreshToolbarArchetypeSummary()
         {
-            if (_library == null)
+            if (_currentArchetypeLabel == null || _currentArchetypeStatusLabel == null)
                 return;
-            _library.Clear();
-            _library.Add(new Label("Archetype Library") { style = { unityFontStyleAndWeight = FontStyle.Bold } });
-            for (int i = 0; i < _prefabs.Count; i++)
+
+            if (_actorPrefab == null || _actor == null)
             {
-                var prefab = _prefabs[i];
-                var actor = ResolveActor(prefab);
-                if (actor == null)
-                    continue;
-                int issueCount = HazardActorPreviewSnapshotBuilder.Validate(prefab).Count(x => x.Severity == ContentValidationSeverity.Error);
-                string label = $"{prefab.name}  phase:{actor.PhaseSelectorPolicies?.Length ?? 0} pattern:{actor.PatternSlots?.Length ?? 0}";
-                if (issueCount > 0)
-                    label += $"  error:{issueCount}";
-                _library.Add(new Button(() => SetActorPrefab(prefab)) { text = label });
+                _currentArchetypeLabel.text = "Archetype: (none)";
+                _currentArchetypeStatusLabel.text = "No HazardActor prefab selected.";
+                _currentArchetypeStatusLabel.tooltip = string.Empty;
+                return;
             }
+
+            var summary = BuildArchetypeSummary(_actorPrefab, _actorPrefab);
+            _currentArchetypeLabel.text = $"Archetype: {summary.Name}";
+            _currentArchetypeStatusLabel.text =
+                $"{summary.PhaseCount} phases | {summary.PatternCount} patterns | {summary.ProfileCount} profiles | {summary.IssueLabel}";
+            _currentArchetypeStatusLabel.tooltip = summary.Path;
+        }
+
+        private void ShowArchetypePicker()
+        {
+            RefreshProjectPrefabs();
+            UnityEditor.PopupWindow.Show(
+                _changeArchetypeButton != null ? _changeArchetypeButton.worldBound : new Rect(0f, 0f, 1f, 1f),
+                new ArchetypePickerPopup(this));
         }
 
         private void RefreshCanvas()
@@ -232,41 +264,45 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             _canvas.Add(new Label("Phases") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 6 } });
             var policies = _actor.PhaseSelectorPolicies ?? Array.Empty<HazardActorPhaseSelectorPolicyAuthoring>();
+            var issues = HazardActorPreviewSnapshotBuilder.Validate(_actorPrefab);
+            DrawTableHeader(_canvas, "Phase", "Selector", "Candidates", "Transition", "Issues", "Commands");
             for (int i = 0; i < policies.Length; i++)
             {
                 var policy = policies[i];
-                var row = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap } };
-                row.Add(new Button(() =>
+                var summary = BuildPhaseRowSummary(_actor, policy, issues);
+                var row = BuildSelectableRow(_selection.Kind == HazardActorWorkbenchSelectionKind.Phase && _selection.PhaseId == policy.PhaseId);
+                row.RegisterCallback<MouseUpEvent>(_ =>
                 {
                     _selection = HazardActorWorkbenchSelection.ForPhase(_actorPrefab, policy.PhaseId);
                     RefreshInspector();
-                }) { text = $"Phase {policy.PhaseId} [{policy.SelectionMode}]" });
-                row.Add(new Button(() =>
+                });
+                row.Add(Cell(summary.PhaseLabel, 70));
+                row.Add(Cell(summary.SelectorLabel, 130));
+                row.Add(Cell(summary.CandidatesLabel, 160));
+                row.Add(Cell(summary.TransitionLabel, 210));
+                row.Add(Cell(summary.IssueLabel, 80));
+                var commands = CommandCell();
+                commands.Add(new Button(() =>
                 {
                     _selection = HazardActorWorkbenchSelection.ForTransition(_actorPrefab, policy.PhaseId);
                     RefreshInspector();
                 }) { text = "Transition" });
-                row.Add(new Button(() =>
+                commands.Add(new Button(() =>
                 {
                     HazardActorWorkbenchCommandUtility.DuplicatePhase(_actor, policy.PhaseId, out int newId);
                     _selection = HazardActorWorkbenchSelection.ForPhase(_actorPrefab, newId);
                     RefreshAfterMutation();
                 }) { text = "Duplicate" });
-                row.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, -1); RefreshAfterMutation(); }) { text = "Up" });
-                row.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, 1); RefreshAfterMutation(); }) { text = "Down" });
-                row.Add(new Button(() =>
+                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, -1); RefreshAfterMutation(); }) { text = "Up" });
+                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePhase(_actor, policy.PhaseId, 1); RefreshAfterMutation(); }) { text = "Down" });
+                commands.Add(new Button(() =>
                 {
                     if (!HazardActorWorkbenchCommandUtility.RemovePhase(_actor, policy.PhaseId, out string error))
                         EditorUtility.DisplayDialog("Remove Phase", error, "OK");
                     RefreshAfterMutation();
                 }) { text = "Remove" });
+                row.Add(commands);
                 _canvas.Add(row);
-
-                var detail = new Label(BuildPhaseSummary(policy));
-                detail.style.marginLeft = 8;
-                detail.style.marginBottom = 4;
-                detail.style.whiteSpace = WhiteSpace.Normal;
-                _canvas.Add(detail);
             }
         }
 
@@ -274,58 +310,95 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             _canvas.Add(new Label("Patterns") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 6 } });
             var slots = _actor.PatternSlots ?? Array.Empty<HazardActorPatternSlotAuthoring>();
+            var issues = HazardActorPreviewSnapshotBuilder.Validate(_actorPrefab);
+            DrawTableHeader(_canvas, "Pattern", "Telegraph", "Emission", "Schedule", "Movement", "Issues", "Commands");
             for (int i = 0; i < slots.Length; i++)
             {
                 var slot = slots[i];
-                string emission = slot.Emission.Profile != null ? slot.Emission.Profile.name : "(missing emission)";
-                string telegraph = slot.TelegraphProfile != null ? slot.TelegraphProfile.name : "(missing telegraph)";
-                var row = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap } };
-                row.Add(new Button(() =>
+                var summary = BuildPatternRowSummary(slot, issues);
+                var row = BuildSelectableRow(_selection.Kind == HazardActorWorkbenchSelectionKind.PatternSlot && _selection.PatternSlotId == slot.PatternSlotId);
+                row.RegisterCallback<MouseUpEvent>(_ =>
                 {
                     _selection = HazardActorWorkbenchSelection.ForPattern(_actorPrefab, slot.PatternSlotId);
                     RefreshInspector();
-                }) { text = $"Pattern {slot.PatternSlotId}: {telegraph} -> {emission}" });
-                row.Add(new Button(() =>
+                });
+                row.Add(Cell(summary.PatternLabel, 70));
+                row.Add(Cell(summary.TelegraphLabel, 140));
+                row.Add(Cell(summary.EmissionLabel, 160));
+                row.Add(Cell(summary.ScheduleLabel, 180));
+                row.Add(Cell(summary.MovementLabel, 110));
+                row.Add(Cell(summary.IssueLabel, 80));
+                var commands = CommandCell();
+                commands.Add(new Button(() =>
                 {
                     _selection = HazardActorWorkbenchSelection.ForEmissionProfile(_actorPrefab, slot.PatternSlotId, slot.Emission.Profile);
                     RefreshInspector();
                 }) { text = "Emission Profile" });
-                row.Add(new Button(() =>
+                commands.Add(new Button(() =>
                 {
                     _selection = HazardActorWorkbenchSelection.ForTelegraphProfile(_actorPrefab, slot.PatternSlotId, slot.TelegraphProfile);
                     RefreshInspector();
                 }) { text = "Telegraph" });
-                row.Add(new Button(() =>
+                commands.Add(new Button(() =>
                 {
                     HazardActorWorkbenchCommandUtility.DuplicatePattern(_actor, slot.PatternSlotId, out int newId);
                     _selection = HazardActorWorkbenchSelection.ForPattern(_actorPrefab, newId);
                     RefreshAfterMutation();
                 }) { text = "Duplicate" });
-                row.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, -1); RefreshAfterMutation(); }) { text = "Up" });
-                row.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, 1); RefreshAfterMutation(); }) { text = "Down" });
-                row.Add(new Button(() =>
+                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, -1); RefreshAfterMutation(); }) { text = "Up" });
+                commands.Add(new Button(() => { HazardActorWorkbenchCommandUtility.MovePattern(_actor, slot.PatternSlotId, 1); RefreshAfterMutation(); }) { text = "Down" });
+                commands.Add(new Button(() =>
                 {
                     if (!HazardActorWorkbenchCommandUtility.RemovePattern(_actor, slot.PatternSlotId, out string error))
                         EditorUtility.DisplayDialog("Remove Pattern", error, "OK");
                     RefreshAfterMutation();
                 }) { text = "Remove" });
+                row.Add(commands);
                 _canvas.Add(row);
-
-                var detail = new Label(BuildPatternSummary(slot));
-                detail.style.marginLeft = 8;
-                detail.style.marginBottom = 4;
-                detail.style.whiteSpace = WhiteSpace.Normal;
-                _canvas.Add(detail);
             }
         }
 
-        private string BuildPhaseSummary(HazardActorPhaseSelectorPolicyAuthoring policy)
+        public static ArchetypeLibraryRowSummary BuildArchetypeSummary(GameObject prefab, GameObject activePrefab)
+        {
+            var actor = ResolveActor(prefab);
+            if (prefab == null || actor == null)
+                return new ArchetypeLibraryRowSummary(prefab, "(missing)", string.Empty, 0, 0, 0, 0, 0, prefab == activePrefab);
+
+            var profiles = new HashSet<UnityEngine.Object>();
+            var slots = actor.PatternSlots ?? Array.Empty<HazardActorPatternSlotAuthoring>();
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i].Emission.Profile != null)
+                    profiles.Add(slots[i].Emission.Profile);
+                if (slots[i].TelegraphProfile != null)
+                    profiles.Add(slots[i].TelegraphProfile);
+            }
+
+            var issues = HazardActorPreviewSnapshotBuilder.Validate(prefab);
+            return new ArchetypeLibraryRowSummary(
+                prefab,
+                prefab.name,
+                AssetDatabase.GetAssetPath(prefab),
+                actor.PhaseSelectorPolicies?.Length ?? 0,
+                slots.Length,
+                profiles.Count,
+                CountIssues(issues, ContentValidationSeverity.Error),
+                CountIssues(issues, ContentValidationSeverity.Warning),
+                prefab == activePrefab);
+        }
+
+        public static PhaseRowSummary BuildPhaseRowSummary(
+            HazardActorAuthoring actor,
+            HazardActorPhaseSelectorPolicyAuthoring policy,
+            HazardActorWorkbenchIssue[] issues)
         {
             var candidates = policy.Candidates ?? Array.Empty<HazardActorPhaseSelectorCandidateAuthoring>();
             string candidateSummary = candidates.Length == 0
                 ? "no candidates"
                 : string.Join(" -> ", candidates.Select((x, index) => $"P{x.PatternSlotId}(candidate {index})"));
-            var transitions = _actor.PhaseProgressTransitions ?? Array.Empty<HazardActorPhaseProgressTransitionAuthoring>();
+            var transitions = actor != null
+                ? actor.PhaseProgressTransitions ?? Array.Empty<HazardActorPhaseProgressTransitionAuthoring>()
+                : Array.Empty<HazardActorPhaseProgressTransitionAuthoring>();
             string transitionSummary = "no progress transition";
             for (int i = 0; i < transitions.Length; i++)
             {
@@ -334,10 +407,23 @@ namespace SweepNDodge.DotsBullets.Editor
                 transitionSummary = $"progress >= {transitions[i].ProgressThresholdNormalized:0.##} -> Phase {transitions[i].ToPhaseId}, lead-in {transitions[i].TransitionLeadInSec:0.##}s";
                 break;
             }
-            return $"Selector: {policy.SelectionMode}. Candidates: {candidateSummary}. Transition: {transitionSummary}.";
+            CountTargetIssues(
+                issues,
+                target => (target.Kind == HazardActorWorkbenchSelectionKind.Phase && target.PhaseId == policy.PhaseId)
+                    || (target.Kind == HazardActorWorkbenchSelectionKind.Transition && target.TransitionFromPhaseId == policy.PhaseId),
+                out int errors,
+                out int warnings);
+            return new PhaseRowSummary(
+                $"Phase {policy.PhaseId}",
+                policy.SelectionMode.ToString(),
+                candidateSummary,
+                transitionSummary,
+                FormatIssueCount(errors, warnings));
         }
 
-        private static string BuildPatternSummary(HazardActorPatternSlotAuthoring slot)
+        public static PatternRowSummary BuildPatternRowSummary(
+            HazardActorPatternSlotAuthoring slot,
+            HazardActorWorkbenchIssue[] issues)
         {
             string telegraph = slot.TelegraphProfile != null ? $"{slot.TelegraphProfile.TelegraphDurationSec:0.##}s" : "missing";
             string repeat = $"repeat x{Mathf.Max(1, slot.Emission.EventRepeatCount)}";
@@ -349,7 +435,18 @@ namespace SweepNDodge.DotsBullets.Editor
             string movement = slot.Emission.Profile != null && EmissionProfileResolver.TryResolve(slot.Emission.Profile, out var core, out _)
                 ? core.MovementFamily.ToString()
                 : "unknown movement";
-            return $"Timeline: Telegraph {telegraph} -> Emit {repeat} / {schedule} -> Cooldown {cooldown}. Profile: {profile}. Movement: {movement}.";
+            CountTargetIssues(
+                issues,
+                target => target.PatternSlotId == slot.PatternSlotId,
+                out int errors,
+                out int warnings);
+            return new PatternRowSummary(
+                $"Pattern {slot.PatternSlotId}",
+                telegraph,
+                profile,
+                $"{repeat} / {schedule} / cooldown {cooldown}",
+                movement,
+                FormatIssueCount(errors, warnings));
         }
 
         private void DrawPreviewControls()
@@ -584,12 +681,26 @@ namespace SweepNDodge.DotsBullets.Editor
                 var issue = issues[i];
                 _issues.Add(new Button(() =>
                 {
-                    _selection = issue.Target;
+                    SelectWorkbenchTarget(issue.Target);
                     if (issue.Target.ProfileAsset != null)
                         EditorGUIUtility.PingObject(issue.Target.ProfileAsset);
-                    RefreshInspector();
                 }) { text = $"{issue.Severity} {issue.Code}: {issue.Message}" });
             }
+        }
+
+        private void SelectWorkbenchTarget(HazardActorWorkbenchSelection target)
+        {
+            if (target.ActorPrefab != null && target.ActorPrefab != _actorPrefab)
+            {
+                _actorPrefab = target.ActorPrefab;
+                _actor = ResolveActor(_actorPrefab);
+            }
+
+            _selection = target.Kind != HazardActorWorkbenchSelectionKind.None
+                ? target
+                : (_actorPrefab != null ? HazardActorWorkbenchSelection.ForActor(_actorPrefab) : HazardActorWorkbenchSelection.None);
+            RefreshAll();
+            RestartPreview();
         }
 
         private void RestartPreview()
@@ -731,6 +842,330 @@ namespace SweepNDodge.DotsBullets.Editor
                 return null;
             var actors = prefab.GetComponentsInChildren<HazardActorAuthoring>(true);
             return actors != null && actors.Length == 1 ? actors[0] : null;
+        }
+
+        private static void DrawTableHeader(VisualElement parent, params string[] labels)
+        {
+            var row = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    marginTop = 3,
+                    marginBottom = 2,
+                    paddingBottom = 2,
+                    borderBottomWidth = 1,
+                    borderBottomColor = new Color(0.22f, 0.22f, 0.22f, 1f),
+                }
+            };
+            for (int i = 0; i < labels.Length; i++)
+                row.Add(Cell(labels[i], HeaderWidth(i), FontStyle.Bold));
+            parent.Add(row);
+        }
+
+        private static float HeaderWidth(int index)
+        {
+            switch (index)
+            {
+                case 0: return 70f;
+                case 1: return 130f;
+                case 2: return 160f;
+                case 3: return 210f;
+                case 4: return 110f;
+                case 5: return 80f;
+                default: return 300f;
+            }
+        }
+
+        private static VisualElement BuildSelectableRow(bool selected)
+        {
+            return new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexWrap = Wrap.NoWrap,
+                    paddingTop = 2,
+                    paddingBottom = 2,
+                    backgroundColor = selected ? new Color(0.18f, 0.27f, 0.38f, 1f) : Color.clear,
+                }
+            };
+        }
+
+        private static Label Cell(string text, float width, FontStyle fontStyle = FontStyle.Normal)
+        {
+            return new Label(text ?? string.Empty)
+            {
+                tooltip = text ?? string.Empty,
+                style =
+                {
+                    width = width,
+                    minWidth = width,
+                    whiteSpace = WhiteSpace.NoWrap,
+                    overflow = Overflow.Hidden,
+                    unityFontStyleAndWeight = fontStyle,
+                    paddingRight = 4,
+                }
+            };
+        }
+
+        private static VisualElement CommandCell()
+        {
+            return new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexWrap = Wrap.Wrap,
+                    width = 300,
+                    minWidth = 300,
+                }
+            };
+        }
+
+        private static int CountIssues(HazardActorWorkbenchIssue[] issues, ContentValidationSeverity severity)
+        {
+            int count = 0;
+            if (issues == null)
+                return 0;
+            for (int i = 0; i < issues.Length; i++)
+            {
+                if (issues[i].Severity == severity)
+                    count++;
+            }
+            return count;
+        }
+
+        private static void CountTargetIssues(
+            HazardActorWorkbenchIssue[] issues,
+            Func<HazardActorWorkbenchSelection, bool> predicate,
+            out int errors,
+            out int warnings)
+        {
+            errors = 0;
+            warnings = 0;
+            if (issues == null || predicate == null)
+                return;
+            for (int i = 0; i < issues.Length; i++)
+            {
+                if (!predicate(issues[i].Target))
+                    continue;
+                if (issues[i].Severity == ContentValidationSeverity.Error)
+                    errors++;
+                else
+                    warnings++;
+            }
+        }
+
+        private static string FormatIssueCount(int errors, int warnings)
+        {
+            if (errors > 0)
+                return $"{errors} error";
+            if (warnings > 0)
+                return $"{warnings} warn";
+            return "OK";
+        }
+
+        public readonly struct ArchetypeLibraryRowSummary
+        {
+            public ArchetypeLibraryRowSummary(
+                GameObject prefab,
+                string name,
+                string path,
+                int phaseCount,
+                int patternCount,
+                int profileCount,
+                int errorCount,
+                int warningCount,
+                bool isActive)
+            {
+                Prefab = prefab;
+                Name = name ?? string.Empty;
+                Path = path ?? string.Empty;
+                PhaseCount = phaseCount;
+                PatternCount = patternCount;
+                ProfileCount = profileCount;
+                ErrorCount = errorCount;
+                WarningCount = warningCount;
+                IsActive = isActive;
+            }
+
+            public GameObject Prefab { get; }
+            public string Name { get; }
+            public string Path { get; }
+            public int PhaseCount { get; }
+            public int PatternCount { get; }
+            public int ProfileCount { get; }
+            public int ErrorCount { get; }
+            public int WarningCount { get; }
+            public bool IsActive { get; }
+            public string IssueLabel => FormatIssueCount(ErrorCount, WarningCount);
+        }
+
+        public readonly struct PhaseRowSummary
+        {
+            public PhaseRowSummary(string phaseLabel, string selectorLabel, string candidatesLabel, string transitionLabel, string issueLabel)
+            {
+                PhaseLabel = phaseLabel ?? string.Empty;
+                SelectorLabel = selectorLabel ?? string.Empty;
+                CandidatesLabel = candidatesLabel ?? string.Empty;
+                TransitionLabel = transitionLabel ?? string.Empty;
+                IssueLabel = issueLabel ?? string.Empty;
+            }
+
+            public string PhaseLabel { get; }
+            public string SelectorLabel { get; }
+            public string CandidatesLabel { get; }
+            public string TransitionLabel { get; }
+            public string IssueLabel { get; }
+        }
+
+        public readonly struct PatternRowSummary
+        {
+            public PatternRowSummary(string patternLabel, string telegraphLabel, string emissionLabel, string scheduleLabel, string movementLabel, string issueLabel)
+            {
+                PatternLabel = patternLabel ?? string.Empty;
+                TelegraphLabel = telegraphLabel ?? string.Empty;
+                EmissionLabel = emissionLabel ?? string.Empty;
+                ScheduleLabel = scheduleLabel ?? string.Empty;
+                MovementLabel = movementLabel ?? string.Empty;
+                IssueLabel = issueLabel ?? string.Empty;
+            }
+
+            public string PatternLabel { get; }
+            public string TelegraphLabel { get; }
+            public string EmissionLabel { get; }
+            public string ScheduleLabel { get; }
+            public string MovementLabel { get; }
+            public string IssueLabel { get; }
+        }
+
+        private sealed class ArchetypePickerPopup : PopupWindowContent
+        {
+            private readonly HazardActorWorkbenchWindow _owner;
+            private readonly List<ArchetypeLibraryRowSummary> _summaries = new List<ArchetypeLibraryRowSummary>();
+            private string _search = string.Empty;
+            private Vector2 _scroll;
+            private int _selectedIndex;
+
+            public ArchetypePickerPopup(HazardActorWorkbenchWindow owner)
+            {
+                _owner = owner;
+                if (_owner == null)
+                    return;
+                for (int i = 0; i < _owner._prefabs.Count; i++)
+                    _summaries.Add(BuildArchetypeSummary(_owner._prefabs[i], _owner._actorPrefab));
+            }
+
+            public override Vector2 GetWindowSize()
+            {
+                return new Vector2(720f, 420f);
+            }
+
+            public override void OnGUI(Rect rect)
+            {
+                if (_owner == null)
+                    return;
+
+                EditorGUILayout.Space(4);
+                GUI.SetNextControlName("HazardActorArchetypeSearch");
+                _search = EditorGUILayout.TextField("Search", _search);
+                EditorGUILayout.Space(4);
+                DrawHeader();
+                var filtered = BuildFilteredSummaries();
+                HandleKeyboard(filtered);
+                _scroll = EditorGUILayout.BeginScrollView(_scroll);
+                for (int i = 0; i < filtered.Count; i++)
+                    DrawRow(filtered[i], i);
+                EditorGUILayout.EndScrollView();
+            }
+
+            private List<ArchetypeLibraryRowSummary> BuildFilteredSummaries()
+            {
+                var result = new List<ArchetypeLibraryRowSummary>();
+                string needle = _search ?? string.Empty;
+                for (int i = 0; i < _summaries.Count; i++)
+                {
+                    var summary = _summaries[i];
+                    if (!string.IsNullOrWhiteSpace(needle)
+                        && summary.Name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0
+                        && summary.Path.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+                    result.Add(summary);
+                }
+                _selectedIndex = Mathf.Clamp(_selectedIndex, 0, Mathf.Max(0, result.Count - 1));
+                return result;
+            }
+
+            private void DrawHeader()
+            {
+                EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+                GUILayout.Label("Name", EditorStyles.boldLabel, GUILayout.Width(250));
+                GUILayout.Label("Phases", EditorStyles.boldLabel, GUILayout.Width(70));
+                GUILayout.Label("Patterns", EditorStyles.boldLabel, GUILayout.Width(80));
+                GUILayout.Label("Profiles", EditorStyles.boldLabel, GUILayout.Width(80));
+                GUILayout.Label("Issues", EditorStyles.boldLabel, GUILayout.Width(90));
+                EditorGUILayout.EndHorizontal();
+            }
+
+            private void DrawRow(ArchetypeLibraryRowSummary summary, int index)
+            {
+                Rect row = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 4f);
+                if (summary.IsActive)
+                    EditorGUI.DrawRect(row, new Color(0.18f, 0.27f, 0.38f, 1f));
+                else if (index == _selectedIndex)
+                    EditorGUI.DrawRect(row, new Color(0.16f, 0.16f, 0.16f, 1f));
+
+                var nameRect = new Rect(row.x + 4f, row.y + 2f, 246f, EditorGUIUtility.singleLineHeight);
+                var phaseRect = new Rect(nameRect.xMax, nameRect.y, 70f, nameRect.height);
+                var patternRect = new Rect(phaseRect.xMax, nameRect.y, 80f, nameRect.height);
+                var profileRect = new Rect(patternRect.xMax, nameRect.y, 80f, nameRect.height);
+                var issueRect = new Rect(profileRect.xMax, nameRect.y, 90f, nameRect.height);
+                EditorGUI.LabelField(nameRect, summary.Name);
+                EditorGUI.LabelField(phaseRect, summary.PhaseCount.ToString());
+                EditorGUI.LabelField(patternRect, summary.PatternCount.ToString());
+                EditorGUI.LabelField(profileRect, summary.ProfileCount.ToString());
+                EditorGUI.LabelField(issueRect, summary.IssueLabel);
+
+                var current = Event.current;
+                if (current.type == EventType.MouseDown && row.Contains(current.mousePosition))
+                {
+                    _selectedIndex = index;
+                    _owner.SetActorPrefab(summary.Prefab);
+                    editorWindow.Close();
+                    current.Use();
+                }
+            }
+
+            private void HandleKeyboard(List<ArchetypeLibraryRowSummary> filtered)
+            {
+                var current = Event.current;
+                if (current.type != EventType.KeyDown || filtered.Count == 0)
+                    return;
+                if (current.keyCode == KeyCode.DownArrow)
+                {
+                    _selectedIndex = Mathf.Min(_selectedIndex + 1, filtered.Count - 1);
+                    current.Use();
+                }
+                else if (current.keyCode == KeyCode.UpArrow)
+                {
+                    _selectedIndex = Mathf.Max(_selectedIndex - 1, 0);
+                    current.Use();
+                }
+                else if (current.keyCode == KeyCode.Return || current.keyCode == KeyCode.KeypadEnter)
+                {
+                    _owner.SetActorPrefab(filtered[_selectedIndex].Prefab);
+                    editorWindow.Close();
+                    current.Use();
+                }
+                else if (current.keyCode == KeyCode.Escape)
+                {
+                    editorWindow.Close();
+                    current.Use();
+                }
+            }
         }
     }
 }

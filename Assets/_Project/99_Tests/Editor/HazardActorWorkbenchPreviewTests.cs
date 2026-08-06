@@ -480,6 +480,67 @@ namespace SweepNDodge.DotsBullets.Tests
             }
         }
 
+        [Test]
+        public void WorkbenchVisibility_UsesPopupArchetypePickerInsteadOfPersistentLibraryPanel()
+        {
+            string root = Directory.GetParent(Application.dataPath).FullName;
+            string window = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorWorkbenchWindow.cs"),
+                Encoding.UTF8);
+
+            Assert.That(window, Does.Contain("Change Archetype"));
+            Assert.That(window, Does.Contain("PopupWindowContent"));
+            Assert.That(window, Does.Contain("BuildArchetypeSummary"));
+            Assert.That(window, Does.Not.Contain("Panel(\"Archetype Library\""));
+            Assert.That(window, Does.Not.Contain("private ScrollView _library"));
+            Assert.That(window, Does.Not.Contain("new UnityEditor.UIElements.ObjectField"));
+        }
+
+        [Test]
+        public void WorkbenchVisibility_SummarizesArchetypePhaseAndPatternAsSeparatedFields()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                var archetype = HazardActorWorkbenchWindow.BuildArchetypeSummary(setup.Root, setup.Root);
+                Assert.That(archetype.Name, Is.EqualTo(setup.Root.name));
+                Assert.That(archetype.PhaseCount, Is.EqualTo(2));
+                Assert.That(archetype.PatternCount, Is.EqualTo(2));
+                Assert.That(archetype.ProfileCount, Is.EqualTo(3));
+                Assert.That(archetype.IssueLabel, Is.EqualTo("OK"));
+                Assert.That(archetype.IsActive, Is.True);
+
+                var phaseIssue = new HazardActorWorkbenchIssue(
+                    ContentValidationSeverity.Warning,
+                    "TEST_PHASE",
+                    "phase warning",
+                    HazardActorWorkbenchSelection.ForPhase(setup.Root, 1));
+                var phase = HazardActorWorkbenchWindow.BuildPhaseRowSummary(
+                    setup.Actor,
+                    setup.Actor.PhaseSelectorPolicies[0],
+                    new[] { phaseIssue });
+                Assert.That(phase.PhaseLabel, Is.EqualTo("Phase 1"));
+                Assert.That(phase.SelectorLabel, Is.EqualTo(HazardActorSelectionModeId.OrderedPriority.ToString()));
+                Assert.That(phase.CandidatesLabel, Does.Contain("P1"));
+                Assert.That(phase.TransitionLabel, Does.Contain("Phase 2"));
+                Assert.That(phase.IssueLabel, Is.EqualTo("1 warn"));
+
+                var patternIssue = new HazardActorWorkbenchIssue(
+                    ContentValidationSeverity.Error,
+                    "TEST_PATTERN",
+                    "pattern error",
+                    HazardActorWorkbenchSelection.ForPattern(setup.Root, 1));
+                var pattern = HazardActorWorkbenchWindow.BuildPatternRowSummary(
+                    setup.Actor.PatternSlots[0],
+                    new[] { patternIssue });
+                Assert.That(pattern.PatternLabel, Is.EqualTo("Pattern 1"));
+                Assert.That(pattern.TelegraphLabel, Is.EqualTo("0s"));
+                Assert.That(pattern.EmissionLabel, Is.EqualTo(setup.ProfileA.name));
+                Assert.That(pattern.ScheduleLabel, Does.Contain("repeat x1"));
+                Assert.That(pattern.MovementLabel, Is.Not.Empty);
+                Assert.That(pattern.IssueLabel, Is.EqualTo("1 error"));
+            }
+        }
+
         private static (float time, int ghostCount, Vector3 firstGhost) RunCadencePreview(int hz)
         {
             using (var setup = CreateActorSetup())
