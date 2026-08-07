@@ -381,6 +381,78 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void EncounterSource_FollowsSelectionUnlessPinned()
+        {
+            using (var setup = CreateSetup())
+            {
+                var sources = setup.Document.SourceRegions;
+                Array.Resize(ref sources, 2);
+                sources[1] = new StageMapRegionData
+                {
+                    StableId = 300u,
+                    Active = true,
+                    AnchorCell = new Vector2Int(2, 2),
+                };
+                setup.Document.SourceRegions = sources;
+
+                var window = EditorWindow.GetWindow<StageMapEditorWindow>(utility: true, title: "Stage Map Editor Encounter Source Test", focus: false);
+                try
+                {
+                    window.LoadDocument(setup.Document);
+                    Assert.That(window.TrySelect(StageMapSelection.ForRegion(StageRegionKind.Source, 300u), frame: false), Is.True);
+                    Assert.That(window.ResolveEncounterSourceIdForTests(), Is.EqualTo(300u));
+
+                    window.Session.PinHazardEncounterSource = true;
+                    window.Session.PinnedHazardEncounterSourceStableId = 100u;
+                    Assert.That(window.TrySelect(StageMapSelection.ForRegion(StageRegionKind.Source, 300u), frame: false), Is.True);
+                    Assert.That(window.ResolveEncounterSourceIdForTests(), Is.EqualTo(100u));
+
+                    window.Session.PinHazardEncounterSource = false;
+                    Assert.That(window.ResolveEncounterSourceIdForTests(), Is.EqualTo(300u));
+                }
+                finally
+                {
+                    HazardActorPreviewCoordinator.Shutdown();
+                    window.Close();
+                }
+            }
+        }
+
+        [Test]
+        public void EncounterRuleProgress_CommandClampsAndPreservesRuleIdentity()
+        {
+            using (var setup = CreateSetup())
+            {
+                var window = EditorWindow.GetWindow<StageMapEditorWindow>(utility: true, title: "Stage Map Editor Rule Progress Test", focus: false);
+                try
+                {
+                    window.LoadDocument(setup.Document);
+                    Assert.That(window.TrySetEncounterRuleProgress(100u, 1, 0.75f), Is.False);
+
+                    Assert.That(StageMapHazardActorOrchestrationUtility.AddRule(
+                        setup.Document,
+                        100u,
+                        HazardActorOrchestrationActionId.PhaseSet,
+                        1,
+                        out int progressRuleId), Is.True);
+
+                    Assert.That(window.TrySetEncounterRuleProgress(100u, progressRuleId, 0.75f), Is.True);
+                    var rule = setup.Document.HazardActorOrchestrationRules.Single(x => x.RuleId == progressRuleId);
+                    Assert.That(rule.OwningSourceStableId, Is.EqualTo(100u));
+                    Assert.That(rule.TriggerThresholdNormalized, Is.EqualTo(0.75f).Within(0.0001f));
+
+                    Assert.That(window.TrySetEncounterRuleProgress(100u, progressRuleId, 2f), Is.True);
+                    rule = setup.Document.HazardActorOrchestrationRules.Single(x => x.RuleId == progressRuleId);
+                    Assert.That(rule.TriggerThresholdNormalized, Is.EqualTo(1f).Within(0.0001f));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+        }
+
+        [Test]
         public void AnchorMutation_RequiresOwnerAndAnchorLayersButSelectionRemainsAvailable()
         {
             using (var setup = CreateSetup())

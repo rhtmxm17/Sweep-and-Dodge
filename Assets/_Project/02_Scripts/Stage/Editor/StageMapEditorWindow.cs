@@ -15,6 +15,7 @@ namespace SweepNDodge.DotsBullets.Editor
         private Vector2 _rightScroll;
         private Vector2 _issueScroll;
         private Vector2 _diffScroll;
+        private Vector2 _encounterScroll;
         private bool _showRawDocument;
         private bool _showProjectDocuments = true;
         private StageMapDocument _document;
@@ -34,6 +35,8 @@ namespace SweepNDodge.DotsBullets.Editor
         private string _observedDocumentSignature = string.Empty;
         private Vector2Int _navigatorCell;
         private float _encounterPreviewProgress;
+        private int _draggingEncounterRuleId;
+        private uint _draggingEncounterSourceId;
 
         public StageMapDocument ActiveDocument => _document;
         public StageMapEditingSession Session => _session;
@@ -94,10 +97,15 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
             }
 
-            using (new EditorGUILayout.HorizontalScope())
+            using (new EditorGUILayout.VerticalScope())
             {
-                DrawDocumentPanel();
-                DrawRightPanel();
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawDocumentPanel();
+                    DrawRightPanel();
+                }
+
+                DrawEncounterTrack();
             }
         }
 
@@ -392,7 +400,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 DrawSessionToolbar();
                 DrawSelectionNavigator();
                 DrawContextualInspector();
-                DrawEncounterTrack();
                 DrawIssues();
                 DrawImportPanel();
                 DrawDiff();
@@ -475,8 +482,9 @@ namespace SweepNDodge.DotsBullets.Editor
                     DrawCenterPlayerStartPreference();
                     break;
                 case StageMapEditorToolMode.PlaceHazardActor:
-                    _session.HazardActorSourceStableId = DrawUIntField("Source Stable Id", _session.HazardActorSourceStableId);
-                    _session.HazardActorArchetypePrefab = (GameObject)EditorGUILayout.ObjectField("Actor Archetype", _session.HazardActorArchetypePrefab, typeof(GameObject), false);
+                    uint sourceId = ResolveEncounterSourceId();
+                    _session.HazardActorSourceStableId = DrawUIntField("Source Stable Id", sourceId);
+                    DrawHazardActorArchetypePickerButton();
                     _session.HazardActorLocalYawDeg = EditorGUILayout.FloatField("Local Yaw Deg", _session.HazardActorLocalYawDeg);
                     break;
                 case StageMapEditorToolMode.PlacePresentationLink:
@@ -499,6 +507,57 @@ namespace SweepNDodge.DotsBullets.Editor
                     _session.PresentationScale = EditorGUILayout.Vector3Field("Scale", _session.PresentationScale == Vector3.zero ? Vector3.one : _session.PresentationScale);
                     break;
             }
+        }
+
+        private void DrawHazardActorArchetypePickerButton()
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                string label = _session.HazardActorArchetypePrefab != null
+                    ? _session.HazardActorArchetypePrefab.name
+                    : "(none)";
+                EditorGUILayout.LabelField("Actor Archetype", label, EditorStyles.miniLabel);
+                Rect buttonRect = GUILayoutUtility.GetRect(new GUIContent("Change"), EditorStyles.miniButton, GUILayout.Width(72f));
+                if (GUI.Button(buttonRect, "Change", EditorStyles.miniButton))
+                {
+                    PopupWindow.Show(
+                        buttonRect,
+                        new HazardArchetypePickerPopup(
+                            _session.HazardActorArchetypePrefab,
+                            selected =>
+                            {
+                                _session.HazardActorArchetypePrefab = selected;
+                                Repaint();
+                            }));
+                }
+            }
+
+            if (_session.HazardActorArchetypePrefab == null)
+                EditorGUILayout.HelpBox("Choose a HazardActor archetype before placing in Scene View.", MessageType.Info);
+        }
+
+        internal static StageMapHazardArchetypeSummary[] BuildHazardArchetypeSummaries()
+        {
+            string[] guids = AssetDatabase.FindAssets("t:Prefab");
+            var result = new List<StageMapHazardArchetypeSummary>(guids.Length);
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                var actor = prefab != null ? prefab.GetComponentInChildren<HazardActorAuthoring>(true) : null;
+                if (actor == null)
+                    continue;
+
+                result.Add(new StageMapHazardArchetypeSummary(
+                    prefab,
+                    prefab.name,
+                    actor.PhaseSelectorPolicies?.Length ?? 0,
+                    actor.PatternSlots?.Length ?? 0,
+                    HazardActorAuthoringValidationUtility.TryValidateStandalone(actor, out _, out _, out _, out _) ? 0 : 1));
+            }
+
+            result.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+            return result.ToArray();
         }
 
         private void DrawCenterRegionAnchorPreference()
@@ -624,6 +683,8 @@ namespace SweepNDodge.DotsBullets.Editor
             _session.ReconcileSelection(_document);
             if (_session.Selection.Kind == StageMapSelectionKind.None)
                 return false;
+            SyncEncounterSourceFromSelection(_session.Selection);
+            PrepareHazardPreviewForSelection(play: false);
             if (frame)
                 FrameSelection(_session.Selection);
             Repaint();
@@ -883,8 +944,18 @@ namespace SweepNDodge.DotsBullets.Editor
                             out _));
                 }
 
-                if (GUILayout.Button("Delete Hazard Actor"))
-                    RecordAndApply("Delete Stage Hazard Actor", () => StageMapEditorMutationUtility.TryDeleteSelection(_session, out _));
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUI.DisabledScope(placement.ActorArchetypePrefab == null))
+                    {
+                        if (GUILayout.Button("Open in Workbench"))
+                            HazardActorWorkbenchWindow.Open(placement.ActorArchetypePrefab);
+                        if (GUILayout.Button("Actor Preview"))
+                            BeginPlacementPreview(placement, HazardActorPreviewScope.Actor, play: true);
+                    }
+                    if (GUILayout.Button(new GUIContent("X", "Delete Hazard Actor"), GUILayout.Width(32f)))
+                        RecordAndApply("Delete Stage Hazard Actor", () => StageMapEditorMutationUtility.TryDeleteSelection(_session, out _));
+                }
             }
         }
 
@@ -936,7 +1007,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Duplicate Rule"))
+                    if (GUILayout.Button(new GUIContent("C", "Duplicate Rule"), GUILayout.Width(32f)))
                     {
                         RecordAndApply(
                             "Duplicate Stage Hazard Actor Rule",
@@ -948,7 +1019,7 @@ namespace SweepNDodge.DotsBullets.Editor
                                 return changed;
                             });
                     }
-                    if (GUILayout.Button("Delete Rule"))
+                    if (GUILayout.Button(new GUIContent("X", "Delete Rule"), GUILayout.Width(32f)))
                         RecordAndApply("Delete Stage Hazard Actor Rule", () => StageMapEditorMutationUtility.TryDeleteSelection(_session, out _));
                 }
             }
@@ -1012,41 +1083,10 @@ namespace SweepNDodge.DotsBullets.Editor
         private void DrawEncounterTrack()
         {
             EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("Hazard Encounter", EditorStyles.boldLabel);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.MinHeight(180f)))
             {
                 uint sourceId = ResolveEncounterSourceId();
-                sourceId = DrawUIntField("Source Id", sourceId);
-                _session.HazardActorSourceStableId = sourceId;
-                EditorGUI.BeginChangeCheck();
-                _encounterPreviewProgress = EditorGUILayout.Slider("Progress", _encounterPreviewProgress, 0f, 1f);
-                if (EditorGUI.EndChangeCheck() && HazardActorPreviewCoordinator.ActiveEncounterSession != null)
-                {
-                    HazardActorPreviewCoordinator.ActiveEncounterSession.SetSourceProgress(_encounterPreviewProgress);
-                    SceneView.RepaintAll();
-                }
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (GUILayout.Button("Preview Import"))
-                        _hazardOrchestrationImportPlan = StageMapHazardActorOrchestrationUtility.BuildImportPreview(_document);
-                    using (new EditorGUI.DisabledScope(_hazardOrchestrationImportPlan == null || _hazardOrchestrationImportPlan.HasErrors || !_hazardOrchestrationImportPlan.HasChanges))
-                    {
-                        if (GUILayout.Button("Apply Import"))
-                        {
-                            if (!StageMapHazardActorOrchestrationUtility.TryApplyImport(_hazardOrchestrationImportPlan, false, out string error))
-                                EditorUtility.DisplayDialog("Import Hazard Orchestration", error, "OK");
-                            RefreshAfterDocumentMutation(markDirty: true);
-                        }
-                    }
-                }
-
-                if (_hazardOrchestrationImportPlan != null)
-                {
-                    EditorGUILayout.LabelField($"Import candidates: {_hazardOrchestrationImportPlan.CandidateRules.Count}, changes: {_hazardOrchestrationImportPlan.Changes.Count}", EditorStyles.miniLabel);
-                    for (int i = 0; i < _hazardOrchestrationImportPlan.Issues.Count; i++)
-                        EditorGUILayout.HelpBox(_hazardOrchestrationImportPlan.Issues[i].Message, MessageType.Error);
-                }
+                DrawEncounterTrackHeader(sourceId);
 
                 var placements = (_document.HazardActorPlacements ?? Array.Empty<StageMapHazardActorPlacementData>())
                     .Where(x => x.OwningSourceStableId == sourceId)
@@ -1058,56 +1098,251 @@ namespace SweepNDodge.DotsBullets.Editor
                     .ThenBy(x => x.RuleId)
                     .ToArray();
 
-                for (int i = 0; i < placements.Length; i++)
+                if (sourceId == 0u || !SourceExists(sourceId))
                 {
-                    var placement = placements[i];
-                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                    {
-                        using (new EditorGUILayout.HorizontalScope())
-                        {
-                            if (GUILayout.Button($"Placement {placement.PlacementInstanceId}", EditorStyles.miniButtonLeft))
-                                TrySelect(StageMapSelection.ForHazard(sourceId, placement.PlacementInstanceId), frame: true);
-                            if (GUILayout.Button("Actor Preview", EditorStyles.miniButtonRight))
-                                BeginPlacementPreview(placement, HazardActorPreviewScope.Actor);
-                        }
-
-                        using (new EditorGUILayout.HorizontalScope())
-                        {
-                            if (GUILayout.Button("Spawn", EditorStyles.miniButton))
-                                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.Spawn);
-                            if (GUILayout.Button("PhaseSet", EditorStyles.miniButton))
-                                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.PhaseSet);
-                            if (GUILayout.Button("Retire", EditorStyles.miniButton))
-                                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.Retire);
-                        }
-
-                        for (int ruleIndex = 0; ruleIndex < rules.Length; ruleIndex++)
-                        {
-                            var rule = rules[ruleIndex];
-                            if (!ContainsTarget(rule.TargetPlacementInstanceIds, placement.PlacementInstanceId))
-                                continue;
-                            Rect row = EditorGUILayout.GetControlRect(false, 20f);
-                            float x = Mathf.Lerp(row.xMin + 80f, row.xMax - 16f, Mathf.Clamp01(rule.TriggerThresholdNormalized));
-                            EditorGUI.LabelField(new Rect(row.xMin, row.y, 76f, row.height), rule.ActionType.ToString(), EditorStyles.miniLabel);
-                            if (GUI.Button(new Rect(x - 6f, row.y + 2f, 12f, 16f), GUIContent.none))
-                                TrySelect(StageMapSelection.ForHazardRule(sourceId, rule.RuleId), frame: true);
-                            EditorGUI.LabelField(new Rect(x + 8f, row.y, row.xMax - x - 8f, row.height), $"Rule {rule.RuleId}", EditorStyles.miniLabel);
-                        }
-                    }
+                    EditorGUILayout.HelpBox("No active Source is available for Hazard Encounter editing.", MessageType.Warning);
+                    return;
                 }
 
-                using (new EditorGUILayout.HorizontalScope())
+                if (placements.Length == 0)
                 {
-                    if (GUILayout.Button("Encounter Preview"))
-                        BeginEncounterPreviewForSource(sourceId);
-                    if (GUILayout.Button("Step"))
-                    {
-                        HazardActorPreviewCoordinator.StepActiveSession();
-                        SceneView.RepaintAll();
-                    }
-                    if (GUILayout.Button("Restart"))
-                        BeginEncounterPreviewForSource(sourceId);
+                    EditorGUILayout.HelpBox("This Source has no HazardActor placements. Select PlaceHazardActor, choose an archetype, then click in Scene View.", MessageType.Info);
+                    return;
                 }
+
+                DrawEncounterTimeline(sourceId, placements, rules);
+            }
+        }
+
+        private void DrawEncounterTrackHeader(uint sourceId)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Hazard Encounter", EditorStyles.boldLabel, GUILayout.Width(130f));
+                GUILayout.Label($"Source {sourceId}", EditorStyles.miniBoldLabel, GUILayout.Width(88f));
+                bool pin = GUILayout.Toggle(_session.PinHazardEncounterSource, "Pin Source", EditorStyles.miniButton, GUILayout.Width(82f));
+                if (pin != _session.PinHazardEncounterSource)
+                {
+                    _session.PinHazardEncounterSource = pin;
+                    _session.PinnedHazardEncounterSourceStableId = pin ? sourceId : 0u;
+                }
+
+                GUILayout.FlexibleSpace();
+                DrawEncounterPreviewTransport(sourceId);
+            }
+
+            EditorGUI.BeginChangeCheck();
+            _encounterPreviewProgress = EditorGUILayout.Slider("Source Progress", _encounterPreviewProgress, 0f, 1f);
+            if (EditorGUI.EndChangeCheck())
+            {
+                if (HazardActorPreviewCoordinator.ActiveEncounterSession != null)
+                    HazardActorPreviewCoordinator.ActiveEncounterSession.SetSourceProgress(_encounterPreviewProgress);
+                SceneView.RepaintAll();
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Preview Import", EditorStyles.miniButton, GUILayout.Width(96f)))
+                    _hazardOrchestrationImportPlan = StageMapHazardActorOrchestrationUtility.BuildImportPreview(_document);
+                using (new EditorGUI.DisabledScope(_hazardOrchestrationImportPlan == null || _hazardOrchestrationImportPlan.HasErrors || !_hazardOrchestrationImportPlan.HasChanges))
+                {
+                    if (GUILayout.Button("Apply Import", EditorStyles.miniButton, GUILayout.Width(88f)))
+                    {
+                        if (!StageMapHazardActorOrchestrationUtility.TryApplyImport(_hazardOrchestrationImportPlan, false, out string error))
+                            EditorUtility.DisplayDialog("Import Hazard Orchestration", error, "OK");
+                        RefreshAfterDocumentMutation(markDirty: true);
+                    }
+                }
+                if (_hazardOrchestrationImportPlan != null)
+                    EditorGUILayout.LabelField($"Import candidates {_hazardOrchestrationImportPlan.CandidateRules.Count}, changes {_hazardOrchestrationImportPlan.Changes.Count}", EditorStyles.miniLabel);
+            }
+
+            if (_hazardOrchestrationImportPlan != null)
+            {
+                for (int i = 0; i < _hazardOrchestrationImportPlan.Issues.Count; i++)
+                    EditorGUILayout.HelpBox(_hazardOrchestrationImportPlan.Issues[i].Message, MessageType.Error);
+            }
+        }
+
+        private void DrawEncounterPreviewTransport(uint sourceId)
+        {
+            bool hasEncounter = HazardActorPreviewCoordinator.ActiveEncounterSession != null;
+            bool playing = hasEncounter && HazardActorPreviewCoordinator.ActiveEncounterSession.Playing;
+            string playLabel = playing ? "Pause" : "Play";
+            if (GUILayout.Button(playLabel, EditorStyles.miniButtonLeft, GUILayout.Width(54f)))
+            {
+                if (!hasEncounter && BeginEncounterPreviewForSource(sourceId, play: false))
+                    hasEncounter = true;
+                if (HazardActorPreviewCoordinator.ActiveEncounterSession != null)
+                {
+                    if (HazardActorPreviewCoordinator.ActiveEncounterSession.Playing)
+                        HazardActorPreviewCoordinator.ActiveEncounterSession.Pause();
+                    else
+                        HazardActorPreviewCoordinator.ActiveEncounterSession.Play();
+                    SceneView.RepaintAll();
+                }
+            }
+            if (GUILayout.Button("Step", EditorStyles.miniButtonMid, GUILayout.Width(46f)))
+            {
+                if (!hasEncounter)
+                    BeginEncounterPreviewForSource(sourceId, play: false);
+                HazardActorPreviewCoordinator.StepActiveSession();
+                SceneView.RepaintAll();
+            }
+            if (GUILayout.Button("Restart", EditorStyles.miniButtonRight, GUILayout.Width(62f)))
+                BeginEncounterPreviewForSource(sourceId, play: false);
+        }
+
+        private void DrawEncounterTimeline(
+            uint sourceId,
+            StageMapHazardActorPlacementData[] placements,
+            StageMapHazardActorOrchestrationRuleData[] rules)
+        {
+            const float LabelWidth = 170f;
+            const float RowHeight = 28f;
+            Rect header = EditorGUILayout.GetControlRect(false, 18f);
+            Rect axis = new Rect(header.x + LabelWidth, header.y + 2f, Mathf.Max(80f, header.width - LabelWidth - 8f), 12f);
+            EditorGUI.LabelField(new Rect(header.x, header.y, LabelWidth - 4f, header.height), "Placement", EditorStyles.miniBoldLabel);
+            EditorGUI.DrawRect(new Rect(axis.x, axis.center.y, axis.width, 1f), new Color(0.45f, 0.45f, 0.45f, 1f));
+            EditorGUI.LabelField(new Rect(axis.x - 4f, header.y, 24f, header.height), "0", EditorStyles.miniLabel);
+            EditorGUI.LabelField(new Rect(axis.xMax - 16f, header.y, 24f, header.height), "1", EditorStyles.miniLabel);
+
+            _encounterScroll = EditorGUILayout.BeginScrollView(_encounterScroll, GUILayout.MinHeight(96f), GUILayout.MaxHeight(260f));
+            var rowByPlacement = new Dictionary<int, Rect>(placements.Length);
+            for (int i = 0; i < placements.Length; i++)
+            {
+                var placement = placements[i];
+                Rect row = EditorGUILayout.GetControlRect(false, RowHeight);
+                bool selected = _session.Selection.Kind == StageMapSelectionKind.HazardActor
+                    && _session.Selection.OwningSourceStableId == sourceId
+                    && _session.Selection.PlacementInstanceId == placement.PlacementInstanceId;
+                DrawEncounterPlacementRow(sourceId, placement, row, LabelWidth, selected);
+                rowByPlacement[placement.PlacementInstanceId] = row;
+            }
+
+            for (int i = 0; i < rules.Length; i++)
+                DrawEncounterRuleMarker(sourceId, rules[i], rowByPlacement, LabelWidth);
+
+            EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawEncounterPlacementRow(
+            uint sourceId,
+            StageMapHazardActorPlacementData placement,
+            Rect row,
+            float labelWidth,
+            bool selected)
+        {
+            Color rowColor = selected
+                ? new Color(0.25f, 0.42f, 0.78f, 0.28f)
+                : new Color(0.18f, 0.18f, 0.18f, 0.18f);
+            EditorGUI.DrawRect(row, rowColor);
+            float timelineXMin = row.x + labelWidth;
+            float timelineXMax = row.xMax - 92f;
+            EditorGUI.DrawRect(
+                new Rect(Mathf.Lerp(timelineXMin, timelineXMax, Mathf.Clamp01(_encounterPreviewProgress)), row.y + 2f, 1f, row.height - 4f),
+                new Color(0.45f, 0.85f, 1f, 0.85f));
+
+            Rect label = new Rect(row.x + 4f, row.y + 3f, labelWidth - 8f, row.height - 6f);
+            string actorName = placement.ActorArchetypePrefab != null ? placement.ActorArchetypePrefab.name : "(missing prefab)";
+            if (GUI.Button(label, $"#{placement.PlacementInstanceId}  {actorName}", EditorStyles.miniButtonLeft))
+                TrySelect(StageMapSelection.ForHazard(sourceId, placement.PlacementInstanceId), frame: true);
+
+            Rect commands = new Rect(row.xMax - 82f, row.y + 3f, 78f, row.height - 6f);
+            if (GUI.Button(new Rect(commands.x, commands.y, 24f, commands.height), new GUIContent("+S", "Add Spawn rule")))
+                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.Spawn);
+            if (GUI.Button(new Rect(commands.x + 26f, commands.y, 24f, commands.height), new GUIContent("+P", "Add PhaseSet rule")))
+                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.PhaseSet);
+            if (GUI.Button(new Rect(commands.x + 52f, commands.y, 24f, commands.height), new GUIContent("+R", "Add Retire rule")))
+                AddEncounterRule(sourceId, placement.PlacementInstanceId, HazardActorOrchestrationActionId.Retire);
+        }
+
+        private void DrawEncounterRuleMarker(
+            uint sourceId,
+            StageMapHazardActorOrchestrationRuleData rule,
+            Dictionary<int, Rect> rowByPlacement,
+            float labelWidth)
+        {
+            var targets = rule.TargetPlacementInstanceIds ?? Array.Empty<int>();
+            if (targets.Length == 0)
+                return;
+
+            var targetRows = new List<Rect>(targets.Length);
+            for (int i = 0; i < targets.Length; i++)
+            {
+                if (rowByPlacement.TryGetValue(targets[i], out Rect row))
+                    targetRows.Add(row);
+            }
+            if (targetRows.Count == 0)
+                return;
+
+            Rect firstRow = targetRows[0];
+            float xMin = firstRow.x + labelWidth;
+            float xMax = firstRow.xMax - 92f;
+            float progress = rule.TriggerType == HazardActorOrchestrationTriggerId.OnStageStart
+                ? 0f
+                : Mathf.Clamp01(rule.TriggerThresholdNormalized);
+            float markerX = Mathf.Lerp(xMin, xMax, progress);
+            Color color = GetEncounterActionColor(rule.ActionType);
+
+            if (targetRows.Count > 1 && Event.current != null && Event.current.type == EventType.Repaint)
+            {
+                float yMin = targetRows.Min(x => x.center.y);
+                float yMax = targetRows.Max(x => x.center.y);
+                Handles.BeginGUI();
+                Handles.color = new Color(color.r, color.g, color.b, 0.75f);
+                Handles.DrawLine(new Vector3(markerX, yMin, 0f), new Vector3(markerX, yMax, 0f));
+                Handles.EndGUI();
+            }
+
+            for (int i = 0; i < targetRows.Count; i++)
+            {
+                Rect row = targetRows[i];
+                Rect marker = new Rect(markerX - 7f, row.y + 5f, 14f, 18f);
+                EditorGUI.DrawRect(marker, color);
+                GUIContent content = new GUIContent(
+                    GetEncounterActionGlyph(rule.ActionType),
+                    $"{rule.ActionType} Rule {rule.RuleId} @ {rule.TriggerThresholdNormalized:0.###}");
+                if (GUI.Button(marker, content, EditorStyles.miniButton))
+                    TrySelect(StageMapSelection.ForHazardRule(sourceId, rule.RuleId), frame: true);
+                if (rule.TriggerType != HazardActorOrchestrationTriggerId.OnStageStart)
+                    HandleEncounterRuleMarkerDrag(sourceId, rule.RuleId, marker, xMin, xMax);
+            }
+        }
+
+        private void HandleEncounterRuleMarkerDrag(
+            uint sourceId,
+            int ruleId,
+            Rect markerRect,
+            float xMin,
+            float xMax)
+        {
+            Event evt = Event.current;
+            if (evt == null || IsLayerLocked(StageMapEditorLayer.HazardActors))
+                return;
+
+            if (evt.type == EventType.MouseDown && evt.button == 0 && markerRect.Contains(evt.mousePosition))
+            {
+                _draggingEncounterSourceId = sourceId;
+                _draggingEncounterRuleId = ruleId;
+                evt.Use();
+            }
+            else if (evt.type == EventType.MouseDrag
+                && evt.button == 0
+                && _draggingEncounterSourceId == sourceId
+                && _draggingEncounterRuleId == ruleId)
+            {
+                float progress = Mathf.InverseLerp(xMin, xMax, evt.mousePosition.x);
+                TrySetEncounterRuleProgress(sourceId, ruleId, progress);
+                evt.Use();
+            }
+            else if (evt.type == EventType.MouseUp
+                && _draggingEncounterSourceId == sourceId
+                && _draggingEncounterRuleId == ruleId)
+            {
+                _draggingEncounterSourceId = 0u;
+                _draggingEncounterRuleId = 0;
+                evt.Use();
             }
         }
 
@@ -1118,32 +1353,160 @@ namespace SweepNDodge.DotsBullets.Editor
                 () =>
                 {
                     bool changed = StageMapHazardActorOrchestrationUtility.AddRule(_document, sourceId, action, placementId, out int ruleId);
+                    if (changed && action != HazardActorOrchestrationActionId.Spawn)
+                    {
+                        StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(_document, sourceId, ruleId, out int index);
+                        var rule = _document.HazardActorOrchestrationRules[index];
+                        rule.TriggerThresholdNormalized = Mathf.Clamp01(_encounterPreviewProgress);
+                        StageMapHazardActorOrchestrationUtility.UpdateRule(_document, sourceId, ruleId, rule);
+                    }
                     if (changed)
                         _session.Select(StageMapSelection.ForHazardRule(sourceId, ruleId));
                     return changed;
+                });
+            PrepareHazardPreviewForSelection(play: false);
+        }
+
+        public bool TrySetEncounterRuleProgress(uint sourceId, int ruleId, float progress01)
+        {
+            return RecordAndApply(
+                "Move Hazard Encounter Rule Marker",
+                () =>
+                {
+                    if (!StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(_document, sourceId, ruleId, out int index))
+                        return false;
+                    var rule = _document.HazardActorOrchestrationRules[index];
+                    if (rule.TriggerType == HazardActorOrchestrationTriggerId.OnStageStart)
+                        return false;
+                    float next = Mathf.Clamp01(progress01);
+                    if (Mathf.Approximately(rule.TriggerThresholdNormalized, next))
+                        return false;
+                    rule.TriggerThresholdNormalized = next;
+                    return StageMapHazardActorOrchestrationUtility.UpdateRule(_document, sourceId, ruleId, rule);
                 });
         }
 
         private uint ResolveEncounterSourceId()
         {
-            if (_session.Selection.Kind == StageMapSelectionKind.HazardActor || _session.Selection.Kind == StageMapSelectionKind.HazardActorRule)
-                return _session.Selection.OwningSourceStableId;
-            if (_session.HazardActorSourceStableId > 0u)
+            if (_session.PinHazardEncounterSource
+                && _session.PinnedHazardEncounterSourceStableId > 0u
+                && SourceExists(_session.PinnedHazardEncounterSourceStableId))
+            {
+                _session.HazardActorSourceStableId = _session.PinnedHazardEncounterSourceStableId;
+                return _session.PinnedHazardEncounterSourceStableId;
+            }
+
+            if (TryGetSourceIdFromSelection(_session.Selection, out uint selectedSourceId)
+                && SourceExists(selectedSourceId))
+            {
+                _session.HazardActorSourceStableId = selectedSourceId;
+                return selectedSourceId;
+            }
+
+            if (_session.HazardActorSourceStableId > 0u && SourceExists(_session.HazardActorSourceStableId))
                 return _session.HazardActorSourceStableId;
+
             var sources = _document.SourceRegions ?? Array.Empty<StageMapRegionData>();
             for (int i = 0; i < sources.Length; i++)
             {
                 if (sources[i].Active && sources[i].StableId > 0u)
+                {
+                    _session.HazardActorSourceStableId = sources[i].StableId;
                     return sources[i].StableId;
+                }
             }
-            return 1u;
+            return 0u;
         }
 
-        private void BeginPlacementPreview(StageMapHazardActorPlacementData placement, HazardActorPreviewScope scope)
+        public uint ResolveEncounterSourceIdForTests()
+        {
+            return ResolveEncounterSourceId();
+        }
+
+        private void SyncEncounterSourceFromSelection(StageMapSelection selection)
+        {
+            if (_session.PinHazardEncounterSource)
+                return;
+            if (!TryGetSourceIdFromSelection(selection, out uint sourceId) || !SourceExists(sourceId))
+                return;
+            _session.HazardActorSourceStableId = sourceId;
+        }
+
+        public bool PrepareHazardPreviewForSelection(bool play)
+        {
+            if (_document == null)
+                return false;
+
+            StageMapSelection selection = _session.Selection;
+            if (selection.Kind == StageMapSelectionKind.HazardActor
+                && StageMapHazardActorOrchestrationUtility.TryFindPlacement(
+                    _document,
+                    selection.OwningSourceStableId,
+                    selection.PlacementInstanceId,
+                    out var placement))
+            {
+                BeginPlacementPreview(placement, HazardActorPreviewScope.Actor, play);
+                return HazardActorPreviewCoordinator.ActiveSession != null;
+            }
+
+            if (selection.Kind == StageMapSelectionKind.HazardActorRule
+                && StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                    _document,
+                    selection.OwningSourceStableId,
+                    selection.RuleId,
+                    out int ruleIndex))
+            {
+                var rule = _document.HazardActorOrchestrationRules[ruleIndex];
+                _encounterPreviewProgress = Mathf.Clamp01(rule.TriggerThresholdNormalized);
+                return BeginEncounterPreviewForSource(selection.OwningSourceStableId, play);
+            }
+
+            if ((selection.Kind == StageMapSelectionKind.SourceRegion || selection.Kind == StageMapSelectionKind.SourceAnchor)
+                && SourceExists(selection.StableId))
+            {
+                return BeginEncounterPreviewForSource(selection.StableId, play);
+            }
+
+            return false;
+        }
+
+        private bool SourceExists(uint sourceId)
+        {
+            var sources = _document != null ? _document.SourceRegions : null;
+            if (sources == null || sourceId == 0u)
+                return false;
+            for (int i = 0; i < sources.Length; i++)
+            {
+                if (sources[i].StableId == sourceId && sources[i].Active)
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool TryGetSourceIdFromSelection(StageMapSelection selection, out uint sourceId)
+        {
+            sourceId = 0u;
+            switch (selection.Kind)
+            {
+                case StageMapSelectionKind.SourceRegion:
+                case StageMapSelectionKind.SourceAnchor:
+                    sourceId = selection.StableId;
+                    return sourceId > 0u;
+                case StageMapSelectionKind.HazardActor:
+                case StageMapSelectionKind.HazardActorRule:
+                    sourceId = selection.OwningSourceStableId;
+                    return sourceId > 0u;
+                default:
+                    return false;
+            }
+        }
+
+        private void BeginPlacementPreview(StageMapHazardActorPlacementData placement, HazardActorPreviewScope scope, bool play = true)
         {
             if (placement.ActorArchetypePrefab == null)
                 return;
-            HazardActorPreviewSnapshotBuilder.TryBuild(placement.ActorArchetypePrefab, out var snapshot);
+            if (!HazardActorPreviewSnapshotBuilder.TryBuild(placement.ActorArchetypePrefab, out var snapshot))
+                return;
             if (!StageMapSelectionUtility.TryFindUniqueHazardIndex(_document.HazardActorPlacements, placement.OwningSourceStableId, placement.PlacementInstanceId, out int hazardIndex))
                 return;
             Vector3 world = StageMapSelectionUtility.GetHazardActorWorld(_document, hazardIndex);
@@ -1157,12 +1520,18 @@ namespace SweepNDodge.DotsBullets.Editor
                 TargetWorldPosition = StageMapSelectionUtility.GetPlayerStartWorld(_document),
                 SpawnAtStart = true,
             });
-            session.Play();
+            if (play)
+                session.Play();
             HazardActorPreviewCoordinator.SetActiveSession(session);
             SceneView.RepaintAll();
         }
 
         public bool BeginEncounterPreviewForSource(uint sourceId)
+        {
+            return BeginEncounterPreviewForSource(sourceId, play: true);
+        }
+
+        public bool BeginEncounterPreviewForSource(uint sourceId, bool play)
         {
             var placements = _document.HazardActorPlacements ?? Array.Empty<StageMapHazardActorPlacementData>();
             int matchingCount = placements.Count(x => x.OwningSourceStableId == sourceId && x.ActorArchetypePrefab != null);
@@ -1194,7 +1563,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 return false;
             }
 
-            encounter.Play();
+            if (play)
+                encounter.Play();
             HazardActorPreviewCoordinator.SetActiveEncounterSession(encounter);
             SceneView.RepaintAll();
             return true;
@@ -1264,6 +1634,28 @@ namespace SweepNDodge.DotsBullets.Editor
                     return true;
             }
             return false;
+        }
+
+        private static Color GetEncounterActionColor(HazardActorOrchestrationActionId action)
+        {
+            switch (action)
+            {
+                case HazardActorOrchestrationActionId.Spawn: return new Color(0.25f, 0.85f, 0.35f, 1f);
+                case HazardActorOrchestrationActionId.PhaseSet: return new Color(0.35f, 0.65f, 1f, 1f);
+                case HazardActorOrchestrationActionId.Retire: return new Color(1f, 0.45f, 0.25f, 1f);
+                default: return new Color(0.7f, 0.7f, 0.7f, 1f);
+            }
+        }
+
+        private static string GetEncounterActionGlyph(HazardActorOrchestrationActionId action)
+        {
+            switch (action)
+            {
+                case HazardActorOrchestrationActionId.Spawn: return "S";
+                case HazardActorOrchestrationActionId.PhaseSet: return "P";
+                case HazardActorOrchestrationActionId.Retire: return "R";
+                default: return "?";
+            }
         }
 
         private void DrawIssues()
@@ -1653,15 +2045,20 @@ namespace SweepNDodge.DotsBullets.Editor
             if (placements == null)
                 return;
 
+            uint activeSourceId = ResolveEncounterSourceId();
             for (int i = 0; i < placements.Length; i++)
             {
                 Vector3 baseWorld = TryGetRegionAnchorWorld(StageRegionKind.Source, placements[i].OwningSourceStableId, out var anchor)
                     ? anchor
                     : _document.Grid.Origin;
                 Vector3 world = baseWorld + placements[i].SourceLocalOffset;
-                Handles.color = new Color(1f, 0.25f, 0.75f, 1f);
+                bool activeSource = placements[i].OwningSourceStableId == activeSourceId;
+                Handles.color = activeSource
+                    ? new Color(1f, 0.25f, 0.75f, 1f)
+                    : new Color(1f, 0.25f, 0.75f, 0.28f);
                 Handles.DrawWireCube(world, Vector3.one * (_document.Grid.CellSize * 0.25f));
-                Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), $"Hazard {placements[i].PlacementInstanceId}");
+                if (activeSource)
+                    Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), $"Hazard {placements[i].PlacementInstanceId}");
             }
         }
 
@@ -2118,6 +2515,101 @@ namespace SweepNDodge.DotsBullets.Editor
                     values.Add(value);
             }
             return values.ToArray();
+        }
+
+        internal readonly struct StageMapHazardArchetypeSummary
+        {
+            public StageMapHazardArchetypeSummary(GameObject prefab, string name, int phaseCount, int patternCount, int issueCount)
+            {
+                Prefab = prefab;
+                Name = name ?? string.Empty;
+                PhaseCount = phaseCount;
+                PatternCount = patternCount;
+                IssueCount = issueCount;
+            }
+
+            public GameObject Prefab { get; }
+            public string Name { get; }
+            public int PhaseCount { get; }
+            public int PatternCount { get; }
+            public int IssueCount { get; }
+        }
+
+        private sealed class HazardArchetypePickerPopup : PopupWindowContent
+        {
+            private readonly GameObject _current;
+            private readonly Action<GameObject> _select;
+            private Vector2 _scroll;
+            private string _search = string.Empty;
+            private StageMapHazardArchetypeSummary[] _summaries;
+
+            public HazardArchetypePickerPopup(GameObject current, Action<GameObject> select)
+            {
+                _current = current;
+                _select = select;
+            }
+
+            public override Vector2 GetWindowSize()
+            {
+                return new Vector2(520f, 360f);
+            }
+
+            public override void OnOpen()
+            {
+                _summaries = BuildHazardArchetypeSummaries();
+            }
+
+            public override void OnGUI(Rect rect)
+            {
+                if (_summaries == null)
+                    _summaries = BuildHazardArchetypeSummaries();
+
+                EditorGUILayout.LabelField("Hazard Actor Archetypes", EditorStyles.boldLabel);
+                _search = EditorGUILayout.TextField("Search", _search);
+                DrawHeader();
+                _scroll = EditorGUILayout.BeginScrollView(_scroll);
+                for (int i = 0; i < _summaries.Length; i++)
+                {
+                    var summary = _summaries[i];
+                    if (!MatchesSearch(summary, _search))
+                        continue;
+                    DrawRow(summary);
+                }
+                EditorGUILayout.EndScrollView();
+            }
+
+            private void DrawHeader()
+            {
+                using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField("Name", EditorStyles.miniBoldLabel, GUILayout.MinWidth(220f));
+                    EditorGUILayout.LabelField("Phases", EditorStyles.miniBoldLabel, GUILayout.Width(56f));
+                    EditorGUILayout.LabelField("Patterns", EditorStyles.miniBoldLabel, GUILayout.Width(64f));
+                    EditorGUILayout.LabelField("Issues", EditorStyles.miniBoldLabel, GUILayout.Width(52f));
+                }
+            }
+
+            private void DrawRow(StageMapHazardArchetypeSummary summary)
+            {
+                bool selected = summary.Prefab == _current;
+                using (new EditorGUILayout.HorizontalScope(selected ? EditorStyles.helpBox : GUIStyle.none))
+                {
+                    if (GUILayout.Button(summary.Name, EditorStyles.miniButtonLeft, GUILayout.MinWidth(220f)))
+                    {
+                        _select?.Invoke(summary.Prefab);
+                        editorWindow.Close();
+                    }
+                    EditorGUILayout.LabelField(summary.PhaseCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(56f));
+                    EditorGUILayout.LabelField(summary.PatternCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(64f));
+                    EditorGUILayout.LabelField(summary.IssueCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(52f));
+                }
+            }
+
+            private static bool MatchesSearch(StageMapHazardArchetypeSummary summary, string search)
+            {
+                return string.IsNullOrWhiteSpace(search)
+                    || summary.Name.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
         }
     }
 }

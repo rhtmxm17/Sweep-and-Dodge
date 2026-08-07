@@ -194,10 +194,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 AssertSelectionSection(window, StageMapSelection.ForPlayerStart(), StageMapInspectorSection.PlayerStart);
 
                 StageMapHazardActorPlacementData hazard = document.HazardActorPlacements.First();
+                HazardActorPreviewCoordinator.Shutdown();
                 AssertSelectionSection(
                     window,
                     StageMapSelection.ForHazard(hazard.OwningSourceStableId, hazard.PlacementInstanceId),
                     StageMapInspectorSection.HazardActor);
+                Assert.That(HazardActorPreviewCoordinator.ActiveSession, Is.Not.Null);
+                Assert.That(HazardActorPreviewCoordinator.ActiveSession.Playing, Is.False);
                 Assert.That(window.BeginEncounterPreviewForSource(hazard.OwningSourceStableId), Is.True);
                 Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession, Is.Not.Null);
                 Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession.ActiveActorCount, Is.GreaterThan(0));

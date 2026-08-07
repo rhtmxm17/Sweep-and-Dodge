@@ -185,6 +185,8 @@ namespace SweepNDodge.DotsBullets.Editor
         public uint HazardActorSourceStableId { get; set; } = 1u;
         public GameObject HazardActorArchetypePrefab { get; set; }
         public float HazardActorLocalYawDeg { get; set; }
+        public bool PinHazardEncounterSource { get; set; }
+        public uint PinnedHazardEncounterSourceStableId { get; set; }
         public uint PresentationStableId { get; set; } = 1u;
         public string PresentationKey { get; set; } = string.Empty;
         public StagePresentationPlacementMode PresentationPlacementMode { get; set; } = StagePresentationPlacementMode.Standalone;
