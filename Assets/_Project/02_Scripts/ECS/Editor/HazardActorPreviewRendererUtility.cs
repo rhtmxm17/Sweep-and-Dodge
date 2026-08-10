@@ -202,6 +202,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 rect,
                 out Vector2 targetPosition);
             int markerQuadCount = (drawActor ? 1 : 0) + (drawTarget ? 1 : 0);
+            if (drawActor && _session.Frame.PhaseChangedThisFrame)
+                markerQuadCount++;
             int quadCount = ghostQuadCount + markerQuadCount;
             LastVisibleGhostCount = _displayMode == HazardActorPreviewDisplayMode.Exact
                 ? ghostQuadCount
@@ -217,7 +219,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 DrawDensity(mesh, rect, ref quadIndex);
 
             if (drawActor)
-                AddQuad(mesh, actorPosition, 7f, new Color32(255, 70, 210, 255), quadIndex++);
+            {
+                if (_session.Frame.PhaseChangedThisFrame)
+                    AddQuad(mesh, actorPosition, 14f, new Color32(255, 240, 40, 145), quadIndex++);
+                AddQuad(mesh, actorPosition, 7f, HazardActorPreviewRendererUtility.GetPhaseColor(_session.Frame.PhaseId), quadIndex++);
+            }
             if (drawTarget)
                 AddQuad(mesh, targetPosition, 6f, new Color32(255, 220, 60, 255), quadIndex++);
             LastDrawSubmissions = 1;
@@ -400,6 +406,18 @@ namespace SweepNDodge.DotsBullets.Editor
         public static int LastRenderedGhostCount { get; private set; }
         public static int LastAggregateCount { get; private set; }
         public static bool HasAllocatedResources => _quadMesh != null || _ghostMaterial != null || _aggregateMaterial != null;
+
+        public static Color32 GetPhaseColor(int phaseId)
+        {
+            if (phaseId <= 0)
+                return new Color32(255, 70, 210, 255);
+
+            uint hash = (uint)phaseId * 2654435761u;
+            float hue = (hash & 0xFFFFu) / 65535f;
+            Color color = Color.HSVToRGB(hue, 0.68f, 1f);
+            color.a = 1f;
+            return color;
+        }
 
         public static int EstimateDrawSubmissions(int ghostCount, bool drawAggregate)
         {

@@ -255,7 +255,62 @@ namespace SweepNDodge.DotsBullets.Tests
                     session.Step();
 
                 Assert.That(session.Frame.PhaseId, Is.EqualTo(2));
+                Assert.That(session.Frame.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(session.Frame.PhaseVersion, Is.EqualTo(1u));
                 Assert.That(session.Frame.PatternSlotId, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void PreviewFrame_ExposesPhaseChangeAndLeadInTransitionState()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var instant = new HazardActorPreviewSession();
+                instant.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 1f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                instant.Step();
+
+                Assert.That(instant.Frame.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(instant.Frame.PhaseId, Is.EqualTo(2));
+                Assert.That(instant.Frame.PendingPhaseId, Is.EqualTo(-1));
+                Assert.That(instant.Frame.PhaseVersion, Is.EqualTo(1u));
+                Assert.That(instant.Frame.TransitionState, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+                Assert.That(instant.Frame.PhaseChangedThisFrame, Is.True);
+
+                setup.Actor.PhaseProgressTransitions[0].TransitionLeadInSec = HazardActorPreviewSession.FixedDeltaTime;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out snapshot);
+                var leadIn = new HazardActorPreviewSession();
+                leadIn.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 1f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                leadIn.Step();
+
+                Assert.That(leadIn.Frame.PhaseId, Is.EqualTo(1));
+                Assert.That(leadIn.Frame.PendingPhaseId, Is.EqualTo(2));
+                Assert.That(leadIn.Frame.TransitionState, Is.EqualTo(HazardActorPhaseTransitionStateId.Preparing));
+                Assert.That(leadIn.Frame.TransitionDurationSec, Is.EqualTo(HazardActorPreviewSession.FixedDeltaTime).Within(0.0001f));
+                Assert.That(leadIn.Frame.PhaseChangedThisFrame, Is.False);
+
+                leadIn.Step();
+
+                Assert.That(leadIn.Frame.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(leadIn.Frame.PhaseId, Is.EqualTo(2));
+                Assert.That(leadIn.Frame.PendingPhaseId, Is.EqualTo(-1));
+                Assert.That(leadIn.Frame.TransitionState, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+                Assert.That(leadIn.Frame.PhaseChangedThisFrame, Is.True);
             }
         }
 

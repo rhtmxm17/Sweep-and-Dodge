@@ -419,6 +419,48 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void HazardPreviewIdentity_MarksOnlyActivePreviewPlacementAsTarget()
+        {
+            using (var setup = CreateSetup())
+            {
+                var previewAssets = new List<ScriptableObject>();
+                var window = EditorWindow.GetWindow<StageMapEditorWindow>(utility: true, title: "Stage Map Editor Hazard Preview Identity Test", focus: false);
+                try
+                {
+                    ConfigurePreviewableHazardActorPrefab(setup.Prefab, previewAssets);
+                    HazardActorPreviewCoordinator.Shutdown();
+                    window.LoadDocument(setup.Document);
+                    var hazard = setup.Document.HazardActorPlacements[0];
+
+                    Assert.That(window.TrySelect(StageMapSelection.ForHazard(hazard.OwningSourceStableId, hazard.PlacementInstanceId), frame: false), Is.True);
+                    Assert.That(window.PrepareHazardPreviewForSelection(play: false), Is.True);
+
+                    Assert.That(HazardActorPreviewCoordinator.ActiveSession, Is.Not.Null);
+                    Assert.That(HazardActorPreviewCoordinator.ActiveSession.Input.OwningSourceStableId, Is.EqualTo(hazard.OwningSourceStableId));
+                    Assert.That(HazardActorPreviewCoordinator.ActiveSession.Input.PlacementInstanceId, Is.EqualTo(hazard.PlacementInstanceId));
+                    Assert.That(StageMapEditorWindow.IsHazardPlacementPreviewTarget(hazard.OwningSourceStableId, hazard.PlacementInstanceId), Is.True);
+                    Assert.That(StageMapEditorWindow.IsHazardPlacementPreviewTarget(hazard.OwningSourceStableId, hazard.PlacementInstanceId + 1), Is.False);
+
+                    Assert.That(window.BeginEncounterPreviewForSource(hazard.OwningSourceStableId, play: false), Is.True);
+                    Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession, Is.Not.Null);
+                    Assert.That(
+                        HazardActorPreviewCoordinator.ActiveEncounterSession.Actors.Any(x =>
+                            x.Input.OwningSourceStableId == hazard.OwningSourceStableId
+                            && x.Input.PlacementInstanceId == hazard.PlacementInstanceId),
+                        Is.True);
+                    Assert.That(StageMapEditorWindow.IsHazardPlacementPreviewTarget(hazard.OwningSourceStableId, hazard.PlacementInstanceId), Is.True);
+                }
+                finally
+                {
+                    HazardActorPreviewCoordinator.Shutdown();
+                    window.Close();
+                    for (int i = 0; i < previewAssets.Count; i++)
+                        UnityEngine.Object.DestroyImmediate(previewAssets[i]);
+                }
+            }
+        }
+
+        [Test]
         public void EncounterRuleProgress_CommandClampsAndPreservesRuleIdentity()
         {
             using (var setup = CreateSetup())
@@ -642,6 +684,52 @@ namespace SweepNDodge.DotsBullets.Tests
             document.TargetCatalog = catalog;
             document.PresentationCatalog = presentationCatalog;
             return new Setup(document, prefab, layout, definition, catalog, presentationCatalog);
+        }
+
+        private static void ConfigurePreviewableHazardActorPrefab(GameObject prefab, List<ScriptableObject> created)
+        {
+            var actor = prefab.AddComponent<HazardActorAuthoring>();
+            actor.InitialPresenceState = HazardActorPresenceStateId.Active;
+            actor.InitialPhaseId = 1;
+            actor.PhaseSelectorPolicies = new[]
+            {
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { PatternSlotId = 1 } },
+                },
+            };
+
+            var bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            created.Add(bullet);
+            bullet.Editor_SetDefinitionId(101);
+            bullet.Speed = 1f;
+            bullet.Lifetime = 1f;
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            created.Add(telegraph);
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            created.Add(profile);
+            profile.Bullet = bullet;
+            profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+            profile.Aim = new FixedAimAuthoring();
+            profile.ShotPattern = new SingleShotPatternAuthoring();
+            actor.PatternSlots = new[]
+            {
+                new HazardActorPatternSlotAuthoring
+                {
+                    PatternSlotId = 1,
+                    TelegraphProfile = telegraph,
+                    Emission = new HazardActorEmissionAuthoring
+                    {
+                        Profile = profile,
+                        EventRepeatCount = 1,
+                        EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                        CooldownSec = 0f,
+                    },
+                    BaseWeight = 1f,
+                },
+            };
         }
 
         private readonly struct Setup : IDisposable

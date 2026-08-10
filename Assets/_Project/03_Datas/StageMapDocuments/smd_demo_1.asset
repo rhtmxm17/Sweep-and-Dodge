@@ -3744,8 +3744,8 @@ MonoBehaviour:
     RuleId: 1
     TargetPlacementInstanceIds: 02000000
     ActionType: 1
-    TriggerType: 1
-    TriggerThresholdNormalized: 0
+    TriggerType: 2
+    TriggerThresholdNormalized: 0.4
     TargetPhaseId: 1
   - OwningSourceStableId: 1001
     RuleId: 2
@@ -3753,6 +3753,13 @@ MonoBehaviour:
     ActionType: 2
     TriggerType: 2
     TriggerThresholdNormalized: 0.6
+    TargetPhaseId: 2
+  - OwningSourceStableId: 1001
+    RuleId: 3
+    TargetPlacementInstanceIds: 02000000
+    ActionType: 3
+    TriggerType: 2
+    TriggerThresholdNormalized: 0.8
     TargetPhaseId: 2
   PresentationLinks:
   - StableId: 9001

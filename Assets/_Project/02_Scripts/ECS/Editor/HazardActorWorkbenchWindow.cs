@@ -792,7 +792,8 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 _previewStatusLabel.text =
                     $"Preview: {binding.PresentationLabel} | Target: Live ({_previewTargetWorldPosition.x:0.##}, {_previewTargetWorldPosition.z:0.##}) | " +
-                    $"t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} " +
+                    $"t={_previewSession.TimeSec:0.00} presence={frame.Presence} phase={frame.PhaseId} prev={frame.PreviousPhaseId} " +
+                    $"pending={FormatPendingPhase(frame)} transition={FormatPhaseTransition(frame)} " +
                     $"pattern={frame.PatternSlotId} {frame.Lifecycle} | ghosts={frame.ActiveGhostCount}/{_previewSession.GhostCap} " +
                     $"suppressed={frame.SuppressedGhostCount} | display={_previewDisplayMode}";
             }
@@ -805,6 +806,18 @@ namespace SweepNDodge.DotsBullets.Editor
                 _previewSurface.MarkDirtyRepaint();
             }
             Repaint();
+        }
+
+        private static string FormatPendingPhase(HazardActorPreviewFrame frame)
+        {
+            return frame.PendingPhaseId > 0 ? frame.PendingPhaseId.ToString() : "-";
+        }
+
+        private static string FormatPhaseTransition(HazardActorPreviewFrame frame)
+        {
+            if (frame.TransitionState != HazardActorPhaseTransitionStateId.Preparing)
+                return frame.PhaseChangedThisFrame ? "changed" : frame.TransitionState.ToString();
+            return $"{frame.TransitionState} {frame.TransitionElapsedSec:0.00}/{frame.TransitionDurationSec:0.00}s";
         }
 
         private void SetPreviewTarget(Vector3 target)

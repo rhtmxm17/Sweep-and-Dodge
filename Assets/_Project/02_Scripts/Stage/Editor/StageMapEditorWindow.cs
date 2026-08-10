@@ -1514,6 +1514,8 @@ namespace SweepNDodge.DotsBullets.Editor
             session.Load(snapshot, new HazardActorPreviewInput
             {
                 Scope = scope,
+                OwningSourceStableId = placement.OwningSourceStableId,
+                PlacementInstanceId = placement.PlacementInstanceId,
                 SourceProgress01 = _encounterPreviewProgress,
                 ActorWorldPosition = world,
                 ActorYawDeg = placement.LocalYawDeg,
@@ -1589,6 +1591,8 @@ namespace SweepNDodge.DotsBullets.Editor
             input = new HazardActorPreviewInput
             {
                 Scope = HazardActorPreviewScope.Encounter,
+                OwningSourceStableId = placement.OwningSourceStableId,
+                PlacementInstanceId = placement.PlacementInstanceId,
                 GhostCapOverride = capPerActor,
                 SourceProgress01 = _encounterPreviewProgress,
                 ActorWorldPosition = world,
@@ -2056,10 +2060,42 @@ namespace SweepNDodge.DotsBullets.Editor
                 Handles.color = activeSource
                     ? new Color(1f, 0.25f, 0.75f, 1f)
                     : new Color(1f, 0.25f, 0.75f, 0.28f);
-                Handles.DrawWireCube(world, Vector3.one * (_document.Grid.CellSize * 0.25f));
+                if (!IsHazardPlacementPreviewTarget(placements[i].OwningSourceStableId, placements[i].PlacementInstanceId))
+                    Handles.DrawWireCube(world, Vector3.one * (_document.Grid.CellSize * 0.25f));
                 if (activeSource)
                     Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), $"Hazard {placements[i].PlacementInstanceId}");
             }
+        }
+
+        public static bool IsHazardPlacementPreviewTarget(uint owningSourceStableId, int placementInstanceId)
+        {
+            if (owningSourceStableId == 0u || placementInstanceId <= 0)
+                return false;
+
+            var active = HazardActorPreviewCoordinator.ActiveSession;
+            if (active != null && MatchesPreviewInput(active.Input, owningSourceStableId, placementInstanceId))
+                return true;
+
+            var encounter = HazardActorPreviewCoordinator.ActiveEncounterSession;
+            if (encounter == null)
+                return false;
+
+            var actors = encounter.Actors;
+            for (int i = 0; i < actors.Count; i++)
+            {
+                if (MatchesPreviewInput(actors[i].Input, owningSourceStableId, placementInstanceId))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool MatchesPreviewInput(
+            HazardActorPreviewInput input,
+            uint owningSourceStableId,
+            int placementInstanceId)
+        {
+            return input.OwningSourceStableId == owningSourceStableId
+                && input.PlacementInstanceId == placementInstanceId;
         }
 
         private void DrawPresentationLinks()

@@ -153,6 +153,8 @@ namespace SweepNDodge.DotsBullets.Editor
     public struct HazardActorPreviewInput
     {
         public HazardActorPreviewScope Scope;
+        public uint OwningSourceStableId;
+        public int PlacementInstanceId;
         public int ForcedPhaseId;
         public int ForcedPatternSlotId;
         public int GhostCapOverride;
@@ -205,7 +207,14 @@ namespace SweepNDodge.DotsBullets.Editor
     public sealed class HazardActorPreviewFrame
     {
         public HazardActorPresenceStateId Presence;
+        public int PreviousPhaseId;
         public int PhaseId;
+        public int PendingPhaseId;
+        public uint PhaseVersion;
+        public HazardActorPhaseTransitionStateId TransitionState;
+        public float TransitionElapsedSec;
+        public float TransitionDurationSec;
+        public bool PhaseChangedThisFrame;
         public int PatternSlotId;
         public HazardActorEmitLifecycleStateId Lifecycle;
         public float LifecycleElapsedSec;
@@ -400,6 +409,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public void SetTargetWorldPosition(Vector3 targetWorldPosition)
         {
             _input.TargetWorldPosition = targetWorldPosition;
+            Frame.PhaseChangedThisFrame = false;
             PublishFrame();
         }
 
@@ -429,6 +439,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _appliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId;
             _remainingRepeats = 0;
             _repeatElapsed = 0f;
+            Frame.PhaseChangedThisFrame = false;
             PublishFrame();
         }
 
@@ -457,6 +468,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         public void Step()
         {
+            Frame.PhaseChangedThisFrame = false;
             if (_snapshot == null || _snapshot.HasErrors)
             {
                 _warning = "Preview snapshot has validation errors.";
@@ -1043,6 +1055,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _pendingPhaseId = -1;
             _transitionElapsed = 0f;
             _transitionDuration = 0f;
+            Frame.PhaseChangedThisFrame = _previousPhaseId != _phaseId;
             ResetEmit();
         }
 
@@ -1150,7 +1163,13 @@ namespace SweepNDodge.DotsBullets.Editor
         private void PublishFrame()
         {
             Frame.Presence = _presence;
+            Frame.PreviousPhaseId = _previousPhaseId;
             Frame.PhaseId = _phaseId;
+            Frame.PendingPhaseId = _pendingPhaseId;
+            Frame.PhaseVersion = _phaseVersion;
+            Frame.TransitionState = _transitionState;
+            Frame.TransitionElapsedSec = _transitionElapsed;
+            Frame.TransitionDurationSec = _transitionDuration;
             Frame.PatternSlotId = _currentPatternSlotId;
             Frame.Lifecycle = _lifecycle;
             Frame.LifecycleElapsedSec = _lifecycleElapsed;
@@ -1494,11 +1513,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 return;
 
             var input = _activeSession.Input;
-            float radius = 0.25f;
-            Handles.color = Color.magenta;
-            Handles.DrawWireDisc(input.ActorWorldPosition, Vector3.up, radius);
-            Vector3 forward = Quaternion.Euler(0f, input.ActorYawDeg, 0f) * Vector3.forward;
-            Handles.DrawLine(input.ActorWorldPosition, input.ActorWorldPosition + forward * 0.7f);
+            DrawActorPhaseOrigin(input, _activeSession.Frame, 0.25f, 0.7f);
 
             var ghosts = _activeSession.Ghosts;
             HazardActorPreviewRendererUtility.DrawGhostInstances(
@@ -1516,10 +1531,7 @@ namespace SweepNDodge.DotsBullets.Editor
             {
                 var actor = actors[actorIndex];
                 var input = actor.Input;
-                Handles.color = Color.magenta;
-                Handles.DrawWireDisc(input.ActorWorldPosition, Vector3.up, 0.2f);
-                Vector3 forward = Quaternion.Euler(0f, input.ActorYawDeg, 0f) * Vector3.forward;
-                Handles.DrawLine(input.ActorWorldPosition, input.ActorWorldPosition + forward * 0.55f);
+                DrawActorPhaseOrigin(input, actor.Frame, 0.2f, 0.55f);
 
                 HazardActorPreviewRendererUtility.DrawGhostInstances(
                     actor.Ghosts,
@@ -1529,6 +1541,37 @@ namespace SweepNDodge.DotsBullets.Editor
 
             if (!string.IsNullOrEmpty(encounter.Frame.Warning) && actors.Count > 0)
                 Handles.Label(actors[0].Input.ActorWorldPosition + Vector3.up * 0.6f, encounter.Frame.Warning);
+        }
+
+        private static void DrawActorPhaseOrigin(
+            HazardActorPreviewInput input,
+            HazardActorPreviewFrame frame,
+            float radius,
+            float forwardLength)
+        {
+            Color phaseColor = HazardActorPreviewRendererUtility.GetPhaseColor(frame.PhaseId);
+            Handles.color = phaseColor;
+            Handles.DrawWireDisc(input.ActorWorldPosition, Vector3.up, radius);
+            Vector3 forward = Quaternion.Euler(0f, input.ActorYawDeg, 0f) * Vector3.forward;
+            Handles.DrawLine(input.ActorWorldPosition, input.ActorWorldPosition + forward * forwardLength);
+            if (frame.PhaseChangedThisFrame)
+            {
+                Handles.color = new Color(1f, 0.95f, 0.15f, 0.95f);
+                Handles.DrawWireDisc(input.ActorWorldPosition, Vector3.up, radius * 1.8f);
+            }
+
+            Handles.Label(
+                input.ActorWorldPosition + Vector3.up * (radius * 1.4f),
+                BuildPhasePreviewLabel(frame));
+        }
+
+        public static string BuildPhasePreviewLabel(HazardActorPreviewFrame frame)
+        {
+            string phase = frame.TransitionState == HazardActorPhaseTransitionStateId.Preparing && frame.PendingPhaseId > 0
+                ? $"Phase {frame.PhaseId} -> {frame.PendingPhaseId}"
+                : $"Phase {frame.PhaseId}";
+            string pattern = frame.PatternSlotId > 0 ? $" / Pattern {frame.PatternSlotId}" : " / Pattern -";
+            return phase + pattern;
         }
 
         private static void EnsureHooks()
