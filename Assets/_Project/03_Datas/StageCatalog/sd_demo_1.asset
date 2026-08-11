@@ -43,13 +43,35 @@ MonoBehaviour:
       ActorArchetypePrefab: {fileID: 4069771742991948589, guid: be2250d34f47b4d4389d07084b4b5da8, type: 3}
       LocalOffset: {x: -6.0067773, y: 0, z: 2.044446}
       LocalYawDeg: 0
+    - PlacementInstanceId: 2
+      ActorArchetypePrefab: {fileID: 4287959101875013301, guid: 5c5e42d5ef02ba0469460d7cfdc790c3, type: 3}
+      LocalOffset: {x: 6, y: -0.000000016863282, z: -3}
+      LocalYawDeg: 0
     HazardActorOrchestrationRules:
+    - RuleId: 1
+      TargetPlacementInstanceIds: 02000000
+      ActionType: 1
+      TriggerType: 2
+      TriggerThresholdNormalized: 0.4
+      TargetPhaseId: 1
+    - RuleId: 2
+      TargetPlacementInstanceIds: 02000000
+      ActionType: 2
+      TriggerType: 2
+      TriggerThresholdNormalized: 0.6
+      TargetPhaseId: 2
+    - RuleId: 3
+      TargetPlacementInstanceIds: 02000000
+      ActionType: 3
+      TriggerType: 2
+      TriggerThresholdNormalized: 0.8
+      TargetPhaseId: 2
     - RuleId: 101
       TargetPlacementInstanceIds: 01000000
       ActionType: 1
       TriggerType: 1
       TriggerThresholdNormalized: 0
-      TargetPhaseId: 0
+      TargetPhaseId: 1
     - RuleId: 102
       TargetPlacementInstanceIds: 01000000
       ActionType: 2

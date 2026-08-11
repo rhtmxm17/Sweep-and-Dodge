@@ -98,8 +98,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 });
 
                 double start = UnityEditor.EditorApplication.timeSinceStartup;
-                HazardActorPreviewCoordinator.SetActiveSession(session);
-                session.Play();
+                var owner = new HazardActorPreviewOwnerToken("Wall Clock Test");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
+                HazardActorPreviewCoordinator.Play(owner);
                 HazardActorPreviewCoordinator.EvaluatePlaybackForTests(start);
                 HazardActorPreviewCoordinator.EvaluatePlaybackForTests(start + 5.0);
 
@@ -443,6 +444,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     new HazardActorPreviewInput
                     {
                         Scope = HazardActorPreviewScope.Encounter,
+                        OwningSourceStableId = 1u,
                         GhostCapOverride = HazardActorPreviewSession.EncounterGhostCap,
                         ActorWorldPosition = Vector3.zero,
                         TargetWorldPosition = new Vector3(0f, 0f, 5f),
@@ -457,11 +459,16 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 encounter.SetSourceProgress(0f);
                 Assert.That(encounter.ActiveActorCount, Is.EqualTo(0));
+                Assert.That(encounter.TryGetPlacementState(0u, 7, out _), Is.False);
+                Assert.That(encounter.TryGetPlacementState(1u, 7, out var waitingState), Is.True);
+                Assert.That(waitingState, Is.EqualTo(HazardActorEncounterPlacementPreviewState.WaitingForSpawn));
 
                 encounter.SetSourceProgress(0.3f);
                 encounter.EvaluateAt(0.2f);
                 Assert.That(encounter.ActiveActorCount, Is.EqualTo(1));
                 Assert.That(encounter.Actors[0].Frame.PhaseId, Is.EqualTo(1));
+                Assert.That(encounter.TryGetPlacementState(1u, 7, out var activeState), Is.True);
+                Assert.That(activeState, Is.EqualTo(HazardActorEncounterPlacementPreviewState.Active));
 
                 encounter.SetSourceProgress(0.6f);
                 encounter.EvaluateAt(0.2f);
@@ -470,6 +477,8 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 encounter.SetSourceProgress(0.9f);
                 Assert.That(encounter.ActiveActorCount, Is.EqualTo(0));
+                Assert.That(encounter.TryGetPlacementState(1u, 7, out var retiredState), Is.True);
+                Assert.That(retiredState, Is.EqualTo(HazardActorEncounterPlacementPreviewState.Retired));
 
                 encounter.SetSourceProgress(0.6f);
                 encounter.EvaluateAt(0.2f);
@@ -665,11 +674,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 HazardActorPreviewRendererUtility.DrawGhostInstances(session.Ghosts, 0.08f, drawAggregate: true);
                 Assert.That(HazardActorPreviewRendererUtility.HasAllocatedResources, Is.True);
 
-                HazardActorPreviewCoordinator.SetActiveSession(session);
+                var owner = new HazardActorPreviewOwnerToken("Renderer Shutdown Test");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
                 HazardActorPreviewCoordinator.Shutdown();
 
                 Assert.That(HazardActorPreviewRendererUtility.HasAllocatedResources, Is.False);
                 Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(0));
+                Assert.That(session.IsDisposed, Is.False);
+                session.Dispose();
             }
         }
 
@@ -700,19 +712,122 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void PreviewCoordinator_CleansCallbacksAndSessionState()
+        public void PreviewCoordinator_ClearOwner_DetachesWithoutDisposingOwnerSession()
         {
             using (var setup = CreateActorSetup())
             {
                 HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
                 var session = new HazardActorPreviewSession();
                 session.Load(snapshot, new HazardActorPreviewInput { Scope = HazardActorPreviewScope.Actor, SpawnAtStart = true });
-                HazardActorPreviewCoordinator.SetActiveSession(session);
+                var owner = new HazardActorPreviewOwnerToken("Lifecycle Test");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
                 Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(2));
 
-                HazardActorPreviewCoordinator.ClearActiveSession(session);
-                Assert.That(session.IsDisposed, Is.True);
+                HazardActorPreviewCoordinator.ClearOwner(owner);
+                Assert.That(session.IsDisposed, Is.False);
                 Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(0));
+                session.Dispose();
+            }
+        }
+
+        [Test]
+        public void PreviewCoordinator_OwnerHandoffPausesButDoesNotDisposePreviousSession()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var first = new HazardActorPreviewSession();
+                var second = new HazardActorPreviewSession();
+                first.Load(snapshot, new HazardActorPreviewInput { Scope = HazardActorPreviewScope.Actor, SpawnAtStart = true });
+                second.Load(snapshot, new HazardActorPreviewInput { Scope = HazardActorPreviewScope.Actor, SpawnAtStart = true });
+                var firstOwner = new HazardActorPreviewOwnerToken("First Owner");
+                var secondOwner = new HazardActorPreviewOwnerToken("Second Owner");
+                try
+                {
+                    HazardActorPreviewCoordinator.ActivateActor(firstOwner, first);
+                    HazardActorPreviewCoordinator.Play(firstOwner);
+                    HazardActorPreviewCoordinator.ActivateActor(secondOwner, second);
+
+                    Assert.That(first.Playing, Is.False);
+                    Assert.That(first.IsDisposed, Is.False);
+                    Assert.That(HazardActorPreviewCoordinator.IsActiveOwner(secondOwner), Is.True);
+
+                    HazardActorPreviewCoordinator.ClearOwner(firstOwner);
+                    Assert.That(HazardActorPreviewCoordinator.IsActiveOwner(secondOwner), Is.True);
+                    HazardActorPreviewCoordinator.ClearOwner(secondOwner);
+                    Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(0));
+                }
+                finally
+                {
+                    HazardActorPreviewCoordinator.Shutdown();
+                    first.Dispose();
+                    second.Dispose();
+                }
+            }
+        }
+
+        [Test]
+        public void ActorSourceProgress_ReevaluatesAtCurrentTimeAndPreservesPlayingState()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                try
+                {
+                    session.Load(snapshot, new HazardActorPreviewInput
+                    {
+                        Scope = HazardActorPreviewScope.Actor,
+                        SourceProgress01 = 0f,
+                        SpawnAtStart = true,
+                    });
+                    session.EvaluateAt(0.3f);
+                    session.Play();
+                    float time = session.TimeSec;
+
+                    session.SetSourceProgress(0.8f);
+                    Assert.That(session.Input.SourceProgress01, Is.EqualTo(0.8f).Within(0.0001f));
+                    Assert.That(session.TimeSec, Is.EqualTo(time).Within(HazardActorPreviewSession.FixedDeltaTime));
+                    Assert.That(session.Playing, Is.True);
+
+                    session.SetSourceProgress(0.2f);
+                    Assert.That(session.Input.SourceProgress01, Is.EqualTo(0.2f).Within(0.0001f));
+                    Assert.That(session.TimeSec, Is.EqualTo(time).Within(HazardActorPreviewSession.FixedDeltaTime));
+                }
+                finally
+                {
+                    session.Dispose();
+                }
+            }
+        }
+
+        [Test]
+        public void EncounterTarget_PersistsAcrossProgressRebuild()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var encounter = new HazardActorEncounterPreviewSession();
+                try
+                {
+                    encounter.AddActor(snapshot, new HazardActorPreviewInput
+                    {
+                        Scope = HazardActorPreviewScope.Encounter,
+                        TargetWorldPosition = new Vector3(0f, 0f, 3f),
+                        GhostCapOverride = 16,
+                        SpawnAtStart = true,
+                    });
+                    var target = new Vector3(4f, 0f, -2f);
+                    encounter.SetTargetWorldPosition(target);
+                    encounter.SetSourceProgress(0.7f);
+
+                    Assert.That(encounter.Actors.Count, Is.GreaterThan(0));
+                    Assert.That(encounter.Actors[0].Input.TargetWorldPosition, Is.EqualTo(target));
+                }
+                finally
+                {
+                    encounter.Dispose();
+                }
             }
         }
 
@@ -907,8 +1022,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 });
 
                 double start = UnityEditor.EditorApplication.timeSinceStartup;
-                HazardActorPreviewCoordinator.SetActiveSession(session);
-                session.Play();
+                var owner = new HazardActorPreviewOwnerToken($"Cadence {hz}");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
+                HazardActorPreviewCoordinator.Play(owner);
                 HazardActorPreviewCoordinator.EvaluatePlaybackForTests(start);
                 int callbacks = Mathf.CeilToInt(hz * 1f);
                 for (int i = 1; i <= callbacks; i++)

@@ -204,7 +204,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(window.BeginEncounterPreviewForSource(hazard.OwningSourceStableId), Is.True);
                 Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession, Is.Not.Null);
                 Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession.ActiveActorCount, Is.GreaterThan(0));
-                HazardActorPreviewCoordinator.StepActiveSession();
+                Assert.That(HazardActorPreviewCoordinator.Step(HazardActorPreviewCoordinator.ActiveOwner), Is.True);
                 StageMapPresentationLinkData presentation = document.PresentationLinks.First();
                 AssertSelectionSection(window, StageMapSelection.ForPresentation(presentation.StableId), StageMapInspectorSection.Presentation);
 

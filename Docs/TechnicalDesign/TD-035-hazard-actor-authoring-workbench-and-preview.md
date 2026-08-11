@@ -5,7 +5,7 @@
 - doc_id: `TD-035`
 - type: `TechnicalDesign`
 - status: `implemented`
-- last_updated: `2026-08-06`
+- last_updated: `2026-08-11`
 - related_docs:
   - [../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md](../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md)
   - [TD-031-hazard-actor-behavior-runtime.md](TD-031-hazard-actor-behavior-runtime.md)
@@ -138,7 +138,9 @@
   - Phase: `Phase` scope, 해당 `PhaseId`를 forced phase로 사용, source progress slider 숨김
   - Transition: `Phase` scope, transition source `PhaseId`를 forced phase로 사용, source progress slider 숨김
   - Pattern/EmissionProfile/TelegraphProfile: `Pattern` scope, 해당 `PatternSlotId`를 forced pattern으로 사용, source progress slider 숨김
+  - Stage Map HazardActor placement: `Actor` scope, source progress slider 표시
   - Stage Map source/Encounter rule: `Encounter` scope, source progress slider 표시
+  - Stage Map의 그 외 selection: preview binding 없음, 해당 Stage Map Editor가 소유한 preview를 즉시 해제
 - `Pattern`
   - 선택한 Pattern 하나를 반복하며 Phase/selector/orchestration을 건너뛴다.
 - `Phase`
@@ -151,11 +153,12 @@
 
 ### 4.3 Transport와 입력
 - 공통 transport는 `Play`, `Pause`, `Restart`, `Step`을 제공한다.
+- Stage Map transport는 Encounter Track header가 아니라 track 위의 독립 `Hazard Preview` strip에 둔다. transport는 현재 selection-derived binding만 조작한다.
 - Step은 1 fixed step인 `1/30초`를 진행한다.
 - source progress는 기본적으로 time과 독립된 수동 slider다.
 - optional `Sweep Progress`는 session-only duration 동안 0에서 1까지 선형 진행하며 기본 duration은 10초다.
 - progress 또는 time을 뒤로 scrub하면 초기 상태에서 해당 지점까지 고정 step으로 재평가한다.
-- player target은 preview 영역 좌클릭 또는 draggable preview handle로 이동할 수 있으며 Stage Map에서는 PlayerStart를 최초 기본값으로 사용한다.
+- player target은 preview 영역 좌클릭 또는 draggable preview handle로 이동할 수 있다. Stage Map에서는 PlayerStart를 기본값으로 사용하고, Scene View의 cyan handle을 옮기면 `Custom`, `Reset Target`을 누르면 다시 `FollowPlayerStart` 상태가 된다.
 - Workbench embedded preview는 휠 클릭 drag로 pan, mouse wheel로 zoom, `F`로 active ghost fit, `R`로 view reset, `Shift+R`로 현재 live target 기준 restart를 제공한다.
 - Workbench target, pan, zoom, display mode, transport는 session-only 상태이며 asset dirty나 Undo 대상이 아니다.
 - forced Phase/Pattern은 preview 격리용이며 asset이나 runtime rule을 변경하지 않는다.
@@ -169,30 +172,34 @@
 - 미지원 mode, 잘못된 profile, cap/depth 초과는 정상처럼 생략하지 않고 preview warning과 Issue Navigator에 표시한다.
 
 ### 4.5 시각화
-- 항상 표시하는 debug layer:
-  - actor proxy와 forward
-  - slot origin/local offset
-  - telegraph cone/arc/line과 진행도
-  - aim ray와 spawn point
-  - ghost bullet과 예측 trajectory
-  - 현재 presence/phase/pattern/lifecycle HUD
-- actor/bullet prefab에서 안전하게 renderer resource를 해석할 수 있으면 inert ghost 외형을 함께 표시한다.
+- v1 최소 시각화 계약은 다음과 같다.
+  - actor origin proxy와 forward
+  - 현재 phase/pattern 상태 label
+  - 개별 world 위치를 보존하는 generic ghost bullet
+  - ghost cap/미지원 동작 warning과 명시적으로 선택 가능한 density 진단 표시
+- v1 시각화는 행동 판독과 실제 placement pose 확인을 위한 debug surface이며 actor/bullet prefab 외형 재현을 요구하지 않는다.
 - collider, rigidbody, script, particle system, animation은 preview simulation owner가 아니며 실행하지 않는다.
-- renderer를 해석할 수 없거나 prefab에 외형이 없으면 debug proxy를 사용한다.
 - active scene에 preview GameObject를 영속 생성하지 않는다.
+- 다음은 필수 완료 범위가 아닌 향후 확장 가능성으로 둔다.
+  - slot origin/local offset, aim ray, spawn point의 별도 debug geometry
+  - telegraph cone/arc/line과 진행도
+  - 예측 trajectory와 방향 bundle
+  - 안전하게 해석 가능한 actor/bullet prefab의 inert ghost 외형 및 해석 실패 시 proxy fallback
 
 ### 4.6 성능 예산
 - simulation fixed step과 repaint 요청은 최대 30Hz다.
 - Actor Preview는 active ghost 최대 1,024개, Encounter Preview는 최대 4,096개다.
-- trajectory는 독립 branch당 최대 16 sample이며 예측 시간은 resolved lifetime과 4초 중 작은 값이다.
-- cap을 넘으면 preview를 중단하지 않고 방향 bundle, 대표 trajectory, density count로 집약한다.
+- cap을 넘는 ghost는 simulation을 중단하지 않고 억제 수와 warning을 표시한다. Workbench의 density 표시는 사용자가 명시적으로 선택하는 진단 모드다.
 - unchanged snapshot의 steady preview는 managed allocation 0을 목표로 한다.
 - renderer resource, geometry, resolved snapshot은 signature 기반으로 cache하고 authoring/selection/visibility 변경 시에만 재생성한다.
 - preview update는 `EditorApplication.update` 단일 owner가 수행하고 Scene repaint callback에서 전체 재계산하지 않는다.
 
 ### 4.7 수명주기
 - Workbench와 Stage Map Editor는 동시에 별도 simulator를 진행하지 않고 전역 preview coordinator의 active session 하나를 공유한다.
+- 각 편집 표면은 고유 `HazardActorPreviewOwnerToken`과 자체 session을 소유한다. coordinator는 마지막 명시 조작 owner의 session만 진행·표시하며 전환/clear 때 caller-owned session을 dispose하지 않는다.
+- Workbench와 Stage Map Editor는 창 종료 시 자신의 session만 dispose한다. 비활성 owner의 창 종료는 현재 active preview에 영향을 주지 않는다.
 - selection/document/scope 변경, Undo/Redo, asset import는 snapshot을 invalidate하고 session을 안전하게 reset한다.
+- Stage Map document mutation은 같은 editor tick의 반복 invalidate를 하나로 합쳐 최신 selection/document 기준 time 0, paused session을 다시 준비한다. background project change는 비활성 Stage Map owner가 전역 소유권을 빼앗지 않는다.
 - Scene/Window close, assembly reload, prefab stage 변경, Play Mode 진입 시 preview resource와 hidden instance를 즉시 정리한다.
 - preview renderer가 만든 object/resource에는 save되지 않는 hide flag를 적용한다.
 
@@ -213,6 +220,7 @@
 
 ### 5.2 Encounter Track
 - `StageMapEditorWindow`에 선택 source 기준 `Hazard Encounter` 패널을 추가한다.
+- Encounter Track은 rule/placement 편집만 소유한다. Preview scope/status/transport/source progress/target은 track 위의 독립 `Hazard Preview` strip이 소유한다.
 - 각 placement를 한 행으로 표시하고 normalized source progress를 가로축으로 사용한다.
 - `OnStageStart` rule은 0 지점의 고정 lane에, `OnSourceProgressAtOrAbove` rule은 threshold 위치에 표시한다.
 - Spawn/PhaseSet/Retire marker를 생성, 선택, 이동, 복제, 삭제할 수 있다.
@@ -224,9 +232,16 @@
 ### 5.3 Scene View Preview
 - HazardActor placement 선택 시 preview snapshot을 준비하고 정적 proxy를 표시한다.
 - 명시적 Play 이후에만 Actor 또는 Encounter simulation을 시작한다.
+- HazardActor placement는 Actor scope, source/source anchor/rule은 Encounter scope로 자동 준비하며, 다른 selection으로 이동하면 이전 Stage Map preview를 해제한다.
 - world pose는 현재 document의 source anchor, placement local offset, local yaw, slot local offset으로 계산한다.
 - legacy scene marker transform과 generated `StageDefinitionSO`는 preview pose의 SSOT로 사용하지 않는다.
 - Scene View Overlay는 Workbench와 같은 transport/scope/progress/target 상태를 사용한다.
+- active Stage Map preview에는 grid XZ plane으로 제한된 cyan target handle을 항상 표시한다. target/progress/transport는 session-only이며 document dirty와 Undo 대상이 아니다.
+- `FollowPlayerStart` 상태에서는 PlayerStart 변경을 추종한다. handle drag 이후 `Custom` 상태에서는 선택/scope/progress 변경과 preview rebuild를 거쳐도 custom target을 유지한다.
+- Stage Map이 active preview owner인 동안 일반 authoring label(`Source`, `Deposit`, `PlayerStart`, `Hazard`, `Link`)은 숨기고 Preview label과 target label이 텍스트 표시를 소유한다. Workbench 또는 다른 owner의 preview는 Stage Map authoring label을 변경하지 않는다.
+- Encounter plan의 placement 표시는 `WaitingForSpawn / Active / Retired`를 구분한다. Active placement는 일반 분홍 placement cube와 `Hazard N` label을 완전히 숨기고 Preview actor 표시만 사용한다.
+- Spawn 전과 Retire 후 placement는 계획에서 제거하지 않는다. 각각 저강도 neutral ring+center dot과 double ring footprint로 위치만 표시하며, 상태 text는 현재 선택된 placement 또는 rule target에만 표시한다.
+- Encounter 준비 성공 여부는 현재 active actor 수가 아니라 유효한 planned actor 수를 기준으로 한다. 따라서 source progress가 첫 Spawn 이전이거나 모든 actor가 Retire된 시점에도 Preview session과 상태 표시를 유지한다.
 
 ### 5.4 Migration / Export
 - schema migration은 load 시 자동으로 rule을 쓰지 않는다.
@@ -273,7 +288,7 @@
 - T3. Preview snapshot/simulator
   - resolver 기반 snapshot, fixed-step lifecycle, movement와 lifecycle trigger 제한을 구현한다.
 - T4. Preview surfaces
-  - embedded preview, Scene View Overlay, inert ghost/proxy renderer, cache와 cleanup을 구현한다.
+  - embedded preview와 Scene View Overlay에 actor origin/forward, phase/pattern label, exact-position generic ghost renderer, cache와 cleanup을 구현한다.
 - T5. Stage document orchestration
   - schema, validation, explicit migration, dry-run/export/stale 정책을 구현한다.
 - T6. Encounter Track
@@ -287,6 +302,9 @@
   - arbitrary condition/orchestration graph
   - ECS Sandbox runtime-accurate preview
   - advanced playtest tooling
+  - spatial telegraph debug geometry와 진행도
+  - predicted trajectory/aim/spawn guide
+  - actor/bullet prefab inert ghost와 proxy fallback
 
 ## 9. 검증 계획 / 합격 기준
 
@@ -305,13 +323,13 @@
 - 선택 시 preview는 canonical selection에 맞는 Actor/Phase/Pattern scope로 준비되지만 자동 재생되지 않고, transport와 Undo/Redo 후 selection/preview가 일관된다.
 - Actor 선택에서만 Workbench Source Progress slider가 표시되고 Phase/Transition/Pattern/Profile 선택에서는 숨겨진다.
 - Workbench embedded preview에서 target click, pan, zoom, fit/reset 조작이 asset dirty나 Undo 기록을 만들지 않는다.
-- Stage Map에서 실제 placement 위치/yaw로 telegraph와 탄막이 표시된다.
+- Stage Map에서 실제 placement 위치/yaw로 actor origin/forward, phase/pattern 상태와 exact-position generic ghost 탄막이 표시된다.
 - Source Progress scrub과 역방향 재평가에서 Spawn/PhaseSet/Retire 결과가 결정적이다.
 - issue 클릭 시 해당 Workbench 항목, Encounter marker 또는 Scene 위치로 이동한다.
 
 ### 9.3 성능 / 수명주기
 - steady preview에서 current-thread managed allocation 0을 확인한다.
-- 1,024/4,096 ghost cap, branch당 16 trajectory sample, 30Hz 상한과 집약 전환을 측정한다.
+- 1,024/4,096 ghost cap, 30Hz 상한, cap warning과 명시적 density 진단 전환을 측정한다.
 - Window/Scene close, domain reload, Play Mode 전환 후 hidden object, callback, native/editor resource가 남지 않는다.
 
 ### 9.4 Runtime 회귀
@@ -323,7 +341,7 @@
 - T0: `HazardActorAuthoringEditor`를 추가해 기본 Inspector를 read-only summary, validation, `Open HazardActor Workbench` 진입점으로 제한했다.
 - T1~T2: `HazardActorWorkbenchWindow`와 command utility를 추가해 Actor/Phase/Transition/Pattern/Profile canonical selection, Contextual Inspector, 구조 명령, shared profile 사용처, `Open`, `Duplicate & Assign`, Undo/dirty 경로를 구현했다.
 - T3: `HazardActorPreviewSnapshotBuilder`와 `HazardActorPreviewSession`이 기존 authoring resolver/profile resolver 결과를 사용하며 30Hz fixed-step Presence/Phase/Selector/Telegraph/Emit/Cooldown, Linear/DampedLinear/HomingLite, MotionCompleted depth 3, manual CleanupRemoved를 재생한다.
-- T4: Workbench embedded preview와 Scene View preview는 `HazardActorPreviewCoordinator`의 active session을 공유한다. Actor cap 1,024, Encounter cap 4,096, branch sample 16, 30Hz update owner, callback cleanup을 editor-only로 구현했다.
+- T4: Workbench embedded preview와 Scene View preview는 `HazardActorPreviewCoordinator`의 active session을 공유한다. Actor cap 1,024, Encounter cap 4,096, exact-position generic ghost, 30Hz update owner, callback cleanup을 editor-only로 구현했다. spatial telegraph/trajectory와 prefab inert ghost는 향후 확장 가능성으로 남긴다.
 - T5: `StageMapDocument` schema v3에 source-local `StageMapHazardActorOrchestrationRuleData[]`를 추가했다. TargetDefinition rule import는 preview/diff/apply 전용이며 stale/missing/ambiguous identity를 거부하고, exporter는 document rule을 authoritative하게 기록한다.
 - T6: Stage Map Editor `Hazard Encounter` track에서 source별 placement row, Spawn/PhaseSet/Retire marker, multi-target target id edit, common PhaseId picker, duplicate/move/delete, progress scrub preview를 document pose 기준으로 연결했다.
 - T7: actor/workbench issue와 StageMap source/rule/placement issue target mapping을 canonical selection과 Scene View navigation으로 확장했다.
@@ -366,3 +384,32 @@
 - `HazardActorWorkbenchPreviewTests`: 가시성 회귀 테스트 2개를 포함해 21/21 pass.
 - `HazardEmitterPlayModeTests`: 기존 HazardActor PlayMode smoke 2/2 pass.
 - 전체 EditMode/PlayMode 최신 재실행은 별도 검증 대상이다.
+
+## 12. 2026-08-11 Stage Map Preview session consistency 후속 구현
+- `HazardActorPreviewCoordinator`는 owner token 기반 단일 active session만 진행하며 session dispose 책임을 Workbench와 Stage Map Editor로 반환했다. owner 전환은 이전 session을 pause하되 폐기하지 않는다.
+- Stage Map Editor는 HazardActor placement를 Actor, source/source anchor/rule을 Encounter로 해석하는 selection-derived binding과 독립 `Hazard Preview` strip을 사용한다. 다른 selection은 Stage Map 소유 preview를 해제한다.
+- Actor/Encounter 공통 Source Progress, owner-scoped Play/Pause/Restart/Step, document/Undo/project change coalesced reconcile을 구현했다. mutation rebuild는 최신 입력의 time 0 paused 상태다.
+- Stage Map target은 `FollowPlayerStart`와 `Custom` session state로 분리했다. Scene View cyan handle, `Reset Target`, grid plane 제한과 Encounter plan target 보존을 구현했으며 document schema/export/runtime ECS는 변경하지 않았다.
+
+검증 결과:
+- 신규 owner/binding/reconcile/progress/target 행동 계약을 포함한 targeted EditMode suite: 54/54 pass.
+- 전체 EditMode: 596/596 pass. 분리 실행 중 MCP `NetworkStream` 종료 로그가 유입된 테스트는 단독 재실행 후, 같은 MCP client 수명 안에서 전체 suite를 재실행해 최종 전건 통과를 확인했다.
+- 기존 HazardActor PlayMode smoke (`HazardEmitterPlayModeTests`): 2/2 pass.
+- Preview 성능: Actor p95 `0.887 ms`, submissions `2`, managed GC `0 B`; Encounter p95 `3.17 ms`, submissions `5`, managed GC `0 B`.
+- 실제 `smd_demo_1` Editor smoke: placement=`Actor`, source/rule=`Encounter`, rule threshold progress `0.6`, cell selection 후 preview clear를 확인했다. Scene View에서 custom target의 cyan handle이 실제 world 위치에 표시됐다.
+- Workbench가 active owner인 상태에서 Stage Map Editor를 닫아도 session이 유지됐고, 마지막 Workbench 종료 후 coordinator callback `0`을 확인했다.
+- runtime ECS component/system/baker/update order/Fence, `StageMapDocument` schema와 export 결과는 변경하지 않았다.
+
+## 13. 2026-08-11 Stage Map Preview authoring gizmo 가시성 후속 구현
+- Encounter Preview Core가 planned placement를 현재 progress 기준 `WaitingForSpawn / Active / Retired`로 조회하는 API를 제공한다. actor session 생성과 같은 orchestration 평가 경로를 재사용해 표시용 중복 규칙 계산을 두지 않는다.
+- Stage Map 소유 Preview는 모든 일반 authoring label을 숨긴다. Active placement의 일반 분홍 cube도 숨기며, Spawn 전은 neutral ring+center dot, Retire 후는 neutral double ring footprint로 낮은 강조도 위치만 표시한다.
+- 상태 label은 선택된 placement 또는 선택된 rule target에만 제한한다. 다른 preview owner가 활성일 때는 기존 Stage Map authoring label과 placement gizmo를 유지한다.
+- planned actor가 하나 이상이면 active actor가 0이어도 Encounter Preview를 준비할 수 있어, 최초 Spawn 이전과 전부 Retire된 progress에서도 session을 유지한다.
+
+검증 결과:
+- 관련 targeted EditMode (`HazardActorWorkbenchPreviewTests`, `StageMapEditorInteractionTests`): 55/55 pass.
+- 전체 EditMode: 597/597 pass. 최초 실행은 MCP `NetworkStream` 종료 로그가 테스트에 유입되어 실패했으며, 실행 중 추가 polling 없이 재실행해 코드 실패가 아님을 확인했다.
+- 기존 HazardActor PlayMode smoke (`HazardEmitterPlayModeTests`): 2/2 pass.
+- Unity Console error 0.
+- 실제 `smd_demo_1` source `1001`에서 placement `2`의 progress `0.0=WaitingForSpawn`, `0.9=Retired` 표시와 일반 authoring label 억제를 Scene View로 확인했다. 검증용 screenshot asset은 완료 전 삭제했다.
+- runtime ECS, `StageMapDocument` schema/export, document dirty/Undo 계약은 변경하지 않았다.

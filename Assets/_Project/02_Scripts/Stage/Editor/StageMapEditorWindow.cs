@@ -6,11 +6,20 @@ using UnityEngine;
 
 namespace SweepNDodge.DotsBullets.Editor
 {
+    public enum StageMapHazardPlacementPreviewVisualState : byte
+    {
+        NotInPreview = 0,
+        WaitingForSpawn = 1,
+        Active = 2,
+        Retired = 3,
+    }
+
     public sealed class StageMapEditorWindow : EditorWindow
     {
         private readonly StageMapEditingSession _session = new StageMapEditingSession();
         private readonly List<ContentValidationIssue> _issues = new List<ContentValidationIssue>(32);
         private readonly List<StageMapDocumentIssue> _documentIssues = new List<StageMapDocumentIssue>(32);
+        private readonly HazardActorPreviewOwnerToken _hazardPreviewOwner = new HazardActorPreviewOwnerToken("Stage Map Editor");
         private Vector2 _documentScroll;
         private Vector2 _rightScroll;
         private Vector2 _issueScroll;
@@ -34,7 +43,13 @@ namespace SweepNDodge.DotsBullets.Editor
         private int _observedDocumentDirtyCount;
         private string _observedDocumentSignature = string.Empty;
         private Vector2Int _navigatorCell;
-        private float _encounterPreviewProgress;
+        private HazardActorPreviewSession _hazardActorPreviewSession;
+        private HazardActorEncounterPreviewSession _hazardEncounterPreviewSession;
+        private StageMapHazardPreviewBinding _hazardPreviewBinding;
+        private string _hazardPreviewError = string.Empty;
+        private bool _hazardPreviewReconcileQueued;
+        private bool _hazardPreviewReconcileClaimsOwner;
+        private GUIStyle _inactiveHazardPreviewLabelStyle;
         private int _draggingEncounterRuleId;
         private uint _draggingEncounterSourceId;
 
@@ -44,6 +59,11 @@ namespace SweepNDodge.DotsBullets.Editor
         public StageMapApplyPlan CurrentApplyPlan => _applyPlan;
         public StageMapInspectorSection CurrentInspectorSection => _session.GetInspectorSection();
         public IReadOnlyList<StageMapDocument> ProjectDocuments => _projectDocuments;
+        public StageMapHazardPreviewBinding HazardPreviewBinding => _hazardPreviewBinding;
+        public bool IsHazardPreviewActive => HazardActorPreviewCoordinator.IsActiveOwner(_hazardPreviewOwner);
+        public string HazardPreviewError => _hazardPreviewError;
+
+        public bool ShouldDrawAuthoringGizmoLabelsForTests() => ShouldDrawAuthoringGizmoLabels();
 
         [MenuItem("Tools/Project/Stage Map Editor/Open")]
         public static void Open()
@@ -57,12 +77,17 @@ namespace SweepNDodge.DotsBullets.Editor
             SceneView.duringSceneGui += OnSceneGUI;
             Undo.undoRedoPerformed -= OnUndoRedo;
             Undo.undoRedoPerformed += OnUndoRedo;
+            EditorApplication.projectChanged -= OnProjectChanged;
+            EditorApplication.projectChanged += OnProjectChanged;
         }
 
         private void OnDisable()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
             Undo.undoRedoPerformed -= OnUndoRedo;
+            EditorApplication.projectChanged -= OnProjectChanged;
+            EditorApplication.delayCall -= FlushHazardPreviewReconcile;
+            ReleaseHazardPreview(clearBinding: true);
             _overlayCache.Dispose();
             _session.Dispose();
         }
@@ -105,12 +130,17 @@ namespace SweepNDodge.DotsBullets.Editor
                     DrawRightPanel();
                 }
 
+                DrawHazardPreviewStrip();
                 DrawEncounterTrack();
             }
         }
 
         public void LoadDocument(StageMapDocument document)
         {
+            EditorApplication.delayCall -= FlushHazardPreviewReconcile;
+            _hazardPreviewReconcileQueued = false;
+            _hazardPreviewReconcileClaimsOwner = false;
+            ReleaseHazardPreview(clearBinding: true);
             _document = document;
             _applyPlan = null;
             _importPlan = null;
@@ -124,6 +154,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _pendingGrid = document != null ? document.Grid : default;
             _observedDocumentDirtyCount = document != null ? EditorUtility.GetDirtyCount(document) : 0;
             _observedDocumentSignature = StageMapApplyPlanner.ComputeSignature(document);
+            _hazardPreviewError = string.Empty;
             InvalidateOverlayCache();
         }
 
@@ -951,7 +982,7 @@ namespace SweepNDodge.DotsBullets.Editor
                         if (GUILayout.Button("Open in Workbench"))
                             HazardActorWorkbenchWindow.Open(placement.ActorArchetypePrefab);
                         if (GUILayout.Button("Actor Preview"))
-                            BeginPlacementPreview(placement, HazardActorPreviewScope.Actor, play: true);
+                            PrepareHazardPreviewForSelection(play: true);
                     }
                     if (GUILayout.Button(new GUIContent("X", "Delete Hazard Actor"), GUILayout.Width(32f)))
                         RecordAndApply("Delete Stage Hazard Actor", () => StageMapEditorMutationUtility.TryDeleteSelection(_session, out _));
@@ -1080,6 +1111,95 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
+        private void DrawHazardPreviewStrip()
+        {
+            if (!_hazardPreviewBinding.IsValid)
+                return;
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                bool active = HazardActorPreviewCoordinator.IsActiveOwner(_hazardPreviewOwner);
+                bool prepared = _hazardActorPreviewSession != null || _hazardEncounterPreviewSession != null;
+                bool playing = _hazardActorPreviewSession != null
+                    ? _hazardActorPreviewSession.Playing
+                    : _hazardEncounterPreviewSession != null && _hazardEncounterPreviewSession.Playing;
+                string scope = _hazardPreviewBinding.Kind == StageMapHazardPreviewBindingKind.Actor
+                    ? $"Actor #{_hazardPreviewBinding.PlacementInstanceId}"
+                    : $"Encounter Source {_hazardPreviewBinding.SourceStableId}";
+                string status = !prepared ? "Invalid" : active ? (playing ? "Playing" : "Paused") : "Inactive";
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("Hazard Preview", EditorStyles.boldLabel, GUILayout.Width(110f));
+                    EditorGUILayout.LabelField(scope, EditorStyles.miniBoldLabel, GUILayout.Width(170f));
+                    EditorGUILayout.LabelField(status, EditorStyles.miniLabel, GUILayout.Width(64f));
+                    GUILayout.FlexibleSpace();
+                    using (new EditorGUI.DisabledScope(!prepared))
+                    {
+                        if (GUILayout.Button(playing && active ? "Pause" : "Play", EditorStyles.miniButtonLeft, GUILayout.Width(54f))
+                            && ClaimPreparedHazardPreview())
+                        {
+                            if ((_hazardActorPreviewSession != null && _hazardActorPreviewSession.Playing)
+                                || (_hazardEncounterPreviewSession != null && _hazardEncounterPreviewSession.Playing))
+                            {
+                                HazardActorPreviewCoordinator.Pause(_hazardPreviewOwner);
+                            }
+                            else
+                            {
+                                HazardActorPreviewCoordinator.Play(_hazardPreviewOwner);
+                            }
+                        }
+                        if (GUILayout.Button("Step", EditorStyles.miniButtonMid, GUILayout.Width(46f))
+                            && ClaimPreparedHazardPreview())
+                        {
+                            HazardActorPreviewCoordinator.Step(_hazardPreviewOwner);
+                        }
+                        if (GUILayout.Button("Restart", EditorStyles.miniButtonRight, GUILayout.Width(62f))
+                            && ClaimPreparedHazardPreview())
+                        {
+                            HazardActorPreviewCoordinator.Restart(_hazardPreviewOwner);
+                        }
+                    }
+                }
+
+                EditorGUI.BeginChangeCheck();
+                float progress = EditorGUILayout.Slider(
+                    "Source Progress",
+                    _session.HazardPreviewSourceProgress01,
+                    0f,
+                    1f);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    _session.HazardPreviewSourceProgress01 = Mathf.Clamp01(progress);
+                    ClaimPreparedHazardPreview();
+                    _hazardActorPreviewSession?.SetSourceProgress(_session.HazardPreviewSourceProgress01);
+                    _hazardEncounterPreviewSession?.SetSourceProgress(_session.HazardPreviewSourceProgress01);
+                    SceneView.RepaintAll();
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    string mode = _session.HazardPreviewTargetMode == StageMapHazardPreviewTargetMode.FollowPlayerStart
+                        ? "Follow PlayerStart"
+                        : "Custom";
+                    Vector3 target = _session.HazardPreviewTargetWorldPosition;
+                    EditorGUILayout.LabelField(
+                        $"Target: {mode} ({target.x:0.##}, {target.z:0.##})",
+                        EditorStyles.miniLabel);
+                    if (GUILayout.Button("Reset Target", EditorStyles.miniButton, GUILayout.Width(92f)))
+                    {
+                        SetHazardPreviewTarget(
+                            GetCurrentHazardPreviewPlayerTarget(),
+                            StageMapHazardPreviewTargetMode.FollowPlayerStart,
+                            claimOwner: true);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(_hazardPreviewError))
+                    EditorGUILayout.HelpBox(_hazardPreviewError, MessageType.Warning);
+            }
+        }
+
         private void DrawEncounterTrack()
         {
             EditorGUILayout.Space(6f);
@@ -1126,18 +1246,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     _session.PinHazardEncounterSource = pin;
                     _session.PinnedHazardEncounterSourceStableId = pin ? sourceId : 0u;
                 }
-
                 GUILayout.FlexibleSpace();
-                DrawEncounterPreviewTransport(sourceId);
-            }
-
-            EditorGUI.BeginChangeCheck();
-            _encounterPreviewProgress = EditorGUILayout.Slider("Source Progress", _encounterPreviewProgress, 0f, 1f);
-            if (EditorGUI.EndChangeCheck())
-            {
-                if (HazardActorPreviewCoordinator.ActiveEncounterSession != null)
-                    HazardActorPreviewCoordinator.ActiveEncounterSession.SetSourceProgress(_encounterPreviewProgress);
-                SceneView.RepaintAll();
             }
 
             using (new EditorGUILayout.HorizontalScope())
@@ -1162,35 +1271,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 for (int i = 0; i < _hazardOrchestrationImportPlan.Issues.Count; i++)
                     EditorGUILayout.HelpBox(_hazardOrchestrationImportPlan.Issues[i].Message, MessageType.Error);
             }
-        }
-
-        private void DrawEncounterPreviewTransport(uint sourceId)
-        {
-            bool hasEncounter = HazardActorPreviewCoordinator.ActiveEncounterSession != null;
-            bool playing = hasEncounter && HazardActorPreviewCoordinator.ActiveEncounterSession.Playing;
-            string playLabel = playing ? "Pause" : "Play";
-            if (GUILayout.Button(playLabel, EditorStyles.miniButtonLeft, GUILayout.Width(54f)))
-            {
-                if (!hasEncounter && BeginEncounterPreviewForSource(sourceId, play: false))
-                    hasEncounter = true;
-                if (HazardActorPreviewCoordinator.ActiveEncounterSession != null)
-                {
-                    if (HazardActorPreviewCoordinator.ActiveEncounterSession.Playing)
-                        HazardActorPreviewCoordinator.ActiveEncounterSession.Pause();
-                    else
-                        HazardActorPreviewCoordinator.ActiveEncounterSession.Play();
-                    SceneView.RepaintAll();
-                }
-            }
-            if (GUILayout.Button("Step", EditorStyles.miniButtonMid, GUILayout.Width(46f)))
-            {
-                if (!hasEncounter)
-                    BeginEncounterPreviewForSource(sourceId, play: false);
-                HazardActorPreviewCoordinator.StepActiveSession();
-                SceneView.RepaintAll();
-            }
-            if (GUILayout.Button("Restart", EditorStyles.miniButtonRight, GUILayout.Width(62f)))
-                BeginEncounterPreviewForSource(sourceId, play: false);
         }
 
         private void DrawEncounterTimeline(
@@ -1240,7 +1320,7 @@ namespace SweepNDodge.DotsBullets.Editor
             float timelineXMin = row.x + labelWidth;
             float timelineXMax = row.xMax - 92f;
             EditorGUI.DrawRect(
-                new Rect(Mathf.Lerp(timelineXMin, timelineXMax, Mathf.Clamp01(_encounterPreviewProgress)), row.y + 2f, 1f, row.height - 4f),
+                new Rect(Mathf.Lerp(timelineXMin, timelineXMax, Mathf.Clamp01(_session.HazardPreviewSourceProgress01)), row.y + 2f, 1f, row.height - 4f),
                 new Color(0.45f, 0.85f, 1f, 0.85f));
 
             Rect label = new Rect(row.x + 4f, row.y + 3f, labelWidth - 8f, row.height - 6f);
@@ -1357,7 +1437,7 @@ namespace SweepNDodge.DotsBullets.Editor
                     {
                         StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(_document, sourceId, ruleId, out int index);
                         var rule = _document.HazardActorOrchestrationRules[index];
-                        rule.TriggerThresholdNormalized = Mathf.Clamp01(_encounterPreviewProgress);
+                        rule.TriggerThresholdNormalized = Mathf.Clamp01(_session.HazardPreviewSourceProgress01);
                         StageMapHazardActorOrchestrationUtility.UpdateRule(_document, sourceId, ruleId, rule);
                     }
                     if (changed)
@@ -1438,17 +1518,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 return false;
 
             StageMapSelection selection = _session.Selection;
-            if (selection.Kind == StageMapSelectionKind.HazardActor
-                && StageMapHazardActorOrchestrationUtility.TryFindPlacement(
-                    _document,
-                    selection.OwningSourceStableId,
-                    selection.PlacementInstanceId,
-                    out var placement))
-            {
-                BeginPlacementPreview(placement, HazardActorPreviewScope.Actor, play);
-                return HazardActorPreviewCoordinator.ActiveSession != null;
-            }
-
             if (selection.Kind == StageMapSelectionKind.HazardActorRule
                 && StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
                     _document,
@@ -1456,18 +1525,87 @@ namespace SweepNDodge.DotsBullets.Editor
                     selection.RuleId,
                     out int ruleIndex))
             {
-                var rule = _document.HazardActorOrchestrationRules[ruleIndex];
-                _encounterPreviewProgress = Mathf.Clamp01(rule.TriggerThresholdNormalized);
-                return BeginEncounterPreviewForSource(selection.OwningSourceStableId, play);
+                _session.HazardPreviewSourceProgress01 = Mathf.Clamp01(
+                    _document.HazardActorOrchestrationRules[ruleIndex].TriggerThresholdNormalized);
             }
 
-            if ((selection.Kind == StageMapSelectionKind.SourceRegion || selection.Kind == StageMapSelectionKind.SourceAnchor)
-                && SourceExists(selection.StableId))
+            bool prepared = ReconcileHazardPreview(claimOwner: true);
+            if (prepared && play)
+                HazardActorPreviewCoordinator.Play(_hazardPreviewOwner);
+            return prepared;
+        }
+
+        public StageMapHazardPreviewBinding ResolveHazardPreviewBindingForTests()
+        {
+            return ResolveHazardPreviewBinding(_session.Selection);
+        }
+
+        private StageMapHazardPreviewBinding ResolveHazardPreviewBinding(StageMapSelection selection)
+        {
+            switch (selection.Kind)
             {
-                return BeginEncounterPreviewForSource(selection.StableId, play);
+                case StageMapSelectionKind.HazardActor:
+                    return StageMapHazardActorOrchestrationUtility.TryFindPlacement(
+                        _document,
+                        selection.OwningSourceStableId,
+                        selection.PlacementInstanceId,
+                        out _)
+                        ? StageMapHazardPreviewBinding.ForActor(
+                            selection.OwningSourceStableId,
+                            selection.PlacementInstanceId)
+                        : StageMapHazardPreviewBinding.None;
+                case StageMapSelectionKind.HazardActorRule:
+                    return StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                        _document,
+                        selection.OwningSourceStableId,
+                        selection.RuleId,
+                        out _)
+                        ? StageMapHazardPreviewBinding.ForEncounter(selection.OwningSourceStableId)
+                        : StageMapHazardPreviewBinding.None;
+                case StageMapSelectionKind.SourceRegion:
+                case StageMapSelectionKind.SourceAnchor:
+                    return SourceExists(selection.StableId)
+                        ? StageMapHazardPreviewBinding.ForEncounter(selection.StableId)
+                        : StageMapHazardPreviewBinding.None;
+                default:
+                    return StageMapHazardPreviewBinding.None;
+            }
+        }
+
+        private bool ReconcileHazardPreview(bool claimOwner)
+        {
+            StageMapHazardPreviewBinding binding = ResolveHazardPreviewBinding(_session.Selection);
+            if (!binding.IsValid)
+            {
+                ReleaseHazardPreview(clearBinding: true);
+                return false;
             }
 
-            return false;
+            if (_session.HazardPreviewTargetMode == StageMapHazardPreviewTargetMode.FollowPlayerStart)
+                _session.HazardPreviewTargetWorldPosition = GetCurrentHazardPreviewPlayerTarget();
+            else
+                _session.HazardPreviewTargetWorldPosition = ProjectHazardPreviewTargetToGridPlane(
+                    _session.HazardPreviewTargetWorldPosition);
+
+            _hazardPreviewBinding = binding;
+            _hazardPreviewError = string.Empty;
+            switch (binding.Kind)
+            {
+                case StageMapHazardPreviewBindingKind.Actor:
+                    if (!StageMapHazardActorOrchestrationUtility.TryFindPlacement(
+                            _document,
+                            binding.SourceStableId,
+                            binding.PlacementInstanceId,
+                            out var placement))
+                    {
+                        return FailHazardPreview("The selected HazardActor placement no longer exists.");
+                    }
+                    return BeginPlacementPreview(placement, claimOwner);
+                case StageMapHazardPreviewBindingKind.Encounter:
+                    return BuildEncounterPreviewForSource(binding.SourceStableId, claimOwner);
+                default:
+                    return false;
+            }
         }
 
         private bool SourceExists(uint sourceId)
@@ -1501,31 +1639,29 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private void BeginPlacementPreview(StageMapHazardActorPlacementData placement, HazardActorPreviewScope scope, bool play = true)
+        private bool BeginPlacementPreview(StageMapHazardActorPlacementData placement, bool claimOwner)
         {
             if (placement.ActorArchetypePrefab == null)
-                return;
+                return FailHazardPreview("The selected HazardActor placement has no archetype prefab.");
             if (!HazardActorPreviewSnapshotBuilder.TryBuild(placement.ActorArchetypePrefab, out var snapshot))
-                return;
+                return FailHazardPreview("The selected HazardActor archetype could not produce a preview snapshot.");
             if (!StageMapSelectionUtility.TryFindUniqueHazardIndex(_document.HazardActorPlacements, placement.OwningSourceStableId, placement.PlacementInstanceId, out int hazardIndex))
-                return;
+                return FailHazardPreview("The selected HazardActor placement identity is ambiguous.");
             Vector3 world = StageMapSelectionUtility.GetHazardActorWorld(_document, hazardIndex);
             var session = new HazardActorPreviewSession();
             session.Load(snapshot, new HazardActorPreviewInput
             {
-                Scope = scope,
+                Scope = HazardActorPreviewScope.Actor,
                 OwningSourceStableId = placement.OwningSourceStableId,
                 PlacementInstanceId = placement.PlacementInstanceId,
-                SourceProgress01 = _encounterPreviewProgress,
+                SourceProgress01 = _session.HazardPreviewSourceProgress01,
                 ActorWorldPosition = world,
                 ActorYawDeg = placement.LocalYawDeg,
-                TargetWorldPosition = StageMapSelectionUtility.GetPlayerStartWorld(_document),
+                TargetWorldPosition = _session.HazardPreviewTargetWorldPosition,
                 SpawnAtStart = true,
             });
-            if (play)
-                session.Play();
-            HazardActorPreviewCoordinator.SetActiveSession(session);
-            SceneView.RepaintAll();
+            ReplaceHazardActorPreviewSession(session, claimOwner);
+            return true;
         }
 
         public bool BeginEncounterPreviewForSource(uint sourceId)
@@ -1535,10 +1671,23 @@ namespace SweepNDodge.DotsBullets.Editor
 
         public bool BeginEncounterPreviewForSource(uint sourceId, bool play)
         {
+            if (_document == null || !SourceExists(sourceId))
+                return false;
+            _hazardPreviewBinding = StageMapHazardPreviewBinding.ForEncounter(sourceId);
+            if (_session.HazardPreviewTargetMode == StageMapHazardPreviewTargetMode.FollowPlayerStart)
+                _session.HazardPreviewTargetWorldPosition = GetCurrentHazardPreviewPlayerTarget();
+            bool prepared = BuildEncounterPreviewForSource(sourceId, claimOwner: true);
+            if (prepared && play)
+                HazardActorPreviewCoordinator.Play(_hazardPreviewOwner);
+            return prepared;
+        }
+
+        private bool BuildEncounterPreviewForSource(uint sourceId, bool claimOwner)
+        {
             var placements = _document.HazardActorPlacements ?? Array.Empty<StageMapHazardActorPlacementData>();
             int matchingCount = placements.Count(x => x.OwningSourceStableId == sourceId && x.ActorArchetypePrefab != null);
             if (matchingCount <= 0)
-                return false;
+                return FailHazardPreview($"Source {sourceId} has no previewable HazardActor placements.");
 
             int capPerActor = Mathf.Max(1, HazardActorPreviewSession.EncounterGhostCap / matchingCount);
             var encounter = new HazardActorEncounterPreviewSession();
@@ -1557,18 +1706,15 @@ namespace SweepNDodge.DotsBullets.Editor
                     BuildEncounterRulePreviews(sourceId, placements[i].PlacementInstanceId));
             }
 
-            encounter.SetSourceProgress(_encounterPreviewProgress);
+            encounter.SetSourceProgress(_session.HazardPreviewSourceProgress01);
 
-            if (encounter.ActiveActorCount <= 0)
+            if (encounter.PlannedActorCount <= 0)
             {
                 encounter.Dispose();
-                return false;
+                return FailHazardPreview($"Source {sourceId} could not build an Encounter preview.");
             }
 
-            if (play)
-                encounter.Play();
-            HazardActorPreviewCoordinator.SetActiveEncounterSession(encounter);
-            SceneView.RepaintAll();
+            ReplaceHazardEncounterPreviewSession(encounter, claimOwner);
             return true;
         }
 
@@ -1594,13 +1740,146 @@ namespace SweepNDodge.DotsBullets.Editor
                 OwningSourceStableId = placement.OwningSourceStableId,
                 PlacementInstanceId = placement.PlacementInstanceId,
                 GhostCapOverride = capPerActor,
-                SourceProgress01 = _encounterPreviewProgress,
+                SourceProgress01 = _session.HazardPreviewSourceProgress01,
                 ActorWorldPosition = world,
                 ActorYawDeg = placement.LocalYawDeg,
-                TargetWorldPosition = StageMapSelectionUtility.GetPlayerStartWorld(_document),
+                TargetWorldPosition = _session.HazardPreviewTargetWorldPosition,
                 SpawnAtStart = true,
             };
             return true;
+        }
+
+        private void ReplaceHazardActorPreviewSession(HazardActorPreviewSession session, bool claimOwner)
+        {
+            HazardActorPreviewSession previousActor = _hazardActorPreviewSession;
+            HazardActorEncounterPreviewSession previousEncounter = _hazardEncounterPreviewSession;
+            _hazardActorPreviewSession = session;
+            _hazardEncounterPreviewSession = null;
+            if (claimOwner || HazardActorPreviewCoordinator.IsActiveOwner(_hazardPreviewOwner))
+                HazardActorPreviewCoordinator.ActivateActor(_hazardPreviewOwner, session);
+            previousActor?.Dispose();
+            previousEncounter?.Dispose();
+            _hazardPreviewError = string.Empty;
+            SceneView.RepaintAll();
+            Repaint();
+        }
+
+        private void ReplaceHazardEncounterPreviewSession(HazardActorEncounterPreviewSession session, bool claimOwner)
+        {
+            HazardActorPreviewSession previousActor = _hazardActorPreviewSession;
+            HazardActorEncounterPreviewSession previousEncounter = _hazardEncounterPreviewSession;
+            _hazardActorPreviewSession = null;
+            _hazardEncounterPreviewSession = session;
+            if (claimOwner || HazardActorPreviewCoordinator.IsActiveOwner(_hazardPreviewOwner))
+                HazardActorPreviewCoordinator.ActivateEncounter(_hazardPreviewOwner, session);
+            previousActor?.Dispose();
+            previousEncounter?.Dispose();
+            _hazardPreviewError = string.Empty;
+            SceneView.RepaintAll();
+            Repaint();
+        }
+
+        private bool FailHazardPreview(string error)
+        {
+            _hazardPreviewError = error ?? "Hazard preview could not be prepared.";
+            ReleaseHazardPreview(clearBinding: false);
+            Repaint();
+            return false;
+        }
+
+        private void ReleaseHazardPreview(bool clearBinding)
+        {
+            HazardActorPreviewCoordinator.ClearOwner(_hazardPreviewOwner);
+            _hazardActorPreviewSession?.Dispose();
+            _hazardEncounterPreviewSession?.Dispose();
+            _hazardActorPreviewSession = null;
+            _hazardEncounterPreviewSession = null;
+            if (clearBinding)
+            {
+                _hazardPreviewBinding = StageMapHazardPreviewBinding.None;
+                _hazardPreviewError = string.Empty;
+            }
+            SceneView.RepaintAll();
+        }
+
+        private bool ClaimPreparedHazardPreview()
+        {
+            switch (_hazardPreviewBinding.Kind)
+            {
+                case StageMapHazardPreviewBindingKind.Actor when _hazardActorPreviewSession != null:
+                    HazardActorPreviewCoordinator.ActivateActor(_hazardPreviewOwner, _hazardActorPreviewSession);
+                    return true;
+                case StageMapHazardPreviewBindingKind.Encounter when _hazardEncounterPreviewSession != null:
+                    HazardActorPreviewCoordinator.ActivateEncounter(_hazardPreviewOwner, _hazardEncounterPreviewSession);
+                    return true;
+                default:
+                    return ReconcileHazardPreview(claimOwner: true);
+            }
+        }
+
+        private void QueueHazardPreviewReconcile(bool claimOwner)
+        {
+            _hazardPreviewReconcileClaimsOwner |= claimOwner;
+            if (_hazardPreviewReconcileQueued)
+                return;
+            _hazardPreviewReconcileQueued = true;
+            EditorApplication.delayCall += FlushHazardPreviewReconcile;
+        }
+
+        private void FlushHazardPreviewReconcile()
+        {
+            EditorApplication.delayCall -= FlushHazardPreviewReconcile;
+            if (!_hazardPreviewReconcileQueued)
+                return;
+            bool claimOwner = _hazardPreviewReconcileClaimsOwner;
+            _hazardPreviewReconcileQueued = false;
+            _hazardPreviewReconcileClaimsOwner = false;
+            ReconcileHazardPreview(claimOwner);
+        }
+
+        public void FlushHazardPreviewReconcileForTests()
+        {
+            FlushHazardPreviewReconcile();
+        }
+
+        private Vector3 GetCurrentHazardPreviewPlayerTarget()
+        {
+            return ProjectHazardPreviewTargetToGridPlane(StageMapSelectionUtility.GetPlayerStartWorld(_document));
+        }
+
+        private Vector3 ProjectHazardPreviewTargetToGridPlane(Vector3 target)
+        {
+            target.y = _document != null ? _document.Grid.Origin.y : 0f;
+            return target;
+        }
+
+        public void SetHazardPreviewTargetForTests(Vector3 target, bool followPlayerStart)
+        {
+            SetHazardPreviewTarget(
+                target,
+                followPlayerStart
+                    ? StageMapHazardPreviewTargetMode.FollowPlayerStart
+                    : StageMapHazardPreviewTargetMode.Custom,
+                claimOwner: true);
+        }
+
+        private void SetHazardPreviewTarget(
+            Vector3 target,
+            StageMapHazardPreviewTargetMode mode,
+            bool claimOwner)
+        {
+            if (_document == null)
+                return;
+            _session.HazardPreviewTargetMode = mode;
+            _session.HazardPreviewTargetWorldPosition = mode == StageMapHazardPreviewTargetMode.FollowPlayerStart
+                ? GetCurrentHazardPreviewPlayerTarget()
+                : ProjectHazardPreviewTargetToGridPlane(target);
+            if (claimOwner)
+                ClaimPreparedHazardPreview();
+            _hazardActorPreviewSession?.SetTargetWorldPosition(_session.HazardPreviewTargetWorldPosition);
+            _hazardEncounterPreviewSession?.SetTargetWorldPosition(_session.HazardPreviewTargetWorldPosition);
+            SceneView.RepaintAll();
+            Repaint();
         }
 
         private HazardActorEncounterRulePreview[] BuildEncounterRulePreviews(uint sourceId, int placementId)
@@ -1845,6 +2124,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             DrawDocumentSceneView();
             DrawSelectionHandle();
+            DrawHazardPreviewTargetHandle();
             HandleDeleteShortcut(Event.current);
             HandleSceneInput(Event.current);
         }
@@ -1869,6 +2149,36 @@ namespace SweepNDodge.DotsBullets.Editor
             RecordAndApply(
                 "Move Stage Map Selection",
                 () => StageMapEditorMutationUtility.TryMoveSelection(_session, nextWorld, yaw, euler, out _));
+        }
+
+        private void DrawHazardPreviewTargetHandle()
+        {
+            if (!_hazardPreviewBinding.IsValid
+                || !HazardActorPreviewCoordinator.IsActiveOwner(_hazardPreviewOwner)
+                || (_hazardActorPreviewSession == null && _hazardEncounterPreviewSession == null))
+            {
+                return;
+            }
+
+            Vector3 target = ProjectHazardPreviewTargetToGridPlane(_session.HazardPreviewTargetWorldPosition);
+            float size = Mathf.Max(0.04f, HandleUtility.GetHandleSize(target) * 0.08f);
+            Color previousColor = Handles.color;
+            Handles.color = new Color(0.15f, 0.9f, 1f, 0.95f);
+            Handles.DrawWireDisc(target, Vector3.up, size * 1.6f);
+            Handles.DrawLine(target + Vector3.left * size, target + Vector3.right * size);
+            Handles.DrawLine(target + Vector3.back * size, target + Vector3.forward * size);
+            Handles.Label(target + Vector3.up * (size * 1.8f), "Preview Target");
+
+            EditorGUI.BeginChangeCheck();
+            Vector3 next = Handles.FreeMoveHandle(target, size, Vector3.zero, Handles.CircleHandleCap);
+            if (EditorGUI.EndChangeCheck())
+            {
+                SetHazardPreviewTarget(
+                    next,
+                    StageMapHazardPreviewTargetMode.Custom,
+                    claimOwner: true);
+            }
+            Handles.color = previousColor;
         }
 
         public bool CanDrawSelectionHandle()
@@ -2026,7 +2336,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
                 Handles.color = color;
                 Handles.DrawSolidDisc(world, Vector3.up, radius);
-                Handles.Label(world + Vector3.up * radius, $"{kind} {regions[i].StableId}");
+                if (ShouldDrawAuthoringGizmoLabels())
+                    Handles.Label(world + Vector3.up * radius, $"{kind} {regions[i].StableId}");
             }
         }
 
@@ -2040,7 +2351,8 @@ namespace SweepNDodge.DotsBullets.Editor
             Handles.DrawSolidDisc(world, Vector3.up, _document.Grid.CellSize * 0.14f);
             Vector3 forward = Quaternion.Euler(0f, _document.PlayerStart.YawDeg, 0f) * Vector3.forward;
             Handles.DrawLine(world, world + forward * (_document.Grid.CellSize * 0.45f));
-            Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), "PlayerStart");
+            if (ShouldDrawAuthoringGizmoLabels())
+                Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), "PlayerStart");
         }
 
         private void DrawHazardActors()
@@ -2057,33 +2369,153 @@ namespace SweepNDodge.DotsBullets.Editor
                     : _document.Grid.Origin;
                 Vector3 world = baseWorld + placements[i].SourceLocalOffset;
                 bool activeSource = placements[i].OwningSourceStableId == activeSourceId;
-                Handles.color = activeSource
-                    ? new Color(1f, 0.25f, 0.75f, 1f)
-                    : new Color(1f, 0.25f, 0.75f, 0.28f);
-                if (!IsHazardPlacementPreviewTarget(placements[i].OwningSourceStableId, placements[i].PlacementInstanceId))
+                StageMapHazardPlacementPreviewVisualState previewState = GetHazardPlacementPreviewVisualState(
+                    placements[i].OwningSourceStableId,
+                    placements[i].PlacementInstanceId);
+                if (previewState == StageMapHazardPlacementPreviewVisualState.NotInPreview)
+                {
+                    Handles.color = activeSource
+                        ? new Color(1f, 0.25f, 0.75f, 1f)
+                        : new Color(1f, 0.25f, 0.75f, 0.28f);
                     Handles.DrawWireCube(world, Vector3.one * (_document.Grid.CellSize * 0.25f));
-                if (activeSource)
-                    Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), $"Hazard {placements[i].PlacementInstanceId}");
+                    if (activeSource && ShouldDrawAuthoringGizmoLabels())
+                        Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), $"Hazard {placements[i].PlacementInstanceId}");
+                    continue;
+                }
+
+                if (previewState != StageMapHazardPlacementPreviewVisualState.Active)
+                {
+                    DrawInactiveHazardPreviewPlacement(
+                        world,
+                        placements[i].PlacementInstanceId,
+                        previewState,
+                        ShouldLabelInactiveHazardPreviewPlacement(
+                            placements[i].OwningSourceStableId,
+                            placements[i].PlacementInstanceId));
+                }
             }
         }
 
-        public static bool IsHazardPlacementPreviewTarget(uint owningSourceStableId, int placementInstanceId)
+        public StageMapHazardPlacementPreviewVisualState GetHazardPlacementPreviewVisualStateForTests(
+            uint owningSourceStableId,
+            int placementInstanceId)
+        {
+            return GetHazardPlacementPreviewVisualState(owningSourceStableId, placementInstanceId);
+        }
+
+        private StageMapHazardPlacementPreviewVisualState GetHazardPlacementPreviewVisualState(
+            uint owningSourceStableId,
+            int placementInstanceId)
         {
             if (owningSourceStableId == 0u || placementInstanceId <= 0)
-                return false;
+                return StageMapHazardPlacementPreviewVisualState.NotInPreview;
+            if (!HazardActorPreviewCoordinator.IsActiveOwner(_hazardPreviewOwner))
+                return StageMapHazardPlacementPreviewVisualState.NotInPreview;
 
-            var active = HazardActorPreviewCoordinator.ActiveSession;
-            if (active != null && MatchesPreviewInput(active.Input, owningSourceStableId, placementInstanceId))
-                return true;
-
-            var encounter = HazardActorPreviewCoordinator.ActiveEncounterSession;
-            if (encounter == null)
-                return false;
-
-            var actors = encounter.Actors;
-            for (int i = 0; i < actors.Count; i++)
+            if (_hazardPreviewBinding.Kind == StageMapHazardPreviewBindingKind.Actor
+                && _hazardActorPreviewSession != null
+                && MatchesPreviewInput(_hazardActorPreviewSession.Input, owningSourceStableId, placementInstanceId))
             {
-                if (MatchesPreviewInput(actors[i].Input, owningSourceStableId, placementInstanceId))
+                return StageMapHazardPlacementPreviewVisualState.Active;
+            }
+
+            if (_hazardPreviewBinding.Kind != StageMapHazardPreviewBindingKind.Encounter
+                || _hazardEncounterPreviewSession == null
+                || _hazardPreviewBinding.SourceStableId != owningSourceStableId
+                || !_hazardEncounterPreviewSession.TryGetPlacementState(
+                    owningSourceStableId,
+                    placementInstanceId,
+                    out var state))
+            {
+                return StageMapHazardPlacementPreviewVisualState.NotInPreview;
+            }
+
+            switch (state)
+            {
+                case HazardActorEncounterPlacementPreviewState.WaitingForSpawn:
+                    return StageMapHazardPlacementPreviewVisualState.WaitingForSpawn;
+                case HazardActorEncounterPlacementPreviewState.Retired:
+                    return StageMapHazardPlacementPreviewVisualState.Retired;
+                default:
+                    return StageMapHazardPlacementPreviewVisualState.Active;
+            }
+        }
+
+        private void DrawInactiveHazardPreviewPlacement(
+            Vector3 world,
+            int placementInstanceId,
+            StageMapHazardPlacementPreviewVisualState state,
+            bool drawLabel)
+        {
+            float radius = _document.Grid.CellSize * 0.15f;
+            Vector3 markerWorld = world + Vector3.up * (_document.Grid.CellSize * 0.015f);
+            Color markerColor = state == StageMapHazardPlacementPreviewVisualState.Retired
+                ? new Color(0.55f, 0.58f, 0.62f, 0.22f)
+                : new Color(0.58f, 0.72f, 0.78f, 0.24f);
+            Handles.color = markerColor;
+            Handles.DrawWireDisc(markerWorld, Vector3.up, radius);
+            markerColor.a = 0.52f;
+            Handles.color = markerColor;
+
+            if (state == StageMapHazardPlacementPreviewVisualState.Retired)
+            {
+                Handles.DrawWireDisc(markerWorld, Vector3.up, radius * 0.48f);
+            }
+            else
+            {
+                Handles.DrawSolidDisc(markerWorld, Vector3.up, radius * 0.18f);
+            }
+
+            if (drawLabel)
+            {
+                string status = state == StageMapHazardPlacementPreviewVisualState.Retired ? "Retired" : "Waiting";
+                Handles.Label(
+                    world + Vector3.up * (_document.Grid.CellSize * 0.08f),
+                    $"#{placementInstanceId} · {status}",
+                    GetInactiveHazardPreviewLabelStyle());
+            }
+        }
+
+        private GUIStyle GetInactiveHazardPreviewLabelStyle()
+        {
+            if (_inactiveHazardPreviewLabelStyle == null)
+            {
+                _inactiveHazardPreviewLabelStyle = new GUIStyle(EditorStyles.miniLabel);
+                _inactiveHazardPreviewLabelStyle.normal.textColor = new Color(0.68f, 0.74f, 0.78f, 0.62f);
+            }
+            return _inactiveHazardPreviewLabelStyle;
+        }
+
+        private bool ShouldDrawAuthoringGizmoLabels()
+        {
+            return !IsHazardPreviewActive;
+        }
+
+        private bool ShouldLabelInactiveHazardPreviewPlacement(uint owningSourceStableId, int placementInstanceId)
+        {
+            StageMapSelection selection = _session.Selection;
+            if (selection.Kind == StageMapSelectionKind.HazardActor)
+            {
+                return selection.OwningSourceStableId == owningSourceStableId
+                    && selection.PlacementInstanceId == placementInstanceId;
+            }
+
+            if (selection.Kind != StageMapSelectionKind.HazardActorRule
+                || selection.OwningSourceStableId != owningSourceStableId
+                || !StageMapHazardActorOrchestrationUtility.TryFindRuleIndex(
+                    _document,
+                    selection.OwningSourceStableId,
+                    selection.RuleId,
+                    out int ruleIndex))
+            {
+                return false;
+            }
+
+            int[] targets = _document.HazardActorOrchestrationRules[ruleIndex].TargetPlacementInstanceIds
+                ?? Array.Empty<int>();
+            for (int i = 0; i < targets.Length; i++)
+            {
+                if (targets[i] == placementInstanceId)
                     return true;
             }
             return false;
@@ -2121,7 +2553,8 @@ namespace SweepNDodge.DotsBullets.Editor
                 Vector3 world = baseWorld + links[i].Position;
                 Handles.color = new Color(0.55f, 0.45f, 1f, 1f);
                 Handles.DrawWireDisc(world, Vector3.up, _document.Grid.CellSize * 0.16f);
-                Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), $"Link {links[i].StableId}");
+                if (ShouldDrawAuthoringGizmoLabels())
+                    Handles.Label(world + Vector3.up * (_document.Grid.CellSize * 0.12f), $"Link {links[i].StableId}");
             }
         }
 
@@ -2318,7 +2751,7 @@ namespace SweepNDodge.DotsBullets.Editor
             return true;
         }
 
-        private void RefreshAfterDocumentMutation(bool markDirty)
+        private void RefreshAfterDocumentMutation(bool markDirty, bool claimPreviewOwner = true)
         {
             if (_document == null)
                 return;
@@ -2335,11 +2768,12 @@ namespace SweepNDodge.DotsBullets.Editor
             _observedDocumentSignature = StageMapApplyPlanner.ComputeSignature(_document);
             InvalidateOverlayCache();
             Validate();
+            QueueHazardPreviewReconcile(claimPreviewOwner);
         }
 
         public void ReconcileAfterExternalMutation()
         {
-            RefreshAfterDocumentMutation(markDirty: true);
+            RefreshAfterDocumentMutation(markDirty: true, claimPreviewOwner: false);
         }
 
         private void OnUndoRedo()
@@ -2368,7 +2802,13 @@ namespace SweepNDodge.DotsBullets.Editor
             if (dirtyCount == _observedDocumentDirtyCount)
                 return;
 
-            RefreshAfterDocumentMutation(markDirty: true);
+            RefreshAfterDocumentMutation(markDirty: true, claimPreviewOwner: false);
+        }
+
+        private void OnProjectChanged()
+        {
+            if (_document != null && _hazardPreviewBinding.IsValid)
+                QueueHazardPreviewReconcile(claimOwner: false);
         }
 
         private void ClampSelection()

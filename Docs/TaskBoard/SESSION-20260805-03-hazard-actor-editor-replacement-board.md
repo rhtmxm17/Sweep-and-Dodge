@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260805-03`
 - type: `SessionTaskBoard`
 - status: `completed`
-- last_updated: `2026-08-06`
+- last_updated: `2026-08-11`
 - related_docs:
   - [../TechnicalDesign/TD-035-hazard-actor-authoring-workbench-and-preview.md](../TechnicalDesign/TD-035-hazard-actor-authoring-workbench-and-preview.md)
   - [../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md](../TechnicalDesign/TD-031-hazard-actor-behavior-runtime.md)
@@ -21,7 +21,7 @@
 - Workbench만으로 Actor/Phase/Transition/Pattern/Profile 제작과 validation navigation을 수행할 수 있다.
 - Pattern/Actor/Encounter preview가 동일 snapshot/simulator를 사용하고 실제 document pose를 반영한다.
 - 기존 StageDefinition rule을 명시적 preview/diff/apply로 document에 손실 없이 이전할 수 있다.
-- Scene View preview가 정의된 30Hz/ghost/trajectory 예산과 cleanup 수명주기를 지킨다.
+- Scene View preview가 정의된 30Hz/ghost 예산, exact-position generic ghost와 cleanup 수명주기를 지킨다.
 - Unity compile, Console error 0, 관련 EditMode와 기존 HazardActor PlayMode smoke를 통과한다.
 
 ## Now
@@ -67,9 +67,27 @@
   - embedded preview의 target click, middle-drag pan, wheel zoom, fit/reset/restart-with-target 조작과 session-only 상태 정책을 문서화했다.
   - Phase/Pattern 반복 command는 icon button + tooltip으로 축약하는 정책을 문서화했다.
   - ADR 갱신은 하지 않았다. 이번 항목은 SSOT/소유권 결정이 아니라 Workbench UX 계약 보강이다.
+- [x] R11. Preview coordinator owner/lifecycle 일관성
+  - owner token 기반 단일 active session과 owner-scoped transport를 적용하고, coordinator 전환/clear가 caller-owned session을 dispose하지 않게 했다.
+  - Workbench와 Stage Map Editor가 각자 session 생성·교체·dispose를 담당하며 비활성 창 close가 활성 preview를 종료하지 않게 했다.
+- [x] R12. Stage Map selection binding/Hazard Preview strip/reconcile
+  - placement=Actor, source/source anchor/rule=Encounter, 그 외=None binding을 적용하고 Encounter header transport를 독립 Preview strip으로 이동했다.
+  - Actor/Encounter 공통 Source Progress와 document/Undo/project change coalesced time-0 paused rebuild를 구현·검증했다.
+- [x] R13. Stage Map Preview target interaction과 마감 검증
+  - `FollowPlayerStart/Custom`, Scene View cyan handle, Reset Target, Encounter progress rebuild target 보존을 session-only로 구현했다.
+  - compile, Console, targeted/full EditMode, HazardActor PlayMode smoke, 성능 budget, 실제 Window/Scene View smoke를 완료했다.
+  - 검증: targeted EditMode 54/54, full EditMode 596/596, `HazardEmitterPlayModeTests` 2/2 pass.
+  - 성능: Actor p95 `0.887 ms` / 2 submissions / GC `0 B`, Encounter p95 `3.17 ms` / 5 submissions / GC `0 B`.
+  - 실제 `smd_demo_1` smoke에서 Actor/Encounter/None binding, rule progress, cyan target handle, Workbench owner handoff와 최종 callback 0을 확인했다.
+- [x] R14. Stage Map Preview authoring gizmo 가시성
+  - Preview Core의 planned placement 상태를 `WaitingForSpawn/Active/Retired`로 노출하고, Stage Map owner에 한정해 일반 authoring label과 Active placement cube를 숨긴다.
+  - Spawn 전은 neutral ring+center dot, Retire 후는 neutral double ring footprint로 표시하고 상태 label은 선택 placement/rule target에만 제한한다.
+  - active actor가 0이어도 planned actor가 있으면 Encounter Preview 준비를 유지한다.
+  - 검증: targeted EditMode 55/55, full EditMode 597/597, `HazardEmitterPlayModeTests` 2/2, Console error 0.
+  - 실제 `smd_demo_1` source `1001`의 placement `2`에서 waiting ring+dot과 retired double ring, 일반 authoring label 억제를 Scene View로 확인했다.
 
 ## Next
-- 없음. 후속 R1~R7 감사 기준 구현과 검증을 완료했다.
+- 없음. R11~R14 구현과 검증을 완료했다.
 
 ## Blocked
 - 없음
@@ -91,7 +109,8 @@
 - [x] T3. Preview snapshot/simulator
   - resolver 기반 snapshot과 30Hz fixed-step Presence/Phase/Selector/Telegraph/Emit/Cooldown, Linear/DampedLinear/HomingLite, lifecycle trigger replay를 구현했다.
 - [x] T4. Embedded/Scene View preview renderer
-  - Workbench embedded preview와 Scene View preview가 `HazardActorPreviewCoordinator` active session을 공유하며 cap/30Hz/callback cleanup을 검증했다.
+  - Workbench embedded preview와 Scene View preview가 `HazardActorPreviewCoordinator` active session을 공유하며 exact-position generic ghost, cap/30Hz/callback cleanup을 검증했다.
+  - spatial telegraph/trajectory debug geometry와 actor/bullet prefab inert ghost는 v1 완료 조건이 아닌 향후 확장 가능성으로 둔다.
 - [x] T5. StageMapDocument orchestration schema/migration
   - schema v3, source-local rule validation, explicit TargetDefinition import preview/apply/stale rejection, document-authoritative export를 구현했다.
 - [x] T6. Encounter Track

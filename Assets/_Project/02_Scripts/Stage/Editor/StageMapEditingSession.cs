@@ -56,6 +56,43 @@ namespace SweepNDodge.DotsBullets.Editor
         HazardActorRule = 8,
     }
 
+    public enum StageMapHazardPreviewBindingKind : byte
+    {
+        None = 0,
+        Actor = 1,
+        Encounter = 2,
+    }
+
+    public enum StageMapHazardPreviewTargetMode : byte
+    {
+        FollowPlayerStart = 0,
+        Custom = 1,
+    }
+
+    public readonly struct StageMapHazardPreviewBinding
+    {
+        private StageMapHazardPreviewBinding(
+            StageMapHazardPreviewBindingKind kind,
+            uint sourceStableId,
+            int placementInstanceId)
+        {
+            Kind = kind;
+            SourceStableId = sourceStableId;
+            PlacementInstanceId = placementInstanceId;
+        }
+
+        public StageMapHazardPreviewBindingKind Kind { get; }
+        public uint SourceStableId { get; }
+        public int PlacementInstanceId { get; }
+        public bool IsValid => Kind != StageMapHazardPreviewBindingKind.None;
+
+        public static StageMapHazardPreviewBinding None => default;
+        public static StageMapHazardPreviewBinding ForActor(uint sourceStableId, int placementInstanceId) =>
+            new StageMapHazardPreviewBinding(StageMapHazardPreviewBindingKind.Actor, sourceStableId, placementInstanceId);
+        public static StageMapHazardPreviewBinding ForEncounter(uint sourceStableId) =>
+            new StageMapHazardPreviewBinding(StageMapHazardPreviewBindingKind.Encounter, sourceStableId, 0);
+    }
+
     /// <summary>
     /// Canonical logical selection identity. Array indices are resolved from the current document on demand.
     /// </summary>
@@ -210,6 +247,9 @@ namespace SweepNDodge.DotsBullets.Editor
         public bool LockPlayerStartLayer { get; set; }
         public bool LockHazardActorLayer { get; set; }
         public bool LockPresentationLayer { get; set; }
+        public StageMapHazardPreviewTargetMode HazardPreviewTargetMode { get; set; }
+        public Vector3 HazardPreviewTargetWorldPosition { get; set; }
+        public float HazardPreviewSourceProgress01 { get; set; }
         public bool Dirty { get; set; }
         public List<ContentValidationIssue> ValidationSnapshot { get; } = new List<ContentValidationIssue>(32);
 
@@ -234,6 +274,11 @@ namespace SweepNDodge.DotsBullets.Editor
             SelectedLayer = StageMapEditorLayer.Grid;
             SelectedIssueIndex = -1;
             Selection = StageMapSelection.None;
+            HazardPreviewTargetMode = StageMapHazardPreviewTargetMode.FollowPlayerStart;
+            HazardPreviewTargetWorldPosition = document != null
+                ? StageMapSelectionUtility.GetPlayerStartWorld(document)
+                : Vector3.zero;
+            HazardPreviewSourceProgress01 = 0f;
             PresentationStableId = StageMapDocumentCommandUtility.GetNextPresentationStableId(document);
             Dirty = false;
             ValidationSnapshot.Clear();

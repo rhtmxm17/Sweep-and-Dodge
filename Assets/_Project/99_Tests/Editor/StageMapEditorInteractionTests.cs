@@ -419,7 +419,7 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void HazardPreviewIdentity_MarksOnlyActivePreviewPlacementAsTarget()
+        public void HazardPreviewVisualState_IsScopedToStageMapOwnerAndCurrentBinding()
         {
             using (var setup = CreateSetup())
             {
@@ -438,8 +438,20 @@ namespace SweepNDodge.DotsBullets.Tests
                     Assert.That(HazardActorPreviewCoordinator.ActiveSession, Is.Not.Null);
                     Assert.That(HazardActorPreviewCoordinator.ActiveSession.Input.OwningSourceStableId, Is.EqualTo(hazard.OwningSourceStableId));
                     Assert.That(HazardActorPreviewCoordinator.ActiveSession.Input.PlacementInstanceId, Is.EqualTo(hazard.PlacementInstanceId));
-                    Assert.That(StageMapEditorWindow.IsHazardPlacementPreviewTarget(hazard.OwningSourceStableId, hazard.PlacementInstanceId), Is.True);
-                    Assert.That(StageMapEditorWindow.IsHazardPlacementPreviewTarget(hazard.OwningSourceStableId, hazard.PlacementInstanceId + 1), Is.False);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(hazard.OwningSourceStableId, hazard.PlacementInstanceId),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.Active));
+                    Assert.That(window.ShouldDrawAuthoringGizmoLabelsForTests(), Is.False);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(hazard.OwningSourceStableId, hazard.PlacementInstanceId + 1),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.NotInPreview));
+
+                    var otherOwner = new HazardActorPreviewOwnerToken("Other Preview Owner");
+                    HazardActorPreviewCoordinator.ActivateActor(otherOwner, HazardActorPreviewCoordinator.ActiveSession);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(hazard.OwningSourceStableId, hazard.PlacementInstanceId),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.NotInPreview));
+                    Assert.That(window.ShouldDrawAuthoringGizmoLabelsForTests(), Is.True);
 
                     Assert.That(window.BeginEncounterPreviewForSource(hazard.OwningSourceStableId, play: false), Is.True);
                     Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession, Is.Not.Null);
@@ -448,7 +460,73 @@ namespace SweepNDodge.DotsBullets.Tests
                             x.Input.OwningSourceStableId == hazard.OwningSourceStableId
                             && x.Input.PlacementInstanceId == hazard.PlacementInstanceId),
                         Is.True);
-                    Assert.That(StageMapEditorWindow.IsHazardPlacementPreviewTarget(hazard.OwningSourceStableId, hazard.PlacementInstanceId), Is.True);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(hazard.OwningSourceStableId, hazard.PlacementInstanceId),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.Active));
+                }
+                finally
+                {
+                    HazardActorPreviewCoordinator.Shutdown();
+                    window.Close();
+                    for (int i = 0; i < previewAssets.Count; i++)
+                        UnityEngine.Object.DestroyImmediate(previewAssets[i]);
+                }
+            }
+        }
+
+        [Test]
+        public void HazardPreviewVisualState_DistinguishesWaitingActiveAndRetiredPlacements()
+        {
+            using (var setup = CreateSetup())
+            {
+                var previewAssets = new List<ScriptableObject>();
+                var window = EditorWindow.GetWindow<StageMapEditorWindow>(utility: true, title: "Stage Map Hazard Preview Lifecycle Test", focus: false);
+                try
+                {
+                    ConfigurePreviewableHazardActorPrefab(setup.Prefab, previewAssets);
+                    setup.Document.HazardActorOrchestrationRules = new[]
+                    {
+                        new StageMapHazardActorOrchestrationRuleData
+                        {
+                            OwningSourceStableId = 100u,
+                            RuleId = 1,
+                            TargetPlacementInstanceIds = new[] { 1 },
+                            ActionType = HazardActorOrchestrationActionId.Spawn,
+                            TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                            TriggerThresholdNormalized = 0.2f,
+                        },
+                        new StageMapHazardActorOrchestrationRuleData
+                        {
+                            OwningSourceStableId = 100u,
+                            RuleId = 2,
+                            TargetPlacementInstanceIds = new[] { 1 },
+                            ActionType = HazardActorOrchestrationActionId.Retire,
+                            TriggerType = HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove,
+                            TriggerThresholdNormalized = 0.8f,
+                        },
+                    };
+
+                    HazardActorPreviewCoordinator.Shutdown();
+                    window.LoadDocument(setup.Document);
+                    Assert.That(window.BeginEncounterPreviewForSource(100u, play: false), Is.True);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(100u, 1),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.WaitingForSpawn));
+
+                    HazardActorPreviewCoordinator.ActiveEncounterSession.SetSourceProgress(0.3f);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(100u, 1),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.Active));
+
+                    HazardActorPreviewCoordinator.ActiveEncounterSession.SetSourceProgress(0.9f);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(100u, 1),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.Retired));
+
+                    HazardActorPreviewCoordinator.ActiveEncounterSession.SetSourceProgress(0.1f);
+                    Assert.That(
+                        window.GetHazardPlacementPreviewVisualStateForTests(100u, 1),
+                        Is.EqualTo(StageMapHazardPlacementPreviewVisualState.WaitingForSpawn));
                 }
                 finally
                 {
@@ -607,6 +685,131 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(StageMapEditorMutationUtility.CanApplyFix(session, issue, target, out _), Is.False);
                 session.LockAnchorLayer = false;
                 Assert.That(StageMapEditorMutationUtility.CanApplyFix(session, issue, target, out _), Is.True);
+            }
+        }
+
+        [Test]
+        public void HazardPreviewBinding_FollowsSelectionAndClearsForUnrelatedSelection()
+        {
+            using (var setup = CreateSetup())
+            {
+                var previewAssets = new List<ScriptableObject>();
+                var window = EditorWindow.GetWindow<StageMapEditorWindow>(utility: true, title: "Stage Map Preview Binding Test", focus: false);
+                try
+                {
+                    ConfigurePreviewableHazardActorPrefab(setup.Prefab, previewAssets);
+                    HazardActorPreviewCoordinator.Shutdown();
+                    window.LoadDocument(setup.Document);
+
+                    Assert.That(window.TrySelect(StageMapSelection.ForHazard(100u, 1), frame: false), Is.True);
+                    Assert.That(window.HazardPreviewBinding.Kind, Is.EqualTo(StageMapHazardPreviewBindingKind.Actor));
+                    Assert.That(window.IsHazardPreviewActive, Is.True);
+                    Assert.That(HazardActorPreviewCoordinator.ActiveSession, Is.Not.Null);
+
+                    Assert.That(window.TrySelect(StageMapSelection.ForRegion(StageRegionKind.Source, 100u), frame: false), Is.True);
+                    Assert.That(window.HazardPreviewBinding.Kind, Is.EqualTo(StageMapHazardPreviewBindingKind.Encounter));
+                    Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession, Is.Not.Null);
+
+                    Assert.That(window.TrySelect(StageMapSelection.ForCell(Vector2Int.zero), frame: false), Is.True);
+                    Assert.That(window.HazardPreviewBinding.Kind, Is.EqualTo(StageMapHazardPreviewBindingKind.None));
+                    Assert.That(window.IsHazardPreviewActive, Is.False);
+                    Assert.That(HazardActorPreviewCoordinator.ActiveSession, Is.Null);
+                    Assert.That(HazardActorPreviewCoordinator.ActiveEncounterSession, Is.Null);
+                }
+                finally
+                {
+                    window.Close();
+                    HazardActorPreviewCoordinator.Shutdown();
+                    for (int i = 0; i < previewAssets.Count; i++)
+                        UnityEngine.Object.DestroyImmediate(previewAssets[i]);
+                }
+            }
+        }
+
+        [Test]
+        public void HazardPreviewTarget_CustomPersistsAndResetRestoresPlayerStartFollowWithoutDirtyingDocument()
+        {
+            using (var setup = CreateSetup())
+            {
+                var previewAssets = new List<ScriptableObject>();
+                var window = EditorWindow.GetWindow<StageMapEditorWindow>(utility: true, title: "Stage Map Preview Target Test", focus: false);
+                try
+                {
+                    ConfigurePreviewableHazardActorPrefab(setup.Prefab, previewAssets);
+                    window.LoadDocument(setup.Document);
+                    Assert.That(window.TrySelect(StageMapSelection.ForHazard(100u, 1), frame: false), Is.True);
+                    int dirtyBefore = EditorUtility.GetDirtyCount(setup.Document);
+
+                    var custom = new Vector3(2.25f, 99f, -1.5f);
+                    window.SetHazardPreviewTargetForTests(custom, followPlayerStart: false);
+                    Assert.That(window.Session.HazardPreviewTargetMode, Is.EqualTo(StageMapHazardPreviewTargetMode.Custom));
+                    Assert.That(window.Session.HazardPreviewTargetWorldPosition.y, Is.EqualTo(setup.Document.Grid.Origin.y));
+                    Assert.That(HazardActorPreviewCoordinator.ActiveSession.Input.TargetWorldPosition, Is.EqualTo(window.Session.HazardPreviewTargetWorldPosition));
+                    Assert.That(EditorUtility.GetDirtyCount(setup.Document), Is.EqualTo(dirtyBefore));
+
+                    setup.Document.PlayerStart.AnchorOffset = new Vector2(0.2f, -0.2f);
+                    window.ReconcileAfterExternalMutation();
+                    window.FlushHazardPreviewReconcileForTests();
+                    Assert.That(window.Session.HazardPreviewTargetWorldPosition.x, Is.EqualTo(custom.x).Within(0.0001f));
+                    Assert.That(window.Session.HazardPreviewTargetWorldPosition.z, Is.EqualTo(custom.z).Within(0.0001f));
+
+                    window.SetHazardPreviewTargetForTests(Vector3.zero, followPlayerStart: true);
+                    Assert.That(window.Session.HazardPreviewTargetMode, Is.EqualTo(StageMapHazardPreviewTargetMode.FollowPlayerStart));
+                    Assert.That(window.Session.HazardPreviewTargetWorldPosition, Is.EqualTo(StageMapSelectionUtility.GetPlayerStartWorld(setup.Document)));
+
+                    setup.Document.PlayerStart.AnchorOffset = new Vector2(-0.25f, 0.25f);
+                    window.ReconcileAfterExternalMutation();
+                    window.FlushHazardPreviewReconcileForTests();
+                    Assert.That(window.Session.HazardPreviewTargetWorldPosition, Is.EqualTo(StageMapSelectionUtility.GetPlayerStartWorld(setup.Document)));
+                }
+                finally
+                {
+                    window.Close();
+                    HazardActorPreviewCoordinator.Shutdown();
+                    for (int i = 0; i < previewAssets.Count; i++)
+                        UnityEngine.Object.DestroyImmediate(previewAssets[i]);
+                }
+            }
+        }
+
+        [Test]
+        public void HazardPreviewDocumentMutation_RebuildsLatestPoseAtPausedTimeZero()
+        {
+            using (var setup = CreateSetup())
+            {
+                var previewAssets = new List<ScriptableObject>();
+                var window = EditorWindow.GetWindow<StageMapEditorWindow>(utility: true, title: "Stage Map Preview Reconcile Test", focus: false);
+                try
+                {
+                    ConfigurePreviewableHazardActorPrefab(setup.Prefab, previewAssets);
+                    window.LoadDocument(setup.Document);
+                    Assert.That(window.TrySelect(StageMapSelection.ForHazard(100u, 1), frame: false), Is.True);
+                    Assert.That(HazardActorPreviewCoordinator.Play(HazardActorPreviewCoordinator.ActiveOwner), Is.True);
+                    Assert.That(HazardActorPreviewCoordinator.Step(HazardActorPreviewCoordinator.ActiveOwner), Is.True);
+
+                    StageMapHazardActorPlacementData placement = setup.Document.HazardActorPlacements[0];
+                    placement.SourceLocalOffset += new Vector3(0.4f, 0f, -0.3f);
+                    placement.LocalYawDeg = 73f;
+                    setup.Document.HazardActorPlacements[0] = placement;
+                    Vector3 expectedWorld = StageMapSelectionUtility.GetHazardActorWorld(setup.Document, 0);
+
+                    window.ReconcileAfterExternalMutation();
+                    window.FlushHazardPreviewReconcileForTests();
+
+                    HazardActorPreviewSession active = HazardActorPreviewCoordinator.ActiveSession;
+                    Assert.That(active, Is.Not.Null);
+                    Assert.That(active.Input.ActorWorldPosition, Is.EqualTo(expectedWorld));
+                    Assert.That(active.Input.ActorYawDeg, Is.EqualTo(73f).Within(0.0001f));
+                    Assert.That(active.TimeSec, Is.EqualTo(0f));
+                    Assert.That(active.Playing, Is.False);
+                }
+                finally
+                {
+                    window.Close();
+                    HazardActorPreviewCoordinator.Shutdown();
+                    for (int i = 0; i < previewAssets.Count; i++)
+                        UnityEngine.Object.DestroyImmediate(previewAssets[i]);
+                }
             }
         }
 

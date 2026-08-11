@@ -11,7 +11,8 @@ namespace SweepNDodge.DotsBullets.Editor
     public sealed class HazardActorWorkbenchWindow : EditorWindow
     {
         private readonly List<GameObject> _prefabs = new List<GameObject>(32);
-        private readonly HazardActorPreviewSession _previewSession = new HazardActorPreviewSession();
+        private readonly HazardActorPreviewOwnerToken _previewOwner = new HazardActorPreviewOwnerToken("Hazard Actor Workbench");
+        private HazardActorPreviewSession _previewSession;
         private GameObject _actorPrefab;
         private HazardActorAuthoring _actor;
         private HazardActorWorkbenchSelection _selection;
@@ -78,10 +79,11 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void OnEnable()
         {
+            EnsurePreviewSession();
             Undo.undoRedoPerformed += OnUndoRedo;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             HazardActorPreviewCoordinator.PreviewRepaintRequested += OnPreviewRepaintRequested;
-            HazardActorPreviewCoordinator.SetActiveSession(_previewSession);
+            HazardActorPreviewCoordinator.ActivateActor(_previewOwner, _previewSession);
         }
 
         private void OnDisable()
@@ -89,7 +91,7 @@ namespace SweepNDodge.DotsBullets.Editor
             Undo.undoRedoPerformed -= OnUndoRedo;
             AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
             HazardActorPreviewCoordinator.PreviewRepaintRequested -= OnPreviewRepaintRequested;
-            HazardActorPreviewCoordinator.ClearActiveSession(_previewSession);
+            ReleasePreviewSession();
         }
 
         private void Update()
@@ -105,7 +107,7 @@ namespace SweepNDodge.DotsBullets.Editor
             _actor = ResolveActor(_actorPrefab);
             RefreshCanvas();
             RefreshIssues();
-            RestartPreview();
+            RestartPreview(claimOwnership: false);
         }
 
         private void BuildToolbar()
@@ -137,10 +139,10 @@ namespace SweepNDodge.DotsBullets.Editor
             toolbar.Add(new ToolbarButton(() => SelectActor()) { text = "Actor" });
             toolbar.Add(new ToolbarSpacer { flex = true });
             toolbar.Add(new ToolbarButton(() => RestartPreview()) { text = "Restart" });
-            toolbar.Add(new ToolbarButton(() => _previewSession.Play()) { text = "Play" });
-            toolbar.Add(new ToolbarButton(() => _previewSession.Pause()) { text = "Pause" });
-            toolbar.Add(new ToolbarButton(() => { _previewSession.Step(); RefreshPreviewPresentation(); }) { text = "Step" });
-            toolbar.Add(new ToolbarButton(() => { _previewSession.CleanupOldestGhost(); RefreshPreviewPresentation(); }) { text = "CleanupRemoved" });
+            toolbar.Add(new ToolbarButton(PlayPreview) { text = "Play" });
+            toolbar.Add(new ToolbarButton(PausePreview) { text = "Pause" });
+            toolbar.Add(new ToolbarButton(StepPreview) { text = "Step" });
+            toolbar.Add(new ToolbarButton(CleanupPreview) { text = "CleanupRemoved" });
             rootVisualElement.Add(toolbar);
         }
 
@@ -757,8 +759,9 @@ namespace SweepNDodge.DotsBullets.Editor
             SetWorkbenchSelection(target);
         }
 
-        private void RestartPreview()
+        private void RestartPreview(bool claimOwnership = true)
         {
+            EnsurePreviewSession();
             if (_actorPrefab == null)
                 return;
             HazardActorPreviewSnapshotBuilder.TryBuild(_actorPrefab, out var snapshot);
@@ -776,8 +779,54 @@ namespace SweepNDodge.DotsBullets.Editor
             };
             _previewSession.Load(snapshot, input);
             _observedPreviewSignature = ComputePreviewSignature();
-            HazardActorPreviewCoordinator.SetActiveSession(_previewSession);
+            if (claimOwnership || HazardActorPreviewCoordinator.IsActiveOwner(_previewOwner))
+                HazardActorPreviewCoordinator.ActivateActor(_previewOwner, _previewSession);
             RefreshPreviewPresentation();
+        }
+
+        private void PlayPreview()
+        {
+            ClaimPreviewOwnership();
+            HazardActorPreviewCoordinator.Play(_previewOwner);
+        }
+
+        private void PausePreview()
+        {
+            ClaimPreviewOwnership();
+            HazardActorPreviewCoordinator.Pause(_previewOwner);
+        }
+
+        private void StepPreview()
+        {
+            ClaimPreviewOwnership();
+            HazardActorPreviewCoordinator.Step(_previewOwner);
+            RefreshPreviewPresentation();
+        }
+
+        private void CleanupPreview()
+        {
+            ClaimPreviewOwnership();
+            _previewSession.CleanupOldestGhost();
+            RefreshPreviewPresentation();
+        }
+
+        private void ClaimPreviewOwnership()
+        {
+            EnsurePreviewSession();
+            HazardActorPreviewCoordinator.ActivateActor(_previewOwner, _previewSession);
+        }
+
+        private void EnsurePreviewSession()
+        {
+            if (_previewSession == null || _previewSession.IsDisposed)
+                _previewSession = new HazardActorPreviewSession();
+        }
+
+        private void ReleasePreviewSession()
+        {
+            HazardActorPreviewCoordinator.ClearOwner(_previewOwner);
+            _previewSession?.Dispose();
+            _previewSession = null;
         }
 
         private void RefreshPreviewPresentation()
@@ -822,6 +871,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void SetPreviewTarget(Vector3 target)
         {
+            ClaimPreviewOwnership();
             _previewTargetWorldPosition = target;
             _targetField?.SetValueWithoutNotify(_previewTargetWorldPosition);
             _previewSession.SetTargetWorldPosition(_previewTargetWorldPosition);
@@ -912,7 +962,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void OnBeforeAssemblyReload()
         {
-            HazardActorPreviewCoordinator.ClearActiveSession(_previewSession);
+            ReleasePreviewSession();
         }
 
         private void OnPreviewRepaintRequested()

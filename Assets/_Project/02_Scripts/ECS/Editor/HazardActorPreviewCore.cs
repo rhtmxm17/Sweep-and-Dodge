@@ -14,6 +14,13 @@ namespace SweepNDodge.DotsBullets.Editor
         Phase = 3,
     }
 
+    public enum HazardActorEncounterPlacementPreviewState : byte
+    {
+        WaitingForSpawn = 0,
+        Active = 1,
+        Retired = 2,
+    }
+
     public enum HazardActorWorkbenchSelectionKind : byte
     {
         None = 0,
@@ -411,6 +418,21 @@ namespace SweepNDodge.DotsBullets.Editor
             _input.TargetWorldPosition = targetWorldPosition;
             Frame.PhaseChangedThisFrame = false;
             PublishFrame();
+        }
+
+        public void SetSourceProgress(float sourceProgress01)
+        {
+            float next = Mathf.Clamp01(sourceProgress01);
+            if (Mathf.Approximately(_input.SourceProgress01, next))
+                return;
+
+            float time = TimeSec;
+            bool wasPlaying = Playing;
+            _input.SourceProgress01 = next;
+            Restart();
+            EvaluateAt(time);
+            if (wasPlaying)
+                Play();
         }
 
         public void Restart()
@@ -1210,6 +1232,7 @@ namespace SweepNDodge.DotsBullets.Editor
             public HazardActorPreviewSnapshot Snapshot;
             public HazardActorPreviewInput Input;
             public HazardActorEncounterRulePreview[] Rules = Array.Empty<HazardActorEncounterRulePreview>();
+            public HazardActorEncounterPlacementPreviewState State;
         }
 
         private readonly List<ActorPlan> _plans = new List<ActorPlan>(16);
@@ -1221,7 +1244,9 @@ namespace SweepNDodge.DotsBullets.Editor
         public IReadOnlyList<HazardActorPreviewSession> Actors => _actors;
         public bool Playing { get; private set; }
         public bool IsDisposed { get; private set; }
+        public int PlannedActorCount => _plans.Count;
         public int ActiveActorCount => _actors.Count;
+        public float SourceProgress01 => _sourceProgress01;
         public float TimeSec
         {
             get
@@ -1295,6 +1320,49 @@ namespace SweepNDodge.DotsBullets.Editor
                 Play();
         }
 
+        public void SetTargetWorldPosition(Vector3 targetWorldPosition)
+        {
+            for (int i = 0; i < _plans.Count; i++)
+            {
+                HazardActorPreviewInput input = _plans[i].Input;
+                input.TargetWorldPosition = targetWorldPosition;
+                _plans[i].Input = input;
+            }
+
+            for (int i = 0; i < _actors.Count; i++)
+                _actors[i].SetTargetWorldPosition(targetWorldPosition);
+            PublishFrame();
+        }
+
+        /// <summary>
+        /// Resolves the orchestration state of a planned placement at the current source progress.
+        /// Plans remain queryable while their actor session is absent before Spawn or after Retire.
+        /// </summary>
+        public bool TryGetPlacementState(
+            uint owningSourceStableId,
+            int placementInstanceId,
+            out HazardActorEncounterPlacementPreviewState state)
+        {
+            state = default;
+            if (owningSourceStableId == 0u || placementInstanceId <= 0)
+                return false;
+
+            for (int i = 0; i < _plans.Count; i++)
+            {
+                ActorPlan plan = _plans[i];
+                if (plan.Input.OwningSourceStableId != owningSourceStableId
+                    || plan.PlacementInstanceId != placementInstanceId)
+                {
+                    continue;
+                }
+
+                state = plan.State;
+                return true;
+            }
+
+            return false;
+        }
+
         public void Step()
         {
             for (int i = 0; i < _actors.Count; i++)
@@ -1358,10 +1426,23 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             input = plan.Input;
             input.SourceProgress01 = _sourceProgress01;
+            HazardActorEncounterPlacementPreviewState state = ResolvePlacementState(plan, out int forcedPhaseId);
+            plan.State = state;
+            if (state != HazardActorEncounterPlacementPreviewState.Active)
+                return false;
+            input.SpawnAtStart = true;
+            input.ForcedPhaseId = forcedPhaseId;
+            return true;
+        }
+
+        private HazardActorEncounterPlacementPreviewState ResolvePlacementState(
+            ActorPlan plan,
+            out int forcedPhaseId)
+        {
             bool hasRule = false;
             bool spawned = false;
             bool retired = false;
-            int forcedPhaseId = 0;
+            forcedPhaseId = 0;
             var rules = plan.Rules ?? Array.Empty<HazardActorEncounterRulePreview>();
             for (int i = 0; i < rules.Length; i++)
             {
@@ -1387,11 +1468,11 @@ namespace SweepNDodge.DotsBullets.Editor
                 }
             }
 
-            if (hasRule && (!spawned || retired))
-                return false;
-            input.SpawnAtStart = !hasRule || spawned;
-            input.ForcedPhaseId = forcedPhaseId;
-            return true;
+            if (!hasRule || (spawned && !retired))
+                return HazardActorEncounterPlacementPreviewState.Active;
+            return retired
+                ? HazardActorEncounterPlacementPreviewState.Retired
+                : HazardActorEncounterPlacementPreviewState.WaitingForSpawn;
         }
 
         private static bool IsRuleTriggered(HazardActorEncounterRulePreview rule, float progress01)
@@ -1423,10 +1504,34 @@ namespace SweepNDodge.DotsBullets.Editor
         }
     }
 
+    public enum HazardActorPreviewActiveKind : byte
+    {
+        None = 0,
+        Actor = 1,
+        Encounter = 2,
+    }
+
+    /// <summary>
+    /// Identifies an editor surface that may temporarily own the one global HazardActor preview.
+    /// The coordinator never owns or disposes sessions registered by this token.
+    /// </summary>
+    public sealed class HazardActorPreviewOwnerToken
+    {
+        public HazardActorPreviewOwnerToken(string label)
+        {
+            Label = string.IsNullOrWhiteSpace(label) ? "Hazard Preview" : label;
+        }
+
+        public string Label { get; }
+        public override string ToString() => Label;
+    }
+
     public static class HazardActorPreviewCoordinator
     {
         private static HazardActorPreviewSession _activeSession;
         private static HazardActorEncounterPreviewSession _activeEncounterSession;
+        private static HazardActorPreviewOwnerToken _activeOwner;
+        private static HazardActorPreviewActiveKind _activeKind;
         private static double _lastUpdateTime;
         private static double _playWallAnchorTime;
         private static float _playPreviewAnchorTime;
@@ -1437,63 +1542,129 @@ namespace SweepNDodge.DotsBullets.Editor
 
         public static HazardActorPreviewSession ActiveSession => _activeSession;
         public static HazardActorEncounterPreviewSession ActiveEncounterSession => _activeEncounterSession;
+        public static HazardActorPreviewOwnerToken ActiveOwner => _activeOwner;
+        public static HazardActorPreviewActiveKind ActiveKind => _activeKind;
         public static int ActiveCallbackCount => _hooksRegistered ? 2 : 0;
 
-        public static void SetActiveSession(HazardActorPreviewSession session)
+        public static void ActivateActor(HazardActorPreviewOwnerToken owner, HazardActorPreviewSession session)
         {
-            if (_activeSession == session)
+            ValidateActivation(owner, session != null && !session.IsDisposed, nameof(session));
+            if (ReferenceEquals(_activeOwner, owner) && ReferenceEquals(_activeSession, session))
                 return;
-            _activeSession?.Dispose();
-            _activeEncounterSession?.Dispose();
+
+            PauseActiveSession();
+            _activeOwner = owner;
+            _activeKind = HazardActorPreviewActiveKind.Actor;
             _activeSession = session;
             _activeEncounterSession = null;
             ResetPlaybackClock(EditorApplication.timeSinceStartup);
-            if (_activeSession != null)
-                EnsureHooks();
+            EnsureHooks();
+            RequestPreviewRepaint();
         }
 
-        public static void SetActiveEncounterSession(HazardActorEncounterPreviewSession session)
+        public static void ActivateEncounter(HazardActorPreviewOwnerToken owner, HazardActorEncounterPreviewSession session)
         {
-            if (_activeEncounterSession == session)
+            ValidateActivation(owner, session != null && !session.IsDisposed, nameof(session));
+            if (ReferenceEquals(_activeOwner, owner) && ReferenceEquals(_activeEncounterSession, session))
                 return;
-            _activeSession?.Dispose();
-            _activeEncounterSession?.Dispose();
+
+            PauseActiveSession();
+            _activeOwner = owner;
+            _activeKind = HazardActorPreviewActiveKind.Encounter;
             _activeSession = null;
             _activeEncounterSession = session;
             ResetPlaybackClock(EditorApplication.timeSinceStartup);
-            if (_activeEncounterSession != null)
-                EnsureHooks();
+            EnsureHooks();
+            RequestPreviewRepaint();
         }
 
-        public static void ClearActiveSession(HazardActorPreviewSession session)
+        public static bool IsActiveOwner(HazardActorPreviewOwnerToken owner)
         {
-            if (_activeSession != session)
+            return owner != null && ReferenceEquals(_activeOwner, owner);
+        }
+
+        public static void ClearOwner(HazardActorPreviewOwnerToken owner)
+        {
+            if (!IsActiveOwner(owner))
                 return;
-            _activeSession?.Dispose();
+
+            PauseActiveSession();
             _activeSession = null;
+            _activeEncounterSession = null;
+            _activeOwner = null;
+            _activeKind = HazardActorPreviewActiveKind.None;
             ResetPlaybackClock(EditorApplication.timeSinceStartup);
             RemoveHooksIfIdle();
+            HazardActorPreviewRendererUtility.Dispose();
+            RequestPreviewRepaint();
+        }
+
+        public static bool Play(HazardActorPreviewOwnerToken owner)
+        {
+            if (!IsActiveOwner(owner))
+                return false;
+            if (_activeSession != null)
+                _activeSession.Play();
+            else if (_activeEncounterSession != null)
+                _activeEncounterSession.Play();
+            else
+                return false;
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
+            RequestPreviewRepaint();
+            return true;
+        }
+
+        public static bool Pause(HazardActorPreviewOwnerToken owner)
+        {
+            if (!IsActiveOwner(owner))
+                return false;
+            PauseActiveSession();
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
+            RequestPreviewRepaint();
+            return true;
+        }
+
+        public static bool Restart(HazardActorPreviewOwnerToken owner)
+        {
+            if (!IsActiveOwner(owner))
+                return false;
+            if (_activeSession != null)
+                _activeSession.Restart();
+            else if (_activeEncounterSession != null)
+                _activeEncounterSession.Restart();
+            else
+                return false;
+            ResetPlaybackClock(EditorApplication.timeSinceStartup);
+            RequestPreviewRepaint();
+            return true;
         }
 
         public static void Shutdown()
         {
-            _activeSession?.Dispose();
-            _activeEncounterSession?.Dispose();
+            PauseActiveSession();
             _activeSession = null;
             _activeEncounterSession = null;
+            _activeOwner = null;
+            _activeKind = HazardActorPreviewActiveKind.None;
             ResetPlaybackClock(EditorApplication.timeSinceStartup);
             HazardActorPreviewRendererUtility.Dispose();
             RemoveHooks();
+            RequestPreviewRepaint();
         }
 
-        public static void StepActiveSession()
+        public static bool Step(HazardActorPreviewOwnerToken owner)
         {
+            if (!IsActiveOwner(owner))
+                return false;
             if (_activeSession != null)
                 _activeSession.Step();
+            else if (_activeEncounterSession != null)
+                _activeEncounterSession.Step();
             else
-                _activeEncounterSession?.Step();
+                return false;
             ResetPlaybackClock(EditorApplication.timeSinceStartup);
             RequestPreviewRepaint();
+            return true;
         }
 
         public static void EvaluatePlaybackForTests(double editorTimeSinceStartup)
@@ -1582,6 +1753,23 @@ namespace SweepNDodge.DotsBullets.Editor
             SceneView.duringSceneGui += OnSceneGUI;
             _lastUpdateTime = EditorApplication.timeSinceStartup;
             _hooksRegistered = true;
+        }
+
+        private static void ValidateActivation(
+            HazardActorPreviewOwnerToken owner,
+            bool sessionIsValid,
+            string sessionParameterName)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+            if (!sessionIsValid)
+                throw new ArgumentException("A live preview session is required.", sessionParameterName);
+        }
+
+        private static void PauseActiveSession()
+        {
+            _activeSession?.Pause();
+            _activeEncounterSession?.Pause();
         }
 
         private static void RemoveHooksIfIdle()
