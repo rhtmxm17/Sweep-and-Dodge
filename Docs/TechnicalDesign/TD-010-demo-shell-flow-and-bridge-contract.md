@@ -4,7 +4,7 @@
 - doc_id: `TD-010`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-26`
+- last_updated: `2026-08-11`
 - related_docs:
   - [GD-008-demo-flow-design.md](../GameDesign/GD-008-demo-flow-design.md)
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -90,7 +90,7 @@
   - `StageCatalog` 할당 시: `Entries` 순서대로 `Enabled=true` 엔트리만 런타임 프로필 구성
   - `StageCatalog` 미할당/유효 엔트리 없음 시: 직렬화된 `StageProfiles` 사용
   - 로딩 중 불일치(예: null Definition/Layout, StageId 중복/불일치)는 경고 후 skip
-  - `sc_demo`는 수작업 운영 자산이 아니라 편집 씬 + generator/composer가 만든 생성물로 취급한다
+  - `sc_demo`는 수작업 운영 자산이 아니라 `StageMapDocument`의 dry-run/diff/apply 결과로 관리한다.
 - Bridge runtime publish 계약
   - `StageTopologyBridge`가 `StageCatalogRuntimeComponent`를 최신화한다
   - topology prefab singleton은 `StageTopologyBridge`가 bind/보강한다
@@ -128,7 +128,7 @@
   - 현재 stage entry prepare 범위는 `Source / Deposit / Obstacle`다
   - `Presentation`은 GO-only layer로, `AppliedStageId + Ready` 기준 stage entry rebuild만 수행한다
   - 미연결 시 기존 `StageProfiles` fallback 동작
-  - `sc_demo` 갱신은 `StageLayoutEditingSampleV1.unity` 수정 후 generator/composer 실행으로 수행한다
+  - `sc_demo` 갱신은 `smd_demo_1/2/3`을 `StageMapEditorWindow`에서 검증한 뒤 Apply해 수행한다.
 - `PlayModeSmoke_Dedicated`
   - 기존 스모크 목적 유지
 

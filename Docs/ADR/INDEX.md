@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260811-01-stage-map-legacy-authoring-retirement.md](ADR-20260811-01-stage-map-legacy-authoring-retirement.md): Stage 2·3 단발성 migration 후 Scene/Tilemap/Marker authoring과 전용 테스트를 제거
 - [ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md](ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md): `HazardActorAuthoring` prefab SSOT를 유지하면서 Workbench, `StageMapDocument` orchestration authoring, 분석형 Preview Core의 소유권을 고정
 - [ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md](ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md): 신규 Stage Map Editor의 편집 SSOT를 `StageMapDocument`로 고정하고 기존 Tilemap/Marker/Inspector 툴을 legacy import/debug 경로로 격하
 - [ADR-20260417-01-hazard-actor-direct-emit-ownership.md](ADR-20260417-01-hazard-actor-direct-emit-ownership.md): `HazardEmitter` 런타임 엔티티를 제거하고 pattern slot/emit runtime/direct emit producer ownership을 `HazardActor`로 일원화

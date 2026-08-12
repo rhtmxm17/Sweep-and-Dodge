@@ -244,17 +244,11 @@
 - Encounter 준비 성공 여부는 현재 active actor 수가 아니라 유효한 planned actor 수를 기준으로 한다. 따라서 source progress가 첫 Spawn 이전이거나 모든 actor가 Retire된 시점에도 Preview session과 상태 표시를 유지한다.
 
 ### 5.4 Migration / Export
-- schema migration은 load 시 자동으로 rule을 쓰지 않는다.
-- migration preview는 document의 `TargetDefinition`에서 source binding별 orchestration rule을 읽어 candidate를 만든다.
-- 다음 조건에서는 import를 거부한다.
-  - target definition 또는 source binding identity가 없거나 ambiguous함
-  - source-local RuleId 또는 target placement identity가 중복됨
-  - target placement가 document에 없거나 다른 source에 속함
-- 사용자는 `Validate/Preview -> Diff -> Apply`를 거쳐 candidate를 document에 반영한다.
-- migration plan은 document와 target definition signature를 보관하고 apply 직전 변경되면 stale로 거부한다.
-- migration 완료 후 exporter는 document rule을 `StageDefinitionSO`에 기록한다.
+- `smd_demo_1/2/3`의 source-local orchestration migration은 2026-08-11에 완료되었다.
+- 현재는 `StageMapDocument.HazardActorOrchestrationRules`가 유일한 stage orchestration 편집 SSOT다.
+- exporter는 document rule을 `StageDefinitionSO`에 기록한다.
 - 기존 target definition rule을 암묵적으로 보존하거나 merge하지 않는다.
-- legacy `HazardActorSourceAuthoringMarker`는 명시적 legacy import/debug 입력으로만 남긴다.
+- TargetDefinition rule import와 scene marker import는 제거되었으며 공식·debug 경로 모두 지원하지 않는다.
 
 ## 6. Validation / Undo / Failure Policy
 - actor validation은 기존 `HazardActorAuthoringValidationUtility`와 profile resolver를 기준으로 한다.
@@ -290,7 +284,7 @@
 - T4. Preview surfaces
   - embedded preview와 Scene View Overlay에 actor origin/forward, phase/pattern label, exact-position generic ghost renderer, cache와 cleanup을 구현한다.
 - T5. Stage document orchestration
-  - schema, validation, explicit migration, dry-run/export/stale 정책을 구현한다.
+  - schema, validation, document rule 편집, dry-run/export/stale 정책을 구현한다.
 - T6. Encounter Track
   - source track, rule/target 편집, progress scrub, Actor/Encounter preview 연결을 구현한다.
 - T7. Issue navigation
@@ -314,8 +308,7 @@
 - Linear/DampedLinear/HomingLite와 target snapshot timing을 대표 profile로 검증한다.
 - MotionCompleted depth 3, cleanup manual trigger, ghost cap과 집약 warning을 검증한다.
 - selection reconcile, shared profile edit, Duplicate & Assign, 구조 명령 Undo/Redo와 dirty 대상을 검증한다.
-- StageMapDocument schema migration preview/diff/apply, stale rejection, rule validation과 export round-trip을 검증한다.
-- 기존 `StageDefinitionSO` orchestration rule이 명시적 migration에서 의미 손실 없이 document로 이동하는지 검증한다.
+- StageMapDocument schema migration, apply stale rejection, rule validation과 export round-trip을 검증한다.
 
 ### 9.2 Editor UX smoke
 - 기본 Inspector 없이 Actor, Phase, Pattern, Transition, Profile을 생성·수정할 수 있다.
@@ -342,10 +335,10 @@
 - T1~T2: `HazardActorWorkbenchWindow`와 command utility를 추가해 Actor/Phase/Transition/Pattern/Profile canonical selection, Contextual Inspector, 구조 명령, shared profile 사용처, `Open`, `Duplicate & Assign`, Undo/dirty 경로를 구현했다.
 - T3: `HazardActorPreviewSnapshotBuilder`와 `HazardActorPreviewSession`이 기존 authoring resolver/profile resolver 결과를 사용하며 30Hz fixed-step Presence/Phase/Selector/Telegraph/Emit/Cooldown, Linear/DampedLinear/HomingLite, MotionCompleted depth 3, manual CleanupRemoved를 재생한다.
 - T4: Workbench embedded preview와 Scene View preview는 `HazardActorPreviewCoordinator`의 active session을 공유한다. Actor cap 1,024, Encounter cap 4,096, exact-position generic ghost, 30Hz update owner, callback cleanup을 editor-only로 구현했다. spatial telegraph/trajectory와 prefab inert ghost는 향후 확장 가능성으로 남긴다.
-- T5: `StageMapDocument` schema v3에 source-local `StageMapHazardActorOrchestrationRuleData[]`를 추가했다. TargetDefinition rule import는 preview/diff/apply 전용이며 stale/missing/ambiguous identity를 거부하고, exporter는 document rule을 authoritative하게 기록한다.
+- T5: `StageMapDocument` schema v3에 source-local `StageMapHazardActorOrchestrationRuleData[]`를 추가했고 exporter가 document rule을 authoritative하게 기록한다. 단발성 TargetDefinition rule migration 경로는 Stage 1~3 전환 완료 후 제거했다.
 - T6: Stage Map Editor `Hazard Encounter` track에서 source별 placement row, Spawn/PhaseSet/Retire marker, multi-target target id edit, common PhaseId picker, duplicate/move/delete, progress scrub preview를 document pose 기준으로 연결했다.
 - T7: actor/workbench issue와 StageMap source/rule/placement issue target mapping을 canonical selection과 Scene View navigation으로 확장했다.
-- T8: `smd_demo_1` actual document를 schema v3로 명시 migration하고 기존 `sd_demo_1` source rule을 document-owned rule로 반영했다. Runtime ECS component, baker, owner, update order, Fence 규칙은 변경하지 않았다.
+- T8: `smd_demo_1/2/3`을 schema v3 Document로 확정하고 모든 source rule을 document-owned rule로 반영했다. Runtime ECS component, baker, owner, update order, Fence 규칙은 변경하지 않았다.
 
 검증 결과:
 - EditMode targeted Workbench/StageMap suite: 58/58 pass.
@@ -363,7 +356,7 @@
 
 검증 결과:
 - `HazardActorWorkbenchPreviewTests`: 17/17 pass.
-- StageMap targeted suite (`StageMapSampleMigrationAndWindowSmokeTests`, `StageMapDocumentTests`, `StageMapEditorInteractionTests`): 50/50 pass.
+- StageMap permanent suite는 `StageMapDocumentTests`, `StageMapEditorInteractionTests`, `StageMapEditorWindowSmokeTests`로 구성한다. legacy migration fixture는 제거했다.
 - EditMode full: 574/574 pass.
 - PlayMode full: 46/46 pass.
 - Preview performance 단독 측정: Actor p95 `0.815 ms`, Encounter p95 `4.002 ms`, managed GC `0 B`, submissions Actor `2` / Encounter `5`.

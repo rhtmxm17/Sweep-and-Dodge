@@ -3,8 +3,8 @@
 ## Metadata
 - doc_id: `TD-025`
 - type: `TechnicalDesign`
-- status: `draft`
-- last_updated: `2026-03-26`
+- status: `implemented`
+- last_updated: `2026-08-11`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](./TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
@@ -29,7 +29,7 @@
 
 ## 2. 채택안 요약
 - player start는 `StageDefinitionSO`가 아니라 `StageLayoutSO`에 둔다.
-- authoring은 `StageLayoutStageMarker` 하위의 `StagePlayerStartMarker` 1개를 기준으로 한다.
+- authoring은 `StageMapDocument.PlayerStart`를 기준으로 한다.
 - 저장 형식은 grid-relative `AnchorCell + AnchorOffset + YawDeg`를 사용한다.
 - stage apply owner는 player start를 world position으로 resolve해 runtime singleton에 publish한다.
 - 실제 player entity write는 `PlayerStageEntryApplyPrepareSystem` 단일 writer가 수행한다.
@@ -41,12 +41,12 @@
 ## 3. 소유권 (Owner / Writer)
 - Layout SSOT Owner: `StageLayoutSO`
   - `PlayerStart` 필드를 소유한다.
-- Authoring Owner: `StagePlayerStartMarker`
-  - `StageLayoutStageMarker` 하위에서 단일 시작 위치를 정의한다.
-- Generator Owner: `StageLayoutCatalogGenerator`
-  - marker를 읽어 `StageLayoutSO.PlayerStart`를 쓴다.
+- Authoring Owner: `StageMapDocument`
+  - `PlayerStart` record를 단일 편집 SSOT로 소유한다.
+- Export/Apply Owner: `StageMapDocumentExporter` / `StageMapApplyPlanner`
+  - document record를 `StageLayoutSO.PlayerStart`에 반영한다.
 - Validation Owner:
-  - authoring seam: `StageGridAuthoringValidationRules`
+  - authoring seam: `StageMapDocumentValidationRules`
   - asset seam: `StageGridLayoutValidationRules`
 - Runtime publish Owner: `StageTopologyApplyPrepareSystem`
   - layout의 player start를 world-space runtime singleton으로 publish한다.
@@ -108,35 +108,17 @@
   - stage reapply/retry/next 시 새 apply version만 다시 반영한다.
 
 ## 6. Authoring 계약
-### 6.1 Marker
-- `StagePlayerStartMarker`
-  - `bool Active = true`
-  - `Vector2Int AnchorCell`
-  - `Vector2 AnchorOffset`
-  - `float YawDeg`
-  - `bool DrawGizmo = true`
-- marker는 `StageLayoutStageMarker` 하위에 정확히 1개 있어야 한다.
-- marker transform은 runtime authority가 아니다.
-  - 실제 저장 값은 `AnchorCell + AnchorOffset + YawDeg`다.
-
-### 6.2 Validation
-- error
-  - marker가 0개이거나 2개 이상
+- 편집 SSOT는 `StageMapDocument.PlayerStart`다.
+- `StageMapEditorWindow`의 PlayerStart tool과 contextual inspector가 공식 편집 표면이다.
+- 저장 형식은 grid-relative `Active / AnchorCell / AnchorOffset / YawDeg`를 유지한다.
+- `CenterPlayerStart` session 옵션이 켜지면 offset을 0으로 만들고 이후 배치·이동에서도 cell center를 강제한다.
+- validation error:
   - `AnchorCell`이 bounds 밖
   - start cell이 `BlockPlayer`
-- warning
-  - start cell이 `SourceRegionId` 또는 `DepositRegionId`를 가진다.
-  - 시작 yaw가 canonical 값이 아니어도 허용하되 normalize 없이 raw 저장한다.
+- validation warning:
+  - start cell이 source 또는 deposit region과 겹침
+- `StageMapDocumentExporter`가 `StageLayoutSO.PlayerStart` snapshot을 만들고, `StageMapApplyPlanner`가 dry-run/diff/apply 및 stale rejection을 소유한다.
 
-### 6.3 Generator
-- `StageLayoutCatalogGenerator`
-  - `StagePlayerStartMarker`를 읽어 `StageLayoutSO.PlayerStart`에 기록한다.
-  - marker가 없으면 validation error로 생성 실패 처리한다.
-- sample 갱신 루틴은 기존과 동일하다.
-  1. authoring scene 수정
-  2. layout generator
-  3. definition generator
-  4. catalog composer
 
 ## 7. Runtime apply 계약
 ### 7.1 StageTopologyApplyPrepareSystem
@@ -177,10 +159,10 @@
 
 ## 8. 테스트 계획 / 합격 기준
 - EditMode
-  - `StageLayoutCatalogGeneratorTests`
-    - player start marker가 layout asset으로 기록되는지
-  - `StageGridAuthoringValidationRulesTests`
-    - marker count / bounds / blocked-cell validation
+  - `StageMapDocumentTests`
+    - PlayerStart record가 layout snapshot에 기록되는지
+  - `StageMapEditorInteractionTests`
+    - bounds / blocked-cell validation, center option, Scene tool interaction
   - `StageLayoutValidationRulesTests`
     - layout asset의 player start validation
   - `StageTopologyApplyPrepareSystemTests`
@@ -197,16 +179,16 @@
 ## 9. 작업 분해 / 진행 상태
 - P1. 문서/결정 고정
   - TD/ADR/TaskBoard 작성
-- P2. 데이터/에디터 seam
+- P2. 데이터/에디터 seam (완료)
   - `StageLayoutSO.PlayerStart`
-  - `StagePlayerStartMarker`
-  - generator/validation
+  - `StageMapDocument.PlayerStart`
+  - exporter/validation
 - P3. runtime seam
   - bootstrap singleton
   - topology apply publish
   - player stage-entry apply owner
-- P4. sample/content
-  - `StageLayoutEditingSampleV1`, `sl_demo_*`, `sc_demo` 갱신
+- P4. sample/content (완료)
+  - `smd_demo_1/2/3`, `sl_demo_*`, `sc_demo` 갱신
 - P5. 검증
   - compile / console / EditMode / PlayMode smoke
 

@@ -28,11 +28,8 @@ namespace SweepNDodge.DotsBullets.Editor
         private bool _showRawDocument;
         private bool _showProjectDocuments = true;
         private StageMapDocument _document;
-        private StageLayoutStageMarker _legacySourceStage;
         private StageMapApplyPlan _applyPlan;
-        private StageMapLegacyImportPlan _importPlan;
         private StageMapDocumentMigrationPlan _migrationPlan;
-        private StageMapHazardActorOrchestrationImportPlan _hazardOrchestrationImportPlan;
         private StageMapGridResizePlan _gridResizePlan;
         private StageGridSpec _pendingGrid;
         private readonly List<StageMapDocument> _projectDocuments = new List<StageMapDocument>(16);
@@ -143,9 +140,7 @@ namespace SweepNDodge.DotsBullets.Editor
             ReleaseHazardPreview(clearBinding: true);
             _document = document;
             _applyPlan = null;
-            _importPlan = null;
             _migrationPlan = null;
-            _hazardOrchestrationImportPlan = null;
             _gridResizePlan = null;
             _issues.Clear();
             _documentIssues.Clear();
@@ -432,7 +427,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 DrawSelectionNavigator();
                 DrawContextualInspector();
                 DrawIssues();
-                DrawImportPanel();
                 DrawDiff();
                 EditorGUILayout.EndScrollView();
             }
@@ -1249,28 +1243,6 @@ namespace SweepNDodge.DotsBullets.Editor
                 GUILayout.FlexibleSpace();
             }
 
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("Preview Import", EditorStyles.miniButton, GUILayout.Width(96f)))
-                    _hazardOrchestrationImportPlan = StageMapHazardActorOrchestrationUtility.BuildImportPreview(_document);
-                using (new EditorGUI.DisabledScope(_hazardOrchestrationImportPlan == null || _hazardOrchestrationImportPlan.HasErrors || !_hazardOrchestrationImportPlan.HasChanges))
-                {
-                    if (GUILayout.Button("Apply Import", EditorStyles.miniButton, GUILayout.Width(88f)))
-                    {
-                        if (!StageMapHazardActorOrchestrationUtility.TryApplyImport(_hazardOrchestrationImportPlan, false, out string error))
-                            EditorUtility.DisplayDialog("Import Hazard Orchestration", error, "OK");
-                        RefreshAfterDocumentMutation(markDirty: true);
-                    }
-                }
-                if (_hazardOrchestrationImportPlan != null)
-                    EditorGUILayout.LabelField($"Import candidates {_hazardOrchestrationImportPlan.CandidateRules.Count}, changes {_hazardOrchestrationImportPlan.Changes.Count}", EditorStyles.miniLabel);
-            }
-
-            if (_hazardOrchestrationImportPlan != null)
-            {
-                for (int i = 0; i < _hazardOrchestrationImportPlan.Issues.Count; i++)
-                    EditorGUILayout.HelpBox(_hazardOrchestrationImportPlan.Issues[i].Message, MessageType.Error);
-            }
         }
 
         private void DrawEncounterTimeline(
@@ -1979,74 +1951,6 @@ namespace SweepNDodge.DotsBullets.Editor
             }
 
             EditorGUILayout.EndScrollView();
-        }
-
-        private void DrawImportPanel()
-        {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("Legacy Import", EditorStyles.boldLabel);
-            _legacySourceStage = (StageLayoutStageMarker)EditorGUILayout.ObjectField("Source Stage", _legacySourceStage, typeof(StageLayoutStageMarker), true);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                using (new EditorGUI.DisabledScope(_document == null || _legacySourceStage == null))
-                {
-                    if (GUILayout.Button("Preview Import"))
-                        BuildImportPreview();
-                    using (new EditorGUI.DisabledScope(_importPlan == null || _importPlan.HasErrors))
-                    {
-                        if (GUILayout.Button("Apply Import"))
-                            ApplyImport();
-                    }
-                }
-            }
-
-            if (_importPlan == null)
-                return;
-
-            EditorGUILayout.LabelField($"Import Changes ({_importPlan.Changes.Count})", EditorStyles.miniBoldLabel);
-            for (int i = 0; i < _importPlan.Changes.Count; i++)
-            {
-                var change = _importPlan.Changes[i];
-                EditorGUILayout.LabelField($"{change.Kind}: {change.Field}", EditorStyles.wordWrappedMiniLabel);
-            }
-        }
-
-        private void BuildImportPreview()
-        {
-            if (!StageMapLegacyImportUtility.TryBuildImportPlan(_legacySourceStage, _document, out _importPlan))
-            {
-                _issues.Clear();
-                _issues.AddRange(_importPlan.ValidationIssues);
-                _session.ValidationSnapshot.Clear();
-                _session.ValidationSnapshot.AddRange(_issues);
-                StageMapDocumentIssueMapper.Map(_document, _issues, _documentIssues);
-                Repaint();
-                return;
-            }
-
-            _issues.Clear();
-            _issues.AddRange(_importPlan.ValidationIssues);
-            _session.ValidationSnapshot.Clear();
-            _session.ValidationSnapshot.AddRange(_issues);
-            StageMapDocumentIssueMapper.Map(_document, _issues, _documentIssues);
-            Repaint();
-        }
-
-        private void ApplyImport()
-        {
-            if (_importPlan == null)
-                return;
-
-            if (!StageMapLegacyImportUtility.TryApplyImportPlan(_importPlan, saveAssets: true, out string error))
-            {
-                EditorUtility.DisplayDialog("Import Legacy Stage", error, "OK");
-                BuildImportPreview();
-                return;
-            }
-
-            _session.Dirty = false;
-            RefreshAfterDocumentMutation(markDirty: false);
-            BuildDryRun();
         }
 
         private void DrawDiff()
@@ -2758,9 +2662,7 @@ namespace SweepNDodge.DotsBullets.Editor
 
             _session.Dirty = markDirty;
             _applyPlan = null;
-            _importPlan = null;
             _migrationPlan = null;
-            _hazardOrchestrationImportPlan = null;
             _gridResizePlan = null;
             _pendingGrid = _document.Grid;
             ClampSelection();

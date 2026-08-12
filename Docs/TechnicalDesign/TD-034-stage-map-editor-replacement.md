@@ -4,13 +4,14 @@
 ## Metadata
 - doc_id: `TD-034`
 - type: `TechnicalDesign`
-- status: `active`
-- last_updated: `2026-08-05`
+- status: `implemented`
+- last_updated: `2026-08-11`
 - related_docs:
   - [TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](./TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
   - [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](./TD-032-hazard-actor-stage-placement-and-orchestration-framework.md)
   - [TD-035-hazard-actor-authoring-workbench-and-preview.md](./TD-035-hazard-actor-authoring-workbench-and-preview.md)
   - [../ADR/ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md](../ADR/ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md)
+  - [../ADR/ADR-20260811-01-stage-map-legacy-authoring-retirement.md](../ADR/ADR-20260811-01-stage-map-legacy-authoring-retirement.md)
   - [../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md)
 
 ## 1. 목표 / 비목표
@@ -32,7 +33,7 @@
 - v1에서 외부 importer(`LDtk`, `Tiled` 등)를 도입하지 않는다.
 - runtime stage topology, DOTS update order, `StageLayoutSO` grid schema를 재설계하지 않는다.
 - HazardActor behavior prefab/profile 편집 UI와 분석형 preview 내부 구현을 이 문서에서 중복 정의하지 않는다. 해당 기준은 `TD-035`를 따른다.
-- 기존 Tilemap/Marker scene authoring을 즉시 삭제하지 않는다.
+- 제거된 Scene/Tilemap/Marker authoring 또는 TargetDefinition rule import를 복구하지 않는다.
 
 ## 2. 채택 구조 요약
 - `StageMapDocument`
@@ -45,9 +46,9 @@
 - `StageMapApplyPlan`
   - document를 generated assets로 반영하기 전 만드는 dry-run 결과.
   - 대상 `StageLayoutSO`, `StageDefinitionSO`, `StageCatalogSO`, 변경 요약, validation 결과, stale 검사용 signature를 가진다.
-- legacy authoring scene
-  - `StageGridAuthoring`, Tilemap, `StageRegionAnchorMarker`, `StagePlayerStartMarker`, `StageHazardActorMarker`, `StagePresentationMarker`는 import/debug/backend 자료로 유지한다.
-  - 신규 editor와 같은 사용자-facing 공식 편집 경로로 병행 확장하지 않는다.
+- retired legacy authoring
+  - Stage 1~3 one-shot migration과 runtime smoke를 완료했다.
+  - scene, marker, Tilemap asset, importer, generator와 사용자 진입점은 제거되었다.
 
 ## 3. 데이터 모델
 ### 3.1 StageMapDocument
@@ -155,7 +156,7 @@
 - Source/Deposit Anchor mutation은 owner region layer와 Anchors layer가 모두 unlocked일 때만 허용한다.
 - hidden layer element는 Scene View hit-test에서 제외한다.
 - `CenterRegionAnchors`와 `CenterPlayerStart`는 서로 독립적인 Undo 가능 editor-session preference이며 기본값은 false다. enable 시 compatible selection offset을 0으로 만들고 이후 place/move에도 0을 강제한다.
-- document switch, structured/raw edit, import, migration, quick-fix, resize, Undo/Redo, 외부 serialized 변경은 selection clamp와 apply/import plan 폐기 및 overlay invalidation을 수행한다.
+- document switch, structured/raw edit, schema migration, quick-fix, resize, Undo/Redo, 외부 serialized 변경은 selection clamp와 apply plan 폐기 및 overlay invalidation을 수행한다.
 
 ### 4.4 Scene View overlay geometry
 - movement/source/deposit은 layer별 cached `Mesh` geometry로 생성한다.
@@ -165,15 +166,12 @@
 - dense synthetic grid에서 vertex/index/layer 계약, build count, managed allocation, draw submission 수를 검증한다.
 
 ## 5. Import / Export / Apply 흐름
-### 5.1 Legacy import
-- `StageLayoutEditingSampleV1` 같은 기존 authoring scene에서 document를 생성할 수 있어야 한다.
-- import source:
-  - `StageGridAuthoring` bounds, cell size, movement tilemap, region tilemap, mapping table
-  - region anchors, player start marker
-  - hazard actor markers
-  - presentation markers
-- import는 document를 수정하는 작업이므로 preview summary와 Undo/dirty 정책을 따른다.
-- saved legacy scene이 dirty이면 automated migration/import를 거부하며, scene dirty state를 import stale signature에 포함한다.
+### 5.1 Legacy retirement
+- Stage 1~3 semantic migration과 runtime/Preview smoke를 완료했다.
+- Scene/Tilemap/Marker import, TargetDefinition orchestration import, generator/composer 및 전용 tests는 제거했다.
+- `StageMapEditorWindow`에는 legacy 입력이나 import 조작이 존재하지 않는다.
+- 외부 importer는 별도 schema와 검증 계약을 갖는 신규 기능으로만 도입할 수 있다.
+
 
 ### 5.2 Export / Apply
 - document에서 `StageLayoutSO` grid schema를 생성한다.
@@ -185,9 +183,10 @@
 - apply 성공 전까지 generated asset은 수정하지 않는다.
 
 ### 5.3 동등성 기준
-- legacy sample scene import/export 동등성은 temporary document/Layout/Definition/Catalog에서 검증하며 실제 document와 generated asset을 수정하지 않는다.
-- 실제 document는 자체 validation, target reference integrity, document-to-runtime dry-run 0을 기준으로 검증하고 legacy scene을 콘텐츠 oracle로 사용하지 않는다.
-- 동등하지 않은 값은 diff summary에서 설명 가능해야 하며, 문서화된 migration rule 없이는 silent rewrite하지 않는다.
+- migration 확정 시 layout/definition/catalog의 semantic equivalence를 검증했다.
+- 허용된 차이는 runtime에서 읽지 않는 non-PhaseSet `TargetPhaseId`의 `0 -> 1` canonicalization뿐이었다.
+- 현재 document는 자체 validation, target reference integrity와 document-to-runtime dry-run을 기준으로 검증한다.
+- 실제 document와 runtime asset의 차이는 정상적인 미적용 편집 상태일 수 있으므로 serialized snapshot equality를 장기 테스트 oracle로 사용하지 않는다.
 
 ### 5.4 Catalog identity / apply group
 - catalog entry identity는 last-applied key, Definition/Layout pair의 단일 일치, 아직 apply되지 않은 document의 현재 key 순서로 해석한다.
@@ -201,7 +200,6 @@
 ## 6. 소유권 / 업데이트 순서 / 제약
 - Editor document writer: `StageMapEditorWindow`와 Scene View tool command layer.
 - Validation owner: `StageMapDocumentValidationRules`.
-- Import owner: `StageMapLegacyImportUtility`.
 - Apply plan owner: `StageMapApplyPlanner`.
 - Export owner: `StageMapDocumentExporter`.
 - HazardActor behavior authoring/preview owner는 `TD-035`의 Workbench와 Preview Core다.
@@ -212,7 +210,7 @@
 
 ## 7. 작업 분해 / 진행 상태
 - T0. Legacy freeze policy
-  - 기존 Inspector/Tilemap/Marker UI의 신규 기능 추가를 중단하고 import/debug/backend 지위를 명시한다.
+  - 대체 구현 중 신규 기능 추가를 동결했고 Stage 1~3 migration 완료 후 해당 경로를 폐기했다.
 - T1. `StageMapDocument` schema
   - document asset, serialized fields, schema version, migration hook, tests를 설계/구현한다.
 - T2. `StageMapEditorWindow` MVP
@@ -220,33 +218,35 @@
 - T3. Custom Scene View tool / brush
   - select, movement paint, region paint, anchor, player start, hazard actor, presentation link 모드를 구현한다.
 - T4. Import / export / apply pipeline
-  - legacy scene import, generated asset dry-run, diff summary, stale-plan 거부, apply를 구현한다.
+  - generated asset dry-run, diff summary, stale-plan 거부, apply를 구현한다. one-shot legacy import는 migration 완료 후 제거한다.
 - T5. Validation navigator
   - issue list, scene focus, quick-fix preview/apply를 구현한다.
 - T6. Migration / compatibility
-  - `StageLayoutEditingSampleV1`을 document로 import하고 export 동등성을 검증한다.
+  - Stage 1~3을 document로 migration하고 export 동등성을 검증한 뒤 legacy source를 폐기한다.
 - 2026-08-05 implementation 상태
-  - T0: 완료. legacy Inspector UI는 import/debug/backend 안내를 유지한다.
+  - T0: 완료. legacy Inspector/import/debug/backend 경로를 폐기했다.
   - T1: 완료. schema v2 explicit migration과 dense grid resize/repair 안전성을 구현했다.
   - T2: 완료. Window 제작 표면, lock/visibility, Undo/dirty/cache/stale-plan 정책을 구현했다.
   - T3: 완료. 명시적 selection과 v1 Scene View 배치/이동/삭제, overlap 표시를 구현했다.
-  - T4: 완료. complete legacy import diff/validation/stale 검사와 prevalidated single-Undo-group apply/catalog identity를 구현했다.
+  - T4: 완료. document export diff/validation/stale 검사와 prevalidated single-Undo-group apply/catalog identity를 구현했다.
   - T5: 완료. structured issue target/navigation과 preview-first quick-fix를 구현했다.
-  - T6: 완료. sample Stage 1 document migration과 Layout/Definition/Catalog 동등성, operational runtime을 검증했다.
+  - T6: 완료. Stage 1~3 document migration과 Layout/Definition/Catalog 동등성, operational runtime을 검증했다.
   - Scene View overlay 성능 교체: 완료. layer별 cached mesh와 fixed submission 경계를 검증했다.
-- T7. HazardActor Encounter extension: 계획됨
-  - orchestration schema/migration/export, Encounter Track과 Preview 연결은 `TD-035`와 `SESSION-20260805-03`에서 추적한다.
+- T7. HazardActor Encounter extension: 완료
+  - orchestration schema/export, Encounter Track과 Preview 연결은 `TD-035`를 따른다.
 - Parking Lot
   - external importer
   - advanced playtest tooling
 
+- T8. Stage 2·3 migration / legacy retirement: 완료
+  - semantic migration, runtime/Preview smoke, legacy authoring subsystem과 전용 테스트 제거를 `SESSION-20260811-01`에서 완료했다.
+
 ## 8. 검증 계획 / 합격 기준
 - 문서/설계 검증
-  - `TD-034`는 신규 editor 구현 기준이고, `TD-015`는 runtime layout/catalog와 legacy import 기준으로 역할이 분리되어야 한다.
+  - `TD-034`는 editor 구현 기준이고, `TD-015`는 runtime layout/catalog 계약 기준으로 역할이 분리되어야 한다.
 - EditMode
   - `StageMapDocument` serialization/schema test
   - validation rules test
-  - legacy import fixture test
   - document export equivalence test
   - apply plan stale rejection test
   - destructive diff confirmation seam test
@@ -256,7 +256,6 @@
 - Runtime smoke
   - document에서 생성된 `StageLayoutSO`, `StageDefinitionSO`, `StageCatalogSO`로 기존 PlayMode stage entry smoke가 통과해야 한다.
 - HazardActor Encounter extension
-  - 기존 target definition rule을 명시적 migration으로 손실 없이 document에 편입할 수 있어야 한다.
   - document rule export와 stale-plan 거부, source/rule/placement structured navigation을 검증해야 한다.
   - 실제 placement pose를 사용하는 Encounter Preview 기준은 `TD-035`를 따른다.
 
@@ -284,3 +283,13 @@
 - 정적 / console
   - Unity `6000.3.6f1` compile 성공, 최종 console error 0.
   - `git diff --check` 통과, `Assets/_Project` 파일 `.meta` 누락 0, `InitTestScene*`/`__Generated*` 잔여물 0.
+
+### 8.2 2026-08-11 Stage 2·3 migration / retirement 결과
+- `smd_demo_2`, `smd_demo_3`을 current schema로 생성했다.
+- Stage 2는 placement 2/source 2/rule 4, 승인된 PlayerStart overlap warning 1건을 유지한다.
+- Stage 3은 placement 2/source 1/rule 2, warning 0이다.
+- 허용된 runtime asset 변경은 non-PhaseSet rule의 의미 없는 `TargetPhaseId 0 -> 1` canonicalization뿐이다.
+- 두 Document의 모든 placement/source/rule Preview 준비와 progress 0/1 rebuild를 확인했다.
+- sample scene, Scene/Tilemap/Marker authoring, legacy importer/generator/composer, TargetDefinition rule import와 직접 Tilemap package 의존을 제거했다.
+- targeted StageMap/Hazard/Catalog EditMode 92/92, full EditMode 514/514, full PlayMode 46/46을 통과했다.
+- Unity Console error 0, 삭제 asset GUID 참조 0, legacy code/asset symbol 0, generated test residue와 `.meta` 누락 0을 확인했다.

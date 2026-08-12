@@ -450,7 +450,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 if (!link.Active || string.IsNullOrWhiteSpace(link.PresentationKey))
                     continue;
 
-                if (!StagePresentationEditorUtility.TryResolveEntry(catalog, link.PresentationKey, out _))
+                if (!StagePresentationCatalogValidationRules.TryResolveEntry(catalog, link.PresentationKey, out _))
                 {
                     issues.Add(new ContentValidationIssue(
                         ContentValidationSeverity.Error,

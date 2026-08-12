@@ -6,6 +6,8 @@
 - type: `ArchitectureDecisionRecord`
 - status: `accepted`
 - date: `2026-08-04`
+- partially_superseded_by:
+  - [ADR-20260811-01-stage-map-legacy-authoring-retirement.md](ADR-20260811-01-stage-map-legacy-authoring-retirement.md)
 - related_docs:
   - [../TechnicalDesign/TD-034-stage-map-editor-replacement.md](../TechnicalDesign/TD-034-stage-map-editor-replacement.md)
   - [../TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](../TechnicalDesign/TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
@@ -49,6 +51,7 @@
   - 기각 사유: 프로젝트 목표는 유지보수 가능한 ownership과 업데이트 순서 명확화이며, 공식 병행 지원은 이 원칙에 맞지 않는다.
 
 ## 결과
+- 2026-08-11 이후 legacy import/debug/backend 유지 결정은 `ADR-20260811-01`에 의해 폐기됐다. `StageMapDocument` SSOT와 runtime asset 경계 결정은 그대로 유효하다.
 - 긍정 효과
   - stage 편집 상태, validation, layer visibility, apply diff를 한 workflow 안에서 다룰 수 있다.
   - Scene hierarchy/Inspector 구조 지식 없이 주요 맵 제작 작업을 수행할 수 있다.
@@ -59,5 +62,5 @@
   - custom Scene View tool이 Unity Tilemap 기본 brush 기능을 대체해야 한다.
 - 후속
   - `TD-034`를 신규 editor 실행 기준 문서로 유지한다.
-  - `TD-015`는 runtime layout/catalog 계약과 legacy authoring import 기준으로 유지한다.
-  - `StageLayoutEditingSampleV1`은 신규 document import/export 동등성 검증 샘플로 사용한다.
+  - `TD-015`는 runtime layout/catalog 계약 기준으로 유지한다.
+  - legacy retirement의 최종 경계와 결과는 `ADR-20260811-01`을 따른다.

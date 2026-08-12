@@ -4,7 +4,7 @@
 - doc_id: `GD-017`
 - type: `GameDesign`
 - status: `draft`
-- last_updated: `2026-05-18`
+- last_updated: `2026-08-11`
 - related_docs:
   - [GD-008-demo-flow-design.md](./GD-008-demo-flow-design.md)
   - [GD-016-hazard-actor-blueprint-scenarios.md](./GD-016-hazard-actor-blueprint-scenarios.md)
@@ -407,10 +407,9 @@ Stage 3 최소안의 목표는 최종 스테이지처럼 보이고, `Stage3 -> D
 | Stage 3 | 최종 쇼케이스 영상/GIF 하이라이트 |
 
 ## 11. T1c 편집 체크리스트
-- `StageLayoutEditingSampleV1`을 authoring SSOT로 보고 grid / region / anchor를 편집한다.
-- `StageGridLayoutGenerator`로 `sl_demo_*` layout asset을 갱신한다.
-- `StageDefinitionGenerator` 또는 수동 보강으로 `sd_demo_*` SourceBindings 누락을 정리한다.
-- `StageCatalogComposer`로 `sc_demo` entry가 definition/layout pair를 올바르게 참조하는지 확인한다.
+- `smd_demo_1/2/3`을 authoring SSOT로 보고 grid / region / anchor / PlayerStart / HazardActor encounter를 편집한다.
+- Stage Map Editor에서 validation과 dry-run diff를 확인한 뒤 Apply해 `sl_demo_*`, `sd_demo_*`, `sc_demo`를 갱신한다.
+- `sc_demo` entry가 각 document의 definition/layout pair와 stable entry identity를 유지하는지 확인한다.
 - Stage 1:
   - 기존 복합 actor를 제거하고 `Simple Crossing Sentry`를 배치한다.
   - 기본 패턴은 고정 방향 단발, phase 후 패턴은 동일 방향 2점사로 제한한다.

@@ -58,7 +58,7 @@ MonoBehaviour:
       ActionType: 1
       TriggerType: 1
       TriggerThresholdNormalized: 0
-      TargetPhaseId: 0
+      TargetPhaseId: 1
     - RuleId: 202
       TargetPlacementInstanceIds: 01000000
       ActionType: 2
@@ -106,7 +106,7 @@ MonoBehaviour:
       ActionType: 1
       TriggerType: 1
       TriggerThresholdNormalized: 0
-      TargetPhaseId: 0
+      TargetPhaseId: 1
     - RuleId: 212
       TargetPlacementInstanceIds: 02000000
       ActionType: 2

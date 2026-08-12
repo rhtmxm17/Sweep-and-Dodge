@@ -413,7 +413,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 finally
                 {
                     HazardActorPreviewCoordinator.Shutdown();
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                 }
             }
         }
@@ -467,7 +467,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 finally
                 {
                     HazardActorPreviewCoordinator.Shutdown();
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                     for (int i = 0; i < previewAssets.Count; i++)
                         UnityEngine.Object.DestroyImmediate(previewAssets[i]);
                 }
@@ -531,7 +531,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 finally
                 {
                     HazardActorPreviewCoordinator.Shutdown();
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                     for (int i = 0; i < previewAssets.Count; i++)
                         UnityEngine.Object.DestroyImmediate(previewAssets[i]);
                 }
@@ -567,7 +567,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
                 finally
                 {
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                 }
             }
         }
@@ -718,7 +718,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
                 finally
                 {
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                     HazardActorPreviewCoordinator.Shutdown();
                     for (int i = 0; i < previewAssets.Count; i++)
                         UnityEngine.Object.DestroyImmediate(previewAssets[i]);
@@ -764,7 +764,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
                 finally
                 {
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                     HazardActorPreviewCoordinator.Shutdown();
                     for (int i = 0; i < previewAssets.Count; i++)
                         UnityEngine.Object.DestroyImmediate(previewAssets[i]);
@@ -805,7 +805,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 }
                 finally
                 {
-                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                     HazardActorPreviewCoordinator.Shutdown();
                     for (int i = 0; i < previewAssets.Count; i++)
                         UnityEngine.Object.DestroyImmediate(previewAssets[i]);
