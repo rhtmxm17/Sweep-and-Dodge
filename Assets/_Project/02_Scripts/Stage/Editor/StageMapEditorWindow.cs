@@ -16,6 +16,26 @@ namespace SweepNDodge.DotsBullets.Editor
 
     public sealed class StageMapEditorWindow : EditorWindow
     {
+        private static readonly string[] ToolLabels = { "Select", "Movement", "Region", "Anchor", "Player", "Hazard", "Link" };
+        private static readonly string[] MovementPresetLabels = { "Passable", "Block Player", "Block Bullet", "Block Both" };
+        private static readonly string[] RegionKindLabels = { "Source", "Deposit" };
+        private static readonly string[] PresentationModeLabels = { "Standalone", "Linked" };
+        private static readonly string[] RightPanelTabLabels = { "Selection", "Issues", "Diff" };
+        private static readonly string[] SelectionCategoryLabels = { "Regions", "Hazards", "Rules", "Links" };
+        private static readonly string[] RegionTableHeaders = { "Kind", "ID", "Active", "Anchor Cell", "Cells", "Issues", "Anchor" };
+        private static readonly float[] RegionTableWidths = { 48f, 42f, 48f, 76f, 42f, 44f, 48f };
+        private static readonly string[] HazardTableHeaders = { "Source", "Place", "Archetype", "Yaw", "Issues" };
+        private static readonly float[] HazardTableWidths = { 52f, 48f, 154f, 52f, 44f };
+        private static readonly string[] RuleTableHeaders = { "Source", "Rule", "Action", "Trigger / Progress", "Targets", "Issues" };
+        private static readonly float[] RuleTableWidths = { 48f, 42f, 62f, 124f, 64f, 44f };
+        private static readonly string[] LinkTableHeaders = { "ID", "Key", "Mode", "Linked Target", "Active", "Issues" };
+        private static readonly float[] LinkTableWidths = { 40f, 112f, 72f, 104f, 44f, 44f };
+        private static readonly string[] IssueTableHeaders = { "Severity", "Code", "Target", "Message", "Fix" };
+        private static readonly float[] IssueTableWidths = { 58f, 64f, 104f, 180f, 32f };
+        private static readonly string[] DiffTableHeaders = { "Kind", "Target", "Field", "Summary" };
+        private static readonly float[] DiffTableWidths = { 52f, 112f, 92f, 196f };
+        private static readonly GUIContent SelectAnchorContent = new GUIContent("◎", "Select and frame anchor");
+        private static readonly GUIContent ApplyFixContent = new GUIContent("✓", "Preview and apply fix");
         private readonly StageMapEditingSession _session = new StageMapEditingSession();
         private readonly List<ContentValidationIssue> _issues = new List<ContentValidationIssue>(32);
         private readonly List<StageMapDocumentIssue> _documentIssues = new List<StageMapDocumentIssue>(32);
@@ -24,6 +44,10 @@ namespace SweepNDodge.DotsBullets.Editor
         private Vector2 _rightScroll;
         private Vector2 _issueScroll;
         private Vector2 _diffScroll;
+        private Vector2 _selectionTableScroll;
+        private Vector2 _regionPaletteScroll;
+        private Vector2 _anchorPaletteScroll;
+        private Vector2 _presentationTargetPaletteScroll;
         private Vector2 _encounterScroll;
         private bool _showRawDocument;
         private bool _showProjectDocuments = true;
@@ -49,6 +73,12 @@ namespace SweepNDodge.DotsBullets.Editor
         private GUIStyle _inactiveHazardPreviewLabelStyle;
         private int _draggingEncounterRuleId;
         private uint _draggingEncounterSourceId;
+        private readonly StageMapEditorTableCache _tableCache = new StageMapEditorTableCache();
+        [SerializeField] private StageMapRightPanelTab _rightPanelTab = StageMapRightPanelTab.Selection;
+        [SerializeField] private StageMapSelectionCategory _selectionCategory = StageMapSelectionCategory.Regions;
+        [SerializeField] private float _rightPanelWidth = StageMapEditorUiPolicy.DefaultRightPanelWidth;
+        private int _selectedDiffIndex = -1;
+        private int _splitterControlId;
 
         public StageMapDocument ActiveDocument => _document;
         public StageMapEditingSession Session => _session;
@@ -59,8 +89,10 @@ namespace SweepNDodge.DotsBullets.Editor
         public StageMapHazardPreviewBinding HazardPreviewBinding => _hazardPreviewBinding;
         public bool IsHazardPreviewActive => HazardActorPreviewCoordinator.IsActiveOwner(_hazardPreviewOwner);
         public string HazardPreviewError => _hazardPreviewError;
+        public int TableSummaryBuildCount => _tableCache.BuildCount;
 
         public bool ShouldDrawAuthoringGizmoLabelsForTests() => ShouldDrawAuthoringGizmoLabels();
+        public void EnsureTableSummaryForTests() => EnsureTableCache();
 
         [MenuItem("Tools/Project/Stage Map Editor/Open")]
         public static void Open()
@@ -70,6 +102,11 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void OnEnable()
         {
+            minSize = new Vector2(
+                StageMapEditorUiPolicy.MinDocumentPanelWidth
+                    + StageMapEditorUiPolicy.MinRightPanelWidth
+                    + StageMapEditorUiPolicy.SplitterWidth,
+                420f);
             SceneView.duringSceneGui -= OnSceneGUI;
             SceneView.duringSceneGui += OnSceneGUI;
             Undo.undoRedoPerformed -= OnUndoRedo;
@@ -124,6 +161,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     DrawDocumentPanel();
+                    DrawPanelSplitter();
                     DrawRightPanel();
                 }
 
@@ -146,16 +184,20 @@ namespace SweepNDodge.DotsBullets.Editor
             _documentIssues.Clear();
             _session.Load(document);
             _navigatorCell = Vector2Int.zero;
+            _selectedDiffIndex = -1;
             _pendingGrid = document != null ? document.Grid : default;
             _observedDocumentDirtyCount = document != null ? EditorUtility.GetDirtyCount(document) : 0;
             _observedDocumentSignature = StageMapApplyPlanner.ComputeSignature(document);
             _hazardPreviewError = string.Empty;
             InvalidateOverlayCache();
+            InvalidateTableCache();
         }
 
         private void DrawDocumentPanel()
         {
-            using (new EditorGUILayout.VerticalScope(GUILayout.MinWidth(360f)))
+            using (new EditorGUILayout.VerticalScope(
+                GUILayout.MinWidth(StageMapEditorUiPolicy.MinDocumentPanelWidth),
+                GUILayout.ExpandWidth(true)))
             {
                 EditorGUILayout.LabelField("Document", EditorStyles.boldLabel);
                 DrawProjectDocumentList();
@@ -420,67 +462,107 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void DrawRightPanel()
         {
-            using (new EditorGUILayout.VerticalScope(GUILayout.MinWidth(320f), GUILayout.MaxWidth(520f)))
+            _rightPanelWidth = StageMapEditorUiPolicy.ClampRightPanelWidth(_rightPanelWidth, position.width);
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(_rightPanelWidth)))
             {
                 _rightScroll = EditorGUILayout.BeginScrollView(_rightScroll);
                 DrawSessionToolbar();
-                DrawSelectionNavigator();
+                DrawRightPanelTabs();
                 DrawContextualInspector();
-                DrawIssues();
-                DrawDiff();
                 EditorGUILayout.EndScrollView();
+            }
+        }
+
+        private void DrawPanelSplitter()
+        {
+            Rect splitter = GUILayoutUtility.GetRect(
+                StageMapEditorUiPolicy.SplitterWidth,
+                StageMapEditorUiPolicy.SplitterWidth,
+                GUILayout.ExpandHeight(true));
+            EditorGUIUtility.AddCursorRect(splitter, MouseCursor.ResizeHorizontal);
+            if (Event.current.type == EventType.Repaint)
+                EditorGUI.DrawRect(splitter, new Color(0.18f, 0.18f, 0.18f, 1f));
+
+            _splitterControlId = GUIUtility.GetControlID("StageMapEditorSplitter".GetHashCode(), FocusType.Passive, splitter);
+            Event evt = Event.current;
+            switch (evt.GetTypeForControl(_splitterControlId))
+            {
+                case EventType.MouseDown:
+                    if (evt.button == 0 && splitter.Contains(evt.mousePosition))
+                    {
+                        GUIUtility.hotControl = _splitterControlId;
+                        evt.Use();
+                    }
+                    break;
+                case EventType.MouseDrag:
+                    if (GUIUtility.hotControl == _splitterControlId)
+                    {
+                        _rightPanelWidth = StageMapEditorUiPolicy.ClampRightPanelWidth(
+                            _rightPanelWidth - evt.delta.x,
+                            position.width);
+                        Repaint();
+                        evt.Use();
+                    }
+                    break;
+                case EventType.MouseUp:
+                    if (GUIUtility.hotControl == _splitterControlId)
+                    {
+                        GUIUtility.hotControl = 0;
+                        evt.Use();
+                    }
+                    break;
             }
         }
 
         private void DrawSessionToolbar()
         {
             EditorGUILayout.LabelField("Editing Session", EditorStyles.boldLabel);
-            _session.SelectedTool = (StageMapEditorToolMode)EditorGUILayout.EnumPopup("Tool", _session.SelectedTool);
-            _session.SelectedLayer = (StageMapEditorLayer)EditorGUILayout.EnumPopup("Active Layer", _session.SelectedLayer);
-            DrawLayerVisibility();
-            DrawLayerLocks();
+            EditorGUILayout.LabelField("Tool", EditorStyles.miniBoldLabel);
+            _session.SelectedTool = (StageMapEditorToolMode)GUILayout.SelectionGrid(
+                (int)_session.SelectedTool,
+                ToolLabels,
+                4,
+                EditorStyles.miniButton);
+            DrawLayerMatrix();
             DrawPalette();
         }
 
-        private void DrawLayerVisibility()
+        private void DrawLayerMatrix()
         {
             EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField("Visibility", EditorStyles.boldLabel);
-            using (new EditorGUILayout.HorizontalScope())
+            EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                _session.ShowGridLayer = GUILayout.Toggle(_session.ShowGridLayer, "Grid", EditorStyles.miniButton);
-                _session.ShowMovementLayer = GUILayout.Toggle(_session.ShowMovementLayer, "Movement", EditorStyles.miniButton);
-                _session.ShowSourceLayer = GUILayout.Toggle(_session.ShowSourceLayer, "Source", EditorStyles.miniButton);
-                _session.ShowDepositLayer = GUILayout.Toggle(_session.ShowDepositLayer, "Deposit", EditorStyles.miniButton);
+                GUILayout.Label("Layer", EditorStyles.miniBoldLabel, GUILayout.Width(112f));
+                GUILayout.Label("Active", EditorStyles.miniBoldLabel, GUILayout.Width(52f));
+                GUILayout.Label("Visible", EditorStyles.miniBoldLabel, GUILayout.Width(52f));
+                GUILayout.Label("Locked", EditorStyles.miniBoldLabel, GUILayout.Width(52f));
             }
 
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                _session.ShowAnchorLayer = GUILayout.Toggle(_session.ShowAnchorLayer, "Anchors", EditorStyles.miniButton);
-                _session.ShowPlayerStartLayer = GUILayout.Toggle(_session.ShowPlayerStartLayer, "Player", EditorStyles.miniButton);
-                _session.ShowHazardActorLayer = GUILayout.Toggle(_session.ShowHazardActorLayer, "Hazards", EditorStyles.miniButton);
-                _session.ShowPresentationLayer = GUILayout.Toggle(_session.ShowPresentationLayer, "Links", EditorStyles.miniButton);
-            }
+            DrawLayerMatrixRow(StageMapEditorLayer.Grid, "Grid");
+            DrawLayerMatrixRow(StageMapEditorLayer.Movement, "Movement");
+            DrawLayerMatrixRow(StageMapEditorLayer.Source, "Source");
+            DrawLayerMatrixRow(StageMapEditorLayer.Deposit, "Deposit");
+            DrawLayerMatrixRow(StageMapEditorLayer.Anchors, "Anchors");
+            DrawLayerMatrixRow(StageMapEditorLayer.PlayerStart, "Player Start");
+            DrawLayerMatrixRow(StageMapEditorLayer.HazardActors, "Hazard Actors");
+            DrawLayerMatrixRow(StageMapEditorLayer.Presentations, "Presentations");
         }
 
-        private void DrawLayerLocks()
+        private void DrawLayerMatrixRow(StageMapEditorLayer layer, string label)
         {
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField("Locks", EditorStyles.boldLabel);
+            StageMapLayerUiState state = StageMapEditorUiPolicy.GetLayerState(_session, layer);
             using (new EditorGUILayout.HorizontalScope())
             {
-                _session.LockGridLayer = GUILayout.Toggle(_session.LockGridLayer, "Grid", EditorStyles.miniButton);
-                _session.LockMovementLayer = GUILayout.Toggle(_session.LockMovementLayer, "Movement", EditorStyles.miniButton);
-                _session.LockSourceLayer = GUILayout.Toggle(_session.LockSourceLayer, "Source", EditorStyles.miniButton);
-                _session.LockDepositLayer = GUILayout.Toggle(_session.LockDepositLayer, "Deposit", EditorStyles.miniButton);
-            }
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                _session.LockAnchorLayer = GUILayout.Toggle(_session.LockAnchorLayer, "Anchors", EditorStyles.miniButton);
-                _session.LockPlayerStartLayer = GUILayout.Toggle(_session.LockPlayerStartLayer, "Player", EditorStyles.miniButton);
-                _session.LockHazardActorLayer = GUILayout.Toggle(_session.LockHazardActorLayer, "Hazards", EditorStyles.miniButton);
-                _session.LockPresentationLayer = GUILayout.Toggle(_session.LockPresentationLayer, "Links", EditorStyles.miniButton);
+                GUILayout.Label(label, EditorStyles.miniLabel, GUILayout.Width(112f));
+                bool active = GUILayout.Toggle(state.Active, GUIContent.none, GUILayout.Width(52f));
+                bool visible = GUILayout.Toggle(state.Visible, GUIContent.none, GUILayout.Width(52f));
+                bool locked = GUILayout.Toggle(state.Locked, GUIContent.none, GUILayout.Width(52f));
+                if (active != state.Active || visible != state.Visible || locked != state.Locked)
+                {
+                    StageMapEditorUiPolicy.SetLayerState(_session, layer, active, visible, locked);
+                    SceneView.RepaintAll();
+                }
             }
         }
 
@@ -491,15 +573,31 @@ namespace SweepNDodge.DotsBullets.Editor
             switch (_session.SelectedTool)
             {
                 case StageMapEditorToolMode.PaintMovement:
-                    _session.MovementBrush = (StageCellMovementFlags)EditorGUILayout.EnumFlagsField("Movement Flags", _session.MovementBrush);
+                    EditorGUILayout.LabelField("Movement", EditorStyles.miniBoldLabel);
+                    int movementPreset = GUILayout.SelectionGrid(
+                        StageMapEditorUiPolicy.GetMovementPresetIndex(_session.MovementBrush),
+                        MovementPresetLabels,
+                        2,
+                        EditorStyles.miniButton);
+                    _session.MovementBrush = StageMapEditorUiPolicy.GetMovementPreset(movementPreset);
                     break;
                 case StageMapEditorToolMode.PaintRegion:
-                    _session.RegionBrushKind = (StageRegionKind)EditorGUILayout.EnumPopup("Region Kind", _session.RegionBrushKind);
-                    _session.RegionBrushStableId = DrawUIntField("Stable Id", _session.RegionBrushStableId);
+                    _session.RegionBrushKind = DrawRegionKindSegments(_session.RegionBrushKind);
+                    EnsureTableCache();
+                    _session.RegionBrushStableId = DrawStableIdPalette(
+                        _session.RegionBrushKind,
+                        allowErase: StageMapEditorUiPolicy.CanEraseStableId(_session.SelectedTool),
+                        _session.RegionBrushStableId,
+                        ref _regionPaletteScroll);
                     break;
                 case StageMapEditorToolMode.PlaceAnchor:
-                    _session.AnchorBrushKind = (StageRegionKind)EditorGUILayout.EnumPopup("Region Kind", _session.AnchorBrushKind);
-                    _session.AnchorBrushStableId = DrawUIntField("Stable Id", _session.AnchorBrushStableId);
+                    _session.AnchorBrushKind = DrawRegionKindSegments(_session.AnchorBrushKind);
+                    EnsureTableCache();
+                    _session.AnchorBrushStableId = DrawStableIdPalette(
+                        _session.AnchorBrushKind,
+                        allowErase: false,
+                        _session.AnchorBrushStableId,
+                        ref _anchorPaletteScroll);
                     DrawCenterRegionAnchorPreference();
                     break;
                 case StageMapEditorToolMode.PlacePlayerStart:
@@ -521,17 +619,109 @@ namespace SweepNDodge.DotsBullets.Editor
                     }
 
                     _session.PresentationKey = EditorGUILayout.TextField("Presentation Key", _session.PresentationKey);
-                    _session.PresentationPlacementMode = (StagePresentationPlacementMode)EditorGUILayout.EnumPopup("Placement Mode", _session.PresentationPlacementMode);
+                    _session.PresentationPlacementMode = (StagePresentationPlacementMode)GUILayout.Toolbar(
+                        (int)_session.PresentationPlacementMode,
+                        PresentationModeLabels,
+                        EditorStyles.miniButton);
                     if (_session.PresentationPlacementMode == StagePresentationPlacementMode.LinkedToParent)
                     {
-                        _session.PresentationLinkKind = (StagePresentationLinkKind)EditorGUILayout.EnumPopup("Link Kind", _session.PresentationLinkKind);
-                        _session.PresentationLinkedStableId = DrawUIntField("Linked Stable Id", _session.PresentationLinkedStableId);
+                        int linkKind = _session.PresentationLinkKind == StagePresentationLinkKind.Deposit ? 1 : 0;
+                        linkKind = GUILayout.Toolbar(linkKind, RegionKindLabels, EditorStyles.miniButton);
+                        _session.PresentationLinkKind = linkKind == 0
+                            ? StagePresentationLinkKind.Source
+                            : StagePresentationLinkKind.Deposit;
+                        EnsureTableCache();
+                        _session.PresentationLinkedStableId = DrawStableIdPalette(
+                            _session.PresentationLinkKind == StagePresentationLinkKind.Source
+                                ? StageRegionKind.Source
+                                : StageRegionKind.Deposit,
+                            allowErase: false,
+                            _session.PresentationLinkedStableId,
+                            ref _presentationTargetPaletteScroll);
                     }
 
                     _session.PresentationEuler = EditorGUILayout.Vector3Field("Euler", _session.PresentationEuler);
                     _session.PresentationScale = EditorGUILayout.Vector3Field("Scale", _session.PresentationScale == Vector3.zero ? Vector3.one : _session.PresentationScale);
                     break;
             }
+        }
+
+        private static StageRegionKind DrawRegionKindSegments(StageRegionKind current)
+        {
+            int next = GUILayout.Toolbar((int)current, RegionKindLabels, EditorStyles.miniButton);
+            return next == 0 ? StageRegionKind.Source : StageRegionKind.Deposit;
+        }
+
+        private uint DrawStableIdPalette(
+            StageRegionKind kind,
+            bool allowErase,
+            uint selectedId,
+            ref Vector2 scroll)
+        {
+            IReadOnlyList<uint> ids = kind == StageRegionKind.Source ? _tableCache.SourceIds : _tableCache.DepositIds;
+            bool matchesExisting = ContainsStableId(ids, selectedId);
+            int rowCount = ids.Count + (allowErase ? 1 : 0) + 1;
+            bool scrollable = rowCount > 6;
+            if (scrollable)
+            {
+                scroll = EditorGUILayout.BeginScrollView(
+                    scroll,
+                    false,
+                    true,
+                    GUIStyle.none,
+                    GUI.skin.verticalScrollbar,
+                    EditorStyles.helpBox,
+                    GUILayout.Height(6f * (EditorGUIUtility.singleLineHeight + 4f) + 16f));
+            }
+            else
+            {
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            }
+            if (allowErase)
+            {
+                bool erase = GUILayout.Toggle(selectedId == 0u, "Erase (0)", EditorStyles.radioButton);
+                if (erase)
+                    selectedId = 0u;
+            }
+            for (int i = 0; i < ids.Count; i++)
+            {
+                uint id = ids[i];
+                bool selected = GUILayout.Toggle(selectedId == id, $"{kind} {id}", EditorStyles.radioButton);
+                if (selected)
+                    selectedId = id;
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                bool custom = selectedId != 0u && !matchesExisting;
+                bool nextCustom = GUILayout.Toggle(custom, "Custom/New ID", EditorStyles.radioButton, GUILayout.Width(112f));
+                long next = EditorGUILayout.LongField(custom ? selectedId : GetNextStableId(ids));
+                if (nextCustom)
+                    selectedId = next <= 0L ? 1u : next >= uint.MaxValue ? uint.MaxValue : (uint)next;
+            }
+            if (scrollable)
+                EditorGUILayout.EndScrollView();
+            else
+                EditorGUILayout.EndVertical();
+            return selectedId;
+        }
+
+        private static bool ContainsStableId(IReadOnlyList<uint> ids, uint value)
+        {
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (ids[i] == value)
+                    return true;
+            }
+            return false;
+        }
+
+        private static uint GetNextStableId(IReadOnlyList<uint> ids)
+        {
+            uint max = 0u;
+            for (int i = 0; i < ids.Count; i++)
+                max = Math.Max(max, ids[i]);
+            return max == uint.MaxValue ? uint.MaxValue : max + 1u;
         }
 
         private void DrawHazardActorArchetypePickerButton()
@@ -615,10 +805,30 @@ namespace SweepNDodge.DotsBullets.Editor
                 () => StageMapEditorMutationUtility.TrySetCenterPlayerStart(_session, enabled, out _));
         }
 
-        private void DrawSelectionNavigator()
+        private void DrawRightPanelTabs()
         {
             EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("Selection Navigator", EditorStyles.boldLabel);
+            _rightPanelTab = (StageMapRightPanelTab)GUILayout.Toolbar(
+                (int)_rightPanelTab,
+                RightPanelTabLabels,
+                EditorStyles.toolbarButton);
+            switch (_rightPanelTab)
+            {
+                case StageMapRightPanelTab.Selection:
+                    DrawSelectionTable();
+                    break;
+                case StageMapRightPanelTab.Issues:
+                    DrawIssueTable();
+                    break;
+                case StageMapRightPanelTab.Diff:
+                    DrawDiffTable();
+                    break;
+            }
+        }
+
+        private void DrawSelectionTable()
+        {
+            EnsureTableCache();
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 EditorGUILayout.LabelField(
@@ -628,78 +838,306 @@ namespace SweepNDodge.DotsBullets.Editor
                 {
                     using (new EditorGUI.DisabledScope(_session.Selection.Kind == StageMapSelectionKind.None))
                     {
-                        if (GUILayout.Button("Frame"))
+                        if (GUILayout.Button("Frame", EditorStyles.miniButton))
                             FrameSelection(_session.Selection);
-                        if (GUILayout.Button("Clear Selection"))
+                        if (GUILayout.Button("Clear", EditorStyles.miniButton))
                             _session.Select(StageMapSelection.None);
                     }
                 }
 
-                EditorGUILayout.Space(3f);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     _navigatorCell = EditorGUILayout.Vector2IntField("Cell", _navigatorCell);
-                    if (GUILayout.Button("Select", GUILayout.Width(56f)))
+                    if (GUILayout.Button("Select", EditorStyles.miniButton, GUILayout.Width(56f)))
                         TrySelect(StageMapSelection.ForCell(_navigatorCell), frame: false);
-                }
-
-                DrawRegionNavigator(_document.SourceRegions, StageRegionKind.Source);
-                DrawRegionNavigator(_document.DepositRegions, StageRegionKind.Deposit);
-
-                if (_document.PlayerStart.Active && GUILayout.Button("PlayerStart", EditorStyles.miniButton))
-                    TrySelect(StageMapSelection.ForPlayerStart(), frame: false);
-
-                EditorGUILayout.LabelField("Hazard Actors", EditorStyles.miniBoldLabel);
-                var placements = _document.HazardActorPlacements ?? Array.Empty<StageMapHazardActorPlacementData>();
-                for (int i = 0; i < placements.Length; i++)
-                {
-                    var placement = placements[i];
-                    string label = $"Source {placement.OwningSourceStableId} / Placement {placement.PlacementInstanceId}";
-                    if (GUILayout.Button(label, EditorStyles.miniButton))
+                    using (new EditorGUI.DisabledScope(!_document.PlayerStart.Active))
                     {
-                        TrySelect(
-                            StageMapSelection.ForHazard(placement.OwningSourceStableId, placement.PlacementInstanceId),
-                            frame: false);
+                        if (GUILayout.Button("PlayerStart", EditorStyles.miniButton, GUILayout.Width(82f)))
+                            TrySelect(StageMapSelection.ForPlayerStart(), frame: false);
                     }
                 }
 
-                EditorGUILayout.LabelField("Hazard Rules", EditorStyles.miniBoldLabel);
-                var rules = _document.HazardActorOrchestrationRules ?? Array.Empty<StageMapHazardActorOrchestrationRuleData>();
-                for (int i = 0; i < rules.Length; i++)
+                _selectionCategory = (StageMapSelectionCategory)GUILayout.Toolbar(
+                    (int)_selectionCategory,
+                    SelectionCategoryLabels,
+                    EditorStyles.miniButton);
+                _selectionTableScroll = EditorGUILayout.BeginScrollView(
+                    _selectionTableScroll,
+                    GUILayout.MinHeight(100f),
+                    GUILayout.MaxHeight(260f));
+                switch (_selectionCategory)
                 {
-                    var rule = rules[i];
-                    string label = $"Source {rule.OwningSourceStableId} / Rule {rule.RuleId} / {rule.ActionType}";
-                    if (GUILayout.Button(label, EditorStyles.miniButton))
-                        TrySelect(StageMapSelection.ForHazardRule(rule.OwningSourceStableId, rule.RuleId), frame: false);
+                    case StageMapSelectionCategory.Regions: DrawRegionTable(); break;
+                    case StageMapSelectionCategory.Hazards: DrawHazardTable(); break;
+                    case StageMapSelectionCategory.Rules: DrawRuleTable(); break;
+                    case StageMapSelectionCategory.Links: DrawLinkTable(); break;
                 }
-
-                EditorGUILayout.LabelField("Presentation Links", EditorStyles.miniBoldLabel);
-                var links = _document.PresentationLinks ?? Array.Empty<StageMapPresentationLinkData>();
-                for (int i = 0; i < links.Length; i++)
-                {
-                    string label = $"{links[i].StableId} / {links[i].PresentationKey}";
-                    if (GUILayout.Button(label, EditorStyles.miniButton))
-                        TrySelect(StageMapSelection.ForPresentation(links[i].StableId), frame: false);
-                }
+                EditorGUILayout.EndScrollView();
             }
         }
 
-        private void DrawRegionNavigator(StageMapRegionData[] regions, StageRegionKind kind)
+        private void DrawRegionTable()
         {
-            EditorGUILayout.LabelField($"{kind} Regions / Anchors", EditorStyles.miniBoldLabel);
-            regions = regions ?? Array.Empty<StageMapRegionData>();
-            for (int i = 0; i < regions.Length; i++)
+            DrawTableHeader(RegionTableHeaders, RegionTableWidths);
+            var rows = _tableCache.Regions;
+            for (int i = 0; i < rows.Count; i++)
             {
-                uint stableId = regions[i].StableId;
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField($"{kind} {stableId}", EditorStyles.miniLabel);
-                    if (GUILayout.Button("Region", EditorStyles.miniButton, GUILayout.Width(56f)))
-                        TrySelect(StageMapSelection.ForRegion(kind, stableId), frame: false);
-                    if (GUILayout.Button("Anchor", EditorStyles.miniButton, GUILayout.Width(56f)))
-                        TrySelect(StageMapSelection.ForAnchor(kind, stableId), frame: false);
-                }
+                StageMapRegionTableRow row = rows[i];
+                Rect rect = GetTableRowRect(RegionTableWidths);
+                bool selected = _session.Selection == row.RegionSelection || _session.Selection == row.AnchorSelection;
+                DrawTableRowBackground(rect, selected);
+                float x = rect.x;
+                DrawTableCell(ref x, rect, RegionTableWidths[0], row.KindLabel);
+                DrawTableCell(ref x, rect, RegionTableWidths[1], row.IdLabel);
+                DrawTableCell(ref x, rect, RegionTableWidths[2], row.ActiveLabel);
+                DrawTableCell(ref x, rect, RegionTableWidths[3], row.AnchorCellLabel);
+                DrawTableCell(ref x, rect, RegionTableWidths[4], row.CellCountLabel);
+                DrawTableCell(ref x, rect, RegionTableWidths[5], row.IssueLabel);
+                Rect anchorRect = new Rect(x + 2f, rect.y + 2f, RegionTableWidths[6] - 4f, rect.height - 4f);
+                if (GUI.Button(anchorRect, SelectAnchorContent, EditorStyles.miniButton))
+                    TrySelect(row.AnchorSelection, frame: true);
+                HandleSelectionRow(rect, row.RegionSelection);
             }
+        }
+
+        private void DrawHazardTable()
+        {
+            DrawTableHeader(HazardTableHeaders, HazardTableWidths);
+            var rows = _tableCache.Hazards;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                StageMapHazardTableRow row = rows[i];
+                Rect rect = GetTableRowRect(HazardTableWidths);
+                DrawTableRowBackground(rect, _session.Selection == row.Selection);
+                float x = rect.x;
+                DrawTableCell(ref x, rect, HazardTableWidths[0], row.SourceLabel);
+                DrawTableCell(ref x, rect, HazardTableWidths[1], row.PlacementLabel);
+                DrawTableCell(ref x, rect, HazardTableWidths[2], row.ArchetypeLabel);
+                DrawTableCell(ref x, rect, HazardTableWidths[3], row.YawLabel);
+                DrawTableCell(ref x, rect, HazardTableWidths[4], row.IssueLabel);
+                HandleSelectionRow(rect, row.Selection);
+            }
+        }
+
+        private void DrawRuleTable()
+        {
+            DrawTableHeader(RuleTableHeaders, RuleTableWidths);
+            var rows = _tableCache.Rules;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                StageMapRuleTableRow row = rows[i];
+                Rect rect = GetTableRowRect(RuleTableWidths);
+                DrawTableRowBackground(rect, _session.Selection == row.Selection);
+                float x = rect.x;
+                DrawTableCell(ref x, rect, RuleTableWidths[0], row.SourceLabel);
+                DrawTableCell(ref x, rect, RuleTableWidths[1], row.RuleLabel);
+                DrawTableCell(ref x, rect, RuleTableWidths[2], row.ActionLabel);
+                DrawTableCell(ref x, rect, RuleTableWidths[3], row.TriggerLabel);
+                DrawTableCell(ref x, rect, RuleTableWidths[4], row.TargetLabel);
+                DrawTableCell(ref x, rect, RuleTableWidths[5], row.IssueLabel);
+                HandleSelectionRow(rect, row.Selection);
+            }
+        }
+
+        private void DrawLinkTable()
+        {
+            DrawTableHeader(LinkTableHeaders, LinkTableWidths);
+            var rows = _tableCache.Links;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                StageMapLinkTableRow row = rows[i];
+                Rect rect = GetTableRowRect(LinkTableWidths);
+                DrawTableRowBackground(rect, _session.Selection == row.Selection);
+                float x = rect.x;
+                DrawTableCell(ref x, rect, LinkTableWidths[0], row.IdLabel);
+                DrawTableCell(ref x, rect, LinkTableWidths[1], row.KeyLabel);
+                DrawTableCell(ref x, rect, LinkTableWidths[2], row.ModeLabel);
+                DrawTableCell(ref x, rect, LinkTableWidths[3], row.LinkedTargetLabel);
+                DrawTableCell(ref x, rect, LinkTableWidths[4], row.ActiveLabel);
+                DrawTableCell(ref x, rect, LinkTableWidths[5], row.IssueLabel);
+                HandleSelectionRow(rect, row.Selection);
+            }
+        }
+
+        private void DrawIssueTable()
+        {
+            EnsureTableCache();
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField($"Issues ({_issues.Count})", EditorStyles.miniBoldLabel);
+                _issueScroll = EditorGUILayout.BeginScrollView(
+                    _issueScroll,
+                    GUILayout.MinHeight(120f),
+                    GUILayout.MaxHeight(260f));
+                DrawTableHeader(IssueTableHeaders, IssueTableWidths);
+                var rows = _tableCache.Issues;
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    StageMapIssueTableRow row = rows[i];
+                    Rect rect = GetTableRowRect(IssueTableWidths);
+                    DrawTableRowBackground(rect, _session.SelectedIssueIndex == row.Index);
+                    float x = rect.x;
+                    DrawTableCell(ref x, rect, IssueTableWidths[0], row.SeverityLabel);
+                    DrawTableCell(ref x, rect, IssueTableWidths[1], row.CodeLabel);
+                    DrawTableCell(ref x, rect, IssueTableWidths[2], row.TargetLabel);
+                    DrawTableCell(ref x, rect, IssueTableWidths[3], row.MessageLabel);
+                    Rect fixRect = new Rect(x + 2f, rect.y + 2f, IssueTableWidths[4] - 4f, rect.height - 4f);
+                    if (row.HasFix)
+                    {
+                        StageMapIssueTarget target = row.Index < _documentIssues.Count
+                            ? _documentIssues[row.Index].Target
+                            : StageMapDocumentIssueMapper.ResolveTarget(_document, _issues[row.Index]);
+                        bool canApply = StageMapEditorMutationUtility.CanApplyFix(
+                            _session,
+                            _issues[row.Index],
+                            target,
+                            out _);
+                        using (new EditorGUI.DisabledScope(!canApply))
+                        {
+                            if (GUI.Button(fixRect, ApplyFixContent, EditorStyles.miniButton))
+                                ApplyIssueFix(row.Index);
+                        }
+                    }
+                    HandleIssueRow(rect, row.Index);
+                }
+                EditorGUILayout.EndScrollView();
+                DrawSelectedIssueDetails();
+            }
+        }
+
+        private void DrawSelectedIssueDetails()
+        {
+            int index = _session.SelectedIssueIndex;
+            if (index < 0 || index >= _issues.Count)
+                return;
+            ContentValidationIssue issue = _issues[index];
+            EditorGUILayout.LabelField($"{issue.Code} · {issue.Location}", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField(issue.Message, EditorStyles.wordWrappedMiniLabel);
+            StageMapIssueTarget target = index < _documentIssues.Count
+                ? _documentIssues[index].Target
+                : StageMapDocumentIssueMapper.ResolveTarget(_document, issue);
+            if (!string.IsNullOrEmpty(target.FixId)
+                && StageMapDocumentFixUtility.TryBuildFixPreview(_document, issue, out var preview))
+            {
+                EditorGUILayout.LabelField(preview.Summary, EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
+        private void DrawDiffTable()
+        {
+            EnsureTableCache();
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                int count = _applyPlan != null ? _applyPlan.Changes.Count : 0;
+                EditorGUILayout.LabelField($"Diff Summary ({count})", EditorStyles.miniBoldLabel);
+                _diffScroll = EditorGUILayout.BeginScrollView(
+                    _diffScroll,
+                    GUILayout.MinHeight(120f),
+                    GUILayout.MaxHeight(260f));
+                DrawTableHeader(DiffTableHeaders, DiffTableWidths);
+                var rows = _tableCache.Diffs;
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    StageMapDiffTableRow row = rows[i];
+                    Rect rect = GetTableRowRect(DiffTableWidths);
+                    DrawTableRowBackground(rect, _selectedDiffIndex == row.Index);
+                    float x = rect.x;
+                    DrawTableCell(ref x, rect, DiffTableWidths[0], row.KindLabel);
+                    DrawTableCell(ref x, rect, DiffTableWidths[1], row.TargetLabel);
+                    DrawTableCell(ref x, rect, DiffTableWidths[2], row.FieldLabel);
+                    DrawTableCell(ref x, rect, DiffTableWidths[3], row.SummaryLabel);
+                    HandleDiffRow(rect, row.Index);
+                }
+                EditorGUILayout.EndScrollView();
+                if (_applyPlan != null && _selectedDiffIndex >= 0 && _selectedDiffIndex < _applyPlan.Changes.Count)
+                    EditorGUILayout.LabelField(_applyPlan.Changes[_selectedDiffIndex].Description, EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
+        private static void DrawTableHeader(string[] labels, float[] widths)
+        {
+            Rect rect = GetTableRowRect(widths, EditorGUIUtility.singleLineHeight);
+            if (Event.current.type == EventType.Repaint)
+                EditorGUI.DrawRect(rect, new Color(0.13f, 0.13f, 0.13f, 1f));
+            float x = rect.x;
+            for (int i = 0; i < labels.Length; i++)
+            {
+                float width = widths[i];
+                EditorGUI.LabelField(new Rect(x + 3f, rect.y, width - 6f, rect.height), labels[i], EditorStyles.miniBoldLabel);
+                x += width;
+            }
+        }
+
+        private static Rect GetTableRowRect(float[] widths, float height = 22f)
+        {
+            float total = 0f;
+            for (int i = 0; i < widths.Length; i++)
+                total += widths[i];
+            return EditorGUILayout.GetControlRect(false, height, GUILayout.MinWidth(total));
+        }
+
+        private static void DrawTableRowBackground(Rect rect, bool selected)
+        {
+            if (Event.current.type != EventType.Repaint)
+                return;
+            EditorGUI.DrawRect(
+                rect,
+                selected
+                    ? new Color(0.18f, 0.32f, 0.52f, 0.58f)
+                    : new Color(0.16f, 0.16f, 0.16f, 0.22f));
+        }
+
+        private static void DrawTableCell(ref float x, Rect row, float width, string value)
+        {
+            EditorGUI.LabelField(
+                new Rect(x + 3f, row.y + 2f, width - 6f, row.height - 4f),
+                value ?? string.Empty,
+                EditorStyles.miniLabel);
+            x += width;
+        }
+
+        private void HandleSelectionRow(Rect rect, StageMapSelection selection)
+        {
+            Event evt = Event.current;
+            if (evt.type != EventType.MouseDown || !rect.Contains(evt.mousePosition))
+                return;
+            StageMapTableRowAction action = StageMapEditorUiPolicy.GetRowAction(evt.button, evt.clickCount);
+            if (action == StageMapTableRowAction.None)
+                return;
+            TrySelect(selection, frame: action == StageMapTableRowAction.SelectAndFrame);
+            evt.Use();
+        }
+
+        private void HandleIssueRow(Rect rect, int issueIndex)
+        {
+            Event evt = Event.current;
+            if (evt.type != EventType.MouseDown || !rect.Contains(evt.mousePosition))
+                return;
+            StageMapTableRowAction action = StageMapEditorUiPolicy.GetRowAction(evt.button, evt.clickCount);
+            if (action == StageMapTableRowAction.None)
+                return;
+            SelectIssue(issueIndex, frame: action == StageMapTableRowAction.SelectAndFrame);
+            evt.Use();
+        }
+
+        private void HandleDiffRow(Rect rect, int diffIndex)
+        {
+            Event evt = Event.current;
+            if (evt.type != EventType.MouseDown || evt.button != 0 || !rect.Contains(evt.mousePosition))
+                return;
+            _selectedDiffIndex = diffIndex;
+            evt.Use();
+            Repaint();
+        }
+
+        private void EnsureTableCache()
+        {
+            _tableCache.EnsureBuilt(_document, _documentIssues, _applyPlan);
+        }
+
+        private void InvalidateTableCache()
+        {
+            _tableCache.Invalidate();
         }
 
         public bool TrySelect(StageMapSelection selection, bool frame)
@@ -1913,73 +2351,15 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private void DrawIssues()
-        {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField($"Issues ({_issues.Count})", EditorStyles.boldLabel);
-            _issueScroll = EditorGUILayout.BeginScrollView(_issueScroll, GUILayout.MinHeight(140f), GUILayout.MaxHeight(220f));
-            for (int i = 0; i < _issues.Count; i++)
-            {
-                var issue = _issues[i];
-                StageMapIssueTarget target = i < _documentIssues.Count
-                    ? _documentIssues[i].Target
-                    : StageMapDocumentIssueMapper.ResolveTarget(_document, issue);
-                MessageType messageType = issue.Severity == ContentValidationSeverity.Error
-                    ? MessageType.Error
-                    : MessageType.Warning;
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    EditorGUILayout.HelpBox($"{issue.Code} {issue.Location}\n{issue.Message}", messageType);
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        if (GUILayout.Button("Select", GUILayout.Width(72f)))
-                            NavigateToIssue(i);
-
-                        if (!string.IsNullOrEmpty(target.FixId)
-                            && StageMapDocumentFixUtility.TryBuildFixPreview(_document, issue, out var fixPreview))
-                        {
-                            bool canApply = StageMapEditorMutationUtility.CanApplyFix(_session, issue, target, out _);
-                            using (new EditorGUI.DisabledScope(!canApply))
-                            {
-                                if (GUILayout.Button("Apply Fix", GUILayout.Width(80f)))
-                                    ApplyIssueFix(i);
-                            }
-                            EditorGUILayout.LabelField(fixPreview.Summary, EditorStyles.wordWrappedMiniLabel);
-                        }
-                    }
-                }
-            }
-
-            EditorGUILayout.EndScrollView();
-        }
-
-        private void DrawDiff()
-        {
-            EditorGUILayout.Space(6f);
-            int changeCount = _applyPlan != null ? _applyPlan.Changes.Count : 0;
-            EditorGUILayout.LabelField($"Diff Summary ({changeCount})", EditorStyles.boldLabel);
-            _diffScroll = EditorGUILayout.BeginScrollView(_diffScroll, GUILayout.MinHeight(140f));
-            if (_applyPlan != null)
-            {
-                for (int i = 0; i < _applyPlan.Changes.Count; i++)
-                {
-                    var change = _applyPlan.Changes[i];
-                    EditorGUILayout.LabelField($"{change.Kind}: {change.Target}.{change.Field}", EditorStyles.boldLabel);
-                    EditorGUILayout.LabelField(change.Description, EditorStyles.wordWrappedLabel);
-                    EditorGUILayout.Space(3f);
-                }
-            }
-
-            EditorGUILayout.EndScrollView();
-        }
-
         private void Validate()
         {
             _issues.Clear();
+            _session.SelectedIssueIndex = -1;
             _session.ValidationSnapshot.Clear();
             StageMapDocumentValidationRules.ValidateDocument(_document, AssetDatabase.GetAssetPath(_document), _issues);
             _session.ValidationSnapshot.AddRange(_issues);
             StageMapDocumentIssueMapper.Map(_document, _issues, _documentIssues);
+            InvalidateTableCache();
             Repaint();
         }
 
@@ -1987,10 +2367,13 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             _applyPlan = StageMapApplyPlanner.BuildPlan(_document);
             _issues.Clear();
+            _session.SelectedIssueIndex = -1;
             _issues.AddRange(_applyPlan.ValidationIssues);
             _session.ValidationSnapshot.Clear();
             _session.ValidationSnapshot.AddRange(_issues);
             StageMapDocumentIssueMapper.Map(_document, _issues, _documentIssues);
+            _selectedDiffIndex = -1;
+            InvalidateTableCache();
             Repaint();
         }
 
@@ -2709,8 +3092,10 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void OnProjectChanged()
         {
+            InvalidateTableCache();
             if (_document != null && _hazardPreviewBinding.IsValid)
                 QueueHazardPreviewReconcile(claimOwner: false);
+            Repaint();
         }
 
         private void ClampSelection()
@@ -2795,6 +3180,11 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void NavigateToIssue(int issueIndex)
         {
+            SelectIssue(issueIndex, frame: true);
+        }
+
+        private void SelectIssue(int issueIndex, bool frame)
+        {
             if (issueIndex < 0 || issueIndex >= _issues.Count)
                 return;
 
@@ -2802,7 +3192,23 @@ namespace SweepNDodge.DotsBullets.Editor
             StageMapIssueTarget target = issueIndex < _documentIssues.Count
                 ? _documentIssues[issueIndex].Target
                 : StageMapDocumentIssueMapper.ResolveTarget(_document, _issues[issueIndex]);
-            TryNavigateToIssueTarget(target);
+            if (frame)
+            {
+                TryNavigateToIssueTarget(target);
+                return;
+            }
+
+            if (!StageMapIssueNavigationUtility.TryResolve(
+                    _document,
+                    target,
+                    out StageMapSelection selection,
+                    out _,
+                    out _))
+            {
+                Repaint();
+                return;
+            }
+            TrySelect(selection, frame: false);
         }
 
         public bool TryNavigateToIssueTarget(StageMapIssueTarget target)

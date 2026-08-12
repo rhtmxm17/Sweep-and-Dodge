@@ -5,7 +5,7 @@
 - doc_id: `TD-034`
 - type: `TechnicalDesign`
 - status: `implemented`
-- last_updated: `2026-08-11`
+- last_updated: `2026-08-12`
 - related_docs:
   - [TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](./TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
   - [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](./TD-032-hazard-actor-stage-placement-and-orchestration-framework.md)
@@ -130,6 +130,18 @@
 - Hazard Encounter panel
   - 선택 source의 placement 행과 normalized progress 축에 Spawn/PhaseSet/Retire rule을 표시한다.
   - rule/target 편집, 다중 target fan-out, progress scrub과 Encounter Preview를 제공하며 세부 기준은 `TD-035`를 따른다.
+- Editing Session과 Palette
+  - IMGUI 기반 Window를 유지하고 Tool 및 소수의 배타적 brush 선택은 segmented button으로 상시 노출한다.
+  - Movement brush는 Passable, Block Player, Block Bullet, Block Both의 네 최종 flag preset을 사용한다.
+  - Source/Deposit 종류는 segmented button, 가변 Stable ID는 Erase와 기존 ID 및 Custom/New ID를 포함하는 최대 6행 scroll radio 목록으로 선택한다.
+  - Active/Visible/Locked layer 상태는 행 단위 matrix로 통합하며 transient session state만 변경한다.
+- 우측 탐색·검증 패널
+  - 좌우 패널 사이에는 400~720px 범위의 transient resize splitter를 두고 Document panel 최소 360px을 보장한다.
+  - Selection, Issues, Diff는 상위 tab으로 전환하며 Contextual Inspector는 tab 밖의 독립 section으로 계속 표시한다.
+  - Selection inventory는 Regions/Hazards/Rules/Links category table로 표시한다. 행 단일 클릭은 canonical selection만 갱신하고 더블클릭은 Scene View 또는 asset을 frame/ping한다.
+  - Issue table은 단일 클릭 시 selection과 상세만 갱신하고 더블클릭 시 structured target navigation을 수행한다. quick-fix의 lock, preview, confirmation, Undo 계약은 유지한다.
+  - Diff table은 현재 apply plan의 Kind/Target/Field/Summary를 표시하되 apply change에 navigation identity를 추가하지 않는다.
+  - table row summary는 document load/mutation/Undo·Redo/external mutation/Validate/Dry Run에서만 invalidate하고 repaint에서는 cache를 재사용한다.
 
 ### 4.2 Scene View tool modes
 - Select
@@ -293,3 +305,10 @@
 - sample scene, Scene/Tilemap/Marker authoring, legacy importer/generator/composer, TargetDefinition rule import와 직접 Tilemap package 의존을 제거했다.
 - targeted StageMap/Hazard/Catalog EditMode 92/92, full EditMode 514/514, full PlayMode 46/46을 통과했다.
 - Unity Console error 0, 삭제 asset GUID 참조 0, legacy code/asset symbol 0, generated test residue와 `.meta` 누락 0을 확인했다.
+
+### 8.3 2026-08-12 Palette·우측 패널 가시성 개선 결과
+- IMGUI Window를 유지하면서 segmented Tool/Palette, layer matrix, 400~720px resize splitter, Selection/Issues/Diff table tab과 독립 Contextual Inspector를 구현했다.
+- `smd_demo_1/2/3`은 session-only Palette 변경 후 document signature를 유지했고 Dry Run runtime diff는 모두 0이었다. Stage 2의 기존 승인 warning 1건만 유지했다.
+- table summary cache는 steady `EnsureBuilt` 256회에서 rebuild 0회, current-thread managed allocation `0 B`를 확인했다.
+- 실제 Window 1100x900에서 Paint Region Stable ID radio, Regions table, Stage 2 Issue table과 Contextual Inspector 분리를 시각 점검했다.
+- 최종 full EditMode `516/516`, full PlayMode `46/46`을 통과했다. MCP transport의 allowlisted client-disconnect 로그를 제외한 compile/Console error는 0이며 generated test residue와 C# `.meta` 누락도 0이다.
