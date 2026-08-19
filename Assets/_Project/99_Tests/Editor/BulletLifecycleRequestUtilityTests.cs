@@ -6,6 +6,50 @@ namespace SweepNDodge.DotsBullets.Tests
 {
     public class BulletLifecycleRequestUtilityTests
     {
+        [TestCase(
+            BulletLifecycleReasonId.StageBlocked,
+            false,
+            BulletLifecycleReasonId.PlayerHit,
+            true,
+            TestName = "CanPromote_DisabledRequest_IgnoresStalePriority")]
+        [TestCase(
+            BulletLifecycleReasonId.PlayerHit,
+            true,
+            BulletLifecycleReasonId.LifetimeExpired,
+            true,
+            TestName = "CanPromote_EnabledRequest_AcceptsHigherPriority")]
+        [TestCase(
+            BulletLifecycleReasonId.CarryFullRemoved,
+            true,
+            BulletLifecycleReasonId.VacuumCollected,
+            false,
+            TestName = "CanPromote_EnabledRequest_RejectsEqualPriority")]
+        [TestCase(
+            BulletLifecycleReasonId.LifetimeExpired,
+            true,
+            BulletLifecycleReasonId.PlayerHit,
+            false,
+            TestName = "CanPromote_EnabledRequest_RejectsLowerPriority")]
+        public void CanPromoteLifecycleRequest_UsesEnableStateAndPriority(
+            BulletLifecycleReasonId candidateReason,
+            bool requestEnabled,
+            BulletLifecycleReasonId currentReason,
+            bool expected)
+        {
+            var currentRequest = new BulletLifecycleRequestComponent
+            {
+                Reason = currentReason,
+                Priority = BulletLifecycleRequestUtility.ResolvePriority(currentReason),
+            };
+
+            Assert.That(
+                BulletLifecycleRequestUtility.CanPromoteLifecycleRequest(
+                    candidateReason,
+                    requestEnabled,
+                    in currentRequest),
+                Is.EqualTo(expected));
+        }
+
         [Test]
         public void TryPromoteLifecycleRequest_AcceptsEmptyRequest()
         {

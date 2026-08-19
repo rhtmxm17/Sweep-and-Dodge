@@ -2,7 +2,9 @@
 > 비활성 탄환의 불필요한 시뮬레이션을 제거하고 디스폰 요청/실행 책임을 분리
 
 ## 상태
-- 반영됨
+- 대체됨
+- same-entity lifecycle 요청 접근 결정은 [ADR-20260819-01-bullet-self-lifecycle-request-with-present.md](ADR-20260819-01-bullet-self-lifecycle-request-with-present.md)로 대체됐다.
+- 활성 `BulletActiveTag`만 시뮬레이션하고 디스폰 실행 책임을 분리한다는 결정은 유지된다.
 
 ## 배경
 - `BulletSimulationSystem`의 `BulletMoveAndLifetimeJob`에서 `EntityQueryOptions.IgnoreComponentEnabledState` 사용으로 인해 `BulletActiveTag`가 비활성이어도 이동/수명 갱신이 수행될 수 있다.

@@ -57,13 +57,11 @@ ExecutionBegin → Simulation → Request → ExecutionEnd
 - enable: 요청 생성
 - disable: 실행 소비
 - 병렬 Job에서의 플래그 토글:
-- 기본: `EnabledRefRW<T>` 사용
-- enableable 쿼리 주의:
-  - `IJobEntity` 파라미터에 enableable 컴포넌트를 포함하면 기본적으로 "enabled만" 잡힌다.
-  - "disabled 상태라도 write가 필요"하면 `EntityQueryOptions.IgnoreComponentEnabledState`(또는 WithOptions)를 **명시**한다.
-  - 병렬 Job에서 "현재 엔티티 외 다른 엔티티"에 대해 enable/disable(write)가 필요하면,
-    - **ECB.ParallelWriter를 사용**하거나(권장),
-    - 또는 Owner 단일 스레드 단계로 이동한다.
+  - 현재 엔티티의 enabled/disabled 양쪽 상태를 모두 다루면 `[WithPresent(typeof(T))]`와 `EnabledRefRW<T>`를 사용한다.
+  - disabled 상태만 처리하면 `[WithDisabled(typeof(T))]`와 `EnabledRefRW<T>`를 사용한다.
+  - `IJobEntity` 파라미터에 enableable 컴포넌트를 옵션 없이 포함하면 기본적으로 enabled 상태만 잡힌다.
+  - `EntityQueryOptions.IgnoreComponentEnabledState`는 쿼리의 다른 enableable 필터까지 모두 무시하려는 경우에만 사용한다. 단일 request tag의 양쪽 상태를 포함하기 위한 용도로 사용하지 않는다.
+  - 현재 엔티티 외 다른 엔티티 접근은 `ComponentLookup<T>` 경로로 분리한다. 병렬 write는 **ECB.ParallelWriter** 또는 Owner 단일 스레드 단계를 우선하고, Lookup write가 필요하면 비경합 소유권과 의존성을 명시적으로 증명한다.
 - 다중 렌더 파츠 토글
   - 프리팹 계층 하위에 렌더 엔티티가 여러 개 존재할 수 있으므로, "루트에 Renderer/MaterialMeshInfo가 있다"를 가정하지 않는다.
   - Bake 시 루트에 `DynamicBuffer<EntityRenderElementBuffer>`(렌더 파츠 엔티티 목록)를 채워두고,

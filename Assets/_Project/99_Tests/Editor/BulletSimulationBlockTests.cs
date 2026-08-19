@@ -137,6 +137,86 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void BulletSimulation_PromotesExistingLifetimeRequest_WhenPathEntersBlockedCell()
+        {
+            using var world = new World("BulletSimulation_PromoteLifetimeToBlock");
+            var em = world.EntityManager;
+
+            SetSimulationPrerequisites(em);
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[] { StageCellMovementFlags.BlockBullet });
+            var bullet = CreateBullet(
+                em,
+                new float3(0.2f, 0f, 0.2f),
+                new float2(0.5f, 0f),
+                radius: 0.05f,
+                lifetime: 5f,
+                despawnRequested: true,
+                existingReason: BulletLifecycleReasonId.LifetimeExpired);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.True);
+            var request = em.GetComponentData<BulletLifecycleRequestComponent>(bullet);
+            Assert.That(request.Reason, Is.EqualTo(BulletLifecycleReasonId.StageBlocked));
+            Assert.That(request.Priority, Is.EqualTo(BulletLifecycleRequestUtility.ResolvePriority(BulletLifecycleReasonId.StageBlocked)));
+            Assert.That(request.RelatedEntity, Is.EqualTo(Entity.Null));
+            Assert.That(request.Frame, Is.EqualTo(0u));
+
+            var contact = em.GetComponentData<BulletLifecycleContactComponent>(bullet);
+            Assert.That(contact.PositionXZ.x, Is.EqualTo(0.7f).Within(0.0001f));
+            Assert.That(contact.PositionXZ.y, Is.EqualTo(0.2f).Within(0.0001f));
+            Assert.That(contact.DirectionXZ.x, Is.EqualTo(1f).Within(0.0001f));
+            Assert.That(contact.DirectionXZ.y, Is.EqualTo(0f).Within(0.0001f));
+        }
+
+        [Test]
+        public void BulletSimulation_DoesNotUpdateInactiveBullets_RegardlessOfRequestEnableState()
+        {
+            using var world = new World("BulletSimulation_InactiveFilter");
+            var em = world.EntityManager;
+
+            SetSimulationPrerequisites(em);
+            SetGameplayReadySingletons(em);
+            SetRuntimeGrid(em, new[] { StageCellMovementFlags.BlockBullet });
+            var disabledRequestBullet = CreateBullet(
+                em,
+                new float3(0.2f, 0f, 0.2f),
+                new float2(0.5f, 0f),
+                radius: 0.05f,
+                lifetime: 5f);
+            var enabledRequestBullet = CreateBullet(
+                em,
+                new float3(0.3f, 0f, 0.3f),
+                new float2(0.25f, 0f),
+                radius: 0.05f,
+                lifetime: 6f,
+                despawnRequested: true,
+                existingReason: BulletLifecycleReasonId.LifetimeExpired);
+            em.SetComponentEnabled<BulletActiveTag>(disabledRequestBullet, false);
+            em.SetComponentEnabled<BulletActiveTag>(enabledRequestBullet, false);
+
+            world.GetOrCreateSystem<BulletSimulationSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            AssertInactiveBulletUnchanged(
+                em,
+                disabledRequestBullet,
+                new float3(0.2f, 0f, 0.2f),
+                5f,
+                requestEnabled: false,
+                BulletLifecycleReasonId.None);
+            AssertInactiveBulletUnchanged(
+                em,
+                enabledRequestBullet,
+                new float3(0.3f, 0f, 0.3f),
+                6f,
+                requestEnabled: true,
+                BulletLifecycleReasonId.LifetimeExpired);
+        }
+
+        [Test]
         public void BulletSimulation_RadiusSweepCoversBlockedNeighborCell()
         {
             using var world = new World("BulletSimulation_RadiusCoverage");
@@ -271,6 +351,25 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentEnabled<BulletActiveTag>(entity, true);
             em.SetComponentEnabled<BulletDespawnRequestTag>(entity, despawnRequested);
             return entity;
+        }
+
+        private static void AssertInactiveBulletUnchanged(
+            EntityManager em,
+            Entity bullet,
+            float3 expectedPosition,
+            float expectedLifetime,
+            bool requestEnabled,
+            BulletLifecycleReasonId expectedReason)
+        {
+            float3 actualPosition = em.GetComponentData<LocalTransform>(bullet).Position;
+            Assert.That(actualPosition.x, Is.EqualTo(expectedPosition.x).Within(0.0001f));
+            Assert.That(actualPosition.y, Is.EqualTo(expectedPosition.y).Within(0.0001f));
+            Assert.That(actualPosition.z, Is.EqualTo(expectedPosition.z).Within(0.0001f));
+            Assert.That(em.GetComponentData<BulletLifetimeComponent>(bullet).Value, Is.EqualTo(expectedLifetime));
+            Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.EqualTo(requestEnabled));
+            Assert.That(
+                em.GetComponentData<BulletLifecycleRequestComponent>(bullet).Reason,
+                Is.EqualTo(expectedReason));
         }
 
         private static void InitializeSharedContainers(int capacity = 128)
