@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.InWorldDialogueCatalogSO
   SchemaVersion: 1
   Entries:
-  - Enabled: 1
-    EntryKey: stage_01_start
+  - EntryKey: stage_01_start
+    Enabled: 1
     Trigger: 1
     TargetKind: 0
     StageId: 1
@@ -25,24 +25,20 @@ MonoBehaviour:
     RetryPolicy: 1
     FullVariant:
       Lines:
-      - SpeakerKey: hero
-        Text: Full intro
+      - SpeakerKey: MC
+        Text: "\uC7A5\uBE44 \uBC18\uC751\uC740 \uAD1C\uCC2E\uC544 \uBCF4\uC5EC.\r\nWASD\uB85C
+          \uC6C0\uC9C1\uC774\uACE0, \uCEE4\uC11C\uB85C \uBC29\uD5A5\uC744 \uC7A1\uC544.
+          \uD074\uB9AD\uD558\uBA74 \uADF8\uCABD\uC744 \uCCAD\uC18C\uD560 \uC218 \uC788\uC5B4."
         Anchor:
           Kind: 1
           StagePresentationStableId: 9001
           ScreenAnchor: 0
         MinHoldSec: 0.2
         AutoAdvanceSec: 0
-      - SpeakerKey: hero
-        Text: Second line
-        Anchor:
-          Kind: 2
-          StagePresentationStableId: 0
-          ScreenAnchor: 3
-        MinHoldSec: 0
-        AutoAdvanceSec: 0
-      - SpeakerKey: hero
-        Text: 3 line
+      - SpeakerKey: MC
+        Text: "\uC870\uAE08 \uD070 \uB369\uC5B4\uB9AC\uB3C4 \uD0C0\uC774\uBC0D\uC744
+          \uB9DE\uCDB0 \uC815\uD655\uD788 \uACA8\uB204\uBA74 \uC4F8\uC5B4\uB2F4\uC744
+          \uC218 \uC788\uC744\uAC70\uC57C."
         Anchor:
           Kind: 2
           StagePresentationStableId: 0
@@ -51,37 +47,52 @@ MonoBehaviour:
         AutoAdvanceSec: 0
     RetryVariant:
       Lines:
-      - SpeakerKey: hero
-        Text: Retry intro
+      - SpeakerKey: MC
+        Text: "\uC774\uBC88\uC5D4 \uB108\uBB34 \uC624\uB798 \uBA38\uBB34\uB974\uC9C0
+          \uB9D0\uC790.\r\n\uBA3C\uC9C0\uD1B5\uC774 \uCC28\uBA74 \uBE44\uC6B0\uACE0,
+          \uBE68\uAC04 \uB369\uC5B4\uB9AC\uB294 \uAC70\uB9AC\uB97C \uBC8C\uB9AC\uBA74
+          \uB3FC."
         Anchor:
           Kind: 2
           StagePresentationStableId: 0
           ScreenAnchor: 4
         MinHoldSec: 0
         AutoAdvanceSec: 0
-  - Enabled: 1
-    EntryKey: stage_02_start
+  - EntryKey: stage_02_start
+    Enabled: 1
     Trigger: 1
     TargetKind: 0
     StageId: 2
     ThemeKey: 
     Priority: 10
     BlockingMode: 1
-    RetryPolicy: 0
+    RetryPolicy: 1
     FullVariant:
       Lines:
-      - SpeakerKey: hero
-        Text: Stage 2 intro
+      - SpeakerKey: MC
+        Text: "\uC774\uBC88\uC5D4 \uB450 \uAC1C\uC758 \uBC29\uC744 \uCCAD\uC18C\uD574\uC57C\uD574.\n\uBC29\uB9C8\uB2E4
+          \uC704\uD5D8 \uC7A5\uCE58\uC758 \uD589\uB3D9\uC774 \uB2E4\uB974\uB2C8\uAE4C
+          \uC870\uC2EC\uD558\uC790."
         Anchor:
-          Kind: 1
-          StagePresentationStableId: 9002
-          ScreenAnchor: 0
-        MinHoldSec: 0.2
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
         AutoAdvanceSec: 0
     RetryVariant:
-      Lines: []
-  - Enabled: 1
-    EntryKey: stage_01_clear
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uD55C\uCABD\uB9CC \uBD99\uC7A1\uACE0 \uC788\uC73C\uBA74 \uB3D9\uC120\uC774
+          \uAF2C\uC77C \uC218 \uC788\uC5B4.\n\uB450 \uBC29\uC758 \uC704\uD5D8 \uC7A5\uCE58\uAC00
+          \uC5B4\uB5BB\uAC8C \uB2E4\uB978\uC9C0 \uBCF4\uACE0 \uC6C0\uC9C1\uC774\uC790."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
+  - EntryKey: stage_01_clear
+    Enabled: 1
     Trigger: 2
     TargetKind: 0
     StageId: 1
@@ -91,18 +102,19 @@ MonoBehaviour:
     RetryPolicy: 0
     FullVariant:
       Lines:
-      - SpeakerKey: hero
-        Text: Clear line
+      - SpeakerKey: MC
+        Text: "\uC2AC\uC2AC \uC0AC\uC6A9\uBC95\uC5D0 \uC775\uC219\uD574\uC9C4 \uAC83
+          \uAC19\uC544.\n\uC774\uB300\uB85C \uB2E4\uC74C \uAD6C\uC5ED\uB3C4 \uD574\uACB0\uD574\uBCF4\uC790!"
         Anchor:
           Kind: 2
           StagePresentationStableId: 0
           ScreenAnchor: 1
-        MinHoldSec: 0
+        MinHoldSec: 0.1
         AutoAdvanceSec: 0
     RetryVariant:
       Lines: []
-  - Enabled: 1
-    EntryKey: stage_01_intervention_carry_full
+  - EntryKey: stage_01_intervention_carry_full
+    Enabled: 1
     Trigger: 4
     TargetKind: 0
     StageId: 1
@@ -112,8 +124,10 @@ MonoBehaviour:
     RetryPolicy: 0
     FullVariant:
       Lines:
-      - SpeakerKey: hero
-        Text: Carry full
+      - SpeakerKey: MC
+        Text: "\uBA3C\uC9C0\uD1B5\uC774 \uAF49 \uCC3C\uC5B4.\r\n\uB354 \uBC00\uACE0
+          \uB4E4\uC5B4\uAC00\uAE30 \uC804\uC5D0 \uC4F0\uB808\uAE30\uD1B5\uC73C\uB85C
+          \uB3CC\uC544\uAC00\uC11C \uBE44\uC6B0\uC790."
         Anchor:
           Kind: 2
           StagePresentationStableId: 0
@@ -122,8 +136,8 @@ MonoBehaviour:
         AutoAdvanceSec: 0
     RetryVariant:
       Lines: []
-  - Enabled: 1
-    EntryKey: stage_01_intervention_first_hit
+  - EntryKey: stage_01_intervention_first_hit
+    Enabled: 1
     Trigger: 5
     TargetKind: 0
     StageId: 1
@@ -133,8 +147,10 @@ MonoBehaviour:
     RetryPolicy: 3
     FullVariant:
       Lines:
-      - SpeakerKey: hero
-        Text: Watch the hazards
+      - SpeakerKey: MC
+        Text: "\uC73D, \uBAA8\uC544\uB454 \uBA3C\uC9C0\uAC00 \uCDA9\uACA9\uC73C\uB85C
+          \uC870\uAE08 \uC3DF\uC544\uC84C\uC5B4.\r\n\uC7A0\uAE50 \uAC70\uB9AC\uB97C
+          \uBC8C\uB9AC\uACE0, \uD328\uD134\uC744 \uBCF4\uACE0 \uB2E4\uC2DC \uB4E4\uC5B4\uAC00\uC790."
         Anchor:
           Kind: 2
           StagePresentationStableId: 0
@@ -143,8 +159,8 @@ MonoBehaviour:
         AutoAdvanceSec: 0
     RetryVariant:
       Lines: []
-  - Enabled: 1
-    EntryKey: theme_forest_once
+  - EntryKey: theme_forest_once
+    Enabled: 1
     Trigger: 3
     TargetKind: 1
     StageId: 0
@@ -154,13 +170,92 @@ MonoBehaviour:
     RetryPolicy: 3
     FullVariant:
       Lines:
-      - SpeakerKey: hero
+      - SpeakerKey: MC
         Text: Forest theme
         Anchor:
           Kind: 0
           StagePresentationStableId: 0
           ScreenAnchor: 0
         MinHoldSec: 0
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
+  - EntryKey: stage_02_clear
+    Enabled: 1
+    Trigger: 2
+    TargetKind: 0
+    StageId: 2
+    ThemeKey: 
+    Priority: 20
+    BlockingMode: 2
+    RetryPolicy: 0
+    FullVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uC88B\uC544, \uB450 \uBC29 \uBAA8\uB450 \uAE54\uB054\uD558\uAC8C
+          \uC815\uB9AC\uB410\uC5B4.\n\uB9C8\uC9C0\uB9C9 \uAD6C\uC5ED\uC740 \uB354
+          \uC9D1\uC911\uD574\uC11C \uD53C\uD574\uC57C \uD560\uAC70\uC57C."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 1
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines: []
+  - EntryKey: stage_03_start
+    Enabled: 1
+    Trigger: 1
+    TargetKind: 0
+    StageId: 3
+    ThemeKey: 
+    Priority: 10
+    BlockingMode: 1
+    RetryPolicy: 1
+    FullVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uB9C8\uC9C0\uB9C9 \uAD6C\uC5ED\uC740 \uBC18\uC751\uC774 \uD6E8\uC52C
+          \uD06C\uAC8C \uC62C \uAC70\uC57C.\nSource\uAC00 \uC57D\uD574\uC9C0\uB294
+          \uC21C\uAC04 \uD06C\uAC8C \uB0A0\uB6F0\uB2C8\uAE4C \uC8FC\uC758\uD574\uC57C\uD574."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
+    RetryVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uD328\uD134\uC774 \uBC14\uB00C\uB294 \uC21C\uAC04\uB9CC \uB193\uCE58\uC9C0
+          \uB9D0\uC790.\n\uBAB0\uB9AC\uAE30 \uC804\uC5D0 Deposit \uCABD \uAE38\uC744
+          \uB0A8\uACA8 \uB450\uBA74 \uB2E4\uC2DC \uB4E4\uC5B4\uAC08 \uC218 \uC788\uC5B4."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 3
+        MinHoldSec: 0.1
+        AutoAdvanceSec: 0
+  - EntryKey: stage_03_clear
+    Enabled: 1
+    Trigger: 2
+    TargetKind: 0
+    StageId: 3
+    ThemeKey: 
+    Priority: 20
+    BlockingMode: 2
+    RetryPolicy: 0
+    FullVariant:
+      Lines:
+      - SpeakerKey: MC
+        Text: "\uB410\uC5B4, \uB9C8\uC9C0\uB9C9 Source\uAE4C\uC9C0 \uC815\uB9AC\uB410\uC5B4.\n\uC774
+          \uC815\uB3C4\uBA74 \uACF5\uAC1C \uB370\uBAA8 \uB8E8\uD504\uB294 \uB05D\uAE4C\uC9C0
+          \uBCF4\uC5EC\uC904 \uC218 \uC788\uACA0\uB2E4."
+        Anchor:
+          Kind: 2
+          StagePresentationStableId: 0
+          ScreenAnchor: 1
+        MinHoldSec: 0.1
         AutoAdvanceSec: 0
     RetryVariant:
       Lines: []

@@ -143,6 +143,12 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
+            if (!em.HasComponent<SourceAnchorComponent>(sourceEntity))
+            {
+                error = "Source entity does not contain SourceAnchorComponent.";
+                return false;
+            }
+
             if (!TryResolveStandaloneActorAuthoring(actorArchetypePrefab, out var actorAuthoring, out error))
                 return false;
 
@@ -166,11 +172,15 @@ namespace SweepNDodge.DotsBullets
                 linked.Add(sourceEntity);
             }
 
+            float3 actorWorldPosition = em.GetComponentData<SourceAnchorComponent>(sourceEntity).Position
+                + localOffset;
+
             return TryCreateStandaloneActorHierarchy(
                 em,
                 sourceEntity,
                 placementInstanceId,
                 localOffset,
+                actorWorldPosition,
                 localYawDeg,
                 actorAuthoring,
                 compatibilitySeed,
@@ -214,6 +224,7 @@ namespace SweepNDodge.DotsBullets
             Entity sourceEntity,
             int placementInstanceId,
             float3 localOffset,
+            float3 worldPosition,
             float localYawDeg,
             HazardActorAuthoring actorAuthoring,
             HazardActorPhaseSelectorCompatibilitySeed compatibilitySeed,
@@ -247,11 +258,13 @@ namespace SweepNDodge.DotsBullets
                 typeof(HazardActorPhaseTransitionSignalComponent),
                 typeof(HazardActorPresencePresentationSignalComponent),
                 typeof(HazardActorOrchestrationRequestSignalComponent),
-                typeof(HazardActorOrchestrationRequestConsumptionComponent));
+                typeof(HazardActorOrchestrationRequestConsumptionComponent),
+                typeof(LocalTransform));
             createdEntities.Add(actorEntity);
 
             byte actorEnabled = actorAuthoring.Enabled ? (byte)1 : (byte)0;
             byte actorSuppressed = actorAuthoring.StartSuppressed ? (byte)1 : (byte)0;
+            quaternion actorRotation = quaternion.RotateY(math.radians(localYawDeg));
 
             em.SetComponentData(actorEntity, new HazardActorComponent
             {
@@ -264,6 +277,7 @@ namespace SweepNDodge.DotsBullets
                 LocalOffset = localOffset,
                 LocalYawDeg = localYawDeg,
             });
+            em.SetComponentData(actorEntity, LocalTransform.FromPositionRotationScale(worldPosition, actorRotation, 1f));
             em.SetComponentData(actorEntity, new HazardActorAppliedConfigBaselineComponent
             {
                 IsEnabled = actorEnabled,
@@ -382,6 +396,7 @@ namespace SweepNDodge.DotsBullets
                 resolvedSlots,
                 ref patternSlots,
                 ref executionSlots);
+            ApplyPlacementYawToExecutionSlots(executionSlots, localYawDeg);
 
             var baselineTelegraph = HazardActorPatternSlotAuthoringUtility.CreateBaselineTelegraph(resolvedSlots);
             var baselineEmission = HazardActorPatternSlotAuthoringUtility.CreateBaselineEmission(resolvedSlots);
@@ -404,7 +419,6 @@ namespace SweepNDodge.DotsBullets
                 PlacementInstanceId = placementInstanceId,
                 ActorEntity = actorEntity,
             });
-            em.GetBuffer<LinkedEntityGroup>(sourceEntity).Add(actorEntity);
 
             return true;
 
@@ -452,6 +466,21 @@ namespace SweepNDodge.DotsBullets
             }
 
             return false;
+        }
+
+        private static void ApplyPlacementYawToExecutionSlots(
+            DynamicBuffer<HazardActorPatternExecutionSlotBuffer> executionSlots,
+            float localYawDeg)
+        {
+            if (math.abs(localYawDeg) <= 0.0001f)
+                return;
+
+            for (int i = 0; i < executionSlots.Length; i++)
+            {
+                var slot = executionSlots[i];
+                slot.BaseAngleDeg += localYawDeg;
+                executionSlots[i] = slot;
+            }
         }
 
     }

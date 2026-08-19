@@ -198,6 +198,43 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
+        /// <summary>
+        /// Validates the Hazard Actor slice of one source binding without requiring a catalog asset.
+        /// </summary>
+        public static void ValidateHazardActorData(
+            StageSourceBinding binding,
+            string location,
+            List<ContentValidationIssue> issues)
+        {
+            if (issues == null)
+                return;
+
+            ValidateHazardActorDataInternal(
+                binding,
+                string.IsNullOrWhiteSpace(location) ? "HazardActorData" : location,
+                issues,
+                enforceOperationalReferenceRestrictions: false);
+        }
+
+        /// <summary>
+        /// Validates Hazard Actor placement and orchestration data for editor-only import/apply previews.
+        /// </summary>
+        public static void ValidateHazardActorData(
+            StageSourceBinding binding,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
+        {
+            if (issues == null)
+                return;
+
+            ValidateHazardActorDataInternal(
+                binding,
+                string.IsNullOrWhiteSpace(location) ? "HazardActorData" : location,
+                issues,
+                enforceOperationalReferenceRestrictions);
+        }
+
         private static void ValidateDefinition(
             StageDefinitionSO definition,
             string location,
@@ -215,6 +252,8 @@ namespace SweepNDodge.DotsBullets.Editor
 
             var bindings = definition.SourceBindings ?? Array.Empty<StageSourceBinding>();
             var sourceOwners = new Dictionary<uint, List<int>>();
+            var stagePlacementOwners = new Dictionary<int, List<string>>();
+            var stagePlacementBindingOwners = new Dictionary<int, HashSet<int>>();
 
             for (int i = 0; i < bindings.Length; i++)
             {
@@ -248,31 +287,29 @@ namespace SweepNDodge.DotsBullets.Editor
                 ValidateSustainSlots(binding.SustainSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
                 ValidateEventSlots(binding.EventSlots, bindingLocation, issues, enforceOperationalReferenceRestrictions);
 
-                var placementOwners = new Dictionary<int, List<string>>();
-                var placementDataById = new Dictionary<int, HazardActorPlacementValidationData>();
-                ValidateHazardPlacements(binding, bindingLocation, issues, enforceOperationalReferenceRestrictions, placementOwners, placementDataById);
-
-                foreach (var pair in placementOwners)
-                {
-                    if (pair.Key < 1 || pair.Value.Count <= 1)
-                        continue;
-
-                    string joined = string.Join(", ", pair.Value);
-                    for (int j = 0; j < pair.Value.Count; j++)
-                    {
-                        issues.Add(new ContentValidationIssue(
-                            ContentValidationSeverity.Error,
-                            "STC036",
-                            pair.Value[j],
-                            $"Duplicate HazardActorPlacementBinding.PlacementInstanceId detected: {pair.Key}. Owners: {joined}"));
-                    }
-                }
-
-                ValidateHazardActorOrchestrationRules(
-                    binding.HazardActorOrchestrationRules,
+                ValidateHazardActorDataInternal(
+                    binding,
                     bindingLocation,
                     issues,
-                    placementDataById);
+                    enforceOperationalReferenceRestrictions);
+
+                var placements = binding.HazardActorPlacements ?? Array.Empty<HazardActorPlacementBinding>();
+                for (int placementIndex = 0; placementIndex < placements.Length; placementIndex++)
+                {
+                    int placementId = placements[placementIndex].PlacementInstanceId;
+                    if (placementId < 1)
+                        continue;
+
+                    if (!stagePlacementOwners.TryGetValue(placementId, out var placementLocations))
+                    {
+                        placementLocations = new List<string>(2);
+                        stagePlacementOwners.Add(placementId, placementLocations);
+                        stagePlacementBindingOwners.Add(placementId, new HashSet<int>());
+                    }
+
+                    placementLocations.Add($"{bindingLocation}/HazardActorPlacements[{placementIndex}]");
+                    stagePlacementBindingOwners[placementId].Add(i);
+                }
             }
 
             foreach (var pair in sourceOwners)
@@ -286,6 +323,61 @@ namespace SweepNDodge.DotsBullets.Editor
                     location,
                     $"Duplicate SourceStableId in StageDefinition. stableId={pair.Key}"));
             }
+
+            foreach (var pair in stagePlacementOwners)
+            {
+                if (stagePlacementBindingOwners[pair.Key].Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC036",
+                        pair.Value[i],
+                        $"Stage-global HazardActor PlacementInstanceId is duplicated across SourceBindings: {pair.Key}. Owners: {joined}"));
+                }
+            }
+        }
+
+        private static void ValidateHazardActorDataInternal(
+            StageSourceBinding binding,
+            string location,
+            List<ContentValidationIssue> issues,
+            bool enforceOperationalReferenceRestrictions)
+        {
+            var placementOwners = new Dictionary<int, List<string>>();
+            var placementDataById = new Dictionary<int, HazardActorPlacementValidationData>();
+            ValidateHazardPlacements(
+                binding,
+                location,
+                issues,
+                enforceOperationalReferenceRestrictions,
+                placementOwners,
+                placementDataById);
+
+            foreach (var pair in placementOwners)
+            {
+                if (pair.Key < 1 || pair.Value.Count <= 1)
+                    continue;
+
+                string joined = string.Join(", ", pair.Value);
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    issues.Add(new ContentValidationIssue(
+                        ContentValidationSeverity.Error,
+                        "STC036",
+                        pair.Value[i],
+                        $"Duplicate HazardActorPlacementBinding.PlacementInstanceId detected: {pair.Key}. Owners: {joined}"));
+                }
+            }
+
+            ValidateHazardActorOrchestrationRules(
+                binding.HazardActorOrchestrationRules,
+                location,
+                issues,
+                placementDataById);
         }
 
         private static void ValidateSustainSlots(

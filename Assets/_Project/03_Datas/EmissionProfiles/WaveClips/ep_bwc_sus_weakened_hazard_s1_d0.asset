@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0354f73ac2220374faa8fce7c055686a, type: 3}
+  m_Name: ep_bwc_sus_weakened_hazard_s1_d0
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.EmissionProfileSO
+  Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+  SpawnTuning:
+    OverrideSpeed: 1
+    SpeedOverride: 3.6
+    OverrideLifetime: 1
+    LifetimeOverride: 4
+  MovementTuning:
+    OverrideMovement: 1
+    Family: 0
+    DampedLinear:
+      DampingPerSec: 1
+      StopSpeedThreshold: 0.1
+    HomingLite:
+      TurnRateDegPerSec: 90
+      MaxAcquireDistance: 10
+      MinRetargetDistance: 0.25
+  PositionPattern:
+    rid: 3059539566354235606
+  Aim:
+    rid: 3059539566354235607
+  ShotPattern:
+    rid: 3059539566354235608
+  LifecycleTriggers:
+    MotionCompleted:
+      Enabled: 0
+      TargetProfile: {fileID: 0}
+      OriginPosition: 0
+      ForwardDirection: 0
+      SourceEntity: 0
+      CauserEntity: 0
+      DelaySec: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 3059539566354235606
+      type: {class: LineEvenPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        LineStart: {x: -10, y: -10}
+        LineEnd: {x: 10, y: -10}
+        SampleSpacing: 4
+    - rid: 3059539566354235607
+      type: {class: FixedAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        BaseAngleDeg: 90
+    - rid: 3059539566354235608
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 

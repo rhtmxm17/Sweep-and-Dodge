@@ -5,9 +5,9 @@
 
 ## Documents
 - [TD-001-player-feedback-event-channel.md](TD-001-player-feedback-event-channel.md): ECS 피드백 이벤트 채널 설계 정리
-- [TD-002-pattern-wave-progress-runtime-contract.md](TD-002-pattern-wave-progress-runtime-contract.md): Pattern/Wave/Progress 런타임 데이터/수식/검증 계약
-- [TD-003-spawn-directive-model.md](TD-003-spawn-directive-model.md): SpawnDirective 분해 모델(Sampling/Emission/Payload)과 모드 조합 규칙
-- [TD-005-spawn-directive-settings-reference.md](TD-005-spawn-directive-settings-reference.md): WaveClipSO SpawnEntry 인라인 프로필 설정 의미/운영 규칙 레퍼런스
+- [TD-002-pattern-wave-progress-runtime-contract.md](TD-002-pattern-wave-progress-runtime-contract.md): WaveClip runtime buffer/request/consume 계약과 profile-resolved apply 기준
+- [TD-003-spawn-directive-model.md](TD-003-spawn-directive-model.md): Wave directive의 `Profile + SourceEmission + Sampling` authoring 모델
+- [TD-005-spawn-directive-settings-reference.md](TD-005-spawn-directive-settings-reference.md): superseded. Wave directive 설정 관련 현재 TD 링크
 - [TD-006-run-progress-director-design.md](TD-006-run-progress-director-design.md): 런 진행도 디렉터 책임 경계/상태 모델/연동 계약
 - [TD-007-common-combat-event-channel.md](TD-007-common-combat-event-channel.md): 공통 전투 이벤트 채널 범위(`Hit/Collect/Cleanup`)와 소유권/집계 계약
 - [TD-008-replay-io-persistence-and-version-policy.md](TD-008-replay-io-persistence-and-version-policy.md): Replay 파일 입출력과 `runSeed + tick 입력` 저장 계약, 버전 불일치 즉시 실패 정책
@@ -28,9 +28,12 @@
 - [TD-024-stageplay-intervention-dialogue-contract.md](TD-024-stageplay-intervention-dialogue-contract.md): `StagePlay` 도중 특수 조건에서 끼어드는 개입형 인월드 대화의 owner, trigger 우선순위, seen-state, hint/pause 정합성 계약
 - [TD-025-stage-player-start-position-contract.md](TD-025-stage-player-start-position-contract.md): 스테이지별 플레이어 시작 위치의 layout 소유, prepare owner, authoring/runtime 적용 계약
 - [TD-026-source-pollution-recovery-wave-contract.md](TD-026-source-pollution-recovery-wave-contract.md): `GD-014` 청소 흔적 복구를 `active/inactive + recovery wave` runtime 계약으로 정리
-- [TD-027-hazard-bullet-extension-contract.md](TD-027-hazard-bullet-extension-contract.md): Hazard 확장을 `Movement + Reaction + LifecycleReason` 조합으로 분리하는 초안
-- [TD-028-hazard-emitter-common-contract.md](TD-028-hazard-emitter-common-contract.md): superseded 기록. `HazardEmitter`를 독립 runtime entity로 보던 초기 계약과 현재 SSOT 링크 정리
+- [TD-027-hazard-bullet-extension-contract.md](TD-027-hazard-bullet-extension-contract.md): superseded. Hazard bullet/lifecycle emission 관련 현재 TD 링크
+- [TD-028-hazard-emitter-common-contract.md](TD-028-hazard-emitter-common-contract.md): superseded. HazardActor emit ownership 관련 현재 TD 링크
 - [TD-029-discrete-emit-spawn-bridge-contract.md](TD-029-discrete-emit-spawn-bridge-contract.md): `WaveClip` discrete branch와 `HazardActor` 직접 발사를 공통 `DiscreteEmit` 브리지로 묶는 현재 producer/request/update-order 계약
 - [TD-030-hazard-actor-hierarchy-and-stage-application.md](TD-030-hazard-actor-hierarchy-and-stage-application.md): 현재 `Source -> HazardActor` hierarchy, actor-owned pattern/emit runtime, stage apply/reset/cleanup 계약
 - [TD-031-hazard-actor-behavior-runtime.md](TD-031-hazard-actor-behavior-runtime.md): `Presence + PhaseTransition + PatternSelector + actor-owned emit runtime` 기준의 현재 behavior SSOT
 - [TD-032-hazard-actor-stage-placement-and-orchestration-framework.md](TD-032-hazard-actor-stage-placement-and-orchestration-framework.md): stage가 actor archetype을 actor-only placement/orchestration seam으로 attach/reset/cleanup 하는 current content-delivery 계약
+- [TD-033-emission-profile-common-schema.md](TD-033-emission-profile-common-schema.md): Source/Hazard/Triggered 공통 `EmissionProfileSO` authoring/runtime schema
+- [TD-034-stage-map-editor-replacement.md](TD-034-stage-map-editor-replacement.md): 기존 Inspector/Tilemap/Marker 기반 stage authoring 툴을 `StageMapDocument` 중심 실무형 맵 에디터로 대체하는 설계
+- [TD-035-hazard-actor-authoring-workbench-and-preview.md](TD-035-hazard-actor-authoring-workbench-and-preview.md): prefab SSOT 기반 HazardActor Workbench, Stage Encounter 편집, 공통 분석형 Preview Core 설계

@@ -152,17 +152,23 @@ namespace SweepNDodge.DotsBullets.Tests
             var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
             var bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             bullet.Editor_SetDefinitionId(1000 + slotId);
-            var emission = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
-            emission.Bullet = bullet;
-            emission.PositionPattern = new SinglePointPositionPatternAuthoring();
-            emission.Aim = new FixedAimAuthoring();
-            emission.ShotPattern = new SingleShotPatternAuthoring();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            profile.Bullet = bullet;
+            profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+            profile.Aim = new FixedAimAuthoring();
+            profile.ShotPattern = new SingleShotPatternAuthoring();
 
             return new HazardActorPatternSlotAuthoring
             {
                 PatternSlotId = slotId,
                 TelegraphProfile = telegraph,
-                EmissionProfile = emission,
+                Emission = new HazardActorEmissionAuthoring
+                {
+                    Profile = profile,
+                    EventRepeatCount = 1,
+                    EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                    CooldownSec = 1f,
+                },
                 BaseWeight = 1f,
             };
         }

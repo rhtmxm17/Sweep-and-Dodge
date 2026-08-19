@@ -6,6 +6,9 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+#endif
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -204,23 +207,40 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             bool previousIgnore = LogAssert.ignoreFailingMessages;
             LogAssert.ignoreFailingMessages = true;
-
-            SceneManager.LoadScene(scenePath, LoadSceneMode.Single);
-
-            int waitForActiveSceneFrames = 16;
-            while (waitForActiveSceneFrames-- > 0)
+            try
             {
-                var activeScene = SceneManager.GetActiveScene();
-                if (activeScene.IsValid() && activeScene.path == scenePath)
-                    break;
+#if UNITY_EDITOR
+                var loadedScene = EditorSceneManager.LoadSceneInPlayMode(
+                    scenePath,
+                    new LoadSceneParameters(LoadSceneMode.Single));
+                Assert.That(loadedScene.IsValid(), Is.True, $"Could not load PlayMode test scene: {scenePath}");
+#else
+                SceneManager.LoadScene(scenePath, LoadSceneMode.Single);
+#endif
 
-                yield return null;
+                int waitForActiveSceneFrames = 16;
+                while (waitForActiveSceneFrames-- > 0)
+                {
+                    var activeScene = SceneManager.GetActiveScene();
+                    if (activeScene.IsValid() && activeScene.path == scenePath)
+                        break;
+
+                    yield return null;
+                }
+
+                var settledScene = SceneManager.GetActiveScene();
+                Assert.That(
+                    settledScene.IsValid() && settledScene.path == scenePath,
+                    Is.True,
+                    $"Expected active PlayMode test scene '{scenePath}', but active scene was '{settledScene.path}'.");
+
+                for (int i = 0; i < settleFrames; i++)
+                    yield return null;
             }
-
-            for (int i = 0; i < settleFrames; i++)
-                yield return null;
-
-            LogAssert.ignoreFailingMessages = previousIgnore;
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previousIgnore;
+            }
         }
 
         private static IEnumerator WaitForStagePlayRunning(System.Func<bool> predicate, int timeoutFrames, string failMessage)

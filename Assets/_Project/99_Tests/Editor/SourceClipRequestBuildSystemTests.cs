@@ -32,6 +32,48 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SourceClipRequestBuild_ProfileRuntimeTuning_IsCopiedToSpawnRequest()
+        {
+            using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_RuntimeTuning", out _);
+            var em = world.EntityManager;
+            var buildSystem = world.GetOrCreateSystem<SourceClipRequestBuildSystem>();
+
+            InitializeBuildWorld(em, stageState: RunDirectorStageStateId.Running, deltaTime: 1f);
+            var source = CreateSourceWithPattern(
+                em,
+                spawnDensityPerSecPerArea: 1f,
+                profileRefId: 1234,
+                hasSpeedOverride: 1,
+                speedOverride: 6f,
+                hasLifetimeOverride: 1,
+                lifetimeOverride: 9f,
+                hasMovementOverride: 1,
+                movementFamily: BulletMovementFamilyId.HomingLite,
+                homingLite: new BulletHomingLiteDefinition
+                {
+                    TurnRateDegPerSec = 90f,
+                    MaxAcquireDistance = 12f,
+                    MinRetargetDistance = 0.5f,
+                });
+
+            world.SetTime(new TimeData(1d, 1f));
+            buildSystem.Update(world.Unmanaged);
+
+            var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+            Assert.That(requests.Length, Is.EqualTo(1));
+            Assert.That(requests[0].ProfileRefId, Is.EqualTo(1234));
+            Assert.That(requests[0].HasSpeedOverride, Is.EqualTo(1));
+            Assert.That(requests[0].SpeedOverride, Is.EqualTo(6f));
+            Assert.That(requests[0].HasLifetimeOverride, Is.EqualTo(1));
+            Assert.That(requests[0].LifetimeOverride, Is.EqualTo(9f));
+            Assert.That(requests[0].HasMovementOverride, Is.EqualTo(1));
+            Assert.That(requests[0].MovementFamily, Is.EqualTo(BulletMovementFamilyId.HomingLite));
+            Assert.That(requests[0].HomingLite.TurnRateDegPerSec, Is.EqualTo(90f));
+            Assert.That(requests[0].HomingLite.MaxAcquireDistance, Is.EqualTo(12f));
+            Assert.That(requests[0].HomingLite.MinRetargetDistance, Is.EqualTo(0.5f));
+        }
+
+        [Test]
         public void SourceClipRequestBuild_UniformFieldRateField_ScalesByActiveAreaRatio()
         {
             using var world = CreateDefaultTestWorld("SourceClipRequestBuildWorld_UniformScale", out _);
@@ -497,7 +539,16 @@ namespace SweepNDodge.DotsBullets.Tests
             float maxActiveDensityPerArea = 0f,
             float localStartSec = 0f,
             float localEndSec = 10f,
-            float clipDurationSec = 10f)
+            float clipDurationSec = 10f,
+            int profileRefId = 0,
+            byte hasSpeedOverride = 0,
+            float speedOverride = 0f,
+            byte hasLifetimeOverride = 0,
+            float lifetimeOverride = 0f,
+            byte hasMovementOverride = 0,
+            BulletMovementFamilyId movementFamily = BulletMovementFamilyId.Linear,
+            BulletDampedLinearDefinition dampedLinear = default,
+            BulletHomingLiteDefinition homingLite = default)
         {
             var entity = em.CreateEntity(
                 typeof(SourceSpawnComponent),
@@ -570,7 +621,16 @@ namespace SweepNDodge.DotsBullets.Tests
                 TriggerState = SourceStateId.Normal,
                 LocalStartSec = localStartSec,
                 LocalEndSec = localEndSec,
+                ProfileRefId = profileRefId,
                 BulletTypeKey = 101,
+                HasSpeedOverride = hasSpeedOverride,
+                SpeedOverride = speedOverride,
+                HasLifetimeOverride = hasLifetimeOverride,
+                LifetimeOverride = lifetimeOverride,
+                HasMovementOverride = hasMovementOverride,
+                MovementFamily = movementFamily,
+                DampedLinear = dampedLinear,
+                HomingLite = homingLite,
                 EmissionMode = emissionMode,
                 SpawnMode = spawnMode,
                 SamplingAnchorMode = samplingAnchorMode,

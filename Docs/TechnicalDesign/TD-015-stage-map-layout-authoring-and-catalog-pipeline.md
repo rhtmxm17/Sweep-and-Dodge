@@ -4,7 +4,7 @@
 - doc_id: `TD-015`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-26`
+- last_updated: `2026-08-11`
 - related_docs:
   - [TD-010-demo-shell-flow-and-bridge-contract.md](./TD-010-demo-shell-flow-and-bridge-contract.md)
   - [TD-025-stage-player-start-position-contract.md](./TD-025-stage-player-start-position-contract.md)
@@ -13,8 +13,9 @@
   - [../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md](../ADR/ADR-20260306-02-dual-catalog-definition-layout-explicit-pair-entry.md)
   - [../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md](../ADR/ADR-20260308-01-stage-topology-lifecycle-and-failure-policy.md)
   - [../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md](../ADR/ADR-20260324-01-grid-authoritative-stage-layout-and-explicit-region-id.md)
+  - [TD-034-stage-map-editor-replacement.md](./TD-034-stage-map-editor-replacement.md)
   - [../TaskBoard/SESSION-20260324-01-stage-grid-layout-board.md](../TaskBoard/SESSION-20260324-01-stage-grid-layout-board.md)
-> 현재 채택안은 `StageCatalogSO`의 dual catalog 구조는 유지하되, layout 쪽 SSOT를 `shape entry array`에서 `grid cell authoritative`로 전환하는 것이다. `StageTopologyPrepareGroup`은 계속 `StageSessionResetPrepareSystem -> StageTopologyApplyPrepareSystem` 순서로 동작하고, prepare owner는 `StageLayoutSO`의 grid 데이터를 읽어 runtime grid cache를 구축한다. P4 기준으로 runtime topology reconcile은 `Source`만 유지하고, movement / deposit gameplay는 grid cache를 직접 읽는다. obstacle gameplay는 더 이상 독립 shape topology kind가 아니라 cell movement authority로 흡수하며, obstacle visual은 gameplay authority와 분리된 tilemap/presentation 계층으로 유지한다.
+> `StageCatalogSO`의 dual catalog와 grid-authoritative runtime 계약은 유지한다. 편집 SSOT는 `StageMapDocument`이며 `StageMapEditorWindow`가 유일한 공식 사용자-facing authoring 경로다. runtime은 Apply된 `StageLayoutSO / StageDefinitionSO / StageCatalogSO`만 읽는다.
 
 ## 1. 목표 / 비목표
 ### 1.1 목표
@@ -25,8 +26,8 @@
   - `DepositRegionId`
 - `SourceRegionId`, `DepositRegionId`는 paint 시 명시 입력을 강제한다.
 - `StageDefinitionSO.SourceBindings` 계약은 유지하되, key 의미를 `Source region stable id`로 고정한다.
-- obstacle gameplay authority를 `grid movement`로 이관하고, obstacle visual은 tilemap/presentation 계층에서 별도로 운영한다.
-- Unity Tilemap, 외부 툴 import, 수동 편집 중 어느 authoring 경로를 사용하더라도 최종 SSOT는 동일한 `StageLayoutSO` grid schema로 수렴시킨다.
+- obstacle gameplay authority를 `grid movement`로 유지하고, obstacle visual은 presentation 계층에서 별도로 운영한다.
+- 모든 공식 authoring 변경은 `StageMapDocument`에서 시작해 runtime asset의 동일한 grid schema로 수렴시킨다.
 
 ### 1.2 비목표
 - mid-run topology reapply 허용
@@ -36,7 +37,8 @@
 
 ## 2. 현재 상태(코드 기준)
 - 현재 `StageLayoutSO`는 `Grid / Cells / SourceRegions / DepositRegions / PlayerStart / Presentations`를 authoritative layout schema로 가진다.
-- legacy editor pipeline의 scene marker fallback(`StageSourceMarker`, `StageDepositMarker`, `StageObstacleMarker`)는 제거됐고, sample/editor authoring은 `StageRegionAnchorMarker` 기준으로만 동작한다.
+- Scene/Tilemap/Marker 기반 legacy authoring과 generator/import 경로는 제거되었다.
+- `smd_demo_1 / smd_demo_2 / smd_demo_3`이 데모 stage의 현재 authoring Documents다.
 - runtime apply는 layout의 grid/region 데이터를 stable id map으로 바꿔 `Source` aggregate runtime entity와 `StageRuntimeGrid` cache를 reconcile한다.
 - `Deposit` gameplay와 `Movement/Obstacle` gameplay는 standalone topology entity가 아니라 grid cache를 직접 읽는다.
 - 남아 있는 후속 범위는 terrain visual polish와 외부 importer 같은 authoring/content 확장이지, shape-centric runtime 계약 복구가 아니다.
@@ -48,21 +50,21 @@
 - runtime gameplay query의 authoritative source는 `StageGridRuntimeComponent`가 가리키는 grid cache/blob이다.
 - `Source / Deposit`는 grid cell에 새겨진 region id를 기반으로 생성되는 aggregate runtime entity다.
 - `Obstacle`는 standalone topology kind가 아니라 `MovementFlags`가 표현하는 셀 상태다.
-- obstacle visual은 grid 또는 obstacle layer를 읽어 GO/tilemap 쪽에서 재생성할 수 있지만, gameplay authority와는 분리한다.
+- obstacle visual은 grid 또는 obstacle layer를 읽는 presentation 계층에서 재생성할 수 있지만, gameplay authority와는 분리한다.
 
 ## 4. 소유권 (Owner / Writer)
-- Definition 생성/보강 Owner: `StageDefinitionGenerator`
-- Layout 생성 Owner: `StageGridLayoutGenerator`
-  - Unity Tilemap authoring scene 또는 외부 importer 결과를 읽어 `StageLayoutSO` grid schema를 쓴다.
+- 편집 SSOT Owner: `StageMapDocument`
+- Definition/Layout/Catalog snapshot Owner: `StageMapDocumentExporter`
+- Diff/Apply Owner: `StageMapApplyPlanner`
+- Document validation Owner: `StageMapDocumentValidationRules`
 - Layout 검증 Owner: `StageGridLayoutValidationRules`
-- Catalog 조립 Owner: `StageCatalogComposer`
 - 런타임 stage topology/apply Owner: `StageTopologyApplyPrepareSystem`
   - stage entry 시 grid cache build + `Source / Deposit` region aggregate reconcile을 단일 writer로 수행한다.
 - 런타임 stage session reset Owner: `StageSessionResetPrepareSystem`
 - GO -> ECS topology input Writer: `StageTopologyBridge`
 - GO -> ECS stage state Writer: `RunDirectorStageBridge`
-- obstacle visual/tilemap rebuild Owner:
-  - gameplay owner와 분리된 presentation/tilemap owner가 read-only로 grid를 소비한다.
+- obstacle visual rebuild Owner:
+  - gameplay owner와 분리된 presentation owner가 read-only로 grid를 소비한다.
   - 필요 시 자동 obstacle visual 생성은 이 계층에서 수행한다.
 
 ## 5. 업데이트 순서
@@ -223,94 +225,37 @@
   - stage entry 시 `LocalTransform`, `PlayerGoSyncComponent`, `PlayerPreviousPositionComponent`를 함께 맞춘다.
 
 ## 7. 에디터 파이프라인
+
+> 사용자-facing 맵 편집 기준은 [TD-034 Stage Map Editor Replacement](./TD-034-stage-map-editor-replacement.md)를 따른다. Scene/Tilemap/Marker 기반 authoring과 그 import/generator 경로는 2026-08-11에 폐기되었다.
+
 ### 7.1 채택 authoring 경로
-- 1순위: Unity Tilemap 기반 authoring + generator
-  - `StageGridAuthoring`
-    - `Grid`
-    - `MovementTilemap`
-    - `RegionTilemap`
-    - `BoundsMinCell`
-    - `BoundsSize`
-  - `StageRegionAnchorMarker`
-  - `StagePlayerStartMarker`
-  - `StagePresentationMarker`
-- 2순위: 외부 툴(`LDtk`, `Tiled` 등) -> importer -> `StageLayoutSO`
-- 공통 원칙:
-  - runtime은 tilemap scene 또는 외부 raw file을 직접 읽지 않는다.
-  - 최종 입력은 항상 `StageLayoutSO` grid schema다.
-  - obstacle visual은 generator 입력이 아니라 별도 visual owner가 read-only로 rebuild한다.
+- 편집 SSOT: editor-only `StageMapDocument`
+- 공식 편집 표면: `StageMapEditorWindow`와 custom Scene View tool
+- Document validation owner: `StageMapDocumentValidationRules`
+- runtime snapshot owner: `StageMapDocumentExporter`
+- dry-run/diff/apply owner: `StageMapApplyPlanner`
+- schema migration owner: `StageMapDocumentMigrationUtility`
+- runtime은 `StageMapDocument`를 직접 읽지 않고, Apply된 `StageLayoutSO / StageDefinitionSO / StageCatalogSO`만 읽는다.
 
-### 7.2 Authoring 입력 모델
-- `MovementTilemap`
-  - `BlockPlayer`, `BlockBullet` 의미를 갖는 metadata tilemap이다.
-  - visual tilemap과 분리한다.
-  - tilemap `cellBounds`는 참고값일 뿐 authoring bounds authority가 아니다.
-- `RegionTilemap`
-  - `StageRegionTile.RegionKind + RegionSlotIndex`를 갖는 metadata tilemap이다.
-  - source/deposit는 separate tilemap이 아니라 같은 tilemap 안에서 `RegionKind`로 구분한다.
-  - `StableId`는 tile asset이 직접 소유하지 않고, `StageGridAuthoring.SourceRegionMappings / DepositRegionMappings`가 `slot -> stable id`를 소유한다.
-  - authoring 입력은 `RegionTilemap + mapping table + anchor marker`만 사용한다.
-- `BoundsMinCell`, `BoundsSize`
-  - `StageGridAuthoring`가 직접 편집 bounds를 소유한다.
-  - local paint cell `(0,0)`은 실제 tilemap cell `(BoundsMinCell.x, BoundsMinCell.y)`에 대응한다.
-  - 음수 tile 좌표를 허용한다.
-  - generator는 `BoundsMinCell + local cell`로 movement tile을 읽고, runtime layout는 normalized local grid로 저장한다.
-  - `StageGridAuthoring` transform과 `Grid.transform.position`은 editor workspace offset으로만 취급한다.
-  - 생성되는 runtime `Grid.Origin`은 world transform이 아니라 `BoundsMinCell * CellSize`로 고정한다.
-  - anchor preview/gizmo는 별도의 editor preview 계산으로 workspace offset을 반영한다.
-  - `StageRegionAnchorMarker`
-  - `RegionKind`, `RegionSlotIndex`, `StableId`, `AnchorCell`, `AnchorOffset`를 가진다.
-  - `AnchorCell`은 `BoundsMinCell` 기준 normalized 좌표가 아니라 실제 authoring tile cell 좌표다.
-  - generator가 export 시점에만 `AnchorCell - BoundsMinCell`로 정규화해 layout에 기록한다.
-  - source/deposit 대표점의 authoring SSOT다.
-- `StagePlayerStartMarker`
-  - `AnchorCell`, `AnchorOffset`, `YawDeg`를 가진다.
-  - `AnchorCell`은 실제 authoring tile cell 좌표다.
-  - generator가 export 시점에만 `AnchorCell - BoundsMinCell`로 정규화해 layout에 기록한다.
-  - stage player start의 authoring SSOT다.
-- `StageGridLayoutGenerator`
-  - `StageGridAuthoring + StageRegionAnchorMarker + StagePlayerStartMarker + StagePresentationMarker`를 읽어 `StageLayoutSO v2`를 생성한다.
-  - generator는 source/deposit region stable id를 항상 `RegionTilemap`에서만 resolve한다.
-  - sample authoring scene에는 더 이상 `StageObstacleMarker`가 남아 있지 않으며, source/deposit anchor host만 dedicated GO로 유지한다.
+### 7.2 편집·적용 계약
+1. Window에서 Document의 grid, movement, regions, anchors, PlayerStart, HazardActor placement/rule, presentation link를 편집한다.
+2. Document validation과 issue navigation을 수행한다.
+3. `Validate/Dry Run -> Diff Summary -> Apply`를 통과한다.
+4. Apply는 Document와 target asset signature가 preview 이후 바뀌면 stale로 거부한다.
+5. Apply 성공 후 runtime asset과 catalog pair를 저장한다.
 
-### 7.3 Paint/Validation 규칙
-- paint 시 `StageRegionTile.RegionSlotIndex`를 명시적으로 선택하지 않으면 region cell을 칠할 수 없게 한다.
-- validation error:
-  - `RegionTilemap` 미할당
-  - region slot이 있는데 대응 mapping entry가 없음
-  - paint된 source/deposit stable id에 대응 anchor marker가 없거나 2개 이상임
-  - anchor가 자기 region 셀 위에 있지 않음
-  - region marker가 있는데 `RegionTilemap`에 칠해진 셀이 없음
-  - source/deposit overlap 셀
-  - player start marker가 없거나 2개 이상임
-  - player start가 bounds 밖이거나 `BlockPlayer` 셀 위에 있음
-- validation warning:
-  - movement used tile이 authoring bounds 밖에 남아 있음
-  - stage 전체에 source 또는 deposit region이 없음
-  - player start cell이 source/deposit region과 겹침
-  - editor gizmo는 authoring bounds 범위 안의 grid / movement / source / deposit / anchor만 시각화한다.
+### 7.3 좌표와 시각화
+- Document grid의 `Origin / CellSize / AnchorCell / AnchorOffset`가 편집·export 좌표의 authority다.
+- Scene View overlay와 selection handle은 Document에서 직접 world pose를 계산한다.
+- region/player anchor offset을 cell center로 고정하는 옵션은 session preference이며 Undo 가능한 Document 변경만 기록한다.
+- obstacle visual은 gameplay authority가 아니며 presentation 계층이 grid를 read-only로 소비한다.
 
-### 7.4 패키지 기준
-- 필수
-  - `com.unity.2d.tilemap`
-    - Unity Tilemap editor authoring, Tile Palette, Grid 기반 편집에 필요하다.
-- 선택
-  - `com.unity.2d.tilemap.extras`
-    - Rule Tile, Random Brush, Group Brush 등 visual/auxiliary workflow에 유용하다.
-    - explicit region id backing store를 대체하지는 않으므로 P3 필수 의존은 아니다.
-- 비범위
-  - 외부 importer 패키지는 Unity Tilemap 경로 안정화 후 별도 단계에서 검토한다.
+### 7.4 지원 범위와 폐기 경계
+- `smd_demo_1 / smd_demo_2 / smd_demo_3`이 현재 데모 stage의 authoring Documents다.
+- Scene/Tilemap/Marker authoring, legacy import, scene 기반 generator/composer, 전용 palette/tile assets는 지원하지 않는다.
+- 직접 `com.unity.2d.tilemap` 패키지 의존은 제거했다. Unity core tilemap module은 다른 Unity 기능과의 호환을 위해 별도 계약으로 취급한다.
+- 외부 importer는 향후 신규 기능으로만 도입할 수 있으며 제거된 legacy scene schema를 복구하지 않는다.
 
-### 7.5 샘플 갱신 루틴
-1. stage authoring scene에서 tilemap 또는 importer source를 수정한다.
-2. `StageDefinitionGenerator`로 source binding 누락을 보강한다.
-3. `StageGridLayoutGenerator`로 `StageLayoutSO` grid 데이터를 갱신한다.
-4. `StageCatalogComposer`로 `StageCatalogSO`를 갱신한다.
-5. 생성 asset을 `StageGridLayoutValidationRules`와 catalog validation으로 검증한다.
-- 데모 샘플 운영 규칙:
-  - `StageLayoutEditingSampleV1` 씬 상태를 authoring SSOT로 본다.
-  - `sl_demo_*` layout asset은 임의 수치나 이전 샘플 메모보다, 해당 씬과 region paint asset 상태에 맞춰 다시 생성/동기화해야 한다.
-  - Stage2/3 sample source는 tiny region이 아니라 최소 `30` cells 이상을 갖는 authoring 예시로 유지한다.
 
 ## 8. 런타임 반영
 ### 8.1 Topology Layer
@@ -349,6 +294,8 @@
 - 이 경로는 editor/debug 전용이며, 빌드용 debug overlay를 의미하지 않는다.
 
 ## 9. 작업 분해 / 진행 상태
+> P1~P6는 grid-authoritative runtime으로 전환하던 당시의 이력이다. 현재 authoring 계약은 P7과 7절을 따른다.
+
 - P1. 문서/결정 고정
   - `TD-015`, 신규 ADR, TaskBoard로 grid authority / explicit region id / obstacle visual 분리 기준을 확정한다.
 - P2. 데이터 스키마 전환
@@ -375,6 +322,9 @@
   - presentation/editor/sample scene에서 obstacle-linked authoring 경로와 `StageObstacleMarker`를 제거했다.
 - [x] P6.next-C. runtime/template legacy path 정리
   - hidden compatibility field, legacy marker fallback, obstacle/deposit topology template를 제거하고 source-only runtime/template 계약으로 정리했다.
+- [x] P7. Stage Map Editor 대체와 legacy authoring 폐기
+  - `StageMapDocument` 3개를 데모 authoring SSOT로 확정했다.
+  - Scene/Tilemap/Marker authoring, generator/import/composer 및 전용 테스트와 직접 Tilemap package 의존을 제거했다.
 
 ## 10. 검증 계획 / 합격 기준
 - 공통
@@ -383,8 +333,10 @@
   - EditMode pass
   - PlayMode smoke pass
 - EditMode
+  - `StageMapDocumentTests`
+  - `StageMapEditorInteractionTests`
+  - `StageMapEditorWindowSmokeTests`
   - `StageGridLayoutValidationRulesTests`
-  - `StageDefinitionGeneratorTests`
   - `StageCatalogValidationRulesTests`
   - grid coord / region id / explicit anchor validation 회귀
 - PlayMode

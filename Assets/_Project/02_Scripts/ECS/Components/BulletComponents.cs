@@ -82,16 +82,6 @@ namespace SweepNDodge.DotsBullets
         public float MinRetargetDistance;
     }
 
-    public struct BulletSecondarySpawnReactionRuntimeDefinition
-    {
-        public int SecondaryBulletTypeKey;
-        public int SpawnCount;
-        public BulletSecondarySpawnShapeId Shape;
-        public float SpreadAngleDeg;
-        public float SpawnRadius;
-        public float SpawnDelaySec;
-    }
-
     public struct BulletDampedMotionComponent : IComponentData
     {
         public float DampingPerSec;
@@ -105,24 +95,11 @@ namespace SweepNDodge.DotsBullets
         public float MinRetargetDistance;
     }
 
-    public struct BulletOnMotionCompletedExplodeReactionComponent : IComponentData
+    public struct BulletMovementRuntimeComponent : IComponentData
     {
-        public int SecondaryBulletTypeKey;
-        public int SpawnCount;
-        public BulletSecondarySpawnShapeId Shape;
-        public float SpreadAngleDeg;
-        public float SpawnRadius;
-        public float SpawnDelaySec;
-    }
-
-    public struct BulletOnCleanupRemovedSpawnSecondaryReactionComponent : IComponentData
-    {
-        public int SecondaryBulletTypeKey;
-        public int SpawnCount;
-        public BulletSecondarySpawnShapeId Shape;
-        public float SpreadAngleDeg;
-        public float SpawnRadius;
-        public float SpawnDelaySec;
+        public BulletMovementFamilyId Family;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
     }
 
     public struct BulletLifecycleRequestComponent : IComponentData
@@ -143,6 +120,11 @@ namespace SweepNDodge.DotsBullets
     public struct BulletSourceRefComponent : IComponentData
     {
         public Entity Value;
+    }
+
+    public struct BulletEmissionProfileRefComponent : IComponentData
+    {
+        public int ProfileRefId;
     }
 
     // Enableable Tag (활성/비활성 토글용)
@@ -178,8 +160,6 @@ namespace SweepNDodge.DotsBullets
         public BulletMovementFamilyId MovementFamily;
         public BulletDampedLinearDefinition DampedLinear;
         public BulletHomingLiteDefinition HomingLite;
-        public BulletSecondarySpawnReactionRuntimeDefinition OnMotionCompletedExplode;
-        public BulletSecondarySpawnReactionRuntimeDefinition OnCleanupRemovedSpawnSecondary;
     }
 
     // 프레임 파이프라인 기준 단조 증가 프레임 ID.

@@ -4,7 +4,7 @@
 - doc_id: `TD-016`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-17`
+- last_updated: `2026-05-18`
 - related_docs:
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [OPS-003-public-release-readiness-plan.md](../ProjectOps/OPS-003-public-release-readiness-plan.md)
@@ -25,6 +25,7 @@
   - Modal V2: `Pause`, `Confirm`
   - HUD V1: `Stage HUD`, `Notification`, `Hint`
 - 현재 공개 빌드 경로에서 `Title/Lobby/Stage HUD/Result/DemoComplete/Settings/Pause/Confirm`는 `uGUI` 기준으로 동작한다.
+- 2026-05-18 기준 `DemoShellFlowController` fallback `OnGUI`, fallback keyboard shortcut, `Force ClearReady` test API는 `UNITY_EDITOR || DEVELOPMENT_BUILD`에서만 동작한다.
 - 미완료 범위
   - 온보딩 전용 힌트 시퀀스
   - `PresentationLayer` 기반 인월드 연출 대화
@@ -322,10 +323,12 @@
 ### 7.3 fallback 원칙
 - fallback은 `UNITY_EDITOR`/`DEVELOPMENT_BUILD`에 한정한다.
 - 공개 빌드에서는 `OnGUI`를 비활성하거나 제거한다.
+- 공개 빌드에서 runtime UI가 연결되지 못하더라도 fallback shell overlay, 직접 stage 선택 shortcut, force progression test command는 열리지 않는다.
 
 ### 7.4 현재 마이그레이션 결과
 - `DemoShellFlowController`
-  - Shell/Settings `OnGUI`는 `RuntimeUiShellActive` 기준으로 공개 빌드 경로에서 비활성
+  - Shell/Settings `OnGUI`는 `RuntimeUiShellActive` 및 `UNITY_EDITOR || DEVELOPMENT_BUILD` 기준으로 공개 빌드 경로에서 비활성
+  - `ProcessKeyboardFallback()`와 `RequestForceClearReadyForTest()`는 development-only fallback으로 유지
 - `PlayerRuntimeHudBridge`
   - runtime HUD `OnGUI`는 `RuntimeUiHudActive` 기준으로 비활성
 - `DemoAudioBridge`
@@ -361,6 +364,7 @@
   - `PresentationLayer`가 `HudLayer`와 독립적으로 활성/비활성된다
   - 인월드 연출 대화 active 동안 `Notification/Hint`가 숨겨지고, clear dialogue 완료 후에만 `ResultPanel`이 열린다
   - 공개 빌드에서 `OnGUI` 경로가 비노출이다
+  - 공개 빌드에서 `Force ClearReady` 테스트 명령과 fallback keyboard shortcut이 비활성이다
   - 마우스 클릭과 키보드 `Submit/Cancel` 모두 기본 경로에서 동작한다
 
 ### 9.1 최신 검증 결과
@@ -392,3 +396,4 @@
 - 2026-03-16: `HUD V1` 재배치와 후속 설계 반영. `HintToast`를 `Notification` / `Hint` 2레인 구조로 교체하고, `TD-020`을 `Hint/Notification V2` SSOT로 연결했다.
 - 2026-03-16: `TD-022` 연계 반영. `PresentationLayer`, `InWorldDialoguePresenter`, dialogue 입력/표시 우선순위, lower-center lane suppress 규칙을 추가했다.
 - 2026-03-17: `RuntimeUiRoot` 운영 가드레일을 추가했다. 공용 UI 구조의 SSOT를 `RuntimeUiRoot.prefab`으로 고정하고, agent와 씬 작업은 prefab 우선 / scene-specific override 제한 규칙을 따른다.
+- 2026-05-18: 공개 빌드 비노출 정책을 코드 기준으로 반영했다. `DemoShellFlowController` fallback `OnGUI`, keyboard shortcut, `Force ClearReady` test API를 `UNITY_EDITOR || DEVELOPMENT_BUILD` 전용으로 제한했다.

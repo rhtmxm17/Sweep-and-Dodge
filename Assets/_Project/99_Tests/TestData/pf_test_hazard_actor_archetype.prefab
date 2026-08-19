@@ -65,22 +65,37 @@ MonoBehaviour:
   PatternSlots:
   - PatternSlotId: 1
     TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
-    EmissionProfile: {fileID: 11400000, guid: e2a3b4c5d6f74899aa0bb1cc2dd3e402, type: 2}
+    Emission:
+      Profile: {fileID: 11400000, guid: a8f5f39520a963b44b36aedbc4f6707d, type: 2}
+      EventRepeatCount: 2
+      EventShotSchedule: 1
+      EventShotIntervalSec: 0.18
+      CooldownSec: 0.5
     BaseWeight: 1
     AvailabilityFlags: 0
-    LocalOffset: {x: -3, y: 0, z: 2}
+    LocalOffset: {x: 0, y: 0, z: 0}
   - PatternSlotId: 2
     TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
-    EmissionProfile: {fileID: 11400000, guid: 1650095bfb9b7eb41b880713873ec566, type: 2}
+    Emission:
+      Profile: {fileID: 11400000, guid: 87030cd1231c44047a28beced221db8a, type: 2}
+      EventRepeatCount: 3
+      EventShotSchedule: 1
+      EventShotIntervalSec: 0.1
+      CooldownSec: 0.5
     BaseWeight: 1
     AvailabilityFlags: 0
-    LocalOffset: {x: -3, y: 0, z: 2}
+    LocalOffset: {x: 0, y: 0, z: 0}
   - PatternSlotId: 3
     TelegraphProfile: {fileID: 11400000, guid: d1f2a3b4c5d6478899aa0bb1cc2dd301, type: 2}
-    EmissionProfile: {fileID: 11400000, guid: 42200ce557fc01b498bfe793aa6bf4b1, type: 2}
+    Emission:
+      Profile: {fileID: 11400000, guid: 38f3158ff0fc8744ab3059abc5b5acc0, type: 2}
+      EventRepeatCount: 7
+      EventShotSchedule: 1
+      EventShotIntervalSec: 0.08
+      CooldownSec: 0.5
     BaseWeight: 1
     AvailabilityFlags: 0
-    LocalOffset: {x: -3, y: 0, z: 2}
+    LocalOffset: {x: 0, y: 0, z: 0}
   PhaseProgressTransitions:
   - FromPhaseId: 1
     ToPhaseId: 2

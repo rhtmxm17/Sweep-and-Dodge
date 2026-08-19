@@ -20,3 +20,4 @@
 - [GD-014-cleaning-trace-recovery-loop.md](GD-014-cleaning-trace-recovery-loop.md): 청소 흔적 복구를 공간 순환 규칙으로 확장하는 방향 문서
 - [GD-015-hazard-emitter-design.md](GD-015-hazard-emitter-design.md): `HazardEmitter` gameplay-facing 위험 발화점 설계와 `HazardActor` 구현 상위 개념 연결 문서
 - [GD-016-hazard-actor-blueprint-scenarios.md](GD-016-hazard-actor-blueprint-scenarios.md): `HazardActor` 행동 확장의 발화점이 된 청사진 시나리오와 일반화 범위
+- [GD-017-demo-stage-level-design-brief.md](GD-017-demo-stage-level-design-brief.md): 공개 데모 Stage 1~3의 Source/Deposit/HazardActor 배치 의도와 T1c 편집 체크리스트

@@ -138,7 +138,7 @@ namespace SweepNDodge.DotsBullets
 
         private void OnGUI()
         {
-            if (!ShowOverlay || _runtimeUiShellActive)
+            if (!IsDeveloperFallbackUiAllowed() || !ShowOverlay || _runtimeUiShellActive)
                 return;
 
             GUILayout.BeginArea(OverlayRect, GUI.skin.box);
@@ -369,6 +369,8 @@ namespace SweepNDodge.DotsBullets
 
         public bool RequestForceClearReadyForTest()
         {
+            if (!IsDeveloperFallbackUiAllowed())
+                return false;
             if (_currentScreen != DemoShellScreenId.StagePlay)
                 return false;
             if (StageBridge == null)
@@ -539,7 +541,7 @@ namespace SweepNDodge.DotsBullets
 
         private void ProcessKeyboardFallback()
         {
-            if (!EnableKeyboardFallback || _runtimeUiShellActive)
+            if (!IsDeveloperFallbackUiAllowed() || !EnableKeyboardFallback || _runtimeUiShellActive)
                 return;
 
             switch (_currentScreen)
@@ -1093,6 +1095,15 @@ namespace SweepNDodge.DotsBullets
         public void SetRuntimeUiShellActive(bool active)
         {
             _runtimeUiShellActive = active;
+        }
+
+        private static bool IsDeveloperFallbackUiAllowed()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            return true;
+#else
+            return false;
+#endif
         }
 
         private readonly struct GuiEnabledScope : System.IDisposable

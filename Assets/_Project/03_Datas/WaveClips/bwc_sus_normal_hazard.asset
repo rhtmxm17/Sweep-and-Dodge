@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -22,8 +22,7 @@ MonoBehaviour:
     StartSec: 0
     DurationSec: 1
     Directives:
-    - Payload:
-        Bullet: {fileID: 11400000, guid: f4056a867fd066f4b85104e6e521ee51, type: 2}
+    - Profile: {fileID: 11400000, guid: 49a78117af1e33344a1ddd959b5d27b5, type: 2}
       Emission:
         rid: 6141543268140187722
       Sampling:
@@ -33,12 +32,6 @@ MonoBehaviour:
           rid: 7141543268140187723
         AreaSampler:
           rid: 6141543268140187723
-      PositionPattern:
-        rid: 8141543268140187723
-      Aim:
-        rid: 6141543268140187724
-      ShotPattern:
-        rid: 9141543268140187724
   references:
     version: 2
     RefIds:
@@ -50,17 +43,7 @@ MonoBehaviour:
         RatePerSecPerArea: 0.03
     - rid: 6141543268140187723
       type: {class: PollutionTopKAreaSamplerAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
+      data: 
     - rid: 7141543268140187723
       type: {class: SourceCenterSamplingAnchorAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 8141543268140187723
-      type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 6141543268140187724
-      type: {class: RandomAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-    - rid: 9141543268140187724
-      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
-      data: {}
-
+      data: 

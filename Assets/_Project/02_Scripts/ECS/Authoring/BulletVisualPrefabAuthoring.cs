@@ -48,8 +48,6 @@ namespace SweepNDodge.DotsBullets
                         MovementFamily = def.MovementFamily,
                         DampedLinear = def.DampedLinear,
                         HomingLite = def.HomingLite,
-                        OnMotionCompletedExplode = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(def.OnMotionCompletedExplode),
-                        OnCleanupRemovedSpawnSecondary = BulletDefinitionBakeUtility.CreateRuntimeReactionDefinition(def.OnCleanupRemovedSpawnSecondary),
                     });
                 }
             }

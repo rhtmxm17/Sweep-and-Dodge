@@ -10,6 +10,7 @@ namespace SweepNDodge.DotsBullets
 
     public struct ResolvedHazardEmitterEmissionProfileSnapshot
     {
+        public ResolvedEmissionCore EmissionCore;
         public BulletDefinitionSO Bullet;
         public WavePositionPatternModeId PositionPatternMode;
         public Vector2 SpawnOffset;
@@ -56,7 +57,33 @@ namespace SweepNDodge.DotsBullets
         }
 
         public static bool TryResolve(
-            HazardEmitterEmissionProfileSO profile,
+            in HazardActorEmissionAuthoring emission,
+            out ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
+            out string error)
+        {
+            if (emission.Profile != null)
+            {
+                return TryResolve(
+                    emission.Profile,
+                    emission.EventRepeatCount,
+                    emission.EventShotSchedule,
+                    emission.EventShotIntervalSec,
+                    emission.CooldownSec,
+                    out snapshot,
+                    out error);
+            }
+
+            snapshot = default;
+            error = "Hazard actor emission profile is null.";
+            return false;
+        }
+
+        public static bool TryResolve(
+            EmissionProfileSO profile,
+            int eventRepeatCount,
+            SourceSpawnEventShotScheduleId eventShotSchedule,
+            float eventShotIntervalSec,
+            float cooldownSec,
             out ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
             out string error)
         {
@@ -65,155 +92,73 @@ namespace SweepNDodge.DotsBullets
 
             if (profile == null)
             {
-                error = "Hazard emitter emission profile is null.";
+                error = "Hazard actor emission profile is null.";
                 return false;
             }
 
-            if (profile.Bullet == null)
-            {
-                error = "Hazard emitter emission profile is missing Bullet.";
+            if (!EmissionProfileResolver.TryResolve(profile, out var core, out error))
                 return false;
-            }
 
-            if (profile.Bullet.DefinitionId <= 0)
-            {
-                error = $"Hazard emitter emission profile references invalid DefinitionId {profile.Bullet.DefinitionId}.";
-                return false;
-            }
+            return TryCreateEmissionSnapshot(
+                in core,
+                eventRepeatCount,
+                eventShotSchedule,
+                eventShotIntervalSec,
+                cooldownSec,
+                out snapshot,
+                out error);
+        }
 
-            if (profile.PositionPattern == null)
-            {
-                error = "Hazard emitter emission profile is missing PositionPattern.";
-                return false;
-            }
+        private static bool TryCreateEmissionSnapshot(
+            in ResolvedEmissionCore core,
+            int eventRepeatCount,
+            SourceSpawnEventShotScheduleId eventShotSchedule,
+            float eventShotIntervalSec,
+            float cooldownSec,
+            out ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
+            out string error)
+        {
+            snapshot = default;
+            error = string.Empty;
 
-            if (profile.Aim == null)
+            if (core.AimMode == WaveAimModeId.Random)
             {
-                error = "Hazard emitter emission profile is missing Aim.";
-                return false;
-            }
-
-            if (profile.ShotPattern == null)
-            {
-                error = "Hazard emitter emission profile is missing ShotPattern.";
-                return false;
-            }
-
-            if (profile.Aim.AimMode == WaveAimModeId.Random)
-            {
-                error = "Hazard emitter emission profile does not support Random aim in Plan D.";
+                error = "Hazard actor emission profile does not support Random aim.";
                 return false;
             }
 
             snapshot = new ResolvedHazardEmitterEmissionProfileSnapshot
             {
-                Bullet = profile.Bullet,
-                PositionPatternMode = profile.PositionPattern.PositionPatternMode,
-                SpawnOffset = Vector2.zero,
-                LineStart = Vector2.zero,
-                LineEnd = Vector2.zero,
-                SampleSpacing = 1f,
-                PointSetCount = 0,
-                Point0 = Vector2.zero,
-                Point1 = Vector2.zero,
-                Point2 = Vector2.zero,
-                Point3 = Vector2.zero,
-                AimMode = profile.Aim.AimMode,
-                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
-                BaseAngleDeg = 0f,
-                AimAngleOffsetDeg = 0f,
-                LineNormalSide = WaveLineNormalSideId.Left,
-                LineNormalAngleOffsetDeg = 0f,
-                SpiralStepDeg = 0f,
-                ShotPatternMode = profile.ShotPattern.ShotPatternMode,
-                ShotCount = 1,
-                NWayAngleSpacingDeg = 0f,
-                EventShotSchedule = profile.EventShotSchedule,
-                EventShotIntervalSec = profile.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
-                    ? Mathf.Max(0.001f, profile.EventShotIntervalSec)
+                EmissionCore = core,
+                Bullet = core.Bullet,
+                PositionPatternMode = core.PositionPatternMode,
+                SpawnOffset = core.SpawnOffset,
+                LineStart = core.LineStart,
+                LineEnd = core.LineEnd,
+                SampleSpacing = core.SampleSpacing,
+                PointSetCount = core.PointSetCount,
+                Point0 = core.Point0,
+                Point1 = core.Point1,
+                Point2 = core.Point2,
+                Point3 = core.Point3,
+                AimMode = core.AimMode,
+                AimSnapshotTiming = core.AimSnapshotTiming,
+                BaseAngleDeg = core.BaseAngleDeg,
+                AimAngleOffsetDeg = core.AimAngleOffsetDeg,
+                LineNormalSide = core.LineNormalSide,
+                LineNormalAngleOffsetDeg = core.LineNormalAngleOffsetDeg,
+                SpiralStepDeg = core.SpiralStepDeg,
+                ShotPatternMode = core.ShotPatternMode,
+                ShotCount = core.ShotCount,
+                NWayAngleSpacingDeg = core.NWayAngleSpacingDeg,
+                EventShotSchedule = eventShotSchedule,
+                EventShotIntervalSec = eventShotSchedule == SourceSpawnEventShotScheduleId.Timed
+                    ? Mathf.Max(0.001f, eventShotIntervalSec)
                     : 0f,
-                EventRepeatCount = Mathf.Max(1, profile.EventRepeatCount),
-                CooldownSec = Mathf.Max(0f, profile.CooldownSec),
+                EventRepeatCount = Mathf.Max(1, eventRepeatCount),
+                CooldownSec = Mathf.Max(0f, cooldownSec),
             };
-
-            ApplyPositionPattern(ref snapshot, profile.PositionPattern);
-            ApplyAim(ref snapshot, profile.Aim);
-            ApplyShotPattern(ref snapshot, profile.ShotPattern);
             return true;
-        }
-
-        private static void ApplyPositionPattern(
-            ref ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
-            WavePositionPatternAuthoringBase positionPattern)
-        {
-            switch (positionPattern)
-            {
-                case LineEvenPositionPatternAuthoring lineEven:
-                    snapshot.LineStart = lineEven.LineStart;
-                    snapshot.LineEnd = lineEven.LineEnd;
-                    snapshot.SampleSpacing = lineEven.SampleSpacing > 0f ? lineEven.SampleSpacing : 1f;
-                    break;
-
-                case PointSetPositionPatternAuthoring pointSet:
-                    snapshot.PointSetCount = Mathf.Clamp(pointSet.Points?.Length ?? 0, 0, PointSetPositionPatternAuthoring.MaxPointCount);
-                    snapshot.Point0 = GetPoint(pointSet.Points, 0);
-                    snapshot.Point1 = GetPoint(pointSet.Points, 1);
-                    snapshot.Point2 = GetPoint(pointSet.Points, 2);
-                    snapshot.Point3 = GetPoint(pointSet.Points, 3);
-                    break;
-            }
-        }
-
-        private static void ApplyAim(
-            ref ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
-            WaveAimAuthoringBase aim)
-        {
-            switch (aim)
-            {
-                case FixedAimAuthoring fixedAim:
-                    snapshot.BaseAngleDeg = fixedAim.BaseAngleDeg;
-                    break;
-
-                case SpiralAimAuthoring spiralAim:
-                    snapshot.BaseAngleDeg = spiralAim.BaseAngleDeg;
-                    snapshot.SpiralStepDeg = spiralAim.SpiralStepDeg;
-                    break;
-
-                case PlayerPositionAimAuthoring playerAim:
-                    snapshot.AimAngleOffsetDeg = playerAim.AngleOffsetDeg;
-                    snapshot.AimSnapshotTiming = playerAim.SnapshotTiming;
-                    break;
-
-                case LineNormalAimAuthoring lineNormalAim:
-                    snapshot.LineNormalSide = lineNormalAim.NormalSide;
-                    snapshot.LineNormalAngleOffsetDeg = lineNormalAim.AngleOffsetDeg;
-                    break;
-            }
-        }
-
-        private static void ApplyShotPattern(
-            ref ResolvedHazardEmitterEmissionProfileSnapshot snapshot,
-            WaveShotPatternAuthoringBase shotPattern)
-        {
-            switch (shotPattern)
-            {
-                case NWayShotPatternAuthoring nWay:
-                    snapshot.ShotCount = Mathf.Max(1, nWay.ShotCount);
-                    snapshot.NWayAngleSpacingDeg = nWay.AngleSpacingDeg;
-                    break;
-
-                case RadialShotPatternAuthoring radial:
-                    snapshot.ShotCount = Mathf.Max(1, radial.ShotCount);
-                    break;
-            }
-        }
-
-        private static Vector2 GetPoint(Vector2[] points, int index)
-        {
-            if (points == null || index < 0 || index >= points.Length)
-                return Vector2.zero;
-
-            return points[index];
         }
     }
 }

@@ -61,6 +61,126 @@ namespace SweepNDodge.DotsBullets.Tests
             var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
             Assert.That(metrics.PendingCount, Is.EqualTo(0));
             Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameBudgetUsedWaveClipEvent, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_ProfileRuntimeTuning_OverridesSpawnedBulletSpeedAndLifetime()
+        {
+            using var world = new World("DiscreteEmit_RuntimeTuning");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 10u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 4, 16, 60u);
+            var source = CreateSourceWithActiveCountBuffer(em, 17);
+            var pooledBullet = CreatePooledBullet(em, 17, 1f, 2f);
+            BulletFieldShared.FreeByKey.Add(17, pooledBullet);
+
+            var requests = em.GetBuffer<DiscreteEmitRequestBuffer>(channel);
+            requests.Add(DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(new DiscreteEmitRequestSeed
+            {
+                ProducerKind = DiscreteEmitProducerKind.HazardActor,
+                SourceEntity = source,
+                ProducerEntity = source,
+                EmissionId = 10,
+                ProfileRefId = 20,
+                BulletTypeKey = 17,
+                HasSpeedOverride = 1,
+                SpeedOverride = 6f,
+                HasLifetimeOverride = 1,
+                LifetimeOverride = 9f,
+                HasMovementOverride = 1,
+                MovementFamily = BulletMovementFamilyId.DampedLinear,
+                DampedLinear = new BulletDampedLinearDefinition
+                {
+                    DampingPerSec = 12f,
+                    StopSpeedThreshold = 0.3f,
+                },
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorEntity = source,
+                AnchorPosition = float3.zero,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                BaseAngleDeg = 0f,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                RepeatCount = 1,
+            }, 10u));
+
+            world.GetOrCreateSystem<DiscreteEmitExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetComponentData<BulletSpeedComponent>(pooledBullet).Value, Is.EqualTo(6f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletVelocityComponent>(pooledBullet).Value.x, Is.EqualTo(6f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletVelocityComponent>(pooledBullet).Value.y, Is.EqualTo(0f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletLifetimeComponent>(pooledBullet).Value, Is.EqualTo(9f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletLifetimeMaxComponent>(pooledBullet).Value, Is.EqualTo(9f).Within(1e-5f));
+            var movement = em.GetComponentData<BulletMovementRuntimeComponent>(pooledBullet);
+            Assert.That(movement.Family, Is.EqualTo(BulletMovementFamilyId.DampedLinear));
+            Assert.That(movement.DampedLinear.DampingPerSec, Is.EqualTo(12f).Within(1e-5f));
+            Assert.That(movement.DampedLinear.StopSpeedThreshold, Is.EqualTo(0.3f).Within(1e-5f));
+            Assert.That(em.GetComponentData<BulletEmissionProfileRefComponent>(pooledBullet).ProfileRefId, Is.EqualTo(20));
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(metrics.LastFrameBudgetUsedHazardActor, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_ReadyFrameDefersRequestWithoutSpendingBudget()
+        {
+            using var world = new World("DiscreteEmit_ReadyFrameDelay");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 10u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 4, 16, 60u);
+            var source = CreateSourceWithActiveCountBuffer(em, 18);
+            var pooledBullet = CreatePooledBullet(em, 18, 2f, 4f);
+            BulletFieldShared.FreeByKey.Add(18, pooledBullet);
+
+            em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Add(DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(new DiscreteEmitRequestSeed
+            {
+                ProducerKind = DiscreteEmitProducerKind.TriggeredEmission,
+                SourceEntity = source,
+                ProducerEntity = Entity.Null,
+                CauserEntity = Entity.Null,
+                EmissionId = 100,
+                ProfileRefId = 200,
+                BulletTypeKey = 18,
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorPosition = float3.zero,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                RepeatCount = 1,
+                ReadyFrame = 12u,
+            }, 10u));
+
+            var system = world.GetOrCreateSystem<DiscreteEmitExecutionSystem>();
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.IsComponentEnabled<BulletActiveTag>(pooledBullet), Is.False);
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(1));
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(0));
+            Assert.That(metrics.PendingTriggeredEmission, Is.EqualTo(1));
+
+            CreateFrameCounter(em, 12u);
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.IsComponentEnabled<BulletActiveTag>(pooledBullet), Is.True);
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
         }
 
         [Test]
@@ -301,6 +421,87 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(1));
         }
 
+        [Test]
+        public void DiscreteEmitExecution_ProducerBudget_AllowsWaveWhenTriggeredBudgetIsExhausted()
+        {
+            using var world = new World("DiscreteEmit_ProducerBudget");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 50u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 2, 16, 60u);
+            em.SetComponentData(channel, new DiscreteEmitPolicyComponent
+            {
+                BudgetPerFrame = 2,
+                MaxPendingCount = 16,
+                MaxPendingAgeFrames = 60u,
+                TriggeredEmissionBudgetPerFrame = 1,
+            });
+
+            var triggeredSource = CreateSourceWithActiveCountBuffer(em, 61);
+            var waveSource = CreateSourceWithActiveCountBuffer(em, 61);
+            for (int i = 0; i < 3; i++)
+                BulletFieldShared.FreeByKey.Add(61, CreatePooledBullet(em, 61, 2f, 4f));
+
+            var requests = em.GetBuffer<DiscreteEmitRequestBuffer>(channel);
+            requests.Add(CreateSingleRequest(DiscreteEmitProducerKind.TriggeredEmission, triggeredSource, emissionId: 1, bulletTypeKey: 61, priority: 10, frame: 50u));
+            requests.Add(CreateSingleRequest(DiscreteEmitProducerKind.TriggeredEmission, triggeredSource, emissionId: 2, bulletTypeKey: 61, priority: 10, frame: 50u));
+            requests.Add(CreateSingleRequest(DiscreteEmitProducerKind.WaveClipEvent, waveSource, emissionId: 3, bulletTypeKey: 61, priority: 1, frame: 50u));
+
+            world.GetOrCreateSystem<DiscreteEmitExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(triggeredSource)[0].ActiveCount, Is.EqualTo(1));
+            Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(waveSource)[0].ActiveCount, Is.EqualTo(1));
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(1));
+
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(2));
+            Assert.That(metrics.LastFrameBudgetUsedTriggeredEmission, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameBudgetUsedWaveClipEvent, Is.EqualTo(1));
+            Assert.That(metrics.PendingTriggeredEmission, Is.EqualTo(1));
+            Assert.That(metrics.DeferredByBudgetTriggeredEmission, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_ProducerMaxPending_TrimsOnlyOverflowingProducer()
+        {
+            using var world = new World("DiscreteEmit_ProducerCapacity");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 60u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 0, 16, 60u);
+            em.SetComponentData(channel, new DiscreteEmitPolicyComponent
+            {
+                BudgetPerFrame = 0,
+                MaxPendingCount = 16,
+                MaxPendingAgeFrames = 60u,
+                TriggeredEmissionMaxPendingCount = 2,
+            });
+
+            var triggeredSource = CreateSourceWithActiveCountBuffer(em, 71);
+            var waveSource = CreateSourceWithActiveCountBuffer(em, 71);
+            var requests = em.GetBuffer<DiscreteEmitRequestBuffer>(channel);
+            requests.Add(CreateSingleRequest(DiscreteEmitProducerKind.TriggeredEmission, triggeredSource, emissionId: 1, bulletTypeKey: 71, priority: 1, frame: 60u));
+            requests.Add(CreateSingleRequest(DiscreteEmitProducerKind.TriggeredEmission, triggeredSource, emissionId: 2, bulletTypeKey: 71, priority: 1, frame: 60u));
+            requests.Add(CreateSingleRequest(DiscreteEmitProducerKind.TriggeredEmission, triggeredSource, emissionId: 3, bulletTypeKey: 71, priority: 1, frame: 60u));
+            requests.Add(CreateSingleRequest(DiscreteEmitProducerKind.WaveClipEvent, waveSource, emissionId: 4, bulletTypeKey: 71, priority: 1, frame: 60u));
+
+            world.GetOrCreateSystem<DiscreteEmitExecutionSystem>().Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(metrics.PendingCount, Is.EqualTo(3));
+            Assert.That(metrics.PendingTriggeredEmission, Is.EqualTo(2));
+            Assert.That(metrics.PendingWaveClipEvent, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameDroppedByCapacity, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameDroppedByCapacityTriggeredEmission, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameDroppedByCapacityWaveClipEvent, Is.EqualTo(0));
+        }
+
         private static void CreateFrameCounter(EntityManager em, uint frame)
         {
             var entity = GetOrCreateSingletonEntity<BulletFrameCounterComponent>(em);
@@ -340,6 +541,36 @@ namespace SweepNDodge.DotsBullets.Tests
             return entity;
         }
 
+        private static DiscreteEmitRequestBuffer CreateSingleRequest(
+            DiscreteEmitProducerKind producerKind,
+            Entity source,
+            int emissionId,
+            int bulletTypeKey,
+            byte priority,
+            uint frame)
+        {
+            return DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(new DiscreteEmitRequestSeed
+            {
+                ProducerKind = producerKind,
+                SourceEntity = source,
+                ProducerEntity = source,
+                EmissionId = emissionId,
+                BulletTypeKey = bulletTypeKey,
+                AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
+                AnchorEntity = source,
+                AnchorPosition = float3.zero,
+                PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                AimMode = WaveAimModeId.Fixed,
+                AimSnapshotTiming = WaveAimSnapshotTimingId.EventStart,
+                LineNormalSide = WaveLineNormalSideId.Left,
+                ShotPatternMode = WaveShotPatternModeId.Single,
+                ShotCount = 1,
+                EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                RepeatCount = 1,
+                Priority = priority,
+            }, frame);
+        }
+
         private static Entity CreateSourceWithActiveCountBuffer(EntityManager em, int bulletTypeKey)
         {
             var entity = em.CreateEntity();
@@ -361,6 +592,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 typeof(BulletLifetimeComponent),
                 typeof(BulletSpeedComponent),
                 typeof(BulletLifetimeMaxComponent),
+                typeof(BulletMovementRuntimeComponent),
+                typeof(BulletEmissionProfileRefComponent),
                 typeof(BulletLifecycleRequestComponent),
                 typeof(BulletLifecycleContactComponent),
                 typeof(BulletTypeKeyComponent),
@@ -375,6 +608,13 @@ namespace SweepNDodge.DotsBullets.Tests
             em.SetComponentData(entity, new BulletLifetimeComponent { Value = 0f });
             em.SetComponentData(entity, new BulletSpeedComponent { Value = speed });
             em.SetComponentData(entity, new BulletLifetimeMaxComponent { Value = lifetime });
+            em.SetComponentData(entity, new BulletMovementRuntimeComponent
+            {
+                Family = BulletMovementFamilyId.Linear,
+                DampedLinear = default,
+                HomingLite = default,
+            });
+            em.SetComponentData(entity, new BulletEmissionProfileRefComponent { ProfileRefId = 0 });
             em.SetComponentData(entity, default(BulletLifecycleRequestComponent));
             em.SetComponentData(entity, default(BulletLifecycleContactComponent));
             em.SetComponentData(entity, new BulletTypeKeyComponent { Value = bulletTypeKey });

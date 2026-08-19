@@ -7,11 +7,21 @@ using UnityEngine;
 namespace SweepNDodge.DotsBullets
 {
     [Serializable]
+    public struct HazardActorEmissionAuthoring
+    {
+        public EmissionProfileSO Profile;
+        [Min(1)] public int EventRepeatCount;
+        public SourceSpawnEventShotScheduleId EventShotSchedule;
+        [Min(0f)] public float EventShotIntervalSec;
+        [Min(0f)] public float CooldownSec;
+    }
+
+    [Serializable]
     public struct HazardActorPatternSlotAuthoring
     {
         [Min(1)] public int PatternSlotId;
         public HazardEmitterTelegraphProfileSO TelegraphProfile;
-        public HazardEmitterEmissionProfileSO EmissionProfile;
+        public HazardActorEmissionAuthoring Emission;
         [Min(0f)] public float BaseWeight;
         public uint AvailabilityFlags;
         public Vector3 LocalOffset;
@@ -71,7 +81,7 @@ namespace SweepNDodge.DotsBullets
                     return false;
                 }
 
-                if (slot.EmissionProfile == null)
+                if (slot.Emission.Profile == null)
                 {
                     error = $"HazardActor pattern slot is missing EmissionProfile. slotId={slot.PatternSlotId}.";
                     return false;
@@ -89,7 +99,7 @@ namespace SweepNDodge.DotsBullets
                     return false;
                 }
 
-                if (!HazardEmitterProfileResolver.TryResolve(slot.EmissionProfile, out var resolvedEmission, out error))
+                if (!HazardEmitterProfileResolver.TryResolve(slot.Emission, out var resolvedEmission, out error))
                 {
                     error = $"HazardActor pattern slot failed to resolve EmissionProfile. slotId={slot.PatternSlotId}. {error}";
                     return false;
@@ -99,13 +109,13 @@ namespace SweepNDodge.DotsBullets
                 {
                     PatternSlotId = slot.PatternSlotId,
                     TelegraphProfileRefId = resolvedTelegraph.ProfileId,
-                    EmissionProfileRefId = slot.EmissionProfile.GetInstanceID(),
+                    EmissionProfileRefId = resolvedEmission.EmissionCore.ProfileRefId,
                     BaseWeight = math.max(0f, slot.BaseWeight),
                     AvailabilityFlags = slot.AvailabilityFlags,
                 };
                 var execution = CreateExecutionSlot(
                     slot.PatternSlotId,
-                    slot.EmissionProfile.GetInstanceID(),
+                    resolvedEmission.EmissionCore.ProfileRefId,
                     (float3)slot.LocalOffset,
                     resolvedTelegraph,
                     resolvedEmission);
@@ -153,6 +163,14 @@ namespace SweepNDodge.DotsBullets
                 AppliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId,
                 ProfileId = first.EmissionProfileRefId,
                 BulletTypeKey = first.BulletTypeKey,
+                HasSpeedOverride = first.HasSpeedOverride,
+                SpeedOverride = first.SpeedOverride,
+                HasLifetimeOverride = first.HasLifetimeOverride,
+                LifetimeOverride = first.LifetimeOverride,
+                HasMovementOverride = first.HasMovementOverride,
+                MovementFamily = first.MovementFamily,
+                DampedLinear = first.DampedLinear,
+                HomingLite = first.HomingLite,
                 PositionPatternMode = first.PositionPatternMode,
                 SpawnOffset = first.SpawnOffset,
                 LineStart = first.LineStart,
@@ -195,6 +213,14 @@ namespace SweepNDodge.DotsBullets
                 TelegraphDurationSec = telegraph.TelegraphDurationSec,
                 LocalOffset = localOffset,
                 BulletTypeKey = emission.Bullet != null ? emission.Bullet.DefinitionId : 0,
+                HasSpeedOverride = emission.EmissionCore.HasSpeedOverride ? (byte)1 : (byte)0,
+                SpeedOverride = emission.EmissionCore.SpeedOverride,
+                HasLifetimeOverride = emission.EmissionCore.HasLifetimeOverride ? (byte)1 : (byte)0,
+                LifetimeOverride = emission.EmissionCore.LifetimeOverride,
+                HasMovementOverride = emission.EmissionCore.HasMovementOverride ? (byte)1 : (byte)0,
+                MovementFamily = emission.EmissionCore.MovementFamily,
+                DampedLinear = emission.EmissionCore.DampedLinear,
+                HomingLite = emission.EmissionCore.HomingLite,
                 PositionPatternMode = emission.PositionPatternMode,
                 SpawnOffset = emission.SpawnOffset,
                 LineStart = emission.LineStart,

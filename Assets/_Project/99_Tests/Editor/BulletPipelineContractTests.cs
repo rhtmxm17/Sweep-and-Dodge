@@ -129,12 +129,12 @@ namespace SweepNDodge.DotsBullets.Tests
         [Test]
         public void ExecutionBeginSpawnSubSequence_StaysInContractOrder()
         {
-            AssertUpdateInGroup(typeof(SecondarySpawnExecutionSystem), typeof(BulletExecutionBeginGroup));
-            AssertUpdateAfter(typeof(SecondarySpawnExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
-            AssertUpdateBefore(typeof(SecondarySpawnExecutionSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
+            AssertUpdateInGroup(typeof(DiscreteEmitExecutionSystem), typeof(BulletExecutionBeginGroup));
+            AssertUpdateAfter(typeof(DiscreteEmitExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
+            AssertUpdateBefore(typeof(DiscreteEmitExecutionSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
             AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
-            AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(SecondarySpawnExecutionSystem));
-            AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(SecondarySpawnExecutionSystem));
+            AssertUpdateBefore(typeof(BulletFieldAreaUpdateSystem), typeof(DiscreteEmitExecutionSystem));
+            AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(DiscreteEmitExecutionSystem));
             AssertUpdateAfter(typeof(SpawnRequestRoundRobinExecutionSystem), typeof(BulletFieldAreaUpdateSystem));
             AssertUpdateAfter(typeof(SpawnBacklogWarningSystem), typeof(SpawnRequestRoundRobinExecutionSystem));
         }

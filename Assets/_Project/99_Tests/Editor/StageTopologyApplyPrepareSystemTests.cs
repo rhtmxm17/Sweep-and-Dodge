@@ -14,7 +14,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             public GameObject Root;
             public HazardEmitterTelegraphProfileSO Telegraph;
-            public HazardEmitterEmissionProfileSO Emission;
+            public EmissionProfileSO Emission;
             public BulletDefinitionSO Bullet;
 
             public void Dispose()
@@ -274,6 +274,7 @@ namespace SweepNDodge.DotsBullets.Tests
                         PlacementInstanceId = 101,
                         ActorArchetypePrefab = archetype.Root,
                         LocalOffset = new UnityEngine.Vector3(3f, 0f, -2f),
+                        LocalYawDeg = 180f,
                     }
                 };
 
@@ -294,12 +295,30 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(placement.PlacementInstanceId, Is.EqualTo(101));
                 Assert.That(placement.LocalOffset.x, Is.EqualTo(3f).Within(0.001f));
                 Assert.That(placement.LocalOffset.z, Is.EqualTo(-2f).Within(0.001f));
+                Assert.That(placement.LocalYawDeg, Is.EqualTo(180f).Within(0.001f));
+                Assert.That(em.HasComponent<LocalTransform>(actor), Is.True);
+                var actorTransform = em.GetComponentData<LocalTransform>(actor);
+                var sourceAnchor = em.GetComponentData<SourceAnchorComponent>(source);
+                float3 expectedWorldPosition = sourceAnchor.Position + placement.LocalOffset;
+                Assert.That(actorTransform.Position.x, Is.EqualTo(expectedWorldPosition.x).Within(0.001f));
+                Assert.That(actorTransform.Position.y, Is.EqualTo(expectedWorldPosition.y).Within(0.001f));
+                Assert.That(actorTransform.Position.z, Is.EqualTo(expectedWorldPosition.z).Within(0.001f));
+                var actorRight = math.rotate(actorTransform.Rotation, new float3(1f, 0f, 0f));
+                Assert.That(actorRight.x, Is.EqualTo(-1f).Within(0.001f));
+                Assert.That(actorRight.z, Is.EqualTo(0f).Within(0.001f));
+                var executionSlots = em.GetBuffer<HazardActorPatternExecutionSlotBuffer>(actor);
+                Assert.That(executionSlots.Length, Is.EqualTo(1));
+                Assert.That(executionSlots[0].BaseAngleDeg, Is.EqualTo(180f).Within(0.001f));
                 Assert.That(em.GetComponentData<HazardActorRuntimeStateComponent>(actor).PresenceState, Is.EqualTo(HazardActorPresenceStateId.Hidden));
 
                 var actorRefs = em.GetBuffer<SourceHazardActorRefBuffer>(source);
                 Assert.That(actorRefs.Length, Is.EqualTo(1));
                 Assert.That(actorRefs[0].ActorEntity, Is.EqualTo(actor));
                 Assert.That(actorRefs[0].ActorId, Is.EqualTo(101));
+
+                var linkedGroup = em.GetBuffer<LinkedEntityGroup>(source);
+                Assert.That(linkedGroup.Length, Is.EqualTo(1), "Runtime hazard actors must not be added to the SubScene source LinkedEntityGroup.");
+                Assert.That(linkedGroup[0].Value, Is.EqualTo(source));
             }
             finally
             {
@@ -708,15 +727,11 @@ namespace SweepNDodge.DotsBullets.Tests
             fixture.Telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
             fixture.Bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
             fixture.Bullet.Editor_SetDefinitionId(7000 + emitterId);
-            fixture.Emission = ScriptableObject.CreateInstance<HazardEmitterEmissionProfileSO>();
+            fixture.Emission = ScriptableObject.CreateInstance<EmissionProfileSO>();
             fixture.Emission.Bullet = fixture.Bullet;
             fixture.Emission.PositionPattern = new SinglePointPositionPatternAuthoring();
             fixture.Emission.Aim = new FixedAimAuthoring();
             fixture.Emission.ShotPattern = new SingleShotPatternAuthoring();
-            fixture.Emission.EventRepeatCount = 1;
-            fixture.Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Instant;
-            fixture.Emission.EventShotIntervalSec = 0f;
-            fixture.Emission.CooldownSec = 1f;
 
             actor.PatternSlots = new[]
             {
@@ -724,7 +739,14 @@ namespace SweepNDodge.DotsBullets.Tests
                 {
                     PatternSlotId = 1,
                     TelegraphProfile = fixture.Telegraph,
-                    EmissionProfile = fixture.Emission,
+                    Emission = new HazardActorEmissionAuthoring
+                    {
+                        Profile = fixture.Emission,
+                        EventRepeatCount = 1,
+                        EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                        EventShotIntervalSec = 0f,
+                        CooldownSec = 1f,
+                    },
                     BaseWeight = 1f,
                     AvailabilityFlags = 0u,
                 }

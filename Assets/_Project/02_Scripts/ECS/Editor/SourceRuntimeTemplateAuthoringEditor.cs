@@ -167,6 +167,7 @@ namespace SweepNDodge.DotsBullets.Editor
             EditorGUILayout.PropertyField(_drawGizmoProperty);
             EditorGUILayout.PropertyField(_drawGizmoWhenNotSelectedProperty);
         }
+
     }
 
     public static class SourceRuntimeTemplateAuthoringEditorSummaryUtility

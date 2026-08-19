@@ -38,5 +38,25 @@ MonoBehaviour:
     - TriggerState: 1
       EventClips:
       - {fileID: 11400000, guid: e3f7b98d8a214f0f8fa73980e7f9a2f6, type: 2}
-    HazardActorPlacements: []
-    HazardActorOrchestrationRules: []
+    HazardActorPlacements:
+    - PlacementInstanceId: 1
+      ActorArchetypePrefab: {fileID: 7002816760119344309, guid: 8465163384813284292d13356760fe08, type: 3}
+      LocalOffset: {x: -5, y: 0, z: -2}
+      LocalYawDeg: 45.000004
+    - PlacementInstanceId: 2
+      ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
+      LocalOffset: {x: 6, y: 0, z: 4}
+      LocalYawDeg: 210
+    HazardActorOrchestrationRules:
+    - RuleId: 301
+      TargetPlacementInstanceIds: 0100000002000000
+      ActionType: 1
+      TriggerType: 1
+      TriggerThresholdNormalized: 0
+      TargetPhaseId: 1
+    - RuleId: 302
+      TargetPlacementInstanceIds: 0100000002000000
+      ActionType: 2
+      TriggerType: 2
+      TriggerThresholdNormalized: 0.5
+      TargetPhaseId: 2

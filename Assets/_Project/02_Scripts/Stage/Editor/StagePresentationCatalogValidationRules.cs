@@ -6,6 +6,29 @@ namespace SweepNDodge.DotsBullets.Editor
 {
     public static class StagePresentationCatalogValidationRules
     {
+        public static bool TryResolveEntry(
+            StagePresentationCatalogSO catalog,
+            string presentationKey,
+            out StagePresentationCatalogEntry entry)
+        {
+            entry = default;
+            if (catalog == null || catalog.Entries == null || string.IsNullOrWhiteSpace(presentationKey))
+                return false;
+
+            string trimmed = presentationKey.Trim();
+            for (int i = 0; i < catalog.Entries.Length; i++)
+            {
+                StagePresentationCatalogEntry candidate = catalog.Entries[i];
+                if (!string.Equals(candidate.PresentationKey?.Trim(), trimmed, StringComparison.Ordinal))
+                    continue;
+
+                entry = candidate;
+                return true;
+            }
+
+            return false;
+        }
+
         public static void ValidateCatalogRecords(
             IReadOnlyList<ContentValidationRecord<StagePresentationCatalogSO>> catalogs,
             IReadOnlyList<ContentValidationRecord<StageLayoutSO>> layouts,

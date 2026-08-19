@@ -142,7 +142,16 @@ namespace SweepNDodge.DotsBullets
         public SourceStateId TriggerState;
         public float LocalStartSec;
         public float LocalEndSec;
+        public int ProfileRefId;
         public int BulletTypeKey;
+        public byte HasSpeedOverride;
+        public float SpeedOverride;
+        public byte HasLifetimeOverride;
+        public float LifetimeOverride;
+        public byte HasMovementOverride;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
         public SourceSpawnEmissionModeId EmissionMode;
         public SourceSpawnModeId SpawnMode;
         public WaveSamplingAnchorModeId SamplingAnchorMode;

@@ -1,20 +1,7 @@
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace SweepNDodge.DotsBullets
 {
-    [System.Serializable]
-    public struct BulletSecondarySpawnReactionDefinition
-    {
-        public bool Enabled;
-        public BulletDefinitionSO SecondaryBullet;
-        public int SpawnCount;
-        public BulletSecondarySpawnShapeId Shape;
-        public float SpreadAngleDeg;
-        public float SpawnRadius;
-        public float SpawnDelaySec;
-    }
-
     [CreateAssetMenu(menuName = "SweepNDodge/Bullet/Bullet Definition", fileName = "bd_")]
     public class BulletDefinitionSO : ScriptableObject
     {
@@ -45,29 +32,6 @@ namespace SweepNDodge.DotsBullets
             TurnRateDegPerSec = 90f,
             MaxAcquireDistance = 10f,
             MinRetargetDistance = 0.25f,
-        };
-
-        [Header("Reactions")]
-        public BulletSecondarySpawnReactionDefinition OnMotionCompletedExplode = new BulletSecondarySpawnReactionDefinition
-        {
-            Enabled = false,
-            SecondaryBullet = null,
-            SpawnCount = 0,
-            Shape = BulletSecondarySpawnShapeId.PointBurst,
-            SpreadAngleDeg = 90f,
-            SpawnRadius = 0f,
-            SpawnDelaySec = 0f,
-        };
-        [FormerlySerializedAs("OnCollectedSpawnSecondary")]
-        public BulletSecondarySpawnReactionDefinition OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
-        {
-            Enabled = false,
-            SecondaryBullet = null,
-            SpawnCount = 0,
-            Shape = BulletSecondarySpawnShapeId.PointBurst,
-            SpreadAngleDeg = 90f,
-            SpawnRadius = 0f,
-            SpawnDelaySec = 0f,
         };
 
 #if UNITY_EDITOR

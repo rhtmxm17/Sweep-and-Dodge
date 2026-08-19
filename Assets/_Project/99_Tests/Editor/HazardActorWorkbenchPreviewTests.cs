@@ -1,0 +1,1217 @@
+using System;
+using System.Linq;
+using System.IO;
+using System.Text;
+using System.Diagnostics;
+using NUnit.Framework;
+using SweepNDodge.DotsBullets.Editor;
+using UnityEditor;
+using UnityEngine;
+
+namespace SweepNDodge.DotsBullets.Tests
+{
+    public sealed class HazardActorWorkbenchPreviewTests
+    {
+        [Test]
+        public void SnapshotBuilder_UsesAuthoringResolverExecutionData()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                Assert.That(HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot), Is.True);
+                Assert.That(snapshot.PatternSlots, Has.Length.EqualTo(2));
+
+                Assert.That(HazardActorPatternSlotAuthoringUtility.TryResolveSlots(
+                    setup.Actor.PatternSlots,
+                    out var resolved,
+                    out string error), Is.True, error);
+
+                var expected = resolved.Single(x => x.Metadata.PatternSlotId == 1).Execution;
+                var actual = snapshot.PatternSlots.Single(x => x.PatternSlotId == 1).Execution;
+                Assert.That(actual.EmissionProfileRefId, Is.EqualTo(expected.EmissionProfileRefId));
+                Assert.That(actual.PositionPatternMode, Is.EqualTo(expected.PositionPatternMode));
+                Assert.That(actual.AimMode, Is.EqualTo(expected.AimMode));
+                Assert.That(actual.ShotPatternMode, Is.EqualTo(expected.ShotPatternMode));
+            }
+        }
+
+        [Test]
+        public void WorkbenchCommands_EditPhasePatternAndProtectReferences()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                Assert.That(HazardActorWorkbenchCommandUtility.AddPhase(setup.Actor, out int phaseId), Is.True);
+                Assert.That(setup.Actor.PhaseSelectorPolicies.Any(x => x.PhaseId == phaseId), Is.True);
+                Assert.That(HazardActorWorkbenchCommandUtility.DuplicatePattern(setup.Actor, 1, out int duplicatedPattern), Is.True);
+                Assert.That(setup.Actor.PatternSlots.Any(x => x.PatternSlotId == duplicatedPattern), Is.True);
+                Assert.That(HazardActorWorkbenchCommandUtility.RemovePattern(setup.Actor, 1, out string removeError), Is.False);
+                Assert.That(removeError, Does.Contain("selector candidates reference"));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_ReplaysPresenceSelectorTelegraphEmitCooldownDeterministically()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                session.Step();
+                Assert.That(session.Frame.Presence, Is.EqualTo(HazardActorPresenceStateId.Active));
+                Assert.That(session.Frame.PatternSlotId, Is.EqualTo(1));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(0));
+
+                session.Step();
+                Assert.That(session.Frame.Lifecycle, Is.EqualTo(HazardActorEmitLifecycleStateId.Dormant));
+                Assert.That(session.Frame.ActiveGhostCount, Is.GreaterThan(0));
+
+                float firstTime = session.TimeSec;
+                int firstCount = session.Frame.ActiveGhostCount;
+                session.Restart();
+                session.Step();
+                session.Step();
+                Assert.That(session.TimeSec, Is.EqualTo(firstTime));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(firstCount));
+            }
+        }
+
+        [Test]
+        public void PreviewCoordinator_AdvancesByWallClockInsteadOfCallbackCount()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                double start = UnityEditor.EditorApplication.timeSinceStartup;
+                var owner = new HazardActorPreviewOwnerToken("Wall Clock Test");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
+                HazardActorPreviewCoordinator.Play(owner);
+                HazardActorPreviewCoordinator.EvaluatePlaybackForTests(start);
+                HazardActorPreviewCoordinator.EvaluatePlaybackForTests(start + 5.0);
+
+                Assert.That(session.TimeSec, Is.InRange(4.9f, 5.1f));
+                HazardActorPreviewCoordinator.Shutdown();
+            }
+        }
+
+        [Test]
+        public void PreviewCoordinator_ProducesSameStateAcrossCallbackCadence()
+        {
+            var low = RunCadencePreview(8);
+            var high = RunCadencePreview(60);
+
+            Assert.That(low.time, Is.EqualTo(high.time));
+            Assert.That(low.ghostCount, Is.EqualTo(high.ghostCount));
+            Assert.That(low.firstGhost, Is.EqualTo(high.firstGhost));
+        }
+
+        [Test]
+        public void PreviewSession_LiveTargetMove_PreservesPlaybackTimeAndGhosts()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+                session.EvaluateAt(0.2f);
+                session.Play();
+
+                float timeBefore = session.TimeSec;
+                int ghostsBefore = session.Frame.ActiveGhostCount;
+                var nextTarget = new Vector3(3f, 0f, -2f);
+
+                session.SetTargetWorldPosition(nextTarget);
+
+                Assert.That(session.Playing, Is.True);
+                Assert.That(session.TimeSec, Is.EqualTo(timeBefore));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(ghostsBefore));
+                Assert.That(session.Input.TargetWorldPosition, Is.EqualTo(nextTarget));
+
+                session.Step();
+                Assert.That(session.Playing, Is.True);
+                Assert.That(session.TimeSec, Is.GreaterThan(timeBefore));
+            }
+        }
+
+        [Test]
+        public void PreviewSession_RestartWithTarget_RebuildsFromCurrentTarget()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+                session.EvaluateAt(0.2f);
+                Assert.That(session.Frame.ActiveGhostCount, Is.GreaterThan(0));
+
+                var nextTarget = new Vector3(3f, 0f, -2f);
+                session.SetTargetWorldPosition(nextTarget);
+                session.Restart();
+
+                Assert.That(session.TimeSec, Is.EqualTo(0f));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(0));
+                Assert.That(session.Input.TargetWorldPosition, Is.EqualTo(nextTarget));
+                Assert.That(session.Frame.Presence, Is.EqualTo(HazardActorPresenceStateId.Active));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_UsesRepeatScheduleAndInterval()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Actor.PatternSlots[0].Emission.EventRepeatCount = 3;
+                setup.Actor.PatternSlots[0].Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+                setup.Actor.PatternSlots[0].Emission.EventShotIntervalSec = 0.1f;
+                setup.Actor.PatternSlots[0].Emission.CooldownSec = 10f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Pattern,
+                    ForcedPatternSlotId = 1,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                session.EvaluateAt(0.12f);
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(1));
+                session.EvaluateAt(0.30f);
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(3));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_LineEvenSpawnCountIsIndependentFromTrajectorySampleBudget()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.ProfileA.PositionPattern = new LineEvenPositionPatternAuthoring
+                {
+                    LineStart = Vector2.zero,
+                    LineEnd = new Vector2(20f, 0f),
+                    SampleSpacing = 1f,
+                };
+                setup.Actor.PatternSlots[0].Emission.CooldownSec = 10f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Pattern,
+                    ForcedPatternSlotId = 1,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                session.EvaluateAt(0.10f);
+
+                Assert.That(session.Frame.ActiveGhostCount, Is.GreaterThan(HazardActorPreviewSession.TrajectorySamplesPerBranch));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(21));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_HandlesPhaseProgressAndOrderedCycle()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 1f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                for (int i = 0; i < 6; i++)
+                    session.Step();
+
+                Assert.That(session.Frame.PhaseId, Is.EqualTo(2));
+                Assert.That(session.Frame.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(session.Frame.PhaseVersion, Is.EqualTo(1u));
+                Assert.That(session.Frame.PatternSlotId, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void PreviewFrame_ExposesPhaseChangeAndLeadInTransitionState()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var instant = new HazardActorPreviewSession();
+                instant.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 1f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                instant.Step();
+
+                Assert.That(instant.Frame.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(instant.Frame.PhaseId, Is.EqualTo(2));
+                Assert.That(instant.Frame.PendingPhaseId, Is.EqualTo(-1));
+                Assert.That(instant.Frame.PhaseVersion, Is.EqualTo(1u));
+                Assert.That(instant.Frame.TransitionState, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+                Assert.That(instant.Frame.PhaseChangedThisFrame, Is.True);
+
+                setup.Actor.PhaseProgressTransitions[0].TransitionLeadInSec = HazardActorPreviewSession.FixedDeltaTime;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out snapshot);
+                var leadIn = new HazardActorPreviewSession();
+                leadIn.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 1f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                leadIn.Step();
+
+                Assert.That(leadIn.Frame.PhaseId, Is.EqualTo(1));
+                Assert.That(leadIn.Frame.PendingPhaseId, Is.EqualTo(2));
+                Assert.That(leadIn.Frame.TransitionState, Is.EqualTo(HazardActorPhaseTransitionStateId.Preparing));
+                Assert.That(leadIn.Frame.TransitionDurationSec, Is.EqualTo(HazardActorPreviewSession.FixedDeltaTime).Within(0.0001f));
+                Assert.That(leadIn.Frame.PhaseChangedThisFrame, Is.False);
+
+                leadIn.Step();
+
+                Assert.That(leadIn.Frame.PreviousPhaseId, Is.EqualTo(1));
+                Assert.That(leadIn.Frame.PhaseId, Is.EqualTo(2));
+                Assert.That(leadIn.Frame.PendingPhaseId, Is.EqualTo(-1));
+                Assert.That(leadIn.Frame.TransitionState, Is.EqualTo(HazardActorPhaseTransitionStateId.Idle));
+                Assert.That(leadIn.Frame.PhaseChangedThisFrame, Is.True);
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_PhaseScope_IsolatesForcedPhaseWithoutActivationOrProgressTransition()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Actor.ActivationDurationSec = 5f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Phase,
+                    ForcedPhaseId = 1,
+                    SourceProgress01 = 1f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                session.Step();
+                session.Step();
+
+                Assert.That(session.Frame.Presence, Is.EqualTo(HazardActorPresenceStateId.Active));
+                Assert.That(session.Frame.PhaseId, Is.EqualTo(1));
+                Assert.That(session.Frame.PatternSlotId, Is.EqualTo(1));
+                Assert.That(session.Frame.ActiveGhostCount, Is.GreaterThan(0));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_AppliesMovementFamiliesAndGhostCap()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.ProfileA.MovementTuning.OverrideMovement = true;
+                setup.ProfileA.MovementTuning.Family = BulletMovementFamilyId.HomingLite;
+                setup.ProfileA.SpawnTuning.OverrideLifetime = true;
+                setup.ProfileA.SpawnTuning.LifetimeOverride = 2f;
+                setup.ProfileA.ShotPattern = new RadialShotPatternAuthoring { ShotCount = HazardActorPreviewSession.ActorGhostCap + 100 };
+
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Pattern,
+                    ForcedPatternSlotId = 1,
+                    TargetWorldPosition = new Vector3(10f, 0f, 0f),
+                    SpawnAtStart = true,
+                });
+                session.Step();
+                session.Step();
+
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(HazardActorPreviewSession.ActorGhostCap));
+                Assert.That(session.Frame.SuppressedGhostCount, Is.GreaterThan(0));
+                Assert.That(session.Frame.Warning, Does.Contain("Ghost cap"));
+                Assert.That(session.Ghosts[0].MovementFamily, Is.EqualTo(BulletMovementFamilyId.HomingLite));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_SteadyStepDoesNotAllocateManagedMemory()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                for (int i = 0; i < 12; i++)
+                    session.Step();
+
+                Assert.That(session.MeasureSteadyStepManagedAllocation(), Is.EqualTo(0L));
+            }
+        }
+
+        [Test]
+        public void EncounterPreviewSession_AggregatesMultipleActorsUnderSharedCap()
+        {
+            using (var setupA = CreateActorSetup())
+            using (var setupB = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setupA.Root, out var snapshotA);
+                HazardActorPreviewSnapshotBuilder.TryBuild(setupB.Root, out var snapshotB);
+                var encounter = new HazardActorEncounterPreviewSession();
+                encounter.AddActor(snapshotA, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Encounter,
+                    GhostCapOverride = HazardActorPreviewSession.EncounterGhostCap / 2,
+                    ActorWorldPosition = Vector3.zero,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+                encounter.AddActor(snapshotB, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Encounter,
+                    GhostCapOverride = HazardActorPreviewSession.EncounterGhostCap / 2,
+                    ActorWorldPosition = new Vector3(2f, 0f, 0f),
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                encounter.Step();
+                encounter.Step();
+
+                Assert.That(encounter.ActiveActorCount, Is.EqualTo(2));
+                Assert.That(encounter.Frame.ActiveGhostCount, Is.GreaterThan(0));
+                Assert.That(encounter.Frame.ActiveGhostCount, Is.LessThanOrEqualTo(HazardActorPreviewSession.EncounterGhostCap));
+                encounter.Dispose();
+                Assert.That(encounter.IsDisposed, Is.True);
+            }
+        }
+
+        [Test]
+        public void EncounterPreviewSession_ReevaluatesSpawnPhaseSetRetireWhenProgressScrubsBackward()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var encounter = new HazardActorEncounterPreviewSession();
+                encounter.AddActorPlan(
+                    7,
+                    snapshot,
+                    new HazardActorPreviewInput
+                    {
+                        Scope = HazardActorPreviewScope.Encounter,
+                        OwningSourceStableId = 1u,
+                        GhostCapOverride = HazardActorPreviewSession.EncounterGhostCap,
+                        ActorWorldPosition = Vector3.zero,
+                        TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                        SpawnAtStart = true,
+                    },
+                    new[]
+                    {
+                        new HazardActorEncounterRulePreview(1, 7, HazardActorOrchestrationActionId.Spawn, HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove, 0.2f, 0),
+                        new HazardActorEncounterRulePreview(2, 7, HazardActorOrchestrationActionId.PhaseSet, HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove, 0.5f, 2),
+                        new HazardActorEncounterRulePreview(3, 7, HazardActorOrchestrationActionId.Retire, HazardActorOrchestrationTriggerId.OnSourceProgressAtOrAbove, 0.8f, 0),
+                    });
+
+                encounter.SetSourceProgress(0f);
+                Assert.That(encounter.ActiveActorCount, Is.EqualTo(0));
+                Assert.That(encounter.TryGetPlacementState(0u, 7, out _), Is.False);
+                Assert.That(encounter.TryGetPlacementState(1u, 7, out var waitingState), Is.True);
+                Assert.That(waitingState, Is.EqualTo(HazardActorEncounterPlacementPreviewState.WaitingForSpawn));
+
+                encounter.SetSourceProgress(0.3f);
+                encounter.EvaluateAt(0.2f);
+                Assert.That(encounter.ActiveActorCount, Is.EqualTo(1));
+                Assert.That(encounter.Actors[0].Frame.PhaseId, Is.EqualTo(1));
+                Assert.That(encounter.TryGetPlacementState(1u, 7, out var activeState), Is.True);
+                Assert.That(activeState, Is.EqualTo(HazardActorEncounterPlacementPreviewState.Active));
+
+                encounter.SetSourceProgress(0.6f);
+                encounter.EvaluateAt(0.2f);
+                Assert.That(encounter.ActiveActorCount, Is.EqualTo(1));
+                Assert.That(encounter.Actors[0].Frame.PhaseId, Is.EqualTo(2));
+
+                encounter.SetSourceProgress(0.9f);
+                Assert.That(encounter.ActiveActorCount, Is.EqualTo(0));
+                Assert.That(encounter.TryGetPlacementState(1u, 7, out var retiredState), Is.True);
+                Assert.That(retiredState, Is.EqualTo(HazardActorEncounterPlacementPreviewState.Retired));
+
+                encounter.SetSourceProgress(0.6f);
+                encounter.EvaluateAt(0.2f);
+                Assert.That(encounter.ActiveActorCount, Is.EqualTo(1));
+                Assert.That(encounter.Actors[0].Frame.PhaseId, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void PreviewRenderer_DoesNotUsePerGhostImmediateDrawPaths()
+        {
+            string root = Directory.GetParent(Application.dataPath).FullName;
+            string core = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorPreviewCore.cs"),
+                Encoding.UTF8);
+            string window = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorWorkbenchWindow.cs"),
+                Encoding.UTF8);
+
+            Assert.That(core, Does.Not.Contain("Handles.DrawSolidDisc(ghosts"));
+            Assert.That(core, Does.Not.Contain("Handles.DrawLine(ghosts"));
+            Assert.That(window, Does.Not.Contain("GUI.DrawTexture"));
+            Assert.That(window, Does.Not.Contain("_previewDensity"));
+            Assert.That(window, Does.Contain("new HazardActorWorkbenchPreviewElement"));
+        }
+
+        [Test]
+        public void WorkbenchPreviewProjection_PreservesExactPositionsAndRejectsOutOfViewPoints()
+        {
+            var rect = new Rect(0f, 0f, 320f, 160f);
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectWorldToPreview(
+                new Vector3(-4f, 0f, -2f),
+                Vector2.zero,
+                8f,
+                rect,
+                out Vector2 first), Is.True);
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectWorldToPreview(
+                new Vector3(4f, 0f, 2f),
+                Vector2.zero,
+                8f,
+                rect,
+                out Vector2 second), Is.True);
+
+            Assert.That(first, Is.EqualTo(new Vector2(120f, 100f)));
+            Assert.That(second, Is.EqualTo(new Vector2(200f, 60f)));
+            Assert.That(Vector2.Distance(first, second), Is.GreaterThan(2f));
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectWorldToPreview(
+                new Vector3(100f, 0f, 0f),
+                Vector2.zero,
+                8f,
+                rect,
+                out _), Is.False, "Out-of-view bullets must be clipped instead of clamped into an edge density cell.");
+
+            var ghosts = new[]
+            {
+                new HazardActorPreviewGhost { Position = Vector3.zero },
+                new HazardActorPreviewGhost { Position = new Vector3(100f, 0f, 0f) },
+            };
+            Assert.That(
+                HazardActorWorkbenchPreviewElement.CountVisibleGhosts(ghosts, Vector2.zero, 8f, rect),
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void WorkbenchPreviewProjection_RoundTripsAndSupportsViewInteractionMath()
+        {
+            var rect = new Rect(0f, 0f, 320f, 160f);
+            var center = new Vector2(2f, -1f);
+            const float halfHeight = 8f;
+            var world = new Vector3(4f, 0f, 3f);
+
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectWorldToPreview(
+                world,
+                center,
+                halfHeight,
+                rect,
+                out Vector2 preview), Is.True);
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectPreviewToWorld(
+                preview,
+                center,
+                halfHeight,
+                rect,
+                out Vector3 roundTrip), Is.True);
+            Assert.That(roundTrip.x, Is.EqualTo(world.x).Within(0.001f));
+            Assert.That(roundTrip.z, Is.EqualTo(world.z).Within(0.001f));
+
+            var panned = HazardActorWorkbenchPreviewElement.CalculatePannedCenter(
+                center,
+                halfHeight,
+                rect,
+                new Vector2(40f, -20f));
+            Assert.That(panned.x, Is.LessThan(center.x));
+            Assert.That(panned.y, Is.LessThan(center.y));
+
+            HazardActorWorkbenchPreviewElement.CalculateZoomAroundPoint(
+                preview,
+                center,
+                halfHeight,
+                rect,
+                0.5f,
+                out Vector2 zoomCenter,
+                out float zoomHalfHeight);
+            Assert.That(zoomHalfHeight, Is.EqualTo(4f).Within(0.001f));
+            Assert.That(HazardActorWorkbenchPreviewElement.TryProjectPreviewToWorld(
+                preview,
+                zoomCenter,
+                zoomHalfHeight,
+                rect,
+                out Vector3 zoomRoundTrip), Is.True);
+            Assert.That(zoomRoundTrip.x, Is.EqualTo(world.x).Within(0.001f));
+            Assert.That(zoomRoundTrip.z, Is.EqualTo(world.z).Within(0.001f));
+        }
+
+        [Test]
+        public void WorkbenchPreviewInteractionState_DoesNotDirtyAuthoringAssets()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                EditorUtility.ClearDirty(setup.Actor);
+                EditorUtility.ClearDirty(setup.ProfileA);
+                EditorUtility.ClearDirty(setup.Telegraph);
+
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+                session.EvaluateAt(0.2f);
+
+                session.SetTargetWorldPosition(new Vector3(2f, 0f, -1f));
+                HazardActorWorkbenchPreviewElement.CalculatePannedCenter(
+                    Vector2.zero,
+                    8f,
+                    new Rect(0f, 0f, 320f, 160f),
+                    new Vector2(40f, -20f));
+                HazardActorWorkbenchPreviewElement.CalculateZoomAroundPoint(
+                    new Vector2(160f, 80f),
+                    Vector2.zero,
+                    8f,
+                    new Rect(0f, 0f, 320f, 160f),
+                    0.9f,
+                    out _,
+                    out _);
+                session.Restart();
+
+                Assert.That(EditorUtility.GetDirtyCount(setup.Actor), Is.EqualTo(0));
+                Assert.That(EditorUtility.GetDirtyCount(setup.ProfileA), Is.EqualTo(0));
+                Assert.That(EditorUtility.GetDirtyCount(setup.Telegraph), Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void WorkbenchPreview_DefaultsToExactAndUsesDensityOnlyWhenExplicitlySelected()
+        {
+            var session = new HazardActorPreviewSession();
+            try
+            {
+                var preview = new HazardActorWorkbenchPreviewElement(session);
+                Assert.That(preview.DisplayMode, Is.EqualTo(HazardActorPreviewDisplayMode.Exact));
+
+                preview.DisplayMode = HazardActorPreviewDisplayMode.Density;
+                Assert.That(preview.DisplayMode, Is.EqualTo(HazardActorPreviewDisplayMode.Density));
+            }
+            finally
+            {
+                session.Dispose();
+            }
+        }
+
+        [Test]
+        public void PreviewRenderer_SubmissionBudgetStaysWithinActorAndEncounterLimits()
+        {
+            Assert.That(
+                HazardActorPreviewRendererUtility.EstimateDrawSubmissions(HazardActorPreviewSession.ActorGhostCap, drawAggregate: false),
+                Is.LessThanOrEqualTo(3));
+            Assert.That(
+                HazardActorPreviewRendererUtility.EstimateDrawSubmissions(HazardActorPreviewSession.EncounterGhostCap, drawAggregate: false),
+                Is.LessThanOrEqualTo(8));
+            Assert.That(
+                HazardActorPreviewRendererUtility.EstimateDrawSubmissions(HazardActorPreviewSession.EncounterGhostCap, drawAggregate: true),
+                Is.LessThanOrEqualTo(8));
+        }
+
+        [Test]
+        public void PreviewRenderer_ShutdownReleasesEditorResources()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                var session = CreateHighCountSession(setup, HazardActorPreviewScope.Actor, 8);
+                HazardActorPreviewRendererUtility.DrawGhostInstances(session.Ghosts, 0.08f, drawAggregate: true);
+                Assert.That(HazardActorPreviewRendererUtility.HasAllocatedResources, Is.True);
+
+                var owner = new HazardActorPreviewOwnerToken("Renderer Shutdown Test");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
+                HazardActorPreviewCoordinator.Shutdown();
+
+                Assert.That(HazardActorPreviewRendererUtility.HasAllocatedResources, Is.False);
+                Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(0));
+                Assert.That(session.IsDisposed, Is.False);
+                session.Dispose();
+            }
+        }
+
+        [Test]
+        public void PreviewRenderer_MeetsMeasuredActorAndEncounterFrameBudgets()
+        {
+            using (var actorSetup = CreateActorSetup())
+            using (var encounterSetup = CreateActorSetup())
+            {
+                var actorSession = CreateHighCountSession(actorSetup, HazardActorPreviewScope.Actor, HazardActorPreviewSession.ActorGhostCap);
+                var encounterSession = CreateHighCountSession(encounterSetup, HazardActorPreviewScope.Encounter, HazardActorPreviewSession.EncounterGhostCap);
+
+                var actor = MeasurePreviewFrame(actorSession, 80, drawAggregate: false);
+                var encounter = MeasurePreviewFrame(encounterSession, 80, drawAggregate: false);
+
+                string actorSummary = $"Actor preview p95={actor.p95Ms:0.###}ms submissions={actor.maxSubmissions} gc={actor.allocationBytes}B";
+                string encounterSummary = $"Encounter preview p95={encounter.p95Ms:0.###}ms submissions={encounter.maxSubmissions} gc={encounter.allocationBytes}B";
+                TestContext.WriteLine(actorSummary);
+                TestContext.WriteLine(encounterSummary);
+                UnityEngine.Debug.Log($"[HazardActorPreviewPerformance] {actorSummary}; {encounterSummary}");
+                Assert.That(actor.p95Ms, Is.LessThanOrEqualTo(8d));
+                Assert.That(actor.maxSubmissions, Is.LessThanOrEqualTo(3));
+                Assert.That(actor.allocationBytes, Is.EqualTo(0L));
+                Assert.That(encounter.p95Ms, Is.LessThanOrEqualTo(16d));
+                Assert.That(encounter.maxSubmissions, Is.LessThanOrEqualTo(8));
+                Assert.That(encounter.allocationBytes, Is.EqualTo(0L));
+            }
+        }
+
+        [Test]
+        public void PreviewCoordinator_ClearOwner_DetachesWithoutDisposingOwnerSession()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput { Scope = HazardActorPreviewScope.Actor, SpawnAtStart = true });
+                var owner = new HazardActorPreviewOwnerToken("Lifecycle Test");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
+                Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(2));
+
+                HazardActorPreviewCoordinator.ClearOwner(owner);
+                Assert.That(session.IsDisposed, Is.False);
+                Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(0));
+                session.Dispose();
+            }
+        }
+
+        [Test]
+        public void PreviewCoordinator_OwnerHandoffPausesButDoesNotDisposePreviousSession()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var first = new HazardActorPreviewSession();
+                var second = new HazardActorPreviewSession();
+                first.Load(snapshot, new HazardActorPreviewInput { Scope = HazardActorPreviewScope.Actor, SpawnAtStart = true });
+                second.Load(snapshot, new HazardActorPreviewInput { Scope = HazardActorPreviewScope.Actor, SpawnAtStart = true });
+                var firstOwner = new HazardActorPreviewOwnerToken("First Owner");
+                var secondOwner = new HazardActorPreviewOwnerToken("Second Owner");
+                try
+                {
+                    HazardActorPreviewCoordinator.ActivateActor(firstOwner, first);
+                    HazardActorPreviewCoordinator.Play(firstOwner);
+                    HazardActorPreviewCoordinator.ActivateActor(secondOwner, second);
+
+                    Assert.That(first.Playing, Is.False);
+                    Assert.That(first.IsDisposed, Is.False);
+                    Assert.That(HazardActorPreviewCoordinator.IsActiveOwner(secondOwner), Is.True);
+
+                    HazardActorPreviewCoordinator.ClearOwner(firstOwner);
+                    Assert.That(HazardActorPreviewCoordinator.IsActiveOwner(secondOwner), Is.True);
+                    HazardActorPreviewCoordinator.ClearOwner(secondOwner);
+                    Assert.That(HazardActorPreviewCoordinator.ActiveCallbackCount, Is.EqualTo(0));
+                }
+                finally
+                {
+                    HazardActorPreviewCoordinator.Shutdown();
+                    first.Dispose();
+                    second.Dispose();
+                }
+            }
+        }
+
+        [Test]
+        public void ActorSourceProgress_ReevaluatesAtCurrentTimeAndPreservesPlayingState()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                try
+                {
+                    session.Load(snapshot, new HazardActorPreviewInput
+                    {
+                        Scope = HazardActorPreviewScope.Actor,
+                        SourceProgress01 = 0f,
+                        SpawnAtStart = true,
+                    });
+                    session.EvaluateAt(0.3f);
+                    session.Play();
+                    float time = session.TimeSec;
+
+                    session.SetSourceProgress(0.8f);
+                    Assert.That(session.Input.SourceProgress01, Is.EqualTo(0.8f).Within(0.0001f));
+                    Assert.That(session.TimeSec, Is.EqualTo(time).Within(HazardActorPreviewSession.FixedDeltaTime));
+                    Assert.That(session.Playing, Is.True);
+
+                    session.SetSourceProgress(0.2f);
+                    Assert.That(session.Input.SourceProgress01, Is.EqualTo(0.2f).Within(0.0001f));
+                    Assert.That(session.TimeSec, Is.EqualTo(time).Within(HazardActorPreviewSession.FixedDeltaTime));
+                }
+                finally
+                {
+                    session.Dispose();
+                }
+            }
+        }
+
+        [Test]
+        public void EncounterTarget_PersistsAcrossProgressRebuild()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var encounter = new HazardActorEncounterPreviewSession();
+                try
+                {
+                    encounter.AddActor(snapshot, new HazardActorPreviewInput
+                    {
+                        Scope = HazardActorPreviewScope.Encounter,
+                        TargetWorldPosition = new Vector3(0f, 0f, 3f),
+                        GhostCapOverride = 16,
+                        SpawnAtStart = true,
+                    });
+                    var target = new Vector3(4f, 0f, -2f);
+                    encounter.SetTargetWorldPosition(target);
+                    encounter.SetSourceProgress(0.7f);
+
+                    Assert.That(encounter.Actors.Count, Is.GreaterThan(0));
+                    Assert.That(encounter.Actors[0].Input.TargetWorldPosition, Is.EqualTo(target));
+                }
+                finally
+                {
+                    encounter.Dispose();
+                }
+            }
+        }
+
+        [Test]
+        public void WorkbenchVisibility_UsesPopupArchetypePickerInsteadOfPersistentLibraryPanel()
+        {
+            string root = Directory.GetParent(Application.dataPath).FullName;
+            string window = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorWorkbenchWindow.cs"),
+                Encoding.UTF8);
+
+            Assert.That(window, Does.Contain("Change Archetype"));
+            Assert.That(window, Does.Contain("PopupWindowContent"));
+            Assert.That(window, Does.Contain("BuildArchetypeSummary"));
+            Assert.That(window, Does.Not.Contain("Panel(\"Archetype Library\""));
+            Assert.That(window, Does.Not.Contain("private ScrollView _library"));
+            Assert.That(window, Does.Not.Contain("new UnityEditor.UIElements.ObjectField"));
+        }
+
+        [Test]
+        public void WorkbenchPreviewScope_FollowsSelectionWithoutManualScopeField()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                var actor = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForActor(setup.Root));
+                Assert.That(actor.Scope, Is.EqualTo(HazardActorPreviewScope.Actor));
+                Assert.That(actor.ForcedPhaseId, Is.EqualTo(0));
+                Assert.That(actor.ForcedPatternSlotId, Is.EqualTo(0));
+                Assert.That(actor.ShowSourceProgress, Is.True);
+                Assert.That(actor.PresentationLabel, Is.EqualTo("Actor"));
+
+                var phase = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForPhase(setup.Root, 2));
+                Assert.That(phase.Scope, Is.EqualTo(HazardActorPreviewScope.Phase));
+                Assert.That(phase.ForcedPhaseId, Is.EqualTo(2));
+                Assert.That(phase.ForcedPatternSlotId, Is.EqualTo(0));
+                Assert.That(phase.ShowSourceProgress, Is.False);
+                Assert.That(phase.PresentationLabel, Is.EqualTo("Phase 2"));
+
+                var transition = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForTransition(setup.Root, 1));
+                Assert.That(transition.Scope, Is.EqualTo(HazardActorPreviewScope.Phase));
+                Assert.That(transition.ForcedPhaseId, Is.EqualTo(1));
+                Assert.That(transition.ShowSourceProgress, Is.False);
+
+                var pattern = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForPattern(setup.Root, 2));
+                Assert.That(pattern.Scope, Is.EqualTo(HazardActorPreviewScope.Pattern));
+                Assert.That(pattern.ForcedPatternSlotId, Is.EqualTo(2));
+                Assert.That(pattern.ShowSourceProgress, Is.False);
+
+                var emission = HazardActorWorkbenchWindow.BuildPreviewBinding(
+                    HazardActorWorkbenchSelection.ForEmissionProfile(setup.Root, 1, setup.ProfileA));
+                Assert.That(emission.Scope, Is.EqualTo(HazardActorPreviewScope.Pattern));
+                Assert.That(emission.ForcedPatternSlotId, Is.EqualTo(1));
+                Assert.That(emission.ShowSourceProgress, Is.False);
+
+                Assert.That(
+                    HazardActorWorkbenchWindow.BuildSelectionBreadcrumb(
+                        HazardActorWorkbenchSelection.ForEmissionProfile(setup.Root, 1, setup.ProfileA)),
+                    Does.Contain("Pattern 1 > Emission Profile"));
+            }
+        }
+
+        [Test]
+        public void WorkbenchVisibility_SeparatesEditColumnAndUsesIconCommandButtons()
+        {
+            string root = Directory.GetParent(Application.dataPath).FullName;
+            string window = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorWorkbenchWindow.cs"),
+                Encoding.UTF8);
+            string renderer = File.ReadAllText(
+                Path.Combine(root, "Assets/_Project/02_Scripts/ECS/Editor/HazardActorPreviewRendererUtility.cs"),
+                Encoding.UTF8);
+
+            Assert.That(window, Does.Not.Contain("EnumField(\"Scope\""));
+            Assert.That(window, Does.Not.Contain("_scopeField"));
+            Assert.That(window, Does.Not.Contain("text = \"Duplicate\""));
+            Assert.That(window, Does.Not.Contain("text = \"Up\""));
+            Assert.That(window, Does.Not.Contain("text = \"Down\""));
+            Assert.That(window, Does.Not.Contain("text = \"Remove\""));
+            Assert.That(window, Does.Contain("\"Edit\", \"Commands\""));
+            Assert.That(window, Does.Contain("EditButton(\"Transition\""));
+            Assert.That(window, Does.Contain("EditButton(\"Emission\""));
+            Assert.That(window, Does.Contain("EditButton(\"Telegraph\""));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.Duplicate"));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.MoveUp"));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.MoveDown"));
+            Assert.That(window, Does.Contain("IconCommandButton(EditorIconKind.Remove"));
+            Assert.That(window, Does.Contain("EditorGUIUtility.IconContent"));
+            Assert.That(window, Does.Contain("Advanced Preview Controls"));
+            Assert.That(window, Does.Contain("Restart With Target"));
+            Assert.That(window, Does.Contain("Target: Live"));
+            Assert.That(renderer, Does.Contain("Shift+R restart with target"));
+            Assert.That(renderer, Does.Contain("RestartWithTargetRequested"));
+            Assert.That(window, Does.Not.Contain("(scope={binding.Scope})"));
+        }
+
+        [Test]
+        public void WorkbenchIssueNavigator_BuildsUnsavedChangeItemsWithoutValidationSeverity()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                EditorUtility.ClearDirty(setup.Actor);
+                EditorUtility.ClearDirty(setup.ProfileA);
+                EditorUtility.ClearDirty(setup.ProfileB);
+                EditorUtility.ClearDirty(setup.Telegraph);
+                EditorUtility.SetDirty(setup.Actor);
+                EditorUtility.SetDirty(setup.ProfileA);
+                EditorUtility.SetDirty(setup.Telegraph);
+
+                var issues = HazardActorWorkbenchWindow.BuildUnsavedChangeIssues(setup.Root, setup.Actor);
+
+                Assert.That(issues.Select(x => x.Code), Does.Contain("UNSAVED_ACTOR"));
+                Assert.That(issues.Select(x => x.Code), Does.Contain("UNSAVED_EMISSION_PROFILE"));
+                Assert.That(issues.Select(x => x.Code), Does.Contain("UNSAVED_TELEGRAPH_PROFILE"));
+
+                var actor = issues.Single(x => x.Code == "UNSAVED_ACTOR");
+                Assert.That(actor.Target.Kind, Is.EqualTo(HazardActorWorkbenchSelectionKind.Actor));
+                Assert.That(actor.PingTarget, Is.EqualTo(setup.Root));
+
+                var emission = issues.Single(x => x.Code == "UNSAVED_EMISSION_PROFILE");
+                Assert.That(emission.Target.Kind, Is.EqualTo(HazardActorWorkbenchSelectionKind.EmissionProfile));
+                Assert.That(emission.Target.PatternSlotId, Is.EqualTo(1));
+                Assert.That(emission.PingTarget, Is.EqualTo(setup.ProfileA));
+
+                var telegraph = issues.Single(x => x.Code == "UNSAVED_TELEGRAPH_PROFILE");
+                Assert.That(telegraph.Target.Kind, Is.EqualTo(HazardActorWorkbenchSelectionKind.TelegraphProfile));
+                Assert.That(telegraph.Target.PatternSlotId, Is.EqualTo(1));
+                Assert.That(telegraph.PingTarget, Is.EqualTo(setup.Telegraph));
+            }
+        }
+
+        [Test]
+        public void WorkbenchVisibility_SummarizesArchetypePhaseAndPatternAsSeparatedFields()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                var archetype = HazardActorWorkbenchWindow.BuildArchetypeSummary(setup.Root, setup.Root);
+                Assert.That(archetype.Name, Is.EqualTo(setup.Root.name));
+                Assert.That(archetype.PhaseCount, Is.EqualTo(2));
+                Assert.That(archetype.PatternCount, Is.EqualTo(2));
+                Assert.That(archetype.ProfileCount, Is.EqualTo(3));
+                Assert.That(archetype.IssueLabel, Is.EqualTo("OK"));
+                Assert.That(archetype.IsActive, Is.True);
+
+                var phaseIssue = new HazardActorWorkbenchIssue(
+                    ContentValidationSeverity.Warning,
+                    "TEST_PHASE",
+                    "phase warning",
+                    HazardActorWorkbenchSelection.ForPhase(setup.Root, 1));
+                var phase = HazardActorWorkbenchWindow.BuildPhaseRowSummary(
+                    setup.Actor,
+                    setup.Actor.PhaseSelectorPolicies[0],
+                    new[] { phaseIssue });
+                Assert.That(phase.PhaseLabel, Is.EqualTo("Phase 1"));
+                Assert.That(phase.SelectorLabel, Is.EqualTo(HazardActorSelectionModeId.OrderedPriority.ToString()));
+                Assert.That(phase.CandidatesLabel, Does.Contain("P1"));
+                Assert.That(phase.TransitionLabel, Does.Contain("Phase 2"));
+                Assert.That(phase.IssueLabel, Is.EqualTo("1 warn"));
+
+                var patternIssue = new HazardActorWorkbenchIssue(
+                    ContentValidationSeverity.Error,
+                    "TEST_PATTERN",
+                    "pattern error",
+                    HazardActorWorkbenchSelection.ForPattern(setup.Root, 1));
+                var pattern = HazardActorWorkbenchWindow.BuildPatternRowSummary(
+                    setup.Actor.PatternSlots[0],
+                    new[] { patternIssue });
+                Assert.That(pattern.PatternLabel, Is.EqualTo("Pattern 1"));
+                Assert.That(pattern.TelegraphLabel, Is.EqualTo("0s"));
+                Assert.That(pattern.EmissionLabel, Is.EqualTo(setup.ProfileA.name));
+                Assert.That(pattern.ScheduleLabel, Does.Contain("repeat x1"));
+                Assert.That(pattern.MovementLabel, Is.Not.Empty);
+                Assert.That(pattern.IssueLabel, Is.EqualTo("1 error"));
+            }
+        }
+
+        private static (float time, int ghostCount, Vector3 firstGhost) RunCadencePreview(int hz)
+        {
+            using (var setup = CreateActorSetup())
+            {
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Actor,
+                    SourceProgress01 = 0f,
+                    TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                    SpawnAtStart = true,
+                });
+
+                double start = UnityEditor.EditorApplication.timeSinceStartup;
+                var owner = new HazardActorPreviewOwnerToken($"Cadence {hz}");
+                HazardActorPreviewCoordinator.ActivateActor(owner, session);
+                HazardActorPreviewCoordinator.Play(owner);
+                HazardActorPreviewCoordinator.EvaluatePlaybackForTests(start);
+                int callbacks = Mathf.CeilToInt(hz * 1f);
+                for (int i = 1; i <= callbacks; i++)
+                    HazardActorPreviewCoordinator.EvaluatePlaybackForTests(start + ((double)i / hz));
+
+                Vector3 first = session.Ghosts.Count > 0 ? session.Ghosts[0].Position : Vector3.zero;
+                var result = (session.TimeSec, session.Frame.ActiveGhostCount, first);
+                HazardActorPreviewCoordinator.Shutdown();
+                return result;
+            }
+        }
+
+        private static HazardActorPreviewSession CreateHighCountSession(
+            ActorSetup setup,
+            HazardActorPreviewScope scope,
+            int ghostCount)
+        {
+            setup.ProfileA.SpawnTuning.OverrideLifetime = true;
+            setup.ProfileA.SpawnTuning.LifetimeOverride = 20f;
+            setup.ProfileA.ShotPattern = new RadialShotPatternAuthoring { ShotCount = ghostCount };
+            setup.Actor.PatternSlots[0].Emission.CooldownSec = 20f;
+            HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+            var session = new HazardActorPreviewSession();
+            session.Load(snapshot, new HazardActorPreviewInput
+            {
+                Scope = scope,
+                ForcedPatternSlotId = 1,
+                TargetWorldPosition = new Vector3(0f, 0f, 5f),
+                SpawnAtStart = true,
+            });
+            session.EvaluateAt(0.1f);
+            Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(ghostCount));
+            return session;
+        }
+
+        private static (double p95Ms, int maxSubmissions, long allocationBytes) MeasurePreviewFrame(
+            HazardActorPreviewSession session,
+            int samples,
+            bool drawAggregate)
+        {
+            for (int i = 0; i < 16; i++)
+            {
+                session.Step();
+                HazardActorPreviewRendererUtility.PrepareGhostBatchesForMeasurement(session.Ghosts, 0.08f, drawAggregate);
+            }
+
+            var timings = new double[samples];
+            int maxSubmissions = 0;
+            var stopwatch = new Stopwatch();
+            for (int i = 0; i < samples; i++)
+            {
+                stopwatch.Restart();
+                session.Step();
+                HazardActorPreviewRendererUtility.PrepareGhostBatchesForMeasurement(session.Ghosts, 0.08f, drawAggregate);
+                stopwatch.Stop();
+                timings[i] = stopwatch.Elapsed.TotalMilliseconds;
+                maxSubmissions = Mathf.Max(maxSubmissions, HazardActorPreviewRendererUtility.LastDrawSubmissions);
+            }
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            session.Step();
+            HazardActorPreviewRendererUtility.PrepareGhostBatchesForMeasurement(session.Ghosts, 0.08f, drawAggregate);
+            long allocationBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Array.Sort(timings);
+            int p95Index = Mathf.Clamp(Mathf.CeilToInt(samples * 0.95f) - 1, 0, samples - 1);
+            return (timings[p95Index], maxSubmissions, allocationBytes);
+        }
+
+        private static ActorSetup CreateActorSetup()
+        {
+            var root = new GameObject("hazard_actor_prefab");
+            var actor = root.AddComponent<HazardActorAuthoring>();
+            actor.InitialPresenceState = HazardActorPresenceStateId.Active;
+            actor.InitialPhaseId = 1;
+            actor.PhaseSelectorPolicies = new[]
+            {
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 1,
+                    SelectionMode = HazardActorSelectionModeId.OrderedPriority,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { PatternSlotId = 1 } },
+                },
+                new HazardActorPhaseSelectorPolicyAuthoring
+                {
+                    PhaseId = 2,
+                    SelectionMode = HazardActorSelectionModeId.OrderedCycle,
+                    Candidates = new[] { new HazardActorPhaseSelectorCandidateAuthoring { PatternSlotId = 2 } },
+                },
+            };
+            actor.PhaseProgressTransitions = new[]
+            {
+                new HazardActorPhaseProgressTransitionAuthoring
+                {
+                    FromPhaseId = 1,
+                    ToPhaseId = 2,
+                    ProgressThresholdNormalized = 0.5f,
+                    TransitionLeadInSec = 0f,
+                }
+            };
+
+            var bullet = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            bullet.Editor_SetDefinitionId(11);
+            bullet.Speed = 1f;
+            bullet.Lifetime = 1f;
+            var telegraph = ScriptableObject.CreateInstance<HazardEmitterTelegraphProfileSO>();
+            telegraph.TelegraphDurationSec = 0f;
+            var profileA = CreateProfile("profile_a", bullet, WaveAimModeId.Fixed);
+            var profileB = CreateProfile("profile_b", bullet, WaveAimModeId.PlayerPosition);
+            actor.PatternSlots = new[]
+            {
+                new HazardActorPatternSlotAuthoring
+                {
+                    PatternSlotId = 1,
+                    TelegraphProfile = telegraph,
+                    Emission = new HazardActorEmissionAuthoring
+                    {
+                        Profile = profileA,
+                        EventRepeatCount = 1,
+                        EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                        CooldownSec = 0f,
+                    },
+                    BaseWeight = 1f,
+                },
+                new HazardActorPatternSlotAuthoring
+                {
+                    PatternSlotId = 2,
+                    TelegraphProfile = telegraph,
+                    Emission = new HazardActorEmissionAuthoring
+                    {
+                        Profile = profileB,
+                        EventRepeatCount = 1,
+                        EventShotSchedule = SourceSpawnEventShotScheduleId.Instant,
+                        CooldownSec = 0f,
+                    },
+                    BaseWeight = 1f,
+                },
+            };
+            return new ActorSetup(root, actor, bullet, telegraph, profileA, profileB);
+        }
+
+        private static EmissionProfileSO CreateProfile(string name, BulletDefinitionSO bullet, WaveAimModeId aimMode)
+        {
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            profile.name = name;
+            profile.Bullet = bullet;
+            profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+            profile.Aim = aimMode == WaveAimModeId.PlayerPosition
+                ? (WaveAimAuthoringBase)new PlayerPositionAimAuthoring()
+                : new FixedAimAuthoring();
+            profile.ShotPattern = new SingleShotPatternAuthoring();
+            return profile;
+        }
+
+        private readonly struct ActorSetup : System.IDisposable
+        {
+            public ActorSetup(
+                GameObject root,
+                HazardActorAuthoring actor,
+                BulletDefinitionSO bullet,
+                HazardEmitterTelegraphProfileSO telegraph,
+                EmissionProfileSO profileA,
+                EmissionProfileSO profileB)
+            {
+                Root = root;
+                Actor = actor;
+                Bullet = bullet;
+                Telegraph = telegraph;
+                ProfileA = profileA;
+                ProfileB = profileB;
+            }
+
+            public GameObject Root { get; }
+            public HazardActorAuthoring Actor { get; }
+            public BulletDefinitionSO Bullet { get; }
+            public HazardEmitterTelegraphProfileSO Telegraph { get; }
+            public EmissionProfileSO ProfileA { get; }
+            public EmissionProfileSO ProfileB { get; }
+
+            public void Dispose()
+            {
+                UnityEngine.Object.DestroyImmediate(Root);
+                UnityEngine.Object.DestroyImmediate(Bullet);
+                UnityEngine.Object.DestroyImmediate(Telegraph);
+                UnityEngine.Object.DestroyImmediate(ProfileA);
+                UnityEngine.Object.DestroyImmediate(ProfileB);
+            }
+        }
+    }
+}

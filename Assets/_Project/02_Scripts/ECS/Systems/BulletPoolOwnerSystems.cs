@@ -211,8 +211,8 @@ namespace SweepNDodge.DotsBullets
                 });
             }
 
-            EnsureSecondarySpawnRuntimeSingleton(em);
             EnsureDiscreteEmitRuntimeSingleton(em);
+            EnsureEmissionProfileRuntimeRegistrySingleton(em);
 
             if (!HasSingleton<RunProgressDirectorConfigComponent>(em))
             {
@@ -379,36 +379,6 @@ namespace SweepNDodge.DotsBullets
             return !query.IsEmptyIgnoreFilter;
         }
 
-        private static void EnsureSecondarySpawnRuntimeSingleton(EntityManager em)
-        {
-            Entity singletonEntity;
-            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<BulletSecondarySpawnChannelSingletonTag>()))
-            {
-                singletonEntity = query.IsEmptyIgnoreFilter
-                    ? em.CreateEntity(typeof(BulletSecondarySpawnChannelSingletonTag))
-                    : query.GetSingletonEntity();
-            }
-
-            if (!em.HasBuffer<BulletSecondarySpawnRequestBuffer>(singletonEntity))
-            {
-                var buffer = em.AddBuffer<BulletSecondarySpawnRequestBuffer>(singletonEntity);
-                buffer.EnsureCapacity(32);
-            }
-
-            if (!em.HasComponent<SecondarySpawnPolicyComponent>(singletonEntity))
-            {
-                em.AddComponentData(singletonEntity, new SecondarySpawnPolicyComponent
-                {
-                    BudgetPerFrame = 256,
-                    MaxPendingCount = 8192,
-                    MaxPendingAgeFrames = 120,
-                });
-            }
-
-            if (!em.HasComponent<SecondarySpawnBacklogMetricsComponent>(singletonEntity))
-                em.AddComponentData(singletonEntity, default(SecondarySpawnBacklogMetricsComponent));
-        }
-
         private static void EnsureDiscreteEmitRuntimeSingleton(EntityManager em)
         {
             Entity singletonEntity;
@@ -439,8 +409,32 @@ namespace SweepNDodge.DotsBullets
                 em.AddComponentData(singletonEntity, default(DiscreteEmitBacklogMetricsComponent));
         }
 
+        private static void EnsureEmissionProfileRuntimeRegistrySingleton(EntityManager em)
+        {
+            Entity singletonEntity;
+            using (var query = em.CreateEntityQuery(ComponentType.ReadOnly<EmissionProfileRuntimeRegistryTag>()))
+            {
+                singletonEntity = query.IsEmptyIgnoreFilter
+                    ? em.CreateEntity(typeof(EmissionProfileRuntimeRegistryTag))
+                    : query.GetSingletonEntity();
+            }
+
+            if (!em.HasBuffer<EmissionProfileRuntimeRegistryBuffer>(singletonEntity))
+            {
+                var buffer = em.AddBuffer<EmissionProfileRuntimeRegistryBuffer>(singletonEntity);
+                buffer.EnsureCapacity(32);
+            }
+        }
+
         private static void ApplyDefinitionBehaviorComponents(EntityManager em, Entity bullet, in BulletPoolDefinitionBuffer def)
         {
+            SetOrAddComponent(em, bullet, new BulletMovementRuntimeComponent
+            {
+                Family = def.MovementFamily,
+                DampedLinear = def.DampedLinear,
+                HomingLite = def.HomingLite,
+            });
+
             switch (def.MovementFamily)
             {
                 case BulletMovementFamilyId.DampedLinear:
@@ -468,50 +462,6 @@ namespace SweepNDodge.DotsBullets
                     break;
             }
 
-            ApplyReactionComponent(
-                em,
-                bullet,
-                def.OnMotionCompletedExplode,
-                static reaction => new BulletOnMotionCompletedExplodeReactionComponent
-                {
-                    SecondaryBulletTypeKey = reaction.SecondaryBulletTypeKey,
-                    SpawnCount = reaction.SpawnCount,
-                    Shape = reaction.Shape,
-                    SpreadAngleDeg = reaction.SpreadAngleDeg,
-                    SpawnRadius = reaction.SpawnRadius,
-                    SpawnDelaySec = reaction.SpawnDelaySec,
-                });
-
-            ApplyReactionComponent(
-                em,
-                bullet,
-                def.OnCleanupRemovedSpawnSecondary,
-                static reaction => new BulletOnCleanupRemovedSpawnSecondaryReactionComponent
-                {
-                    SecondaryBulletTypeKey = reaction.SecondaryBulletTypeKey,
-                    SpawnCount = reaction.SpawnCount,
-                    Shape = reaction.Shape,
-                    SpreadAngleDeg = reaction.SpreadAngleDeg,
-                    SpawnRadius = reaction.SpawnRadius,
-                    SpawnDelaySec = reaction.SpawnDelaySec,
-                });
-        }
-
-        private static void ApplyReactionComponent<TComponent>(
-            EntityManager em,
-            Entity bullet,
-            in BulletSecondarySpawnReactionRuntimeDefinition reaction,
-            global::System.Func<BulletSecondarySpawnReactionRuntimeDefinition, TComponent> create)
-            where TComponent : unmanaged, IComponentData
-        {
-            if (reaction.SecondaryBulletTypeKey < 0 || reaction.SpawnCount <= 0)
-            {
-                RemoveComponentIfPresent<TComponent>(em, bullet);
-                return;
-            }
-
-            var component = create(reaction);
-            SetOrAddComponent(em, bullet, component);
         }
 
         private static void SetOrAddComponent<T>(EntityManager em, Entity entity, T value)
@@ -538,7 +488,7 @@ namespace SweepNDodge.DotsBullets
     [BurstCompile]
     [UpdateInGroup(typeof(BulletExecutionBeginGroup))]
     [UpdateAfter(typeof(BulletPoolOwnerBootstrapSystem))]
-    [UpdateBefore(typeof(SecondarySpawnExecutionSystem))]
+    [UpdateBefore(typeof(DiscreteEmitExecutionSystem))]
     [UpdateBefore(typeof(SpawnRequestRoundRobinExecutionSystem))]
     public partial struct BulletFieldAreaUpdateSystem : ISystem
     {

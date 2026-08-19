@@ -38,6 +38,12 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(policy.BudgetPerFrame, Is.EqualTo(256));
             Assert.That(policy.MaxPendingCount, Is.EqualTo(8192));
             Assert.That(policy.MaxPendingAgeFrames, Is.EqualTo(120u));
+            Assert.That(policy.WaveClipEventBudgetPerFrame, Is.EqualTo(0));
+            Assert.That(policy.HazardActorBudgetPerFrame, Is.EqualTo(0));
+            Assert.That(policy.TriggeredEmissionBudgetPerFrame, Is.EqualTo(0));
+            Assert.That(policy.WaveClipEventMaxPendingCount, Is.EqualTo(0));
+            Assert.That(policy.HazardActorMaxPendingCount, Is.EqualTo(0));
+            Assert.That(policy.TriggeredEmissionMaxPendingCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -46,13 +52,27 @@ namespace SweepNDodge.DotsBullets.Tests
             var sourceEntity = new Entity { Index = 101, Version = 1 };
             var producerEntity = new Entity { Index = 202, Version = 1 };
             var anchorEntity = new Entity { Index = 303, Version = 1 };
+            var causerEntity = new Entity { Index = 404, Version = 1 };
             var seed = new DiscreteEmitRequestSeed
             {
                 ProducerKind = DiscreteEmitProducerKind.HazardActor,
                 SourceEntity = sourceEntity,
                 ProducerEntity = producerEntity,
+                CauserEntity = causerEntity,
                 EmissionId = 77,
+                ProfileRefId = 88,
                 BulletTypeKey = 9,
+                HasSpeedOverride = 1,
+                SpeedOverride = 6.5f,
+                HasLifetimeOverride = 1,
+                LifetimeOverride = 9.25f,
+                HasMovementOverride = 1,
+                MovementFamily = BulletMovementFamilyId.DampedLinear,
+                DampedLinear = new BulletDampedLinearDefinition
+                {
+                    DampingPerSec = 4f,
+                    StopSpeedThreshold = 0.2f,
+                },
                 AnchorMode = DiscreteEmitAnchorMode.FixedWorld,
                 AnchorEntity = anchorEntity,
                 AnchorPosition = new float3(1f, 2f, 3f),
@@ -81,6 +101,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 EventShotIntervalSec = 0.25f,
                 RepeatCount = 3,
                 Priority = 12,
+                ReadyFrame = 60u,
             };
 
             var request = DiscreteEmitRequestUtility.CreateDiscreteEmitRequest(seed, 55u);
@@ -88,8 +109,18 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.ProducerKind, Is.EqualTo(DiscreteEmitProducerKind.HazardActor));
             Assert.That(request.SourceEntity, Is.EqualTo(sourceEntity));
             Assert.That(request.ProducerEntity, Is.EqualTo(producerEntity));
+            Assert.That(request.CauserEntity, Is.EqualTo(causerEntity));
             Assert.That(request.EmissionId, Is.EqualTo(77));
+            Assert.That(request.ProfileRefId, Is.EqualTo(88));
             Assert.That(request.BulletTypeKey, Is.EqualTo(9));
+            Assert.That(request.HasSpeedOverride, Is.EqualTo(1));
+            Assert.That(request.SpeedOverride, Is.EqualTo(6.5f));
+            Assert.That(request.HasLifetimeOverride, Is.EqualTo(1));
+            Assert.That(request.LifetimeOverride, Is.EqualTo(9.25f));
+            Assert.That(request.HasMovementOverride, Is.EqualTo(1));
+            Assert.That(request.MovementFamily, Is.EqualTo(BulletMovementFamilyId.DampedLinear));
+            Assert.That(request.DampedLinear.DampingPerSec, Is.EqualTo(4f));
+            Assert.That(request.DampedLinear.StopSpeedThreshold, Is.EqualTo(0.2f));
             Assert.That(request.AnchorMode, Is.EqualTo(DiscreteEmitAnchorMode.FixedWorld));
             Assert.That(request.AnchorEntity, Is.EqualTo(anchorEntity));
             Assert.That(request.AnchorPosition, Is.EqualTo(new float3(1f, 2f, 3f)));
@@ -104,6 +135,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.EventShotElapsedSec, Is.EqualTo(0f));
             Assert.That(request.Priority, Is.EqualTo(12));
             Assert.That(request.OldestFrame, Is.EqualTo(55u));
+            Assert.That(request.ReadyFrame, Is.EqualTo(60u));
         }
 
         [Test]
@@ -142,6 +174,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(request.ShotCount, Is.EqualTo(1));
             Assert.That(request.PointSetCount, Is.EqualTo(4));
             Assert.That(request.EventShotIntervalSec, Is.EqualTo(0f));
+            Assert.That(request.ReadyFrame, Is.EqualTo(99u));
         }
     }
 }

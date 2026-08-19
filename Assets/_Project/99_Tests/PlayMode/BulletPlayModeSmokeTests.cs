@@ -8,6 +8,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using Unity.Transforms;
 
 namespace SweepNDodge.DotsBullets.Tests
 {
@@ -15,7 +16,7 @@ namespace SweepNDodge.DotsBullets.Tests
     {
         private const string DedicatedScenePath = "Assets/_Project/01_Scenes/PlayModeTests/PlayModeSmoke_Dedicated.unity";
         private const string OperationalScenePath = "Assets/_Project/01_Scenes/SampleScene.unity";
-        private const int LinearHazardTypeKey = 1435459723;
+        private const int Stage1HazardTypeKey = 1827470348;
 
         [UnityTest]
         public IEnumerator PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors()
@@ -67,13 +68,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
                     bool ready = shell.CurrentScreen == DemoShellScreenId.StagePlay
                         && shell.CurrentStageId == 1
-                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running
-                        && CountByComponentType<HazardActorComponent>(em) > 0;
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
                     if (!ready)
                         return false;
 
-                    actorEntity = FindFirstEntity<HazardActorComponent>(em);
-                    return actorEntity != Entity.Null
+                    return TryFindFirstPlacementDeliveredHazardActor(em, out actorEntity)
                         && em.HasBuffer<HazardActorPhaseSelectorPolicyBuffer>(actorEntity)
                         && em.HasBuffer<HazardActorPhaseSelectorCandidateBuffer>(actorEntity)
                         && em.HasBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity)
@@ -88,26 +87,26 @@ namespace SweepNDodge.DotsBullets.Tests
             var transitions = em.GetBuffer<HazardActorPhaseProgressTransitionBuffer>(actorEntity);
             var slots = em.GetBuffer<HazardActorPatternSlotBuffer>(actorEntity);
             Assert.That(selectorPolicies.Length, Is.EqualTo(2), "Operational blueprint actor must expose two phase selector policies.");
-            Assert.That(selectorCandidates.Length, Is.EqualTo(4), "Operational blueprint actor must expose four ordered selector candidates.");
+            Assert.That(selectorCandidates.Length, Is.EqualTo(2), "Stage 1 Simple Crossing Sentry must expose one ordered selector candidate per phase.");
             Assert.That(transitions.Length, Is.EqualTo(1), "Operational blueprint actor must expose one progress transition.");
-            Assert.That(slots.Length, Is.EqualTo(3), "Operational blueprint actor must expose A/B/B' slots.");
+            Assert.That(slots.Length, Is.EqualTo(2), "Stage 1 Simple Crossing Sentry must expose single-shot and double-shot slots.");
             Assert.That(slots[0].PatternSlotId, Is.EqualTo(1));
             Assert.That(slots[1].PatternSlotId, Is.EqualTo(2));
-            Assert.That(slots[2].PatternSlotId, Is.EqualTo(3));
+            AssertHazardActorPlacementMatchesSource(em, actorEntity);
 
             bool sawLinearBullet = false;
             bool sawEmitterAdvance = false;
             for (int i = 0; i < 600; i++)
             {
                 yield return null;
-                sawLinearBullet |= CountActiveBulletsByType(em, LinearHazardTypeKey) > 0;
+                sawLinearBullet |= CountActiveBulletsByType(em, Stage1HazardTypeKey) > 0;
                 sawEmitterAdvance |= AnyEmitterAdvancedFromDormant(em);
                 if (sawLinearBullet && sawEmitterAdvance)
                     break;
             }
 
             Assert.That(sawEmitterAdvance, Is.True, "Operational sample actor-owned emitter did not advance its runtime state.");
-            Assert.That(sawLinearBullet, Is.True, "Operational sample actor-owned emitter did not produce the sample linear hazard bullet.");
+            Assert.That(sawLinearBullet, Is.True, "Operational sample actor-owned emitter did not produce the Stage 1 hazard bullet.");
         }
 
         [UnityTest]
@@ -2517,15 +2516,14 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentStageId == 1
                         && controller != null
                         && controller.LastAppliedStageId == 1
-                        && controller.SpawnedRootCount == stage1ExpectedRootCount
-                        && controller.transform.childCount == stage1ExpectedRootCount;
+                        && controller.SpawnedRootCount == stage1ExpectedRootCount;
                 },
                 360,
                 () => $"Stage1 presentation state did not settle within timeout. {DescribePresentationControllerState()}");
 
             Assert.That(stage1ExpectedRootCount, Is.GreaterThan(0), "Stage1 must expose at least one active presentation for rebuild identity checks.");
             var stage1Controller = controller;
-            var stage1Presentation = controller.transform.GetChild(0).gameObject;
+            Assert.That(TryGetFirstActivePresentationRoot(controller, 1, out var stage1Presentation), Is.True, "Stage1 presentation root must be registered by stable id.");
 
             ForceStageStateToRunning(em, 0f);
             yield return WaitForCondition(
@@ -2557,20 +2555,19 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentStageId == 2
                         && controller != null
                         && controller.LastAppliedStageId == 2
-                        && controller.SpawnedRootCount == stage2ExpectedRootCount
-                        && controller.transform.childCount == stage2ExpectedRootCount;
+                        && controller.SpawnedRootCount == stage2ExpectedRootCount;
                 },
                 360,
                 () => $"Stage2 presentation state did not settle within timeout. {DescribePresentationControllerState()}");
 
             Assert.That(controller, Is.Not.EqualTo(stage1Controller), "NextStage should reload the operational scene and recreate the presentation controller.");
-            GameObject stage2Presentation = controller.transform.childCount > 0
-                ? controller.transform.GetChild(0).gameObject
+            GameObject stage2Presentation = TryGetFirstActivePresentationRoot(controller, 2, out var resolvedStage2Presentation)
+                ? resolvedStage2Presentation
                 : null;
             if (stage2Presentation != null)
                 Assert.That(stage2Presentation, Is.Not.EqualTo(stage1Presentation), "Stage2 presentation should be recreated, not stale Stage1 instance.");
             else
-                Assert.That(controller.transform.childCount, Is.EqualTo(0), "Stage2 without active presentations must clear Stage1 roots.");
+                Assert.That(controller.SpawnedRootCount, Is.EqualTo(0), "Stage2 without active presentations must clear Stage1 presentation roots.");
 
             ForceStageStateToRunning(em, 0f);
             yield return WaitForCondition(
@@ -2603,17 +2600,21 @@ namespace SweepNDodge.DotsBullets.Tests
                         && shell.CurrentStageId == 2
                         && controller != null
                         && controller.LastAppliedStageId == 2
-                        && controller.SpawnedRootCount == stage2ExpectedRootCount
-                        && controller.transform.childCount == stage2ExpectedRootCount;
+                        && controller.SpawnedRootCount == stage2ExpectedRootCount;
                 },
                 360,
                 () => $"Retry did not settle Stage2 presentation state within timeout. {DescribePresentationControllerState()}");
 
             Assert.That(controller, Is.Not.EqualTo(stage2Controller), "Retry should reload the operational scene and recreate the presentation controller.");
             if (stage2Presentation != null)
-                Assert.That(controller.transform.GetChild(0).gameObject, Is.Not.EqualTo(stage2Presentation), "Retry should recreate the Stage2 presentation root.");
+            {
+                Assert.That(TryGetFirstActivePresentationRoot(controller, 2, out var retryPresentation), Is.True, "Retry should register the Stage2 presentation root.");
+                Assert.That(retryPresentation, Is.Not.EqualTo(stage2Presentation), "Retry should recreate the Stage2 presentation root.");
+            }
             else
-                Assert.That(controller.transform.childCount, Is.EqualTo(0), "Retry should preserve the current stage's zero-presentation state without reviving stale roots.");
+            {
+                Assert.That(controller.SpawnedRootCount, Is.EqualTo(0), "Retry should preserve the current stage's zero-presentation state without reviving stale roots.");
+            }
         }
 
         [UnityTest]
@@ -3472,6 +3473,7 @@ namespace SweepNDodge.DotsBullets.Tests
                     240,
                     "Operational scene smoke did not apply Stage1 layout before core loop observation.");
 
+                AssertPlayerStartApplied(em, expectedStageId: 1);
                 ForceStageStateToRunning(em, 0f);
             }
 
@@ -3534,7 +3536,14 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             LogAssert.ignoreFailingMessages = true;
 
+#if UNITY_EDITOR
+            var loadedScene = UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
+                scenePath,
+                new LoadSceneParameters(LoadSceneMode.Single));
+            Assert.That(loadedScene.IsValid(), Is.True, $"Could not load PlayMode test scene: {scenePath}");
+#else
             SceneManager.LoadScene(scenePath, LoadSceneMode.Single);
+#endif
 
             int waitForActiveSceneFrames = 16;
             while (waitForActiveSceneFrames-- > 0)
@@ -3545,6 +3554,12 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 yield return null;
             }
+
+            var settledScene = SceneManager.GetActiveScene();
+            Assert.That(
+                settledScene.IsValid() && settledScene.path == scenePath,
+                Is.True,
+                $"Expected active PlayMode test scene '{scenePath}', but active scene was '{settledScene.path}'.");
 
             for (int i = 0; i < settleFrames; i++)
                 yield return null;
@@ -3756,6 +3771,76 @@ namespace SweepNDodge.DotsBullets.Tests
                 && area1.Kind == Shape2DKind.Rectangle
                 && sourceCells1.Length > 0
                 && HasAnyDepositCell(cells);
+        }
+
+        private static void AssertPlayerStartApplied(EntityManager em, int expectedStageId)
+        {
+            CompleteTrackedJobs(em);
+            var runtime = GetSingleton<StagePlayerStartRuntimeComponent>(em);
+            Assert.That(runtime.StageId, Is.EqualTo(expectedStageId));
+            Assert.That(runtime.Ready, Is.EqualTo(1));
+            Assert.That(runtime.AppliedVersion, Is.GreaterThan(0u));
+
+            var player = GetSingletonEntity<PlayerTag>(em);
+            Assert.That(em.HasComponent<LocalTransform>(player), Is.True);
+            Assert.That(em.HasComponent<PlayerStageEntryApplyStateComponent>(player), Is.True);
+
+            var transform = em.GetComponentData<LocalTransform>(player);
+            Assert.That(transform.Position.x, Is.EqualTo(runtime.PositionX).Within(0.001f));
+            Assert.That(transform.Position.y, Is.EqualTo(runtime.PositionY).Within(0.001f));
+            Assert.That(transform.Position.z, Is.EqualTo(runtime.PositionZ).Within(0.001f));
+
+            var applyState = em.GetComponentData<PlayerStageEntryApplyStateComponent>(player);
+            Assert.That(applyState.LastAppliedVersion, Is.EqualTo(runtime.AppliedVersion));
+        }
+
+        private static void AssertHazardActorPlacementMatchesSource(EntityManager em, Entity actorEntity)
+        {
+            CompleteTrackedJobs(em);
+            Assert.That(em.Exists(actorEntity), Is.True, "Placement-delivered HazardActor must exist.");
+            Assert.That(em.HasComponent<HazardActorComponent>(actorEntity), Is.True, "Placement actor must keep HazardActorComponent.");
+            Assert.That(em.HasComponent<HazardActorPlacementComponent>(actorEntity), Is.True, "Placement actor must keep source-local placement data.");
+            Assert.That(em.HasComponent<LocalTransform>(actorEntity), Is.True, "Placement actor must expose its runtime world transform.");
+
+            var actor = em.GetComponentData<HazardActorComponent>(actorEntity);
+            Assert.That(actor.SourceEntity, Is.Not.EqualTo(Entity.Null), "Placement actor must reference its owning source.");
+            Assert.That(em.Exists(actor.SourceEntity), Is.True, "Placement actor source must exist.");
+            Assert.That(em.HasComponent<SourceAnchorComponent>(actor.SourceEntity), Is.True, "Placement actor source must expose its runtime anchor.");
+
+            var placement = em.GetComponentData<HazardActorPlacementComponent>(actorEntity);
+            var sourceAnchor = em.GetComponentData<SourceAnchorComponent>(actor.SourceEntity);
+            var actorTransform = em.GetComponentData<LocalTransform>(actorEntity);
+            var expectedWorldPosition = sourceAnchor.Position + placement.LocalOffset;
+            Assert.That(actorTransform.Position.x, Is.EqualTo(expectedWorldPosition.x).Within(0.001f));
+            Assert.That(actorTransform.Position.y, Is.EqualTo(expectedWorldPosition.y).Within(0.001f));
+            Assert.That(actorTransform.Position.z, Is.EqualTo(expectedWorldPosition.z).Within(0.001f));
+        }
+
+        private static bool TryFindFirstPlacementDeliveredHazardActor(EntityManager em, out Entity actorEntity)
+        {
+            CompleteTrackedJobs(em);
+            actorEntity = Entity.Null;
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<SourceHazardActorPlacementRefBuffer>());
+            using var sources = query.ToEntityArray(Allocator.Temp);
+            for (int sourceIndex = 0; sourceIndex < sources.Length; sourceIndex++)
+            {
+                var placements = em.GetBuffer<SourceHazardActorPlacementRefBuffer>(sources[sourceIndex], isReadOnly: true);
+                for (int placementIndex = 0; placementIndex < placements.Length; placementIndex++)
+                {
+                    Entity candidate = placements[placementIndex].ActorEntity;
+                    if (!em.Exists(candidate)
+                        || !em.HasComponent<HazardActorComponent>(candidate)
+                        || !em.HasComponent<HazardActorPlacementComponent>(candidate))
+                    {
+                        continue;
+                    }
+
+                    actorEntity = candidate;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsStageMapAppliedForStage2(EntityManager em)
@@ -4308,13 +4393,76 @@ namespace SweepNDodge.DotsBullets.Tests
                 ? controller.transform.GetChild(0).name
                 : "none";
 
+            var children = new System.Text.StringBuilder();
+            for (int i = 0; i < controller.transform.childCount; i++)
+            {
+                var child = controller.transform.GetChild(i);
+                if (i > 0)
+                    children.Append(", ");
+                children.Append(i)
+                    .Append(":")
+                    .Append(child.name)
+                    .Append("(active=")
+                    .Append(child.gameObject.activeSelf)
+                    .Append(", scene=")
+                    .Append(child.gameObject.scene.name)
+                    .Append(")");
+            }
+
             return
-                $"presentation(lastApplied={controller.LastAppliedStageId}, lastReady={controller.LastReady}, spawned={controller.SpawnedRootCount}, childCount={controller.transform.childCount}, firstChild={childName})";
+                $"presentation(lastApplied={controller.LastAppliedStageId}, lastReady={controller.LastReady}, spawned={controller.SpawnedRootCount}, childCount={controller.transform.childCount}, firstChild={childName}, children=[{children}])";
+        }
+
+        private static bool TryGetFirstActivePresentationRoot(StagePresentationRuntimeController controller, int stageId, out GameObject root)
+        {
+            root = null;
+            if (!TryGetStageLayout(controller, stageId, out var layout))
+                return false;
+
+            var presentations = layout.Presentations;
+            if (presentations == null)
+                return false;
+
+            for (int i = 0; i < presentations.Length; i++)
+            {
+                var presentation = presentations[i];
+                if (!presentation.Active)
+                    continue;
+                if (controller.TryGetPresentationRoot(presentation.StableId, out root) && root != null)
+                    return true;
+            }
+
+            root = null;
+            return false;
         }
 
         private static bool TryGetExpectedActivePresentationCount(StagePresentationRuntimeController controller, int stageId, out int count)
         {
             count = -1;
+            if (!TryGetStageLayout(controller, stageId, out var layout))
+                return false;
+
+            var presentations = layout.Presentations;
+            if (presentations == null)
+            {
+                count = 0;
+                return true;
+            }
+
+            int activeCount = 0;
+            for (int p = 0; p < presentations.Length; p++)
+            {
+                if (presentations[p].Active)
+                    activeCount++;
+            }
+
+            count = activeCount;
+            return true;
+        }
+
+        private static bool TryGetStageLayout(StagePresentationRuntimeController controller, int stageId, out StageLayoutSO layout)
+        {
+            layout = null;
             if (controller == null || stageId <= 0)
                 return false;
 
@@ -4332,21 +4480,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 if (!entry.Enabled || entry.Layout == null || entry.Layout.StageId != stageId)
                     continue;
 
-                var presentations = entry.Layout.Presentations;
-                if (presentations == null)
-                {
-                    count = 0;
-                    return true;
-                }
-
-                int activeCount = 0;
-                for (int p = 0; p < presentations.Length; p++)
-                {
-                    if (presentations[p].Active)
-                        activeCount++;
-                }
-
-                count = activeCount;
+                layout = entry.Layout;
                 return true;
             }
 
@@ -4521,13 +4655,3 @@ namespace SweepNDodge.DotsBullets.Tests
 
     }
 }
-
-
-
-
-
-
-
-
-
-

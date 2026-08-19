@@ -23,6 +23,12 @@ namespace SweepNDodge.DotsBullets
                 AddComponent(root, new BulletTypeKeyComponent { Value = 0 });
                 AddComponent(root, new BulletCaptureRuleComponent { Value = BulletCaptureRuleId.StandardCollectible });
                 AddComponent(root, new BulletLifetimeComponent { Value = 0f });
+                AddComponent(root, new BulletMovementRuntimeComponent
+                {
+                    Family = BulletMovementFamilyId.Linear,
+                    DampedLinear = default,
+                    HomingLite = default,
+                });
                 AddComponent(root, new BulletLifecycleRequestComponent
                 {
                     Reason = BulletLifecycleReasonId.None,
@@ -36,6 +42,7 @@ namespace SweepNDodge.DotsBullets
                     DirectionXZ = Unity.Mathematics.float2.zero,
                 });
                 AddComponent(root, new BulletSourceRefComponent { Value = Entity.Null });
+                AddComponent(root, new BulletEmissionProfileRefComponent { ProfileRefId = 0 });
                 AddComponent(root, new BulletLifecycleTraceComponent
                 {
                     LastSpawnFrame = 0,

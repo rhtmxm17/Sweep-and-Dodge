@@ -29,6 +29,14 @@ namespace SweepNDodge.DotsBullets
         public int AppliedPatternSlotId;
         public int ProfileId;
         public int BulletTypeKey;
+        public byte HasSpeedOverride;
+        public float SpeedOverride;
+        public byte HasLifetimeOverride;
+        public float LifetimeOverride;
+        public byte HasMovementOverride;
+        public BulletMovementFamilyId MovementFamily;
+        public BulletDampedLinearDefinition DampedLinear;
+        public BulletHomingLiteDefinition HomingLite;
 
         public WavePositionPatternModeId PositionPatternMode;
         public float2 SpawnOffset;
@@ -83,6 +91,14 @@ namespace SweepNDodge.DotsBullets
             emission.AppliedPatternSlotId = slot.PatternSlotId;
             emission.ProfileId = slot.EmissionProfileRefId;
             emission.BulletTypeKey = slot.BulletTypeKey;
+            emission.HasSpeedOverride = slot.HasSpeedOverride;
+            emission.SpeedOverride = slot.SpeedOverride;
+            emission.HasLifetimeOverride = slot.HasLifetimeOverride;
+            emission.LifetimeOverride = slot.LifetimeOverride;
+            emission.HasMovementOverride = slot.HasMovementOverride;
+            emission.MovementFamily = slot.MovementFamily;
+            emission.DampedLinear = slot.DampedLinear;
+            emission.HomingLite = slot.HomingLite;
             emission.PositionPatternMode = slot.PositionPatternMode;
             emission.SpawnOffset = slot.SpawnOffset;
             emission.LineStart = slot.LineStart;

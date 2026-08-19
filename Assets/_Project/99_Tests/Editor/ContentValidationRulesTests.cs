@@ -291,94 +291,6 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Definition_ReactionWithUnknownSecondaryBulletReference_IsError()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(2203);
-                def.Prefab = prefab;
-                secondary.Editor_SetDefinitionId(9999);
-                secondary.Prefab = secondaryPrefab;
-                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = secondary,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 45f,
-                    SpawnRadius = 1f,
-                    SpawnDelaySec = 0f,
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    null,
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV035"), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(secondary);
-                Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(secondaryPrefab);
-            }
-        }
-
-        [Test]
-        public void Definition_ReactionWithNullSecondaryBullet_IsError()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(2205);
-                def.Prefab = prefab;
-                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = null,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 45f,
-                    SpawnRadius = 1f,
-                    SpawnDelaySec = 0f,
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                    },
-                    null,
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV033"), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
         public void Definition_PrefabWithForbiddenOptionalBehaviorAuthoring_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -407,54 +319,6 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 Object.DestroyImmediate(def);
                 Object.DestroyImmediate(prefab);
-            }
-        }
-
-        [Test]
-        public void Definition_ReactionWithKnownSecondaryBulletReference_IsAllowed()
-        {
-            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var prefab = new GameObject("bullet_prefab");
-            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
-
-            try
-            {
-                def.Editor_SetDefinitionId(2206);
-                def.Prefab = prefab;
-                secondary.Editor_SetDefinitionId(2207);
-                secondary.Prefab = secondaryPrefab;
-                def.OnMotionCompletedExplode = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = secondary,
-                    SpawnCount = 2,
-                    Shape = BulletSecondarySpawnShapeId.ForwardSpread,
-                    SpreadAngleDeg = 60f,
-                    SpawnRadius = 0.5f,
-                    SpawnDelaySec = 0.1f,
-                };
-
-                var input = new ContentValidationInput(
-                    new List<ContentValidationRecord<BulletDefinitionSO>>
-                    {
-                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                        new ContentValidationRecord<BulletDefinitionSO>(secondary, "secondary"),
-                    },
-                    null,
-                    null,
-                    null,
-                    null);
-
-                var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV033" || i.Code == "CV035"), Is.False);
-            }
-            finally
-            {
-                Object.DestroyImmediate(def);
-                Object.DestroyImmediate(secondary);
-                Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(secondaryPrefab);
             }
         }
 
@@ -569,35 +433,40 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void Definition_ReactionWithNegativeSpawnDelay_IsError()
+        public void EmissionProfile_CleanupRemovedWithNegativeDelay_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
-            var secondary = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var targetProfile = ScriptableObject.CreateInstance<EmissionProfileSO>();
             var prefab = new GameObject("bullet_prefab");
-            var secondaryPrefab = new GameObject("secondary_bullet_prefab");
+            var targetPrefab = new GameObject("target_bullet_prefab");
+            var targetDef = ScriptableObject.CreateInstance<BulletDefinitionSO>();
 
             try
             {
                 def.Editor_SetDefinitionId(2208);
                 def.Prefab = prefab;
-                secondary.Editor_SetDefinitionId(2209);
-                secondary.Prefab = secondaryPrefab;
-                def.OnCleanupRemovedSpawnSecondary = new BulletSecondarySpawnReactionDefinition
-                {
-                    Enabled = true,
-                    SecondaryBullet = secondary,
-                    SpawnCount = 1,
-                    Shape = BulletSecondarySpawnShapeId.PointBurst,
-                    SpreadAngleDeg = 45f,
-                    SpawnRadius = 1f,
-                    SpawnDelaySec = -0.01f,
-                };
+                targetDef.Editor_SetDefinitionId(2209);
+                targetDef.Prefab = targetPrefab;
+                profile.Bullet = def;
+                targetProfile.Bullet = targetDef;
+                profile.LifecycleTriggers.CleanupRemoved.Enabled = true;
+                profile.LifecycleTriggers.CleanupRemoved.TargetProfile = targetProfile;
+                profile.LifecycleTriggers.CleanupRemoved.DelaySec = -0.01f;
 
                 var input = new ContentValidationInput(
                     new List<ContentValidationRecord<BulletDefinitionSO>>
                     {
                         new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
-                        new ContentValidationRecord<BulletDefinitionSO>(secondary, "secondary"),
+                        new ContentValidationRecord<BulletDefinitionSO>(targetDef, "target"),
+                    },
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                        new ContentValidationRecord<EmissionProfileSO>(targetProfile, "Assets/_Project/03_Datas/EmissionProfiles/target.asset"),
                     },
                     null,
                     null,
@@ -605,14 +474,16 @@ namespace SweepNDodge.DotsBullets.Tests
                     null);
 
                 var issues = ContentValidationRules.Validate(input);
-                Assert.That(issues.Any(i => i.Code == "CV033"), Is.True);
+                Assert.That(issues.Any(i => i.Code == "CV048"), Is.True);
             }
             finally
             {
                 Object.DestroyImmediate(def);
-                Object.DestroyImmediate(secondary);
+                Object.DestroyImmediate(targetDef);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(targetProfile);
                 Object.DestroyImmediate(prefab);
-                Object.DestroyImmediate(secondaryPrefab);
+                Object.DestroyImmediate(targetPrefab);
             }
         }
 
@@ -1000,8 +871,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 15f };
-                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 1, AngleSpacingDeg = 30f };
+                entry.Profile.Aim = new FixedAimAuthoring { BaseAngleDeg = 15f };
+                entry.Profile.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 1, AngleSpacingDeg = 30f };
 
                 clip.ClipId = 14;
                 clip.Segments = new[]
@@ -1030,7 +901,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
 
-                entry.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 4, AngleSpacingDeg = 0f };
+                entry.Profile.ShotPattern = new NWayShotPatternAuthoring { ShotCount = 4, AngleSpacingDeg = 0f };
                 issues = ContentValidationRules.Validate(input);
                 Assert.That(issues.Any(i => i.Code == "CV023"), Is.True);
             }
@@ -1055,7 +926,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new PlayerPositionAimAuthoring
+                entry.Profile.Aim = new PlayerPositionAimAuthoring
                 {
                     AngleOffsetDeg = 10f,
                     SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
@@ -1109,8 +980,8 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.PositionPattern = new SinglePointPositionPatternAuthoring();
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Left,
                     AngleOffsetDeg = 0f,
@@ -1143,7 +1014,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 var issues = ContentValidationRules.Validate(input);
                 Assert.That(issues.Any(i => i.Code == "CV042"), Is.True);
 
-                entry.PositionPattern = new PointSetPositionPatternAuthoring
+                entry.Profile.PositionPattern = new PointSetPositionPatternAuthoring
                 {
                     Points = new[] { Vector2.zero }
                 };
@@ -1171,13 +1042,13 @@ namespace SweepNDodge.DotsBullets.Tests
                 def.Prefab = prefab;
 
                 var entry = CreateDefaultTypedEntry(def);
-                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                entry.Profile.PositionPattern = new LineEvenPositionPatternAuthoring
                 {
                     LineStart = Vector2.zero,
                     LineEnd = Vector2.zero,
                     SampleSpacing = 1f,
                 };
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Right,
                     AngleOffsetDeg = 15f,
@@ -1245,16 +1116,16 @@ namespace SweepNDodge.DotsBullets.Tests
                     Anchor = new SourceCenterSamplingAnchorAuthoring(),
                     AreaSampler = new CenterPointAreaSamplerAuthoring(),
                 };
-                entry.PositionPattern = new PointSetPositionPatternAuthoring
+                entry.Profile.PositionPattern = new PointSetPositionPatternAuthoring
                 {
                     Points = new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one, new Vector2(-1f, 0f) }
                 };
-                entry.Aim = new PlayerPositionAimAuthoring
+                entry.Profile.Aim = new PlayerPositionAimAuthoring
                 {
                     AngleOffsetDeg = 22f,
                     SnapshotTiming = WaveAimSnapshotTimingId.EventStart,
                 };
-                entry.ShotPattern = new RadialShotPatternAuthoring
+                entry.Profile.ShotPattern = new RadialShotPatternAuthoring
                 {
                     ShotCount = 6,
                 };
@@ -1284,13 +1155,13 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(3008);
                 var entry = CreateDefaultTypedEntry(def);
-                entry.PositionPattern = new LineEvenPositionPatternAuthoring
+                entry.Profile.PositionPattern = new LineEvenPositionPatternAuthoring
                 {
                     LineStart = new Vector2(-2f, 0f),
                     LineEnd = new Vector2(2f, 0f),
                     SampleSpacing = 1f,
                 };
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Left,
                     AngleOffsetDeg = 0f,
@@ -1301,7 +1172,7 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(snapshot.LineNormalSide, Is.EqualTo(WaveLineNormalSideId.Left));
                 Assert.That(snapshot.LineNormalAngleOffsetDeg, Is.EqualTo(0f));
 
-                entry.Aim = new LineNormalAimAuthoring
+                entry.Profile.Aim = new LineNormalAimAuthoring
                 {
                     NormalSide = WaveLineNormalSideId.Right,
                     AngleOffsetDeg = 15f,
@@ -1327,7 +1198,7 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(3007);
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new PlayerPositionAimAuthoring
+                entry.Profile.Aim = new PlayerPositionAimAuthoring
                 {
                     AngleOffsetDeg = 15f,
                     SnapshotTiming = WaveAimSnapshotTimingId.PerShot,
@@ -1353,8 +1224,8 @@ namespace SweepNDodge.DotsBullets.Tests
             {
                 def.Editor_SetDefinitionId(3009);
                 var entry = CreateDefaultTypedEntry(def);
-                entry.Aim = new FixedAimAuthoring { BaseAngleDeg = 0f };
-                entry.ShotPattern = new NWayShotPatternAuthoring
+                entry.Profile.Aim = new FixedAimAuthoring { BaseAngleDeg = 0f };
+                entry.Profile.ShotPattern = new NWayShotPatternAuthoring
                 {
                     ShotCount = 4,
                     AngleSpacingDeg = 30f,
@@ -1896,6 +1767,205 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void OperationalWaveClipDirective_WithoutEmissionProfileReference_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9401);
+                def.Prefab = prefab;
+                clip.ClipId = 9401;
+                clip.DurationSec = 1f;
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Profile = null;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry },
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "Assets/_Project/03_Datas/WaveClips/generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV046"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void OperationalWaveClipDirective_WithEmissionProfileReference_IsAllowed()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var clip = ScriptableObject.CreateInstance<WaveClipSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9402);
+                def.Prefab = prefab;
+                profile.Bullet = def;
+                var entry = CreateDefaultTypedEntry(def);
+                entry.Profile = profile;
+
+                clip.ClipId = 9402;
+                clip.DurationSec = 1f;
+                clip.Segments = new[]
+                {
+                    new WaveClipSO.ClipSegment
+                    {
+                        StartSec = 0f,
+                        DurationSec = 1f,
+                        Directives = new[] { entry },
+                    }
+                };
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    new List<ContentValidationRecord<WaveClipSO>>
+                    {
+                        new ContentValidationRecord<WaveClipSO>(clip, "Assets/_Project/03_Datas/WaveClips/generated.asset"),
+                    },
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV046"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void EmissionProfile_MotionCompletedWithoutTarget_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9403);
+                def.Prefab = prefab;
+                profile.Bullet = def;
+                profile.LifecycleTriggers.MotionCompleted.Enabled = true;
+                profile.LifecycleTriggers.MotionCompleted.TargetProfile = null;
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV048"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void EmissionProfile_CleanupRemovedWithoutTarget_IsError()
+        {
+            var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            var prefab = new GameObject("bullet_prefab");
+
+            try
+            {
+                def.Editor_SetDefinitionId(9404);
+                def.Prefab = prefab;
+                profile.Bullet = def;
+                profile.LifecycleTriggers.CleanupRemoved.Enabled = true;
+                profile.LifecycleTriggers.CleanupRemoved.TargetProfile = null;
+
+                var input = new ContentValidationInput(
+                    new List<ContentValidationRecord<BulletDefinitionSO>>
+                    {
+                        new ContentValidationRecord<BulletDefinitionSO>(def, "def"),
+                    },
+                    null,
+                    null,
+                    null,
+                    new List<ContentValidationRecord<EmissionProfileSO>>
+                    {
+                        new ContentValidationRecord<EmissionProfileSO>(profile, "Assets/_Project/03_Datas/EmissionProfiles/generated.asset"),
+                    },
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var issues = ContentValidationRules.Validate(input);
+                Assert.That(issues.Any(i => i.Code == "CV048"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(def);
+                Object.DestroyImmediate(profile);
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
         public void WaveClip_TypedEntryMissingEmission_IsError()
         {
             var def = ScriptableObject.CreateInstance<BulletDefinitionSO>();
@@ -1948,10 +2018,7 @@ namespace SweepNDodge.DotsBullets.Tests
         {
             return new WaveSpawnEntryAuthoring
             {
-                Payload = new WaveClipSO.SpawnPayloadProfile
-                {
-                    Bullet = def,
-                },
+                Profile = CreateDefaultEmissionProfile(def),
                 Emission = new RateFieldEmissionAuthoring
                 {
                     SpawnMode = SourceSpawnModeId.FixedDensity,
@@ -1965,17 +2032,24 @@ namespace SweepNDodge.DotsBullets.Tests
                     Anchor = new SourceCenterSamplingAnchorAuthoring(),
                     AreaSampler = new UniformFieldAreaSamplerAuthoring(),
                 },
-                PositionPattern = new SinglePointPositionPatternAuthoring(),
-                Aim = new RandomAimAuthoring(),
-                ShotPattern = new SingleShotPatternAuthoring(),
             };
+        }
+
+        private static EmissionProfileSO CreateDefaultEmissionProfile(BulletDefinitionSO def)
+        {
+            var profile = ScriptableObject.CreateInstance<EmissionProfileSO>();
+            profile.Bullet = def;
+            profile.PositionPattern = new SinglePointPositionPatternAuthoring();
+            profile.Aim = new RandomAimAuthoring();
+            profile.ShotPattern = new SingleShotPatternAuthoring();
+            return profile;
         }
 
         private static WaveSpawnEntryAuthoring CreatePointSetTypedEntry(BulletDefinitionSO def, Vector2[] points)
         {
             var entry = CreateDefaultTypedEntry(def);
             entry.Sampling.AreaSampler = new CenterPointAreaSamplerAuthoring();
-            entry.PositionPattern = new PointSetPositionPatternAuthoring { Points = points };
+            entry.Profile.PositionPattern = new PointSetPositionPatternAuthoring { Points = points };
             return entry;
         }
 

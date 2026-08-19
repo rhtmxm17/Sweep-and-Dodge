@@ -271,24 +271,15 @@ namespace SweepNDodge.DotsBullets
     [Serializable]
     public sealed class WaveSpawnEntryAuthoring
     {
-        public WaveClipSO.SpawnPayloadProfile Payload;
+        public EmissionProfileSO Profile;
 
         [SerializeReference] public WaveEmissionAuthoringBase Emission = new RateFieldEmissionAuthoring();
         public WaveSamplingAuthoring Sampling = new WaveSamplingAuthoring();
-        [SerializeReference] public WavePositionPatternAuthoringBase PositionPattern = new SinglePointPositionPatternAuthoring();
-        [SerializeReference] public WaveAimAuthoringBase Aim = new RandomAimAuthoring();
-        [SerializeReference] public WaveShotPatternAuthoringBase ShotPattern = new SingleShotPatternAuthoring();
     }
 
     [CreateAssetMenu(menuName = "SweepNDodge/Bullet/Wave Clip", fileName = "bwc_")]
     public class WaveClipSO : ScriptableObject
     {
-        [Serializable]
-        public struct SpawnPayloadProfile
-        {
-            public BulletDefinitionSO Bullet;
-        }
-
         [Serializable]
         public struct ClipSegment
         {

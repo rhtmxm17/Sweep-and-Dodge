@@ -4,6 +4,7 @@ namespace SweepNDodge.DotsBullets
 {
     public struct ResolvedWaveSpawnDirectiveSnapshot
     {
+        public ResolvedEmissionCore EmissionCore;
         public BulletDefinitionSO Bullet;
 
         public SourceSpawnEmissionModeId EmissionMode;
@@ -91,37 +92,30 @@ namespace SweepNDodge.DotsBullets
                 return false;
             }
 
-            if (entry.PositionPattern == null)
+            if (!TryResolveEmissionCore(entry, out var core, out error))
             {
-                error = "Typed wave directive entry is missing PositionPattern authoring.";
                 return false;
             }
 
-            if (entry.Aim == null)
-            {
-                error = "Typed wave directive entry is missing Aim authoring.";
-                return false;
-            }
-
-            if (entry.ShotPattern == null)
-            {
-                error = "Typed wave directive entry is missing ShotPattern authoring.";
-                return false;
-            }
-
-            snapshot.Bullet = entry.Payload.Bullet;
+            ApplyResolvedEmissionCore(ref snapshot, in core);
             ApplyTypedEmission(ref snapshot, entry.Emission);
             ApplyTypedSampling(ref snapshot, entry.Sampling);
-            ApplyTypedPositionPattern(ref snapshot, entry.PositionPattern);
-            ApplyTypedAim(ref snapshot, entry.Aim);
-            ApplyTypedShotPattern(ref snapshot, entry.ShotPattern);
             return true;
+        }
+
+        private static bool TryResolveEmissionCore(
+            WaveSpawnEntryAuthoring entry,
+            out ResolvedEmissionCore core,
+            out string error)
+        {
+            return EmissionProfileResolver.TryResolve(entry.Profile, out core, out error);
         }
 
         private static ResolvedWaveSpawnDirectiveSnapshot CreateDefaultSnapshot()
         {
             return new ResolvedWaveSpawnDirectiveSnapshot
             {
+                EmissionCore = default,
                 Bullet = null,
                 EmissionMode = SourceSpawnEmissionModeId.RateField,
                 SpawnMode = SourceSpawnModeId.FixedDensity,
@@ -159,6 +153,33 @@ namespace SweepNDodge.DotsBullets
                 ShotCount = 1,
                 NWayAngleSpacingDeg = 0f,
             };
+        }
+
+        private static void ApplyResolvedEmissionCore(
+            ref ResolvedWaveSpawnDirectiveSnapshot snapshot,
+            in ResolvedEmissionCore core)
+        {
+            snapshot.EmissionCore = core;
+            snapshot.Bullet = core.Bullet;
+            snapshot.PositionPatternMode = core.PositionPatternMode;
+            snapshot.LineStart = core.LineStart;
+            snapshot.LineEnd = core.LineEnd;
+            snapshot.SampleSpacing = core.SampleSpacing;
+            snapshot.PointSetCount = core.PointSetCount;
+            snapshot.Point0 = core.Point0;
+            snapshot.Point1 = core.Point1;
+            snapshot.Point2 = core.Point2;
+            snapshot.Point3 = core.Point3;
+            snapshot.AimMode = core.AimMode;
+            snapshot.AimSnapshotTiming = core.AimSnapshotTiming;
+            snapshot.BaseAngleDeg = core.BaseAngleDeg;
+            snapshot.SpiralStepDeg = core.SpiralStepDeg;
+            snapshot.AimAngleOffsetDeg = core.AimAngleOffsetDeg;
+            snapshot.LineNormalSide = core.LineNormalSide;
+            snapshot.LineNormalAngleOffsetDeg = core.LineNormalAngleOffsetDeg;
+            snapshot.ShotPatternMode = core.ShotPatternMode;
+            snapshot.ShotCount = core.ShotCount;
+            snapshot.NWayAngleSpacingDeg = core.NWayAngleSpacingDeg;
         }
 
         private static void ApplyTypedEmission(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveEmissionAuthoringBase emission)
@@ -217,87 +238,5 @@ namespace SweepNDodge.DotsBullets
             snapshot.AreaSamplerMode = sampling.AreaSampler.AreaSamplerMode;
         }
 
-        private static void ApplyTypedPositionPattern(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WavePositionPatternAuthoringBase positionPattern)
-        {
-            snapshot.PositionPatternMode = positionPattern.PositionPatternMode;
-
-            switch (positionPattern)
-            {
-                case LineEvenPositionPatternAuthoring lineEven:
-                    snapshot.LineStart = lineEven.LineStart;
-                    snapshot.LineEnd = lineEven.LineEnd;
-                    snapshot.SampleSpacing = lineEven.SampleSpacing > 0f ? lineEven.SampleSpacing : 1f;
-                    break;
-
-                case PointSetPositionPatternAuthoring pointSet:
-                    int pointCount = Mathf.Clamp(pointSet.Points?.Length ?? 0, 0, PointSetPositionPatternAuthoring.MaxPointCount);
-                    snapshot.PointSetCount = pointCount;
-                    snapshot.Point0 = GetPoint(pointSet.Points, 0);
-                    snapshot.Point1 = GetPoint(pointSet.Points, 1);
-                    snapshot.Point2 = GetPoint(pointSet.Points, 2);
-                    snapshot.Point3 = GetPoint(pointSet.Points, 3);
-                    break;
-            }
-        }
-
-        private static void ApplyTypedAim(
-            ref ResolvedWaveSpawnDirectiveSnapshot snapshot,
-            WaveAimAuthoringBase aim)
-        {
-            snapshot.AimMode = aim.AimMode;
-
-            switch (aim)
-            {
-                case FixedAimAuthoring fixedAim:
-                    snapshot.BaseAngleDeg = fixedAim.BaseAngleDeg;
-                    break;
-
-                case SpiralAimAuthoring spiral:
-                    snapshot.BaseAngleDeg = spiral.BaseAngleDeg;
-                    snapshot.SpiralStepDeg = spiral.SpiralStepDeg;
-                    break;
-
-                case PlayerPositionAimAuthoring playerPositionAim:
-                    snapshot.AimAngleOffsetDeg = playerPositionAim.AngleOffsetDeg;
-                    snapshot.AimSnapshotTiming = playerPositionAim.SnapshotTiming;
-                    break;
-
-                case LineNormalAimAuthoring lineNormalAim:
-                    snapshot.LineNormalSide = lineNormalAim.NormalSide;
-                    snapshot.LineNormalAngleOffsetDeg = lineNormalAim.AngleOffsetDeg;
-                    break;
-            }
-        }
-
-        private static void ApplyTypedShotPattern(ref ResolvedWaveSpawnDirectiveSnapshot snapshot, WaveShotPatternAuthoringBase shotPattern)
-        {
-            snapshot.ShotPatternMode = shotPattern.ShotPatternMode;
-
-            switch (shotPattern)
-            {
-                case NWayShotPatternAuthoring nWay:
-                    snapshot.ShotCount = nWay.ShotCount > 0 ? nWay.ShotCount : 1;
-                    snapshot.NWayAngleSpacingDeg = nWay.AngleSpacingDeg;
-                    break;
-
-                case RadialShotPatternAuthoring radial:
-                    snapshot.ShotCount = radial.ShotCount > 0 ? radial.ShotCount : 1;
-                    snapshot.NWayAngleSpacingDeg = 0f;
-                    break;
-
-                default:
-                    snapshot.ShotCount = 1;
-                    snapshot.NWayAngleSpacingDeg = 0f;
-                    break;
-            }
-        }
-
-        private static Vector2 GetPoint(Vector2[] points, int index)
-        {
-            if (points == null || index < 0 || index >= points.Length)
-                return Vector2.zero;
-
-            return points[index];
-        }
     }
 }
