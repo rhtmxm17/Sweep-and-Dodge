@@ -11,6 +11,7 @@
   - [../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md](../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)
   - [../Portfolio/PORT-002-ai-assisted-engineering-workflow.md](../Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
   - [../Portfolio/PORT-003-validation-report.md](../Portfolio/PORT-003-validation-report.md)
+  - [../Portfolio/PORT-NOTE-001-developer-perspective-and-claim-evidence.md](../Portfolio/PORT-NOTE-001-developer-perspective-and-claim-evidence.md)
   - [SESSION-20260514-01-portfolio-demo-build-board.md](SESSION-20260514-01-portfolio-demo-build-board.md)
   - [../AGENTS/agent-ops.md](../AGENTS/agent-ops.md)
 
@@ -117,6 +118,7 @@
 - 2026-08-14 / T1 범위·비범위 / 제안된 포함 범위와 비범위를 확정하고 검증 자료는 설명 가능한 보조 증거로 제한 / 본 문서 `Adopted Baseline`, `Now` 갱신 / 사용자 승인 확인 / 다음 시작점: AI 활용 포지셔닝의 브리프 문구 확정.
 - 2026-08-14 / T1 완료 / AI 활용 브리프 문구를 채택하고 목표 직무·독자·한 문장 소개·핵심 역량·범위/비범위를 모두 확정 / 본 문서 `Adopted Baseline`, `Now`, `Done` 갱신 / 사용자 완료 승인 / 다음 시작점: 별도 대화 또는 분기에서 T2 주장-근거 인벤토리 작성.
 - 2026-08-20 / T2 완료 / 핵심 주장·대표 사례·테스트 및 성능 증거의 공개 강도를 확정 / 본 문서 `Adopted Baseline`, `Now`, `Done` 갱신 / 코드·ADR·TD·TaskBoard·Git 이력과 사용자 문답 대조 / 다음 시작점: T3 공개 데모와 최신 검증 기준 확정.
+- 2026-08-20 / T2 원천 노트 / 개발자 관점·역할 분담·설명 가능 수준·주장 제한을 `PORT-NOTE-001`에 보존 / `Docs/Portfolio/PORT-NOTE-001-developer-perspective-and-claim-evidence.md` 생성 및 본 문서 연결 / 사용자 승인 초안과 UTF-8 내용 대조 / 다음 시작점: T3와 이후 공개 문서 작성에서 원천 자료로 참조.
 
 ## Done
 - [x] T2. 주장-근거 인벤토리를 확정했다.
@@ -125,6 +127,7 @@
   - 결과: 플레이 기반 `BroomSweep` 개선과 목표 기반 `StageMapEditor` 교체를 개발자 판단과 AI-assisted 실행의 대표 사례로 채택했다.
   - 결과: `StageMapEditor`는 메인 페이지의 대표 보조 사례, `HazardActorWorkbench`는 선택적 심화 자료로 배치한다.
   - 결과: 장애물 충돌 Profiler 사례는 정성적 병목 진단 사례로만 사용하고, 사후 측정 없는 정확 수치·개선 배율·성능 전문성은 주장하지 않는다.
+  - 결과: 개발자 관점과 역할 분담의 상세 판단은 `PORT-NOTE-001` 원천 노트로 분리해 후속 문서 작성과 면접 준비의 참고 자료로 보존했다.
   - 검증 결과: 코드, ADR/TD/OPS/TaskBoard, 로컬 Git 이력과 사용자 설명 가능 수준을 대조해 `핵심 주장`, `보조 증거`, `심화 자료`, `비공개` 경계를 확정했다.
 - [x] T1. 포트폴리오 브리프를 확정했다.
   - 결과: 일반적인 신입~주니어 Unity 클라이언트 개발자 포지션과 채용 담당자/Unity 실무자/기술 면접관의 독자 계층을 확정했다.
