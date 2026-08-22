@@ -1088,6 +1088,82 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void SpawnExecution_ParallelInitialization_PublishesStateThroughDependencies()
+        {
+            try
+            {
+                using var world = CreateDefaultTestWorld("SpawnParallelInitializationWorld", out var simGroup);
+                var em = world.EntityManager;
+
+                var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
+                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                CreatePlayer(em);
+                CreateConfigSingletons(em, budgetPerFrame: 4, maxPendingCount: 1024, maxPendingAgeFrames: 120);
+                var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
+
+                SetSourceAnchor(em, source, new float3(0f, 6f, 0f));
+                SetSourceShape(em, source, Shape2DKind.Rectangle, 0f, float2.zero);
+
+                var requests = em.GetBuffer<SourceSpawnRequestBuffer>(source);
+                requests.Clear();
+                requests.Add(new SourceSpawnRequestBuffer
+                {
+                    DirectiveId = 5099,
+                    BulletTypeKey = 1,
+                    SamplingAnchorMode = WaveSamplingAnchorModeId.FixedPoint,
+                    AreaSamplerMode = WaveAreaSamplerModeId.CenterPoint,
+                    PositionPatternMode = WavePositionPatternModeId.SinglePoint,
+                    AimMode = WaveAimModeId.Fixed,
+                    ShotPatternMode = WaveShotPatternModeId.Single,
+                    ShotCount = 1,
+                    EventRepeatCount = 1,
+                    FixedPoint = new float2(3f, 4f),
+                    SpawnSampleBudget = 1,
+                    PlayerNoSpawnRadius = 0f,
+                    BaseAngleDeg = 0f,
+                    Count = 4,
+                    OldestFrame = 0u,
+                });
+
+                world.SetTime(new TimeData(1d / 60d, 1f / 60f));
+                simGroup.Update();
+
+                using var activeQuery = em.CreateEntityQuery(
+                    ComponentType.ReadOnly<BulletActiveTag>(),
+                    ComponentType.ReadOnly<BulletTypeKeyComponent>(),
+                    ComponentType.ReadOnly<BulletSourceRefComponent>(),
+                    ComponentType.ReadOnly<BulletLifetimeComponent>(),
+                    ComponentType.ReadOnly<LocalTransform>());
+                using var activeEntities = activeQuery.ToEntityArray(Allocator.Temp);
+                Assert.That(activeEntities.Length, Is.EqualTo(4));
+                for (int i = 0; i < activeEntities.Length; i++)
+                {
+                    var bullet = activeEntities[i];
+                    Assert.That(em.GetComponentData<BulletTypeKeyComponent>(bullet).Value, Is.EqualTo(1));
+                    Assert.That(em.GetComponentData<BulletSourceRefComponent>(bullet).Value, Is.EqualTo(source));
+                    Assert.That(em.GetComponentData<BulletLifetimeComponent>(bullet).Value, Is.GreaterThan(0f));
+                    float3 positionDelta = em.GetComponentData<LocalTransform>(bullet).Position
+                        - new float3(3f, 6f, 4f);
+                    Assert.That(math.lengthsq(positionDelta), Is.LessThanOrEqualTo(0.000001f));
+                    Assert.That(em.IsComponentEnabled<BulletActiveTag>(bullet), Is.True);
+                    Assert.That(em.IsComponentEnabled<BulletDespawnRequestTag>(bullet), Is.False);
+                }
+
+                Assert.That(em.GetBuffer<SourceSpawnRequestBuffer>(source).Length, Is.EqualTo(0));
+                var activeCounts = em.GetBuffer<SourceActiveBulletCountBuffer>(source);
+                Assert.That(activeCounts.Length, Is.EqualTo(1));
+                Assert.That(activeCounts[0].BulletTypeKey, Is.EqualTo(1));
+                Assert.That(activeCounts[0].ActiveCount, Is.EqualTo(4));
+                Assert.That(TryGetSingleton(em, out SpawnBacklogMetricsComponent metrics), Is.True);
+                Assert.That(metrics.LastFrameBudgetUsed, Is.EqualTo(4));
+            }
+            finally
+            {
+                ForceDisposeSharedContainersIfNeeded();
+            }
+        }
+
+        [Test]
         public void SpawnExecution_PointSetRoundRobin_SpawnsAcrossConfiguredPoints()
         {
             try

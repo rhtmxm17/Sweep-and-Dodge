@@ -15,8 +15,14 @@ namespace SweepNDodge.DotsBullets
     [UpdateAfter(typeof(DiscreteEmitExecutionSystem))]
     public partial struct SpawnRequestRoundRobinExecutionSystem : ISystem
     {
+        private const int SpawnInitializationInnerLoopBatchCount = 16;
+
+        private NativeList<SpawnInitializationCommand> _spawnInitializationCommands;
+
         public void OnCreate(ref SystemState state)
         {
+            _spawnInitializationCommands = new NativeList<SpawnInitializationCommand>(Allocator.Persistent);
+
             state.RequireForUpdate<BulletFrameCounterComponent>();
             state.RequireForUpdate<SpawnRequestPolicyComponent>();
             state.RequireForUpdate<SpawnBacklogMetricsComponent>();
@@ -31,6 +37,13 @@ namespace SweepNDodge.DotsBullets
             state.RequireForUpdate<SourceActiveBulletCountBuffer>();
             state.RequireForUpdate<SourceSpawnRequestBuffer>();
             state.RequireForUpdate<FixedTickStepRuntimeComponent>();
+        }
+
+        public void OnDestroy(ref SystemState state)
+        {
+            JobHandle.CombineDependencies(state.Dependency, BulletFieldShared.PoolFence).Complete();
+            if (_spawnInitializationCommands.IsCreated)
+                _spawnInitializationCommands.Dispose();
         }
 
         [BurstCompile]
@@ -57,6 +70,7 @@ namespace SweepNDodge.DotsBullets
                 return;
             var policy = SystemAPI.GetSingleton<SpawnRequestPolicyComponent>();
             uint runSeed = math.max(1u, SystemAPI.GetSingleton<SpawnRunSeedComponent>().Value);
+            _spawnInitializationCommands.Clear();
 
             var metricsRW = SystemAPI.GetSingletonRW<SpawnBacklogMetricsComponent>();
             var cursorRW = SystemAPI.GetSingletonRW<SpawnBudgetCursorComponent>();
@@ -206,23 +220,7 @@ namespace SweepNDodge.DotsBullets
                         ref pollutionCellsLookup,
                         ref pollutionValidCellIndicesLookup,
                         ref txLookup,
-                        ref localToWorldLookup,
-                        ref velLookup,
-                        ref lifeLookup,
-                        ref speedLookup,
-                        ref lifeMaxLookup,
-                        ref movementRuntimeLookup,
-                        ref emissionProfileRefLookup,
-                        ref lifecycleRequestLookup,
-                        ref lifecycleContactLookup,
-                        ref typeKeyLookup,
-                        ref sourceRefLookup,
-                        ref lifeCycleLookup,
-                        ref activeLookup,
-                        ref despawnRequestLookup,
-                        ref renderPartsLookup,
-                        ref renderLookup,
-                        ref parentLookup,
+                        ref _spawnInitializationCommands,
                         ref activeCountLookup,
                         hasPlayer,
                         playerPosition,
@@ -307,7 +305,107 @@ namespace SweepNDodge.DotsBullets
             {
                 SourceStartIndex = cursorIndex
             };
+
+            if (_spawnInitializationCommands.Length > 0)
+            {
+                var initializeJob = new ApplySpawnInitializationJob
+                {
+                    Commands = _spawnInitializationCommands.AsArray(),
+                    TransformLookup = txLookup,
+                    LocalToWorldLookup = localToWorldLookup,
+                    VelocityLookup = velLookup,
+                    LifetimeLookup = lifeLookup,
+                    SpeedLookup = speedLookup,
+                    LifetimeMaxLookup = lifeMaxLookup,
+                    MovementRuntimeLookup = movementRuntimeLookup,
+                    EmissionProfileRefLookup = emissionProfileRefLookup,
+                    LifecycleRequestLookup = lifecycleRequestLookup,
+                    LifecycleContactLookup = lifecycleContactLookup,
+                    TypeKeyLookup = typeKeyLookup,
+                    SourceRefLookup = sourceRefLookup,
+                    LifecycleTraceLookup = lifeCycleLookup,
+                    ActiveLookup = activeLookup,
+                    DespawnRequestLookup = despawnRequestLookup,
+                    RenderPartsLookup = renderPartsLookup,
+                    RenderLookup = renderLookup,
+                    ParentLookup = parentLookup,
+                };
+                state.Dependency = initializeJob.Schedule(
+                    _spawnInitializationCommands.Length,
+                    SpawnInitializationInnerLoopBatchCount,
+                    state.Dependency);
+            }
+
             BulletFieldShared.PoolFence = state.Dependency;
+        }
+
+        private struct SpawnInitializationCommand
+        {
+            public Entity BulletEntity;
+            public Entity SourceEntity;
+            public int RequestedTypeKey;
+            public SpawnedBulletRuntimeTuning RuntimeTuning;
+            public float3 Position;
+            public float2 Direction;
+            public uint Frame;
+        }
+
+        [BurstCompile]
+        private struct ApplySpawnInitializationJob : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<SpawnInitializationCommand> Commands;
+
+            // 직렬 pool dequeue가 command마다 고유한 root를 보장하고, 각 prefab instance의
+            // RenderParts도 고유하다. 따라서 서로 다른 job index 사이에는 write 경합이 없다.
+            [NativeDisableParallelForRestriction] public ComponentLookup<LocalTransform> TransformLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<LocalToWorld> LocalToWorldLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletVelocityComponent> VelocityLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifetimeComponent> LifetimeLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletSpeedComponent> SpeedLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifetimeMaxComponent> LifetimeMaxLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletMovementRuntimeComponent> MovementRuntimeLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletEmissionProfileRefComponent> EmissionProfileRefLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleRequestComponent> LifecycleRequestLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleContactComponent> LifecycleContactLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletTypeKeyComponent> TypeKeyLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletSourceRefComponent> SourceRefLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletLifecycleTraceComponent> LifecycleTraceLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletActiveTag> ActiveLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BulletDespawnRequestTag> DespawnRequestLookup;
+            [ReadOnly] public BufferLookup<EntityRenderElementBuffer> RenderPartsLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<MaterialMeshInfo> RenderLookup;
+            [ReadOnly] public ComponentLookup<Parent> ParentLookup;
+
+            public void Execute(int index)
+            {
+                var command = Commands[index];
+                SpawnRequestCommonUtility.ApplySpawnedBulletState(
+                    command.BulletEntity,
+                    command.SourceEntity,
+                    command.RequestedTypeKey,
+                    in command.RuntimeTuning,
+                    command.Position,
+                    command.Direction,
+                    command.Frame,
+                    ref TransformLookup,
+                    ref LocalToWorldLookup,
+                    ref VelocityLookup,
+                    ref LifetimeLookup,
+                    ref SpeedLookup,
+                    ref LifetimeMaxLookup,
+                    ref MovementRuntimeLookup,
+                    ref EmissionProfileRefLookup,
+                    ref LifecycleRequestLookup,
+                    ref LifecycleContactLookup,
+                    ref TypeKeyLookup,
+                    ref SourceRefLookup,
+                    ref LifecycleTraceLookup,
+                    ref ActiveLookup,
+                    ref DespawnRequestLookup,
+                    ref RenderPartsLookup,
+                    ref RenderLookup,
+                    ref ParentLookup);
+            }
         }
 
         private static bool HasBudgetBlockedPendingRequest(
@@ -471,23 +569,7 @@ namespace SweepNDodge.DotsBullets
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
             ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup,
             ref ComponentLookup<LocalTransform> txLookup,
-            ref ComponentLookup<LocalToWorld> localToWorldLookup,
-            ref ComponentLookup<BulletVelocityComponent> velLookup,
-            ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
-            ref ComponentLookup<BulletSpeedComponent> speedLookup,
-            ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
-            ref ComponentLookup<BulletMovementRuntimeComponent> movementRuntimeLookup,
-            ref ComponentLookup<BulletEmissionProfileRefComponent> emissionProfileRefLookup,
-            ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
-            ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
-            ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
-            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
-            ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
-            ref ComponentLookup<BulletActiveTag> activeLookup,
-            ref ComponentLookup<BulletDespawnRequestTag> despawnRequestLookup,
-            ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
-            ref ComponentLookup<MaterialMeshInfo> renderLookup,
-            ref ComponentLookup<Parent> parentLookup,
+            ref NativeList<SpawnInitializationCommand> spawnInitializationCommands,
             ref BufferLookup<SourceActiveBulletCountBuffer> activeCountLookup,
             bool hasPlayer,
             float3 playerPosition,
@@ -513,23 +595,7 @@ namespace SweepNDodge.DotsBullets
                     ref pollutionCellsLookup,
                     ref pollutionValidCellIndicesLookup,
                     ref txLookup,
-                    ref localToWorldLookup,
-                    ref velLookup,
-                    ref lifeLookup,
-                    ref speedLookup,
-                    ref lifeMaxLookup,
-                    ref movementRuntimeLookup,
-                    ref emissionProfileRefLookup,
-                    ref lifecycleRequestLookup,
-                    ref lifecycleContactLookup,
-                    ref typeKeyLookup,
-                    ref sourceRefLookup,
-                    ref lifeCycleLookup,
-                    ref activeLookup,
-                    ref despawnRequestLookup,
-                    ref renderPartsLookup,
-                    ref renderLookup,
-                    ref parentLookup,
+                    ref spawnInitializationCommands,
                     ref activeCountLookup,
                     hasPlayer,
                     playerPosition,
@@ -577,32 +643,16 @@ namespace SweepNDodge.DotsBullets
                     playerPosition,
                     repeatSequence,
                     slotIndex);
-                SpawnRequestCommonUtility.ApplySpawnedBulletState(
-                    bulletEntity,
-                    sourceEntity,
-                    request.BulletTypeKey,
-                    in runtimeTuning,
-                    pos,
-                    dir,
-                    frame,
-                    ref txLookup,
-                    ref localToWorldLookup,
-                    ref velLookup,
-                    ref lifeLookup,
-                    ref speedLookup,
-                    ref lifeMaxLookup,
-                    ref movementRuntimeLookup,
-                    ref emissionProfileRefLookup,
-                    ref lifecycleRequestLookup,
-                    ref lifecycleContactLookup,
-                    ref typeKeyLookup,
-                    ref sourceRefLookup,
-                    ref lifeCycleLookup,
-                    ref activeLookup,
-                    ref despawnRequestLookup,
-                    ref renderPartsLookup,
-                    ref renderLookup,
-                    ref parentLookup);
+                spawnInitializationCommands.Add(new SpawnInitializationCommand
+                {
+                    BulletEntity = bulletEntity,
+                    SourceEntity = sourceEntity,
+                    RequestedTypeKey = request.BulletTypeKey,
+                    RuntimeTuning = runtimeTuning,
+                    Position = pos,
+                    Direction = dir,
+                    Frame = frame,
+                });
             }
 
             if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
@@ -626,23 +676,7 @@ namespace SweepNDodge.DotsBullets
             ref BufferLookup<SourcePollutionCellBuffer> pollutionCellsLookup,
             ref BufferLookup<SourcePollutionValidCellIndexBuffer> pollutionValidCellIndicesLookup,
             ref ComponentLookup<LocalTransform> txLookup,
-            ref ComponentLookup<LocalToWorld> localToWorldLookup,
-            ref ComponentLookup<BulletVelocityComponent> velLookup,
-            ref ComponentLookup<BulletLifetimeComponent> lifeLookup,
-            ref ComponentLookup<BulletSpeedComponent> speedLookup,
-            ref ComponentLookup<BulletLifetimeMaxComponent> lifeMaxLookup,
-            ref ComponentLookup<BulletMovementRuntimeComponent> movementRuntimeLookup,
-            ref ComponentLookup<BulletEmissionProfileRefComponent> emissionProfileRefLookup,
-            ref ComponentLookup<BulletLifecycleRequestComponent> lifecycleRequestLookup,
-            ref ComponentLookup<BulletLifecycleContactComponent> lifecycleContactLookup,
-            ref ComponentLookup<BulletTypeKeyComponent> typeKeyLookup,
-            ref ComponentLookup<BulletSourceRefComponent> sourceRefLookup,
-            ref ComponentLookup<BulletLifecycleTraceComponent> lifeCycleLookup,
-            ref ComponentLookup<BulletActiveTag> activeLookup,
-            ref ComponentLookup<BulletDespawnRequestTag> despawnRequestLookup,
-            ref BufferLookup<EntityRenderElementBuffer> renderPartsLookup,
-            ref ComponentLookup<MaterialMeshInfo> renderLookup,
-            ref ComponentLookup<Parent> parentLookup,
+            ref NativeList<SpawnInitializationCommand> spawnInitializationCommands,
             ref BufferLookup<SourceActiveBulletCountBuffer> activeCountLookup,
             bool hasPlayer,
             float3 playerPosition,
@@ -681,32 +715,16 @@ namespace SweepNDodge.DotsBullets
                 playerPosition,
                 repeatSequence,
                 -1);
-            SpawnRequestCommonUtility.ApplySpawnedBulletState(
-                bulletEntity,
-                sourceEntity,
-                requestedTypeKey,
-                in runtimeTuning,
-                pos,
-                dir,
-                frame,
-                ref txLookup,
-                ref localToWorldLookup,
-                ref velLookup,
-                ref lifeLookup,
-                ref speedLookup,
-                ref lifeMaxLookup,
-                ref movementRuntimeLookup,
-                ref emissionProfileRefLookup,
-                ref lifecycleRequestLookup,
-                ref lifecycleContactLookup,
-                ref typeKeyLookup,
-                ref sourceRefLookup,
-                ref lifeCycleLookup,
-                ref activeLookup,
-                ref despawnRequestLookup,
-                ref renderPartsLookup,
-                ref renderLookup,
-                ref parentLookup);
+            spawnInitializationCommands.Add(new SpawnInitializationCommand
+            {
+                BulletEntity = bulletEntity,
+                SourceEntity = sourceEntity,
+                RequestedTypeKey = requestedTypeKey,
+                RuntimeTuning = runtimeTuning,
+                Position = pos,
+                Direction = dir,
+                Frame = frame,
+            });
 
             if (activeCountLookup.TryGetBuffer(sourceEntity, out var activeCounts))
                 SpawnRequestCommonUtility.IncrementActiveCount(activeCounts, requestedTypeKey);
