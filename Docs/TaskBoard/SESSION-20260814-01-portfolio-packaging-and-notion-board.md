@@ -78,6 +78,15 @@
 - 개발 중 성능/테스트 스냅샷과 최종 공개 빌드 벤치마크를 구분한다.
 - 과거 약 2.5만 active entity 기록은 현재 동일 테스트 이름과 재현 시나리오가 일치하지 않는 historical development snapshot이므로 최신 성능이나 회귀 보장 수치로 사용하지 않는다.
 - 기존 `Bullet` 명칭의 카운터를 인용할 때는 실제로 포함하는 위험 요소와 청소/수집 대상의 범위를 오해 없이 설명한다.
+- 최신 2.5만 active entity 근거는 별도 stress preset이 아니라 공개 빌드와 동일한 Stage 2 콘텐츠에서 청소를 수행하지 않고 Dust를 자연 누적시키는 통제 시나리오로 재현한다.
+- Stage 2 무청소 시나리오는 최초 Dust가 lifetime에 도달한 뒤 spawn과 lifetime despawn이 균형을 이루는 plateau를 약 2.5만 active entity로 맞추는 것을 목표로 한다.
+- 2.5만 근거는 일반 플레이의 상시 밀도라고 표현하지 않고, 공개 빌드에서 재현 가능한 무청소 누적 시나리오라고 명시한다. 전체 active 수와 Dust/Hazard 구성 비율을 함께 기록한다.
+- 무청소 plateau의 합격 기준 초안은 평균 `22,500~27,500`, 최소 15초 유지, 동일 조건 3회 재현이다. frame time·GC·backlog·drop/expire 공개 강도는 실제 측정 후 결정한다.
+- Dust lifetime은 실제 이동 거리와 도달 가능한 위치를 바꾸므로 plateau 튜닝 수단으로 우선 사용하지 않고 현재 `4초`를 유지한다.
+- Stage 2 plateau는 Source cell 구성을 우선 조절해 맞춘다. Source geometry로 목표를 달성하기 어렵거나 플레이 가독성을 해치는 경우에만 spawn rate 등 다른 stage-local tuning을 후순위로 검토한다.
+- lifetime을 유지하므로 무청소 시나리오의 warm-up은 최초 Dust lifetime에 맞춘 약 4초를 기준으로 시작하고, 실제 plateau 진입 시점은 런타임 측정으로 확정한다.
+- 2.5만 plateau는 Stage 2의 초기 무입력 위치에서만 만족하도록 설계하며, 어느 Source를 점유해도 같은 수치를 유지하는 것을 목표로 하지 않는다.
+- Stage 2 Source geometry 초안은 `1002` 면적을 `1004`의 약 3배로 두고, `1002`가 `1004`의 좌측부터 상부까지 둘러싸는 위치 관계로 구성한다. 구체 cell 수와 경계는 플레이 테스트와 plateau 측정으로 다듬는다.
 - 작업 순서는 `포트폴리오 브리프 -> 주장-근거 인벤토리 -> 공개 데모/검증 기준 -> 정보 구조 -> 저장소 문서 -> 시각 자료/데모 패키지 -> Notion -> 최종 검수`로 진행한다.
 
 ## Now
@@ -112,6 +121,9 @@
 - 없음.
 
 ## Branch Handoffs
+- 2026-08-21 / T3 Stage 2 Source 배치 초안 / 2.5만은 초기 무입력 위치에서만 만족하고 `1002:1004 ≈ 3:1`, `1002`가 `1004`의 좌측~상부를 둘러싸는 배치를 초기안으로 채택 / 본 문서 `Adopted Baseline` 갱신 / 사용자 결정 확인 / 다음 시작점: Deposit·Player Start·안전 동선과 Source 경계 조건 확정.
+- 2026-08-21 / T3 plateau 튜닝 우선순위 / Dust lifetime `4초`를 이동 범위 계약으로 유지하고 Stage 2 Source cell 편집을 우선 사용 / 본 문서 `Adopted Baseline` 갱신 / 사용자 결정 확인 / 다음 시작점: 2.5만 목표를 초기 Source 중심으로 맞출지 양쪽 Source 점유 상태까지 맞출지 결정.
+- 2026-08-21 / T3 2.5만 재현 기준 / Stage 2 무청소 자연 누적과 lifetime equilibrium으로 약 2.5만 active entity plateau를 재현하는 방향 채택 / 본 문서 `Adopted Baseline` 갱신 / 사용자 제안 채택 확인 / 다음 시작점: 현재 Dust 실효 lifetime과 Stage 2 spawn rate·plateau 확인.
 - 2026-08-14 / T1 포트폴리오 브리프 / 목표 직무·문서 역할·한 문장 소개 확정 / 본 문서 `Adopted Baseline`, `Now` 갱신 / 사용자 문답으로 문구 채택 확인 / 다음 시작점: 핵심 역량 3개의 최종 표현 확정.
 - 2026-08-14 / T1 핵심 역량 / 대량 엔티티·검증 가능한 아키텍처·플레이 가능한 데모 완성을 핵심 3축으로 확정하고 AI 활용은 전용 심화 섹션으로 분리 / 본 문서 `Adopted Baseline`, `Now` 갱신 / 사용자 결정 확인 / 다음 시작점: 프로젝트 범위와 비범위 확정.
 - 2026-08-14 / T1 검증 자료의 주장 강도 / 자동 테스트·PlayMode smoke·성능 측정을 핵심 역량이 아닌 보조 증거로 잠정 분류하고 T2에서 이해도·설명 가능성 감사 예정 / 본 문서 `Adopted Baseline`, T2 갱신 / 사용자 우려 반영 / 다음 시작점: 범위·비범위에서 검증 자료의 위치를 확정.
