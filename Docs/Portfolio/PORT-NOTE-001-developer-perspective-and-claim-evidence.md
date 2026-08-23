@@ -7,7 +7,7 @@
 - type: `PortfolioSourceNote`
 - status: `working`
 - audience: `internal`
-- last_updated: `2026-08-20`
+- last_updated: `2026-08-22`
 - related_docs:
   - [../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
   - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
@@ -420,7 +420,7 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 - 탄환 제거 시 보너스 UI 외의 즉각적인 반응이 약함
 - 피격 시 캐릭터 반응 외의 피드백이 제한적
 - 청소–Deposit 반복 구조의 장기적인 재미와 선택지 부족
-- 공개 빌드 기준 최신 성능 측정 부재
+- Stage 2 Editor 통제 측정은 확보했지만 공개 빌드 기준 최신 성능과 Dust/Hazard 구성 비율은 미확보
 - 최종 영상·GIF·빌드 전달 자료 부재
 
 이 한계는 실패를 숨기는 항목이 아니라 기술 데모의 현재 범위와 다음 개선 방향으로 설명한다.
@@ -442,7 +442,7 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 | 자동 테스트 전문성 | 주장하지 않음 | 테스트는 존재 | 비공개 |
 | 테스트 기반 계약 보조 | 충분 | 계약·smoke 사례 | 보조 |
 | 장애물 Profiler 진단 | 사례 설명 가능 | 사용자 프롬프트, Git 이력 | 정성적 보조 |
-| 2.5만 active Entity | 현재 재현 근거 부족 | 과거 OPS 기록 | 참고 또는 비공개 |
+| 2.5만 active Entity | Editor 통제 시나리오에서 재현 | `PORT-003` Stage 2 profiling, 과거 OPS 기록 | 보조 |
 | 최신 공개 빌드 성능 | 아직 없음 | T3에서 확보 예정 | 보류 |
 | GameObject 대비 성능 우위 | 직접 비교 없음 | 없음 | 비공개 |
 
@@ -460,11 +460,10 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 
 ## 16. T3로 넘길 증거 공백
 
-- 최신 공개 빌드 기준 성능 시나리오
-- 측정 PC와 Unity·빌드 설정
-- active Entity 수와 frame-time 지표
-- 측정 구간과 반복 방법
+- standalone/public build 기준 동일 성능 시나리오 측정
+- active Entity의 Dust/Hazard 구성 비율
+- Editor profiling과 public benchmark의 조건·해석 분리
 - 대표 플레이 영상과 GIF
 - Stage Map Editor 화면 자료
 - 공개 빌드 기동·완주 smoke
-- development snapshot과 public benchmark의 명확한 분리
+- 구체적인 성능 캡처와 증거 자료의 보존 형식

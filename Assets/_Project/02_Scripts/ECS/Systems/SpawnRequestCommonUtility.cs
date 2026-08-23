@@ -418,7 +418,7 @@ namespace SweepNDodge.DotsBullets
             if (!freeByKey.TryGetFirstValue(key, out entity, out var iterator))
                 return false;
 
-            freeByKey.Remove(key, entity);
+            freeByKey.Remove(iterator);
             return true;
         }
 

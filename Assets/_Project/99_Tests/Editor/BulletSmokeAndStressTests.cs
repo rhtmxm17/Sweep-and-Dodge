@@ -1088,15 +1088,27 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
-        public void SpawnExecution_ParallelInitialization_PublishesStateThroughDependencies()
+        public void SpawnExecution_InitializesSpawnedStateAndConsumesExactPoolEntries()
         {
             try
             {
-                using var world = CreateDefaultTestWorld("SpawnParallelInitializationWorld", out var simGroup);
+                using var world = CreateDefaultTestWorld("SpawnInitializationAndPoolConsumptionWorld", out var simGroup);
                 var em = world.EntityManager;
 
                 var bulletPrefab = CreateBulletPrefab(em, typeKey: 1, lifetime: 5f);
-                CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                var otherBulletPrefab = CreateBulletPrefab(em, typeKey: 2, lifetime: 5f);
+                var poolRegistry = CreatePoolRegistry(em, bulletPrefab, typeKey: 1, poolSize: 16, lifetime: 5f);
+                em.GetBuffer<BulletPoolDefinitionBuffer>(poolRegistry).Add(new BulletPoolDefinitionBuffer
+                {
+                    TypeKey = 2,
+                    Prefab = otherBulletPrefab,
+                    PoolSize = 3,
+                    CaptureRule = BulletCaptureRuleId.StandardCollectible,
+                    Speed = 0f,
+                    Lifetime = 5f,
+                    Radius = 0.2f,
+                    ScoreValue = 1,
+                });
                 CreatePlayer(em);
                 CreateConfigSingletons(em, budgetPerFrame: 4, maxPendingCount: 1024, maxPendingAgeFrames: 120);
                 var source = CreateSource(em, typeKey: 1, spawnDensityPerSecPerArea: 0f);
@@ -1127,6 +1139,11 @@ namespace SweepNDodge.DotsBullets.Tests
 
                 world.SetTime(new TimeData(1d / 60d, 1f / 60f));
                 simGroup.Update();
+                em.CompleteAllTrackedJobs();
+                BulletFieldShared.PoolFence.Complete();
+
+                Assert.That(CountFreePoolEntries(1), Is.EqualTo(12));
+                Assert.That(CountFreePoolEntries(2), Is.EqualTo(3));
 
                 using var activeQuery = em.CreateEntityQuery(
                     ComponentType.ReadOnly<BulletActiveTag>(),
@@ -4984,7 +5001,7 @@ namespace SweepNDodge.DotsBullets.Tests
             return prefab;
         }
 
-        private static void CreatePoolRegistry(EntityManager em, Entity prefab, int typeKey, int poolSize, float lifetime = 0f)
+        private static Entity CreatePoolRegistry(EntityManager em, Entity prefab, int typeKey, int poolSize, float lifetime = 0f)
         {
             var registry = em.CreateEntity(typeof(BulletPoolRegistryTag));
             var defs = em.AddBuffer<BulletPoolDefinitionBuffer>(registry);
@@ -4999,6 +5016,18 @@ namespace SweepNDodge.DotsBullets.Tests
                 Radius = 0.2f,
                 ScoreValue = 1,
             });
+            return registry;
+        }
+
+        private static int CountFreePoolEntries(int typeKey)
+        {
+            if (!BulletFieldShared.FreeByKey.TryGetFirstValue(typeKey, out _, out var iterator))
+                return 0;
+
+            int count = 1;
+            while (BulletFieldShared.FreeByKey.TryGetNextValue(out _, ref iterator))
+                count++;
+            return count;
         }
 
         private static void CreatePlayer(EntityManager em)

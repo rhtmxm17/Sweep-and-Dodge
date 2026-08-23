@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260814-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-08-20`
+- last_updated: `2026-08-22`
 - related_docs:
   - [../../README.md](../../README.md)
   - [../Portfolio/INDEX.md](../Portfolio/INDEX.md)
@@ -12,6 +12,7 @@
   - [../Portfolio/PORT-002-ai-assisted-engineering-workflow.md](../Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
   - [../Portfolio/PORT-003-validation-report.md](../Portfolio/PORT-003-validation-report.md)
   - [../Portfolio/PORT-NOTE-001-developer-perspective-and-claim-evidence.md](../Portfolio/PORT-NOTE-001-developer-perspective-and-claim-evidence.md)
+  - [../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
   - [SESSION-20260514-01-portfolio-demo-build-board.md](SESSION-20260514-01-portfolio-demo-build-board.md)
   - [../AGENTS/agent-ops.md](../AGENTS/agent-ops.md)
 
@@ -87,6 +88,10 @@
 - lifetime을 유지하므로 무청소 시나리오의 warm-up은 최초 Dust lifetime에 맞춘 약 4초를 기준으로 시작하고, 실제 plateau 진입 시점은 런타임 측정으로 확정한다.
 - 2.5만 plateau는 Stage 2의 초기 무입력 위치에서만 만족하도록 설계하며, 어느 Source를 점유해도 같은 수치를 유지하는 것을 목표로 하지 않는다.
 - Stage 2 Source geometry 초안은 `1002` 면적을 `1004`의 약 3배로 두고, `1002`가 `1004`의 좌측부터 상부까지 둘러싸는 위치 관계로 구성한다. 구체 cell 수와 경계는 플레이 테스트와 plateau 측정으로 다듬는다.
+- Stage 2 무입력·무청소 시나리오는 Windows Editor에서 warm-up 6초 후 15초 동안 3회 측정해 active entity 평균 `24,158.6 / 24,161.4 / 24,159.1`, 전체 범위 `24,084~24,208`을 재현했다. Drop/expire와 Spawn system 하위 `GC.Alloc` 표본은 모두 0이었다.
+- 위 수치는 Windows Editor와 Profiler 오버헤드가 포함된 development profiling evidence다. standalone/public build 성능, 60fps 보장, GameObject 대비 우위로 표현하지 않는다.
+- Spawn 병목은 `FreeByKey` 대여에서 `Remove(key, entity)`가 동일 TypeKey chain을 끝까지 순회한 경로로 확인했다. `TryGetFirstValue`가 반환한 iterator를 직접 제거하는 방식으로 교정한다.
+- iterator 제거 후 병렬 상태 초기화 B와 직렬 상태 초기화 C를 비교한 결과 C의 Frame median/p95/Spawn median 증가가 단순화 임계치 안이었다. 최종 구현은 Pool Owner의 직렬 dequeue와 직렬 상태 초기화를 유지한다.
 - 작업 순서는 `포트폴리오 브리프 -> 주장-근거 인벤토리 -> 공개 데모/검증 기준 -> 정보 구조 -> 저장소 문서 -> 시각 자료/데모 패키지 -> Notion -> 최종 검수`로 진행한다.
 
 ## Now
@@ -94,6 +99,8 @@
   - 완료 기준: 대표 플레이 구간, 성능 시나리오, 측정 환경·지표, 촬영 목록, 빌드 전달 기준이 정해진다.
   - 검증: 결과를 재현하거나 최소한 측정 조건과 해석 범위를 확인할 수 있다.
   - 근거: `PORT-003`, `SESSION-20260514-01`, T2에서 확인한 증거 공백.
+  - 확보: Stage 2 Editor 통제 시나리오의 active entity plateau와 A/B/C spawn profiling 결과.
+  - 남음: Dust/Hazard 구성 비율, standalone/public build 동일 시나리오 측정, 대표 캡처·영상과 구체 증거 자료 형식.
 
 ## Next
 - [ ] T4. 포트폴리오 서사와 채널별 정보 구조를 확정한다.
@@ -121,6 +128,7 @@
 - 없음.
 
 ## Branch Handoffs
+- 2026-08-22 / T3 Stage 2 Spawn 최적화 / `FreeByKey.Remove(iterator)`를 채택하고 초기화 병렬 Job은 B/C 단순화 판정에 따라 제거, 최종 C는 A 대비 Frame median 28.46%·p95 25.60%·Spawn median 78.73% 감소 / `ADR-20260822-01`, `PORT-003`, 본 문서 갱신 / Unity Editor profiling 3회와 전체 회귀 검증 / 다음 시작점: Dust/Hazard 구성 비율과 standalone/public build 측정, 구체 증거 자료 형식 확정.
 - 2026-08-21 / T3 Stage 2 Source 배치 초안 / 2.5만은 초기 무입력 위치에서만 만족하고 `1002:1004 ≈ 3:1`, `1002`가 `1004`의 좌측~상부를 둘러싸는 배치를 초기안으로 채택 / 본 문서 `Adopted Baseline` 갱신 / 사용자 결정 확인 / 다음 시작점: Deposit·Player Start·안전 동선과 Source 경계 조건 확정.
 - 2026-08-21 / T3 plateau 튜닝 우선순위 / Dust lifetime `4초`를 이동 범위 계약으로 유지하고 Stage 2 Source cell 편집을 우선 사용 / 본 문서 `Adopted Baseline` 갱신 / 사용자 결정 확인 / 다음 시작점: 2.5만 목표를 초기 Source 중심으로 맞출지 양쪽 Source 점유 상태까지 맞출지 결정.
 - 2026-08-21 / T3 2.5만 재현 기준 / Stage 2 무청소 자연 누적과 lifetime equilibrium으로 약 2.5만 active entity plateau를 재현하는 방향 채택 / 본 문서 `Adopted Baseline` 갱신 / 사용자 제안 채택 확인 / 다음 시작점: 현재 Dust 실효 lifetime과 Stage 2 spawn rate·plateau 확인.
