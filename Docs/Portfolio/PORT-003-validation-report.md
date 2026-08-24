@@ -6,11 +6,12 @@
 - doc_id: `PORT-003`
 - type: `Portfolio`
 - status: `draft`
-- last_updated: `2026-08-22`
+- last_updated: `2026-08-24`
 - related_docs:
   - [../../README.md](../../README.md)
   - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
   - [PORT-002-ai-assisted-engineering-workflow.md](PORT-002-ai-assisted-engineering-workflow.md)
+  - [PORT-NOTE-002-stage2-standalone-profiling-evidence.md](PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
   - [../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
   - [../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
   - [../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -95,7 +96,29 @@ Stage 2의 최신 대량 entity 시나리오는 별도 stress preset이 아니�
 
 여기서 약 2.5만 active entity는 일반 플레이의 상시 밀도가 아니라, Stage 2 초기 위치에서 청소하지 않고 Dust를 누적한 통제 시나리오의 plateau다. 기존 코드 명칭의 active Bullet 카운터는 위험 요소와 청소/수집 대상을 함께 포함한다.
 
-이 결과에는 Windows Editor와 Profiler 기록 오버헤드가 포함된다. standalone 또는 공개 빌드의 FPS, 60fps 보장, GameObject 방식 대비 성능 우위를 의미하지 않는다. 공개 빌드 기준 수치와 Dust/Hazard 구성 비율은 T3 후속 측정에서 별도로 확보한다.
+이 결과에는 Windows Editor와 Profiler 기록 오버헤드가 포함된다. standalone 또는 공개 빌드의 FPS, 60fps 보장, GameObject 방식 대비 성능 우위를 의미하지 않는다. Dust/Hazard 구성 비율은 T3 후속 측정에서 별도로 확보한다.
+
+### 4.3 2026-08-24 Stage 2 standalone profiling
+
+Editor 측정과 같은 Stage 2 콘텐츠의 무입력·무청소 시나리오를 Windows standalone Development Build에서 다시 관찰했다. 최초 빌드는 Deep Profile Support가 활성화되어 frame당 Profiler sample 수와 캡처 크기가 크게 증가했으므로 실제 성능 근거에서 제외했다. 이후 Deep Profile Support를 비활성화한 빌드로 재측정했다.
+
+uncapped 캡처에서는 600 frame 중 202 frame에서만 `BulletFramePipelineGroup`의 fixed Tick 실행이 관찰됐다. Tick frame의 pipeline median은 `2.121ms`, p95는 `2.388ms`였지만, Tick이 없는 frame이 함께 섞이므로 전체 평균 FPS를 ECS 처리 성능으로 사용하지 않는다.
+
+ECS Tick과 GameObject Update 비용을 같은 frame에서 보수적으로 관찰하기 위해 `Application.targetFrameRate = 60`을 측정용으로 일시 적용했다. 이 cap은 공개 데모의 영구 운영 정책이 아니다.
+
+| Metric | Result |
+|---|---:|
+| Sample | 600 frame / 10.026s |
+| Frame interval median | 16.670ms |
+| Frame interval p95 / p99 / max | 17.022 / 17.147 / 17.402ms |
+| Frames over 20ms | 0 |
+| `BulletFramePipelineGroup` median / p95 / max | 2.220 / 2.602 / 3.242ms |
+| `SpawnRequestRoundRobinExecutionSystem` median / p95 / max | 0.421 / 0.661 / 0.719ms |
+| `WaitForTargetFPS` median / p95 / max | 9.116 / 9.654 / 10.068ms |
+
+600개 모든 frame에서 pipeline marker가 관찰됐고 20ms를 넘는 frame은 없었다. 따라서 이 결과는 명시한 테스트 PC와 통제 시나리오에서 60fps frame budget을 충족했다는 보조 근거로 사용한다. 모든 하드웨어와 플레이 상황의 60fps 보장, 최종 공개 Release Build 성능, GameObject 방식 대비 우위를 의미하지 않는다.
+
+Editor에서는 active entity 평균 약 2.4만을 직접 집계했지만 standalone 캡처에는 전체 active 수와 Dust/Hazard 구성 비율을 직접 읽을 수 있는 카운터가 남아 있지 않다. 두 측정은 같은 Stage 2 콘텐츠에 대응하지만, standalone에서 정확히 같은 active 수를 동시에 확인한 결과로 합치지 않는다. 상세 원시 근거와 분석 경계는 `PORT-NOTE-002`에 보존한다.
 
 ## 5. 기술 데모로서의 범위
 

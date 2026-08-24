@@ -7,12 +7,13 @@
 - type: `PortfolioSourceNote`
 - status: `working`
 - audience: `internal`
-- last_updated: `2026-08-22`
+- last_updated: `2026-08-24`
 - related_docs:
   - [../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
   - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
   - [PORT-002-ai-assisted-engineering-workflow.md](PORT-002-ai-assisted-engineering-workflow.md)
   - [PORT-003-validation-report.md](PORT-003-validation-report.md)
+  - [PORT-NOTE-002-stage2-standalone-profiling-evidence.md](PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
 
 ## 1. 문서 목적
 
@@ -420,7 +421,8 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 - 탄환 제거 시 보너스 UI 외의 즉각적인 반응이 약함
 - 피격 시 캐릭터 반응 외의 피드백이 제한적
 - 청소–Deposit 반복 구조의 장기적인 재미와 선택지 부족
-- Stage 2 Editor 통제 측정은 확보했지만 공개 빌드 기준 최신 성능과 Dust/Hazard 구성 비율은 미확보
+- Stage 2 standalone Development Build 측정은 확보했지만 active 수와 Dust/Hazard 구성 비율을 같은 캡처에 직접 결합하지 못함
+- 최종 공개 후보 빌드의 반복 측정과 완전한 환경 manifest는 미확보
 - 최종 영상·GIF·빌드 전달 자료 부재
 
 이 한계는 실패를 숨기는 항목이 아니라 기술 데모의 현재 범위와 다음 개선 방향으로 설명한다.
@@ -442,14 +444,15 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 | 자동 테스트 전문성 | 주장하지 않음 | 테스트는 존재 | 비공개 |
 | 테스트 기반 계약 보조 | 충분 | 계약·smoke 사례 | 보조 |
 | 장애물 Profiler 진단 | 사례 설명 가능 | 사용자 프롬프트, Git 이력 | 정성적 보조 |
-| 2.5만 active Entity | Editor 통제 시나리오에서 재현 | `PORT-003` Stage 2 profiling, 과거 OPS 기록 | 보조 |
-| 최신 공개 빌드 성능 | 아직 없음 | T3에서 확보 예정 | 보류 |
+| 2.5만 전후 active Entity | Editor 통제 시나리오에서 평균 약 2.4만 재현 | `PORT-003` Stage 2 profiling | 보조 |
+| standalone Development Build frame budget | 조건부 설명 가능 | `PORT-003`, `PORT-NOTE-002`, Profiler capture | 보조 |
+| 최종 공개 후보 빌드 성능 | 아직 없음 | T3에서 확보 예정 | 보류 |
 | GameObject 대비 성능 우위 | 직접 비교 없음 | 없음 | 비공개 |
 
 ## 15. 주장하지 않을 내용
 
 - GameObject 방식보다 정량적으로 우수하다는 주장
-- 2.5만 Entity에서 60fps를 보장한다는 주장
+- 테스트 장비와 통제 시나리오를 벗어나 2.5만 Entity에서 보편적인 60fps를 보장한다는 주장
 - 개발 중 snapshot을 최종 공개 빌드 성능으로 표현
 - 테스트 전략 또는 테스트 자동화 전문성
 - 광범위한 성능 엔지니어링 전문성
@@ -460,10 +463,20 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 
 ## 16. T3로 넘길 증거 공백
 
-- standalone/public build 기준 동일 성능 시나리오 측정
-- active Entity의 Dust/Hazard 구성 비율
-- Editor profiling과 public benchmark의 조건·해석 분리
+- standalone 측정과 동시에 기록한 전체 active Entity 수와 Dust/Hazard 구성 비율
+- 해상도·품질·빌드 옵션을 포함한 측정 manifest와 동일 조건 반복 측정
+- Editor 직접 집계, standalone Development Build profiling, 최종 public benchmark의 조건·해석 분리
 - 대표 플레이 영상과 GIF
 - Stage Map Editor 화면 자료
 - 공개 빌드 기동·완주 smoke
 - 구체적인 성능 캡처와 증거 자료의 보존 형식
+
+## 17. Stage 2 standalone profiling 판단
+
+Deep Profile Support를 활성화한 최초 standalone 캡처는 계측 sample과 파일 크기가 크게 증가해 성능 근거에서 제외했다. 비활성화한 uncapped 캡처에서는 ECS fixed Tick이 있는 frame과 없는 frame의 차이를 확인했으며, Tick이 일부 frame에서만 실행되므로 전체 평균 FPS를 대표 수치로 사용하지 않는다.
+
+이후 `Application.targetFrameRate = 60`을 측정용으로 일시 적용한 캡처에서는 600개 모든 frame에서 대량 엔티티 pipeline이 실행됐고, frame interval median `16.670ms`, p95 `17.022ms`, max `17.402ms`, 20ms 초과 0개를 기록했다. 이는 해당 테스트 장비와 통제 시나리오에서 60fps frame budget을 충족했다는 보조 근거다.
+
+60fps cap은 실제 데모 운영 정책이 아니라 ECS Tick과 GameObject Update가 같은 frame에 실행되는 조건을 만들기 위한 임시 측정 설정이다. 또한 현재 fixed-step accumulator는 render frame당 최대 한 Tick을 소비하므로 두 loop가 완전히 독립적으로 실행된다고 주장하지 않는다.
+
+Editor의 약 2.4만 active entity 직접 집계와 standalone frame time은 같은 Stage 2 콘텐츠에 대응하지만 동시 측정이 아니다. 공개 시에는 두 근거를 구분하며, standalone active 수와 Dust/Hazard 구성 비율을 직접 확보하기 전까지 `약 2.5만에서 60fps`를 하나의 무조건적 성능 문구로 축약하지 않는다.
