@@ -1,0 +1,11 @@
+{
+  "name": "SweepNDodge.Editor",
+  "references": [
+    "SweepNDodge.Runtime",
+    "Unity.Mathematics"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}
