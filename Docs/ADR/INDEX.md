@@ -6,6 +6,7 @@
 - 포맷은 파일명 규칙을 중심으로만 필수로 두고, 본문 섹션 구성은 세션 제안(권장)으로 운영한다.
 
 ## Documents (Newest First)
+- [ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md): `FreeByKey` 대여를 iterator 제거로 교정하고 A/B 측정상 이득이 작았던 Spawn 상태 초기화 Job을 제거
 - [ADR-20260819-01-bullet-self-lifecycle-request-with-present.md](ADR-20260819-01-bullet-self-lifecycle-request-with-present.md): same-entity lifecycle 요청을 `WithPresent + EnabledRefRW/ref`로 갱신하고 활성 탄환 필터와 priority 승격을 함께 보존
 - [ADR-20260811-01-stage-map-legacy-authoring-retirement.md](ADR-20260811-01-stage-map-legacy-authoring-retirement.md): Stage 2·3 단발성 migration 후 Scene/Tilemap/Marker authoring과 전용 테스트를 제거
 - [ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md](ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md): `HazardActorAuthoring` prefab SSOT를 유지하면서 Workbench, `StageMapDocument` orchestration authoring, 분석형 Preview Core의 소유권을 고정
