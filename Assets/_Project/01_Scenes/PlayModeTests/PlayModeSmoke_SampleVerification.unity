@@ -2714,6 +2714,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageGridVisualController
   StageCatalog: {fileID: 11400000, guid: f02948394d6e4b74bc983ecbeec8554c, type: 2}
   TopologyBridge: {fileID: 2015128782}
+  CellOverlayMaterial: {fileID: 2100000, guid: f31a4021a6683704a81fefbfe9727c03, type: 2}
+  PollutionPollIntervalSec: 0.1
+  SourceFadeOutSec: 0.2
+  SourceFadeInSec: 0.35
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

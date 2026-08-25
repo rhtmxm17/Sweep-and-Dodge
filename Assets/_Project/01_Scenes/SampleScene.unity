@@ -214,8 +214,8 @@ Camera:
   m_GameObject: {fileID: 330585543}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0.2784314, g: 0.30071133, b: 0.29803923, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -2722,6 +2722,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageGridVisualController
   StageCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}
   TopologyBridge: {fileID: 2015128782}
+  CellOverlayMaterial: {fileID: 2100000, guid: f31a4021a6683704a81fefbfe9727c03, type: 2}
+  PollutionPollIntervalSec: 0.1
+  SourceFadeOutSec: 0.2
+  SourceFadeInSec: 0.35
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -140,22 +140,32 @@ namespace SweepNDodge.DotsBullets
 
                     if (ShowSource && cell.SourceRegionId != 0u)
                     {
-                        DrawCellHatch(
+                        DrawRegionCellFillAndPerimeter(
+                            x,
+                            y,
+                            cell.SourceRegionId,
+                            true,
+                            in grid,
+                            cells,
                             center,
-                            grid.CellSize,
                             planeY,
-                            new Color(0.1f, 0.75f, 1f, 0.55f),
-                            StageGridHatchDirection.BackSlash);
+                            new Color(0.1f, 0.85f, 1f, 0.16f),
+                            new Color(0.1f, 0.85f, 1f, 0.75f));
                     }
 
                     if (ShowDeposit && cell.DepositRegionId != 0u)
                     {
-                        DrawCellHatch(
+                        DrawRegionCellFillAndPerimeter(
+                            x,
+                            y,
+                            cell.DepositRegionId,
+                            false,
+                            in grid,
+                            cells,
                             center,
-                            grid.CellSize,
                             planeY,
-                            new Color(1f, 0.7f, 0.1f, 0.55f),
-                            StageGridHatchDirection.BackSlash);
+                            new Color(1f, 0.75f, 0.1f, 0.16f),
+                            new Color(1f, 0.75f, 0.1f, 0.75f));
                     }
                 }
             }
@@ -243,6 +253,55 @@ namespace SweepNDodge.DotsBullets
             }
         }
 
+        private void DrawRegionCellFillAndPerimeter(
+            int x,
+            int y,
+            uint regionId,
+            bool source,
+            in StageRuntimeGridComponent grid,
+            DynamicBuffer<StageRuntimeGridCellBufferElement> cells,
+            Vector3 center,
+            float planeY,
+            Color fillColor,
+            Color outlineColor)
+        {
+            var size = new Vector3(grid.CellSize, math.max(0.001f, OverlayThickness), grid.CellSize);
+            var drawCenter = new Vector3(center.x, planeY + GridLineYOffset, center.z);
+            Gizmos.color = fillColor;
+            Gizmos.DrawCube(drawCenter, size);
+
+            float x0 = grid.OriginX + x * grid.CellSize;
+            float z0 = grid.OriginZ + y * grid.CellSize;
+            float x1 = x0 + grid.CellSize;
+            float z1 = z0 + grid.CellSize;
+            float drawY = planeY + GridLineYOffset + OverlayThickness * 0.5f;
+            Gizmos.color = outlineColor;
+
+            if (GetNeighborRegionId(x - 1, y, source, in grid, cells) != regionId)
+                Gizmos.DrawLine(new Vector3(x0, drawY, z0), new Vector3(x0, drawY, z1));
+            if (GetNeighborRegionId(x + 1, y, source, in grid, cells) != regionId)
+                Gizmos.DrawLine(new Vector3(x1, drawY, z0), new Vector3(x1, drawY, z1));
+            if (GetNeighborRegionId(x, y - 1, source, in grid, cells) != regionId)
+                Gizmos.DrawLine(new Vector3(x0, drawY, z0), new Vector3(x1, drawY, z0));
+            if (GetNeighborRegionId(x, y + 1, source, in grid, cells) != regionId)
+                Gizmos.DrawLine(new Vector3(x0, drawY, z1), new Vector3(x1, drawY, z1));
+        }
+
+        private static uint GetNeighborRegionId(
+            int x,
+            int y,
+            bool source,
+            in StageRuntimeGridComponent grid,
+            DynamicBuffer<StageRuntimeGridCellBufferElement> cells)
+        {
+            int index = StageRuntimeGridUtility.GetCellIndex(x, y, in grid);
+            if (index < 0 || index >= cells.Length)
+                return 0u;
+
+            var cell = cells[index];
+            return source ? cell.SourceRegionId : cell.DepositRegionId;
+        }
+
         private static Color ResolveMovementColor(StageCellMovementFlags flags)
         {
             bool blockPlayer = (flags & StageCellMovementFlags.BlockPlayer) != 0;
@@ -263,29 +322,4 @@ namespace SweepNDodge.DotsBullets
         }
     }
 
-    public static class StageRuntimeGridDebugDrawerBootstrap
-    {
-        private static StageRuntimeGridDebugDrawer _runtimeInstance;
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void EnsureRuntimeDrawer()
-        {
-            if (_runtimeInstance != null)
-                return;
-
-            var existing = Object.FindFirstObjectByType<StageRuntimeGridDebugDrawer>(FindObjectsInactive.Include);
-            if (existing != null)
-            {
-                _runtimeInstance = existing;
-                return;
-            }
-
-            if (_runtimeInstance != null)
-                return;
-
-            var go = new GameObject("[Runtime] StageGridDebugDrawer");
-            Object.DontDestroyOnLoad(go);
-            _runtimeInstance = go.AddComponent<StageRuntimeGridDebugDrawer>();
-        }
-    }
 }

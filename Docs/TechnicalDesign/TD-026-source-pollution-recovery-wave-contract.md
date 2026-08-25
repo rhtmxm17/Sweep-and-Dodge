@@ -4,13 +4,14 @@
 - doc_id: `TD-026`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-30`
+- last_updated: `2026-08-25`
 - related_docs:
   - [GD-003-stage-cleaning-route-mvp.md](../GameDesign/GD-003-stage-cleaning-route-mvp.md)
   - [GD-014-cleaning-trace-recovery-loop.md](../GameDesign/GD-014-cleaning-trace-recovery-loop.md)
   - [TD-003-spawn-directive-model.md](./TD-003-spawn-directive-model.md)
   - [TD-006-run-progress-director-design.md](./TD-006-run-progress-director-design.md)
   - [TD-015-stage-map-layout-authoring-and-catalog-pipeline.md](./TD-015-stage-map-layout-authoring-and-catalog-pipeline.md)
+  - [TD-036-runtime-stage-cell-overlay.md](./TD-036-runtime-stage-cell-overlay.md)
 - related_adr:
   - [ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md](../ADR/ADR-20260219-06-cleaning-trail-request-owner-and-fast-sampling.md)
   - [ADR-20260330-01-source-pollution-recovery-wave-and-active-cell-contract.md](../ADR/ADR-20260330-01-source-pollution-recovery-wave-and-active-cell-contract.md)
@@ -34,7 +35,7 @@
   - Request 그룹 단일 writer, ExecutionBegin read-only sampling 구조를 유지한다.
   - `GD-014`의 "작은 구역이 다시 어수선해짐" 체감을 만드는 최소 runtime 규칙을 정의한다.
 - 비목표:
-  - HUD/VFX/토스트의 최종 표현안 확정.
+  - `TD-036`에서 정의한 Cell overlay 외 HUD/VFX/토스트의 최종 표현안 확정.
   - 최근 체류 셀 heatmap 도입.
   - 최종 밸런스 수치 확정.
   - source 외부 시스템이 pollution state를 직접 write하도록 허용하는 것.
@@ -186,4 +187,5 @@
 - 후속 단계에서 `recent stay bias`를 어느 owner가 공급할지.
 
 ## 9. 변경 이력
+- 2026-08-25: Source active/inactive의 runtime Cell 표현 계약을 `TD-036`으로 연결했다.
 - 2026-03-30: 초안 작성. `GD-014`의 공간 순환형 복구를 `active/inactive + recovery wave` runtime 계약으로 정리하고, 1차 구현 범위를 최근 청소 편향 중심으로 고정했다.

@@ -203,6 +203,125 @@ namespace SweepNDodge.DotsBullets.Tests
                 "Blueprint sample did not advance to strengthened phase 2 pattern B' in time.");
         }
 
+        [UnityTest]
+        public IEnumerator PlayMode_SampleVerificationScene_RuntimeStageCellOverlay_TracksPollutionState()
+        {
+            ClearDemoShellStaging();
+            yield return LoadSceneWithSettle(ScenePath);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.That(world, Is.Not.Null);
+            var em = world.EntityManager;
+            DemoShellFlowController shell = null;
+
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Title;
+                },
+                240,
+                "Sample verification scene did not reach Title.");
+
+            Assert.That(shell.RequestStartFromTitle(), Is.True);
+            yield return WaitForCondition(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null && shell.CurrentScreen == DemoShellScreenId.Lobby;
+                },
+                240,
+                "Sample verification scene did not reach Lobby.");
+
+            Assert.That(shell.RequestSelectStageById(1), Is.True);
+            yield return WaitForStagePlayRunning(
+                () =>
+                {
+                    shell = FindDemoShell();
+                    return shell != null
+                        && shell.CurrentScreen == DemoShellScreenId.StagePlay
+                        && shell.CurrentStageId == 1
+                        && shell.CurrentStagePlayPhase == DemoShellStagePlayPhaseId.Running;
+                },
+                480,
+                "Sample verification scene did not reach StagePlay/Running.");
+
+            StageGridVisualController controller = null;
+            yield return WaitForCondition(
+                () =>
+                {
+                    controller = Object.FindFirstObjectByType<StageGridVisualController>();
+                    return controller != null
+                        && controller.LastReady
+                        && controller.CellOverlayRoot != null
+                        && controller.SourceOverlayCount > 0;
+                },
+                240,
+                "Runtime Stage Cell overlay did not become ready.");
+
+            Assert.That(controller.CellOverlayMaterial, Is.Not.Null);
+            Assert.That(controller.CellOverlayMaterial.shader.name, Is.EqualTo("SweepNDodge/StageCellOverlay"));
+            Assert.That(controller.CellOverlayRoot.transform.Find("Static"), Is.Not.Null);
+
+            CompleteTrackedJobs(em);
+            using var sourceQuery = em.CreateEntityQuery(
+                ComponentType.ReadOnly<StageTopologySourceTag>(),
+                ComponentType.ReadOnly<SourceStableIdComponent>(),
+                ComponentType.ReadWrite<SourceSpawnComponent>(),
+                ComponentType.ReadWrite<SourcePollutionCellBuffer>());
+            using var sourceEntities = sourceQuery.ToEntityArray(Allocator.Temp);
+            Assert.That(sourceEntities.Length, Is.GreaterThan(0));
+            Entity sourceEntity = sourceEntities[0];
+            uint stableId = em.GetComponentData<SourceStableIdComponent>(sourceEntity).Value;
+            var source = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+            var cells = em.GetBuffer<SourcePollutionCellBuffer>(sourceEntity);
+            int validCellIndex = -1;
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (cells[i].IsValid == 0)
+                    continue;
+
+                validCellIndex = i;
+                break;
+            }
+            Assert.That(validCellIndex, Is.GreaterThanOrEqualTo(0));
+
+            source.State = SourceStateId.Normal;
+            em.SetComponentData(sourceEntity, source);
+            var cell = cells[validCellIndex];
+            cell.IsActive = 1;
+            cells[validCellIndex] = cell;
+            controller.PollutionPollIntervalSec = 0.01f;
+            controller.Tick(0.01f);
+            controller.Tick(0.35f);
+            Assert.That(controller.TryGetSourceCellAlpha(stableId, validCellIndex, out float activeAlpha), Is.True);
+            Assert.That(activeAlpha, Is.EqualTo(StageGridVisualController.SourceActiveAlpha).Within(0.001f));
+
+            cell = cells[validCellIndex];
+            cell.IsActive = 0;
+            cells[validCellIndex] = cell;
+            controller.Tick(0.01f);
+            controller.Tick(0.19f);
+            Assert.That(controller.TryGetSourceCellAlpha(stableId, validCellIndex, out float inactiveAlpha), Is.True);
+            Assert.That(inactiveAlpha, Is.EqualTo(StageGridVisualController.SourceInactiveAlpha).Within(0.001f));
+
+            cell = cells[validCellIndex];
+            cell.IsActive = 1;
+            cells[validCellIndex] = cell;
+            controller.Tick(0.01f);
+            controller.Tick(0.34f);
+            Assert.That(controller.TryGetSourceCellAlpha(stableId, validCellIndex, out float restoredAlpha), Is.True);
+            Assert.That(restoredAlpha, Is.EqualTo(StageGridVisualController.SourceActiveAlpha).Within(0.001f));
+
+            source = em.GetComponentData<SourceSpawnComponent>(sourceEntity);
+            source.State = SourceStateId.Depleted;
+            em.SetComponentData(sourceEntity, source);
+            controller.Tick(0.01f);
+            controller.Tick(0.19f);
+            Assert.That(controller.TryGetSourceCellAlpha(stableId, validCellIndex, out float depletedAlpha), Is.True);
+            Assert.That(depletedAlpha, Is.EqualTo(StageGridVisualController.SourceDepletedAlpha).Within(0.001f));
+        }
+
         private static IEnumerator LoadSceneWithSettle(string scenePath, int settleFrames = 4)
         {
             bool previousIgnore = LogAssert.ignoreFailingMessages;
