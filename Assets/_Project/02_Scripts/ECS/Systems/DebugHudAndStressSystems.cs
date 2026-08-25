@@ -1,6 +1,8 @@
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Profiling;
+using Unity.Profiling.LowLevel;
 using Unity.Rendering;
 using Unity.Transforms;
 using UnityEngine;
@@ -305,7 +307,21 @@ namespace SweepNDodge.DotsBullets
     [UpdateInGroup(typeof(BulletExecutionEndGroup), OrderLast = true)]
     public partial struct DebugHudMetricsCollectSystem : ISystem
     {
+        private static readonly ProfilerCounter<int> ActiveBulletTotalCounter = new(
+            ProfilerCategory.Scripts,
+            "SweepNDodge/Bullet Active Total",
+            ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<int> ActiveBulletDustCounter = new(
+            ProfilerCategory.Scripts,
+            "SweepNDodge/Bullet Active Dust",
+            ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<int> ActiveBulletHazardCounter = new(
+            ProfilerCategory.Scripts,
+            "SweepNDodge/Bullet Active Hazard",
+            ProfilerMarkerDataUnit.Count);
+
         private EntityQuery _activeBulletQuery;
+        private EntityQuery _activeHazardBulletQuery;
 
         public void OnCreate(ref SystemState state)
         {
@@ -314,6 +330,9 @@ namespace SweepNDodge.DotsBullets
 
             _activeBulletQuery = SystemAPI.QueryBuilder()
                 .WithAll<BulletActiveTag>()
+                .Build();
+            _activeHazardBulletQuery = SystemAPI.QueryBuilder()
+                .WithAll<BulletActiveTag, BulletHazardTag>()
                 .Build();
         }
 
@@ -327,10 +346,15 @@ namespace SweepNDodge.DotsBullets
                 : default;
 
             int activeBullets = _activeBulletQuery.CalculateEntityCount();
+            int activeHazardBullets = _activeHazardBulletQuery.CalculateEntityCount();
+            // BulletHazardTag는 모든 pooled Bullet에 존재하고 RiskTimedResolve에서만 enabled다.
+            int activeDustBullets = math.max(0, activeBullets - activeHazardBullets);
             int spawned = math.max(0, spawnMetrics.LastFrameBudgetUsed);
             int despawned = math.max(0, hud.PreviousActiveBullets + spawned - activeBullets);
 
             hud.ActiveBullets = activeBullets;
+            hud.ActiveDustBullets = activeDustBullets;
+            hud.ActiveHazardBullets = activeHazardBullets;
             hud.SpawnedThisFrame = spawned;
             hud.DespawnedThisFrame = despawned;
             hud.PendingBacklog = math.max(0, spawnMetrics.PendingCount);
@@ -345,6 +369,10 @@ namespace SweepNDodge.DotsBullets
             hud.FrameTimeMs = math.max(0f, SystemAPI.Time.DeltaTime * 1000f);
             hud.PreviousActiveBullets = activeBullets;
             hudRW.ValueRW = hud;
+
+            ActiveBulletTotalCounter.Sample(activeBullets);
+            ActiveBulletDustCounter.Sample(activeDustBullets);
+            ActiveBulletHazardCounter.Sample(activeHazardBullets);
         }
     }
 

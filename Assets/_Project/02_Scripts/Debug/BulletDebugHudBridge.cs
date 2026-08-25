@@ -7,6 +7,8 @@ namespace SweepNDodge.DotsBullets
 {
     public sealed class BulletDebugHudBridge : MonoBehaviour
     {
+        private const string ShowHudCommandLineArgument = "-show-bullet-debug-hud";
+
         [Header("HUD")]
         public bool ShowHud = true;
         public Rect HudRect = new Rect(12f, 12f, 520f, 420f);
@@ -64,6 +66,21 @@ namespace SweepNDodge.DotsBullets
         {
             public float Occupancy;
             public float HoldSec;
+        }
+
+        private void Awake()
+        {
+#if !UNITY_EDITOR && DEVELOPMENT_BUILD
+            var args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (!string.Equals(args[i], ShowHudCommandLineArgument, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                ShowHud = true;
+                break;
+            }
+#endif
         }
 
         private void Update()
@@ -332,7 +349,8 @@ namespace SweepNDodge.DotsBullets
             GUILayout.Space(4f);
             GUILayout.Label("[Core Metrics]");
             GUILayout.Label($"frameTime(ms): {hud.FrameTimeMs:0.00}");
-            GUILayout.Label($"active: {hud.ActiveBullets}");
+            GUILayout.Label(
+                $"active total/dust/hazard: {hud.ActiveBullets} / {hud.ActiveDustBullets} / {hud.ActiveHazardBullets}");
             GUILayout.Label($"spawn/despawn: {hud.SpawnedThisFrame} / {hud.DespawnedThisFrame}");
             GUILayout.Label($"pending: {hud.PendingBacklog}");
             GUILayout.Label($"deferred(budget/pool): {hud.DeferredByBudget} / {hud.DeferredByPool}");

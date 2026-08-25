@@ -96,7 +96,7 @@
 - Stage 2 standalone Development Build의 최초 Deep Profile Support 활성 캡처는 큰 계측 오버헤드가 확인되어 성능 근거에서 제외한다. 이후 측정은 Deep Profile Support를 비활성화한다.
 - uncapped standalone 측정은 fixed Tick이 있는 frame과 없는 frame이 섞이므로 전체 평균 FPS를 ECS 성능 대표값으로 사용하지 않는다. Tick frame과 비-Tick frame의 분포를 분리해 해석한다.
 - 임시 `Application.targetFrameRate = 60` 조건의 standalone 측정에서 600개 모든 frame에 pipeline이 실행됐고, frame interval median `16.670ms`, p95 `17.022ms`, max `17.402ms`, 20ms 초과 0개를 기록했다. 이는 명시한 테스트 장비와 통제 시나리오의 60fps frame budget 보조 근거다.
-- 60fps cap은 ECS Tick과 GameObject Update를 같은 frame에서 관찰하기 위한 일시적 측정 조건이며 실제 데모 운영 정책으로 채택하지 않는다. 측정 후 코드는 원복한다.
+- 60fps cap은 ECS Tick과 GameObject Update를 같은 frame에서 관찰하기 위한 일시적 측정 조건이며 실제 데모 운영 정책으로 채택하지 않는다. 측정 후 임시 코드는 원복했고 uncapped 기본 정책을 유지한다.
 - Editor의 평균 약 2.4만 active entity 직접 집계와 standalone frame time은 같은 Stage 2 콘텐츠에 대응하지만 동시 측정이 아니다. standalone active 수와 Dust/Hazard 구성 비율이 확보되기 전에는 `약 2.5만에서 60fps`를 하나의 무조건적 성능 주장으로 사용하지 않는다.
 - 작업 순서는 `포트폴리오 브리프 -> 주장-근거 인벤토리 -> 공개 데모/검증 기준 -> 정보 구조 -> 저장소 문서 -> 시각 자료/데모 패키지 -> Notion -> 최종 검수`로 진행한다.
 
@@ -105,8 +105,8 @@
   - 완료 기준: 대표 플레이 구간, 성능 시나리오, 측정 환경·지표, 촬영 목록, 빌드 전달 기준이 정해진다.
   - 검증: 결과를 재현하거나 최소한 측정 조건과 해석 범위를 확인할 수 있다.
   - 근거: `PORT-003`, `SESSION-20260514-01`, T2에서 확인한 증거 공백.
-  - 확보: Stage 2 Editor 통제 시나리오의 active entity plateau, A/B/C spawn profiling, standalone Development Build의 uncapped 및 임시 60fps cap 측정.
-  - 남음: standalone 측정과 결합한 active entity/Dust/Hazard 카운터, 완전한 환경 manifest와 반복 측정, 최종 공개 후보 빌드 smoke, 대표 캡처·영상과 구체 증거 자료 형식, 임시 60fps cap 코드 원복.
+  - 확보: Stage 2 Editor 통제 시나리오의 active entity plateau, A/B/C spawn profiling, standalone Development Build의 uncapped 및 임시 60fps cap 측정, 임시 cap 코드 원복, Total/Dust/Hazard 동시 Profiler counter 계측, 고정 manifest의 Windows x64 IL2CPP Development Build, 필수 counter가 보존된 600-frame pilot capture, 측정 전용 실행 옵션의 HUD 표시 smoke.
+  - 남음: pilot counter·frame 분포 분석과 반복 측정 판단, HUD가 포함된 Stage 2 증거 화면, 최종 공개 후보 빌드 smoke, 대표 캡처·영상과 구체 증거 자료 형식.
 
 ## Next
 - [ ] T4. 포트폴리오 서사와 채널별 정보 구조를 확정한다.
@@ -134,6 +134,9 @@
 - 없음.
 
 ## Branch Handoffs
+- 2026-08-24 / T3 Composition Pilot HUD Recovery / 첫 pilot은 씬 직렬화 `ShowHud=false` 때문에 HUD가 숨겨졌지만 raw capture에는 Total/Dust/Hazard counter와 pipeline marker가 보존됨을 확인하고, 공개 기본값을 유지한 채 Development Build의 `-show-bullet-debug-hud` 옵션으로만 HUD를 활성화 / `BulletDebugHudBridge`, 측정 실행 스크립트·manifest, 갱신 build GUID `7506bcb5d4b6419498bdc454cb55e520`, 본 문서 / EditMode 524개·전용 PlayMode smoke 1개·갱신 빌드·HUD 화면 smoke 통과 / 다음 시작점: pilot counter·frame 분포 분석 후 필요 시 반복 capture와 Stage 2 HUD 증거 화면 확보.
+- 2026-08-24 / T3 Composition Measurement Preparation / Windows x64 IL2CPP Development Build를 Deep Profile 없이 생성하고 build GUID `4d6dcae0002241d3b9f484187d6552d9`, Total/Dust/Hazard 계측 심볼, Direct3D 12 기동과 Entity Scene streaming을 확인 / `Builds/T3-Stage2-Composition-20260824`, `ProfilerCaptures/Stage2-Composition-20260824-manifest.md`, 측정 실행 스크립트, 본 문서 갱신 / build success 및 15초 숨김 기동 smoke / 다음 시작점: 사용자가 Stage 2 plateau에서 600-frame pilot Profiler capture와 HUD screenshot을 저장하고 agent가 counter·frame 분포를 분석.
+- 2026-08-24 / T3 Standalone Composition Counter / 기존 `BulletActiveTag`와 `BulletHazardTag`를 SSOT로 Total/Dust/Hazard HUD·Profiler counter를 추가하고 임시 60fps cap 원복을 확인 / `DebugHudAndStressSystems`, `DebugHudComponents`, `BulletDebugHudBridge`, 관련 계약 테스트, 본 문서 갱신 / 신규 계약 1개·전체 EditMode 524개·전용 PlayMode smoke 1개 통과 / 다음 시작점: 새 Development Build에서 환경 manifest를 고정하고 Stage 2 무입력·무청소 standalone 동시 측정.
 - 2026-08-24 / T3 Stage 2 Standalone Profiling / Deep Profile Support 오버헤드 캡처를 제외하고 uncapped와 임시 60fps cap 캡처를 분리 해석, cap 측정 600 frame은 median 16.670ms·p95 17.022ms·max 17.402ms·20ms 초과 0개 / `PORT-NOTE-002`, `PORT-003`, `PORT-NOTE-001`, 본 문서 갱신 / raw Profiler capture와 marker 분포 대조 / 다음 시작점: cap 원복, standalone active 구성 직접 기록, 측정 manifest·반복 측정과 공개 증거 형식 확정.
 - 2026-08-22 / T3 Stage 2 Spawn 최적화 / `FreeByKey.Remove(iterator)`를 채택하고 초기화 병렬 Job은 B/C 단순화 판정에 따라 제거, 최종 C는 A 대비 Frame median 28.46%·p95 25.60%·Spawn median 78.73% 감소 / `ADR-20260822-01`, `PORT-003`, 본 문서 갱신 / Unity Editor profiling 3회와 전체 회귀 검증 / 다음 시작점: Dust/Hazard 구성 비율과 standalone/public build 측정, 구체 증거 자료 형식 확정.
 - 2026-08-21 / T3 Stage 2 Source 배치 초안 / 2.5만은 초기 무입력 위치에서만 만족하고 `1002:1004 ≈ 3:1`, `1002`가 `1004`의 좌측~상부를 둘러싸는 배치를 초기안으로 채택 / 본 문서 `Adopted Baseline` 갱신 / 사용자 결정 확인 / 다음 시작점: Deposit·Player Start·안전 동선과 Source 경계 조건 확정.
@@ -172,6 +175,6 @@
   - 검증 결과: 운영 규칙, 채택 기준, 현재 작업, 후속 순서, 분기 인수인계 위치를 한 문서에서 확인할 수 있다.
 
 ## End of Session
-- 결과: T1·T2를 완료했고, T3에서 Stage 2 Editor active entity 직접 집계와 standalone Development Build frame budget 근거를 서로 구분해 확보했다.
-- 남은 리스크: standalone active entity 구성의 동시 기록, 완전한 측정 manifest와 반복 측정, 최종 공개 후보 빌드 smoke, 대표 플레이 구간과 영상/GIF·빌드 전달 기준은 아직 확정되지 않았다.
-- 다음 시작점: 임시 60fps cap을 원복한 뒤 T3의 남은 증거 공백과 공개 자료 형식을 확정한다.
+- 결과: T1·T2를 완료했고, T3에서 Editor active entity 직접 집계와 standalone frame budget 근거를 구분해 확보한 뒤 Total/Dust/Hazard 동시 계측이 포함된 600-frame pilot raw capture와 측정 전용 HUD 표시 build smoke까지 확보했다.
+- 남은 리스크: pilot counter·frame 분포 분석, 반복 측정 판단, HUD가 포함된 Stage 2 증거 화면, 최종 공개 후보 빌드 smoke, 대표 플레이 구간과 영상/GIF·빌드 전달 기준은 아직 확정되지 않았다.
+- 다음 시작점: 저장된 pilot raw capture의 counter·frame 분포를 분석하고 반복 capture 필요 여부를 결정한다.

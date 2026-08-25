@@ -14,6 +14,8 @@ namespace SweepNDodge.DotsBullets
     public struct DebugHudMetricsComponent : IComponentData
     {
         public int ActiveBullets;
+        public int ActiveDustBullets;
+        public int ActiveHazardBullets;
         public int PreviousActiveBullets;
         public int SpawnedThisFrame;
         public int DespawnedThisFrame;

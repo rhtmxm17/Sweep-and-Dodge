@@ -16,6 +16,33 @@ namespace SweepNDodge.DotsBullets.Tests
         private static readonly FixedString64Bytes BroomDefaultProfileKey = "broom_default";
 
         [Test]
+        public void DebugHudMetrics_ReportsActiveDustAndHazardComposition()
+        {
+            using var world = new World("DebugHudCompositionWorld");
+            var em = world.EntityManager;
+
+            em.CreateEntity(typeof(DebugHudMetricsComponent));
+            em.CreateEntity(typeof(SpawnBacklogMetricsComponent));
+
+            CreateMetricsBullet(em, active: true, hazard: false);
+            CreateMetricsBullet(em, active: true, hazard: false);
+            CreateMetricsBullet(em, active: true, hazard: true);
+            CreateMetricsBullet(em, active: false, hazard: true);
+
+            world.GetOrCreateSystem<DebugHudMetricsCollectSystem>().Update(world.Unmanaged);
+
+            var hud = em.CreateEntityQuery(ComponentType.ReadOnly<DebugHudMetricsComponent>())
+                .GetSingleton<DebugHudMetricsComponent>();
+            Assert.That(hud.ActiveBullets, Is.EqualTo(3));
+            Assert.That(hud.ActiveDustBullets, Is.EqualTo(2));
+            Assert.That(hud.ActiveHazardBullets, Is.EqualTo(1));
+            Assert.That(
+                hud.ActiveDustBullets + hud.ActiveHazardBullets,
+                Is.EqualTo(hud.ActiveBullets),
+                "Every active pooled bullet must be classified as Dust or Hazard.");
+        }
+
+        [Test]
         public void Smoke_CoreLoopAndBurstSpawnDespawn_RunWithoutHardLimit()
         {
             using var world = new World("BulletSmokeStressWorld");
@@ -4885,6 +4912,14 @@ namespace SweepNDodge.DotsBullets.Tests
             if (!em.HasComponent<BulletHazardTag>(bullet))
                 em.AddComponent<BulletHazardTag>(bullet);
             em.SetComponentEnabled<BulletHazardTag>(bullet, true);
+            return bullet;
+        }
+
+        private static Entity CreateMetricsBullet(EntityManager em, bool active, bool hazard)
+        {
+            var bullet = em.CreateEntity(typeof(BulletActiveTag), typeof(BulletHazardTag));
+            em.SetComponentEnabled<BulletActiveTag>(bullet, active);
+            em.SetComponentEnabled<BulletHazardTag>(bullet, hazard);
             return bullet;
         }
 
