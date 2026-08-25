@@ -4,7 +4,7 @@
 - doc_id: `TD-016`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-05-18`
+- last_updated: `2026-08-25`
 - related_docs:
   - [OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
   - [OPS-003-public-release-readiness-plan.md](../ProjectOps/OPS-003-public-release-readiness-plan.md)
@@ -168,6 +168,20 @@
 - `LeftCarryRoot`는 viewport 좌측 약 `1/3` 지점의 세로 토템으로 둔다.
 - `CarryBar`와 `HazardStack` 세그먼트는 같은 바닥 기준선에서 시작한다.
 - lower-center `Notification` / `Hint` 배너는 얇은 윤곽만 남는 고투명 배경(`Notification ~= 0.12`, `Hint ~= 0.10`)을 기준으로 둔다.
+
+### 4.2.3 HUD 시각 스타일 전환 계약
+- `StageHudPresenter`는 Inspector에서 선택하는 `StageHudVisualStyle`을 소유한다.
+  - `TechDemoFlat`: 기술 데모 기본값. 메뉴와 같은 진회색/청색 평면 `Image`와 기존 의미 색을 사용한다.
+  - `LegacyIllustrated`: 기존 이미지 기반 HUD를 복구하는 비교/회귀 확인용 모드다.
+- 전환은 플레이어 설정, 저장 데이터, 단축키에 노출하지 않는다.
+- 스타일 전환은 sprite/color/type/enabled와 스타일 전용 rect 속성만 변경한다.
+  - HUD 텍스트, 진행도, 가시성, anchor 기반 배치는 변경하지 않는다.
+  - 같은 Play 세션에서 `TechDemoFlat -> LegacyIllustrated -> TechDemoFlat` 전환이 누적 변경 없이 동작해야 한다.
+- `RuntimeUiRoot.prefab`은 두 스타일의 SSOT다.
+  - 기존 Legacy sprite 참조는 프리팹에 유지한다.
+  - Flat 모드는 신규 이미지 에셋 없이 기본 uGUI `Image` 표현을 사용한다.
+  - `RuntimeUiRoot.Hud` builder는 두 스타일 계약을 재현하는 테스트용 mirror로만 유지한다.
+- Legacy sprite를 프리팹에 유지하므로 Flat 기본 빌드에서도 비공개 HUD 이미지가 build dependency가 될 수 있다. 공개 배포용 참조 분리는 후속 작업으로 둔다.
 
 ### 4.3 Presenter 구조
 - `RuntimeUiRoot`
@@ -368,6 +382,16 @@
   - 마우스 클릭과 키보드 `Submit/Cancel` 모두 기본 경로에서 동작한다
 
 ### 9.1 최신 검증 결과
+- 2026-08-25 HUD 시각 스타일 전환 확인 완료
+  - compile 성공, 프로젝트 코드/에셋 관련 Console `error` 0건
+  - EditMode `527/527` 통과
+  - PlayMode 스모크 `3/3` 통과
+    - `PlayMode_DedicatedScene_PipelineBootAndCoreLoop_RunWithoutHardErrors`
+    - `PlayMode_DedicatedScene_RuntimeUiRoot_Exists`
+    - `PlayMode_OperationalScene_RuntimeUiRoot_HudPresenter_ReflectsDangerAndToast`
+  - Game View `1920x1080`, `1280x720`에서 `TechDemoFlat` 시각 확인
+  - 같은 Play 세션에서 `LegacyIllustrated` 복구와 Flat 재전환 확인
+  - 참고: Console clear 이후 MCP stdio client 종료 시 package transport `Exception` 로그 2건이 재생성되며, 프로젝트 경로 필터 기준 오류는 0건이다.
 - 2026-03-13 기준 확인 완료
   - compile 성공
   - Unity Console `error` 0건
@@ -390,6 +414,8 @@
 - VFX overlay와 UI warning 계층 충돌 규칙은 `TD-018`에서 확정
 
 ## 11. 변경 이력
+- 2026-08-25: HUD 시각 스타일 전환 구현 완료와 EditMode/PlayMode/Game View 검증 결과를 반영했다.
+- 2026-08-25: 기술 데모용 `TechDemoFlat` HUD를 기본값으로 추가하고, 기존 이미지 HUD를 `LegacyIllustrated`로 즉시 복구하는 Inspector 전용 스타일 전환 계약을 반영했다.
 - 2026-03-12: 초안 작성. Runtime UI를 `uGUI` 단일 스택으로 고정하고, `OnGUI -> reader-only presenter` 마이그레이션 구조와 입력/내비게이션 기준을 정리했다.
 - 2026-03-12: 구현 권장안을 반영해 `RuntimeUiRoot` 프리팹 + 씬 고정 인스턴스, `Shell -> Modal -> HUD/Fx` 마이그레이션 순서, `root coordinator + panel presenter` 구조를 추가로 고정했다.
 - 2026-03-13: 구현 반영. `Shell V1`, `Modal V2`, `HUD V1`의 실제 프리팹/패널/bridge 계약과 최신 검증 결과를 문서에 반영하고, `Pressure Source` 진행 바와 weakened threshold marker를 HUD V1 범위에 포함시켰다.

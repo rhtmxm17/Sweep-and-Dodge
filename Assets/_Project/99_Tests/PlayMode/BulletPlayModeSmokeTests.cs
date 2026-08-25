@@ -1797,6 +1797,33 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(uiRoot.StageHudPresenter, Is.Not.Null);
             Assert.That(uiRoot.NotificationPresenter, Is.Not.Null);
             Assert.That(uiRoot.HintPresenter, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.VisualStyle, Is.EqualTo(StageHudVisualStyle.TechDemoFlat));
+            Assert.That(uiRoot.StageHudPresenter.HazardStackSegmentImages, Has.Length.EqualTo(5));
+            Assert.That(uiRoot.StageHudPresenter.HazardStackSegmentImages[0].sprite, Is.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceMaskImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillGraphicImage.sprite, Is.Null);
+            Assert.That(uiRoot.StageHudPresenter.CarryMaskImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.CarryFillGraphicImage.sprite, Is.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
+            Assert.That(uiRoot.StageHudPresenter.CarryFillImage.fillAmount, Is.EqualTo(1f).Within(1e-4f));
+
+            uiRoot.StageHudPresenter.SetVisualStyle(StageHudVisualStyle.LegacyIllustrated);
+            Assert.That(uiRoot.StageHudPresenter.HazardStackSegmentImages[0].sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceMaskImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillGraphicImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.CarryMaskImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.CarryFillGraphicImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
+            Assert.That(uiRoot.StageHudPresenter.CarryFillImage.fillAmount, Is.EqualTo(1f).Within(1e-4f));
+
+            uiRoot.StageHudPresenter.SetVisualStyle(StageHudVisualStyle.TechDemoFlat);
+            Assert.That(uiRoot.StageHudPresenter.HazardStackSegmentImages[0].sprite, Is.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceMaskImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillGraphicImage.sprite, Is.Null);
+            Assert.That(uiRoot.StageHudPresenter.CarryMaskImage.sprite, Is.Not.Null);
+            Assert.That(uiRoot.StageHudPresenter.CarryFillGraphicImage.sprite, Is.Null);
+            Assert.That(uiRoot.StageHudPresenter.PressureSourceFillImage.fillAmount, Is.EqualTo(0.75f).Within(1e-4f));
+            Assert.That(uiRoot.StageHudPresenter.CarryFillImage.fillAmount, Is.EqualTo(1f).Within(1e-4f));
 
             SetPrivateField(hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {

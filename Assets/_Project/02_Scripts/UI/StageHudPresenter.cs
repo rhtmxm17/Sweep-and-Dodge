@@ -6,9 +6,18 @@ using UnityEngine.UI;
 
 namespace SweepNDodge.DotsBullets
 {
+    public enum StageHudVisualStyle
+    {
+        LegacyIllustrated = 0,
+        TechDemoFlat = 1,
+    }
+
     [DisallowMultipleComponent]
     public sealed class StageHudPresenter : MonoBehaviour
     {
+        [Header("Visual Style")]
+        [SerializeField] private StageHudVisualStyle _visualStyle = StageHudVisualStyle.TechDemoFlat;
+
         [Header("Texts")]
         public TextMeshProUGUI ObjectiveSummaryText;
         public TextMeshProUGUI ObjectiveDetailText;
@@ -28,8 +37,19 @@ namespace SweepNDodge.DotsBullets
         public RectTransform HazardStackSegmentSlotTemplate;
         public Sprite HazardStackActiveSprite;
         public Sprite HazardStackInactiveSprite;
+        public Image ObjectiveSummaryBackgroundImage;
+        public Image ObjectiveSummaryDecorationImage;
+        public Image TimerBackgroundImage;
+        public Image TimerDecorationImage;
+        public Image PressureSourceBackgroundImage;
+        public Image PressureSourceTrackImage;
+        public Image PressureSourceMaskImage;
+        public Image PressureSourceFillGraphicImage;
         public Image PressureSourceFillImage;
         public RectTransform PressureSourceWeakThresholdMarker;
+        public Image CarryTrackImage;
+        public Image CarryMaskImage;
+        public Image CarryFillGraphicImage;
         public Image CarryFillImage;
 
         [Header("Hazard Layout")]
@@ -45,12 +65,50 @@ namespace SweepNDodge.DotsBullets
         private static readonly Color CarryWarningColor = new(1f, 0.72f, 0.18f, 1f);
         private static readonly Color HazardNeutralTextColor = new(0.82f, 0.88f, 0.94f, 0.74f);
         private static readonly Color HazardActiveTextColor = new(1f, 0.83f, 0.54f, 1f);
+        private static readonly Color FlatSurfaceColor = new(0.12f, 0.14f, 0.18f, 0.96f);
+        private static readonly Color FlatControlColor = new(0.20f, 0.30f, 0.46f, 1f);
+        private static readonly Color FlatTrackColor = new(0.14f, 0.20f, 0.27f, 1f);
+        private static readonly Color FlatHazardInactiveColor = new(0.20f, 0.27f, 0.37f, 0.8f);
 
         private readonly List<HazardSegmentView> _hazardSegmentViews = new();
+        private readonly List<ImageVisualState> _legacyImageStates = new();
 
         private DemoShellFlowController _shell;
         private PlayerRuntimeHudBridge _runtimeHud;
         private int _configuredHazardStackMax = -1;
+        private bool _legacyStyleCaptured;
+        private bool _flatHazardGeometryCaptured;
+        private RectTransformVisualState _flatHazardGeometry;
+        private StageHudVisualStyle? _appliedVisualStyle;
+
+        public StageHudVisualStyle VisualStyle => _visualStyle;
+
+        private void Awake()
+        {
+            ApplyVisualStyleIfNeeded(force: true);
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (!Application.isPlaying || !isActiveAndEnabled)
+                return;
+
+            ApplyVisualStyleIfNeeded(force: true);
+            RefreshPresentation();
+        }
+#endif
+
+        /// <summary>
+        /// 개발용 비교와 회귀 확인을 위해 현재 HUD 시각 스타일을 즉시 전환한다.
+        /// 플레이어 설정이나 저장 데이터에는 연결하지 않는다.
+        /// </summary>
+        public void SetVisualStyle(StageHudVisualStyle visualStyle)
+        {
+            _visualStyle = visualStyle;
+            ApplyVisualStyleIfNeeded(force: true);
+            RefreshPresentation();
+        }
 
         public void Configure(DemoShellFlowController shell, PlayerRuntimeHudBridge runtimeHud)
         {
@@ -60,6 +118,7 @@ namespace SweepNDodge.DotsBullets
 
         public void RefreshPresentation()
         {
+            ApplyVisualStyleIfNeeded(force: false);
             EnsureRuntimeReferences();
 
             if (_shell == null)
@@ -111,6 +170,9 @@ namespace SweepNDodge.DotsBullets
                 PressureSourceFillImage.fillAmount = 0f;
                 PressureSourceFillImage.color = CarryNormalColor;
             }
+
+            if (_visualStyle == StageHudVisualStyle.TechDemoFlat && PressureSourceFillGraphicImage != null)
+                PressureSourceFillGraphicImage.color = CarryNormalColor;
 
             if (PressureSourceWeakThresholdMarker != null)
                 PressureSourceWeakThresholdMarker.gameObject.SetActive(false);
@@ -198,6 +260,237 @@ namespace SweepNDodge.DotsBullets
                 CarryFillImage.fillAmount = ratio;
                 CarryFillImage.color = carryFull ? CarryWarningColor : CarryNormalColor;
             }
+
+            if (_visualStyle == StageHudVisualStyle.TechDemoFlat && CarryFillGraphicImage != null)
+                CarryFillGraphicImage.color = carryFull ? CarryWarningColor : CarryNormalColor;
+        }
+
+        private void ApplyVisualStyleIfNeeded(bool force)
+        {
+            ResolveVisualStyleReferences();
+            CaptureLegacyVisualStyle();
+
+            if (!force && _appliedVisualStyle == _visualStyle)
+                return;
+
+            if (_visualStyle == StageHudVisualStyle.LegacyIllustrated)
+                RestoreLegacyVisualStyle();
+            else
+                ApplyTechDemoFlatVisualStyle();
+
+            _appliedVisualStyle = _visualStyle;
+        }
+
+        private void ResolveVisualStyleReferences()
+        {
+            if (ObjectiveSummaryText != null)
+            {
+                ObjectiveSummaryBackgroundImage ??= ObjectiveSummaryText.transform.parent.GetComponent<Image>();
+                ObjectiveSummaryDecorationImage ??= ResolveDirectChildImage(ObjectiveSummaryText.transform.parent, "Badge Image");
+            }
+
+            if (TimerValueText != null)
+            {
+                TimerBackgroundImage ??= TimerValueText.transform.parent.GetComponent<Image>();
+                TimerDecorationImage ??= ResolveDirectChildImage(TimerValueText.transform.parent, "Badge Image");
+            }
+
+            if (PressureSourceProgressRoot != null)
+                PressureSourceBackgroundImage ??= PressureSourceProgressRoot.GetComponent<Image>();
+
+            ResolveBarVisualReferences(
+                PressureSourceFillImage,
+                ref PressureSourceTrackImage,
+                ref PressureSourceMaskImage,
+                ref PressureSourceFillGraphicImage);
+            ResolveBarVisualReferences(
+                CarryFillImage,
+                ref CarryTrackImage,
+                ref CarryMaskImage,
+                ref CarryFillGraphicImage);
+            ResolveHazardStackReferences();
+        }
+
+        private static Image ResolveDirectChildImage(Transform parent, string childName)
+        {
+            if (parent == null)
+                return null;
+
+            var child = parent.Find(childName);
+            return child != null ? child.GetComponent<Image>() : null;
+        }
+
+        private static void ResolveBarVisualReferences(
+            Image fillImage,
+            ref Image trackImage,
+            ref Image maskImage,
+            ref Image fillGraphicImage)
+        {
+            if (fillImage == null)
+                return;
+
+            var parent = fillImage.transform.parent;
+            if (parent == null)
+                return;
+
+            if (fillImage.GetComponent<Mask>() != null || fillImage.name == "Fill Mask")
+            {
+                maskImage ??= fillImage;
+                var childGraphic = ResolveDirectChildImage(fillImage.transform, "Fill Bar Image");
+                if (childGraphic != fillImage)
+                    fillGraphicImage ??= childGraphic;
+            }
+
+            if (parent.GetComponent<Mask>() != null || parent.name == "Fill Mask")
+            {
+                maskImage ??= parent.GetComponent<Image>();
+                var childGraphic = ResolveDirectChildImage(parent, "Fill Bar Image");
+                if (childGraphic != fillImage)
+                    fillGraphicImage ??= childGraphic;
+                parent = parent.parent;
+            }
+
+            if (parent != null)
+                trackImage ??= parent.GetComponent<Image>();
+        }
+
+        private void CaptureLegacyVisualStyle()
+        {
+            if (_legacyStyleCaptured)
+                return;
+
+            CaptureImageState(ObjectiveSummaryBackgroundImage);
+            CaptureImageState(ObjectiveSummaryDecorationImage);
+            CaptureImageState(TimerBackgroundImage);
+            CaptureImageState(TimerDecorationImage);
+            CaptureImageState(PressureSourceBackgroundImage);
+            CaptureImageState(PressureSourceTrackImage);
+            CaptureImageState(PressureSourceMaskImage);
+            CaptureImageState(PressureSourceFillGraphicImage);
+            CaptureImageState(PressureSourceFillImage);
+            CaptureImageState(CarryTrackImage);
+            CaptureImageState(CarryMaskImage);
+            CaptureImageState(CarryFillGraphicImage);
+            CaptureImageState(CarryFillImage);
+            CaptureImageState(HazardStackFrameImage);
+
+            var templateDisplay = ResolveHazardSegmentDisplay(HazardStackSegmentSlotTemplate, createIfMissing: false);
+            if (templateDisplay != null)
+            {
+                _flatHazardGeometry = new RectTransformVisualState(templateDisplay.rectTransform);
+                _flatHazardGeometryCaptured = true;
+            }
+
+            _legacyStyleCaptured = true;
+        }
+
+        private void CaptureImageState(Image image)
+        {
+            if (image == null)
+                return;
+
+            for (int i = 0; i < _legacyImageStates.Count; i++)
+            {
+                if (_legacyImageStates[i].Target == image)
+                    return;
+            }
+
+            _legacyImageStates.Add(new ImageVisualState(image));
+        }
+
+        private void RestoreLegacyVisualStyle()
+        {
+            for (int i = 0; i < _legacyImageStates.Count; i++)
+                _legacyImageStates[i].Restore();
+        }
+
+        private void ApplyTechDemoFlatVisualStyle()
+        {
+            ApplyFlatImage(ObjectiveSummaryBackgroundImage, FlatControlColor, Image.Type.Simple);
+            ApplyFlatImage(TimerBackgroundImage, FlatControlColor, Image.Type.Simple);
+            SetImageEnabled(ObjectiveSummaryDecorationImage, false);
+            SetImageEnabled(TimerDecorationImage, false);
+
+            ApplyFlatImage(PressureSourceBackgroundImage, FlatSurfaceColor, Image.Type.Simple);
+            ApplyFlatImage(PressureSourceTrackImage, FlatTrackColor, Image.Type.Simple);
+            ApplyFlatMaskImage(PressureSourceMaskImage);
+            ApplyFlatFillController(
+                PressureSourceFillImage,
+                PressureSourceMaskImage,
+                CarryNormalColor,
+                Image.FillMethod.Horizontal,
+                (int)Image.OriginHorizontal.Left);
+            ApplyFlatImage(PressureSourceFillGraphicImage, CarryNormalColor, Image.Type.Simple);
+
+            ApplyFlatImage(CarryTrackImage, FlatTrackColor, Image.Type.Simple);
+            ApplyFlatMaskImage(CarryMaskImage);
+            ApplyFlatFillController(
+                CarryFillImage,
+                CarryMaskImage,
+                CarryNormalColor,
+                Image.FillMethod.Vertical,
+                (int)Image.OriginVertical.Bottom);
+            ApplyFlatImage(CarryFillGraphicImage, CarryNormalColor, Image.Type.Simple);
+            ApplyFlatImage(HazardStackFrameImage, FlatTrackColor, Image.Type.Simple);
+
+            var templateDisplay = ResolveHazardSegmentDisplay(HazardStackSegmentSlotTemplate, createIfMissing: false);
+            ApplyFlatHazardSegment(templateDisplay, active: false);
+        }
+
+        private static void ApplyFlatImage(Image image, Color color, Image.Type type)
+        {
+            if (image == null)
+                return;
+
+            image.enabled = true;
+            image.sprite = null;
+            image.type = type;
+            image.preserveAspect = false;
+            image.color = color;
+            image.raycastTarget = false;
+        }
+
+        private static void ApplyFlatMaskImage(Image image)
+        {
+            if (image == null)
+                return;
+
+            image.enabled = true;
+            image.color = Color.white;
+            image.raycastTarget = false;
+        }
+
+        private static void ApplyFlatFillController(
+            Image image,
+            Image maskImage,
+            Color color,
+            Image.FillMethod fillMethod,
+            int fillOrigin)
+        {
+            if (image == null)
+                return;
+
+            if (image == maskImage)
+            {
+                image.enabled = true;
+                image.type = Image.Type.Filled;
+                image.preserveAspect = false;
+                image.color = Color.white;
+                image.raycastTarget = false;
+            }
+            else
+            {
+                ApplyFlatImage(image, color, Image.Type.Filled);
+            }
+
+            image.fillMethod = fillMethod;
+            image.fillOrigin = fillOrigin;
+        }
+
+        private static void SetImageEnabled(Image image, bool enabled)
+        {
+            if (image != null)
+                image.enabled = enabled;
         }
 
         private void EnsureRuntimeReferences()
@@ -491,8 +784,30 @@ namespace SweepNDodge.DotsBullets
             if (segment.DisplayImage == null)
                 return;
 
+            if (_visualStyle == StageHudVisualStyle.TechDemoFlat)
+            {
+                ApplyFlatHazardSegment(segment.DisplayImage, active);
+                return;
+            }
+
             Sprite sprite = active ? HazardStackActiveSprite : HazardStackInactiveSprite;
             ApplyHazardSegmentSprite(segment.DisplayImage, sprite);
+        }
+
+        private void ApplyFlatHazardSegment(Image displayImage, bool active)
+        {
+            if (displayImage == null)
+                return;
+
+            displayImage.enabled = true;
+            displayImage.sprite = null;
+            displayImage.type = Image.Type.Simple;
+            displayImage.preserveAspect = false;
+            displayImage.color = active ? CarryWarningColor : FlatHazardInactiveColor;
+            displayImage.raycastTarget = false;
+
+            if (_flatHazardGeometryCaptured)
+                _flatHazardGeometry.Apply(displayImage.rectTransform);
         }
 
         private void ApplyHazardSegmentSprite(Image displayImage, Sprite sprite)
@@ -581,6 +896,92 @@ namespace SweepNDodge.DotsBullets
             }
 
             return -1f;
+        }
+
+        private readonly struct ImageVisualState
+        {
+            public ImageVisualState(Image target)
+            {
+                Target = target;
+                Sprite = target.sprite;
+                Color = target.color;
+                Type = target.type;
+                PreserveAspect = target.preserveAspect;
+                FillMethod = target.fillMethod;
+                FillOrigin = target.fillOrigin;
+                FillClockwise = target.fillClockwise;
+                FillCenter = target.fillCenter;
+                Enabled = target.enabled;
+                RaycastTarget = target.raycastTarget;
+            }
+
+            public Image Target { get; }
+            private Sprite Sprite { get; }
+            private Color Color { get; }
+            private Image.Type Type { get; }
+            private bool PreserveAspect { get; }
+            private Image.FillMethod FillMethod { get; }
+            private int FillOrigin { get; }
+            private bool FillClockwise { get; }
+            private bool FillCenter { get; }
+            private bool Enabled { get; }
+            private bool RaycastTarget { get; }
+
+            public void Restore()
+            {
+                if (Target == null)
+                    return;
+
+                Target.sprite = Sprite;
+                Target.color = Color;
+                Target.type = Type;
+                Target.preserveAspect = PreserveAspect;
+                Target.fillMethod = FillMethod;
+                Target.fillOrigin = FillOrigin;
+                Target.fillClockwise = FillClockwise;
+                Target.fillCenter = FillCenter;
+                Target.enabled = Enabled;
+                Target.raycastTarget = RaycastTarget;
+            }
+        }
+
+        private readonly struct RectTransformVisualState
+        {
+            public RectTransformVisualState(RectTransform target)
+            {
+                AnchorMin = target.anchorMin;
+                AnchorMax = target.anchorMax;
+                Pivot = target.pivot;
+                AnchoredPosition = target.anchoredPosition;
+                SizeDelta = target.sizeDelta;
+                LocalPosition = target.localPosition;
+                LocalScale = target.localScale;
+                LocalRotation = target.localRotation;
+            }
+
+            private Vector2 AnchorMin { get; }
+            private Vector2 AnchorMax { get; }
+            private Vector2 Pivot { get; }
+            private Vector2 AnchoredPosition { get; }
+            private Vector2 SizeDelta { get; }
+            private Vector3 LocalPosition { get; }
+            private Vector3 LocalScale { get; }
+            private Quaternion LocalRotation { get; }
+
+            public void Apply(RectTransform target)
+            {
+                if (target == null)
+                    return;
+
+                target.anchorMin = AnchorMin;
+                target.anchorMax = AnchorMax;
+                target.pivot = Pivot;
+                target.anchoredPosition = AnchoredPosition;
+                target.sizeDelta = SizeDelta;
+                target.localPosition = LocalPosition;
+                target.localScale = LocalScale;
+                target.localRotation = LocalRotation;
+            }
         }
 
         private readonly struct HazardSegmentView

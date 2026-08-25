@@ -1,6 +1,7 @@
 using System.Reflection;
 using NUnit.Framework;
 using TMPro;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,6 +9,10 @@ namespace SweepNDodge.DotsBullets.Tests
 {
     public class RuntimeUiRootTests
     {
+        private const string RuntimeUiRootPrefabPath = "Assets/_Project/04_Prefabs/UI/RuntimeUiRoot.prefab";
+        private static readonly Color FlatHazardActiveColor = new(1f, 0.72f, 0.18f, 1f);
+        private static readonly Color FlatHazardInactiveColor = new(0.20f, 0.27f, 0.37f, 0.8f);
+
         private static readonly MethodInfo ConfigurePresentersMethod = typeof(RuntimeUiRoot)
             .GetMethod("ConfigurePresenters", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -79,6 +84,101 @@ namespace SweepNDodge.DotsBullets.Tests
             finally
             {
                 Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void RuntimePrefab_DefaultsToTechDemoFlat_AndKeepsLegacyVisualReferences()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RuntimeUiRootPrefabPath);
+            Assert.That(prefab, Is.Not.Null);
+
+            var presenter = prefab.GetComponentInChildren<StageHudPresenter>(includeInactive: true);
+            Assert.That(presenter, Is.Not.Null);
+            Assert.That(presenter.VisualStyle, Is.EqualTo(StageHudVisualStyle.TechDemoFlat));
+            Assert.That(presenter.ObjectiveSummaryBackgroundImage, Is.Not.Null);
+            Assert.That(presenter.ObjectiveSummaryDecorationImage, Is.Not.Null);
+            Assert.That(presenter.TimerBackgroundImage, Is.Not.Null);
+            Assert.That(presenter.TimerDecorationImage, Is.Not.Null);
+            Assert.That(presenter.PressureSourceBackgroundImage, Is.Not.Null);
+            Assert.That(presenter.PressureSourceTrackImage, Is.Not.Null);
+            Assert.That(presenter.PressureSourceMaskImage, Is.Not.Null);
+            Assert.That(presenter.PressureSourceFillGraphicImage, Is.Not.Null);
+            Assert.That(presenter.PressureSourceFillImage, Is.Not.Null);
+            Assert.That(presenter.CarryTrackImage, Is.Not.Null);
+            Assert.That(presenter.CarryMaskImage, Is.Not.Null);
+            Assert.That(presenter.CarryFillGraphicImage, Is.Not.Null);
+            Assert.That(presenter.CarryFillImage, Is.Not.Null);
+            Assert.That(presenter.HazardStackFrameImage, Is.Not.Null);
+            Assert.That(presenter.HazardStackActiveSprite, Is.Not.Null);
+            Assert.That(presenter.HazardStackInactiveSprite, Is.Not.Null);
+            Assert.That(presenter.ObjectiveSummaryBackgroundImage.enabled, Is.False,
+                "The added flat background must remain disabled in the serialized Legacy baseline.");
+        }
+
+        [Test]
+        public void StageHudVisualStyle_FlatLegacyFlat_RestoresSerializedVisualsWithoutAccumulation()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RuntimeUiRootPrefabPath);
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            Assert.That(instance, Is.Not.Null);
+
+            try
+            {
+                var presenter = instance.GetComponentInChildren<StageHudPresenter>(includeInactive: true);
+                Assert.That(presenter, Is.Not.Null);
+
+                Sprite legacyTimerDecorationSprite = presenter.TimerDecorationImage.sprite;
+                Sprite legacyPressureTrackSprite = presenter.PressureSourceTrackImage.sprite;
+                Sprite legacyPressureMaskSprite = presenter.PressureSourceMaskImage.sprite;
+                Sprite legacyPressureFillSprite = presenter.PressureSourceFillGraphicImage.sprite;
+                Sprite legacyCarryTrackSprite = presenter.CarryTrackImage.sprite;
+                Sprite legacyCarryMaskSprite = presenter.CarryMaskImage.sprite;
+                Sprite legacyCarryFillSprite = presenter.CarryFillGraphicImage.sprite;
+                Sprite legacyHazardFrameSprite = presenter.HazardStackFrameImage.sprite;
+                bool legacyClearedBackgroundEnabled = presenter.ObjectiveSummaryBackgroundImage.enabled;
+
+                Assert.That(legacyPressureMaskSprite, Is.Not.Null);
+                Assert.That(legacyCarryMaskSprite, Is.Not.Null);
+
+                presenter.SetVisualStyle(StageHudVisualStyle.TechDemoFlat);
+                Assert.That(presenter.ObjectiveSummaryBackgroundImage.enabled, Is.True);
+                Assert.That(presenter.ObjectiveSummaryBackgroundImage.sprite, Is.Null);
+                Assert.That(presenter.TimerDecorationImage.enabled, Is.False);
+                Assert.That(presenter.PressureSourceTrackImage.sprite, Is.Null);
+                Assert.That(presenter.PressureSourceMaskImage.sprite, Is.SameAs(legacyPressureMaskSprite));
+                Assert.That(presenter.PressureSourceFillGraphicImage.sprite, Is.Null);
+                Assert.That(presenter.CarryTrackImage.sprite, Is.Null);
+                Assert.That(presenter.CarryMaskImage.sprite, Is.SameAs(legacyCarryMaskSprite));
+                Assert.That(presenter.CarryFillGraphicImage.sprite, Is.Null);
+                Assert.That(presenter.HazardStackFrameImage.sprite, Is.Null);
+
+                presenter.SetVisualStyle(StageHudVisualStyle.LegacyIllustrated);
+                Assert.That(presenter.ObjectiveSummaryBackgroundImage.enabled, Is.EqualTo(legacyClearedBackgroundEnabled));
+                Assert.That(presenter.TimerDecorationImage.enabled, Is.True);
+                Assert.That(presenter.TimerDecorationImage.sprite, Is.SameAs(legacyTimerDecorationSprite));
+                Assert.That(presenter.PressureSourceTrackImage.sprite, Is.SameAs(legacyPressureTrackSprite));
+                Assert.That(presenter.PressureSourceMaskImage.sprite, Is.SameAs(legacyPressureMaskSprite));
+                Assert.That(presenter.PressureSourceFillGraphicImage.sprite, Is.SameAs(legacyPressureFillSprite));
+                Assert.That(presenter.CarryTrackImage.sprite, Is.SameAs(legacyCarryTrackSprite));
+                Assert.That(presenter.CarryMaskImage.sprite, Is.SameAs(legacyCarryMaskSprite));
+                Assert.That(presenter.CarryFillGraphicImage.sprite, Is.SameAs(legacyCarryFillSprite));
+                Assert.That(presenter.HazardStackFrameImage.sprite, Is.SameAs(legacyHazardFrameSprite));
+
+                presenter.SetVisualStyle(StageHudVisualStyle.TechDemoFlat);
+                presenter.SetVisualStyle(StageHudVisualStyle.LegacyIllustrated);
+                Assert.That(presenter.TimerDecorationImage.sprite, Is.SameAs(legacyTimerDecorationSprite));
+                Assert.That(presenter.PressureSourceTrackImage.sprite, Is.SameAs(legacyPressureTrackSprite));
+                Assert.That(presenter.PressureSourceMaskImage.sprite, Is.SameAs(legacyPressureMaskSprite));
+                Assert.That(presenter.PressureSourceFillGraphicImage.sprite, Is.SameAs(legacyPressureFillSprite));
+                Assert.That(presenter.CarryTrackImage.sprite, Is.SameAs(legacyCarryTrackSprite));
+                Assert.That(presenter.CarryMaskImage.sprite, Is.SameAs(legacyCarryMaskSprite));
+                Assert.That(presenter.CarryFillGraphicImage.sprite, Is.SameAs(legacyCarryFillSprite));
+                Assert.That(presenter.HazardStackFrameImage.sprite, Is.SameAs(legacyHazardFrameSprite));
+            }
+            finally
+            {
+                Object.DestroyImmediate(instance);
             }
         }
 
@@ -452,6 +552,40 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.StageHudPanel.activeSelf, Is.False);
             Assert.That(context.Root.NotificationPanel.activeSelf, Is.False);
             Assert.That(context.Root.HintPanel.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void StageHudVisualStyle_HazardSegmentsSwitchBetweenFlatColorsAndLegacySprites()
+        {
+            using var context = CreateContext();
+
+            SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.StagePlay);
+            SetPrivateField(context.Shell, "_currentStageIndex", 0);
+            SetPrivateField(context.Hud, "_hasSnapshot", true);
+            SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
+            {
+                HazardStack = 3,
+                HazardStackMax = 5,
+                HazardRiskMultiplier = 1.15f,
+            });
+            InvokeConfigurePresenters(context.Root);
+
+            context.Root.StageHudPresenter.SetVisualStyle(StageHudVisualStyle.TechDemoFlat);
+            Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(3));
+            Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(2));
+            AssertHazardSegmentDisplayLayout(context.Root.StageHudPresenter, width: 20.5f, height: 24f);
+
+            context.Root.StageHudPresenter.SetVisualStyle(StageHudVisualStyle.LegacyIllustrated);
+            Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(3));
+            Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(2));
+            AssertHazardSegmentDisplayLayout(context.Root.StageHudPresenter, width: 20.5f, height: 24f);
+
+            context.Root.StageHudPresenter.SetVisualStyle(StageHudVisualStyle.TechDemoFlat);
+            context.Root.StageHudPresenter.SetVisualStyle(StageHudVisualStyle.LegacyIllustrated);
+            Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(3));
+            Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(2));
+            AssertHazardSegmentOrder(context.Root.StageHudPresenter, activeCount: 3);
+            AssertHazardSegmentDisplayLayout(context.Root.StageHudPresenter, width: 20.5f, height: 24f);
         }
 
         [Test]
@@ -1261,7 +1395,10 @@ namespace SweepNDodge.DotsBullets.Tests
             for (int i = 0; i < presenter.HazardStackSegmentImages.Length; i++)
             {
                 var image = presenter.HazardStackSegmentImages[i];
-                if (image != null && image.sprite == presenter.HazardStackActiveSprite)
+                bool highlighted = presenter.VisualStyle == StageHudVisualStyle.TechDemoFlat
+                    ? image != null && image.sprite == null && ColorsApproximatelyEqual(image.color, FlatHazardActiveColor)
+                    : image != null && image.sprite == presenter.HazardStackActiveSprite;
+                if (highlighted)
                     count++;
             }
 
@@ -1277,7 +1414,10 @@ namespace SweepNDodge.DotsBullets.Tests
             for (int i = 0; i < presenter.HazardStackSegmentImages.Length; i++)
             {
                 var image = presenter.HazardStackSegmentImages[i];
-                if (image != null && image.sprite == presenter.HazardStackInactiveSprite)
+                bool inactive = presenter.VisualStyle == StageHudVisualStyle.TechDemoFlat
+                    ? image != null && image.sprite == null && ColorsApproximatelyEqual(image.color, FlatHazardInactiveColor)
+                    : image != null && image.sprite == presenter.HazardStackInactiveSprite;
+                if (inactive)
                     count++;
             }
 
@@ -1333,11 +1473,21 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(rect.localPosition.z, Is.EqualTo(0f).Within(1e-4f));
                 Assert.That(rect.anchoredPosition.x, Is.EqualTo(0f).Within(1e-4f));
                 Assert.That(rect.anchoredPosition.y, Is.EqualTo(0f).Within(1e-4f));
-                Assert.That(rect.pivot.x, Is.EqualTo(0.5121951f).Within(1e-4f));
-                Assert.That(rect.pivot.y, Is.EqualTo(0.46875f).Within(1e-4f));
+                float expectedPivotX = presenter.VisualStyle == StageHudVisualStyle.TechDemoFlat ? 0.5f : 0.5121951f;
+                float expectedPivotY = presenter.VisualStyle == StageHudVisualStyle.TechDemoFlat ? 0.5f : 0.46875f;
+                Assert.That(rect.pivot.x, Is.EqualTo(expectedPivotX).Within(1e-4f));
+                Assert.That(rect.pivot.y, Is.EqualTo(expectedPivotY).Within(1e-4f));
                 Assert.That(rect.sizeDelta.x, Is.EqualTo(width).Within(1e-4f));
                 Assert.That(rect.sizeDelta.y, Is.EqualTo(height).Within(1e-4f));
             }
+        }
+
+        private static bool ColorsApproximatelyEqual(Color lhs, Color rhs)
+        {
+            return Mathf.Abs(lhs.r - rhs.r) <= 1e-4f
+                && Mathf.Abs(lhs.g - rhs.g) <= 1e-4f
+                && Mathf.Abs(lhs.b - rhs.b) <= 1e-4f
+                && Mathf.Abs(lhs.a - rhs.a) <= 1e-4f;
         }
 
         private static bool HazardStackDisplaysNoMaxText(StageHudPresenter presenter)

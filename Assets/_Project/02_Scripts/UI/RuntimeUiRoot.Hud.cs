@@ -34,6 +34,7 @@ namespace SweepNDodge.DotsBullets
                 new Vector2(102f, 87f),
                 new Color(0.20f, 0.27f, 0.37f, 1f));
             SetTopLeftRect(clearedBadge, 209f, -22f, 102f, 87f);
+            StageHudPresenter.ObjectiveSummaryBackgroundImage ??= clearedBadge.GetComponent<Image>();
             StageHudPresenter.ObjectiveSummaryText ??= CreateCenteredOverlayText(clearedBadge, "ObjectiveSummaryText", "0 / 0", 28f);
 
             var timerBadge = CreateHudBadge(
@@ -42,6 +43,7 @@ namespace SweepNDodge.DotsBullets
                 new Vector2(102f, 76f),
                 new Color(0.20f, 0.27f, 0.37f, 1f));
             SetTopLeftRect(timerBadge, 294f, -22f, 102f, 76f);
+            StageHudPresenter.TimerBackgroundImage ??= timerBadge.GetComponent<Image>();
             StageHudPresenter.TimerValueText ??= CreateCenteredOverlayText(timerBadge, "TimerValueText", "--.-s", 24f);
 
             var pressureBlock = GetOrCreateChildGameObject(objectiveRoot, "PressureSourceProgressRoot", typeof(Image)).GetComponent<RectTransform>();
@@ -50,6 +52,7 @@ namespace SweepNDodge.DotsBullets
             pressureBlockImage.color = new Color(0.07f, 0.11f, 0.17f, 1f);
             ApplyDefaultImageSprite(pressureBlockImage);
             StageHudPresenter.PressureSourceProgressRoot ??= pressureBlock.gameObject;
+            StageHudPresenter.PressureSourceBackgroundImage ??= pressureBlockImage;
             var pressureHeader = GetOrCreateChildGameObject(pressureBlock, "PressureSourceHeaderRow").GetComponent<RectTransform>();
             SetTopLeftRect(pressureHeader, 18f, 10f, 444f, 18f);
             StageHudPresenter.ObjectiveDetailText ??= FindOrCreateText(
@@ -72,6 +75,7 @@ namespace SweepNDodge.DotsBullets
             {
                 var refs = CreateProgressBarWithMarker(pressureBlock, "PressureSourceBar", new Vector2(444f, 16f));
                 SetTopLeftRect(refs.RootRect, 18f, 34f, 444f, 16f);
+                StageHudPresenter.PressureSourceTrackImage ??= refs.RootRect.GetComponent<Image>();
                 StageHudPresenter.PressureSourceFillImage ??= refs.FillImage;
                 StageHudPresenter.PressureSourceWeakThresholdMarker ??= refs.Marker;
             }
@@ -92,6 +96,7 @@ namespace SweepNDodge.DotsBullets
             StageHudPresenter.CarryValueText = null;
             StageHudPresenter.HazardStackLabel = null;
             StageHudPresenter.CarryFillImage ??= CreateVerticalFillBar(carryTotemRoot, "CarryBar", new Vector2(22f, 132f));
+            StageHudPresenter.CarryTrackImage ??= StageHudPresenter.CarryFillImage.transform.parent.GetComponent<Image>();
             SetBottomLeftRect(StageHudPresenter.CarryFillImage.transform.parent.GetComponent<RectTransform>(), 38f, 28f, 22f, 132f);
             var hazardRoot = CreateHazardStackRoot(carryTotemRoot, "HazardStackRoot");
             Stretch(hazardRoot);
@@ -388,9 +393,14 @@ namespace SweepNDodge.DotsBullets
                 || presenter.TimerValueText == null
                 || presenter.PressureSourceProgressRoot == null
                 || presenter.PressureSourceValueText == null
+                || presenter.ObjectiveSummaryBackgroundImage == null
+                || presenter.TimerBackgroundImage == null
+                || presenter.PressureSourceBackgroundImage == null
+                || presenter.PressureSourceTrackImage == null
                 || presenter.PressureSourceFillImage == null
                 || presenter.PressureSourceWeakThresholdMarker == null
                 || presenter.CarryFillImage == null
+                || presenter.CarryTrackImage == null
                 || presenter.HazardStackRoot == null
                 || presenter.RiskMultiplierText == null
                 || presenter.HazardStackSegmentsRoot == null
@@ -432,8 +442,19 @@ namespace SweepNDodge.DotsBullets
             StageHudPresenter.HazardStackSegmentImages = null;
             StageHudPresenter.HazardStackActiveSprite = null;
             StageHudPresenter.HazardStackInactiveSprite = null;
+            StageHudPresenter.ObjectiveSummaryBackgroundImage = null;
+            StageHudPresenter.ObjectiveSummaryDecorationImage = null;
+            StageHudPresenter.TimerBackgroundImage = null;
+            StageHudPresenter.TimerDecorationImage = null;
+            StageHudPresenter.PressureSourceBackgroundImage = null;
+            StageHudPresenter.PressureSourceTrackImage = null;
+            StageHudPresenter.PressureSourceMaskImage = null;
+            StageHudPresenter.PressureSourceFillGraphicImage = null;
             StageHudPresenter.PressureSourceFillImage = null;
             StageHudPresenter.PressureSourceWeakThresholdMarker = null;
+            StageHudPresenter.CarryTrackImage = null;
+            StageHudPresenter.CarryMaskImage = null;
+            StageHudPresenter.CarryFillGraphicImage = null;
             StageHudPresenter.CarryFillImage = null;
             StageHudPresenter.SegmentScale = 0.25f;
             StageHudPresenter.SegmentStepY = 16f;

@@ -4,7 +4,7 @@
 - doc_id: `TD-021`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-03-20`
+- last_updated: `2026-08-25`
 - related_docs:
   - [GD-009-in-game-ui-screen-blueprint.md](../GameDesign/GD-009-in-game-ui-screen-blueprint.md)
   - [GD-010-in-game-ui-layout-and-zones.md](../GameDesign/GD-010-in-game-ui-layout-and-zones.md)
@@ -132,10 +132,14 @@ FrameHeight = FrameBaseHeight + (HazardStackMax × FrameHeightPerSegment)
 - `HazardStackMax`나 `current / max` 형식 수치는 노출하지 않는다.
 
 ### 5.4 색 정책
-- 비활성 세그먼트:
-  - `brush gray` sprite
-- 활성 세그먼트:
-  - `brush gold` sprite
+- `LegacyIllustrated`:
+  - 비활성 세그먼트는 `brush gray` sprite를 사용한다.
+  - 활성 세그먼트는 `brush gold` sprite를 사용한다.
+  - 기존 sprite pivot과 `native size * SegmentScale` 표현을 보존한다.
+- `TechDemoFlat`:
+  - sprite가 없는 평면 `Image` 세그먼트를 사용한다.
+  - 비활성 세그먼트는 메뉴 계열 청회색, 활성 세그먼트는 기존 warning gold를 사용한다.
+  - slot 배치, frame 높이, sibling order는 Legacy와 동일하다.
 - `HazardStack == 0`
   - 전체 존재감 낮음
 - `HazardStack > 0`
@@ -193,13 +197,16 @@ FrameHeight = FrameBaseHeight + (HazardStackMax × FrameHeightPerSegment)
 5. `RuntimeUiRoot.prefab` hazard lane을 `slot + display` 구조로 정리 (`done`)
 6. `StageHudPresenter.ApplyHazardStack()`를 `HazardStackMax` 기반 구성으로 구현 (`done`)
 7. EditMode / PlayMode 검증 추가 (`done`)
+8. `TechDemoFlat` / `LegacyIllustrated` 세그먼트 전환과 복구 검증 추가 (`done`)
 
 ## 9. 검증 계획 / 합격 기준
 - compile
 - console error 0
 - EditMode
-  - `HazardStackMax=5`, `HazardStack=0`이면 slot 5개와 inactive sprite 5개 생성
-  - `HazardStack=3`이면 active 3개 / inactive 2개 sprite 적용
+  - `TechDemoFlat`에서 `HazardStackMax=5`, `HazardStack=0`이면 slot 5개와 inactive 색상 세그먼트 5개 생성
+  - `TechDemoFlat`에서 `HazardStack=3`이면 active 3개 / inactive 2개 색상 적용
+  - `LegacyIllustrated`에서 기존 active/inactive sprite, pivot, 크기가 복구됨
+  - 반복 스타일 전환 후에도 세그먼트 geometry와 sibling order가 누적 변경되지 않음
   - `HazardStack=9`, `HazardStackMax=5`이면 active 5개로 clamp
   - frame 높이가 `FrameBaseHeight + max * FrameHeightPerSegment`로 계산
   - `Display.localPosition == (0,0)` 유지
@@ -215,12 +222,21 @@ FrameHeight = FrameBaseHeight + (HazardStackMax × FrameHeightPerSegment)
   - deposit 후 HUD stack 즉시 0 반영
   - retry / stage start 후 HUD stack 0 시작
 
+### 9.1 최신 검증 결과
+- 2026-08-25
+  - EditMode `527/527` 통과
+  - 전용/운영 PlayMode 스모크 `3/3` 통과
+  - Flat에서 color segment와 null sprite, Legacy에서 brush sprite/pivot 복구 확인
+  - 반복 왕복 전환 후 fill amount, segment 수·순서·크기 유지 확인
+
 ## 10. 오픈 이슈
 - stack 증가/리셋 순간의 반응 FX를 V1.5에 넣을지, HUD V2로 미룰지
 - stage 시작 시 brush 외의 sprite 세트를 선택 가능하게 확장할지
 - `RiskMultiplier` 소수점 자릿수를 `0.00`로 고정 유지할지, stage별로 줄일지
 
 ## 11. 변경 이력
+- 2026-08-25: Flat/Legacy 왕복 구현과 최종 EditMode/PlayMode 검증 결과를 반영했다.
+- 2026-08-25: `TechDemoFlat` 색상 세그먼트와 `LegacyIllustrated` brush sprite 복구 계약을 추가하고, 공통 slot/frame/order 규칙은 유지했다.
 - 2026-03-20: 구현 반영. `HazardStackMax`를 HUD snapshot에 포함시키고, `RuntimeUiRoot.prefab` hazard lane을 `slot + display` 구조와 `brush gold/gray` sprite 기준으로 고정했다. `StageHudPresenter`의 frame height, sibling order, pivot/size 검증과 prefab SSOT 원칙을 문서에 반영했다.
 - 2026-03-19: Penpot viewport export 재검토를 반영해 세그먼트 overlap 및 draw-order 규칙을 명시했다.
 - 2026-03-18: 승인된 HUD 레이아웃에 맞춰 `HazardStack` 위치를 `Carry` 세로 토템 내부 보조 레인으로 정리하고, 라벨 없는 세그먼트 + multiplier 구성을 기준안으로 갱신했다.

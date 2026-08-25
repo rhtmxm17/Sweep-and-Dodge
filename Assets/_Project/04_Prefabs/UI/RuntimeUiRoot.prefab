@@ -5247,6 +5247,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ae00e3753fac024bbaa50d1eac75a6d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.StageHudPresenter
+  _visualStyle: 1
   ObjectiveSummaryText: {fileID: 3650971799477035363}
   ObjectiveDetailText: {fileID: 5936829433232332382}
   TimerValueText: {fileID: 2501231437287786441}
@@ -5263,8 +5264,19 @@ MonoBehaviour:
   HazardStackSegmentSlotTemplate: {fileID: 679480092410906069}
   HazardStackActiveSprite: {fileID: 21300000, guid: 32964b95fcf547941bc79fd4608a45d3, type: 3}
   HazardStackInactiveSprite: {fileID: 21300000, guid: 5500dba82d8487e4a94083cde6737034, type: 3}
+  ObjectiveSummaryBackgroundImage: {fileID: 7751336943781319690}
+  ObjectiveSummaryDecorationImage: {fileID: 2939403378746214524}
+  TimerBackgroundImage: {fileID: 4818153765110533552}
+  TimerDecorationImage: {fileID: 457650067701600869}
+  PressureSourceBackgroundImage: {fileID: 5302203845003907924}
+  PressureSourceTrackImage: {fileID: 7618376314414143192}
+  PressureSourceMaskImage: {fileID: 3141613027226588914}
+  PressureSourceFillGraphicImage: {fileID: 701316784214083706}
   PressureSourceFillImage: {fileID: 3141613027226588914}
   PressureSourceWeakThresholdMarker: {fileID: 5616682245114317556}
+  CarryTrackImage: {fileID: 8141746338632008629}
+  CarryMaskImage: {fileID: 5880711305754065480}
+  CarryFillGraphicImage: {fileID: 6984326490841867516}
   CarryFillImage: {fileID: 5880711305754065480}
   SegmentScale: 0.25
   SegmentStepY: 16
@@ -16131,6 +16143,7 @@ GameObject:
   - component: {fileID: 3304520674918931316}
   - component: {fileID: 2938381828283690407}
   - component: {fileID: 6393386890208556005}
+  - component: {fileID: 7751336943781319690}
   m_Layer: 0
   m_Name: ClearedCountBadge
   m_TagString: Untagged
@@ -16187,6 +16200,36 @@ MonoBehaviour:
   m_FlexibleWidth: 0
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &7751336943781319690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7430754633508569992}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.2, g: 0.3, b: 0.46, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &7431815881170864605
 GameObject:
   m_ObjectHideFlags: 0
