@@ -6,7 +6,7 @@
 - doc_id: `PORT-003`
 - type: `Portfolio`
 - status: `draft`
-- last_updated: `2026-08-24`
+- last_updated: `2026-08-26`
 - related_docs:
   - [../../README.md](../../README.md)
   - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
@@ -96,7 +96,7 @@ Stage 2의 최신 대량 entity 시나리오는 별도 stress preset이 아니�
 
 여기서 약 2.5만 active entity는 일반 플레이의 상시 밀도가 아니라, Stage 2 초기 위치에서 청소하지 않고 Dust를 누적한 통제 시나리오의 plateau다. 기존 코드 명칭의 active Bullet 카운터는 위험 요소와 청소/수집 대상을 함께 포함한다.
 
-이 결과에는 Windows Editor와 Profiler 기록 오버헤드가 포함된다. standalone 또는 공개 빌드의 FPS, 60fps 보장, GameObject 방식 대비 성능 우위를 의미하지 않는다. Dust/Hazard 구성 비율은 T3 후속 측정에서 별도로 확보한다.
+이 결과에는 Windows Editor와 Profiler 기록 오버헤드가 포함된다. standalone 또는 공개 빌드의 FPS, 60fps 보장, GameObject 방식 대비 성능 우위를 의미하지 않는다. Dust/Hazard 구성 비율은 2026-08-25 standalone 재측정에서 별도로 확보했다.
 
 ### 4.3 2026-08-24 Stage 2 standalone profiling
 
@@ -118,7 +118,29 @@ ECS Tick과 GameObject Update 비용을 같은 frame에서 보수적으로 관�
 
 600개 모든 frame에서 pipeline marker가 관찰됐고 20ms를 넘는 frame은 없었다. 따라서 이 결과는 명시한 테스트 PC와 통제 시나리오에서 60fps frame budget을 충족했다는 보조 근거로 사용한다. 모든 하드웨어와 플레이 상황의 60fps 보장, 최종 공개 Release Build 성능, GameObject 방식 대비 우위를 의미하지 않는다.
 
-Editor에서는 active entity 평균 약 2.4만을 직접 집계했지만 standalone 캡처에는 전체 active 수와 Dust/Hazard 구성 비율을 직접 읽을 수 있는 카운터가 남아 있지 않다. 두 측정은 같은 Stage 2 콘텐츠에 대응하지만, standalone에서 정확히 같은 active 수를 동시에 확인한 결과로 합치지 않는다. 상세 원시 근거와 분석 경계는 `PORT-NOTE-002`에 보존한다.
+이 2026-08-24 캡처에는 전체 active 수와 Dust/Hazard 구성 비율을 직접 읽을 수 있는 카운터가 남아 있지 않았다. 이 한계는 다음 날 최신 비주얼 빌드 재측정에서 해소했으며, 상세 원시 근거와 분석 경계는 `PORT-NOTE-002`에 보존한다.
+
+### 4.4 2026-08-25 최신 비주얼 standalone 3회 반복
+
+게임플레이 HUD와 Stage Cell 비주얼 변경 이후 Windows x64 IL2CPP Development Build를 새로 만들고, 1024×768 windowed, Deep Profile Support Off, uncapped 조건을 manifest로 고정했다. Stage 2 시작 대화를 건너뛴 뒤 초기 위치에서 입력과 청소 없이 plateau에 진입한 시점부터 600 frame을 3회 기록했다.
+
+| Metric | Run01 | Run02 | Run03 | 3-run 합산 |
+|---|---:|---:|---:|---:|
+| Frame interval median | 7.476ms | 7.396ms | 7.042ms | 7.291ms |
+| Frame interval p95 / max | 9.371 / 12.638ms | 9.320 / 12.872ms | 8.974 / 11.508ms | 9.249 / 12.872ms |
+| 16.67ms 초과 interval | 0 | 0 | 0 | 0 / 1,797 |
+| Active Total mean | 24,153.2 | 24,151.9 | 24,139.6 | 24,148.3 |
+| Active Total range | 24,110–24,236 | 24,099–24,221 | 24,077–24,194 | 24,077–24,236 |
+| Dust mean | 24,107.0 | 24,119.2 | 24,091.9 | 24,106.0 |
+| Hazard mean | 46.2 | 32.7 | 47.7 | 42.2 |
+| Tick-proxy pipeline median | 2.092ms | 2.049ms | 2.040ms | 2.058ms |
+| Tick-proxy spawn median | 0.402ms | 0.390ms | 0.384ms | 0.392ms |
+
+1,800개 모든 frame에서 `Dust + Hazard = Total`이 성립했다. 동일 최신 빌드의 standalone 캡처에서 active 구성과 frame interval을 함께 기록했으므로, Editor entity 규모와 standalone frame time을 서로 다른 시점의 대응 근거로만 두었던 이전 공백은 해소됐다.
+
+uncapped 측정에는 fixed Tick이 실행된 frame과 실행되지 않은 render frame이 섞여 있으므로 전체 frame median을 ECS Tick 비용이나 보편적인 FPS 보장으로 표현하지 않는다. 현재 결과는 명시한 테스트 장비·Development Build·Stage 2 무입력·무청소 시나리오에 한정한다.
+
+별도 HUD 영상 `ProfilerCaptures/Stage2-Composition.mp4`에는 누적 과정과 15초 이상 plateau 유지 구간을 연속으로 보존했다. 파일 길이는 `25.784533초`, 해상도는 1024×768이다. 영상은 연속 유지와 HUD 구성 판독의 시각 근거이며 frame-time 통계의 원천은 아니다.
 
 ## 5. 기술 데모로서의 범위
 

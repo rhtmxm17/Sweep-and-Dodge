@@ -97,7 +97,10 @@
 - uncapped standalone 측정은 fixed Tick이 있는 frame과 없는 frame이 섞이므로 전체 평균 FPS를 ECS 성능 대표값으로 사용하지 않는다. Tick frame과 비-Tick frame의 분포를 분리해 해석한다.
 - 임시 `Application.targetFrameRate = 60` 조건의 standalone 측정에서 600개 모든 frame에 pipeline이 실행됐고, frame interval median `16.670ms`, p95 `17.022ms`, max `17.402ms`, 20ms 초과 0개를 기록했다. 이는 명시한 테스트 장비와 통제 시나리오의 60fps frame budget 보조 근거다.
 - 60fps cap은 ECS Tick과 GameObject Update를 같은 frame에서 관찰하기 위한 일시적 측정 조건이며 실제 데모 운영 정책으로 채택하지 않는다. 측정 후 임시 코드는 원복했고 uncapped 기본 정책을 유지한다.
-- Editor의 평균 약 2.4만 active entity 직접 집계와 standalone frame time은 같은 Stage 2 콘텐츠에 대응하지만 동시 측정이 아니다. standalone active 수와 Dust/Hazard 구성 비율이 확보되기 전에는 `약 2.5만에서 60fps`를 하나의 무조건적 성능 주장으로 사용하지 않는다.
+- 2026-08-24 Editor의 평균 약 2.4만 active entity 직접 집계와 standalone frame time은 같은 Stage 2 콘텐츠에 대응하지만 동시 측정이 아니었다. 이 historical evidence를 인용할 때는 두 근거를 구분한다.
+- 최신 게임플레이 HUD와 Stage Cell 비주얼을 포함한 2026-08-25 standalone Development Build에서는 Total/Dust/Hazard와 frame interval을 같은 600-frame 캡처에 기록하고 동일 조건 3회를 재현했다. 합산 active Total 평균은 `24,148.3`, 전체 범위는 `24,077–24,236`, frame interval median/p95/max는 `7.291/9.249/12.872ms`, 16.67ms 초과는 `0/1,797`이었다.
+- 최신 uncapped 반복 측정에는 fixed Tick 실행 frame과 비실행 render frame이 섞여 있으므로 전체 frame median을 ECS Tick 비용이나 보편적인 60fps 보장으로 축약하지 않는다. 현재 빌드는 Development Build이며 최종 공개 후보 빌드 성능과 구분한다.
+- `ProfilerCaptures/Stage2-Composition.mp4`에 Stage 2 누적 과정과 15초 이상 plateau 유지 구간을 1024×768, `25.784533초`의 연속 HUD 영상으로 보존했다. 영상은 시각 근거이며 frame-time 통계는 raw Profiler capture와 CSV를 기준으로 한다.
 - 작업 순서는 `포트폴리오 브리프 -> 주장-근거 인벤토리 -> 공개 데모/검증 기준 -> 정보 구조 -> 저장소 문서 -> 시각 자료/데모 패키지 -> Notion -> 최종 검수`로 진행한다.
 
 ## Now
@@ -105,8 +108,8 @@
   - 완료 기준: 대표 플레이 구간, 성능 시나리오, 측정 환경·지표, 촬영 목록, 빌드 전달 기준이 정해진다.
   - 검증: 결과를 재현하거나 최소한 측정 조건과 해석 범위를 확인할 수 있다.
   - 근거: `PORT-003`, `SESSION-20260514-01`, T2에서 확인한 증거 공백.
-  - 확보: Stage 2 Editor 통제 시나리오의 active entity plateau, A/B/C spawn profiling, standalone Development Build의 uncapped 및 임시 60fps cap 측정, 임시 cap 코드 원복, Total/Dust/Hazard 동시 Profiler counter 계측, 고정 manifest의 Windows x64 IL2CPP Development Build, 필수 counter가 보존된 600-frame pilot capture, 측정 전용 실행 옵션의 HUD 표시 smoke.
-  - 남음: pilot counter·frame 분포 분석과 반복 측정 판단, HUD가 포함된 Stage 2 증거 화면, 최종 공개 후보 빌드 smoke, 대표 캡처·영상과 구체 증거 자료 형식.
+  - 확보: Stage 2 Editor 통제 시나리오의 active entity plateau, A/B/C spawn profiling, standalone Development Build의 uncapped 및 임시 60fps cap 측정, 임시 cap 코드 원복, Total/Dust/Hazard 동시 Profiler counter 계측, 게임플레이 HUD·Stage Cell 비주얼 변경 이후 2026-08-25 고정 manifest Windows x64 IL2CPP Development Build와 동일 조건 600-frame 3회 반복 분석, 2026-08-26 누적 과정·15초 이상 plateau 연속 HUD 영상, 관련 `PORT-NOTE-001/002`와 `PORT-003` 문서 고정.
+  - 남음: 한글 폰트 missing-glyph와 optional Feel missing-script 정리, 최종 공개 후보 빌드 smoke와 변경 범위에 따른 성능 재측정 판단, 대표 플레이 구간·BroomSweep·Stage Map Editor 캡처, 공개용 표·Profiler 정지 캡처와 raw/CSV 배포 형식, 빌드 전달 기준 확정.
 
 ## Next
 - [ ] T4. 포트폴리오 서사와 채널별 정보 구조를 확정한다.
@@ -134,6 +137,10 @@
 - 없음.
 
 ## Branch Handoffs
+- 2026-08-26 / T3 Visual-Updated Profiling Documentation Freeze / 최신 비주얼 Development Build의 standalone Total/Dust/Hazard 동시 집계, 600-frame 3회 반복 결과, 25.784533초 누적·plateau HUD 영상을 원천 노트·검증 보고서·주장 매트릭스에 고정 / `PORT-NOTE-002`, `PORT-003`, `PORT-NOTE-001`, 3-run summary, manifest, 본 문서 / active Total 합산 평균 `24,148.3`, frame median/p95/max `7.291/9.249/12.872ms`, 16.67ms 초과 `0/1,797`, composition invariant 위반 `0/1,800`, 영상 hash 확인 / 분기 내 계획한 집계·측정·문서화 완료, 다음 단계에서 본래 T3 대화로 맥락 병합.
+- 2026-08-25 / T3 Visual-Updated Profiling 3-Run / 동일 최신 비주얼 Development Build에서 600-frame uncapped profiling을 3회 완료하고 Total mean `24,153.2/24,151.9/24,139.6`, frame median `7.476/7.396/7.042ms`, pipeline median `2.092/2.049/2.040ms`, spawn median `0.402/0.390/0.384ms`를 재현 / Run01~03 raw·CSV, 3-run summary, manifest, 본 문서 / 1,800 frame composition invariant 위반 0건·1,797 interval 중 16.67ms 초과 0건 / 다음 시작점: 15초 plateau 직접 증거 필요성 결정 후 공개용 캡처·영상과 최종 후보 build smoke.
+- 2026-08-25 / T3 Visual-Updated Profiling Run01 / 최신 HUD·Stage Cell 비주얼 빌드의 Stage 2 plateau 600 frame에서 Total mean `24,153.2`와 Dust/Hazard 구성을 standalone으로 직접 기록하고, frame interval median/p95/max `7.476/9.371/12.638ms`, Tick-proxy pipeline median/p95/max `2.092/2.449/2.740ms`, spawn `0.402/0.661/0.771ms`를 추출 / raw `.data`, frame CSV, Run01 summary, manifest, 본 문서 / 600개 composition invariant 및 16.67ms 초과 0개 확인 / 다음 시작점: 반복 측정 필요성 판단, 판독 가능한 HUD 화면과 한글 폰트 문제 정리.
+- 2026-08-25 / T3 Visual-Updated Measurement Rebuild / 게임플레이 HUD와 Stage Cell 비주얼 변경 이후 Windows x64 IL2CPP Development Build를 새 날짜 경로에 재생성하고 build GUID `f0b5e725fa3b42a3a5c2afb793b5e11a`, Total/Dust/Hazard·pipeline 심볼, 측정 HUD와 Entity Scene streaming을 확인 / `Builds/T3-Stage2-Composition-20260825`, `ProfilerCaptures/Stage2-Composition-20260825-manifest.md`, 측정 실행 스크립트, 본 문서 / compile error 0, EditMode 531개·전용 PlayMode smoke 1개·build 및 Player smoke 통과 / 다음 시작점: 최신 비주얼 빌드에서 Stage 2 plateau 600-frame capture와 HUD screenshot 저장.
 - 2026-08-24 / T3 Composition Pilot HUD Recovery / 첫 pilot은 씬 직렬화 `ShowHud=false` 때문에 HUD가 숨겨졌지만 raw capture에는 Total/Dust/Hazard counter와 pipeline marker가 보존됨을 확인하고, 공개 기본값을 유지한 채 Development Build의 `-show-bullet-debug-hud` 옵션으로만 HUD를 활성화 / `BulletDebugHudBridge`, 측정 실행 스크립트·manifest, 갱신 build GUID `7506bcb5d4b6419498bdc454cb55e520`, 본 문서 / EditMode 524개·전용 PlayMode smoke 1개·갱신 빌드·HUD 화면 smoke 통과 / 다음 시작점: pilot counter·frame 분포 분석 후 필요 시 반복 capture와 Stage 2 HUD 증거 화면 확보.
 - 2026-08-24 / T3 Composition Measurement Preparation / Windows x64 IL2CPP Development Build를 Deep Profile 없이 생성하고 build GUID `4d6dcae0002241d3b9f484187d6552d9`, Total/Dust/Hazard 계측 심볼, Direct3D 12 기동과 Entity Scene streaming을 확인 / `Builds/T3-Stage2-Composition-20260824`, `ProfilerCaptures/Stage2-Composition-20260824-manifest.md`, 측정 실행 스크립트, 본 문서 갱신 / build success 및 15초 숨김 기동 smoke / 다음 시작점: 사용자가 Stage 2 plateau에서 600-frame pilot Profiler capture와 HUD screenshot을 저장하고 agent가 counter·frame 분포를 분석.
 - 2026-08-24 / T3 Standalone Composition Counter / 기존 `BulletActiveTag`와 `BulletHazardTag`를 SSOT로 Total/Dust/Hazard HUD·Profiler counter를 추가하고 임시 60fps cap 원복을 확인 / `DebugHudAndStressSystems`, `DebugHudComponents`, `BulletDebugHudBridge`, 관련 계약 테스트, 본 문서 갱신 / 신규 계약 1개·전체 EditMode 524개·전용 PlayMode smoke 1개 통과 / 다음 시작점: 새 Development Build에서 환경 manifest를 고정하고 Stage 2 무입력·무청소 standalone 동시 측정.
@@ -175,6 +182,6 @@
   - 검증 결과: 운영 규칙, 채택 기준, 현재 작업, 후속 순서, 분기 인수인계 위치를 한 문서에서 확인할 수 있다.
 
 ## End of Session
-- 결과: T1·T2를 완료했고, T3에서 Editor active entity 직접 집계와 standalone frame budget 근거를 구분해 확보한 뒤 Total/Dust/Hazard 동시 계측이 포함된 600-frame pilot raw capture와 측정 전용 HUD 표시 build smoke까지 확보했다.
-- 남은 리스크: pilot counter·frame 분포 분석, 반복 측정 판단, HUD가 포함된 Stage 2 증거 화면, 최종 공개 후보 빌드 smoke, 대표 플레이 구간과 영상/GIF·빌드 전달 기준은 아직 확정되지 않았다.
-- 다음 시작점: 저장된 pilot raw capture의 counter·frame 분포를 분석하고 반복 capture 필요 여부를 결정한다.
+- 결과: T1·T2를 완료했고, T3 측정 분기에서 최신 게임플레이 HUD·Stage Cell 비주얼 Development Build의 Stage 2 standalone 600-frame 측정을 3회 반복해 약 2.4만 active composition과 frame/pipeline/spawn 분포의 재현성을 확인했다. 누적 과정과 15초 이상 plateau 유지의 25.784533초 HUD 영상을 확보하고 `PORT-NOTE-001/002`, `PORT-003`에 최신 근거와 해석 경계를 고정했다.
+- 남은 리스크: 한글 폰트 missing-glyph와 optional Feel missing-script 정리, 최종 공개 후보 빌드 smoke와 성능 재측정 판단, 대표 플레이 구간·BroomSweep·Stage Map Editor 캡처, 공개용 표·Profiler 정지 캡처·raw/CSV 배포 형식, 영상/GIF·빌드 전달 기준은 아직 확정되지 않았다.
+- 다음 시작점: 이번 분기의 측정·집계·문서화 결과를 본래 T3 대화 맥락에 병합하고, T3의 남은 공개 데모·증거 패키징 결정을 이어간다.

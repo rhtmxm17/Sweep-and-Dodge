@@ -7,7 +7,7 @@
 - type: `PortfolioSourceNote`
 - status: `working`
 - audience: `internal`
-- last_updated: `2026-08-24`
+- last_updated: `2026-08-26`
 - related_docs:
   - [../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
   - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
@@ -421,9 +421,9 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 - 탄환 제거 시 보너스 UI 외의 즉각적인 반응이 약함
 - 피격 시 캐릭터 반응 외의 피드백이 제한적
 - 청소–Deposit 반복 구조의 장기적인 재미와 선택지 부족
-- Stage 2 standalone Development Build 측정은 확보했지만 active 수와 Dust/Hazard 구성 비율을 같은 캡처에 직접 결합하지 못함
-- 최종 공개 후보 빌드의 반복 측정과 완전한 환경 manifest는 미확보
-- 최종 영상·GIF·빌드 전달 자료 부재
+- 최신 비주얼 Stage 2 standalone Development Build에서 active Total/Dust/Hazard와 frame interval을 같은 캡처에 직접 기록하고 동일 조건 3회를 재현함
+- Development Build 측정 manifest는 확보했지만 최종 공개 후보 빌드의 기동 smoke와 성능 재측정 필요성 판단은 미완료
+- Stage 2 측정 영상은 확보했지만 대표 플레이 영상·GIF와 최종 빌드 전달 자료는 미완료
 
 이 한계는 실패를 숨기는 항목이 아니라 기술 데모의 현재 범위와 다음 개선 방향으로 설명한다.
 
@@ -444,8 +444,8 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 | 자동 테스트 전문성 | 주장하지 않음 | 테스트는 존재 | 비공개 |
 | 테스트 기반 계약 보조 | 충분 | 계약·smoke 사례 | 보조 |
 | 장애물 Profiler 진단 | 사례 설명 가능 | 사용자 프롬프트, Git 이력 | 정성적 보조 |
-| 2.5만 전후 active Entity | Editor 통제 시나리오에서 평균 약 2.4만 재현 | `PORT-003` Stage 2 profiling | 보조 |
-| standalone Development Build frame budget | 조건부 설명 가능 | `PORT-003`, `PORT-NOTE-002`, Profiler capture | 보조 |
+| 2.5만 전후 active Entity | Editor와 최신 standalone 통제 시나리오에서 평균 약 2.4만 재현 | `PORT-003` Stage 2 profiling, 3-run counter capture | 보조 |
+| standalone Development Build frame budget | active 구성과 같은 최신 캡처에서 조건부 설명 가능 | `PORT-003`, `PORT-NOTE-002`, Profiler capture | 보조 |
 | 최종 공개 후보 빌드 성능 | 아직 없음 | T3에서 확보 예정 | 보류 |
 | GameObject 대비 성능 우위 | 직접 비교 없음 | 없음 | 비공개 |
 
@@ -463,10 +463,9 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 
 ## 16. T3로 넘길 증거 공백
 
-- standalone 측정과 동시에 기록한 전체 active Entity 수와 Dust/Hazard 구성 비율
-- 해상도·품질·빌드 옵션을 포함한 측정 manifest와 동일 조건 반복 측정
-- Editor 직접 집계, standalone Development Build profiling, 최종 public benchmark의 조건·해석 분리
-- 대표 플레이 영상과 GIF
+- 최종 공개 후보 빌드 기동 smoke와, 코드·콘텐츠·품질 설정 차이에 따른 성능 재측정 필요성 판단
+- Editor 직접 집계, standalone Development Build profiling, 최종 public candidate의 조건·해석 분리
+- Stage 2 누적·plateau 영상은 확보했으며 대표 플레이 영상과 GIF는 별도 구성
 - Stage Map Editor 화면 자료
 - 공개 빌드 기동·완주 smoke
 - 구체적인 성능 캡처와 증거 자료의 보존 형식
@@ -479,4 +478,14 @@ Deep Profile Support를 활성화한 최초 standalone 캡처는 계측 sample�
 
 60fps cap은 실제 데모 운영 정책이 아니라 ECS Tick과 GameObject Update가 같은 frame에 실행되는 조건을 만들기 위한 임시 측정 설정이다. 또한 현재 fixed-step accumulator는 render frame당 최대 한 Tick을 소비하므로 두 loop가 완전히 독립적으로 실행된다고 주장하지 않는다.
 
-Editor의 약 2.4만 active entity 직접 집계와 standalone frame time은 같은 Stage 2 콘텐츠에 대응하지만 동시 측정이 아니다. 공개 시에는 두 근거를 구분하며, standalone active 수와 Dust/Hazard 구성 비율을 직접 확보하기 전까지 `약 2.5만에서 60fps`를 하나의 무조건적 성능 문구로 축약하지 않는다.
+2026-08-24 시점의 Editor 약 2.4만 active entity 직접 집계와 standalone frame time은 같은 Stage 2 콘텐츠에 대응했지만 동시 측정은 아니었다. 당시 결과를 인용할 때는 두 근거를 계속 구분한다.
+
+## 18. 최신 비주얼 standalone 반복 측정 판단
+
+2026-08-25 최신 게임플레이 HUD와 Stage Cell 비주얼을 포함한 동일 Windows x64 IL2CPP Development Build에서 Stage 2 무입력·무청소 plateau 600 frame을 3회 기록했다. 세 캡처 모두 Total/Dust/Hazard counter와 frame interval, pipeline, spawn marker를 함께 포함한다.
+
+active Total 평균은 실행별 `24,153.2 / 24,151.9 / 24,139.6`이었고, 3회 합산 평균은 `24,148.3`, 전체 범위는 `24,077–24,236`이었다. 합산 1,797 frame interval은 median `7.291ms`, p95 `9.249ms`, max `12.872ms`였으며 16.67ms 초과는 0개였다. 1,800개 모든 frame에서 `Dust + Hazard = Total`이 성립했다.
+
+이로써 standalone active 구성 동시 기록, Development Build manifest, 동일 조건 3회 반복이라는 T3 증거 공백은 해소됐다. 별도 25.784533초 HUD 영상에는 누적 과정과 15초 이상 plateau 유지 구간을 연속으로 보존했다.
+
+다만 uncapped frame에는 fixed Tick 실행 frame과 비실행 frame이 섞이고 현재 빌드는 Development Build다. 따라서 `약 2.5만에서 60fps`를 모든 하드웨어·플레이 상황·최종 공개 빌드에 적용되는 보장 문구로 사용하지 않는다. 최종 공개 후보가 확정되면 기동 smoke를 수행하고, 코드·콘텐츠·품질 설정 차이에 따라 성능 재측정 필요성을 별도로 판단한다.

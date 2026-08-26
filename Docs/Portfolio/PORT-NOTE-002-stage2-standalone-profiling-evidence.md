@@ -7,7 +7,7 @@
 - type: `PortfolioSourceNote`
 - status: `working`
 - audience: `internal`
-- last_updated: `2026-08-24`
+- last_updated: `2026-08-26`
 - related_docs:
   - [../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
   - [PORT-003-validation-report.md](PORT-003-validation-report.md)
@@ -20,7 +20,7 @@
 
 측정 시나리오는 Editor에서 active entity 평균 약 2.4만을 직접 집계한 것과 같은 Stage 2 콘텐츠를 사용한다. 시작 대화를 건너뛴 뒤 초기 위치에서 입력과 청소를 수행하지 않고, Dust가 기존 spawn pipeline을 통해 lifetime equilibrium까지 누적되도록 했다.
 
-다만 standalone Profiler 캡처에는 전체 active entity 수와 Dust/Hazard 구성 비율을 직접 읽을 수 있는 카운터가 보존되지 않았다. 따라서 Editor의 직접 집계 수치와 standalone frame time은 서로 대응하는 근거이지만, 아직 하나의 동시 측정 결과로 결합하지 않는다.
+2026-08-24 캡처에는 전체 active entity 수와 Dust/Hazard 구성 비율을 직접 읽을 수 있는 카운터가 보존되지 않았다. 이 한계는 Total/Dust/Hazard Profiler counter를 추가한 뒤, 최신 게임플레이 HUD와 Stage Cell 비주얼을 포함한 2026-08-25 standalone Development Build를 같은 조건으로 3회 재측정해 해소했다. 따라서 2026-08-24 결과는 Deep Profile 오버헤드와 임시 60fps cap의 진단 근거로, 2026-08-25 결과는 최신 비주얼 빌드의 active 구성과 uncapped frame 분포를 같은 캡처에서 확인한 근거로 분리한다.
 
 ## 2. 측정 환경과 원시 자료
 
@@ -37,7 +37,7 @@
 | Scene / Stage | `SampleScene` / Stage 2 |
 | Input | 시작 대화 skip 후 무입력·무청소 |
 
-해상도, 품질 설정, Development Build의 세부 옵션 목록은 아직 완전한 측정 기록으로 고정하지 못했다. 최종 공개 벤치마크 전 보완한다.
+2026-08-24 측정은 해상도·품질·세부 빌드 옵션이 완전한 manifest로 남지 않았다. 2026-08-25 재측정은 `ProfilerCaptures/Stage2-Composition-20260825-manifest.md`에 1024×768 windowed 실행, Windows x64 IL2CPP, Development Build, Deep Profile Support Off, LZ4, 단일 `SampleScene`, build GUID와 주요 바이너리 SHA-256을 고정했다. 품질 설정은 실행 시 별도 변경 없이 빌드 기본값을 사용했다.
 
 ### 2.2 Profiler 캡처
 
@@ -48,8 +48,13 @@
 | `Sweep and Dodge_2026-08-23_19-29-22.data` | On | 기존 설정 | 1,115,725,516 bytes | 계측 오버헤드가 큰 무효 성능 근거 |
 | `Sweep and Dodge_2026-08-24_10-00-09.data` | Off | uncapped | 93,885,924 bytes | Tick/비-Tick 프레임 분리 관찰용 |
 | `Sweep and Dodge_2026-08-24_11-19-35_fps cap 60.data` | Off | 임시 60fps cap | 97,799,284 bytes | 60fps frame budget 보조 근거 |
+| `Stage2-Composition-20260825-Run01.data` | Off | uncapped | 123,971,376 bytes | 최신 비주얼·active 구성 동시 측정 |
+| `Stage2-Composition-20260825-Run02.data` | Off | uncapped | 124,380,376 bytes | 동일 조건 반복 측정 |
+| `Stage2-Composition-20260825-Run03.data` | Off | uncapped | 123,713,856 bytes | 동일 조건 반복 측정 |
 
 같은 이름의 PNG는 Profiler가 저장한 작은 미리보기이므로 공개용 차트나 판독 가능한 캡처로 사용하지 않는다. 원시 `.data` 파일 역시 현재는 로컬 개발 근거이며, 공개 패키지에 그대로 포함할지는 T3에서 별도로 결정한다.
+
+각 2026-08-25 raw capture에서 frame CSV를 생성했으며, 실행별 수치와 3-run 합산은 `ProfilerCaptures/Stage2-Composition-20260825-3Run-summary.md`에 보존한다. 연속 시각 근거는 `ProfilerCaptures/Stage2-Composition.mp4`에 보존한다. 이 영상은 1024×768, `25.784533초`, 14,692,868 bytes이며 SHA-256은 `80A85091D9A6D80AAD69C59688DA5F84455D68F2C7CE2EDDBCF9DCF06A5078EA`다. 사용자가 Stage 2 누적 과정과 15초 이상 plateau 유지가 포함되도록 측정 절차에 따라 확보했으며, Agent는 파일 메타데이터와 hash를 확인했다. 영상은 연속 유지와 HUD 가독성의 시각 근거이며 frame-time 통계의 원천은 아니다.
 
 ## 3. 분석 방법
 
@@ -105,7 +110,29 @@ render/update frame보다 fixed Tick 주기가 느리므로 600개 중 약 3분�
 
 600개 모든 frame에서 pipeline marker가 관찰됐고, 실제 작업 이후에는 `WaitForTargetFPS`가 frame budget의 상당 부분을 차지했다. 이 캡처는 해당 테스트 장비와 통제 시나리오에서 대량 엔티티 pipeline을 매 frame 실행해도 60fps frame budget 안에 들어왔다는 보조 근거로 사용한다.
 
-이 cap은 ECS Tick과 GameObject Update의 비용을 보수적으로 함께 관찰하기 위한 측정 조건이지, 실제 데모의 영구 운영 정책이 아니다. 측정 후 코드는 원복해야 한다. 또한 현재 fixed-step accumulator는 render frame당 최대 한 Tick을 소비하므로, render와 simulation이 완전히 독립적으로 실행된다고 표현하지 않는다.
+이 cap은 ECS Tick과 GameObject Update의 비용을 보수적으로 함께 관찰하기 위한 측정 조건이지, 실제 데모의 영구 운영 정책이 아니다. 측정 후 임시 코드는 원복했고 uncapped 기본 정책을 유지한다. 또한 현재 fixed-step accumulator는 render frame당 최대 한 Tick을 소비하므로, render와 simulation이 완전히 독립적으로 실행된다고 표현하지 않는다.
+
+### 4.4 2026-08-25 최신 비주얼 빌드·uncapped 3회 반복
+
+게임플레이 HUD와 Stage Cell 비주얼 변경 이후 새 Windows x64 IL2CPP Development Build를 고정하고, 같은 Stage 2 초기 위치·무입력·무청소 plateau에서 600 frame을 3회 기록했다. 세 캡처 모두 Total/Dust/Hazard counter와 frame/pipeline/spawn marker를 함께 포함한다.
+
+| Metric | Run01 | Run02 | Run03 | 3-run 합산 |
+|---|---:|---:|---:|---:|
+| Frames | 600 | 600 | 600 | 1,800 |
+| Frame interval median | 7.476ms | 7.396ms | 7.042ms | 7.291ms |
+| Frame interval p95 / max | 9.371 / 12.638ms | 9.320 / 12.872ms | 8.974 / 11.508ms | 9.249 / 12.872ms |
+| 16.67ms 초과 interval | 0 | 0 | 0 | 0 / 1,797 |
+| Active Total mean | 24,153.2 | 24,151.9 | 24,139.6 | 24,148.3 |
+| Active Total range | 24,110–24,236 | 24,099–24,221 | 24,077–24,194 | 24,077–24,236 |
+| Dust mean | 24,107.0 | 24,119.2 | 24,091.9 | 24,106.0 |
+| Hazard mean | 46.2 | 32.7 | 47.7 | 42.2 |
+| Tick proxy frames | 270 | 266 | 259 | 795 |
+| Pipeline median / p95 / max | 2.092 / 2.449 / 2.740ms | 2.049 / 2.381 / 2.703ms | 2.040 / 2.362 / 2.745ms | 2.058 / 2.408 / 2.745ms |
+| Spawn median / p95 / max | 0.402 / 0.660 / 0.771ms | 0.390 / 0.510 / 0.644ms | 0.384 / 0.606 / 0.768ms | 0.392 / 0.618 / 0.771ms |
+
+1,800개 모든 frame에서 `Dust + Hazard = Total`이 성립했고 `WaitForTargetFPS`는 0이었다. 실행 간 Total mean spread는 13.6 entity, frame median spread는 0.434ms, pipeline median spread는 0.052ms, spawn median spread는 0.018ms였다.
+
+각 raw Profiler 캡처의 연속 구간은 약 4.3–4.5초이므로 세 캡처를 합쳐 하나의 15초 연속 증거로 취급하지 않는다. 연속 plateau 유지와 누적 과정은 별도의 25.784533초 HUD 영상으로 보완한다.
 
 ## 5. 해석과 공개 주장 경계
 
@@ -115,11 +142,13 @@ render/update frame보다 fixed Tick 주기가 느리므로 600개 중 약 3분�
 - uncapped 환경에서는 ECS fixed Tick이 있는 frame과 없는 frame의 비용 차이가 명확했다.
 - 테스트 장비의 Stage 2 무입력·무청소 시나리오에서 임시 60fps cap을 적용한 600 frame은 median `16.670ms`, p95 `17.022ms`, max `17.402ms`였고 20ms 초과 frame은 없었다.
 - 최종 spawn 실행 경로는 같은 cap 측정에서 median `0.421ms`, p95 `0.661ms`였다. 이 결과만으로 spawn 요청의 전면 병렬화를 포트폴리오 근거 확보를 위해 추가 추진할 필요는 없다.
+- 최신 비주얼 Development Build의 uncapped 600-frame 측정 3회에서 active Total 평균은 실행별 `24,153.2 / 24,151.9 / 24,139.6`이었고, Total/Dust/Hazard 구성을 frame interval과 같은 캡처에 직접 기록했다.
+- 세 실행을 합친 1,797개 frame interval에서 median `7.291ms`, p95 `9.249ms`, max `12.872ms`였고 16.67ms를 넘은 interval은 없었다. 다만 uncapped render frame에는 fixed Tick 실행 frame과 비실행 frame이 섞여 있으므로 이 분포를 ECS Tick 비용 하나로 축약하지 않는다.
 
 ### 사용하지 않을 주장
 
 - 모든 하드웨어와 모든 플레이 상황에서 60fps를 보장한다.
-- standalone 캡처에서 active entity가 정확히 24,000대였다고 직접 측정했다.
+- standalone에서 정확히 2.5만 active entity와 고정 60fps를 항상 동시에 유지한다.
 - 현재 결과가 최종 공개 Release Build의 성능이다.
 - GameObject 방식보다 정량적으로 우수하다.
 - render/update와 ECS simulation이 완전히 독립된 60Hz loop로 동작한다.
@@ -127,13 +156,11 @@ render/update frame보다 fixed Tick 주기가 느리므로 600개 중 약 3분�
 
 ### 공개 문장 초안
 
-> Editor에서 Stage 2를 무입력·무청소 상태로 유지해 평균 약 2.4만 active entity plateau를 직접 확인했습니다. 같은 Stage 2 콘텐츠의 standalone Development Build에서는 Deep Profile Support를 끄고 임시 60fps cap을 적용한 600 frame을 측정했으며, frame interval median 16.67ms, p95 17.02ms, max 17.40ms를 기록했습니다. 두 결과는 각각 entity 규모와 frame budget을 확인한 대응 근거이며, 최종 공개 빌드의 보편적인 60fps 보장을 의미하지 않습니다.
+> 최신 게임플레이 비주얼을 포함한 Stage 2 standalone Development Build에서 무입력·무청소 plateau의 600 frame을 같은 조건으로 3회 기록했습니다. active Total 평균은 실행별 약 2.414만이었고 Total/Dust/Hazard 구성과 frame interval을 같은 캡처에 남겼습니다. 3회 합산 frame interval은 median 7.29ms, p95 9.25ms, max 12.87ms였으며 16.67ms 초과 interval은 없었습니다. 이 수치는 명시한 테스트 장비와 통제 시나리오의 uncapped Development Build 결과이며, 최종 공개 빌드나 모든 플레이 상황의 60fps 보장을 의미하지 않습니다.
 
 ## 6. 남은 증거 공백
 
-- standalone 측정과 동시에 기록한 전체 active entity 수와 Dust/Hazard 구성 비율
-- 해상도, 품질 설정, Development Build 옵션을 포함한 완전한 측정 manifest
-- 동일 조건 반복 측정과 최종 공개 후보 빌드 smoke
-- 임시 `Application.targetFrameRate = 60` 코드 원복 확인
-- 공개용 표, 판독 가능한 Profiler 캡처, 누적 과정 영상의 최종 형식
+- 최종 공개 후보 빌드 기동 smoke와, 코드·콘텐츠·품질 설정 차이에 따른 성능 재측정 필요성 판단
+- 공개용 표와 판독 가능한 Profiler 캡처의 최종 형식
 - raw `.data` 파일을 공개 패키지에 포함할지, 요약 CSV와 캡처만 제공할지 결정
+- 한글 missing-glyph와 optional Feel missing-script 정리 이후 최종 후보 빌드 확인
