@@ -93,5 +93,9 @@ memory/
 /Assets/_Project/05_Content/**
 !/Assets/_Project/05_Content/README.md
 !/Assets/_Project/05_Content/README.md.meta
+!/Assets/_Project/05_Content/Fonts/
+!/Assets/_Project/05_Content/Fonts.meta
+!/Assets/_Project/05_Content/Fonts/NanumSquareNeo/
+!/Assets/_Project/05_Content/Fonts/NanumSquareNeo/**
 /Assets/Feel/
 /Assets/Feel.meta
