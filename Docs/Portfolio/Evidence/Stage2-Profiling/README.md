@@ -9,7 +9,6 @@
 - last_updated: `2026-08-28`
 - related_docs:
   - [../../PORT-003-validation-report.md](../../PORT-003-validation-report.md)
-  - [../PORT-NOTE-002-stage2-standalone-profiling-evidence.md](../PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
 
 ## 측정 조건
 

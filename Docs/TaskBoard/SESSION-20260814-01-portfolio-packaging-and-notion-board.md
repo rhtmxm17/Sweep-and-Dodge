@@ -11,8 +11,10 @@
   - [../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md](../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)
   - [../Portfolio/PORT-002-ai-assisted-engineering-workflow.md](../Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
   - [../Portfolio/PORT-003-validation-report.md](../Portfolio/PORT-003-validation-report.md)
-  - [../Portfolio/Evidence/PORT-NOTE-001-developer-perspective-and-claim-evidence.md](../Portfolio/Evidence/PORT-NOTE-001-developer-perspective-and-claim-evidence.md)
-  - [../Portfolio/Evidence/PORT-NOTE-002-stage2-standalone-profiling-evidence.md](../Portfolio/Evidence/PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
+  - [Support/SESSION-20260814-01/INDEX.md](Support/SESSION-20260814-01/INDEX.md)
+  - [Support/SESSION-20260814-01/NOTE-001-developer-perspective-and-claim-evidence.md](Support/SESSION-20260814-01/NOTE-001-developer-perspective-and-claim-evidence.md)
+  - [Support/SESSION-20260814-01/NOTE-002-stage2-standalone-profiling-evidence.md](Support/SESSION-20260814-01/NOTE-002-stage2-standalone-profiling-evidence.md)
+  - [Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md](Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md)
   - [../Portfolio/Evidence/Stage2-Profiling/README.md](../Portfolio/Evidence/Stage2-Profiling/README.md)
   - [../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
   - [SESSION-20260514-01-portfolio-demo-build-board.md](SESSION-20260514-01-portfolio-demo-build-board.md)
@@ -25,7 +27,7 @@
 
 ## 운영 규칙
 - 이 문서는 메인 대화와 분기 대화가 공유하는 상태 허브이자 결정 메모다.
-- 새 분기는 작업 시작 전에 `Adopted Baseline`, `Now`, 자신의 작업 항목, 최신 `Branch Handoffs`를 읽는다.
+- 새 분기는 작업 시작 전에 `Adopted Baseline`, `Now`, 자신의 작업 항목, `Pending Branch Handoffs`를 읽는다.
 - 분기 작업은 담당 항목의 상태, 산출물 링크, 검증 결과, 다음 시작점만 갱신한다.
 - 합의되지 않은 새 범위나 설계 결정을 TaskBoard 갱신만으로 확정하지 않는다.
 - 중요한 새 결정은 메인 대화에서 합의한 뒤 `Adopted Baseline`에 추가한다.
@@ -36,92 +38,58 @@
 - 보조 맥락은 이미 확정된 결정을 재논의하는 근거로 사용하지 않는다. 새로운 충돌 근거나 범위 변경 필요가 확인된 경우에만 메인 대화에서 별도로 논의한다.
 - 보조 맥락이 이후 작업의 공식 판단 기준이나 새 결정으로 승격되어야 한다면, 사용자와 합의한 뒤 해당 SSOT 또는 `Adopted Baseline`에 반영한다.
 - 분기에서 검토 후 폐기한 문장 후보나 표현 대안은 별도 보존 요청이 없는 한 맥락 병합 대상에 포함하지 않는다.
+- `Pending Branch Handoffs`에는 아직 메인 세션에 맥락 병합되지 않은 분기 결과와 미해결 충돌·질문만 둔다.
+- 맥락 병합이 끝나면 채택 결정은 `Adopted Baseline`, 완료 결과는 `Done`, 상세 근거는 세션 Support 노트에 흡수하고 해당 handoff를 제거한다.
 
 ## Adopted Baseline
-- 프로젝트 포지셔닝은 완성 게임 공개본이 아니라 **플레이 가능한 Unity DOTS/Entities 기술 데모**다.
-- 목표 직무는 일반적인 신입~주니어 Unity 클라이언트 개발자 포지션이다.
-- 완성될 Notion 문서는 전체 포트폴리오 아래에 놓이는 여러 프로젝트 문서 중 하나다. 전체 포트폴리오가 넓은 Unity 클라이언트 역량을 설명하고, 이 프로젝트 문서는 DOTS와 대량 엔티티 처리라는 기술적 차별점을 첫인상으로 제시한다.
-- 채용 담당자는 프로젝트의 범위와 결과를 빠르게 읽는 1차 독자로, Unity 실무자와 기술 면접관은 설계·구현·검증 근거를 확인하는 심화 독자로 본다.
+
+### A. 프로젝트 포지셔닝과 독자
+- 프로젝트는 완성 게임 공개본이 아니라 **플레이 가능한 Unity DOTS/Entities 기술 데모**이며, 일반적인 신입~주니어 Unity 클라이언트 개발자 포지션을 목표로 한다.
+- Notion 프로젝트 문서는 전체 포트폴리오 아래의 프로젝트 페이지로 두고 DOTS와 대량 엔티티 처리라는 기술적 차별점을 첫인상으로 제시한다. 채용 담당자는 빠른 범위·결과 확인, Unity 실무자와 기술 면접관은 설계·구현·검증 근거 확인을 주 독서 경로로 본다.
 - 프로젝트 한 문장 소개는 다음을 기준으로 한다.
   > `Sweep and Dodge`는 회피·청소·수집 플레이 루프에 Unity DOTS/Entities 기반 대량 엔티티 파이프라인을 적용하고, 명시적인 소유권과 업데이트 순서로 시스템을 구성한 플레이 가능한 기술 데모입니다.
-- 포트폴리오의 핵심 역량은 다음 세 축을 기준으로 한다.
-  1. DOTS 기반 대량 엔티티 처리와 데이터 지향 설계
-  2. 명시적 ownership, update order, fence와 검증 가능한 아키텍처
-  3. 게임플레이, UI, 콘텐츠 흐름을 연결한 플레이 가능한 데모 완성
-- 포트폴리오 문서의 포함 범위는 다음과 같다.
-  - 회피·청소·수집 게임플레이와 데모 흐름
-  - DOTS 대량 엔티티 파이프라인
-  - ownership, update order, fence, enableable 상태 전환 설계
-  - UI, 피드백, 스테이지 콘텐츠를 포함한 플레이 가능한 데모 완성 과정
-  - 콘텐츠 제작과 반복 작업을 지원하는 authoring/editor tooling
-  - 자동 테스트, PlayMode smoke, 성능 측정, 공개 빌드 자료 중 설명 가능한 검증 근거
-  - AI-assisted engineering workflow
-  - 선택한 설계의 트레이드오프와 현재 한계
-- 포트폴리오 문서의 비범위는 다음과 같다.
-  - 상용 출시 수준의 전체 게임으로 포장하는 것
-  - 최종 아트, 사운드, 콘텐츠 분량을 핵심 성과로 주장하는 것
-  - 모든 코드와 시스템을 빠짐없이 설명하는 것
-  - 측정하지 않은 GameObject 방식 또는 다른 프레임워크와의 성능 우위를 주장하는 것
-  - 개발 중 스냅샷을 최종 공개 빌드 성능으로 표현하는 것
-  - 스토어 배포와 플랫폼별 장기 품질 보증
-- AI-assisted engineering workflow는 위 핵심 역량과 경쟁하는 동일 계층의 카드로 두지 않고, AI 활용 방식을 확인하려는 독자가 쉽게 발견할 수 있는 전용 심화 섹션으로 구성한다.
-- AI 활용 포지셔닝의 브리프 문구는 다음을 기준으로 한다.
-  > 이 프로젝트는 AI coding agent를 설계 논의, 코드베이스 탐색, 구현, 검증 실행, 문서화에 일상적인 개발 도구로 활용했습니다. 반복 과정에서 확인된 프로젝트 지식과 오류 패턴을 ownership, update order, validation rule 등의 명시적인 guardrail로 축적하여 이후 작업의 일관성을 높이는 개발 workflow를 구성했습니다. 개발자는 프로젝트 목표와 요구사항을 정의하고, 설계 채택, 플레이 감각, 공개할 결과의 범위를 판단했습니다.
-- AI 활용은 방어적으로 정당화할 대상이 아니라 현대적인 개발 도구 체인의 기본 구성요소로 설명한다.
-- AI 관련 guardrail은 위험한 도구를 통제한 사례가 아니라, 사람과 자동화 도구가 일관된 결과를 내도록 만든 프로젝트 수준의 엔지니어링 체계로 설명한다.
-- 사람은 프로젝트 방향, 아키텍처 판단, 플레이 감각, 최종 검증 책임을 맡고, agent는 탐색, 구현, 반복 검증, 문서화의 왕복을 가속한 것으로 정리한다.
-- 자동 테스트, PlayMode smoke, 성능 측정은 독립적인 핵심 역량 주장이 아니라 프로젝트 결과를 뒷받침하는 보조 증거로 취급한다.
-- 테스트 자동화는 agent 제안으로 도입했으며, 문서화된 ownership/update order/runtime behavior 중 자동 관찰 가능한 계약을 후속 구현에서 다시 확인하는 2차 guardrail로 설명한다. 포괄적인 테스트 전략 수립 능력이나 테스트 자동화 전문성은 주장하지 않는다.
-- 대량 엔티티 파이프라인은 기술 설계 사례로 사용하되, 장기간 여러 작업에 걸쳐 형성되어 최초 제안 주체가 불명확한 세부 요소의 역할 귀속은 주장하지 않는다.
-- `BroomSweep` 개선은 개발자가 플레이 감각 문제와 개선 목표를 정의하고 최종안을 선택하며, agent가 설계 구체화·구현·자동 검증을 수행한 플레이 기반 개선 대표 사례로 사용한다.
-- `StageMapEditor` 교체는 개발자가 제작 문제·편집 범위·runtime 비변경 경계·UX 후속 요구를 정의하고, agent가 document SSOT와 validation/dry-run/stale/Undo 설계를 제안·구현한 목표 기반 개발 대표 사례로 사용한다.
-- `StageMapEditor`는 메인 프로젝트 페이지의 짧은 대표 보조 사례와 심화 자료로 배치한다. `HazardActorWorkbench`와 encounter preview의 세부 구현은 선택적 심화 자료로 둔다.
-- 장애물 충돌 병목은 개발자가 Profiler로 지배적인 병목 시스템을 특정하고 CellMap 후보 축소를 요구한 정성적 개선 사례로 사용한다. 원본 캡처와 동일 조건 사후 측정이 없으므로 `175.12ms`, `0.024ms`, 개선 배율, 사후 FPS는 공개 성과 수치로 사용하지 않는다.
-- 포괄적인 성능 엔지니어링 전문성은 주장하지 않는다. standalone Development Build 측정은 보조 근거로 사용하고 최종 공개 후보 빌드 성능과 구분한다. 이후 현재 상태 빌드·수동 플레이 smoke는 통과했지만 이를 새 성능 측정으로 취급하지 않는다.
-- 개발 중 성능/테스트 스냅샷과 최종 공개 빌드 벤치마크를 구분한다.
-- 과거 약 2.5만 active entity 기록은 현재 동일 테스트 이름과 재현 시나리오가 일치하지 않는 historical development snapshot이므로 최신 성능이나 회귀 보장 수치로 사용하지 않는다.
-- 기존 `Bullet` 명칭의 카운터를 인용할 때는 실제로 포함하는 위험 요소와 청소/수집 대상의 범위를 오해 없이 설명한다.
-- 최신 2.5만 active entity 근거는 별도 stress preset이 아니라 공개 빌드와 동일한 Stage 2 콘텐츠에서 청소를 수행하지 않고 Dust를 자연 누적시키는 통제 시나리오로 재현한다.
-- Stage 2 무청소 시나리오는 최초 Dust가 lifetime에 도달한 뒤 spawn과 lifetime despawn이 균형을 이루는 plateau를 약 2.5만 active entity로 맞추는 것을 목표로 한다.
-- 2.5만 근거는 일반 플레이의 상시 밀도라고 표현하지 않고, 공개 빌드에서 재현 가능한 무청소 누적 시나리오라고 명시한다. 전체 active 수와 Dust/Hazard 구성 비율을 함께 기록한다.
-- 무청소 plateau의 합격 기준은 평균 `22,500~27,500`, 최소 15초 유지, 동일 조건 3회 재현이다. 최신 standalone 측정은 이 범위를 충족했으며 frame interval과 composition invariant를 조건부 공개 근거로 사용한다.
-- Dust lifetime은 실제 이동 거리와 도달 가능한 위치를 바꾸므로 plateau 튜닝 수단으로 우선 사용하지 않고 현재 `4초`를 유지한다.
-- Stage 2 plateau는 Source cell 구성을 우선 조절해 맞춘다. Source geometry로 목표를 달성하기 어렵거나 플레이 가독성을 해치는 경우에만 spawn rate 등 다른 stage-local tuning을 후순위로 검토한다.
-- lifetime을 유지하므로 무청소 시나리오의 warm-up은 최초 Dust lifetime에 맞춘 약 4초를 기준으로 시작하고, 실제 plateau 진입 시점은 런타임 측정으로 확정한다.
-- 2.5만 plateau는 Stage 2의 초기 무입력 위치에서만 만족하도록 설계하며, 어느 Source를 점유해도 같은 수치를 유지하는 것을 목표로 하지 않는다.
-- Stage 2 Source geometry 초안은 `1002` 면적을 `1004`의 약 3배로 두고, `1002`가 `1004`의 좌측부터 상부까지 둘러싸는 위치 관계로 구성한다. 구체 cell 수와 경계는 플레이 테스트와 plateau 측정으로 다듬는다.
-- Stage 2 무입력·무청소 시나리오는 Windows Editor에서 warm-up 6초 후 15초 동안 3회 측정해 active entity 평균 `24,158.6 / 24,161.4 / 24,159.1`, 전체 범위 `24,084~24,208`을 재현했다. Drop/expire와 Spawn system 하위 `GC.Alloc` 표본은 모두 0이었다.
-- 위 수치는 Windows Editor와 Profiler 오버헤드가 포함된 development profiling evidence다. standalone/public build 성능, 60fps 보장, GameObject 대비 우위로 표현하지 않는다.
-- Spawn 병목은 `FreeByKey` 대여에서 `Remove(key, entity)`가 동일 TypeKey chain을 끝까지 순회한 경로로 확인했다. `TryGetFirstValue`가 반환한 iterator를 직접 제거하는 방식으로 교정한다.
-- iterator 제거 후 병렬 상태 초기화 B와 직렬 상태 초기화 C를 비교한 결과 C의 Frame median/p95/Spawn median 증가가 단순화 임계치 안이었다. 최종 구현은 Pool Owner의 직렬 dequeue와 직렬 상태 초기화를 유지한다.
-- Stage 2 standalone Development Build의 최초 Deep Profile Support 활성 캡처는 큰 계측 오버헤드가 확인되어 성능 근거에서 제외한다. 이후 측정은 Deep Profile Support를 비활성화한다.
-- uncapped standalone 측정은 fixed Tick이 있는 frame과 없는 frame이 섞이므로 전체 평균 FPS를 ECS 성능 대표값으로 사용하지 않는다. Tick frame과 비-Tick frame의 분포를 분리해 해석한다.
-- 임시 `Application.targetFrameRate = 60` 조건의 standalone 측정에서 600개 모든 frame에 pipeline이 실행됐고, frame interval median `16.670ms`, p95 `17.022ms`, max `17.402ms`, 20ms 초과 0개를 기록했다. 이는 명시한 테스트 장비와 통제 시나리오의 60fps frame budget 보조 근거다.
-- 60fps cap은 ECS Tick과 GameObject Update를 같은 frame에서 관찰하기 위한 일시적 측정 조건이며 실제 데모 운영 정책으로 채택하지 않는다. 측정 후 임시 코드는 원복했고 uncapped 기본 정책을 유지한다.
-- 2026-08-24 Editor의 평균 약 2.4만 active entity 직접 집계와 standalone frame time은 같은 Stage 2 콘텐츠에 대응하지만 동시 측정이 아니었다. 이 historical evidence를 인용할 때는 두 근거를 구분한다.
-- 최신 게임플레이 HUD와 Stage Cell 비주얼을 포함한 2026-08-25 standalone Development Build에서는 Total/Dust/Hazard와 frame interval을 같은 600-frame 캡처에 기록하고 동일 조건 3회를 재현했다. 합산 active Total 평균은 `24,148.3`, 전체 범위는 `24,077–24,236`, frame interval median/p95/max는 `7.291/9.249/12.872ms`, 16.67ms 초과는 `0/1,797`이었다.
-- 최신 uncapped 반복 측정에는 fixed Tick 실행 frame과 비실행 render frame이 섞여 있으므로 전체 frame median을 ECS Tick 비용이나 보편적인 60fps 보장으로 축약하지 않는다. 현재 빌드는 Development Build이며 최종 공개 후보 빌드 성능과 구분한다.
-- 편집 전 `ProfilerCaptures/Stage2-Composition-full.mp4`에 Stage 2 누적 과정과 15초 이상 plateau 유지 구간을 1024×768, `25.784533초`의 연속 HUD 영상으로 보존했다. 공개에는 초반 Stage 선택 구간을 덜어낸 약 22초 `Stage2-Composition.mp4`를 사용한다. 영상은 시각 근거이며 frame-time 통계는 raw Profiler capture와 CSV를 기준으로 한다.
-- Stage 2 공개 성능 자료는 3-run 합산 표, 약 22초 HUD 영상, fixed Tick 대표 frame 299의 CPU Timeline과 같은 frame의 Total/Dust/Hazard counter 이미지로 구성한다. 단일 frame 이미지는 실행 구조와 구성의 예시이며 통계 원천으로 사용하지 않는다.
-- `PORT-NOTE-*`와 측정 상세 근거는 `Docs/Portfolio/Evidence/`에 두고 메인 `PORT-*` 서사와 역할을 분리한다.
-- raw Profiler `.data`, run별 frame CSV, 로그, 내부 manifest와 편집 전 영상은 로컬 보존하고 기본 공개 패키지에는 포함하지 않는다. 이미지·영상·CSV SHA-256도 공개 포트폴리오에는 기록하지 않는다.
-- 대표 플레이·BroomSweep·Stage Map Editor 보조 영상의 실제 촬영은 Notion 레이아웃과 설명 흐름이 정해지는 T7 시점으로 미루고, T3에서는 들어갈 내용만 고정한다.
-- 한글 폰트 문제는 폰트 추가로 해결했고 미사용 Feel Asset Store 패키지와 설치 심볼은 제거했다. 이후 현재 상태 빌드와 가벼운 수동 플레이 smoke에서 직접 드러나는 오류는 발견되지 않았다.
-- 측정 이후 변경이 폰트 추가와 미사용 Feel 제거에 한정되므로 추가 Stage 2 profiling은 수행하지 않는다. runtime 코드·Stage 2 콘텐츠·품질 설정이 달라질 때 재측정 필요성을 다시 판단한다.
-- 공개 빌드는 Windows x64 압축 패키지로 전달하며 실행 파일, Unity 데이터 폴더, 조작법·실행 안내·알려진 제한을 포함한다. 측정용 debug HUD는 기본 비활성, frame cap은 uncapped를 유지하고 raw Profiler 자료는 포함하지 않는다.
-- 작업 순서는 `포트폴리오 브리프 -> 주장-근거 인벤토리 -> 공개 데모/검증 기준 -> 정보 구조 -> 저장소 문서 -> 시각 자료/데모 패키지 -> Notion -> 최종 검수`로 진행한다.
 
+### B. 핵심 주장과 비주장
+- 핵심 역량은 ① DOTS 기반 대량 엔티티 처리와 데이터 지향 설계, ② ownership·update order·fence를 통한 검증 가능한 아키텍처, ③ 게임플레이·UI·콘텐츠 흐름을 연결한 플레이 가능한 데모 완성이다.
+- 공개 범위에는 회피·청소·수집 루프, DOTS pipeline, enableable 상태 전환, authoring/editor tooling, 설명 가능한 검증 근거, AI-assisted workflow, 트레이드오프와 현재 한계를 포함한다.
+- 상용 출시 수준의 게임, 최종 아트·사운드·콘텐츠 분량, 모든 코드의 설명, GameObject 대비 정량적 우위, 테스트·성능 엔지니어링 전문성, 스토어 배포와 플랫폼별 장기 품질은 주장하지 않는다.
+- 자동 테스트와 PlayMode smoke는 ownership·update order·runtime behavior의 자동 관찰 가능한 계약을 후속 구현에서 다시 확인하는 2차 guardrail이자 보조 증거로 설명한다.
+
+### C. 대표 사례와 AI 역할
+- AI coding agent는 방어적으로 정당화할 대상이 아니라 일상적인 개발 도구다. 개발자는 목표·제약·설계 채택·플레이 감각·공개 범위를 판단하고, agent는 탐색·대안·계획·구현·반복 검증·문서화를 가속했다.
+- guardrail은 AI 통제가 아니라 프로젝트 지식과 반복 오류 패턴을 ownership, update order, validation rule 등으로 구조화한 엔지니어링 체계다. AI 활용은 핵심 역량과 경쟁시키지 않고 발견 가능한 전용 심화 섹션으로 둔다.
+- 대량 엔티티 파이프라인은 여러 작업에 걸쳐 형성됐으므로 최초 제안 주체가 불명확한 세부 요소의 역할 귀속을 주장하지 않는다.
+- `BroomSweep`은 개발자가 플레이 감각 문제와 제약을 정의하고 최종안을 선택하며 agent가 설계 구체화·구현·자동 검증을 수행한 플레이 기반 개선 사례다.
+- `StageMapEditor`는 개발자가 제작 문제·편집 범위·runtime 비변경 경계·UX 요구를 정의하고 agent가 document SSOT, validation, dry-run, stale-plan 거부, Undo 설계를 제안·구현한 목표 기반 개발 사례다. 메인 페이지에서는 대표 보조 사례, `HazardActorWorkbench`는 선택적 심화 자료로 둔다.
+- 장애물 충돌 병목은 Profiler로 지배적인 시스템을 특정해 CellMap 후보 축소를 요구한 정성적 진단 사례로만 사용한다. 사후 동일 조건 측정이 없는 수치·배율·FPS는 공개하지 않는다.
+- 상세 역할 분담과 주장 경계는 [NOTE-001](Support/SESSION-20260814-01/NOTE-001-developer-perspective-and-claim-evidence.md)을 따른다.
+
+### D. 공개 증거 계약
+- 최신 공개 성능 근거는 공개 데모와 같은 Stage 2에서 무입력·무청소로 Dust를 자연 누적한 plateau를 동일 Windows x64 IL2CPP Development Build에서 600 frame × 3회 측정한 결과다.
+- 3-run 합산 active Total 평균은 `24,148.3`, 범위는 `24,077–24,236`, frame interval median/p95/max는 `7.291/9.249/12.872ms`, 16.67ms 초과는 `0/1,797`이다. 일반 플레이의 상시 밀도나 보편적인 60fps 보장으로 해석하지 않는다.
+- 정확한 공개 조건·표·이미지의 SSOT는 [Stage 2 Standalone Profiling Evidence](../Portfolio/Evidence/Stage2-Profiling/README.md)다. 과거 약 2.5만 snapshot과 Editor 측정은 최신 standalone 결과나 회귀 보장 수치로 사용하지 않는다.
+- 기존 `Bullet` active 명칭은 위험 요소와 청소·수집 대상을 함께 포함하므로 공개 시 Total/Dust/Hazard 구성을 명시한다.
+- Spawn 병목은 `FreeByKey` iterator 직접 제거로 교정했고, 측정 비교 후 Pool Owner의 직렬 dequeue·상태 초기화를 채택했다. 상세 결정은 [ADR-20260822-01](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)을 따른다.
+- 공개 증거 패키지는 3-run 표, 약 22초 HUD 영상, 같은 fixed Tick frame의 CPU Timeline과 composition counter 이미지로 구성한다. raw Profiler 자료·CSV·로그·내부 manifest와 편집 전 영상은 로컬에 유지하고 공개 SHA는 기록하지 않는다.
+- Development Build 결과를 최종 Release Build, 모든 하드웨어·플레이 상황의 60fps, GameObject 대비 우위로 확장하지 않는다. runtime 코드·Stage 2 콘텐츠·렌더링·품질 설정이 바뀔 때 재측정 필요성을 다시 판단한다.
+- 측정 해석과 제외된 캡처의 상세 배경은 [NOTE-002](Support/SESSION-20260814-01/NOTE-002-stage2-standalone-profiling-evidence.md)를 따른다.
+
+### E. 채널과 공개 경계
+- Notion은 채용 독자를 위한 주 서사, README는 저장소 진입점, `PORT-*`는 선택적 심화, 공개 Evidence는 수치 확인 계층으로 구성한다. 공통 서사·섹션 청사진·정보 라우팅은 [NOTE-003](Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md)을 따른다.
+- 공개 가능한 조건·표·이미지는 `Docs/Portfolio/Evidence/`에 두고 세션 Support 노트는 내부 운용·기록 문서로 관리한다. README, `PORT-*`, 공개 Evidence에서는 Support 노트를 직접 참조하지 않는다.
+- 내부 운용 문서는 공개 저장소를 직접 탐색하면 보일 수 있지만 공식 포트폴리오 독자 경로에서는 제외하며 기밀을 의미하지 않는다.
+
+### F. 전달 자료와 작업 순서
+- 대표 플레이·`BroomSweep`·`StageMapEditor` 보조 영상은 T7 Notion 레이아웃에 맞춰 촬영하고, T6에서는 파이프라인 도식과 Windows x64 압축 패키지·실행 안내·최종 전달 smoke를 준비한다.
+- 공개 빌드는 debug HUD 기본 비활성, uncapped 운영 정책을 유지하고 raw Profiler 자료를 포함하지 않는다.
+- 현재 순서는 `T5 저장소 문서 → T6 시각 자료·데모 패키지 → T7 Notion → T8 최종 검수`다.
 ## Now
-- [ ] T4. 포트폴리오 서사와 채널별 정보 구조를 확정한다.
-  - 완료 기준: 문제 선택부터 설계·검증·결과·AI-assisted workflow까지의 이야기 흐름과 README/PORT/Notion의 역할이 정해진다.
-  - 검증: 같은 사실을 채널별로 다르게 표현하더라도 메시지와 수치가 충돌하지 않는다.
-  - 근거: T1, T2, T3 산출물.
-
-## Next
 - [ ] T5. 저장소 포트폴리오 문서를 개편한다.
   - 완료 기준: `PORT-001 -> PORT-003 -> PORT-002 -> README -> INDEX` 순으로 합의된 서사와 근거를 반영한다.
   - 검증: 링크, 명칭, 수치, 문서 간 역할, AI 활용 뉘앙스를 교차 점검한다.
-  - 근거: T4에서 확정한 정보 구조.
+  - 근거: `Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md`.
+
+## Next
 - [ ] T6. 시각 자료와 공개 데모 패키지를 준비한다.
   - 완료 기준: 대표 플레이 영상/GIF, 파이프라인 다이어그램, 검증 결과 표, 공개 빌드와 실행 안내가 준비된다.
   - 검증: 각 자료가 T2의 특정 주장을 뒷받침하고, 공개 후보 빌드 기동 smoke를 통과한다.
@@ -138,29 +106,14 @@
 ## Blocked
 - 없음.
 
-## Branch Handoffs
-- 2026-08-28 / T3 공개 증거 패키지 확정 / 약 22초 Stage 2 영상, 3-run 표, CPU/counter 정지 캡처, Evidence 문서 구조, raw/CSV 로컬 보존, 공개 SHA 생략, 후속 촬영 내용과 Windows x64 빌드 전달 기준을 고정하고 T3 완료 / `PORT-003`, `Docs/Portfolio/Evidence/`, `PORT-NOTE-001/002`, 본 문서 / 한글 폰트·미사용 Feel 정리 후 현재 상태 빌드와 수동 플레이 smoke에서 직접 드러나는 오류 없음, 측정 조건에 영향을 주는 변경이 없어 추가 profiling 불필요 판단 / 다음 시작점: T4 포트폴리오 서사와 채널별 정보 구조 확정.
-- 2026-08-26 / T3 Visual-Updated Profiling Documentation Freeze / 최신 비주얼 Development Build의 standalone Total/Dust/Hazard 동시 집계, 600-frame 3회 반복 결과, 25.784533초 누적·plateau HUD 영상을 원천 노트·검증 보고서·주장 매트릭스에 고정 / `PORT-NOTE-002`, `PORT-003`, `PORT-NOTE-001`, 3-run summary, manifest, 본 문서 / active Total 합산 평균 `24,148.3`, frame median/p95/max `7.291/9.249/12.872ms`, 16.67ms 초과 `0/1,797`, composition invariant 위반 `0/1,800`, 영상 metadata 확인 / 분기 내 계획한 집계·측정·문서화 완료, 다음 단계에서 본래 T3 대화로 맥락 병합.
-- 2026-08-25 / T3 Visual-Updated Profiling 3-Run / 동일 최신 비주얼 Development Build에서 600-frame uncapped profiling을 3회 완료하고 Total mean `24,153.2/24,151.9/24,139.6`, frame median `7.476/7.396/7.042ms`, pipeline median `2.092/2.049/2.040ms`, spawn median `0.402/0.390/0.384ms`를 재현 / Run01~03 raw·CSV, 3-run summary, manifest, 본 문서 / 1,800 frame composition invariant 위반 0건·1,797 interval 중 16.67ms 초과 0건 / 다음 시작점: 15초 plateau 직접 증거 필요성 결정 후 공개용 캡처·영상과 최종 후보 build smoke.
-- 2026-08-25 / T3 Visual-Updated Profiling Run01 / 최신 HUD·Stage Cell 비주얼 빌드의 Stage 2 plateau 600 frame에서 Total mean `24,153.2`와 Dust/Hazard 구성을 standalone으로 직접 기록하고, frame interval median/p95/max `7.476/9.371/12.638ms`, Tick-proxy pipeline median/p95/max `2.092/2.449/2.740ms`, spawn `0.402/0.661/0.771ms`를 추출 / raw `.data`, frame CSV, Run01 summary, manifest, 본 문서 / 600개 composition invariant 및 16.67ms 초과 0개 확인 / 다음 시작점: 반복 측정 필요성 판단, 판독 가능한 HUD 화면과 한글 폰트 문제 정리.
-- 2026-08-25 / T3 Visual-Updated Measurement Rebuild / 게임플레이 HUD와 Stage Cell 비주얼 변경 이후 Windows x64 IL2CPP Development Build를 새 날짜 경로에 재생성하고 build GUID `f0b5e725fa3b42a3a5c2afb793b5e11a`, Total/Dust/Hazard·pipeline 심볼, 측정 HUD와 Entity Scene streaming을 확인 / `Builds/T3-Stage2-Composition-20260825`, `ProfilerCaptures/Stage2-Composition-20260825-manifest.md`, 측정 실행 스크립트, 본 문서 / compile error 0, EditMode 531개·전용 PlayMode smoke 1개·build 및 Player smoke 통과 / 다음 시작점: 최신 비주얼 빌드에서 Stage 2 plateau 600-frame capture와 HUD screenshot 저장.
-- 2026-08-24 / T3 Composition Pilot HUD Recovery / 첫 pilot은 씬 직렬화 `ShowHud=false` 때문에 HUD가 숨겨졌지만 raw capture에는 Total/Dust/Hazard counter와 pipeline marker가 보존됨을 확인하고, 공개 기본값을 유지한 채 Development Build의 `-show-bullet-debug-hud` 옵션으로만 HUD를 활성화 / `BulletDebugHudBridge`, 측정 실행 스크립트·manifest, 갱신 build GUID `7506bcb5d4b6419498bdc454cb55e520`, 본 문서 / EditMode 524개·전용 PlayMode smoke 1개·갱신 빌드·HUD 화면 smoke 통과 / 다음 시작점: pilot counter·frame 분포 분석 후 필요 시 반복 capture와 Stage 2 HUD 증거 화면 확보.
-- 2026-08-24 / T3 Composition Measurement Preparation / Windows x64 IL2CPP Development Build를 Deep Profile 없이 생성하고 build GUID `4d6dcae0002241d3b9f484187d6552d9`, Total/Dust/Hazard 계측 심볼, Direct3D 12 기동과 Entity Scene streaming을 확인 / `Builds/T3-Stage2-Composition-20260824`, `ProfilerCaptures/Stage2-Composition-20260824-manifest.md`, 측정 실행 스크립트, 본 문서 갱신 / build success 및 15초 숨김 기동 smoke / 다음 시작점: 사용자가 Stage 2 plateau에서 600-frame pilot Profiler capture와 HUD screenshot을 저장하고 agent가 counter·frame 분포를 분석.
-- 2026-08-24 / T3 Standalone Composition Counter / 기존 `BulletActiveTag`와 `BulletHazardTag`를 SSOT로 Total/Dust/Hazard HUD·Profiler counter를 추가하고 임시 60fps cap 원복을 확인 / `DebugHudAndStressSystems`, `DebugHudComponents`, `BulletDebugHudBridge`, 관련 계약 테스트, 본 문서 갱신 / 신규 계약 1개·전체 EditMode 524개·전용 PlayMode smoke 1개 통과 / 다음 시작점: 새 Development Build에서 환경 manifest를 고정하고 Stage 2 무입력·무청소 standalone 동시 측정.
-- 2026-08-24 / T3 Stage 2 Standalone Profiling / Deep Profile Support 오버헤드 캡처를 제외하고 uncapped와 임시 60fps cap 캡처를 분리 해석, cap 측정 600 frame은 median 16.670ms·p95 17.022ms·max 17.402ms·20ms 초과 0개 / `PORT-NOTE-002`, `PORT-003`, `PORT-NOTE-001`, 본 문서 갱신 / raw Profiler capture와 marker 분포 대조 / 다음 시작점: cap 원복, standalone active 구성 직접 기록, 측정 manifest·반복 측정과 공개 증거 형식 확정.
-- 2026-08-22 / T3 Stage 2 Spawn 최적화 / `FreeByKey.Remove(iterator)`를 채택하고 초기화 병렬 Job은 B/C 단순화 판정에 따라 제거, 최종 C는 A 대비 Frame median 28.46%·p95 25.60%·Spawn median 78.73% 감소 / `ADR-20260822-01`, `PORT-003`, 본 문서 갱신 / Unity Editor profiling 3회와 전체 회귀 검증 / 다음 시작점: Dust/Hazard 구성 비율과 standalone/public build 측정, 구체 증거 자료 형식 확정.
-- 2026-08-21 / T3 Stage 2 Source 배치 초안 / 2.5만은 초기 무입력 위치에서만 만족하고 `1002:1004 ≈ 3:1`, `1002`가 `1004`의 좌측~상부를 둘러싸는 배치를 초기안으로 채택 / 본 문서 `Adopted Baseline` 갱신 / 사용자 결정 확인 / 다음 시작점: Deposit·Player Start·안전 동선과 Source 경계 조건 확정.
-- 2026-08-21 / T3 plateau 튜닝 우선순위 / Dust lifetime `4초`를 이동 범위 계약으로 유지하고 Stage 2 Source cell 편집을 우선 사용 / 본 문서 `Adopted Baseline` 갱신 / 사용자 결정 확인 / 다음 시작점: 2.5만 목표를 초기 Source 중심으로 맞출지 양쪽 Source 점유 상태까지 맞출지 결정.
-- 2026-08-21 / T3 2.5만 재현 기준 / Stage 2 무청소 자연 누적과 lifetime equilibrium으로 약 2.5만 active entity plateau를 재현하는 방향 채택 / 본 문서 `Adopted Baseline` 갱신 / 사용자 제안 채택 확인 / 다음 시작점: 현재 Dust 실효 lifetime과 Stage 2 spawn rate·plateau 확인.
-- 2026-08-14 / T1 포트폴리오 브리프 / 목표 직무·문서 역할·한 문장 소개 확정 / 본 문서 `Adopted Baseline`, `Now` 갱신 / 사용자 문답으로 문구 채택 확인 / 다음 시작점: 핵심 역량 3개의 최종 표현 확정.
-- 2026-08-14 / T1 핵심 역량 / 대량 엔티티·검증 가능한 아키텍처·플레이 가능한 데모 완성을 핵심 3축으로 확정하고 AI 활용은 전용 심화 섹션으로 분리 / 본 문서 `Adopted Baseline`, `Now` 갱신 / 사용자 결정 확인 / 다음 시작점: 프로젝트 범위와 비범위 확정.
-- 2026-08-14 / T1 검증 자료의 주장 강도 / 자동 테스트·PlayMode smoke·성능 측정을 핵심 역량이 아닌 보조 증거로 잠정 분류하고 T2에서 이해도·설명 가능성 감사 예정 / 본 문서 `Adopted Baseline`, T2 갱신 / 사용자 우려 반영 / 다음 시작점: 범위·비범위에서 검증 자료의 위치를 확정.
-- 2026-08-14 / T1 범위·비범위 / 제안된 포함 범위와 비범위를 확정하고 검증 자료는 설명 가능한 보조 증거로 제한 / 본 문서 `Adopted Baseline`, `Now` 갱신 / 사용자 승인 확인 / 다음 시작점: AI 활용 포지셔닝의 브리프 문구 확정.
-- 2026-08-14 / T1 완료 / AI 활용 브리프 문구를 채택하고 목표 직무·독자·한 문장 소개·핵심 역량·범위/비범위를 모두 확정 / 본 문서 `Adopted Baseline`, `Now`, `Done` 갱신 / 사용자 완료 승인 / 다음 시작점: 별도 대화 또는 분기에서 T2 주장-근거 인벤토리 작성.
-- 2026-08-20 / T2 완료 / 핵심 주장·대표 사례·테스트 및 성능 증거의 공개 강도를 확정 / 본 문서 `Adopted Baseline`, `Now`, `Done` 갱신 / 코드·ADR·TD·TaskBoard·Git 이력과 사용자 문답 대조 / 다음 시작점: T3 공개 데모와 최신 검증 기준 확정.
-- 2026-08-20 / T2 원천 노트 / 개발자 관점·역할 분담·설명 가능 수준·주장 제한을 `PORT-NOTE-001`에 보존 / 현재 위치 `Docs/Portfolio/Evidence/PORT-NOTE-001-developer-perspective-and-claim-evidence.md` 연결 / 사용자 승인 초안과 UTF-8 내용 대조 / 다음 시작점: T3와 이후 공개 문서 작성에서 원천 자료로 참조.
-
+## Pending Branch Handoffs
+- 없음.
 ## Done
+- [x] T4. 포트폴리오 서사와 채널별 정보 구조를 확정했다.
+  - 결과: Notion 주 서사, README 저장소 진입점, `PORT-*` 심화 문서, 공개 Evidence 검증 계층의 점진적 공개 구조를 채택했다.
+  - 결과: 공통 서사, 채널별 섹션 청사진, 주장·수치 라우팅, 중복·인용 규칙과 T5 완료 조건을 `NOTE-003`에 고정했다.
+  - 결과: 내부 `NOTE-001/002`를 Portfolio 범위 밖의 `SESSION-20260814-01` Support 영역으로 이동하고 공개 문서의 직접 참조를 제거했다.
+  - 검증 결과: 공개 문서와 내부 운용 문서의 탐색 경계를 분리하고 상대 링크, UTF-8 내용, `git diff --check`를 확인했다.
 - [x] T3. 공개 데모와 검증 기준을 확정했다.
   - 결과: 최신 비주얼 standalone Development Build에서 Total/Dust/Hazard와 frame interval을 함께 기록하고 동일 조건 600 frame × 3회를 재현했다.
   - 결과: 공개 결과를 3-run 합산 표, 약 22초 누적·plateau 영상, CPU Timeline과 counter 이미지 두 장으로 구성했다.
@@ -174,7 +127,7 @@
   - 결과: 플레이 기반 `BroomSweep` 개선과 목표 기반 `StageMapEditor` 교체를 개발자 판단과 AI-assisted 실행의 대표 사례로 채택했다.
   - 결과: `StageMapEditor`는 메인 페이지의 대표 보조 사례, `HazardActorWorkbench`는 선택적 심화 자료로 배치한다.
   - 결과: 장애물 충돌 Profiler 사례는 정성적 병목 진단 사례로만 사용하고, 사후 측정 없는 정확 수치·개선 배율·성능 전문성은 주장하지 않는다.
-  - 결과: 개발자 관점과 역할 분담의 상세 판단은 `PORT-NOTE-001` 원천 노트로 분리해 후속 문서 작성과 면접 준비의 참고 자료로 보존했다.
+  - 결과: 개발자 관점과 역할 분담의 상세 판단은 `NOTE-001` 세션 보조 노트로 분리해 후속 문서 작성과 면접 준비의 참고 자료로 보존했다.
   - 검증 결과: 코드, ADR/TD/OPS/TaskBoard, 로컬 Git 이력과 사용자 설명 가능 수준을 대조해 `핵심 주장`, `보조 증거`, `심화 자료`, `비공개` 경계를 확정했다.
 - [x] T1. 포트폴리오 브리프를 확정했다.
   - 결과: 일반적인 신입~주니어 Unity 클라이언트 개발자 포지션과 채용 담당자/Unity 실무자/기술 면접관의 독자 계층을 확정했다.
@@ -192,6 +145,6 @@
   - 검증 결과: 운영 규칙, 채택 기준, 현재 작업, 후속 순서, 분기 인수인계 위치를 한 문서에서 확인할 수 있다.
 
 ## End of Session
-- 결과: T1~T3를 완료했다. Stage 2 최신 비주얼 standalone Development Build의 약 2.4만 active composition과 frame/pipeline/spawn 분포를 같은 캡처에서 3회 재현했고, 공개 결과 형식·Evidence 구조·원시 자료 보존 경계·촬영 내용·빌드 전달 기준까지 확정했다.
-- 남은 리스크: 대표 플레이·BroomSweep·Stage Map Editor 영상의 실제 촬영, 파이프라인 도식, 공개 Windows x64 압축 패키지 생성과 최종 전달 smoke는 T6/T7 실행 작업으로 남아 있다.
-- 다음 시작점: T4에서 PORT/README/Notion이 같은 사실을 서로 다른 독자 깊이로 전달하도록 포트폴리오 서사와 채널별 정보 구조를 확정한다.
+- 결과: T1~T4를 완료했다. 채택 주장과 공개 증거를 바탕으로 Notion, README, `PORT-*`, 공개 Evidence의 서사·깊이·탐색 경계를 확정하고 내부 원천 노트를 세션 Support 기록으로 분리했다.
+- 남은 리스크: 공개 문서 본문 개편, 대표 영상·파이프라인 도식, 공개 Windows x64 압축 패키지 생성과 최종 전달 smoke는 T5~T7 실행 작업으로 남아 있다.
+- 다음 시작점: T5에서 `NOTE-003`을 실행 기준으로 `PORT-001`부터 저장소 포트폴리오 문서를 개편한다.

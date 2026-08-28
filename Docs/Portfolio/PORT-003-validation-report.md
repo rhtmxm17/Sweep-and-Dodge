@@ -11,7 +11,6 @@
   - [../../README.md](../../README.md)
   - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
   - [PORT-002-ai-assisted-engineering-workflow.md](PORT-002-ai-assisted-engineering-workflow.md)
-  - [Evidence/PORT-NOTE-002-stage2-standalone-profiling-evidence.md](Evidence/PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
   - [Evidence/Stage2-Profiling/README.md](Evidence/Stage2-Profiling/README.md)
   - [../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
   - [../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
@@ -120,7 +119,7 @@ ECS Tick과 GameObject Update 비용을 같은 frame에서 보수적으로 관�
 
 600개 모든 frame에서 pipeline marker가 관찰됐고 20ms를 넘는 frame은 없었다. 따라서 이 결과는 명시한 테스트 PC와 통제 시나리오에서 60fps frame budget을 충족했다는 보조 근거로 사용한다. 모든 하드웨어와 플레이 상황의 60fps 보장, 최종 공개 Release Build 성능, GameObject 방식 대비 우위를 의미하지 않는다.
 
-이 2026-08-24 캡처에는 전체 active 수와 Dust/Hazard 구성 비율을 직접 읽을 수 있는 카운터가 남아 있지 않았다. 이 한계는 다음 날 최신 비주얼 빌드 재측정에서 해소했으며, 상세 원시 근거와 분석 경계는 `PORT-NOTE-002`에 보존한다.
+이 2026-08-24 캡처에는 전체 active 수와 Dust/Hazard 구성 비율을 직접 읽을 수 있는 카운터가 남아 있지 않았다. 이 한계는 다음 날 최신 비주얼 빌드 재측정에서 해소했으며, 공개 측정 조건·집계 결과·해석 경계는 [Stage 2 Standalone Profiling Evidence](Evidence/Stage2-Profiling/README.md)에 정리한다.
 
 ### 4.4 2026-08-25 최신 비주얼 standalone 3회 반복
 

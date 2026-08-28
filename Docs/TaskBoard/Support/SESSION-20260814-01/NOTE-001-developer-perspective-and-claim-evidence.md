@@ -3,17 +3,17 @@
 > `Sweep and Dodge` 포트폴리오 작성을 위한 개발자 관점·역할 분담·주장 근거 원천 노트
 
 ## Metadata
-- doc_id: `PORT-NOTE-001`
-- type: `PortfolioSourceNote`
+- doc_id: `SESSION-20260814-01-NOTE-001`
+- type: `SessionSupportNote`
 - status: `working`
 - audience: `internal`
 - last_updated: `2026-08-28`
 - related_docs:
-  - [../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
-  - [../PORT-001-dots-large-entity-pipeline-case-study.md](../PORT-001-dots-large-entity-pipeline-case-study.md)
-  - [../PORT-002-ai-assisted-engineering-workflow.md](../PORT-002-ai-assisted-engineering-workflow.md)
-  - [../PORT-003-validation-report.md](../PORT-003-validation-report.md)
-  - [PORT-NOTE-002-stage2-standalone-profiling-evidence.md](PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
+  - [../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
+  - [../../../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md](../../../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)
+  - [../../../Portfolio/PORT-002-ai-assisted-engineering-workflow.md](../../../Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
+  - [../../../Portfolio/PORT-003-validation-report.md](../../../Portfolio/PORT-003-validation-report.md)
+  - [NOTE-002-stage2-standalone-profiling-evidence.md](NOTE-002-stage2-standalone-profiling-evidence.md)
 
 ## 1. 문서 목적
 
@@ -445,7 +445,7 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 | 테스트 기반 계약 보조 | 충분 | 계약·smoke 사례 | 보조 |
 | 장애물 Profiler 진단 | 사례 설명 가능 | 사용자 프롬프트, Git 이력 | 정성적 보조 |
 | 2.5만 전후 active Entity | Editor와 최신 standalone 통제 시나리오에서 평균 약 2.4만 재현 | `PORT-003` Stage 2 profiling, 3-run counter capture | 보조 |
-| standalone Development Build frame budget | active 구성과 같은 최신 캡처에서 조건부 설명 가능 | `PORT-003`, `PORT-NOTE-002`, Profiler capture | 보조 |
+| standalone Development Build frame budget | active 구성과 같은 최신 캡처에서 조건부 설명 가능 | `PORT-003`, `NOTE-002`, Profiler capture | 보조 |
 | 최종 공개 후보 빌드 성능 | 별도 측정 없음 | 현재 상태 빌드·수동 플레이 smoke 통과, Development Build 측정과 분리 | 보류 |
 | GameObject 대비 성능 우위 | 직접 비교 없음 | 없음 | 비공개 |
 
@@ -465,7 +465,7 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 
 - Stage 2 공개 결과는 약 22초 편집 영상, 3-run 집계표, CPU Timeline과 Total/Dust/Hazard counter 정지 캡처로 구성한다.
 - raw Profiler `.data`, run별 frame CSV, 로그, 내부 manifest와 편집 전 영상은 로컬 재분석 근거로 보존하고 기본 공개 패키지에는 포함하지 않는다.
-- `PORT-NOTE-*`는 메인 포트폴리오 서사보다 근거와 해석 경계에 가까우므로 `Docs/Portfolio/Evidence/` 아래에 둔다.
+- 상세 판단과 내부 측정 노트는 메인 포트폴리오 서사가 아니라 `SESSION-20260814-01`을 보조하는 내부 운용·기록 문서로 둔다. 공개 Portfolio 문서에서는 이 노트를 직접 참조하지 않는다.
 - 공개 문서와 Notion에는 이미지·영상·CSV SHA-256을 기록하지 않는다. checksum은 내부 provenance나 실제 배포 채널에서 필요할 때만 관리한다.
 - 대표 플레이, BroomSweep, Stage Map Editor 영상의 실제 촬영은 Notion 레이아웃과 설명 흐름이 정해지는 T7 시점으로 미룬다. T3에서는 각 영상에 들어갈 내용만 고정한다.
 - 현재 상태 빌드와 가벼운 수동 플레이 smoke에서 직접 드러나는 오류는 발견되지 않았다. 측정 이후 변경이 폰트 추가와 미사용 Feel 제거에 한정되므로 Stage 2 profiling은 반복하지 않으며, 이후 runtime 코드·Stage 2 콘텐츠·품질 설정이 달라질 때 재측정 필요성을 다시 판단한다.

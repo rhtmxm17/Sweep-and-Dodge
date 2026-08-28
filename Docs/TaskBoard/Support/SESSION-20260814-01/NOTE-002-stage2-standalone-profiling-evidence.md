@@ -3,16 +3,17 @@
 > Stage 2 대량 엔티티 시나리오의 standalone profiling 원시 근거와 공개 해석 경계를 보존하는 내부 원천 노트
 
 ## Metadata
-- doc_id: `PORT-NOTE-002`
-- type: `PortfolioSourceNote`
+- doc_id: `SESSION-20260814-01-NOTE-002`
+- type: `SessionSupportNote`
 - status: `working`
 - audience: `internal`
 - last_updated: `2026-08-28`
 - related_docs:
-  - [../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
-  - [../PORT-003-validation-report.md](../PORT-003-validation-report.md)
-  - [PORT-NOTE-001-developer-perspective-and-claim-evidence.md](PORT-NOTE-001-developer-perspective-and-claim-evidence.md)
-  - [../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
+  - [../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
+  - [../../../Portfolio/PORT-003-validation-report.md](../../../Portfolio/PORT-003-validation-report.md)
+  - [../../../Portfolio/Evidence/Stage2-Profiling/README.md](../../../Portfolio/Evidence/Stage2-Profiling/README.md)
+  - [NOTE-001-developer-perspective-and-claim-evidence.md](NOTE-001-developer-perspective-and-claim-evidence.md)
+  - [../../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
 
 ## 1. 문서 목적과 범위
 
