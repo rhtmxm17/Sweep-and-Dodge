@@ -7,12 +7,12 @@
 - type: `PortfolioSourceNote`
 - status: `working`
 - audience: `internal`
-- last_updated: `2026-08-26`
+- last_updated: `2026-08-28`
 - related_docs:
-  - [../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
-  - [PORT-003-validation-report.md](PORT-003-validation-report.md)
+  - [../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
+  - [../PORT-003-validation-report.md](../PORT-003-validation-report.md)
   - [PORT-NOTE-001-developer-perspective-and-claim-evidence.md](PORT-NOTE-001-developer-perspective-and-claim-evidence.md)
-  - [../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
+  - [../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
 
 ## 1. 문서 목적과 범위
 
@@ -37,11 +37,11 @@
 | Scene / Stage | `SampleScene` / Stage 2 |
 | Input | 시작 대화 skip 후 무입력·무청소 |
 
-2026-08-24 측정은 해상도·품질·세부 빌드 옵션이 완전한 manifest로 남지 않았다. 2026-08-25 재측정은 `ProfilerCaptures/Stage2-Composition-20260825-manifest.md`에 1024×768 windowed 실행, Windows x64 IL2CPP, Development Build, Deep Profile Support Off, LZ4, 단일 `SampleScene`, build GUID와 주요 바이너리 SHA-256을 고정했다. 품질 설정은 실행 시 별도 변경 없이 빌드 기본값을 사용했다.
+2026-08-24 측정은 해상도·품질·세부 빌드 옵션이 완전한 manifest로 남지 않았다. 2026-08-25 재측정은 `ProfilerCaptures/Stage2-Composition-20260825-manifest.md`에 1024×768 windowed 실행, Windows x64 IL2CPP, Development Build, Deep Profile Support Off, LZ4, 단일 `SampleScene`과 build provenance를 고정했다. 품질 설정은 실행 시 별도 변경 없이 빌드 기본값을 사용했다. 내부 manifest의 checksum은 로컬 provenance로만 유지하며 공개 포트폴리오에는 기록하지 않는다.
 
 ### 2.2 Profiler 캡처
 
-원시 캡처는 저장소의 `ProfilerCaptures/`에 있다.
+원시 캡처는 ignore된 로컬 `ProfilerCaptures/`에 있다.
 
 | Capture | Deep Profile Support | Frame policy | Size | 판정 |
 |---|---|---|---:|---|
@@ -52,9 +52,9 @@
 | `Stage2-Composition-20260825-Run02.data` | Off | uncapped | 124,380,376 bytes | 동일 조건 반복 측정 |
 | `Stage2-Composition-20260825-Run03.data` | Off | uncapped | 123,713,856 bytes | 동일 조건 반복 측정 |
 
-같은 이름의 PNG는 Profiler가 저장한 작은 미리보기이므로 공개용 차트나 판독 가능한 캡처로 사용하지 않는다. 원시 `.data` 파일 역시 현재는 로컬 개발 근거이며, 공개 패키지에 그대로 포함할지는 T3에서 별도로 결정한다.
+같은 이름의 PNG는 Profiler가 저장한 작은 미리보기이므로 공개용 차트나 판독 가능한 캡처로 사용하지 않는다. 원시 `.data` 파일은 로컬 개발 근거로 유지하고 기본 공개 패키지에는 포함하지 않는다. 공개에는 `Evidence/Stage2-Profiling/`의 판독 가능한 CPU Timeline과 counter 이미지를 사용한다.
 
-각 2026-08-25 raw capture에서 frame CSV를 생성했으며, 실행별 수치와 3-run 합산은 `ProfilerCaptures/Stage2-Composition-20260825-3Run-summary.md`에 보존한다. 연속 시각 근거는 `ProfilerCaptures/Stage2-Composition.mp4`에 보존한다. 이 영상은 1024×768, `25.784533초`, 14,692,868 bytes이며 SHA-256은 `80A85091D9A6D80AAD69C59688DA5F84455D68F2C7CE2EDDBCF9DCF06A5078EA`다. 사용자가 Stage 2 누적 과정과 15초 이상 plateau 유지가 포함되도록 측정 절차에 따라 확보했으며, Agent는 파일 메타데이터와 hash를 확인했다. 영상은 연속 유지와 HUD 가독성의 시각 근거이며 frame-time 통계의 원천은 아니다.
+각 2026-08-25 raw capture에서 frame CSV를 생성했으며, 실행별 수치와 3-run 합산은 `ProfilerCaptures/Stage2-Composition-20260825-3Run-summary.md`에 보존한다. 편집 전 연속 시각 근거는 `ProfilerCaptures/Stage2-Composition-full.mp4`에 보존하며 1024×768, `25.784533초`다. 사용자가 Stage 2 누적 과정과 15초 이상 plateau 유지가 포함되도록 측정 절차에 따라 확보했다. 공개에는 초반 Stage 선택 구간을 덜어낸 약 22초 `Stage2-Composition.mp4`를 사용한다. 영상은 연속 유지와 HUD 가독성의 시각 근거이며 frame-time 통계의 원천은 아니다.
 
 ## 3. 분석 방법
 
@@ -132,7 +132,7 @@ render/update frame보다 fixed Tick 주기가 느리므로 600개 중 약 3분�
 
 1,800개 모든 frame에서 `Dust + Hazard = Total`이 성립했고 `WaitForTargetFPS`는 0이었다. 실행 간 Total mean spread는 13.6 entity, frame median spread는 0.434ms, pipeline median spread는 0.052ms, spawn median spread는 0.018ms였다.
 
-각 raw Profiler 캡처의 연속 구간은 약 4.3–4.5초이므로 세 캡처를 합쳐 하나의 15초 연속 증거로 취급하지 않는다. 연속 plateau 유지와 누적 과정은 별도의 25.784533초 HUD 영상으로 보완한다.
+각 raw Profiler 캡처의 연속 구간은 약 4.3–4.5초이므로 세 캡처를 합쳐 하나의 15초 연속 증거로 취급하지 않는다. 연속 plateau 유지와 누적 과정은 편집 전 25.784533초 HUD 영상과 공개용 약 22초 편집본으로 보완한다.
 
 ## 5. 해석과 공개 주장 경계
 
@@ -158,9 +158,13 @@ render/update frame보다 fixed Tick 주기가 느리므로 600개 중 약 3분�
 
 > 최신 게임플레이 비주얼을 포함한 Stage 2 standalone Development Build에서 무입력·무청소 plateau의 600 frame을 같은 조건으로 3회 기록했습니다. active Total 평균은 실행별 약 2.414만이었고 Total/Dust/Hazard 구성과 frame interval을 같은 캡처에 남겼습니다. 3회 합산 frame interval은 median 7.29ms, p95 9.25ms, max 12.87ms였으며 16.67ms 초과 interval은 없었습니다. 이 수치는 명시한 테스트 장비와 통제 시나리오의 uncapped Development Build 결과이며, 최종 공개 빌드나 모든 플레이 상황의 60fps 보장을 의미하지 않습니다.
 
-## 6. 남은 증거 공백
+## 6. 공개 증거 형식 결정
 
-- 최종 공개 후보 빌드 기동 smoke와, 코드·콘텐츠·품질 설정 차이에 따른 성능 재측정 필요성 판단
-- 공개용 표와 판독 가능한 Profiler 캡처의 최종 형식
-- raw `.data` 파일을 공개 패키지에 포함할지, 요약 CSV와 캡처만 제공할지 결정
-- 한글 missing-glyph와 optional Feel missing-script 정리 이후 최종 후보 빌드 확인
+- 공개 표는 동일 빌드·조건의 3-run 합산을 중심으로 제시하고 실행별 상세 수치는 이 원천 노트에 보존한다.
+- 판독 가능한 정지 캡처는 `Evidence/Stage2-Profiling/`의 CPU Timeline과 Total/Dust/Hazard counter 이미지 두 장을 사용한다.
+- CPU 이미지는 fixed Tick marker가 관찰된 대표 frame 299의 실행 구조 예시이며 통계 표본을 대표하는 단일 수치로 사용하지 않는다.
+- counter 이미지는 같은 frame에서 Dust 약 24.14k, Hazard 64, Total 약 24.21k를 판독하는 보완 근거다.
+- raw `.data`, run별 frame CSV, 로그, 내부 manifest와 편집 전 영상은 로컬 보존하며 기본 공개 패키지에는 포함하지 않는다.
+- 공개 문서와 Notion에는 이미지·영상·CSV SHA-256을 기록하지 않는다.
+- 한글 폰트 문제는 폰트 추가로 해결했고 사용하지 않는 Feel Asset Store 패키지와 설치 심볼은 제거했다.
+- 이후 현재 상태 빌드와 가벼운 수동 플레이 smoke에서 직접 드러나는 오류는 발견되지 않았다. 폰트 추가와 미사용 패키지 제거는 측정한 ECS runtime 경로·Stage 2 콘텐츠·품질 설정을 바꾸지 않으므로 추가 profiling은 수행하지 않는다. 이 조건이 달라지면 재측정 필요성을 다시 판단한다.

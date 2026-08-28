@@ -6,12 +6,13 @@
 - doc_id: `PORT-003`
 - type: `Portfolio`
 - status: `draft`
-- last_updated: `2026-08-26`
+- last_updated: `2026-08-28`
 - related_docs:
   - [../../README.md](../../README.md)
   - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
   - [PORT-002-ai-assisted-engineering-workflow.md](PORT-002-ai-assisted-engineering-workflow.md)
-  - [PORT-NOTE-002-stage2-standalone-profiling-evidence.md](PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
+  - [Evidence/PORT-NOTE-002-stage2-standalone-profiling-evidence.md](Evidence/PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
+  - [Evidence/Stage2-Profiling/README.md](Evidence/Stage2-Profiling/README.md)
   - [../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
   - [../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
   - [../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -44,6 +45,7 @@
 - 데모 빌드: 핵심 루프와 화면 피드백을 직접 확인하는 실행 자료
 - `PORT-001`: ECS/DOTS 선택 배경, 대량 엔티티 파이프라인, ownership 설계
 - `PORT-002`: AI coding agent를 설계, 코드 생성, 테스트, 문서화에 사용한 방식
+- `Evidence`: 공개 수치의 측정 조건, 상세 표, 해석 경계와 Profiler 정지 캡처
 
 ## 4. 개발 중 성과 수치
 
@@ -140,7 +142,15 @@ ECS Tick과 GameObject Update 비용을 같은 frame에서 보수적으로 관�
 
 uncapped 측정에는 fixed Tick이 실행된 frame과 실행되지 않은 render frame이 섞여 있으므로 전체 frame median을 ECS Tick 비용이나 보편적인 FPS 보장으로 표현하지 않는다. 현재 결과는 명시한 테스트 장비·Development Build·Stage 2 무입력·무청소 시나리오에 한정한다.
 
-별도 HUD 영상 `ProfilerCaptures/Stage2-Composition.mp4`에는 누적 과정과 15초 이상 plateau 유지 구간을 연속으로 보존했다. 파일 길이는 `25.784533초`, 해상도는 1024×768이다. 영상은 연속 유지와 HUD 구성 판독의 시각 근거이며 frame-time 통계의 원천은 아니다.
+편집 전 HUD 영상 `ProfilerCaptures/Stage2-Composition-full.mp4`에는 누적 과정과 15초 이상 plateau 유지 구간을 1024×768, `25.784533초`로 연속 보존했다. 공개에는 초반 Stage 선택 구간을 덜어낸 약 22초 `Stage2-Composition.mp4`를 사용한다. 영상은 연속 유지와 HUD 구성 판독의 시각 근거이며 frame-time 통계의 원천은 아니다.
+
+### 4.5 공개 증거 패키지
+
+공개 결과는 3-run 합산 표, 약 22초 HUD 영상, CPU Timeline과 Total/Dust/Hazard counter 정지 캡처로 구성한다. CPU 이미지는 fixed Tick marker가 관찰된 대표 frame 299의 실행 구조 예시이고, counter 이미지는 같은 frame의 entity 구성을 판독하기 위한 보완 자료다. 단일 frame 이미지를 전체 분포의 통계 원천으로 사용하지 않는다.
+
+판독 가능한 이미지와 상세 조건은 [Stage 2 Standalone Profiling Evidence](Evidence/Stage2-Profiling/README.md)에 둔다. raw Profiler `.data`, run별 frame CSV, 로그, 내부 manifest와 편집 전 영상은 로컬 재분석 근거로 보존하고 기본 공개 패키지에는 포함하지 않는다. 이미지·영상·CSV의 SHA-256도 공개 포트폴리오에는 기록하지 않는다.
+
+측정 이후 한글 폰트는 필요한 폰트를 추가해 정리했고 사용하지 않는 Feel Asset Store 패키지와 설치 심볼은 제거했다. 이후 현재 상태 빌드와 가벼운 수동 플레이 smoke에서 플레이에 직접 드러나는 오류는 발견되지 않았다. 이 smoke는 최신 빌드의 성능 측정으로 취급하지 않는다. runtime 코드, Stage 2 콘텐츠 또는 품질 설정이 달라질 때만 profiling 반복 필요성을 다시 판단한다.
 
 ## 5. 기술 데모로서의 범위
 
@@ -154,3 +164,9 @@ uncapped 측정에는 fixed Tick이 실행된 frame과 실행되지 않은 rende
 - 플랫폼별 장기 벤치마크
 
 이 문서에서 강조하는 것은 게임의 최종 완성도가 아니라, ECS/DOTS 학습 목표를 실제 게임플레이 문제로 연결하고, 대량 엔티티 처리 구조와 검증 근거를 포트폴리오 자료로 설명하는 방식이다.
+
+## 6. 후속 시각 자료와 빌드 전달
+
+대표 플레이, BroomSweep, Stage Map Editor 보조 영상은 Notion 문서의 레이아웃과 설명 흐름을 구성하는 시점에 촬영한다. 대표 플레이는 Title/Lobby/Stage 선택부터 회피·청소·수집과 결과 흐름을, BroomSweep은 좌우 교대·이동 제한·방향 잠금과 Dust 제거 반응을, Stage Map Editor는 document 선택·Window/Scene View 편집·validation·dry-run diff·Apply와 가능한 runtime 연결을 담는다.
+
+공개 빌드는 Windows x64 압축 패키지로 전달하고 실행 파일, Unity 데이터 폴더, 간단한 조작법·실행 안내·알려진 제한을 포함한다. 측정용 debug HUD는 기본 비활성, frame cap은 uncapped 상태를 유지하며 raw Profiler 자료는 실행 패키지에 포함하지 않는다. 실제 압축 패키지 생성과 최종 기동 smoke는 시각 자료·데모 패키지를 준비하는 T6에서 수행한다.

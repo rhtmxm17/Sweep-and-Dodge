@@ -6,7 +6,7 @@
 - doc_id: `PORT-INDEX`
 - type: `Portfolio`
 - status: `draft`
-- last_updated: `2026-05-15`
+- last_updated: `2026-08-28`
 - related_docs:
   - [../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
   - [../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
@@ -24,9 +24,11 @@
 - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md): DOTS 대량 엔티티 파이프라인 기술 사례
 - [PORT-002-ai-assisted-engineering-workflow.md](PORT-002-ai-assisted-engineering-workflow.md): Codex/Claude 계열 AI coding agent 활용 사례와 품질 관리 방식
 - [PORT-003-validation-report.md](PORT-003-validation-report.md): 포트폴리오 데모 빌드와 참고자료를 함께 읽는 방법
+- [Evidence/INDEX.md](Evidence/INDEX.md): 주장 근거, 해석 경계, 측정 조건과 판독 가능한 공개 증거
 
 ## 사용 규칙
 
 - README는 채용자 첫 화면, `PORT-*` 문서는 면접/심화 검토용 보조 문서로 사용한다.
+- `Evidence/`는 메인 서사를 반복하지 않고 `PORT-*`의 주장과 수치를 확인하는 상세 근거로 사용한다.
 - 검증 수치는 기존 문서에 근거가 있을 때만 사용하고, 개발 중 스냅샷과 공개용 벤치마크를 구분한다.
 - AI 활용 설명은 설계 guardrail, 코드 생성, 반복 구현, 검증 책임을 함께 설명한다.

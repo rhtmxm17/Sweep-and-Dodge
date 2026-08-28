@@ -7,12 +7,12 @@
 - type: `PortfolioSourceNote`
 - status: `working`
 - audience: `internal`
-- last_updated: `2026-08-26`
+- last_updated: `2026-08-28`
 - related_docs:
-  - [../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
-  - [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md)
-  - [PORT-002-ai-assisted-engineering-workflow.md](PORT-002-ai-assisted-engineering-workflow.md)
-  - [PORT-003-validation-report.md](PORT-003-validation-report.md)
+  - [../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
+  - [../PORT-001-dots-large-entity-pipeline-case-study.md](../PORT-001-dots-large-entity-pipeline-case-study.md)
+  - [../PORT-002-ai-assisted-engineering-workflow.md](../PORT-002-ai-assisted-engineering-workflow.md)
+  - [../PORT-003-validation-report.md](../PORT-003-validation-report.md)
   - [PORT-NOTE-002-stage2-standalone-profiling-evidence.md](PORT-NOTE-002-stage2-standalone-profiling-evidence.md)
 
 ## 1. 문서 목적
@@ -422,8 +422,8 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 - 피격 시 캐릭터 반응 외의 피드백이 제한적
 - 청소–Deposit 반복 구조의 장기적인 재미와 선택지 부족
 - 최신 비주얼 Stage 2 standalone Development Build에서 active Total/Dust/Hazard와 frame interval을 같은 캡처에 직접 기록하고 동일 조건 3회를 재현함
-- Development Build 측정 manifest는 확보했지만 최종 공개 후보 빌드의 기동 smoke와 성능 재측정 필요성 판단은 미완료
-- Stage 2 측정 영상은 확보했지만 대표 플레이 영상·GIF와 최종 빌드 전달 자료는 미완료
+- Development Build 측정 manifest와 공개용 결과 형식을 확보했으며, 이후 현재 상태 빌드와 가벼운 수동 플레이 smoke에서 직접 드러나는 오류는 발견되지 않음
+- Stage 2 측정 영상은 확보했지만 대표 플레이 영상·GIF의 실제 촬영과 최종 압축 빌드 전달은 T6/T7 실행 작업으로 남음
 
 이 한계는 실패를 숨기는 항목이 아니라 기술 데모의 현재 범위와 다음 개선 방향으로 설명한다.
 
@@ -446,7 +446,7 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 | 장애물 Profiler 진단 | 사례 설명 가능 | 사용자 프롬프트, Git 이력 | 정성적 보조 |
 | 2.5만 전후 active Entity | Editor와 최신 standalone 통제 시나리오에서 평균 약 2.4만 재현 | `PORT-003` Stage 2 profiling, 3-run counter capture | 보조 |
 | standalone Development Build frame budget | active 구성과 같은 최신 캡처에서 조건부 설명 가능 | `PORT-003`, `PORT-NOTE-002`, Profiler capture | 보조 |
-| 최종 공개 후보 빌드 성능 | 아직 없음 | T3에서 확보 예정 | 보류 |
+| 최종 공개 후보 빌드 성능 | 별도 측정 없음 | 현재 상태 빌드·수동 플레이 smoke 통과, Development Build 측정과 분리 | 보류 |
 | GameObject 대비 성능 우위 | 직접 비교 없음 | 없음 | 비공개 |
 
 ## 15. 주장하지 않을 내용
@@ -461,14 +461,14 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 - 출시 수준의 시청각 완성도
 - 장기적인 게임 재미와 콘텐츠 깊이
 
-## 16. T3로 넘길 증거 공백
+## 16. T3 증거 패키지 결정
 
-- 최종 공개 후보 빌드 기동 smoke와, 코드·콘텐츠·품질 설정 차이에 따른 성능 재측정 필요성 판단
-- Editor 직접 집계, standalone Development Build profiling, 최종 public candidate의 조건·해석 분리
-- Stage 2 누적·plateau 영상은 확보했으며 대표 플레이 영상과 GIF는 별도 구성
-- Stage Map Editor 화면 자료
-- 공개 빌드 기동·완주 smoke
-- 구체적인 성능 캡처와 증거 자료의 보존 형식
+- Stage 2 공개 결과는 약 22초 편집 영상, 3-run 집계표, CPU Timeline과 Total/Dust/Hazard counter 정지 캡처로 구성한다.
+- raw Profiler `.data`, run별 frame CSV, 로그, 내부 manifest와 편집 전 영상은 로컬 재분석 근거로 보존하고 기본 공개 패키지에는 포함하지 않는다.
+- `PORT-NOTE-*`는 메인 포트폴리오 서사보다 근거와 해석 경계에 가까우므로 `Docs/Portfolio/Evidence/` 아래에 둔다.
+- 공개 문서와 Notion에는 이미지·영상·CSV SHA-256을 기록하지 않는다. checksum은 내부 provenance나 실제 배포 채널에서 필요할 때만 관리한다.
+- 대표 플레이, BroomSweep, Stage Map Editor 영상의 실제 촬영은 Notion 레이아웃과 설명 흐름이 정해지는 T7 시점으로 미룬다. T3에서는 각 영상에 들어갈 내용만 고정한다.
+- 현재 상태 빌드와 가벼운 수동 플레이 smoke에서 직접 드러나는 오류는 발견되지 않았다. 측정 이후 변경이 폰트 추가와 미사용 Feel 제거에 한정되므로 Stage 2 profiling은 반복하지 않으며, 이후 runtime 코드·Stage 2 콘텐츠·품질 설정이 달라질 때 재측정 필요성을 다시 판단한다.
 
 ## 17. Stage 2 standalone profiling 판단
 
@@ -486,6 +486,16 @@ Deep Profile Support를 활성화한 최초 standalone 캡처는 계측 sample�
 
 active Total 평균은 실행별 `24,153.2 / 24,151.9 / 24,139.6`이었고, 3회 합산 평균은 `24,148.3`, 전체 범위는 `24,077–24,236`이었다. 합산 1,797 frame interval은 median `7.291ms`, p95 `9.249ms`, max `12.872ms`였으며 16.67ms 초과는 0개였다. 1,800개 모든 frame에서 `Dust + Hazard = Total`이 성립했다.
 
-이로써 standalone active 구성 동시 기록, Development Build manifest, 동일 조건 3회 반복이라는 T3 증거 공백은 해소됐다. 별도 25.784533초 HUD 영상에는 누적 과정과 15초 이상 plateau 유지 구간을 연속으로 보존했다.
+이로써 standalone active 구성 동시 기록, Development Build manifest, 동일 조건 3회 반복이라는 T3 증거 공백은 해소됐다. 편집 전 25.784533초 HUD 영상은 `ProfilerCaptures/Stage2-Composition-full.mp4`에 로컬 보관하고, 공개에는 초반 Stage 선택 구간을 덜어낸 약 22초 `Stage2-Composition.mp4`를 사용한다. 영상에는 누적 과정과 15초 이상 plateau 유지 구간이 남아 있다.
 
-다만 uncapped frame에는 fixed Tick 실행 frame과 비실행 frame이 섞이고 현재 빌드는 Development Build다. 따라서 `약 2.5만에서 60fps`를 모든 하드웨어·플레이 상황·최종 공개 빌드에 적용되는 보장 문구로 사용하지 않는다. 최종 공개 후보가 확정되면 기동 smoke를 수행하고, 코드·콘텐츠·품질 설정 차이에 따라 성능 재측정 필요성을 별도로 판단한다.
+다만 uncapped frame에는 fixed Tick 실행 frame과 비실행 frame이 섞이고 현재 측정 수치는 Development Build 결과다. 따라서 `약 2.5만에서 60fps`를 모든 하드웨어·플레이 상황·최종 공개 빌드에 적용되는 보장 문구로 사용하지 않는다. 이후 현재 상태 빌드와 가벼운 수동 플레이 smoke는 통과했지만 이를 새로운 성능 측정으로 취급하지 않는다.
+
+## 19. T6/T7 촬영 내용
+
+- 대표 플레이 흐름: Title/Lobby/Stage 선택, Stage 진입, 회피, 청소·수집, 결과 또는 다음 흐름
+- BroomSweep: 좌우 스윕 교대, 스윕 중 이동 제한과 방향 잠금, Dust 제거 반응을 하나의 연속 동작으로 표시
+- Stage Map Editor: `StageMapDocument` 선택, Window와 Scene View 편집, validation issue 확인과 대상 이동, dry-run diff, Apply, 가능하면 runtime 결과 연결
+- 선택적 심화 자료: HazardActor Workbench와 Source 진행도 기반 encounter preview
+- 별도 도식: `ExecutionBegin → Simulation → Request → ExecutionEnd`와 Pool/FreeList·CellMap 소유권 및 fence 관계
+
+과거 BroomSweep 빌드를 재현할 수 없다면 before/after 영상을 요구하지 않고 최종 동작과 설계 의도를 설명한다. 실제 길이, 화면 배치와 편집 방식은 Notion 제작 시점에 결정한다.
