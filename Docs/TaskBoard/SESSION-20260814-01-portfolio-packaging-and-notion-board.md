@@ -4,7 +4,7 @@
 - doc_id: `SESSION-20260814-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-08-28`
+- last_updated: `2026-08-29`
 - related_docs:
   - [../../README.md](../../README.md)
   - [../Portfolio/INDEX.md](../Portfolio/INDEX.md)
@@ -84,16 +84,12 @@
 - 공개 빌드는 debug HUD 기본 비활성, uncapped 운영 정책을 유지하고 raw Profiler 자료를 포함하지 않는다.
 - 현재 순서는 `T5 저장소 문서 → T6 시각 자료·데모 패키지 → T7 Notion → T8 최종 검수`다.
 ## Now
-- [ ] T5. 저장소 포트폴리오 문서를 개편한다.
-  - 완료 기준: `PORT-001 -> PORT-003 -> PORT-002 -> README -> INDEX` 순으로 합의된 서사와 근거를 반영한다.
-  - 검증: 링크, 명칭, 수치, 문서 간 역할, AI 활용 뉘앙스를 교차 점검한다.
-  - 근거: `Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md`.
-
-## Next
 - [ ] T6. 시각 자료와 공개 데모 패키지를 준비한다.
   - 완료 기준: 대표 플레이 영상/GIF, 파이프라인 다이어그램, 검증 결과 표, 공개 빌드와 실행 안내가 준비된다.
   - 검증: 각 자료가 T2의 특정 주장을 뒷받침하고, 공개 후보 빌드 기동 smoke를 통과한다.
   - 근거: T2, T3 및 `SESSION-20260514-01`.
+
+## Next
 - [ ] T7. Notion 포트폴리오를 제작한다.
   - 완료 기준: 프로젝트 요약, 대표 영상, 담당 범위, 기술 문제, 아키텍처, 검증 결과, AI-assisted workflow, 회고, 외부 링크가 채용 독자 중심으로 구성된다.
   - 검증: 저장소 문서를 그대로 복제하지 않고, 저장소의 최신 사실과 링크를 기준으로 내용을 대조한다.
@@ -107,8 +103,14 @@
 - 없음.
 
 ## Pending Branch Handoffs
-- 없음.
+- 2026-08-29 / T5 저장소 포트폴리오 문서 개편 / `PORT-001`을 최신 pipeline·lifecycle·ownership·측정 기반 단순화 사례로, `PORT-003`을 최신 검증·빌드 안내로, `PORT-002`를 BroomSweep·StageMapEditor 중심 AI workflow로 재작성하고 README·INDEX를 공개 진입점으로 정리 / `README.md`, `Docs/Portfolio/INDEX.md`, `PORT-001~003`, 본 문서 / 공개 문서 상대 링크 오류 0, Support 직접 참조 0, Stage 2 수치 Evidence 일치, 오래된 상태 표현·replacement character·공개 hash 0, `git diff --check` 내용 오류 0 / 다음 시작점: 메인 세션 맥락 병합 후 이 handoff를 제거하고 T6 시각 자료·공개 데모 패키지 계획 수립.
 ## Done
+- [x] T5. 저장소 포트폴리오 문서를 개편했다.
+  - 결과: `PORT-001`을 DOTS 선택 배경, 4단계 pipeline, lifecycle 병합, ownership/fence, enableable query와 iterator dequeue 사례를 연결한 핵심 기술 심화 문서로 재구성했다.
+  - 결과: `PORT-003`을 최신 Stage 2 3-run 결과, 해석 경계, 공개 Evidence와 후속 빌드·영상 상태를 안내하는 문서로 축약했다.
+  - 결과: `PORT-002`를 일반 기능 목록 대신 BroomSweep 플레이 개선과 StageMapEditor 목표·경계 기반 개발의 역할 분담 사례 중심으로 재작성했다.
+  - 결과: README는 저장소 진입점과 최신 측정 snapshot으로, Portfolio INDEX는 공개 문서 탐색 지도로 정리했다.
+  - 검증 결과: 작업 대상과 공개 Evidence의 상대 링크 오류 0, Support 직접 참조 0, Stage 2 정확 수치 일치, 오래된 상태 표현·replacement character·공개 64자리 hash 0, `git diff --check` 내용 오류 0을 확인했다. 문서 전용 변경이므로 Unity 테스트는 수행하지 않았다.
 - [x] T4. 포트폴리오 서사와 채널별 정보 구조를 확정했다.
   - 결과: Notion 주 서사, README 저장소 진입점, `PORT-*` 심화 문서, 공개 Evidence 검증 계층의 점진적 공개 구조를 채택했다.
   - 결과: 공통 서사, 채널별 섹션 청사진, 주장·수치 라우팅, 중복·인용 규칙과 T5 완료 조건을 `NOTE-003`에 고정했다.
@@ -145,6 +147,6 @@
   - 검증 결과: 운영 규칙, 채택 기준, 현재 작업, 후속 순서, 분기 인수인계 위치를 한 문서에서 확인할 수 있다.
 
 ## End of Session
-- 결과: T1~T4를 완료했다. 채택 주장과 공개 증거를 바탕으로 Notion, README, `PORT-*`, 공개 Evidence의 서사·깊이·탐색 경계를 확정하고 내부 원천 노트를 세션 Support 기록으로 분리했다.
-- 남은 리스크: 공개 문서 본문 개편, 대표 영상·파이프라인 도식, 공개 Windows x64 압축 패키지 생성과 최종 전달 smoke는 T5~T7 실행 작업으로 남아 있다.
-- 다음 시작점: T5에서 `NOTE-003`을 실행 기준으로 `PORT-001`부터 저장소 포트폴리오 문서를 개편한다.
+- 결과: T1~T5를 완료했다. 공개 문서의 역할을 실제 본문에 반영하고 최신 기술 계약·Stage 2 Evidence·AI-assisted 사례가 README와 `PORT-*`에서 일관되게 연결되도록 개편했다.
+- 남은 리스크: 대표 영상·파이프라인 도식, 공개 Windows x64 압축 패키지 생성과 최종 전달 smoke, Notion 페이지 제작은 T6~T7 실행 작업으로 남아 있다.
+- 다음 시작점: 메인 세션에서 T5 맥락 병합 후 T6 시각 자료와 공개 데모 패키지의 제작 순서와 산출물 형식을 확정한다.

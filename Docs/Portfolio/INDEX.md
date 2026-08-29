@@ -1,34 +1,29 @@
 # Portfolio Index
 
-이 폴더는 `Sweep and Dodge`를 Unity 클라이언트 개발자용 기술 포트폴리오로 설명하기 위한 공개용 문서 묶음이다.
+> `Sweep and Dodge`의 공개 기술 문서와 Evidence를 찾기 위한 탐색 지도
 
 ## Metadata
 - doc_id: `PORT-INDEX`
 - type: `Portfolio`
 - status: `draft`
-- last_updated: `2026-08-28`
+- last_updated: `2026-08-29`
 - related_docs:
-  - [../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md](../ProjectOps/OPS-001-prototype-core-capability-priority-matrix.md)
-  - [../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md](../ProjectOps/OPS-002-demo-playable-polish-and-delivery-plan.md)
-  - [../ProjectOps/OPS-003-public-release-readiness-plan.md](../ProjectOps/OPS-003-public-release-readiness-plan.md)
-  - [../ADR/ADR-20260206-01-bullet-pipeline-ownership.md](../ADR/ADR-20260206-01-bullet-pipeline-ownership.md)
-
-## 문서 목적
-
-- 루트 `README.md`에서 다 담기 어려운 기술 사례, AI-assisted workflow, 검증 상태, 공개 데모 빌드 기준을 분리해 정리한다.
-- 채용담당자, 면접관, 기술 리뷰어가 프로젝트의 기술적 초점과 현재 상태를 빠르게 이해할 수 있게 한다.
-- 공개 표기명과 GitHub 저장소명은 `Sweep and Dodge` 기준으로 정리했으며, Unity 제품명도 같은 기준으로 맞춘다.
+  - [Project README](../../README.md)
 
 ## Documents
 
-- [PORT-001-dots-large-entity-pipeline-case-study.md](PORT-001-dots-large-entity-pipeline-case-study.md): DOTS 대량 엔티티 파이프라인 기술 사례
-- [PORT-002-ai-assisted-engineering-workflow.md](PORT-002-ai-assisted-engineering-workflow.md): Codex/Claude 계열 AI coding agent 활용 사례와 품질 관리 방식
-- [PORT-003-validation-report.md](PORT-003-validation-report.md): 포트폴리오 데모 빌드와 참고자료를 함께 읽는 방법
-- [Evidence/INDEX.md](Evidence/INDEX.md): 주장 근거, 해석 경계, 측정 조건과 판독 가능한 공개 증거
+| Document | Role |
+|---|---|
+| [PORT-001: DOTS Large-Entity Pipeline Case Study](PORT-001-dots-large-entity-pipeline-case-study.md) | 4단계 pipeline, lifecycle 병합, ownership, CellMap/fence, enableable과 측정 기반 단순화 |
+| [PORT-002: AI-assisted Engineering Workflow](PORT-002-ai-assisted-engineering-workflow.md) | BroomSweep과 Stage Map Editor를 통한 개발자·agent 역할 분담과 guardrail |
+| [PORT-003: Demo and Validation Guide](PORT-003-validation-report.md) | 데모에서 확인할 내용, 최신 Stage 2 측정 요약, 공개 자료와 빌드 준비 상태 |
+| [Portfolio Evidence Index](Evidence/INDEX.md) | 공개 가능한 측정 조건, 집계표, Profiler 이미지와 해석 경계 |
 
-## 사용 규칙
+## Reading Paths
 
-- README는 채용자 첫 화면, `PORT-*` 문서는 면접/심화 검토용 보조 문서로 사용한다.
-- `Evidence/`는 메인 서사를 반복하지 않고 `PORT-*`의 주장과 수치를 확인하는 상세 근거로 사용한다.
-- 검증 수치는 기존 문서에 근거가 있을 때만 사용하고, 개발 중 스냅샷과 공개용 벤치마크를 구분한다.
-- AI 활용 설명은 설계 guardrail, 코드 생성, 반복 구현, 검증 책임을 함께 설명한다.
+- 프로젝트를 빠르게 파악하려면 [README](../../README.md)에서 시작합니다.
+- DOTS 구조와 대표 기술 결정을 검토하려면 `PORT-001`을 읽습니다.
+- AI coding agent를 실제 개발 workflow에 사용한 방식을 보려면 `PORT-002`를 읽습니다.
+- 실행 자료와 측정 결과의 범위를 확인하려면 `PORT-003`에서 공개 Evidence로 이동합니다.
+
+이 Index는 문서의 역할과 탐색 경로만 안내합니다. 프로젝트 서사는 README와 각 `PORT-*`, 정확한 Stage 2 측정 수치는 공개 Evidence가 담당합니다.

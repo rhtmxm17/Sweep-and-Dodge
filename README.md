@@ -2,60 +2,98 @@
 
 > Unity DOTS/Entities technical portfolio demo for large-scale entity handling.
 
-`Sweep and Dodge`는 Unity DOTS/Entities 기반으로 대량 엔티티 처리, 회피/청소/수집 루프, 명시적 업데이트 파이프라인을 실험하는 포트폴리오용 기술 데모입니다.
+`Sweep and Dodge`는 회피·청소·수집 플레이 루프에 Unity DOTS/Entities 기반 대량 엔티티 파이프라인을 적용하고, 명시적인 소유권과 업데이트 순서로 시스템을 구성한 플레이 가능한 기술 데모입니다.
 
-## Highlights
+## Project Overview
 
-- ECS/DOTS 워크플로우 학습과 검증을 목표로 시작한 기술 데모
-- GameObject 중심 구조에서 비용이 커지는 대량 개체/대량 상태 전환 문제를 의도적으로 선택
-- Unity DOTS/Entities 기반 대량 엔티티 처리
-- `ExecutionBegin -> Simulation -> Request -> ExecutionEnd` 프레임 파이프라인
-- Pool/FreeList 기반 spawn/despawn 실행 경계
-- SpatialHash/CellMap writer 단일화와 request 단계 read-only 조회
-- Enableable component 기반 상태 전환으로 구조 변경 최소화
-- FreeList/CellMap 같은 ECS 외부 Native container 접근을 fence 규칙으로 시퀀싱
-- Codex/Claude 계열 AI coding agent를 활용한 설계 검토, 코드 생성, 반복 구현, 테스트 보강, 문서화
+| Item | Description |
+|---|---|
+| Type | Unity 클라이언트 개발자 포트폴리오용 playable technical demo |
+| Core loop | 위험 탄환 회피, Dust 청소·수집, Deposit 복귀, Source 고갈 |
+| Demo flow | `Title → Lobby → Stage → Result → Demo Complete` |
+| Technology | Unity 6000.3.6f1, Entities/DOTS, C# |
+| Platform | Windows PC |
+| Current state | 3 Stage 데모와 공개 Evidence 구성 완료, 대표 영상과 공개 압축 빌드 준비 중 |
 
-## Portfolio Positioning
+## What the Demo Shows
 
-이 저장소는 완성 게임 공개본이 아니라, **Unity 클라이언트 개발자 포트폴리오용 playable technical demo**를 목표로 정리 중인 프로젝트입니다.
+플레이어는 위험 탄환을 피하면서 Source 영역의 Dust를 쓸어 수거합니다. Carry가 차면 Deposit으로 돌아가 비우고, 아직 활성인 Source로 이동해 청소를 이어갑니다. 위험 탄환은 더 정밀한 스윕 타이밍으로 직접 제거할 수도 있습니다.
 
-프로젝트의 출발점은 ECS/DOTS 워크플로우를 실제 게임플레이 문제에 적용해 보는 것이었습니다. 이를 위해 일반적인 GameObject 구조에서 생성/삭제, Transform 업데이트, 충돌/조회, 상태 전환 비용이 커지는 대량 개체 시나리오를 기술 과제로 선택했습니다. 실제 데모에서는 회피 대상과 수집/청소 대상이 함께 등장하며, 수만 단위로 관측되는 개체는 주로 수집/청소 루프와 연결된 엔티티 흐름입니다.
+대량 Entity를 별도의 stress scene에만 배치하지 않고, Stage 선택·성공·실패·재시도와 최종 완료가 있는 플레이 흐름 안에서 동작하도록 구성했습니다.
 
-포트폴리오로서 드러내고자 하는 핵심은 다음과 같습니다.
+## Technical Focus
 
-- 대량 Entity 처리 구조를 설계하고 유지하는 능력
-- 시스템별 writer/owner와 update order를 문서와 코드 기준으로 관리하는 능력
-- 성능/안정성 리스크를 테스트와 검증 루틴으로 다루는 능력
-- AI coding agent를 설계-구현-검증 흐름에 적극적으로 편입하는 능력
+### 1. DOTS 기반 대량 엔티티 처리
 
-## Current Status
+- Pool/FreeList 기반 spawn/despawn
+- CellMap을 통한 공간 후보 조회
+- Enableable component 기반 상태와 요청 전환
+- 대량 데이터 순회를 Job으로 스케줄링
 
-| Area | Status | Notes |
-|---|---|---|
-| Core DOTS entity pipeline | Implemented | 기존 ADR/OPS 문서 기준으로 파이프라인과 ownership 규칙이 정리되어 있습니다. |
-| Playable technical demo | In progress | 외부 공개용 빌드 스냅샷은 별도 범위로 정리 중입니다. |
-| Validation evidence | Partial snapshot | 기존 자동 테스트와 PlayMode smoke 기록이 있으며, 최신 공개 빌드 수치는 별도 캡처 대상입니다. |
-| Performance evidence | Partial snapshot | 개발 중 스모크/스트레스 관측값은 문서화되어 있으나, 공개용 벤치마크 표는 아직 별도 정리 전입니다. |
-| AI-assisted workflow | Documented | 설계 guardrail을 기준으로 AI coding agent를 코드 생성과 반복 구현에 활용한 방식을 정리했습니다. |
+### 2. 검증 가능한 아키텍처
 
-## Existing Validation Evidence
+- 시스템별 writer와 owner 구분
+- fixed Tick의 명시적 실행 단계
+- ECS 밖 Native container 접근을 fence dependency로 연결
+- 판정과 실행을 분리한 lifecycle request와 priority 병합
 
-기존 운영 문서에는 자동 테스트 기반의 스모크/스트레스 관측값이 기록되어 있습니다. 예를 들어 `OPS-001`에는 Editor 자동 테스트에서 `maxBudgetUsed=5000`, `dropCount=0`, `expiredByAge=0`가 기록되어 있고, PlayMode 자동 테스트에서 약 2.5만 active entity 수준의 관측값이 기록되어 있습니다. 기존 테스트/코드 명칭에 `Bullet`이 남아 있는 경우에도, 포트폴리오 관점의 핵심은 위험 요소와 수집/청소 대상을 포함한 대량 엔티티 처리입니다.
+### 3. 플레이 가능한 기술 데모
 
-이 값들은 개발 중 확보한 검증 스냅샷이며, 공개용 빌드 벤치마크와는 구분됩니다. 데모 빌드와 참고자료를 함께 읽는 방법은 `Docs/Portfolio/PORT-003-validation-report.md`에 정리되어 있습니다.
+- 회피·청소·수집을 연결한 핵심 플레이 루프
+- Title, Lobby, 3 Stage, Result, Demo Complete 흐름
+- UI·피드백·스테이지 콘텐츠와 DOTS runtime 연결
+- Stage Map Editor를 포함한 authoring/editor tooling
 
-## Documents
+## Fixed-tick Pipeline
 
-- [Portfolio Index](Docs/Portfolio/INDEX.md)
-- [DOTS Large-Entity Pipeline Case Study](Docs/Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)
-- [AI-assisted Engineering Workflow](Docs/Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
-- [Portfolio Demo Build and Reference Materials](Docs/Portfolio/PORT-003-validation-report.md)
+```text
+ExecutionBegin → Simulation → Request → ExecutionEnd
+```
+
+| Stage | Responsibility |
+|---|---|
+| `ExecutionBegin` | spawn request 소비, Pool dequeue, 활성 상태 초기화 |
+| `Simulation` | 이동·수명 갱신, block 판정, CellMap build |
+| `Request` | 플레이어 피격·청소 등 상호작용 판단과 lifecycle request 생성 |
+| `ExecutionEnd` | lifecycle reaction, 비활성화, render off, Pool enqueue |
+
+Request와 Simulation은 Entity를 즉시 풀에 반환하지 않습니다. 같은 Tick에 복수 사건이 발생하면 lifecycle priority를 병합하고, 실제 비활성화와 반환은 `ExecutionEnd` owner가 수행합니다.
+
+상세 설계는 [DOTS Large-Entity Pipeline Case Study](Docs/Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)에서 확인할 수 있습니다.
+
+## Stage 2 Measurement Snapshot
+
+최신 게임플레이 비주얼을 포함한 Windows standalone Development Build에서 Stage 2 무입력·무청소 plateau를 동일 조건으로 600 frame씩 3회 기록했습니다.
+
+- Active Total 평균: `24,148.3`
+- Active Total 범위: `24,077–24,236`
+- Frame interval median/p95/max: `7.291/9.249/12.872ms`
+- `16.67ms` 초과 interval: `0/1,797`
+
+이 결과는 명시한 테스트 장비와 통제 시나리오의 Development Build 측정입니다. 일반 플레이의 상시 밀도, 모든 환경의 60fps, 최종 Release Build 성능 또는 GameObject 방식 대비 우위를 의미하지 않습니다.
+
+[측정 조건, 전체 표와 Profiler 이미지 보기](Docs/Portfolio/Evidence/Stage2-Profiling/README.md)
 
 ## AI-assisted Development
 
-이 프로젝트는 Codex/Claude 계열 AI coding agent를 설계 검토, 구현 패치 생성, 반복 리팩터링, 테스트 보강, 문서 초안 작성에 적극 활용했습니다.
+AI coding agent를 설계 논의, 코드베이스 탐색, 대안 비교, 구현, 반복 검증과 문서화에 일상적인 개발 도구로 사용했습니다.
 
-핵심 방식은 먼저 DOTS ownership, update order, fence, enableable component 규칙을 문서화하고, agent가 그 경계 안에서 코드를 생성하도록 운영하는 것입니다. AI를 통해 구현 시간 비용을 줄이되, 아키텍처 판단과 최종 검증 책임은 개발자가 유지했습니다.
+개발자는 프로젝트 목표와 제약, 설계 채택, 플레이 감각과 공개 범위를 판단했습니다. Agent는 관련 맥락 탐색, 실행 계획, 코드 구현과 자동 검증의 왕복을 가속했습니다. 반복해서 발견한 프로젝트 지식과 오류 패턴은 ownership, update order, validation rule 같은 명시적 guardrail로 구조화했습니다.
 
-프로젝트 내부 작업 규칙은 [AGENTS.md](AGENTS.md)에 정리되어 있으며, 외부용 AI 활용 사례는 [AI-assisted Engineering Workflow](Docs/Portfolio/PORT-002-ai-assisted-engineering-workflow.md)에 요약되어 있습니다.
+BroomSweep 플레이 개선과 Stage Map Editor 개발의 구체적인 역할 분담은 [AI-assisted Engineering Workflow](Docs/Portfolio/PORT-002-ai-assisted-engineering-workflow.md)에 정리했습니다.
+
+## Portfolio Documents
+
+- [Portfolio Index](Docs/Portfolio/INDEX.md): 공개 문서 탐색 지도
+- [DOTS Large-Entity Pipeline Case Study](Docs/Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md): pipeline, ownership, fence, enableable과 측정 기반 단순화
+- [AI-assisted Engineering Workflow](Docs/Portfolio/PORT-002-ai-assisted-engineering-workflow.md): BroomSweep과 Stage Map Editor 중심의 실제 협업 사례
+- [Demo and Validation Guide](Docs/Portfolio/PORT-003-validation-report.md): 데모 관찰법, 최신 측정 요약과 공개 자료 상태
+- [Stage 2 Profiling Evidence](Docs/Portfolio/Evidence/Stage2-Profiling/README.md): 측정 조건, 집계 결과와 판독 가능한 캡처
+
+## Current Scope and Limitations
+
+- 플레이 가능한 3 Stage 기술 데모와 최신 Stage 2 공개 Evidence는 준비되어 있습니다.
+- 대표 플레이·BroomSweep·Stage Map Editor 영상의 촬영과 최종 호스팅은 후속 작업입니다.
+- Windows x64 공개 압축 패키지와 실행 안내, 최종 전달 smoke는 아직 준비 중입니다.
+- 청소·피격·위험 탄환 제거의 시청각 피드백과 장기적인 게임 재미는 출시 후보 수준을 목표로 하지 않았습니다.
+- 스토어 배포, 모든 입력 장치 지원, 플랫폼별 장기 벤치마크는 현재 범위가 아닙니다.
