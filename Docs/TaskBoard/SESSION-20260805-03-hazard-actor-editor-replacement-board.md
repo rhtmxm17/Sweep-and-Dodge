@@ -25,7 +25,7 @@
 - Unity compile, Console error 0, 관련 EditMode와 기존 HazardActor PlayMode smoke를 통과한다.
 
 ## Now
-- [x] R0. `PROMPT.md` 기준 후속 감사로 완료 상태 복구
+- [x] R0. 후속 감사 기준으로 완료 상태 복구
   - 기준선 재확인: `HazardActorPreviewCoordinator.OnEditorUpdate`는 callback당 1 step만 진행하고 `_lastUpdateTime = now`로 누적 wall time을 유실한다.
   - 기준선 재확인: Workbench embedded preview는 ghost마다 `GUI.DrawTexture`, Scene View preview는 ghost마다 `Handles.DrawSolidDisc/DrawLine`을 호출한다.
   - 기준선 재확인: `EventRepeatCount`, `EventShotSchedule`, `EventShotIntervalSec`가 preview emission에 반영되지 않는다.
@@ -119,4 +119,4 @@
   - Workbench issue selection과 StageMap source/rule/placement issue target navigation을 구현했다.
 - [x] T8. Migration·UX·성능·runtime 회귀 검증
   - `smd_demo_1` schema v3 migration, targeted 58/58, EditMode 565/565, PlayMode 46/46, allocation 0 byte, MCP window/Scene View smoke를 기록했다.
-  - 2026-08-06 후속 감사 기준으로는 `PROMPT.md` R1~R7 하드 게이트 미충족이 확인되어 이 완료 기록은 과거 T0~T8 기준 결과로만 보존한다.
+  - 2026-08-06 후속 감사에서는 R1~R7 하드 게이트 미충족이 확인되어 이 완료 기록은 과거 T0~T8 기준 결과로만 보존한다.

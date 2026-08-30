@@ -8,8 +8,7 @@
 - date: `2026-08-19`
 - supersedes:
   - [ADR-20260210-01-bullet-active-filtering-and-despawn-request.md](ADR-20260210-01-bullet-active-filtering-and-despawn-request.md)의 same-entity `ComponentLookup + NativeDisableParallelForRestriction` 결정
-- related_docs:
-  - [../AGENTS/PLAN.md](../AGENTS/PLAN.md)
+- related_docs: 없음
 
 ## 배경
 - `BulletSimulationSystem`의 네 `IJobEntity`는 탄환을 직접 순회하면서 현재 탄환의 디스폰 요청 태그와 lifecycle payload만 수정한다.

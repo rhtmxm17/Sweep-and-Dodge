@@ -16,7 +16,7 @@
 - 이 폴더는 `SESSION-20260814-01`의 장기 작업에서 판단 배경, 역할 분담, 측정 해석, 채널 설계를 복원하기 위한 보조 기록을 보관한다.
 - TaskBoard의 `Adopted Baseline`이 포트폴리오 결정의 우선 기준이며, 이 폴더의 문서는 이를 대체하지 않는다.
 - 현재 코드와 채택된 ADR·TD가 기술 사실의 우선 기준이다.
-- 이 폴더는 공개 포트폴리오 독자 경로에 포함하지 않는다. README, `Docs/Portfolio/INDEX.md`, `PORT-*`, 공개 Evidence 문서에서는 이 폴더를 직접 참조하지 않는다.
+- 이 폴더는 공개 포트폴리오 독자 경로에 포함하지 않는다. README와 루트 `Portfolio/`의 공개 문서에서는 이 폴더를 직접 참조하지 않는다.
 - 저장소를 직접 탐색하면 볼 수 있는 내부 운용 문서이며, 기밀 저장소를 의미하지 않는다.
 
 ## Notes
@@ -27,6 +27,5 @@
 
 ## 공개 산출물 경로
 
-- [Portfolio Index](../../../Portfolio/INDEX.md)
-- [Stage 2 Standalone Profiling Evidence](../../../Portfolio/Evidence/Stage2-Profiling/README.md)
-
+- [Public Portfolio](../../../../Portfolio/README.md)
+- [Large-Entity Scenario Profiling](../../../../Portfolio/Validation/large-entity-scenario/README.md)

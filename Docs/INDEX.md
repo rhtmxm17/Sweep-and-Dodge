@@ -1,14 +1,17 @@
 # Docs Index
 
-이 문서는 `Docs` 하위 문서를 빠르게 찾기 위한 단일 진입점이다.
+이 문서는 개발·운영 과정에서 사용하는 `Docs` 하위 문서를 빠르게 찾기 위한 단일 진입점이다.
+
+외부 독자를 위한 기술 문서는 루트 [Portfolio](../Portfolio/README.md)에 둔다. 공개 실행 자료는 Windows x64 패키지가 준비되는 T6에서 루트 `Demo/`에 구성한다.
 
 ## 폴더 구조
 - [`Docs/ADR`](ADR/INDEX.md): 확정된 아키텍처/설계 결정 기록
+- [`Docs/AGENTS`](AGENTS/agent-ops.md): 작업 유형별 Agent 실행 절차
 - [`Docs/Art`](Art/INDEX.md): 컨셉 레퍼런스 이미지와 문서 연결용 자산 보관
 - [`Docs/GameDesign`](GameDesign/INDEX.md): 게임 규칙, 루프, 체감 설계 기획
-- [`Docs/Portfolio`](Portfolio/INDEX.md): 채용자용 기술 포트폴리오 문서와 공개 데모 준비 기준
 - [`Docs/TechnicalDesign`](TechnicalDesign/INDEX.md): 구현 전 기술 설계/구성안
 - [`Docs/ProjectOps`](ProjectOps/INDEX.md): 우선순위, 일정, 운영/관리 문서
+- [`Docs/TaskBoard`](TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md): 세션 진행 상태와 장기 결정 메모
 - [`Docs/Templates`](Templates/game-design-template.md): 신규 문서 작성 템플릿
 
 ## 문서 상태 라벨
@@ -27,9 +30,9 @@
 
 ## 바로가기
 - [Docs/ADR/INDEX.md](ADR/INDEX.md)
+- [Portfolio/README.md](../Portfolio/README.md)
 - [Docs/Art/INDEX.md](Art/INDEX.md)
 - [Docs/GameDesign/INDEX.md](GameDesign/INDEX.md)
-- [Docs/Portfolio/INDEX.md](Portfolio/INDEX.md)
 - [Docs/TechnicalDesign/INDEX.md](TechnicalDesign/INDEX.md)
 - [Docs/ProjectOps/INDEX.md](ProjectOps/INDEX.md)
 - [Docs/Templates/game-design-template.md](Templates/game-design-template.md)

@@ -9,7 +9,7 @@
 - related_docs:
   - [ADR-20260211-02-bullet-type-key-pool-set.md](ADR-20260211-02-bullet-type-key-pool-set.md)
   - [ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md](ADR-20260220-02-spawn-request-aggregation-and-budgeted-carry-over.md)
-  - [../Portfolio/PORT-003-validation-report.md](../Portfolio/PORT-003-validation-report.md)
+  - [Large-Entity Scenario Profiling](../../Portfolio/Validation/large-entity-scenario/README.md)
   - [../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../TaskBoard/SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
 
 ## 배경
@@ -71,4 +71,3 @@ Collections 구현에서 `Remove(key, value)`는 일치 항목을 제거한 뒤�
 - 상태 초기화는 직렬 Owner 경로로 되돌려 Pool ownership과 코드 복잡도를 단순하게 유지한다.
 - `CountFreeByKey`의 전체 chain 순회와 풀 컨테이너 자체의 적합성은 이번 결정 범위 밖이다.
 - 측정에는 Windows Editor와 Profiler 오버헤드가 포함된다. standalone/public build 성능, 60fps 보장, GameObject 방식 대비 우위를 증명하지 않는다.
-

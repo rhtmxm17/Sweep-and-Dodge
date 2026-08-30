@@ -10,9 +10,9 @@
 - last_updated: `2026-08-28`
 - related_docs:
   - [../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
-  - [../../../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md](../../../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)
-  - [../../../Portfolio/PORT-002-ai-assisted-engineering-workflow.md](../../../Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
-  - [../../../Portfolio/PORT-003-validation-report.md](../../../Portfolio/PORT-003-validation-report.md)
+  - [Large-Entity Pipeline Case Study](../../../../Portfolio/CaseStudies/large-entity-pipeline.md)
+  - [AI-assisted Development Case Study](../../../../Portfolio/CaseStudies/ai-assisted-development.md)
+  - [Validation Overview](../../../../Portfolio/Validation/README.md)
   - [NOTE-002-stage2-standalone-profiling-evidence.md](NOTE-002-stage2-standalone-profiling-evidence.md)
 
 ## 1. 문서 목적
@@ -444,8 +444,8 @@ CellMap 적용 후 플레이에서 명백한 프레임 저하 해소를 확인�
 | 자동 테스트 전문성 | 주장하지 않음 | 테스트는 존재 | 비공개 |
 | 테스트 기반 계약 보조 | 충분 | 계약·smoke 사례 | 보조 |
 | 장애물 Profiler 진단 | 사례 설명 가능 | 사용자 프롬프트, Git 이력 | 정성적 보조 |
-| 2.5만 전후 active Entity | Editor와 최신 standalone 통제 시나리오에서 평균 약 2.4만 재현 | `PORT-003` Stage 2 profiling, 3-run counter capture | 보조 |
-| standalone Development Build frame budget | active 구성과 같은 최신 캡처에서 조건부 설명 가능 | `PORT-003`, `NOTE-002`, Profiler capture | 보조 |
+| 2.5만 전후 active Entity | Editor와 최신 standalone 통제 시나리오에서 평균 약 2.4만 재현 | Stage 2 Profiling, 3-run counter capture | 보조 |
+| standalone Development Build frame budget | active 구성과 같은 최신 캡처에서 조건부 설명 가능 | 공개 Validation, `NOTE-002`, Profiler capture | 보조 |
 | 최종 공개 후보 빌드 성능 | 별도 측정 없음 | 현재 상태 빌드·수동 플레이 smoke 통과, Development Build 측정과 분리 | 보류 |
 | GameObject 대비 성능 우위 | 직접 비교 없음 | 없음 | 비공개 |
 

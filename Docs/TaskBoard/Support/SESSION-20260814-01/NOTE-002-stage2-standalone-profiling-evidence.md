@@ -10,8 +10,8 @@
 - last_updated: `2026-08-28`
 - related_docs:
   - [../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md](../../SESSION-20260814-01-portfolio-packaging-and-notion-board.md)
-  - [../../../Portfolio/PORT-003-validation-report.md](../../../Portfolio/PORT-003-validation-report.md)
-  - [../../../Portfolio/Evidence/Stage2-Profiling/README.md](../../../Portfolio/Evidence/Stage2-Profiling/README.md)
+  - [Validation Overview](../../../../Portfolio/Validation/README.md)
+  - [Large-Entity Scenario Profiling](../../../../Portfolio/Validation/large-entity-scenario/README.md)
   - [NOTE-001-developer-perspective-and-claim-evidence.md](NOTE-001-developer-perspective-and-claim-evidence.md)
   - [../../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../../../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
 
@@ -53,7 +53,7 @@
 | `Stage2-Composition-20260825-Run02.data` | Off | uncapped | 124,380,376 bytes | 동일 조건 반복 측정 |
 | `Stage2-Composition-20260825-Run03.data` | Off | uncapped | 123,713,856 bytes | 동일 조건 반복 측정 |
 
-같은 이름의 PNG는 Profiler가 저장한 작은 미리보기이므로 공개용 차트나 판독 가능한 캡처로 사용하지 않는다. 원시 `.data` 파일은 로컬 개발 근거로 유지하고 기본 공개 패키지에는 포함하지 않는다. 공개에는 `Evidence/Stage2-Profiling/`의 판독 가능한 CPU Timeline과 counter 이미지를 사용한다.
+같은 이름의 PNG는 Profiler가 저장한 작은 미리보기이므로 공개용 차트나 판독 가능한 캡처로 사용하지 않는다. 원시 `.data` 파일은 로컬 개발 근거로 유지하고 기본 공개 패키지에는 포함하지 않는다. 공개에는 `Portfolio/Validation/large-entity-scenario/`의 판독 가능한 CPU Timeline과 Counter 이미지를 사용한다.
 
 각 2026-08-25 raw capture에서 frame CSV를 생성했으며, 실행별 수치와 3-run 합산은 `ProfilerCaptures/Stage2-Composition-20260825-3Run-summary.md`에 보존한다. 편집 전 연속 시각 근거는 `ProfilerCaptures/Stage2-Composition-full.mp4`에 보존하며 1024×768, `25.784533초`다. 사용자가 Stage 2 누적 과정과 15초 이상 plateau 유지가 포함되도록 측정 절차에 따라 확보했다. 공개에는 초반 Stage 선택 구간을 덜어낸 약 22초 `Stage2-Composition.mp4`를 사용한다. 영상은 연속 유지와 HUD 가독성의 시각 근거이며 frame-time 통계의 원천은 아니다.
 
@@ -162,7 +162,7 @@ render/update frame보다 fixed Tick 주기가 느리므로 600개 중 약 3분�
 ## 6. 공개 증거 형식 결정
 
 - 공개 표는 동일 빌드·조건의 3-run 합산을 중심으로 제시하고 실행별 상세 수치는 이 원천 노트에 보존한다.
-- 판독 가능한 정지 캡처는 `Evidence/Stage2-Profiling/`의 CPU Timeline과 Total/Dust/Hazard counter 이미지 두 장을 사용한다.
+- 판독 가능한 정지 캡처는 `Portfolio/Validation/large-entity-scenario/`의 CPU Timeline과 Total·Dust·Hazard Counter 이미지 두 장을 사용한다.
 - CPU 이미지는 fixed Tick marker가 관찰된 대표 frame 299의 실행 구조 예시이며 통계 표본을 대표하는 단일 수치로 사용하지 않는다.
 - counter 이미지는 같은 frame에서 Dust 약 24.14k, Hazard 64, Total 약 24.21k를 판독하는 보완 근거다.
 - raw `.data`, run별 frame CSV, 로그, 내부 manifest와 편집 전 영상은 로컬 보존하며 기본 공개 패키지에는 포함하지 않는다.

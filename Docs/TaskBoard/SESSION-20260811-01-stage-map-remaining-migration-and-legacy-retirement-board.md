@@ -8,7 +8,6 @@
 - related_docs:
   - [../ADR/ADR-20260811-01-stage-map-legacy-authoring-retirement.md](../ADR/ADR-20260811-01-stage-map-legacy-authoring-retirement.md)
   - [../TechnicalDesign/TD-034-stage-map-editor-replacement.md](../TechnicalDesign/TD-034-stage-map-editor-replacement.md)
-  - [../AGENTS/PLAN.md](../AGENTS/PLAN.md)
 
 ## Session Goal
 - Stage 2·3을 `StageMapDocument`로 semantic-equivalent migration한다.

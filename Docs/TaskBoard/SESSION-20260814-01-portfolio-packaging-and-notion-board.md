@@ -4,18 +4,18 @@
 - doc_id: `SESSION-20260814-01`
 - type: `SessionTaskBoard`
 - status: `active`
-- last_updated: `2026-08-29`
+- last_updated: `2026-08-30`
 - related_docs:
   - [../../README.md](../../README.md)
-  - [../Portfolio/INDEX.md](../Portfolio/INDEX.md)
-  - [../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md](../Portfolio/PORT-001-dots-large-entity-pipeline-case-study.md)
-  - [../Portfolio/PORT-002-ai-assisted-engineering-workflow.md](../Portfolio/PORT-002-ai-assisted-engineering-workflow.md)
-  - [../Portfolio/PORT-003-validation-report.md](../Portfolio/PORT-003-validation-report.md)
+  - [../../Portfolio/README.md](../../Portfolio/README.md)
+  - [../../Portfolio/CaseStudies/large-entity-pipeline.md](../../Portfolio/CaseStudies/large-entity-pipeline.md)
+  - [../../Portfolio/CaseStudies/ai-assisted-development.md](../../Portfolio/CaseStudies/ai-assisted-development.md)
+  - [../../Portfolio/Validation/README.md](../../Portfolio/Validation/README.md)
   - [Support/SESSION-20260814-01/INDEX.md](Support/SESSION-20260814-01/INDEX.md)
   - [Support/SESSION-20260814-01/NOTE-001-developer-perspective-and-claim-evidence.md](Support/SESSION-20260814-01/NOTE-001-developer-perspective-and-claim-evidence.md)
   - [Support/SESSION-20260814-01/NOTE-002-stage2-standalone-profiling-evidence.md](Support/SESSION-20260814-01/NOTE-002-stage2-standalone-profiling-evidence.md)
   - [Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md](Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md)
-  - [../Portfolio/Evidence/Stage2-Profiling/README.md](../Portfolio/Evidence/Stage2-Profiling/README.md)
+  - [../../Portfolio/Validation/large-entity-scenario/README.md](../../Portfolio/Validation/large-entity-scenario/README.md)
   - [../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)
   - [SESSION-20260514-01-portfolio-demo-build-board.md](SESSION-20260514-01-portfolio-demo-build-board.md)
   - [../AGENTS/agent-ops.md](../AGENTS/agent-ops.md)
@@ -31,7 +31,7 @@
 - 분기 작업은 담당 항목의 상태, 산출물 링크, 검증 결과, 다음 시작점만 갱신한다.
 - 합의되지 않은 새 범위나 설계 결정을 TaskBoard 갱신만으로 확정하지 않는다.
 - 중요한 새 결정은 메인 대화에서 합의한 뒤 `Adopted Baseline`에 추가한다.
-- 상세 설계와 긴 근거는 해당 Portfolio/ADR/OPS 문서에 두고, 이 문서에는 결론과 링크만 남긴다.
+- 상세 설계와 긴 근거는 공개 Portfolio 또는 내부 ADR·TD·OPS 문서에 두고, 이 문서에는 결론과 링크만 남긴다.
 - 저장소 문서를 내용의 기준으로 삼고, Notion은 채용 독자에게 맞춘 표현 계층으로 구성한다.
 - `맥락 병합`은 분기 작업에서 문서로 고정할 수준은 아니지만 배경 이해나 후속 판단에 도움이 되는 보조 맥락을 메인 대화에 전달하는 작업을 뜻한다.
 - 맥락 병합으로 전달된 보조 맥락은 TaskBoard와 확정 문서를 대체하지 않으며, 기본적으로 직접 문서화하지 않는다.
@@ -67,7 +67,7 @@
 ### D. 공개 증거 계약
 - 최신 공개 성능 근거는 공개 데모와 같은 Stage 2에서 무입력·무청소로 Dust를 자연 누적한 plateau를 동일 Windows x64 IL2CPP Development Build에서 600 frame × 3회 측정한 결과다.
 - 3-run 합산 active Total 평균은 `24,148.3`, 범위는 `24,077–24,236`, frame interval median/p95/max는 `7.291/9.249/12.872ms`, 16.67ms 초과는 `0/1,797`이다. 일반 플레이의 상시 밀도나 보편적인 60fps 보장으로 해석하지 않는다.
-- 정확한 공개 조건·표·이미지의 SSOT는 [Stage 2 Standalone Profiling Evidence](../Portfolio/Evidence/Stage2-Profiling/README.md)다. 과거 약 2.5만 snapshot과 Editor 측정은 최신 standalone 결과나 회귀 보장 수치로 사용하지 않는다.
+- 정확한 공개 조건·표·이미지의 SSOT는 [대량 엔티티 누적 시나리오 프로파일링](../../Portfolio/Validation/large-entity-scenario/README.md)이다. 실제 측정 콘텐츠는 Stage 2이며, 과거 약 2.5만 snapshot과 Editor 측정은 최신 standalone 결과나 회귀 보장 수치로 사용하지 않는다.
 - 기존 `Bullet` active 명칭은 위험 요소와 청소·수집 대상을 함께 포함하므로 공개 시 Total/Dust/Hazard 구성을 명시한다.
 - Spawn 병목은 `FreeByKey` iterator 직접 제거로 교정했고, 측정 비교 후 Pool Owner의 직렬 dequeue·상태 초기화를 채택했다. 상세 결정은 [ADR-20260822-01](../ADR/ADR-20260822-01-free-by-key-iterator-dequeue-and-spawn-initialization-simplification.md)을 따른다.
 - 공개 증거 패키지는 3-run 표, 약 22초 HUD 영상, 같은 fixed Tick frame의 CPU Timeline과 composition counter 이미지로 구성한다. raw Profiler 자료·CSV·로그·내부 manifest와 편집 전 영상은 로컬에 유지하고 공개 SHA는 기록하지 않는다.
@@ -75,14 +75,16 @@
 - 측정 해석과 제외된 캡처의 상세 배경은 [NOTE-002](Support/SESSION-20260814-01/NOTE-002-stage2-standalone-profiling-evidence.md)를 따른다.
 
 ### E. 채널과 공개 경계
-- Notion은 채용 독자를 위한 주 서사, README는 저장소 진입점, `PORT-*`는 선택적 심화, 공개 Evidence는 수치 확인 계층으로 구성한다. 공통 서사·섹션 청사진·정보 라우팅은 [NOTE-003](Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md)을 따른다.
-- 공개 가능한 조건·표·이미지는 `Docs/Portfolio/Evidence/`에 두고 세션 Support 노트는 내부 운용·기록 문서로 관리한다. README, `PORT-*`, 공개 Evidence에서는 Support 노트를 직접 참조하지 않는다.
-- 내부 운용 문서는 공개 저장소를 직접 탐색하면 보일 수 있지만 공식 포트폴리오 독자 경로에서는 제외하며 기밀을 의미하지 않는다.
+- Notion은 채용 독자를 위한 주 서사, README는 저장소 진입점, 루트 `Portfolio/`는 선택적 기술 심화와 검증 계층으로 구성한다. 공통 서사·편집 계약·정보 라우팅은 [NOTE-003](Support/SESSION-20260814-01/NOTE-003-channel-content-architecture.md)을 따른다.
+- 공개 기술 사례는 `Portfolio/CaseStudies/`, 공개 가능한 조건·표·이미지는 `Portfolio/Validation/`에 둔다. 공개 문서는 내부 Metadata와 진행 상태를 사용하지 않고 외부 독자를 전제한 경어체로 작성한다.
+- `Docs/`는 ADR, TD, Game Design, TaskBoard 등 개발·운영 기록 전용 영역으로 관리한다. 공개 Case Study는 필요한 ADR·TD만 선택적으로 연결하고, README와 Portfolio에서 TaskBoard·Support 노트를 직접 참조하지 않는다.
+- `Demo/`는 공개 Windows x64 패키지와 실행 안내가 준비되는 T6에서 생성하며, 빌드 바이너리는 저장소 밖 배포 위치에서 제공한다.
+- 개발·운영 문서는 공개 저장소를 직접 탐색하면 볼 수 있지만 공식 포트폴리오 독자 경로에서는 제외하며 기밀을 의미하지 않는다.
 
 ### F. 전달 자료와 작업 순서
 - 대표 플레이·`BroomSweep`·`StageMapEditor` 보조 영상은 T7 Notion 레이아웃에 맞춰 촬영하고, T6에서는 파이프라인 도식과 Windows x64 압축 패키지·실행 안내·최종 전달 smoke를 준비한다.
 - 공개 빌드는 debug HUD 기본 비활성, uncapped 운영 정책을 유지하고 raw Profiler 자료를 포함하지 않는다.
-- 현재 순서는 `T5 저장소 문서 → T6 시각 자료·데모 패키지 → T7 Notion → T8 최종 검수`다.
+- 현재 순서는 `T5R 공개 문서 교정 → T6 시각 자료·데모 패키지 → T7 Notion → T8 최종 검수`다.
 ## Now
 - [ ] T6. 시각 자료와 공개 데모 패키지를 준비한다.
   - 완료 기준: 대표 플레이 영상/GIF, 파이프라인 다이어그램, 검증 결과 표, 공개 빌드와 실행 안내가 준비된다.
@@ -103,12 +105,23 @@
 - 없음.
 
 ## Pending Branch Handoffs
-- 2026-08-29 / T5 저장소 포트폴리오 문서 개편 / `PORT-001`을 최신 pipeline·lifecycle·ownership·측정 기반 단순화 사례로, `PORT-003`을 최신 검증·빌드 안내로, `PORT-002`를 BroomSweep·StageMapEditor 중심 AI workflow로 재작성하고 README·INDEX를 공개 진입점으로 정리 / `README.md`, `Docs/Portfolio/INDEX.md`, `PORT-001~003`, 본 문서 / 공개 문서 상대 링크 오류 0, Support 직접 참조 0, Stage 2 수치 Evidence 일치, 오래된 상태 표현·replacement character·공개 hash 0, `git diff --check` 내용 오류 0 / 다음 시작점: 메인 세션 맥락 병합 후 이 handoff를 제거하고 T6 시각 자료·공개 데모 패키지 계획 수립.
+- 없음.
 ## Done
+- [x] T5R. 저장소 공개 문서를 외부 독자용 문체와 구조로 교정했다.
+  - 결과: README와 공개 기술 문서를 경어체로 통일하고 프로젝트·문제·결과를 먼저 소개하도록 전면 개편했다.
+  - 결과: 내부 Metadata, 진행 상태와 공개되지 않은 자료의 placeholder를 공개 문서에서 제거했다.
+  - 결과: 대량 엔티티 Pipeline과 AI-assisted Development를 번호 없는 주제 중심 Case Study로 재구성하고, 대량 엔티티 누적 시나리오 Profiling을 공개 수치 SSOT로 유지했다.
+  - 결과: 공개 검증 자료의 대표 명칭을 내부 콘텐츠 식별자인 Stage 2 대신 `대량 엔티티 누적 시나리오`로 변경하고, Stage 2는 상세 측정 조건으로만 유지했다.
+  - 검증 결과: 변경 대상 Markdown 상대 링크 오류 0, 이전 공개 경로·식별자와 이전 측정 경로 참조 0, 공개 Metadata·내부 Support 직접 참조 0, 측정 수치 일치와 `git diff --check` 내용 오류 0을 확인했다. 공개 문서의 Stage 2 표기는 상세 측정 조건 2곳에만 남겼다.
+- [x] T4R. 공개·데모·운영 문서의 정보 구조를 교정했다.
+  - 결과: `Docs/`를 개발·운영 기록 영역으로, 루트 `Portfolio/`를 공개 기술 문서 영역으로 분리했다.
+  - 결과: 공개 실행 자료는 T6에서 루트 `Demo/`에 생성하고 빌드 바이너리는 외부 배포 위치에서 연결하는 계약을 채택했다.
+  - 결과: 번호 대신 주제 중심 파일명, 경어체, 독자 우선 도입부와 선택적 ADR·TD 연결 원칙을 `NOTE-003`에 반영했다.
+  - 검증 결과: 루트 공개 문서 폴더 존재, 이전 공개 문서 폴더 제거, T6 전 `Demo/` 미생성을 확인했다. 저장소 Markdown 전체 검사에서 이번 변경과 무관한 기존 링크 오류 6개만 남아 있다.
 - [x] T5. 저장소 포트폴리오 문서를 개편했다.
-  - 결과: `PORT-001`을 DOTS 선택 배경, 4단계 pipeline, lifecycle 병합, ownership/fence, enableable query와 iterator dequeue 사례를 연결한 핵심 기술 심화 문서로 재구성했다.
-  - 결과: `PORT-003`을 최신 Stage 2 3-run 결과, 해석 경계, 공개 Evidence와 후속 빌드·영상 상태를 안내하는 문서로 축약했다.
-  - 결과: `PORT-002`를 일반 기능 목록 대신 BroomSweep 플레이 개선과 StageMapEditor 목표·경계 기반 개발의 역할 분담 사례 중심으로 재작성했다.
+  - 결과: 초기 대량 엔티티 심화 문서를 DOTS 선택 배경, 4단계 pipeline, lifecycle 병합, ownership/fence, enableable query와 iterator dequeue 사례 중심으로 재구성했다.
+  - 결과: 초기 검증 안내 문서를 최신 Stage 2 3-run 결과, 해석 경계, 공개 Evidence와 후속 빌드·영상 상태 중심으로 축약했다.
+  - 결과: 초기 AI workflow 문서를 BroomSweep 플레이 개선과 StageMapEditor 목표·경계 기반 개발의 역할 분담 사례 중심으로 재작성했다.
   - 결과: README는 저장소 진입점과 최신 측정 snapshot으로, Portfolio INDEX는 공개 문서 탐색 지도로 정리했다.
   - 검증 결과: 작업 대상과 공개 Evidence의 상대 링크 오류 0, Support 직접 참조 0, Stage 2 정확 수치 일치, 오래된 상태 표현·replacement character·공개 64자리 hash 0, `git diff --check` 내용 오류 0을 확인했다. 문서 전용 변경이므로 Unity 테스트는 수행하지 않았다.
 - [x] T4. 포트폴리오 서사와 채널별 정보 구조를 확정했다.
@@ -138,7 +151,7 @@
   - 결과: 프로젝트 범위와 비범위, 검증 자료의 보조 증거 원칙, AI-assisted engineering 전용 심화 섹션과 브리프 문구를 확정했다.
   - 검증 결과: T1 완료 조건의 목표 직무와 독자, 한 문장 소개, 핵심 역량 3개, 범위/비범위, AI 활용 포지셔닝이 모두 `Adopted Baseline`에 기록됐다.
 - [x] D1. 현재 포트폴리오 문서의 기준 내용을 읽고 핵심 메시지와 증거 공백을 정리했다.
-  - 검증 결과: `README.md`, `Docs/Portfolio/INDEX.md`, `PORT-001~003`을 UTF-8로 확인했다.
+  - 검증 결과: 당시 `README.md`와 공개 포트폴리오 문서 3종을 UTF-8로 확인했다.
 - [x] D2. 포트폴리오 작업의 전체 순서를 합의했다.
   - 검증 결과: 포지셔닝부터 최종 검수까지 T1~T8의 선후 관계를 현재 보드에 반영했다.
 - [x] D3. AI 활용 서술의 기준을 보정했다.
@@ -147,6 +160,6 @@
   - 검증 결과: 운영 규칙, 채택 기준, 현재 작업, 후속 순서, 분기 인수인계 위치를 한 문서에서 확인할 수 있다.
 
 ## End of Session
-- 결과: T1~T5를 완료했다. 공개 문서의 역할을 실제 본문에 반영하고 최신 기술 계약·Stage 2 Evidence·AI-assisted 사례가 README와 `PORT-*`에서 일관되게 연결되도록 개편했다.
+- 결과: T1~T5와 T4R·T5R 교정을 완료했다. 공개 기술 문서를 루트 `Portfolio/`로 분리하고 최신 기술 계약·Stage 2 Validation·AI-assisted 사례를 외부 독자용 문체로 연결했다.
 - 남은 리스크: 대표 영상·파이프라인 도식, 공개 Windows x64 압축 패키지 생성과 최종 전달 smoke, Notion 페이지 제작은 T6~T7 실행 작업으로 남아 있다.
 - 다음 시작점: 메인 세션에서 T5 맥락 병합 후 T6 시각 자료와 공개 데모 패키지의 제작 순서와 산출물 형식을 확정한다.

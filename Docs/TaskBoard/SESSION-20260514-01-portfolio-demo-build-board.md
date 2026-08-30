@@ -2,7 +2,7 @@
 
 ## Session Goal
 - 한 줄 목표: 외부 포트폴리오 문서에 쓸 데모 빌드, 성과 수치, 영상 자료가 사실로 성립하도록 준비 작업을 추적한다.
-- 완료 기준: 공개 데모 빌드 산출물, 검증 수치, 영상/GIF, README/PORT-003 갱신 항목이 완료되거나 명확한 다음 시작점으로 남는다.
+- 완료 기준: 공개 데모 빌드 산출물, 검증 수치, 영상/GIF, README·Portfolio Validation·Demo 안내 갱신 항목이 완료되거나 명확한 다음 시작점으로 남는다.
 - 이번 세션에서 하지 않을 것: 프로젝트 네이밍 결정, 스토어 배포 준비, 최종 아트/사운드 품질 확정.
 
 ## 현재 상태
@@ -55,15 +55,15 @@
 - [ ] T4. 성능/검증 수치 캡처
   - 완료 기준: 공개 데모 빌드 기준으로 active entity 규모, frame time 또는 동등한 관측값을 기록한다.
   - 검증: 측정 날짜, Unity 버전, 시나리오, 관측값, 해석 메모 기록.
-  - 근거: `Docs/Portfolio/PORT-003-validation-report.md`
+  - 근거: `Portfolio/Validation/large-entity-scenario/README.md`
 - [ ] T5. 영상/GIF 촬영
   - 완료 기준: 10~30초 범위에서 플레이어 조작, 대량 개체, 청소/수집 또는 디스폰 흐름이 보이는 자료를 확보한다.
   - 검증: README에서 참조 가능한 파일 또는 링크가 준비된다.
-  - 근거: `Docs/Portfolio/PORT-003-validation-report.md`
-- [ ] T6. README와 PORT-003 갱신
+  - 근거: `Portfolio/Validation/README.md`
+- [ ] T6. README와 공개 Demo 안내 갱신
   - 완료 기준: 공개 데모 빌드 수치와 영상/GIF가 development snapshot과 구분되어 반영된다.
   - 검증: Markdown 링크 확인, `Sweep and Dodge` 외 임의 제품명 미도입 확인.
-  - 근거: `README.md`, `Docs/Portfolio/PORT-003-validation-report.md`
+  - 근거: `README.md`, `Portfolio/Validation/README.md`, 이후 생성할 `Demo/README.md`
 
 ## Blocked
 - 없음

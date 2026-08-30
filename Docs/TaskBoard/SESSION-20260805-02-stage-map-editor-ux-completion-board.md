@@ -6,7 +6,6 @@
 - status: `complete`
 - last_updated: `2026-08-05`
 - related_docs:
-  - [../AGENTS/PROMPT.md](../AGENTS/PROMPT.md)
   - [../TechnicalDesign/TD-034-stage-map-editor-replacement.md](../TechnicalDesign/TD-034-stage-map-editor-replacement.md)
   - [../ADR/ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md](../ADR/ADR-20260804-01-stage-map-editor-document-ssot-and-legacy-replacement.md)
 
@@ -32,7 +31,7 @@
 - 외부 importer 및 새로운 duplicate 기능
 
 ## Done
-- [x] T0. `PROMPT.md` T1~T6와 기존 구현·테스트·실제 asset을 항목별 감사했다.
+- [x] T0. 당시 T1~T6 작업 기준과 기존 구현·테스트·실제 asset을 항목별 감사했다.
 - [x] T1. Editing Session -> Selection Navigator -> Contextual Inspector 순서로 UI를 분리했다.
   - Navigator만 inventory/category 선택을 소유하고 Inspector는 `Selection.Kind`에 대응하는 한 section만 표시한다.
   - Scene hit-test, Navigator, Issue Navigator가 Window의 동일 `TrySelect` command를 사용한다.
