@@ -19,17 +19,17 @@ MonoBehaviour:
   SourceBindings:
   - SourceStableId: 1003
     InitialSourceState: 0
-    ThresholdWeakened: 1800
-    ThresholdDepleted: 3600
+    ThresholdWeakened: 2200
+    ThresholdDepleted: 3000
     SustainSlots:
     - State: 0
-      Lane: 1
+      Lane: 0
       Clips:
-      - {fileID: 11400000, guid: 7cc14ff5ce5f4a488af830fda539f93d, type: 2}
+      - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
       Weights:
       - 1
     - State: 1
-      Lane: 1
+      Lane: 0
       Clips:
       - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
       Weights:
@@ -41,12 +41,12 @@ MonoBehaviour:
     HazardActorPlacements:
     - PlacementInstanceId: 1
       ActorArchetypePrefab: {fileID: 7002816760119344309, guid: 8465163384813284292d13356760fe08, type: 3}
-      LocalOffset: {x: -5, y: 0, z: -2}
-      LocalYawDeg: 45.000004
+      LocalOffset: {x: -7, y: 0, z: 5}
+      LocalYawDeg: 135
     - PlacementInstanceId: 2
       ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
-      LocalOffset: {x: 6, y: 0, z: 4}
-      LocalYawDeg: 210
+      LocalOffset: {x: 4, y: 0, z: -6}
+      LocalYawDeg: -45
     HazardActorOrchestrationRules:
     - RuleId: 301
       TargetPlacementInstanceIds: 0100000002000000

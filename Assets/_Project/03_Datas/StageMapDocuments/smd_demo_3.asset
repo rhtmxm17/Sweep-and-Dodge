@@ -407,58 +407,58 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -497,7 +497,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -545,10 +545,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -587,7 +587,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -596,28 +596,28 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -638,7 +638,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -674,7 +674,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -687,48 +687,48 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -755,13 +755,13 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -815,10 +815,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -845,7 +845,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -857,14 +857,14 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -905,10 +905,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -935,7 +935,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -947,14 +947,14 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -995,10 +995,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1025,7 +1025,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1035,16 +1035,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1085,10 +1085,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1115,7 +1115,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1125,16 +1125,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1175,10 +1175,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1205,7 +1205,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1215,16 +1215,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1265,10 +1265,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1295,7 +1295,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1305,16 +1305,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1355,10 +1355,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1385,7 +1385,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1395,16 +1395,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1445,10 +1445,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1475,7 +1475,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1485,16 +1485,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1535,10 +1535,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1565,7 +1565,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1575,16 +1575,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1625,10 +1625,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1655,7 +1655,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1665,16 +1665,16 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1715,10 +1715,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1734,9 +1734,6 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 255
-    SourceRegionId: 0
-    DepositRegionId: 0
-  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1748,23 +1745,20 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
-    DepositRegionId: 0
-  - MovementFlags: 255
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
@@ -1814,16 +1808,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
-    DepositRegionId: 0
-  - MovementFlags: 255
-    SourceRegionId: 0
-    DepositRegionId: 0
-  - MovementFlags: 255
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1832,10 +1820,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 255
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 255
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1847,7 +1835,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1893,7 +1881,7 @@ MonoBehaviour:
     SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
@@ -1910,10 +1898,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 255
+  - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1922,10 +1910,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 255
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 255
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1937,7 +1925,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -1981,6 +1969,9 @@ MonoBehaviour:
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 1003
+    DepositRegionId: 0
+  - MovementFlags: 0
+    SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
@@ -1989,6 +1980,15 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 2
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 2
+    SourceRegionId: 0
+    DepositRegionId: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2015,7 +2015,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2025,40 +2025,40 @@ MonoBehaviour:
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
-    SourceRegionId: 0
+    SourceRegionId: 1003
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
@@ -2069,7 +2069,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2105,7 +2105,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2156,7 +2156,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2195,10 +2195,10 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2246,7 +2246,7 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 2
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2257,13 +2257,13 @@ MonoBehaviour:
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
@@ -2285,58 +2285,58 @@ MonoBehaviour:
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
-  - MovementFlags: 0
+  - MovementFlags: 3
     SourceRegionId: 0
     DepositRegionId: 0
   - MovementFlags: 0
@@ -2347,13 +2347,13 @@ MonoBehaviour:
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
@@ -2437,13 +2437,13 @@ MonoBehaviour:
     DepositRegionId: 0
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
-    DepositRegionId: 0
+    DepositRegionId: 2002
   - MovementFlags: 0
     SourceRegionId: 0
     DepositRegionId: 0
@@ -2734,22 +2734,26 @@ MonoBehaviour:
     Active: 1
     AnchorCell: {x: 4, y: 4}
     AnchorOffset: {x: 0, y: 0}
+  - StableId: 2002
+    Active: 1
+    AnchorCell: {x: 25, y: 25}
+    AnchorOffset: {x: 0.013038635, y: 0.15225887}
   PlayerStart:
     Active: 1
-    AnchorCell: {x: 7, y: 4}
+    AnchorCell: {x: 9, y: 2}
     AnchorOffset: {x: 0, y: 0}
-    YawDeg: 45
+    YawDeg: 0
   HazardActorPlacements:
   - OwningSourceStableId: 1003
     PlacementInstanceId: 1
     ActorArchetypePrefab: {fileID: 7002816760119344309, guid: 8465163384813284292d13356760fe08, type: 3}
-    SourceLocalOffset: {x: -5, y: 0, z: -2}
-    LocalYawDeg: 45.000004
+    SourceLocalOffset: {x: -7, y: 0, z: 5}
+    LocalYawDeg: 135
   - OwningSourceStableId: 1003
     PlacementInstanceId: 2
     ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
-    SourceLocalOffset: {x: 6, y: 0, z: 4}
-    LocalYawDeg: 210
+    SourceLocalOffset: {x: 4, y: 0, z: -6}
+    LocalYawDeg: -45
   HazardActorOrchestrationRules:
   - OwningSourceStableId: 1003
     RuleId: 301
@@ -2765,16 +2769,7 @@ MonoBehaviour:
     TriggerType: 2
     TriggerThresholdNormalized: 0.5
     TargetPhaseId: 2
-  PresentationLinks:
-  - StableId: 9003
-    Active: 1
-    PlacementMode: 0
-    LinkKind: 0
-    LinkedStableId: 0
-    PresentationKey: preview_visual_03
-    Position: {x: 15, y: 2, z: 6}
-    Euler: {x: -0, y: 0, z: 0}
-    Scale: {x: 1, y: 1, z: 1}
+  PresentationLinks: []
   TargetLayout: {fileID: 11400000, guid: 6aefe56c6ec34820bdc8024f6240ab67, type: 2}
   TargetDefinition: {fileID: 11400000, guid: 2f3d121991554812ae4a9eaa5ae57667, type: 2}
   TargetCatalog: {fileID: 11400000, guid: be0e8264399b5a54eb9ef1d9d99d4013, type: 2}

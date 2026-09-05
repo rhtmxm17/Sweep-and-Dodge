@@ -4846,9 +4846,9 @@ MonoBehaviour:
   HazardActorPlacements:
   - OwningSourceStableId: 1002
     PlacementInstanceId: 1
-    ActorArchetypePrefab: {fileID: 7002816760119344309, guid: 8465163384813284292d13356760fe08, type: 3}
-    SourceLocalOffset: {x: 1.5, y: 0, z: -1.5}
-    LocalYawDeg: 224.99998
+    ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
+    SourceLocalOffset: {x: -4.104488, y: 0, z: -2.0479393}
+    LocalYawDeg: 45.000004
   - OwningSourceStableId: 1004
     PlacementInstanceId: 2
     ActorArchetypePrefab: {fileID: 4287959101875013301, guid: 5c5e42d5ef02ba0469460d7cfdc790c3, type: 3}

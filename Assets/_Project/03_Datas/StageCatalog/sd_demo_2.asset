@@ -19,19 +19,13 @@ MonoBehaviour:
   SourceBindings:
   - SourceStableId: 1002
     InitialSourceState: 0
-    ThresholdWeakened: 1600
-    ThresholdDepleted: 3200
+    ThresholdWeakened: 2000
+    ThresholdDepleted: 2600
     SustainSlots:
     - State: 0
       Lane: 0
       Clips:
       - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
-      Weights:
-      - 1
-    - State: 0
-      Lane: 1
-      Clips:
-      - {fileID: 11400000, guid: 7ceff6e75b62bb04e8c37b227aa3cc16, type: 2}
       Weights:
       - 1
     - State: 1
@@ -40,18 +34,12 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
       Weights:
       - 1
-    - State: 1
-      Lane: 1
-      Clips:
-      - {fileID: 11400000, guid: 13955e787a1b4edfa70b980acec4da95, type: 2}
-      Weights:
-      - 1
     EventSlots: []
     HazardActorPlacements:
     - PlacementInstanceId: 1
-      ActorArchetypePrefab: {fileID: 7002816760119344309, guid: 8465163384813284292d13356760fe08, type: 3}
-      LocalOffset: {x: 1.5, y: 0, z: -1.5}
-      LocalYawDeg: 224.99998
+      ActorArchetypePrefab: {fileID: 4069771742991948589, guid: e33a2729aabdf3445ac6fadbefba2649, type: 3}
+      LocalOffset: {x: -4.104488, y: 0, z: -2.0479393}
+      LocalYawDeg: 45.000004
     HazardActorOrchestrationRules:
     - RuleId: 201
       TargetPlacementInstanceIds: 01000000
@@ -67,8 +55,8 @@ MonoBehaviour:
       TargetPhaseId: 2
   - SourceStableId: 1004
     InitialSourceState: 0
-    ThresholdWeakened: 1600
-    ThresholdDepleted: 3200
+    ThresholdWeakened: 1000
+    ThresholdDepleted: 1300
     SustainSlots:
     - State: 0
       Lane: 0
@@ -76,22 +64,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 1f388e7e148549c6abf1f0cb0de6e850, type: 2}
       Weights:
       - 1
-    - State: 0
-      Lane: 1
-      Clips:
-      - {fileID: 11400000, guid: 7ceff6e75b62bb04e8c37b227aa3cc16, type: 2}
-      Weights:
-      - 1
     - State: 1
       Lane: 0
       Clips:
       - {fileID: 11400000, guid: 904cc7fd59844552b8f09f4d2088f785, type: 2}
-      Weights:
-      - 1
-    - State: 1
-      Lane: 1
-      Clips:
-      - {fileID: 11400000, guid: 13955e787a1b4edfa70b980acec4da95, type: 2}
       Weights:
       - 1
     EventSlots: []

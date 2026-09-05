@@ -3722,7 +3722,7 @@ MonoBehaviour:
     LocalYawDeg: 0
   - OwningSourceStableId: 1001
     PlacementInstanceId: 2
-    ActorArchetypePrefab: {fileID: 4287959101875013301, guid: 5c5e42d5ef02ba0469460d7cfdc790c3, type: 3}
+    ActorArchetypePrefab: {fileID: 7002816760119344309, guid: 8465163384813284292d13356760fe08, type: 3}
     SourceLocalOffset: {x: 6, y: -0.000000016863282, z: -3}
     LocalYawDeg: 0
   HazardActorOrchestrationRules:
