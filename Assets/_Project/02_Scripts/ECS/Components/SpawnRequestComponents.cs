@@ -245,6 +245,7 @@ namespace SweepNDodge.DotsBullets
         public float EventShotElapsedSec;
 
         public byte Priority;
+        // Last successful progress or transition into a consumable state; intentional schedule waits refresh it.
         public uint OldestFrame;
         public uint ReadyFrame;
     }

@@ -362,6 +362,7 @@ namespace SweepNDodge.DotsBullets.Editor
         public const int MotionCompletedDepthCap = 3;
 
         private readonly List<HazardActorPreviewGhost> _ghosts = new List<HazardActorPreviewGhost>(ActorGhostCap);
+        private readonly List<PendingEmissionSequence> _pendingEmissions = new List<PendingEmissionSequence>(8);
         private HazardActorPreviewSnapshot _snapshot;
         private HazardActorPreviewInput _input;
         private HazardActorPresenceStateId _presence;
@@ -381,10 +382,16 @@ namespace SweepNDodge.DotsBullets.Editor
         private HazardActorEmitLifecycleStateId _lifecycle;
         private float _lifecycleElapsed;
         private int _appliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId;
-        private int _remainingRepeats;
-        private float _repeatElapsed;
         private int _suppressedGhostCount;
         private string _warning = string.Empty;
+
+        private struct PendingEmissionSequence
+        {
+            public HazardActorPreviewPatternSlot Slot;
+            public int RemainingRepeats;
+            public int RepeatSequence;
+            public float ElapsedSec;
+        }
 
         public HazardActorPreviewSession()
         {
@@ -440,6 +447,7 @@ namespace SweepNDodge.DotsBullets.Editor
             Playing = false;
             TimeSec = 0f;
             _ghosts.Clear();
+            _pendingEmissions.Clear();
             _suppressedGhostCount = 0;
             _warning = string.Empty;
             _presence = ResolveInitialPresence();
@@ -459,8 +467,6 @@ namespace SweepNDodge.DotsBullets.Editor
             _lifecycle = HazardActorEmitLifecycleStateId.Dormant;
             _lifecycleElapsed = 0f;
             _appliedPatternSlotId = HazardActorPatternRuntimeUtility.InvalidPatternSlotId;
-            _remainingRepeats = 0;
-            _repeatElapsed = 0f;
             Frame.PhaseChangedThisFrame = false;
             PublishFrame();
         }
@@ -502,6 +508,7 @@ namespace SweepNDodge.DotsBullets.Editor
             StepPresence();
             StepPhase();
             StepSelector();
+            StepPendingEmissions();
             StepEmit();
             StepGhosts();
             PublishFrame();
@@ -548,6 +555,7 @@ namespace SweepNDodge.DotsBullets.Editor
             IsDisposed = true;
             Playing = false;
             _ghosts.Clear();
+            _pendingEmissions.Clear();
             ReleaseAllCallbackOwners();
         }
 
@@ -711,8 +719,6 @@ namespace SweepNDodge.DotsBullets.Editor
 
             if (_lifecycle != HazardActorEmitLifecycleStateId.Dormant)
                 _lifecycleElapsed += FixedDeltaTime;
-            if (_lifecycle == HazardActorEmitLifecycleStateId.Emit)
-                _repeatElapsed += FixedDeltaTime;
 
             bool emittedThisStep = false;
             for (int guard = 0; guard < 4; guard++)
@@ -730,13 +736,7 @@ namespace SweepNDodge.DotsBullets.Editor
                             return;
                         BeginEmit(slot);
                         emittedThisStep = true;
-                        if (_lifecycle == HazardActorEmitLifecycleStateId.Cooldown)
-                            return;
-                        break;
-                    case HazardActorEmitLifecycleStateId.Emit:
-                        if (!TryEmitTimedRepeat(slot, ref emittedThisStep))
-                            return;
-                        break;
+                        return;
                     case HazardActorEmitLifecycleStateId.Cooldown:
                         if (_lifecycleElapsed < Mathf.Max(0f, slot.Execution.CooldownSec))
                             return;
@@ -753,57 +753,56 @@ namespace SweepNDodge.DotsBullets.Editor
 
         private void BeginEmit(HazardActorPreviewPatternSlot slot)
         {
-            _remainingRepeats = Mathf.Max(1, slot.Execution.EventRepeatCount);
-            _repeatElapsed = 0f;
+            int repeats = Mathf.Max(1, slot.Execution.EventRepeatCount);
             if (slot.Execution.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
             {
-                EmitSlot(slot, 0);
-                _remainingRepeats--;
-                if (_remainingRepeats > 0)
+                EmitSlot(slot, 0, 0);
+                if (repeats > 1)
                 {
-                    _lifecycle = HazardActorEmitLifecycleStateId.Emit;
-                    _lifecycleElapsed = 0f;
-                    return;
+                    _pendingEmissions.Add(new PendingEmissionSequence
+                    {
+                        Slot = slot,
+                        RemainingRepeats = repeats - 1,
+                        RepeatSequence = 1,
+                        ElapsedSec = 0f,
+                    });
                 }
             }
             else
             {
-                while (_remainingRepeats > 0)
-                {
-                    EmitSlot(slot, 0);
-                    _remainingRepeats--;
-                }
+                for (int repeatSequence = 0; repeatSequence < repeats; repeatSequence++)
+                    EmitSlot(slot, 0, repeatSequence);
             }
 
             BeginCooldown(slot);
         }
 
-        private bool TryEmitTimedRepeat(HazardActorPreviewPatternSlot slot, ref bool emittedThisStep)
+        private void StepPendingEmissions()
         {
-            float interval = Mathf.Max(0.001f, slot.Execution.EventShotIntervalSec);
-            while (_remainingRepeats > 0 && _repeatElapsed >= interval)
+            for (int i = _pendingEmissions.Count - 1; i >= 0; i--)
             {
-                _repeatElapsed = Mathf.Max(0f, _repeatElapsed - interval);
-                EmitSlot(slot, 0);
-                _remainingRepeats--;
-                emittedThisStep = true;
-                if (_remainingRepeats > 0)
-                    return true;
+                var pending = _pendingEmissions[i];
+                pending.ElapsedSec += FixedDeltaTime;
+                float interval = Mathf.Max(0.001f, pending.Slot.Execution.EventShotIntervalSec);
+                while (pending.RemainingRepeats > 0 && pending.ElapsedSec >= interval)
+                {
+                    pending.ElapsedSec = Mathf.Max(0f, pending.ElapsedSec - interval);
+                    EmitSlot(pending.Slot, 0, pending.RepeatSequence);
+                    pending.RemainingRepeats--;
+                    pending.RepeatSequence++;
+                }
+
+                if (pending.RemainingRepeats <= 0)
+                    _pendingEmissions.RemoveAt(i);
+                else
+                    _pendingEmissions[i] = pending;
             }
-
-            if (_remainingRepeats > 0)
-                return false;
-
-            BeginCooldown(slot);
-            return true;
         }
 
         private void BeginCooldown(HazardActorPreviewPatternSlot slot)
         {
             _lifecycle = HazardActorEmitLifecycleStateId.Cooldown;
             _lifecycleElapsed = 0f;
-            _remainingRepeats = 0;
-            _repeatElapsed = 0f;
             if (slot.Execution.CooldownSec <= 0f)
                 CompleteCycle();
         }
@@ -855,12 +854,12 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private void EmitSlot(HazardActorPreviewPatternSlot slot, int depth)
+        private void EmitSlot(HazardActorPreviewPatternSlot slot, int depth, int repeatSequence)
         {
             Vector3 actorOrigin = _input.ActorWorldPosition;
             Quaternion yaw = Quaternion.Euler(0f, _input.ActorYawDeg, 0f);
             Vector3 slotOrigin = actorOrigin + yaw * ToVector3(slot.Execution.LocalOffset);
-            EmitExecution(slot, slot.Execution, slot.EmissionCore, slotOrigin, yaw, depth);
+            EmitExecution(slot, slot.Execution, slot.EmissionCore, slotOrigin, yaw, depth, repeatSequence);
         }
 
         private void EmitProfileAt(EmissionProfileSO profile, Vector3 origin, Vector3 inheritedVelocity, int depth)
@@ -900,7 +899,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 ShotCount = core.ShotCount,
                 NWayAngleSpacingDeg = core.NWayAngleSpacingDeg,
             };
-            EmitExecution(null, execution, core, origin, Quaternion.identity, depth);
+            EmitExecution(null, execution, core, origin, Quaternion.identity, depth, 0);
         }
 
         private void EmitExecution(
@@ -909,14 +908,15 @@ namespace SweepNDodge.DotsBullets.Editor
             ResolvedEmissionCore core,
             Vector3 origin,
             Quaternion yaw,
-            int depth)
+            int depth,
+            int repeatSequence)
         {
             int positionCount = ResolvePositionCount(execution);
             int shotCount = ResolveShotCount(execution);
             for (int positionIndex = 0; positionIndex < positionCount; positionIndex++)
             {
                 Vector3 spawn = origin + yaw * ToWorldOffset(ResolvePosition(execution, positionIndex));
-                float baseAngle = ResolveAimDeg(execution, spawn, positionIndex);
+                float baseAngle = ResolveAimDeg(execution, spawn, repeatSequence);
                 for (int shotIndex = 0; shotIndex < shotCount; shotIndex++)
                 {
                     float angle = baseAngle + ResolveShotOffsetDeg(execution, shotIndex, shotCount);
@@ -1026,14 +1026,14 @@ namespace SweepNDodge.DotsBullets.Editor
             }
         }
 
-        private float ResolveAimDeg(HazardActorPatternExecutionSlotBuffer execution, Vector3 spawn, int order)
+        private float ResolveAimDeg(HazardActorPatternExecutionSlotBuffer execution, Vector3 spawn, int repeatSequence)
         {
             switch (execution.AimMode)
             {
                 case WaveAimModeId.Fixed:
                     return execution.BaseAngleDeg;
                 case WaveAimModeId.Spiral:
-                    return execution.BaseAngleDeg + (execution.SpiralStepDeg * order);
+                    return execution.BaseAngleDeg + (execution.SpiralStepDeg * repeatSequence);
                 case WaveAimModeId.PlayerPosition:
                     Vector3 toTarget = _input.TargetWorldPosition - spawn;
                     toTarget.y = 0f;

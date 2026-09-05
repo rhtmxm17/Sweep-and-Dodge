@@ -209,6 +209,124 @@ namespace SweepNDodge.DotsBullets.Tests
         }
 
         [Test]
+        public void PreviewSimulator_StartsCooldownWhenTimedSequenceIsRegistered()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Bullet.Lifetime = 20f;
+                setup.Actor.PatternSlots[0].Emission.EventRepeatCount = 3;
+                setup.Actor.PatternSlots[0].Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+                setup.Actor.PatternSlots[0].Emission.EventShotIntervalSec = 0.2f;
+                setup.Actor.PatternSlots[0].Emission.CooldownSec = 1f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Pattern,
+                    ForcedPatternSlotId = 1,
+                    SpawnAtStart = true,
+                });
+
+                session.Step();
+                session.Step();
+
+                Assert.That(session.Frame.Lifecycle, Is.EqualTo(HazardActorEmitLifecycleStateId.Cooldown));
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(1));
+
+                session.EvaluateAt(0.35f);
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_TimedSequenceCanOverlapNextActorCycle()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Bullet.Lifetime = 20f;
+                setup.Actor.PatternSlots[0].Emission.EventRepeatCount = 3;
+                setup.Actor.PatternSlots[0].Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+                setup.Actor.PatternSlots[0].Emission.EventShotIntervalSec = 0.5f;
+                setup.Actor.PatternSlots[0].Emission.CooldownSec = 0.1f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Pattern,
+                    ForcedPatternSlotId = 1,
+                    SpawnAtStart = true,
+                });
+
+                session.EvaluateAt(0.30f);
+
+                Assert.That(session.Frame.ActiveGhostCount, Is.GreaterThanOrEqualTo(2));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_RestartClearsPendingTimedSequences()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Bullet.Lifetime = 20f;
+                setup.Actor.PatternSlots[0].Emission.EventRepeatCount = 3;
+                setup.Actor.PatternSlots[0].Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+                setup.Actor.PatternSlots[0].Emission.EventShotIntervalSec = 0.1f;
+                setup.Actor.PatternSlots[0].Emission.CooldownSec = 10f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Pattern,
+                    ForcedPatternSlotId = 1,
+                    SpawnAtStart = true,
+                });
+
+                session.Step();
+                session.Step();
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(1));
+
+                session.Restart();
+                session.EvaluateAt(0.35f);
+
+                Assert.That(session.Frame.ActiveGhostCount, Is.EqualTo(3));
+            }
+        }
+
+        [Test]
+        public void PreviewSimulator_SpiralAimUsesTimedRepeatSequence()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Bullet.Lifetime = 20f;
+                setup.ProfileA.Aim = new SpiralAimAuthoring
+                {
+                    BaseAngleDeg = 0f,
+                    SpiralStepDeg = 30f,
+                };
+                setup.Actor.PatternSlots[0].Emission.EventRepeatCount = 3;
+                setup.Actor.PatternSlots[0].Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+                setup.Actor.PatternSlots[0].Emission.EventShotIntervalSec = 0.1f;
+                setup.Actor.PatternSlots[0].Emission.CooldownSec = 10f;
+                HazardActorPreviewSnapshotBuilder.TryBuild(setup.Root, out var snapshot);
+                var session = new HazardActorPreviewSession();
+                session.Load(snapshot, new HazardActorPreviewInput
+                {
+                    Scope = HazardActorPreviewScope.Pattern,
+                    ForcedPatternSlotId = 1,
+                    SpawnAtStart = true,
+                });
+
+                session.EvaluateAt(0.35f);
+
+                Assert.That(session.Ghosts, Has.Count.EqualTo(3));
+                Assert.That(Vector3.Angle(session.Ghosts[0].Velocity, Vector3.forward), Is.EqualTo(0f).Within(0.01f));
+                Assert.That(Vector3.Angle(session.Ghosts[1].Velocity, Vector3.forward), Is.EqualTo(30f).Within(0.01f));
+                Assert.That(Vector3.Angle(session.Ghosts[2].Velocity, Vector3.forward), Is.EqualTo(60f).Within(0.01f));
+            }
+        }
+
+        [Test]
         public void PreviewSimulator_LineEvenSpawnCountIsIndependentFromTrajectorySampleBudget()
         {
             using (var setup = CreateActorSetup())
@@ -1002,8 +1120,27 @@ namespace SweepNDodge.DotsBullets.Tests
                 Assert.That(pattern.TelegraphLabel, Is.EqualTo("0s"));
                 Assert.That(pattern.EmissionLabel, Is.EqualTo(setup.ProfileA.name));
                 Assert.That(pattern.ScheduleLabel, Does.Contain("repeat x1"));
+                Assert.That(pattern.ScheduleLabel, Does.Contain("emit span 0s"));
                 Assert.That(pattern.MovementLabel, Is.Not.Empty);
                 Assert.That(pattern.IssueLabel, Is.EqualTo("1 error"));
+            }
+        }
+
+        [Test]
+        public void WorkbenchVisibility_SummarizesComputedTimedEmitSpan()
+        {
+            using (var setup = CreateActorSetup())
+            {
+                setup.Actor.PatternSlots[0].Emission.EventRepeatCount = 4;
+                setup.Actor.PatternSlots[0].Emission.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+                setup.Actor.PatternSlots[0].Emission.EventShotIntervalSec = 0.3f;
+
+                var pattern = HazardActorWorkbenchWindow.BuildPatternRowSummary(
+                    setup.Actor.PatternSlots[0],
+                    Array.Empty<HazardActorWorkbenchIssue>());
+
+                Assert.That(pattern.ScheduleLabel, Does.Contain("timed 0.3s"));
+                Assert.That(pattern.ScheduleLabel, Does.Contain("emit span 0.9s"));
             }
         }
 

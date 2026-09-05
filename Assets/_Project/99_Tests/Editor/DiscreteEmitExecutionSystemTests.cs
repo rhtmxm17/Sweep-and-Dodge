@@ -229,6 +229,10 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(requests.Length, Is.EqualTo(1));
             Assert.That(requests[0].RemainingRepeats, Is.EqualTo(1));
             Assert.That(requests[0].RepeatSequence, Is.EqualTo(1u));
+            var waitingMetrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(waitingMetrics.PendingCount, Is.EqualTo(1));
+            Assert.That(waitingMetrics.DeferredByBudget, Is.EqualTo(0));
+            Assert.That(waitingMetrics.DeferredByPool, Is.EqualTo(0));
 
             CreateFrameCounter(em, 12u);
             system.Update(world.Unmanaged);
@@ -241,6 +245,205 @@ namespace SweepNDodge.DotsBullets.Tests
             system.Update(world.Unmanaged);
             em.CompleteAllTrackedJobs();
             Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_TimedSchedule_LongPatternKeepsProgressingBeyondAgeLimit()
+        {
+            using var world = new World("DiscreteEmit_LongTimedPattern");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            const uint startFrame = 500u;
+            CreateFrameCounter(em, startFrame);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 256, 64, 120u);
+            var source = CreateSourceWithActiveCountBuffer(em, 22);
+            for (int i = 0; i < 12; i++)
+                BulletFieldShared.FreeByKey.Add(22, CreatePooledBullet(em, 22, 4f, 10f));
+
+            var request = CreateSingleRequest(
+                DiscreteEmitProducerKind.HazardActor,
+                source,
+                emissionId: 20,
+                bulletTypeKey: 22,
+                priority: 10,
+                frame: startFrame);
+            request.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+            request.EventShotIntervalSec = 0.45f;
+            request.RemainingRepeats = 12;
+            em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Add(request);
+
+            var system = world.GetOrCreateSystem<DiscreteEmitExecutionSystem>();
+            for (uint frame = startFrame; frame < startFrame + 360u; frame++)
+            {
+                CreateFrameCounter(em, frame);
+                system.Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+            }
+
+            Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(source)[0].ActiveCount, Is.EqualTo(12));
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(metrics.ExpiredByAge, Is.EqualTo(0));
+            Assert.That(metrics.ExpiredByAgeHazardActor, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_TimedIntervalLongerThanAgeLimit_IsIntentionalWait()
+        {
+            using var world = new World("DiscreteEmit_LongTimedInterval");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            const uint startFrame = 100u;
+            CreateFrameCounter(em, startFrame);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 4, 16, 60u);
+            var source = CreateSourceWithActiveCountBuffer(em, 23);
+            BulletFieldShared.FreeByKey.Add(23, CreatePooledBullet(em, 23, 4f, 10f));
+            BulletFieldShared.FreeByKey.Add(23, CreatePooledBullet(em, 23, 4f, 10f));
+
+            var request = CreateSingleRequest(
+                DiscreteEmitProducerKind.WaveClipEvent,
+                source,
+                emissionId: 21,
+                bulletTypeKey: 23,
+                priority: 1,
+                frame: startFrame);
+            request.EventShotSchedule = SourceSpawnEventShotScheduleId.Timed;
+            request.EventShotIntervalSec = 2f;
+            request.RemainingRepeats = 2;
+            em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Add(request);
+
+            var system = world.GetOrCreateSystem<DiscreteEmitExecutionSystem>();
+            for (uint frame = startFrame; frame < startFrame + 150u; frame++)
+            {
+                CreateFrameCounter(em, frame);
+                system.Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+            }
+
+            Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(source)[0].ActiveCount, Is.EqualTo(2));
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
+            Assert.That(em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel).ExpiredByAge, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_ReadyFrameWait_DoesNotExpireOrReportDeferred()
+        {
+            using var world = new World("DiscreteEmit_LongReadyFrame");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 10u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 4, 16, 5u);
+            var source = CreateSourceWithActiveCountBuffer(em, 24);
+            BulletFieldShared.FreeByKey.Add(24, CreatePooledBullet(em, 24, 4f, 10f));
+            var request = CreateSingleRequest(
+                DiscreteEmitProducerKind.TriggeredEmission,
+                source,
+                emissionId: 22,
+                bulletTypeKey: 24,
+                priority: 1,
+                frame: 10u);
+            request.ReadyFrame = 100u;
+            em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Add(request);
+
+            var system = world.GetOrCreateSystem<DiscreteEmitExecutionSystem>();
+            CreateFrameCounter(em, 50u);
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(metrics.PendingCount, Is.EqualTo(1));
+            Assert.That(metrics.DeferredByBudget, Is.EqualTo(0));
+            Assert.That(metrics.DeferredByPool, Is.EqualTo(0));
+            Assert.That(metrics.ExpiredByAge, Is.EqualTo(0));
+
+            CreateFrameCounter(em, 100u);
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(source)[0].ActiveCount, Is.EqualTo(1));
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void DiscreteEmitExecution_ReadyRequestStalledBeyondAgeLimit_Expires(bool blockByBudget)
+        {
+            using var world = new World(blockByBudget ? "DiscreteEmit_BudgetAge" : "DiscreteEmit_PoolAge");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            CreateFrameCounter(em, 20u);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, blockByBudget ? 0 : 4, 16, 1u);
+            var source = CreateSourceWithActiveCountBuffer(em, 25);
+            if (blockByBudget)
+                BulletFieldShared.FreeByKey.Add(25, CreatePooledBullet(em, 25, 4f, 10f));
+            em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Add(CreateSingleRequest(
+                DiscreteEmitProducerKind.HazardActor,
+                source,
+                emissionId: 23,
+                bulletTypeKey: 25,
+                priority: 1,
+                frame: 20u));
+
+            var system = world.GetOrCreateSystem<DiscreteEmitExecutionSystem>();
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+            var metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(blockByBudget ? metrics.DeferredByBudget : metrics.DeferredByPool, Is.EqualTo(1));
+
+            CreateFrameCounter(em, 22u);
+            system.Update(world.Unmanaged);
+            em.CompleteAllTrackedJobs();
+
+            metrics = em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel);
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
+            Assert.That(metrics.LastFrameExpiredByAge, Is.EqualTo(1));
+            Assert.That(metrics.LastFrameExpiredByAgeHazardActor, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DiscreteEmitExecution_InstantPartialProgress_RefreshesAgeUntilCompletion()
+        {
+            using var world = new World("DiscreteEmit_InstantProgressAge");
+            var em = world.EntityManager;
+
+            InitializeSharedContainers();
+            const uint startFrame = 200u;
+            CreateFrameCounter(em, startFrame);
+            CreateFixedTickRuntime(em, 1f / 60f);
+            var channel = CreateDiscreteChannel(em, 1, 16, 1u);
+            var source = CreateSourceWithActiveCountBuffer(em, 26);
+            for (int i = 0; i < 3; i++)
+                BulletFieldShared.FreeByKey.Add(26, CreatePooledBullet(em, 26, 4f, 10f));
+
+            var request = CreateSingleRequest(
+                DiscreteEmitProducerKind.WaveClipEvent,
+                source,
+                emissionId: 24,
+                bulletTypeKey: 26,
+                priority: 1,
+                frame: startFrame);
+            request.RemainingRepeats = 3;
+            em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Add(request);
+
+            var system = world.GetOrCreateSystem<DiscreteEmitExecutionSystem>();
+            for (uint frame = startFrame; frame < startFrame + 3u; frame++)
+            {
+                CreateFrameCounter(em, frame);
+                system.Update(world.Unmanaged);
+                em.CompleteAllTrackedJobs();
+            }
+
+            Assert.That(em.GetBuffer<SourceActiveBulletCountBuffer>(source)[0].ActiveCount, Is.EqualTo(3));
+            Assert.That(em.GetBuffer<DiscreteEmitRequestBuffer>(channel).Length, Is.EqualTo(0));
+            Assert.That(em.GetComponentData<DiscreteEmitBacklogMetricsComponent>(channel).ExpiredByAge, Is.EqualTo(0));
         }
 
         [Test]

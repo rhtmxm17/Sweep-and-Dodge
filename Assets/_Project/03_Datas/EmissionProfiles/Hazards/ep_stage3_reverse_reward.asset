@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0354f73ac2220374faa8fce7c055686a, type: 3}
+  m_Name: ep_stage3_reverse_reward
+  m_EditorClassIdentifier: SweepNDodge.Runtime::SweepNDodge.DotsBullets.EmissionProfileSO
+  Bullet: {fileID: 11400000, guid: 4f9a89a374274cd3a248b20b6cf62577, type: 2}
+  SpawnTuning:
+    OverrideSpeed: 1
+    SpeedOverride: 1.1
+    OverrideLifetime: 1
+    LifetimeOverride: 6
+  MovementTuning:
+    OverrideMovement: 1
+    Family: 0
+    DampedLinear:
+      DampingPerSec: 1
+      StopSpeedThreshold: 0.1
+    HomingLite:
+      TurnRateDegPerSec: 90
+      MaxAcquireDistance: 10
+      MinRetargetDistance: 0.25
+  PositionPattern:
+    rid: 4992342561063960665
+  Aim:
+    rid: 4992342561063960666
+  ShotPattern:
+    rid: 4992342561063960667
+  LifecycleTriggers:
+    MotionCompleted:
+      Enabled: 0
+      TargetProfile: {fileID: 0}
+      OriginPosition: 0
+      ForwardDirection: 0
+      SourceEntity: 0
+      CauserEntity: 0
+      DelaySec: 0
+    CleanupRemoved:
+      Enabled: 1
+      TargetProfile: {fileID: 11400000, guid: 7e243ad45a797c9428033154cf73f5d0, type: 2}
+      OriginPosition: 0
+      ForwardDirection: 0
+      SourceEntity: 0
+      CauserEntity: 0
+      DelaySec: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 4992342561063960665
+      type: {class: SinglePointPositionPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 
+    - rid: 4992342561063960666
+      type: {class: PlayerPositionAimAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data:
+        AngleOffsetDeg: 180
+        SnapshotTiming: 1
+    - rid: 4992342561063960667
+      type: {class: SingleShotPatternAuthoring, ns: SweepNDodge.DotsBullets, asm: SweepNDodge.Runtime}
+      data: 

@@ -4,7 +4,7 @@
 - doc_id: `TD-031`
 - type: `TechnicalDesign`
 - status: `active`
-- last_updated: `2026-04-17`
+- last_updated: `2026-09-05`
 - related_docs:
   - [../ADR/ADR-20260409-01-hazard-actor-behavior-runtime-phase-and-presence.md](../ADR/ADR-20260409-01-hazard-actor-behavior-runtime-phase-and-presence.md)
   - [../ADR/ADR-20260417-01-hazard-actor-direct-emit-ownership.md](../ADR/ADR-20260417-01-hazard-actor-direct-emit-ownership.md)
@@ -69,6 +69,8 @@
   - `HazardActorPatternExecutionSlotBuffer`
 - emit system은 selected `PatternSlotId`의 execution snapshot을 읽어 아래 상태기계를 진행한다.
   - `Dormant -> Telegraph -> Emit -> Cooldown`
+- `Emit`은 repeat를 actor가 직접 소비하는 장기 상태가 아니라 `DiscreteEmitRequest`를 append하는 단일 경계다.
+- request append 직후 actor lifecycle은 `Cooldown`으로 이동하며, request의 남은 repeat는 `DiscreteEmitExecutionSystem`이 독립적으로 소비한다.
 
 ## 3. Slot / Execution Contract
 - pattern data owner는 actor다.
@@ -98,6 +100,8 @@
 - actor가 `Hidden/Activating/Retiring`이면 emit runtime은 즉시 dormant/reset 처리된다.
 - actor가 `Preparing`이면 emit runtime은 공격을 진행하지 않는다.
 - selected slot이 바뀌면 emit lifecycle은 `Dormant + timer 0`으로 hard reset된다.
+- 이미 append된 discrete request는 actor의 Cooldown, 이후 pattern 선택과 독립적으로 예약 발사를 계속한다.
+- `CooldownSec`이 `Timed` repeat 전체 소요 시간보다 짧으면 서로 다른 actor cycle에서 생성된 request가 중첩될 수 있다.
 - `OrderedCycle`의 advance edge는 actor-local `CompletedVersion`이다.
 - cycle completion signal은 natural cycle completion에서만 증가한다.
 

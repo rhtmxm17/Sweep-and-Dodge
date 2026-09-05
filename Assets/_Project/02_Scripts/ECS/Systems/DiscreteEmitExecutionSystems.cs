@@ -220,6 +220,7 @@ namespace SweepNDodge.DotsBullets
 
                 request.RemainingRepeats = math.max(0, request.RemainingRepeats - 1);
                 request.RepeatSequence += 1u;
+                request.OldestFrame = frame;
                 if (request.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
                 {
                     float interval = math.max(0.001f, request.EventShotIntervalSec);
@@ -250,40 +251,13 @@ namespace SweepNDodge.DotsBullets
             metrics.LastFrameBudgetUsedHazardActor = budgetUsedByProducer.HazardActor;
             metrics.LastFrameBudgetUsedTriggeredEmission = budgetUsedByProducer.TriggeredEmission;
             if (pending > 0)
-            {
-                bool budgetBlocked = HasBudgetBlockedPendingRequest(
+                AccumulateReadyDeferredMetrics(
                     requests,
                     ref BulletFieldShared.FreeByKey,
                     remainingBudget,
                     in remainingBudgetByProducer,
-                    frame);
-                if (budgetBlocked)
-                {
-                    metrics.DeferredByBudget = pending;
-                    AssignDeferredByProducer(
-                        requests,
-                        ref BulletFieldShared.FreeByKey,
-                        in pendingByProducer,
-                        remainingBudget,
-                        in remainingBudgetByProducer,
-                        frame,
-                        true,
-                        ref metrics);
-                }
-                else
-                {
-                    metrics.DeferredByPool = pending;
-                    AssignDeferredByProducer(
-                        requests,
-                        ref BulletFieldShared.FreeByKey,
-                        in pendingByProducer,
-                        remainingBudget,
-                        in remainingBudgetByProducer,
-                        frame,
-                        false,
-                        ref metrics);
-                }
-            }
+                    frame,
+                    ref metrics);
 
             SystemAPI.SetComponent(channelEntity, metrics);
             BulletFieldShared.PoolFence = state.Dependency;
@@ -329,7 +303,24 @@ namespace SweepNDodge.DotsBullets
                     continue;
                 }
 
-                if (maxAgeFrames > 0 && frame - item.OldestFrame > maxAgeFrames)
+                bool waitingForReadyFrame = item.ReadyFrame > frame;
+                bool readyBeforeAdvance = !waitingForReadyFrame && IsReadyForConsume(in item, frame);
+
+                if (item.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
+                    item.EventShotElapsedSec = math.max(0f, item.EventShotElapsedSec + deltaTime);
+
+                bool ready = !waitingForReadyFrame && IsReadyForConsume(in item, frame);
+                if (!ready || !readyBeforeAdvance)
+                {
+                    // Intentional ReadyFrame / timed-interval waits are not backlog stalls.
+                    item.OldestFrame = frame;
+                }
+                else if (item.ReadyFrame > item.OldestFrame)
+                {
+                    item.OldestFrame = item.ReadyFrame;
+                }
+
+                if (ready && maxAgeFrames > 0 && frame - item.OldestFrame > maxAgeFrames)
                 {
                     int expired = DiscreteEmitRequestUtility.ResolvePendingBulletEquivalent(in item);
                     expiredByAge = SpawnRequestCommonUtility.SafeAdd(
@@ -339,9 +330,6 @@ namespace SweepNDodge.DotsBullets
                     requests.RemoveAtSwapBack(i);
                     continue;
                 }
-
-                if (item.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed)
-                    item.EventShotElapsedSec = math.max(0f, item.EventShotElapsedSec + deltaTime);
 
                 int pendingEquivalent = DiscreteEmitRequestUtility.ResolvePendingBulletEquivalent(in item);
                 pending = SpawnRequestCommonUtility.SafeAdd(pending, pendingEquivalent);
@@ -506,12 +494,13 @@ namespace SweepNDodge.DotsBullets
             return bestIndex;
         }
 
-        private static bool HasBudgetBlockedPendingRequest(
+        private static void AccumulateReadyDeferredMetrics(
             DynamicBuffer<DiscreteEmitRequestBuffer> requests,
             ref NativeParallelMultiHashMap<int, Entity> freeByKey,
             int remainingBudget,
             in ProducerCounter remainingBudgetByProducer,
-            uint frame)
+            uint frame,
+            ref DiscreteEmitBacklogMetricsComponent metrics)
         {
             for (int i = 0; i < requests.Length; i++)
             {
@@ -522,140 +511,60 @@ namespace SweepNDodge.DotsBullets
                     continue;
 
                 int shotsPerRepeat = ResolveShotsPerRepeat(in item);
-                if (SpawnRequestCommonUtility.CountFreeByKey(ref freeByKey, item.BulletTypeKey) < shotsPerRepeat)
-                    continue;
-                if (remainingBudget < shotsPerRepeat || remainingBudgetByProducer.Get(item.ProducerKind) < shotsPerRepeat)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static void AssignDeferredByProducer(
-            DynamicBuffer<DiscreteEmitRequestBuffer> requests,
-            ref NativeParallelMultiHashMap<int, Entity> freeByKey,
-            in ProducerCounter pendingByProducer,
-            int remainingBudget,
-            in ProducerCounter remainingBudgetByProducer,
-            uint frame,
-            bool budgetBlocked,
-            ref DiscreteEmitBacklogMetricsComponent metrics)
-        {
-            AssignDeferredForProducer(
-                requests,
-                ref freeByKey,
-                in pendingByProducer,
-                DiscreteEmitProducerKind.WaveClipEvent,
-                remainingBudget,
-                in remainingBudgetByProducer,
-                frame,
-                budgetBlocked,
-                ref metrics);
-            AssignDeferredForProducer(
-                requests,
-                ref freeByKey,
-                in pendingByProducer,
-                DiscreteEmitProducerKind.HazardActor,
-                remainingBudget,
-                in remainingBudgetByProducer,
-                frame,
-                budgetBlocked,
-                ref metrics);
-            AssignDeferredForProducer(
-                requests,
-                ref freeByKey,
-                in pendingByProducer,
-                DiscreteEmitProducerKind.TriggeredEmission,
-                remainingBudget,
-                in remainingBudgetByProducer,
-                frame,
-                budgetBlocked,
-                ref metrics);
-        }
-
-        private static void AssignDeferredForProducer(
-            DynamicBuffer<DiscreteEmitRequestBuffer> requests,
-            ref NativeParallelMultiHashMap<int, Entity> freeByKey,
-            in ProducerCounter pendingByProducer,
-            DiscreteEmitProducerKind producerKind,
-            int remainingBudget,
-            in ProducerCounter remainingBudgetByProducer,
-            uint frame,
-            bool budgetBlocked,
-            ref DiscreteEmitBacklogMetricsComponent metrics)
-        {
-            int pending = pendingByProducer.Get(producerKind);
-            if (pending <= 0)
-                return;
-
-            bool producerBudgetBlocked = budgetBlocked
-                && HasBudgetBlockedPendingRequestForProducer(
-                    requests,
-                    ref freeByKey,
-                    producerKind,
-                    remainingBudget,
-                    in remainingBudgetByProducer,
-                    frame);
-
-            if (producerBudgetBlocked)
-            {
-                switch (producerKind)
+                int pendingEquivalent = DiscreteEmitRequestUtility.ResolvePendingBulletEquivalent(in item);
+                bool poolBlocked = SpawnRequestCommonUtility.CountFreeByKey(ref freeByKey, item.BulletTypeKey) < shotsPerRepeat;
+                if (poolBlocked)
                 {
-                    case DiscreteEmitProducerKind.HazardActor:
-                        metrics.DeferredByBudgetHazardActor = pending;
-                        break;
-                    case DiscreteEmitProducerKind.TriggeredEmission:
-                        metrics.DeferredByBudgetTriggeredEmission = pending;
-                        break;
-                    default:
-                        metrics.DeferredByBudgetWaveClipEvent = pending;
-                        break;
+                    metrics.DeferredByPool = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByPool, pendingEquivalent);
+                    AddDeferredByProducer(ref metrics, item.ProducerKind, pendingEquivalent, false);
+                    continue;
                 }
-            }
-            else
-            {
-                switch (producerKind)
-                {
-                    case DiscreteEmitProducerKind.HazardActor:
-                        metrics.DeferredByPoolHazardActor = pending;
-                        break;
-                    case DiscreteEmitProducerKind.TriggeredEmission:
-                        metrics.DeferredByPoolTriggeredEmission = pending;
-                        break;
-                    default:
-                        metrics.DeferredByPoolWaveClipEvent = pending;
-                        break;
-                }
-            }
-        }
 
-        private static bool HasBudgetBlockedPendingRequestForProducer(
-            DynamicBuffer<DiscreteEmitRequestBuffer> requests,
-            ref NativeParallelMultiHashMap<int, Entity> freeByKey,
-            DiscreteEmitProducerKind producerKind,
-            int remainingBudget,
-            in ProducerCounter remainingBudgetByProducer,
-            uint frame)
-        {
-            for (int i = 0; i < requests.Length; i++)
-            {
-                var item = requests[i];
-                if (item.ProducerKind != producerKind)
-                    continue;
-                if (item.AnchorMode != DiscreteEmitAnchorMode.FixedWorld || item.RemainingRepeats <= 0)
-                    continue;
-                if (!IsReadyForConsume(in item, frame))
-                    continue;
-
-                int shotsPerRepeat = ResolveShotsPerRepeat(in item);
-                if (SpawnRequestCommonUtility.CountFreeByKey(ref freeByKey, item.BulletTypeKey) < shotsPerRepeat)
-                    continue;
-
-                return remainingBudget < shotsPerRepeat
+                bool budgetBlocked = remainingBudget < shotsPerRepeat
                     || remainingBudgetByProducer.Get(item.ProducerKind) < shotsPerRepeat;
+                if (budgetBlocked)
+                {
+                    metrics.DeferredByBudget = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByBudget, pendingEquivalent);
+                    AddDeferredByProducer(ref metrics, item.ProducerKind, pendingEquivalent, true);
+                }
+            }
+        }
+
+        private static void AddDeferredByProducer(
+            ref DiscreteEmitBacklogMetricsComponent metrics,
+            DiscreteEmitProducerKind producerKind,
+            int amount,
+            bool budgetBlocked)
+        {
+            if (budgetBlocked)
+            {
+                switch (producerKind)
+                {
+                    case DiscreteEmitProducerKind.HazardActor:
+                        metrics.DeferredByBudgetHazardActor = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByBudgetHazardActor, amount);
+                        break;
+                    case DiscreteEmitProducerKind.TriggeredEmission:
+                        metrics.DeferredByBudgetTriggeredEmission = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByBudgetTriggeredEmission, amount);
+                        break;
+                    default:
+                        metrics.DeferredByBudgetWaveClipEvent = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByBudgetWaveClipEvent, amount);
+                        break;
+                }
+                return;
             }
 
-            return false;
+            switch (producerKind)
+            {
+                case DiscreteEmitProducerKind.HazardActor:
+                    metrics.DeferredByPoolHazardActor = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByPoolHazardActor, amount);
+                    break;
+                case DiscreteEmitProducerKind.TriggeredEmission:
+                    metrics.DeferredByPoolTriggeredEmission = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByPoolTriggeredEmission, amount);
+                    break;
+                default:
+                    metrics.DeferredByPoolWaveClipEvent = SpawnRequestCommonUtility.SafeAdd(metrics.DeferredByPoolWaveClipEvent, amount);
+                    break;
+            }
         }
 
         private static bool IsReadyForConsume(in DiscreteEmitRequestBuffer request, uint frame)

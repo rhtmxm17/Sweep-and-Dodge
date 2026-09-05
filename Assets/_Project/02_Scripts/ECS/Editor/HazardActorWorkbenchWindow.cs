@@ -448,8 +448,11 @@ namespace SweepNDodge.DotsBullets.Editor
         {
             string telegraph = slot.TelegraphProfile != null ? $"{slot.TelegraphProfile.TelegraphDurationSec:0.##}s" : "missing";
             string repeat = $"repeat x{Mathf.Max(1, slot.Emission.EventRepeatCount)}";
+            float emitSpanSec = slot.Emission.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
+                ? (Mathf.Max(1, slot.Emission.EventRepeatCount) - 1) * Mathf.Max(0.001f, slot.Emission.EventShotIntervalSec)
+                : 0f;
             string schedule = slot.Emission.EventShotSchedule == SourceSpawnEventShotScheduleId.Timed
-                ? $"timed {Mathf.Max(0f, slot.Emission.EventShotIntervalSec):0.###}s"
+                ? $"timed {Mathf.Max(0.001f, slot.Emission.EventShotIntervalSec):0.###}s"
                 : "instant";
             string cooldown = $"{Mathf.Max(0f, slot.Emission.CooldownSec):0.##}s";
             string profile = slot.Emission.Profile != null ? slot.Emission.Profile.name : "missing profile";
@@ -465,7 +468,7 @@ namespace SweepNDodge.DotsBullets.Editor
                 $"Pattern {slot.PatternSlotId}",
                 telegraph,
                 profile,
-                $"{repeat} / {schedule} / cooldown {cooldown}",
+                $"{repeat} / {schedule} / emit span {emitSpanSec:0.###}s / cooldown {cooldown}",
                 movement,
                 FormatIssueCount(errors, warnings));
         }

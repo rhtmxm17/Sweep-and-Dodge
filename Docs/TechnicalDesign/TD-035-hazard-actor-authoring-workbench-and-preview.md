@@ -5,7 +5,7 @@
 - doc_id: `TD-035`
 - type: `TechnicalDesign`
 - status: `implemented`
-- last_updated: `2026-08-11`
+- last_updated: `2026-09-05`
 - related_docs:
   - [../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md](../ADR/ADR-20260805-01-hazard-actor-workbench-and-preview-ownership.md)
   - [TD-031-hazard-actor-behavior-runtime.md](TD-031-hazard-actor-behavior-runtime.md)
@@ -95,6 +95,7 @@
   - aim mode와 snapshot timing
   - shot pattern/count/N-way spacing
   - repeat/schedule/interval
+  - `Timed` repeat의 계산된 emit span: `(repeat - 1) * interval`
   - telegraph/cooldown
   - movement family와 local offset
 - `OrderedPriority`와 `OrderedCycle`은 서로 다른 badge와 실행 순서 표시를 사용한다.
@@ -125,7 +126,7 @@
   - `HazardActorPatternSlotAuthoringUtility`와 기존 profile resolver의 resolved 결과를 사용한다.
   - runtime buffer의 의미를 다시 해석하는 별도 preview 전용 authoring 규칙을 만들지 않는다.
 - `HazardActorPreviewSimulator`
-  - snapshot과 preview input을 받아 fixed-step으로 presence, phase, selector, emit lifecycle과 ghost motion을 진행한다.
+  - snapshot과 preview input을 받아 fixed-step으로 presence, phase, selector, emit lifecycle, pending emit sequence와 ghost motion을 진행한다.
 - `HazardActorPreviewSession`
   - Phase/Pattern/Actor/Encounter scope, transport, source progress, target, forced selection과 warning state를 소유한다.
 - `HazardActorPreviewRenderer`
@@ -165,6 +166,9 @@
 
 ### 4.4 지원 행동과 제한
 - v1은 현재 resolved schema의 position, aim, shot, schedule, repeat, speed/lifetime override를 재생한다.
+- actor가 request를 append한 시점부터 Cooldown과 pending emit sequence를 독립적으로 진행한다.
+- pending sequence는 pattern/phase lifecycle과 분리해 보존하며, Cooldown보다 emit span이 긴 경우 다음 cycle의 sequence와 중첩될 수 있다.
+- Spiral aim은 repeat sequence를 사용하여 repeat마다 `SpiralStepDeg`를 적용한다.
 - ghost movement는 `Linear`, `DampedLinear`, `HomingLite`를 지원한다.
 - `MotionCompleted` lifecycle emission은 최대 재귀 깊이 3까지 재생한다.
 - `CleanupRemoved`는 toolbar 명령으로 가장 오래된 활성 ghost 하나에 수동 발생시킨다.
@@ -199,6 +203,7 @@
 - 각 편집 표면은 고유 `HazardActorPreviewOwnerToken`과 자체 session을 소유한다. coordinator는 마지막 명시 조작 owner의 session만 진행·표시하며 전환/clear 때 caller-owned session을 dispose하지 않는다.
 - Workbench와 Stage Map Editor는 창 종료 시 자신의 session만 dispose한다. 비활성 owner의 창 종료는 현재 active preview에 영향을 주지 않는다.
 - selection/document/scope 변경, Undo/Redo, asset import는 snapshot을 invalidate하고 session을 안전하게 reset한다.
+- session reset, snapshot reload와 dispose는 남아 있는 pending emit sequence를 함께 정리한다.
 - Stage Map document mutation은 같은 editor tick의 반복 invalidate를 하나로 합쳐 최신 selection/document 기준 time 0, paused session을 다시 준비한다. background project change는 비활성 Stage Map owner가 전역 소유권을 빼앗지 않는다.
 - Scene/Window close, assembly reload, prefab stage 변경, Play Mode 진입 시 preview resource와 hidden instance를 즉시 정리한다.
 - preview renderer가 만든 object/resource에는 save되지 않는 hide flag를 적용한다.
