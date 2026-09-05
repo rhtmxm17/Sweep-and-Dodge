@@ -3356,7 +3356,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Time critical
+  m_text: "\uC2DC\uAC04\uC774 \uCD09\uBC15\uD569\uB2C8\uB2E4"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 855b237b75ac42f439477efce2e85c91, type: 2}
   m_sharedMaterial: {fileID: 2744976189401479737, guid: 855b237b75ac42f439477efce2e85c91, type: 2}
@@ -3949,7 +3949,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Carry is full. Head to Deposit.
+  m_text: "\uBA3C\uC9C0\uD1B5\uC774 \uAC00\uB4DD \uCC3C\uC2B5\uB2C8\uB2E4. \uC4F0\uB808\uAE30\uD1B5\uC73C\uB85C
+    \uB3CC\uC544\uAC00\uC138\uC694."
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 855b237b75ac42f439477efce2e85c91, type: 2}
   m_sharedMaterial: {fileID: 2744976189401479737, guid: 855b237b75ac42f439477efce2e85c91, type: 2}

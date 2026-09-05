@@ -4265,9 +4265,9 @@ namespace SweepNDodge.DotsBullets.Tests
                 && uiRoot.NotificationPanel.activeInHierarchy
                 && uiRoot.NotificationPresenter != null
                 && uiRoot.NotificationPresenter.NotificationText != null
-                && uiRoot.NotificationPresenter.NotificationText.text == "Carry full - deposit now")
+                && uiRoot.NotificationPresenter.NotificationText.text == "먼지통이 가득 찼습니다")
             {
-                details = "NotificationPresenter still shows Carry full - deposit now.";
+                details = "NotificationPresenter still shows the carry-full notification.";
                 return false;
             }
 

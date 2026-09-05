@@ -18,3 +18,7 @@ MonoBehaviour:
     DisplayName: "\uC8FC\uC778\uACF5"
     Portrait: {fileID: 0}
     PortraitSide: 1
+  - SpeakerKey: guide
+    DisplayName: "\uAC00\uC774\uB4DC"
+    Portrait: {fileID: 0}
+    PortraitSide: 1

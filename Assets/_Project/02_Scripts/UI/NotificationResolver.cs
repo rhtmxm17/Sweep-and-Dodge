@@ -310,18 +310,18 @@ namespace SweepNDodge.DotsBullets
         {
             return id switch
             {
-                NotificationId.HitCarryLost => "Hit! Carry lost",
-                NotificationId.TimeLow => "Time is running out",
-                NotificationId.TimeCritical => "Time critical",
-                NotificationId.CarryFull => "Carry full - deposit now",
-                NotificationId.SourceWeakened => "Source weakened",
-                NotificationId.SourceCleared => "Source cleared",
-                NotificationId.HazardCaptured => "Hazard captured",
-                NotificationId.HazardRemoved => "Hazard removed",
-                NotificationId.VacuumLocked => "Vacuum locked",
-                NotificationId.VacuumCooldown => "Vacuum cooling down",
-                NotificationId.StageClear => "Stage clear",
-                NotificationId.TimeUp => "Time up",
+                NotificationId.HitCarryLost => "피격! 모은 먼지를 잃었습니다",
+                NotificationId.TimeLow => "남은 시간이 얼마 없습니다",
+                NotificationId.TimeCritical => "시간이 촉박합니다",
+                NotificationId.CarryFull => "먼지통이 가득 찼습니다",
+                NotificationId.SourceWeakened => "먼지 발생량 감소",
+                NotificationId.SourceCleared => "구역 청소 완료",
+                NotificationId.HazardCaptured => "위험탄 수거",
+                NotificationId.HazardRemoved => "위험탄 제거",
+                NotificationId.VacuumLocked => "지금은 흡입할 수 없습니다",
+                NotificationId.VacuumCooldown => "흡입기 재사용 대기 중",
+                NotificationId.StageClear => "스테이지 클리어",
+                NotificationId.TimeUp => "시간 종료",
                 _ => string.Empty,
             };
         }

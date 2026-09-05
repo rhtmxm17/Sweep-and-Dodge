@@ -218,13 +218,13 @@ namespace SweepNDodge.DotsBullets
         {
             return id switch
             {
-                HintId.StageStartMoveAndCollect => "Collect trash from active sources.",
-                HintId.CarryFullGoToDeposit => "Carry is full. Head to Deposit.",
-                HintId.CollectFromSources => "Collect trash from active sources.",
-                HintId.DepositRemainingTrash => "Return remaining trash to Deposit.",
-                HintId.FirstHitAvoidHazards => "Avoid hazards to keep your carry.",
-                HintId.FailTimeoutMoveFaster => "Move faster between Source and Deposit.",
-                HintId.FailHighHitKeepDistance => "Keep distance from hazards while carrying.",
+                HintId.StageStartMoveAndCollect => "먼지가 나오는 곳으로 이동해 청소하세요.",
+                HintId.CarryFullGoToDeposit => "먼지통이 가득 찼습니다. 쓰레기통으로 돌아가세요.",
+                HintId.CollectFromSources => "먼지가 나오는 곳으로 이동해 청소하세요.",
+                HintId.DepositRemainingTrash => "남은 먼지를 쓰레기통에 비우세요.",
+                HintId.FirstHitAvoidHazards => "먼지를 지키려면 위험탄을 피하세요.",
+                HintId.FailTimeoutMoveFaster => "청소 구역과 쓰레기통 사이를 더 빠르게 이동하세요.",
+                HintId.FailHighHitKeepDistance => "먼지를 옮길 때는 위험탄과 거리를 두세요.",
                 _ => string.Empty,
             };
         }

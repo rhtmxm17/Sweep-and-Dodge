@@ -138,7 +138,7 @@ namespace SweepNDodge.DotsBullets
                 new Color(0.09f, 0.19f, 0.29f, 0.12f));
             NotificationPresenter.NotificationRoot = root.gameObject;
             NotificationPresenter.NotificationBackgroundImage = root.GetComponent<Image>();
-            NotificationPresenter.NotificationText ??= CreateCenteredOverlayText(root, "NotificationText", "Time critical", 20f);
+            NotificationPresenter.NotificationText ??= CreateCenteredOverlayText(root, "NotificationText", "시간이 촉박합니다", 20f);
             NotificationPresenter.NotificationRoot.SetActive(false);
         }
 
@@ -156,7 +156,7 @@ namespace SweepNDodge.DotsBullets
                 new Vector2(560f, 48f),
                 new Color(0.10f, 0.15f, 0.21f, 0.10f));
             HintPresenter.HintRoot = root.gameObject;
-            HintPresenter.HintText ??= CreateCenteredOverlayText(root, "HintText", "Carry is full. Head to Deposit.", 18f);
+            HintPresenter.HintText ??= CreateCenteredOverlayText(root, "HintText", "먼지통이 가득 찼습니다. 쓰레기통으로 돌아가세요.", 18f);
             HintPresenter.HintRoot.SetActive(false);
         }
 

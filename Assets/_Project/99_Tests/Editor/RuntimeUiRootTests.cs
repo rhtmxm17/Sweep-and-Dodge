@@ -544,7 +544,7 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(context.Root.StageHudPresenter.TimerValueText.text, Is.EqualTo("70.0s"));
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.False);
             Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.True);
-            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Collect trash from active sources."));
+            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("먼지가 나오는 곳으로 이동해 청소하세요."));
 
             SetPrivateField(context.Shell, "_currentScreen", DemoShellScreenId.Title);
             InvokeApplyShellState(context.Root, force: true);
@@ -620,9 +620,9 @@ namespace SweepNDodge.DotsBullets.Tests
             Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(2));
             AssertHazardSegmentOrder(context.Root.StageHudPresenter, activeCount: 3);
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("피격! 모은 먼지를 잃었습니다"));
             Assert.That(context.Root.HintPresenter.HintRoot.activeSelf, Is.True);
-            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Carry is full. Head to Deposit."));
+            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("먼지통이 가득 찼습니다. 쓰레기통으로 돌아가세요."));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -653,7 +653,7 @@ namespace SweepNDodge.DotsBullets.Tests
             context.NotificationBridge.RefreshPresentationState();
             context.Root.StageHudPresenter.RefreshPresentation();
             context.Root.NotificationPresenter.RefreshPresentation();
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Time critical"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("시간이 촉박합니다"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -684,7 +684,7 @@ namespace SweepNDodge.DotsBullets.Tests
             context.NotificationBridge.RefreshPresentationState();
             context.Root.StageHudPresenter.RefreshPresentation();
             context.Root.NotificationPresenter.RefreshPresentation();
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Carry full - deposit now"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("먼지통이 가득 찼습니다"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -723,7 +723,7 @@ namespace SweepNDodge.DotsBullets.Tests
             });
             context.NotificationBridge.RefreshPresentationState();
             context.Root.NotificationPresenter.RefreshPresentation();
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("피격! 모은 먼지를 잃었습니다"));
 
             SetPrivateField(context.Hud, "_lastFeedbackSnapshot", new PlayerUiFeedbackPresentationSnapshotComponent
             {
@@ -735,7 +735,7 @@ namespace SweepNDodge.DotsBullets.Tests
             SetPrivateField(context.Hud, "_feedbackLine", "Vacuum: CarryBin Full");
             context.NotificationBridge.RefreshPresentationState();
             context.Root.NotificationPresenter.RefreshPresentation();
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hit! Carry lost"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("피격! 모은 먼지를 잃었습니다"));
 
             SetPrivateField(context.Hud, "_lastSnapshot", new PlayerHudSnapshotComponent
             {
@@ -762,7 +762,7 @@ namespace SweepNDodge.DotsBullets.Tests
             context.Root.StageHudPresenter.RefreshPresentation();
             context.Root.NotificationPresenter.RefreshPresentation();
             Assert.That(context.Root.NotificationPresenter.NotificationRoot.activeSelf, Is.True);
-            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("Hazard captured"));
+            Assert.That(context.Root.NotificationPresenter.NotificationText.text, Is.EqualTo("위험탄 수거"));
             Assert.That(CountHighlightedHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(5));
             Assert.That(CountInactiveHazardSegments(context.Root.StageHudPresenter), Is.EqualTo(0));
             AssertHazardSegmentOrder(context.Root.StageHudPresenter, activeCount: 5);
@@ -781,7 +781,7 @@ namespace SweepNDodge.DotsBullets.Tests
             context.HintBridge.RefreshState(5f);
             context.HintBridge.RefreshPresentationState();
             context.Root.HintPresenter.RefreshPresentation();
-            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("Collect trash from active sources."));
+            Assert.That(context.Root.HintPresenter.HintText.text, Is.EqualTo("먼지가 나오는 곳으로 이동해 청소하세요."));
         }
 
         [Test]

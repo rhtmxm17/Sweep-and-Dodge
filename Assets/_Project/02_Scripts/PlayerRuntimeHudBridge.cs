@@ -254,21 +254,21 @@ namespace SweepNDodge.DotsBullets
         {
             return snapshot.Type switch
             {
-                PlayerUiFeedbackEventType.PlayerHazardHit => $"Hit -{Mathf.Max(0, snapshot.Value)}",
-                PlayerUiFeedbackEventType.HazardCaptured => "Hazard Captured",
-                PlayerUiFeedbackEventType.HazardRemoved => "Hazard Removed (Carry Full)",
+                PlayerUiFeedbackEventType.PlayerHazardHit => $"피격 -{Mathf.Max(0, snapshot.Value)}",
+                PlayerUiFeedbackEventType.HazardCaptured => "위험탄 수거",
+                PlayerUiFeedbackEventType.HazardRemoved => "위험탄 제거 (먼지통 가득 참)",
                 PlayerUiFeedbackEventType.SourceStateChanged => snapshot.Reason switch
                 {
-                    (byte)PlayerUiFeedbackReasonId.SourceToWeakened => "Source State: Weakened",
-                    (byte)PlayerUiFeedbackReasonId.SourceToDepleted => "Source State: Depleted",
-                    _ => "Source State Changed",
+                    (byte)PlayerUiFeedbackReasonId.SourceToWeakened => "먼지 발생량 감소",
+                    (byte)PlayerUiFeedbackReasonId.SourceToDepleted => "구역 청소 완료",
+                    _ => "청소 구역 상태 변경",
                 },
                 PlayerUiFeedbackEventType.VacuumStartBlocked => snapshot.Reason switch
                 {
-                    (byte)PlayerUiFeedbackReasonId.CarryBinFull => "Vacuum: CarryBin Full",
-                    (byte)PlayerUiFeedbackReasonId.VacuumLocked => "Vacuum: Locked",
-                    (byte)PlayerUiFeedbackReasonId.CooldownActive => "Vacuum: Cooldown",
-                    _ => "Vacuum Start Blocked",
+                    (byte)PlayerUiFeedbackReasonId.CarryBinFull => "흡입 불가: 먼지통 가득 참",
+                    (byte)PlayerUiFeedbackReasonId.VacuumLocked => "흡입 불가: 잠금 상태",
+                    (byte)PlayerUiFeedbackReasonId.CooldownActive => "흡입기 재사용 대기 중",
+                    _ => "지금은 흡입할 수 없습니다",
                 },
                 _ => string.Empty,
             };
