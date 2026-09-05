@@ -63,8 +63,8 @@ MonoBehaviour:
       Profile: {fileID: 11400000, guid: d8abe18060ee324489a04a2042350777, type: 2}
       EventRepeatCount: 12
       EventShotSchedule: 1
-      EventShotIntervalSec: 0.45
-      CooldownSec: 5.4
+      EventShotIntervalSec: 0.65
+      CooldownSec: 7.8
     BaseWeight: 1
     AvailabilityFlags: 0
     LocalOffset: {x: 0, y: 0, z: 0}
